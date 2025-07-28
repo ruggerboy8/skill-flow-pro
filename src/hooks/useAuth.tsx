@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  needsPasswordSetup: boolean;
   signInWithOtp: (email: string) => Promise<{ error: any }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error: any }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error: any }>;
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener
@@ -26,6 +28,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // For now, disable password setup requirement
+        // We'll implement this properly once the basic flow works
+        setNeedsPasswordSetup(false);
+        
         setLoading(false);
       }
     );
@@ -34,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setNeedsPasswordSetup(false);
       setLoading(false);
     });
 
@@ -95,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       loading,
+      needsPasswordSetup,
       signInWithOtp,
       signInWithPassword,
       signUpWithPassword,

@@ -189,8 +189,9 @@ export default function AdminBuilder() {
         role_id: selectedRole,
         action_id: item.action_id,
         display_order: item.display_order,
+        // Legacy fields required by current types (will be removed in next migration)
         iso_year: new Date().getFullYear(),
-        iso_week: 1 // placeholder
+        iso_week: 1
       }));
 
       const { error } = await supabase

@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import Setup from "./pages/Setup";
+import SetupPassword from "./pages/SetupPassword";
 import Index from "./pages/Index";
 import Week from "./pages/Week";
 import Confidence from "./pages/Confidence";
@@ -19,7 +20,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { user, loading, needsPasswordSetup } = useAuth();
 
   if (loading) {
     return (
@@ -33,11 +34,17 @@ function AppRoutes() {
     return <Login />;
   }
 
+  // If user needs to set up a password, show password setup page
+  if (needsPasswordSetup) {
+    return <SetupPassword />;
+  }
+
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="setup" element={<Setup />} />
+        <Route path="setup-password" element={<SetupPassword />} />
         <Route path="stats" element={<Stats />} />
         <Route path="profile" element={<Profile />} />
         <Route path="week" element={<Week />} />

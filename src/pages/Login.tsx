@@ -44,14 +44,14 @@ export default function Login() {
 
     setLoading(true);
     
-    // Try to send magic link - if user exists, Supabase will send a magic link
-    // If user doesn't exist, it will create them and send confirmation
+    // Use signUp instead of signInWithOtp for new users
+    // This will create an account and send a confirmation email
     const { error } = await signInWithOtp(email);
     
     if (error) {
-      // If there's an error, it might be because the user already exists
-      // Show reset password option
-      if (error.message?.includes('already registered') || error.message?.includes('user already exists')) {
+      // Check if the error suggests the user already exists
+      if (error.message?.toLowerCase().includes('already') || 
+          error.message?.toLowerCase().includes('exist')) {
         setShowResetOption(true);
         toast({
           title: "User already exists",
@@ -68,7 +68,7 @@ export default function Login() {
     } else {
       toast({
         title: "Check your email",
-        description: "We've sent you a magic link to sign in or complete your registration"
+        description: "We've sent you a magic link to complete your registration or sign in"
       });
       setShowResetOption(false);
     }

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface Staff {
   id: string;
@@ -16,6 +17,7 @@ interface WeeklyFocus {
   id: string;
   display_order: number;
   action_statement: string;
+  domain_name: string;
 }
 
 export default function WeekInfo() {
@@ -55,14 +57,12 @@ export default function WeekInfo() {
 
     setStaff(staffData);
 
-    // Load weekly focus using the view
-    const { data: focusData, error: focusError } = await supabase
-      .from('v_weekly_focus')
-      .select('id, display_order, action_statement')
-      .eq('cycle', cycleNum)
-      .eq('week_in_cycle', weekNum)
-      .eq('role_id', staffData.role_id)
-      .order('display_order');
+    // Load weekly focus using RPC to get domain information
+    const { data: focusData, error: focusError } = await supabase.rpc('get_weekly_focus_with_domains', {
+      p_cycle: cycleNum,
+      p_week: weekNum,
+      p_role_id: staffData.role_id
+    });
 
     if (focusError || !focusData || focusData.length === 0) {
       toast({
@@ -123,17 +123,24 @@ export default function WeekInfo() {
           <CardHeader>
             <CardTitle className="text-center">Consider the following Pro Moves</CardTitle>
             <CardDescription className="text-center">
-              Cycle {cycleNum}, Week {weekNum}
+              <h2 className="text-lg font-semibold">Cycle {cycleNum} · Week {weekNum}</h2>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
               {weeklyFocus.map((focus, index) => (
-                <div key={focus.id} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                  <Badge variant="outline" className="text-xs shrink-0">
-                    {index + 1}
+                <div 
+                  key={focus.id} 
+                  className="rounded-lg p-4 border"
+                  style={{ backgroundColor: getDomainColor(focus.domain_name) }}
+                >
+                  <Badge 
+                    variant="secondary" 
+                    className="text-xs font-semibold mb-2 bg-white/80 text-gray-900"
+                  >
+                    {focus.domain_name}
                   </Badge>
-                  <p className="text-sm">{focus.action_statement}</p>
+                  <p className="text-sm font-medium text-gray-900">{focus.action_statement}</p>
                 </div>
               ))}
             </div>

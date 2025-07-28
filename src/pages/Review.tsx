@@ -52,20 +52,15 @@ export default function Review() {
 
     setStaff(staffData);
 
-    // Load review data
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from('v_weekly_focus')
-      .select(`
-        action_statement,
-        weekly_scores!inner(confidence_score, performance_score)
-      `)
-      .eq('cycle', parseInt(cycle))
-      .eq('week_in_cycle', parseInt(week))
-      .eq('role_id', staffData.role_id)
-      .eq('weekly_scores.staff_id', staffData.id)
-      .order('display_order');
+    // Load review data with domain information
+    const { data, error } = await supabase.rpc('get_weekly_review', {
+      p_cycle: parseInt(cycle),
+      p_week: parseInt(week),
+      p_role_id: staffData.role_id,
+      p_staff_id: staffData.id
+    });
 
-    if (fallbackError) {
+    if (error) {
       toast({
         title: "Error",
         description: "Failed to load review data",
@@ -75,15 +70,7 @@ export default function Review() {
       return;
     }
 
-    // Transform data - we'll set domain as "Unknown" for now (will enhance later)
-    const transformedData = fallbackData?.map(item => ({
-      domain_name: "Unknown",
-      action_statement: item.action_statement,
-      confidence_score: item.weekly_scores[0]?.confidence_score || 0,
-      performance_score: item.weekly_scores[0]?.performance_score || 0
-    })) || [];
-
-    setReviewData(transformedData);
+    setReviewData(data || []);
 
     setLoading(false);
   };

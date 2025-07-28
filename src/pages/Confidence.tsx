@@ -34,7 +34,7 @@ export default function Confidence() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const [weekNum, yearNum] = week?.split('-').map(Number) || [0, 0];
+  const weekNum = Number(week); // week param is now just "1", "2", etc.
 
   useEffect(() => {
     if (user) {
@@ -63,12 +63,24 @@ export default function Confidence() {
     console.log('Staff data loaded:', staffData);
     setStaff(staffData);
 
-    // Use the working RPC function to get weekly focus with domains
-    const { data: focusData, error: focusError } = await supabase.rpc('get_weekly_focus_with_domains', {
-      p_cycle: 1, // For now use cycle 1
-      p_week: weekNum, // Use the week number from the URL
-      p_role_id: staffData.role_id
-    }) as { data: any[] | null; error: any };
+    // Load weekly focus using direct query with cycle/week_in_cycle
+    const { data: focusData, error: focusError } = await supabase
+      .from('weekly_focus')
+      .select(`
+        id,
+        display_order,
+        self_select,
+        pro_moves (
+          action_statement
+        ),
+        competencies (
+          domains ( domain_name )
+        )
+      `)
+      .eq('cycle', 1) // Use cycle 1 for now
+      .eq('week_in_cycle', weekNum)
+      .eq('role_id', staffData.role_id)
+      .order('display_order');
 
     if (focusError) {
       console.error('Focus error:', focusError);
@@ -82,7 +94,7 @@ export default function Confidence() {
     }
 
     if (!focusData || focusData.length === 0) {
-      console.log('No focus data found for:', { weekNum, yearNum, roleId: staffData.role_id });
+      console.log('No focus data found for:', { weekNum, cycle: 1, roleId: staffData.role_id });
       toast({
         title: "Error",
         description: "No Pro Moves found for this week",
@@ -93,17 +105,7 @@ export default function Confidence() {
     }
 
     console.log('Focus data found:', focusData);
-
-    // Transform the data to match the expected interface
-    const transformedData = focusData.map(focus => ({
-      ...focus,
-      pro_moves: {
-        action_statement: focus.action_statement
-      }
-    }));
-
-    console.log('Transformed data:', transformedData);
-    setWeeklyFocus(transformedData);
+    setWeeklyFocus(focusData);
     setLoading(false);
   };
 
@@ -180,7 +182,7 @@ export default function Confidence() {
               Rate how confident you are you'll do each action 100% this week
             </CardDescription>
             <Badge variant="outline" className="mx-auto">
-              Week {weekNum}, {yearNum}
+              Cycle 1 · Week {weekNum}
             </Badge>
           </CardHeader>
         </Card>
@@ -193,7 +195,7 @@ export default function Confidence() {
                   {index + 1}
                 </Badge>
                 <CardTitle className="text-sm font-medium leading-relaxed">
-                  {focus.pro_moves?.action_statement || focus.action_statement || 'No action statement'}
+                  {focus.pro_moves?.action_statement || 'Self-Select'}
                 </CardTitle>
               </div>
             </CardHeader>

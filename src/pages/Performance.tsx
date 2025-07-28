@@ -17,7 +17,8 @@ interface Staff {
 interface WeeklyFocus {
   id: string;
   display_order: number;
-  pro_moves: {
+  self_select?: boolean;
+  pro_moves?: {
     action_statement: string;
   };
 }
@@ -40,7 +41,7 @@ export default function Performance() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const [weekNum, yearNum] = week?.split('-').map(Number) || [0, 0];
+  const weekNum = Number(week); // week param is now just "1", "2", etc.
 
   useEffect(() => {
     if (user) {
@@ -65,16 +66,22 @@ export default function Performance() {
 
     setStaff(staffData);
 
-    // Load weekly focus
+    // Load weekly focus using direct query with cycle/week_in_cycle
     const { data: focusData, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
         id,
         display_order,
-        pro_moves(action_statement)
+        self_select,
+        pro_moves (
+          action_statement
+        ),
+        competencies (
+          domains ( domain_name )
+        )
       `)
-      .eq('iso_week', weekNum)
-      .eq('iso_year', yearNum)
+      .eq('cycle', 1) // Use cycle 1 for now
+      .eq('week_in_cycle', weekNum)
       .eq('role_id', staffData.role_id)
       .order('display_order');
 
@@ -188,7 +195,7 @@ export default function Performance() {
               Rate how often you actually performed each action this week
             </CardDescription>
             <Badge variant="outline" className="mx-auto">
-              Week {weekNum}, {yearNum}
+              Cycle 1 · Week {weekNum}
             </Badge>
           </CardHeader>
         </Card>
@@ -202,7 +209,7 @@ export default function Performance() {
                 </Badge>
                 <div className="flex-1">
                   <CardTitle className="text-sm font-medium leading-relaxed mb-2">
-                    {focus.pro_moves.action_statement}
+                    {focus.pro_moves?.action_statement || 'Self-Select'}
                   </CardTitle>
                   <Badge variant="secondary" className="text-xs">
                     Monday Confidence: {getConfidenceScore(focus.id)}

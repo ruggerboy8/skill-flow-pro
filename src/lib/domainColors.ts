@@ -1,7 +1,7 @@
 export const domainColors: Record<string, string> = {
   Clinical: '#c9daf8',
   Clerical: '#d9ead3',
-  Cultural: '#f3cccd',
+  Cultural: '#e9a1a4',
   'Case Acceptance': '#fbe5cf'
 };
 

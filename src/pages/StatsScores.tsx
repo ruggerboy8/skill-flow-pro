@@ -185,7 +185,7 @@ export default function StatsScores() {
             className="border rounded-lg"
           >
             <AccordionTrigger 
-              className={`px-4 ${!cycle.hasAnyConfidence ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`px-4 sticky top-0 bg-white z-10 ${!cycle.hasAnyConfidence ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={!cycle.hasAnyConfidence}
             >
               <div className="flex items-center gap-3">
@@ -229,6 +229,7 @@ interface WeekAccordionProps {
 
 function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccordionProps) {
   const [hasConfidence, setHasConfidence] = useState<boolean | null>(null);
+  const [hasPerformance, setHasPerformance] = useState<boolean | null>(null);
 
   useEffect(() => {
     checkConfidence();
@@ -239,13 +240,14 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
 
     const { data } = await supabase
       .from('weekly_scores')
-      .select('confidence_score, weekly_focus!inner(cycle, week_in_cycle)')
+      .select('confidence_score, performance_score, weekly_focus!inner(cycle, week_in_cycle)')
       .eq('staff_id', staffData.id)
       .eq('weekly_focus.cycle', cycle)
-      .eq('weekly_focus.week_in_cycle', week)
-      .not('confidence_score', 'is', null);
+      .eq('weekly_focus.week_in_cycle', week);
 
-    setHasConfidence((data?.length || 0) > 0);
+    const scores = data?.[0];
+    setHasConfidence(scores?.confidence_score !== null);
+    setHasPerformance(scores?.performance_score !== null);
   };
 
   const handleExpand = () => {
@@ -258,6 +260,15 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
     return <div className="h-12 bg-gray-100 animate-pulse rounded" />;
   }
 
+  const getStatusBadge = () => {
+    if (hasPerformance) {
+      return <Badge className="bg-green-500 text-white text-xs">Perf ✓</Badge>;
+    } else if (hasConfidence) {
+      return <Badge className="bg-yellow-500 text-white text-xs">Conf ✓</Badge>;
+    }
+    return null;
+  };
+
   return (
     <AccordionItem value={`week-${cycle}-${week}`} className="border rounded">
       <AccordionTrigger 
@@ -265,11 +276,14 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
         disabled={!hasConfidence}
         onClick={handleExpand}
       >
-        <div className="flex items-center gap-3">
-          <span className="font-medium">Week {week}</span>
-          {!hasConfidence && (
-            <span className="text-xs text-muted-foreground">Submit confidence to unlock week</span>
-          )}
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-3">
+            <span className="font-medium">Week {week}</span>
+            {!hasConfidence && (
+              <span className="text-xs text-muted-foreground">Submit confidence to unlock week</span>
+            )}
+          </div>
+          {getStatusBadge()}
         </div>
       </AccordionTrigger>
       
@@ -290,12 +304,18 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
                 <span className="flex-1 text-sm text-slate-800">
                   {item.action_statement}
                 </span>
-                <Badge className="bg-emerald-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold">
-                  {item.confidence_score || 'N/A'}
-                </Badge>
-                <Badge className="bg-indigo-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold">
-                  {item.performance_score || '—'}
-                </Badge>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-xs text-muted-foreground">conf</span>
+                  <Badge className="bg-emerald-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold">
+                    {item.confidence_score || 'N/A'}
+                  </Badge>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-xs text-muted-foreground">perf</span>
+                  <Badge className="bg-indigo-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold">
+                    {item.performance_score || '—'}
+                  </Badge>
+                </div>
               </div>
             ))}
           </div>

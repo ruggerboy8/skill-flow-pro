@@ -257,7 +257,7 @@ export default function Index() {
         <div className="space-y-8">
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-center">
-              Cycle 1 - Your Personal Journey
+              Cycle 1
             </h2>
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

@@ -181,12 +181,9 @@ export default function ConfidenceWizard() {
       <div className="max-w-md mx-auto space-y-4">
         <Card style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-center">
               <Badge variant="outline" className="bg-white/80 text-gray-900">
                 {currentIndex + 1} / {weeklyFocus.length}
-              </Badge>
-              <Badge variant="secondary" className="bg-white/80 text-gray-900">
-                Cycle {currentFocus.cycle}, Week {currentFocus.week_in_cycle}
               </Badge>
             </div>
             <CardTitle className="text-center text-gray-900">Rate Your Confidence</CardTitle>

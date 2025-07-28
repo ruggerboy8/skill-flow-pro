@@ -272,7 +272,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "weekly_focus_role_id_fkey"
+            foreignKeyName: "staff_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"

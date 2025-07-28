@@ -1,34 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Plus } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
+
+import { StepBar } from '@/components/admin/StepBar';
+import { CycleWeekGrid } from '@/components/admin/CycleWeekGrid';
+import { CompetencyGrid } from '@/components/admin/CompetencyGrid';
+import { ProMovePanel } from '@/components/admin/ProMovePanel';
+import { SlotPreview, type SlotItem } from '@/components/admin/SlotPreview';
 
 interface Role {
   role_id: number;
   role_name: string;
 }
 
-interface Competency {
-  competency_id: number;
-  name: string;
-}
-
 interface ProMove {
   action_id: number;
   action_statement: string;
-}
-
-interface WeekListItem {
-  action_id: number;
-  action_statement: string;
-  display_order: number;
+  domain_name: string;
 }
 
 const ADMIN_EMAILS = ['johno@reallygoodconsulting.org'];
@@ -42,56 +35,37 @@ export default function AdminBuilder() {
     return <Navigate to="/" replace />;
   }
 
-  const [cycles, setCycles] = useState<number[]>([]);
+  // State management
+  const [currentStep, setCurrentStep] = useState(0);
   const [selectedCycle, setSelectedCycle] = useState<number | null>(null);
-  const [newCycle, setNewCycle] = useState('');
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<number | null>(null);
-  const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [selectedCompetency, setSelectedCompetency] = useState<number | null>(null);
-  const [proMoves, setProMoves] = useState<ProMove[]>([]);
-  const [selectedProMove, setSelectedProMove] = useState<number | null>(null);
-  const [weekList, setWeekList] = useState<WeekListItem[]>([]);
+  const [slots, setSlots] = useState<SlotItem[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const steps = ['Cycle', 'Week', 'Role', 'Competency', 'Pro Move'];
 
   // Load initial data
   useEffect(() => {
-    loadCycles();
     loadRoles();
   }, []);
 
-  // Load competencies when role changes
-  useEffect(() => {
-    if (selectedRole) {
-      loadCompetencies(selectedRole);
-    } else {
-      setCompetencies([]);
-      setSelectedCompetency(null);
-    }
-  }, [selectedRole]);
-
-  // Load pro moves when competency changes
+  // Update current step based on selections
   useEffect(() => {
     if (selectedCompetency) {
-      loadProMoves(selectedCompetency);
+      setCurrentStep(4);
+    } else if (selectedRole) {
+      setCurrentStep(3);
+    } else if (selectedWeek) {
+      setCurrentStep(2);
+    } else if (selectedCycle) {
+      setCurrentStep(1);
     } else {
-      setProMoves([]);
-      setSelectedProMove(null);
+      setCurrentStep(0);
     }
-  }, [selectedCompetency]);
-
-  const loadCycles = async () => {
-    const { data } = await supabase
-      .from('weekly_focus')
-      .select('cycle')
-      .not('cycle', 'is', null);
-    
-    if (data) {
-      const uniqueCycles = [...new Set(data.map(d => d.cycle))].sort();
-      setCycles(uniqueCycles);
-    }
-  };
+  }, [selectedCycle, selectedWeek, selectedRole, selectedCompetency]);
 
   const loadRoles = async () => {
     const { data } = await supabase
@@ -102,71 +76,71 @@ export default function AdminBuilder() {
     if (data) setRoles(data);
   };
 
-  const loadCompetencies = async (roleId: number) => {
-    const { data } = await supabase
-      .from('competencies')
-      .select('competency_id, name')
-      .eq('role_id', roleId)
-      .order('name');
-    
-    if (data) setCompetencies(data);
+  const handleWeekSelect = (cycle: number, week: number) => {
+    setSelectedCycle(cycle);
+    setSelectedWeek(week);
+    // Reset downstream selections
+    setSelectedCompetency(null);
+    setSlots([]);
   };
 
-  const loadProMoves = async (competencyId: number) => {
-    const { data } = await supabase
-      .from('pro_moves')
-      .select('action_id, action_statement')
-      .eq('competency_id', competencyId)
-      .eq('status', 'Active')
-      .order('action_statement');
-    
-    if (data) setProMoves(data);
+  const handleRoleSelect = (roleId: string) => {
+    setSelectedRole(parseInt(roleId));
+    // Reset downstream selections
+    setSelectedCompetency(null);
+    setSlots([]);
   };
 
-  const handleNewCycle = () => {
-    const cycleNum = parseInt(newCycle);
-    if (cycleNum && !cycles.includes(cycleNum)) {
-      setCycles([...cycles, cycleNum].sort());
-      setSelectedCycle(cycleNum);
-      setNewCycle('');
-    }
+  const handleCompetencySelect = (competencyId: number) => {
+    setSelectedCompetency(competencyId);
+    setSlots([]);
   };
 
-  const addToWeekList = () => {
-    if (!selectedProMove) return;
-    
-    const proMove = proMoves.find(pm => pm.action_id === selectedProMove);
-    if (!proMove) return;
-
-    // Check for duplicates
-    if (weekList.some(item => item.action_id === selectedProMove)) {
+  const handleProMoveSelect = (proMove: ProMove | null, selfSelect: boolean) => {
+    if (slots.length >= 3) {
       toast({
-        title: "Duplicate Pro Move",
-        description: "This Pro Move is already in the week list.",
+        title: "Week Full",
+        description: "Maximum 3 pro moves per week.",
         variant: "destructive"
       });
       return;
     }
 
-    const newItem: WeekListItem = {
-      action_id: proMove.action_id,
-      action_statement: proMove.action_statement,
-      display_order: weekList.length + 1
+    // Check for duplicates (only for non-self-select)
+    if (proMove && slots.some(slot => slot.action_id === proMove.action_id)) {
+      toast({
+        title: "Duplicate Pro Move",
+        description: "This pro move is already added to the week.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newSlot: SlotItem = {
+      id: `slot-${Date.now()}-${Math.random()}`,
+      action_id: proMove?.action_id || null,
+      action_statement: proMove?.action_statement || 'Self-Select',
+      domain_name: proMove?.domain_name,
+      self_select: selfSelect,
+      display_order: slots.length + 1
     };
 
-    setWeekList([...weekList, newItem]);
-    setSelectedProMove(null);
+    setSlots([...slots, newSlot]);
   };
 
-  const removeFromWeekList = (actionId: number) => {
-    const updatedList = weekList
-      .filter(item => item.action_id !== actionId)
-      .map((item, index) => ({ ...item, display_order: index + 1 }));
-    setWeekList(updatedList);
+  const handleRemoveSlot = (id: string) => {
+    const updatedSlots = slots
+      .filter(slot => slot.id !== id)
+      .map((slot, index) => ({ ...slot, display_order: index + 1 }));
+    setSlots(updatedSlots);
+  };
+
+  const handleReorderSlots = (newOrder: SlotItem[]) => {
+    setSlots(newOrder);
   };
 
   const canSave = () => {
-    return selectedCycle && selectedWeek && selectedRole && weekList.length === 3;
+    return selectedCycle && selectedWeek && selectedRole && slots.length === 3;
   };
 
   const handleSave = async () => {
@@ -183,13 +157,14 @@ export default function AdminBuilder() {
         .eq('role_id', selectedRole);
 
       // Insert new rows
-      const insertData = weekList.map(item => ({
+      const insertData = slots.map(slot => ({
         cycle: selectedCycle,
         week_in_cycle: selectedWeek,
         role_id: selectedRole,
-        action_id: item.action_id,
-        display_order: item.display_order,
-        // Legacy fields required by current types (will be removed in next migration)
+        action_id: slot.action_id,
+        self_select: slot.self_select,
+        display_order: slot.display_order,
+        // Legacy fields required by current types
         iso_year: new Date().getFullYear(),
         iso_week: 1
       }));
@@ -206,10 +181,8 @@ export default function AdminBuilder() {
       });
 
       // Reset form
-      setWeekList([]);
-      setSelectedWeek(null);
+      setSlots([]);
       setSelectedCompetency(null);
-      setSelectedProMove(null);
 
     } catch (error) {
       toast({
@@ -222,173 +195,90 @@ export default function AdminBuilder() {
     }
   };
 
+  const selectedRoleName = roles.find(r => r.role_id === selectedRole)?.role_name;
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <h1 className="text-3xl font-bold">Admin Focus Builder</h1>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Selectors Panel */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Build Week Focus</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Cycle Selector */}
-            <div className="space-y-2">
-              <Label>Cycle</Label>
-              <div className="flex gap-2">
-                <Select value={selectedCycle?.toString()} onValueChange={(value) => setSelectedCycle(parseInt(value))}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select cycle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cycles.map(cycle => (
-                      <SelectItem key={cycle} value={cycle.toString()}>
-                        Cycle {cycle}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="New cycle"
-                  value={newCycle}
-                  onChange={(e) => setNewCycle(e.target.value)}
-                  className="w-24"
-                />
-                <Button onClick={handleNewCycle} size="sm">
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Week Selector */}
-            <div className="space-y-2">
-              <Label>Week</Label>
-              <div className="grid grid-cols-6 gap-2">
-                {[1, 2, 3, 4, 5, 6].map(week => (
-                  <Button
-                    key={week}
-                    variant={selectedWeek === week ? "default" : "outline"}
-                    onClick={() => setSelectedWeek(week)}
-                    className="h-10"
-                  >
-                    {week}
-                  </Button>
+      <StepBar currentStep={currentStep} steps={steps} />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Cycle/Week Grid + Role Selector */}
+        <div className="space-y-6">
+          <CycleWeekGrid
+            selectedRole={selectedRole}
+            onWeekSelect={handleWeekSelect}
+            selectedCycle={selectedCycle}
+            selectedWeek={selectedWeek}
+          />
+          
+          <div className="space-y-2">
+            <Label>Role</Label>
+            <Select value={selectedRole?.toString()} onValueChange={handleRoleSelect}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent className="bg-white z-50">
+                {roles.map(role => (
+                  <SelectItem key={role.role_id} value={role.role_id.toString()}>
+                    {role.role_name}
+                  </SelectItem>
                 ))}
-              </div>
-            </div>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-            {/* Role Selector */}
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <Select value={selectedRole?.toString()} onValueChange={(value) => setSelectedRole(parseInt(value))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map(role => (
-                    <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                      {role.role_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Middle Column: Competency Grid */}
+        <div>
+          <CompetencyGrid
+            selectedRole={selectedRole}
+            onCompetencySelect={handleCompetencySelect}
+            selectedCompetency={selectedCompetency}
+          />
+        </div>
 
-            {/* Competency Selector */}
-            <div className="space-y-2">
-              <Label>Competency</Label>
-              <Select 
-                value={selectedCompetency?.toString()} 
-                onValueChange={(value) => setSelectedCompetency(parseInt(value))}
-                disabled={!selectedRole}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select competency" />
-                </SelectTrigger>
-                <SelectContent>
-                  {competencies.map(comp => (
-                    <SelectItem key={comp.competency_id} value={comp.competency_id.toString()}>
-                      {comp.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Right Column: Pro Move Panel */}
+        <div>
+          <ProMovePanel
+            selectedCompetency={selectedCompetency}
+            onProMoveSelect={handleProMoveSelect}
+          />
+        </div>
+      </div>
 
-            {/* Pro Move Selector */}
-            <div className="space-y-2">
-              <Label>Pro Move</Label>
-              <Select 
-                value={selectedProMove?.toString()} 
-                onValueChange={(value) => setSelectedProMove(parseInt(value))}
-                disabled={!selectedCompetency}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select pro move" />
-                </SelectTrigger>
-                <SelectContent>
-                  {proMoves.map(move => (
-                    <SelectItem key={move.action_id} value={move.action_id.toString()}>
-                      {move.action_statement}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button 
-              onClick={addToWeekList} 
-              disabled={!selectedProMove || weekList.length >= 3}
-              className="w-full"
-            >
-              Add to Week List
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Week List Panel */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Week List ({weekList.length}/3)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {weekList.map((item, index) => (
-                <div key={item.action_id} className="flex items-center gap-3 p-3 border rounded">
-                  <span className="font-semibold text-sm">{index + 1}.</span>
-                  <span className="flex-1 text-sm">{item.action_statement}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeFromWeekList(item.action_id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-              {weekList.length === 0 && (
-                <p className="text-muted-foreground text-center py-8">
-                  No pro moves added yet. Select moves above to build the week focus.
-                </p>
-              )}
-            </div>
-
+      {/* Bottom Row: Slot Preview */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SlotPreview
+          slots={slots}
+          onRemoveSlot={handleRemoveSlot}
+          onReorderSlots={handleReorderSlots}
+          selectedCycle={selectedCycle}
+          selectedWeek={selectedWeek}
+          selectedRole={selectedRoleName}
+        />
+        
+        <div className="flex items-end">
+          <div className="w-full space-y-4">
             <Button 
               onClick={handleSave}
               disabled={!canSave() || loading}
-              className="w-full mt-4"
+              className="w-full h-12 text-lg font-semibold"
             >
-              {loading ? "Saving..." : "SAVE"}
+              {loading ? "Saving..." : "SAVE WEEK FOCUS"}
             </Button>
             
-            {weekList.length < 3 && (
-              <p className="text-sm text-muted-foreground mt-2 text-center">
-                Add exactly 3 pro moves to enable saving
+            {!canSave() && (
+              <p className="text-sm text-muted-foreground text-center">
+                {!selectedCycle || !selectedWeek ? "Select a week cell" :
+                 !selectedRole ? "Select a role" :
+                 slots.length < 3 ? `Add ${3 - slots.length} more pro moves` :
+                 "Ready to save"}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

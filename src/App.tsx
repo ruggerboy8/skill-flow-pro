@@ -22,7 +22,10 @@ import StatsScores from "./pages/StatsScores";
 import StatsGlance from "./pages/StatsGlance";
 import StatsEval from "./pages/StatsEval";
 import Profile from "./pages/Profile";
-import AdminBuilder from "./pages/AdminBuilder";
+import RoleList from "./pages/admin/RoleList";
+import CycleList from "./pages/admin/CycleList";
+import WeekList from "./pages/admin/WeekList";
+import WeekEditor from "./pages/admin/WeekEditor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -68,7 +71,10 @@ function AppRoutes() {
         <Route path="performance/:week" element={<Performance />} />
         <Route path="performance/:focusId/:index" element={<PerformanceWizard />} />
         <Route path="review/:cycle/:week" element={<Review />} />
-        <Route path="admin/builder" element={<AdminBuilder />} />
+        <Route path="builder" element={<RoleList />} />
+        <Route path="builder/:roleId" element={<CycleList />} />
+        <Route path="builder/:roleId/:cycle" element={<WeekList />} />
+        <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

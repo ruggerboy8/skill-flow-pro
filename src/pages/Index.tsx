@@ -198,7 +198,7 @@ export default function Index() {
     );
   }
 
-  const totalCycles = 4; // Adjust as needed
+  const totalCycles = 4; // Total number of cycles available
 
   return (
     <div className="min-h-screen bg-background p-4">

@@ -49,10 +49,13 @@ export default function SetupPassword() {
 
       toast({
         title: "Password set successfully",
-        description: "You can now sign in with your email and password"
+        description: "Your account is now complete! You can sign in with email and password."
       });
 
-      // Redirect to home or setup page
+      // Mark that password has been set to avoid future prompts
+      localStorage.setItem('password_set', 'true');
+
+      // Redirect to home page
       navigate('/');
     } catch (error: any) {
       toast({

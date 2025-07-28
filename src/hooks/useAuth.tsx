@@ -29,9 +29,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // For now, disable password setup requirement
-        // We'll implement this properly once the basic flow works
-        setNeedsPasswordSetup(false);
+        // Check if user needs password setup
+        if (session?.user && event === 'SIGNED_IN') {
+          // Check if this user came via magic link signup
+          const magicLinkEmail = localStorage.getItem('magic_link_signup');
+          if (magicLinkEmail === session.user.email) {
+            setNeedsPasswordSetup(true);
+            localStorage.removeItem('magic_link_signup');
+          } else {
+            setNeedsPasswordSetup(false);
+          }
+        } else {
+          setNeedsPasswordSetup(false);
+        }
         
         setLoading(false);
       }
@@ -41,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      // Don't check password setup for existing sessions - only on new sign-ins
       setNeedsPasswordSetup(false);
       setLoading(false);
     });
@@ -57,6 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailRedirectTo: redirectUrl
       }
     });
+    
+    // If successful, mark this as a potential magic link user
+    if (!error) {
+      localStorage.setItem('magic_link_signup', email);
+    }
     
     return { error };
   };

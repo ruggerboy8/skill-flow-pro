@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface WeeklyFocus {
   id: string;
-  cycle: number;
-  week_in_cycle: number;
-  role_id: number;
-  action_id: number;
+  display_order: number;
+  action_statement: string;
+  domain_name: string;
 }
 
 interface WeekStatus {
@@ -29,7 +30,7 @@ interface Staff {
 export default function Index() {
   const [staff, setStaff] = useState<Staff | null>(null);
   const [weekStatuses, setWeekStatuses] = useState<WeekStatus[]>([]);
-  const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
+  const [currentWeekFocus, setCurrentWeekFocus] = useState<WeeklyFocus[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -77,35 +78,19 @@ export default function Index() {
 
     setLoading(true);
     
-    // Load weekly focus for this staff's role for cycle 1
-    const { data: focusData, error: focusError } = await supabase
-      .from('weekly_focus')
-      .select('id, cycle, week_in_cycle, role_id, action_id')
-      .eq('role_id', staff.role_id)
-      .eq('cycle', 1)
-      .order('week_in_cycle');
-
-    if (focusError) {
-      toast({
-        title: "Error",
-        description: "Failed to load weekly focus",
-        variant: "destructive"
-      });
-      setLoading(false);
-      return;
-    }
-
-    setWeeklyFocus(focusData || []);
-
-    // Calculate week status based on completion
+    // Calculate week status based on completion for cycle 1
     const weekStatusMap = new Map<string, WeekStatus>();
     
-    // Get all unique weeks
-    const weeks = [...new Set(focusData?.map(f => f.week_in_cycle) || [])];
-    
-    for (const weekInCycle of weeks) {
-      const weekFocusItems = focusData?.filter(f => f.week_in_cycle === weekInCycle) || [];
-      const focusIds = weekFocusItems.map(f => f.id);
+    for (let weekInCycle = 1; weekInCycle <= 6; weekInCycle++) {
+      // Get weekly focus for this week
+      const { data: focusData } = await supabase
+        .from('weekly_focus')
+        .select('id')
+        .eq('role_id', staff.role_id)
+        .eq('cycle', 1)
+        .eq('week_in_cycle', weekInCycle);
+      
+      const focusIds = focusData?.map(f => f.id) || [];
       
       if (focusIds.length > 0) {
         const { data: scoresData } = await supabase
@@ -127,6 +112,19 @@ export default function Index() {
     }
     
     setWeekStatuses(Array.from(weekStatusMap.values()));
+
+    // Load current week's pro moves
+    const nextWeek = getNextIncompleteWeek();
+    if (nextWeek) {
+      const { data: currentFocusData } = await supabase.rpc('get_weekly_focus_with_domains', {
+        p_cycle: nextWeek.cycle,
+        p_week: nextWeek.week,
+        p_role_id: staff.role_id
+      }) as { data: WeeklyFocus[] | null; error: any };
+      
+      setCurrentWeekFocus(currentFocusData || []);
+    }
+    
     setLoading(false);
   };
 
@@ -222,14 +220,36 @@ export default function Index() {
           </Button>
         </div>
 
-        {nextWeek && (
+        {nextWeek && currentWeekFocus.length > 0 && (
           <div className="mb-8 p-6 bg-primary/10 rounded-lg border border-primary/20">
-            <h2 className="text-xl font-semibold mb-2">Continue Your Journey</h2>
+            <h2 className="text-xl font-semibold mb-4">This Week's Pro Moves</h2>
             <p className="text-muted-foreground mb-4">
-              You're currently on Cycle {nextWeek.cycle}, Week {nextWeek.week}
+              Cycle {nextWeek.cycle}, Week {nextWeek.week}
             </p>
+            <div className="space-y-3 mb-4">
+              {currentWeekFocus.map((focus, index) => (
+                <div 
+                  key={focus.id} 
+                  className="flex items-start gap-3 p-3 bg-background rounded-lg border"
+                >
+                  <Badge variant="outline" className="text-xs">
+                    {index + 1}
+                  </Badge>
+                  <div className="flex-1">
+                    <Badge 
+                      variant="secondary" 
+                      className="text-xs mb-2"
+                      style={{ backgroundColor: getDomainColor(focus.domain_name) }}
+                    >
+                      {focus.domain_name}
+                    </Badge>
+                    <p className="text-sm">{focus.action_statement}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
             <Button onClick={() => handleWeekClick(nextWeek.cycle, nextWeek.week)} size="lg">
-              Continue Week {nextWeek.week}
+              Start Week {nextWeek.week}
             </Button>
           </div>
         )}

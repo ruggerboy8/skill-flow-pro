@@ -17,6 +17,10 @@ import Performance from "./pages/Performance";
 import PerformanceWizard from "./pages/PerformanceWizard";
 import Review from "./pages/Review";
 import Stats from "./pages/Stats";
+import StatsLayout from "./pages/StatsLayout";
+import StatsScores from "./pages/StatsScores";
+import StatsGlance from "./pages/StatsGlance";
+import StatsEval from "./pages/StatsEval";
 import Profile from "./pages/Profile";
 import AdminBuilder from "./pages/AdminBuilder";
 import NotFound from "./pages/NotFound";
@@ -50,7 +54,12 @@ function AppRoutes() {
         <Route path="setup" element={<Setup />} />
         <Route path="create-password" element={<SetupPassword />} />
         <Route path="setup-password" element={<SetupPassword />} />
-        <Route path="stats" element={<Stats />} />
+        <Route path="stats" element={<StatsLayout />}>
+          <Route index element={<StatsScores />} />
+          <Route path="scores" element={<StatsScores />} />
+          <Route path="glance" element={<StatsGlance />} />
+          <Route path="eval" element={<StatsEval />} />
+        </Route>
         <Route path="profile" element={<Profile />} />
         <Route path="week" element={<Week />} />
         <Route path="week-info/:cycle/:week" element={<WeekInfo />} />

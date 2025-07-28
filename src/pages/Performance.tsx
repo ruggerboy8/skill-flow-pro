@@ -205,7 +205,7 @@ export default function Performance() {
                     {focus.pro_moves.action_statement}
                   </CardTitle>
                   <Badge variant="secondary" className="text-xs">
-                    Monday Confidence: {getConfidenceScore(focus.id)}/4
+                    Monday Confidence: {getConfidenceScore(focus.id)}
                   </Badge>
                 </div>
               </div>

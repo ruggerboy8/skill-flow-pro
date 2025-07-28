@@ -119,10 +119,10 @@ export default function Review() {
                     {item.action_statement}
                   </div>
                   <div className="text-center font-semibold text-gray-900">
-                    {item.confidence_score}/4
+                    {item.confidence_score}
                   </div>
                   <div className="text-center font-semibold text-gray-900">
-                    {item.performance_score}/4
+                    {item.performance_score}
                   </div>
                 </div>
               ))}

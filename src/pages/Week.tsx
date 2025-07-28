@@ -208,12 +208,12 @@ export default function Week() {
                     <div className="flex gap-2 mt-2">
                       {score?.confidence_score && (
                         <Badge variant="secondary" className="text-xs">
-                          Confidence: {score.confidence_score}/4
+                          Confidence: {score.confidence_score}
                         </Badge>
                       )}
                       {score?.performance_score && (
                         <Badge variant="secondary" className="text-xs">
-                          Performance: {score.performance_score}/4
+                          Performance: {score.performance_score}
                         </Badge>
                       )}
                     </div>

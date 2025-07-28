@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
@@ -75,6 +75,7 @@ function AppRoutes() {
         <Route path="builder/:roleId" element={<CycleList />} />
         <Route path="builder/:roleId/:cycle" element={<WeekList />} />
         <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />
+        <Route path="admin/builder" element={<Navigate to="/builder" replace />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

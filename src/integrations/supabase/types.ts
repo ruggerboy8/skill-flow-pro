@@ -236,6 +236,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "weekly_scores_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "v_staff_week_status"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_weekly_focus_id_fkey"
+            columns: ["weekly_focus_id"]
+            isOneToOne: false
+            referencedRelation: "v_staff_week_status"
+            referencedColumns: ["weekly_focus_id"]
+          },
+          {
             foreignKeyName: "weekly_scores_weekly_focus_id_fkey"
             columns: ["weekly_focus_id"]
             isOneToOne: false
@@ -246,7 +260,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_staff_week_status: {
+        Row: {
+          confidence_score: number | null
+          iso_week: number | null
+          iso_year: number | null
+          performance_score: number | null
+          role_id: number | null
+          staff_id: string | null
+          weekly_focus_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_focus_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+        ]
+      }
     }
     Functions: {
       [_ in never]: never

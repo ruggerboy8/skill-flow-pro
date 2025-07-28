@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Week from "./pages/Week";
 import Confidence from "./pages/Confidence";
 import Performance from "./pages/Performance";
+import AdminBuilder from "./pages/AdminBuilder";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ function AppRoutes() {
       <Route path="/week" element={<Week />} />
       <Route path="/confidence/:week" element={<Confidence />} />
       <Route path="/performance/:week" element={<Performance />} />
+      <Route path="/admin/builder" element={<AdminBuilder />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

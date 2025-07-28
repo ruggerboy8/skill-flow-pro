@@ -8,18 +8,19 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface WeeklyFocus {
   id: string;
-  iso_week: number;
-  iso_year: number;
+  cycle: number;
+  week_in_cycle: number;
   role_id: number;
   action_id: number;
+  action_statement: string;
 }
 
 interface WeekStatus {
   weekly_focus_id: string;
   confidence_score: number | null;
   performance_score: number | null;
-  iso_week: number;
-  iso_year: number;
+  cycle: number;
+  week_in_cycle: number;
 }
 
 interface Staff {
@@ -78,10 +79,10 @@ export default function Index() {
 
     setLoading(true);
     
-    // Load weekly focus for this staff's role
+    // Load weekly focus for this staff's role using the new view
     const { data: focusData, error: focusError } = await supabase
-      .from('weekly_focus')
-      .select('id, iso_week, iso_year, role_id, action_id')
+      .from('v_weekly_focus')
+      .select('id, cycle, week_in_cycle, role_id, action_id, action_statement')
       .eq('role_id', staff.role_id);
 
     if (focusError) {
@@ -103,7 +104,7 @@ export default function Index() {
         weekly_focus_id, 
         confidence_score, 
         performance_score,
-        weekly_focus!inner(iso_week, iso_year)
+        weekly_focus!inner(cycle, week_in_cycle)
       `)
       .eq('staff_id', staff.id);
 
@@ -119,8 +120,8 @@ export default function Index() {
         weekly_focus_id: item.weekly_focus_id,
         confidence_score: item.confidence_score,
         performance_score: item.performance_score,
-        iso_week: (item.weekly_focus as any).iso_week,
-        iso_year: (item.weekly_focus as any).iso_year
+        cycle: (item.weekly_focus as any).cycle,
+        week_in_cycle: (item.weekly_focus as any).week_in_cycle
       })) || [];
       
       setWeekStatuses(transformedData);
@@ -128,8 +129,8 @@ export default function Index() {
     setLoading(false);
   };
 
-  const getTileStatus = (week: number, year: number = new Date().getFullYear()): 'grey' | 'yellow' | 'green' => {
-    const weekStatus = weekStatuses.find(ws => ws.iso_week === week && ws.iso_year === year);
+  const getTileStatus = (cycle: number, weekInCycle: number): 'grey' | 'yellow' | 'green' => {
+    const weekStatus = weekStatuses.find(ws => ws.cycle === cycle && ws.week_in_cycle === weekInCycle);
     
     if (!weekStatus) return 'grey';
     if (weekStatus.performance_score === null) return 'yellow';
@@ -152,34 +153,34 @@ export default function Index() {
     }
   };
 
-  const handleWeekClick = async (week: number, year: number = new Date().getFullYear()) => {
+  const handleWeekClick = async (cycle: number, weekInCycle: number) => {
     if (!staff) return;
 
-    // Check if weekly_focus exists for this week/year/role
-    const weekFocus = weeklyFocus.find(wf => wf.iso_week === week && wf.iso_year === year);
+    // Check if weekly_focus exists for this cycle/week/role
+    const weekFocus = weeklyFocus.find(wf => wf.cycle === cycle && wf.week_in_cycle === weekInCycle);
     
     if (!weekFocus) {
       toast({
         title: "No Pro Moves set yet",
-        description: `Week ${week} doesn't have any Pro Moves configured yet.`,
+        description: `Cycle ${cycle}, Week ${weekInCycle} doesn't have any Pro Moves configured yet.`,
         variant: "default"
       });
       return;
     }
 
-    const status = getTileStatus(week, year);
+    const status = getTileStatus(cycle, weekInCycle);
     
     if (status === 'grey') {
       // No scores yet, go to confidence
-      navigate(`/confidence/${week}`);
+      navigate(`/confidence/${cycle}-${weekInCycle}`);
     } else if (status === 'yellow') {
       // Has confidence, missing performance
-      navigate(`/performance/${week}`);
+      navigate(`/performance/${cycle}-${weekInCycle}`);
     } else {
       // Already completed
       toast({
         title: "Already completed",
-        description: `Week ${week} is already completed. Great job!`,
+        description: `Cycle ${cycle}, Week ${weekInCycle} is already completed. Great job!`,
         variant: "default"
       });
     }
@@ -220,20 +221,19 @@ export default function Index() {
                 
                 <div className="grid grid-cols-3 gap-4">
                   {Array.from({ length: 6 }, (_, weekIndex) => {
-                    const week = weekIndex + 1;
-                    const currentYear = new Date().getFullYear();
-                    const status = getTileStatus(week, currentYear);
+                    const weekInCycle = weekIndex + 1;
+                    const status = getTileStatus(cycle, weekInCycle);
                     
                     return (
                       <Card 
-                        key={`${cycle}-${week}`}
+                        key={`${cycle}-${weekInCycle}`}
                         className={`cursor-pointer transition-all hover:scale-105 ${getWeekColor(status)}`}
-                        onClick={() => handleWeekClick(week, currentYear)}
+                        onClick={() => handleWeekClick(cycle, weekInCycle)}
                         title={getTooltipText(status)}
                       >
                         <CardContent className="p-6 text-center">
                           <div className="text-lg font-semibold">
-                            Week {week}
+                            Week {weekInCycle}
                           </div>
                           <div className="text-sm mt-2 opacity-90">
                             {status === 'green' && '✓ All done – great job!'}

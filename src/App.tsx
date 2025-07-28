@@ -44,6 +44,7 @@ function AppRoutes() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="setup" element={<Setup />} />
+        <Route path="create-password" element={<SetupPassword />} />
         <Route path="setup-password" element={<SetupPassword />} />
         <Route path="stats" element={<Stats />} />
         <Route path="profile" element={<Profile />} />

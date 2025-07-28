@@ -29,13 +29,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Check if user needs password setup
-        if (session?.user && event === 'SIGNED_IN') {
-          // Check if this user came via magic link signup
-          const magicLinkEmail = localStorage.getItem('magic_link_signup');
-          if (magicLinkEmail === session.user.email) {
+        // Check if user needs password setup based on metadata flag
+        if (event === 'SIGNED_IN' && session?.user) {
+          const hasPasswordSet = session.user.user_metadata?.password_set;
+          if (!hasPasswordSet) {
+            // User needs to set password
             setNeedsPasswordSetup(true);
-            localStorage.removeItem('magic_link_signup');
           } else {
             setNeedsPasswordSetup(false);
           }
@@ -51,8 +50,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      // Don't check password setup for existing sessions - only on new sign-ins
-      setNeedsPasswordSetup(false);
+      
+      // Check password setup for existing sessions too
+      if (session?.user) {
+        const hasPasswordSet = session.user.user_metadata?.password_set;
+        setNeedsPasswordSetup(!hasPasswordSet);
+      } else {
+        setNeedsPasswordSetup(false);
+      }
+      
       setLoading(false);
     });
 
@@ -68,11 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailRedirectTo: redirectUrl
       }
     });
-    
-    // If successful, mark this as a potential magic link user
-    if (!error) {
-      localStorage.setItem('magic_link_signup', email);
-    }
     
     return { error };
   };

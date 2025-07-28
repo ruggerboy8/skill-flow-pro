@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface Staff {
   id: string;
@@ -19,6 +20,7 @@ interface WeeklyFocus {
   action_statement: string;
   cycle: number;
   week_in_cycle: number;
+  domain_name: string;
 }
 
 interface WeeklyScore {
@@ -66,13 +68,16 @@ export default function PerformanceWizard() {
     setStaff(staffData);
 
     // Get the first focus item to determine cycle/week
-    const { data: firstFocus, error: firstError } = await supabase
-      .from('v_weekly_focus')
-      .select('id, display_order, action_statement, cycle, week_in_cycle')
-      .eq('id', focusId)
-      .single();
+    const { data: firstFocus, error: firstError } = await supabase.rpc('get_weekly_focus_with_domains', {
+      p_cycle: 1, // We'll filter by the specific focus ID after
+      p_week: 1,
+      p_role_id: staffData.role_id
+    }) as { data: WeeklyFocus[] | null; error: any };
 
-    if (firstError || !firstFocus) {
+    // Find the specific focus item
+    const currentFocusItem = firstFocus?.find(f => f.id === focusId);
+    
+    if (firstError || !currentFocusItem) {
       toast({
         title: "Error",
         description: "Focus item not found",
@@ -83,13 +88,11 @@ export default function PerformanceWizard() {
     }
 
     // Load all weekly focus for this cycle/week
-    const { data: focusData, error: focusError } = await supabase
-      .from('v_weekly_focus')
-      .select('id, display_order, action_statement, cycle, week_in_cycle')
-      .eq('cycle', firstFocus.cycle)
-      .eq('week_in_cycle', firstFocus.week_in_cycle)
-      .eq('role_id', staffData.role_id)
-      .order('display_order');
+    const { data: focusData, error: focusError } = await supabase.rpc('get_weekly_focus_with_domains', {
+      p_cycle: currentFocusItem.cycle,
+      p_week: currentFocusItem.week_in_cycle,
+      p_role_id: staffData.role_id
+    }) as { data: WeeklyFocus[] | null; error: any };
 
     if (focusError || !focusData) {
       toast({
@@ -211,25 +214,31 @@ export default function PerformanceWizard() {
   return (
     <div className="min-h-screen p-4 bg-background">
       <div className="max-w-md mx-auto space-y-4">
-        <Card>
+        <Card style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <Badge variant="outline">
-                Pro Move {currentIndex + 1} of {weeklyFocus.length}
+              <Badge variant="outline" className="bg-white/80 text-gray-900">
+                {currentIndex + 1} / {weeklyFocus.length}
               </Badge>
-              <Badge variant="secondary">
+              <Badge variant="secondary" className="bg-white/80 text-gray-900">
                 Cycle {currentFocus.cycle}, Week {currentFocus.week_in_cycle}
               </Badge>
             </div>
-            <CardTitle className="text-center">Rate Your Performance</CardTitle>
-            <CardDescription className="text-center">
+            <CardTitle className="text-center text-gray-900">Rate Your Performance</CardTitle>
+            <CardDescription className="text-center text-gray-800">
               How often did you actually do this action this week?
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm font-medium mb-2">{currentFocus.action_statement}</p>
-              <Badge variant="secondary" className="text-xs">
+            <div className="p-4 bg-white/80 rounded-lg">
+              <Badge 
+                variant="secondary" 
+                className="text-xs font-semibold mb-2 bg-white text-gray-900"
+              >
+                {currentFocus.domain_name}
+              </Badge>
+              <p className="text-sm font-medium mb-2 text-gray-900">{currentFocus.action_statement}</p>
+              <Badge variant="secondary" className="text-xs bg-white text-gray-900">
                 Your confidence: {getConfidenceScore(currentFocus.id)}/4
               </Badge>
             </div>

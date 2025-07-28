@@ -62,7 +62,7 @@ export default function WeekInfo() {
       p_cycle: cycleNum,
       p_week: weekNum,
       p_role_id: staffData.role_id
-    });
+    }) as { data: WeeklyFocus[] | null; error: any };
 
     if (focusError || !focusData || focusData.length === 0) {
       toast({

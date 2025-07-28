@@ -150,6 +150,8 @@ export default function PerformanceWizard() {
 
     const updates = existingScores.map(score => ({
       id: score.id,
+      staff_id: staff.id,
+      weekly_focus_id: score.weekly_focus_id,
       performance_score: performanceScores[score.weekly_focus_id] || 1
     }));
 

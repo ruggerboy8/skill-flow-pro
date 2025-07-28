@@ -60,17 +60,14 @@ export default function ConfidenceWizard() {
 
     setStaff(staffData);
 
-    // Get the first focus item to determine cycle/week
-    const { data: firstFocus, error: firstError } = await supabase.rpc('get_focus_cycle_week', {
-      p_cycle: 1, // We'll filter by the specific focus ID after
-      p_week: 1,
-      p_role_id: staffData.role_id
-    }) as { data: WeeklyFocus[] | null; error: any };
+    // Get the focus item details first
+    const { data: focusDetails, error: focusDetailsError } = await supabase
+      .from('weekly_focus')
+      .select('id, cycle, week_in_cycle')
+      .eq('id', focusId)
+      .single();
 
-    // Find the specific focus item
-    const currentFocusItem = firstFocus?.find(f => f.id === focusId);
-    
-    if (firstError || !currentFocusItem) {
+    if (focusDetailsError || !focusDetails) {
       toast({
         title: "Error",
         description: "Focus item not found",
@@ -82,8 +79,8 @@ export default function ConfidenceWizard() {
 
     // Load all weekly focus for this cycle/week
     const { data: focusData, error: focusError } = await supabase.rpc('get_focus_cycle_week', {
-      p_cycle: currentFocusItem.cycle,
-      p_week: currentFocusItem.week_in_cycle,
+      p_cycle: focusDetails.cycle,
+      p_week: focusDetails.week_in_cycle,
       p_role_id: staffData.role_id
     }) as { data: WeeklyFocus[] | null; error: any };
 

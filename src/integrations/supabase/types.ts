@@ -348,7 +348,7 @@ export type Database = {
       }
     }
     Functions: {
-      get_weekly_focus_with_domains: {
+      get_focus_cycle_week: {
         Args: { p_cycle: number; p_week: number; p_role_id: number }
         Returns: {
           id: string

@@ -116,7 +116,7 @@ export default function Index() {
     // Load current week's pro moves
     const nextWeek = getNextIncompleteWeek();
     if (nextWeek) {
-      const { data: currentFocusData } = await supabase.rpc('get_weekly_focus_with_domains', {
+      const { data: currentFocusData } = await supabase.rpc('get_focus_cycle_week', {
         p_cycle: nextWeek.cycle,
         p_week: nextWeek.week,
         p_role_id: staff.role_id

@@ -156,7 +156,7 @@ export default function AdminBuilder() {
         .eq('week_in_cycle', selectedWeek)
         .eq('role_id', selectedRole);
 
-      // Insert new rows
+      // Insert new rows (keeping legacy fields for TypeScript compatibility)
       const insertData = slots.map(slot => ({
         cycle: selectedCycle,
         week_in_cycle: selectedWeek,
@@ -164,9 +164,8 @@ export default function AdminBuilder() {
         action_id: slot.action_id,
         self_select: slot.self_select,
         display_order: slot.display_order,
-        // Legacy fields required by current types
-        iso_year: new Date().getFullYear(),
-        iso_week: 1
+        iso_year: new Date().getFullYear(), // Legacy field for types
+        iso_week: 1 // Legacy field for types
       }));
 
       const { error } = await supabase

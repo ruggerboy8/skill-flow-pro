@@ -225,7 +225,7 @@ export default function WeekEditor() {
         .eq('week_in_cycle', parseInt(week!))
         .eq('role_id', parseInt(roleId!));
 
-      // Insert new rows
+      // Insert new rows (keeping legacy fields for TypeScript compatibility)
       const insertData = slots.map((slot, index) => ({
         cycle: parseInt(cycle!),
         week_in_cycle: parseInt(week!),
@@ -234,8 +234,8 @@ export default function WeekEditor() {
         action_id: slot.action_id,
         self_select: slot.is_self_select,
         display_order: index + 1,
-        iso_year: new Date().getFullYear(),
-        iso_week: 1
+        iso_year: new Date().getFullYear(), // Legacy field for types
+        iso_week: 1 // Legacy field for types
       }));
 
       const { error } = await supabase

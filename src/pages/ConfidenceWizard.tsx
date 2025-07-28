@@ -61,7 +61,7 @@ export default function ConfidenceWizard() {
     setStaff(staffData);
 
     // Get the first focus item to determine cycle/week
-    const { data: firstFocus, error: firstError } = await supabase.rpc('get_weekly_focus_with_domains', {
+    const { data: firstFocus, error: firstError } = await supabase.rpc('get_focus_cycle_week', {
       p_cycle: 1, // We'll filter by the specific focus ID after
       p_week: 1,
       p_role_id: staffData.role_id
@@ -81,7 +81,7 @@ export default function ConfidenceWizard() {
     }
 
     // Load all weekly focus for this cycle/week
-    const { data: focusData, error: focusError } = await supabase.rpc('get_weekly_focus_with_domains', {
+    const { data: focusData, error: focusError } = await supabase.rpc('get_focus_cycle_week', {
       p_cycle: currentFocusItem.cycle,
       p_week: currentFocusItem.week_in_cycle,
       p_role_id: staffData.role_id

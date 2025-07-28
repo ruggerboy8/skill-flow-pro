@@ -58,7 +58,7 @@ export default function WeekInfo() {
     setStaff(staffData);
 
     // Load weekly focus using RPC to get domain information
-    const { data: focusData, error: focusError } = await supabase.rpc('get_weekly_focus_with_domains', {
+    const { data: focusData, error: focusError } = await supabase.rpc('get_focus_cycle_week', {
       p_cycle: cycleNum,
       p_week: weekNum,
       p_role_id: staffData.role_id

@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
+import Index from "./pages/Index";
 import Week from "./pages/Week";
 import Confidence from "./pages/Confidence";
 import Performance from "./pages/Performance";
@@ -30,7 +31,7 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<Week />} />
+      <Route path="/" element={<Index />} />
       <Route path="/setup" element={<Setup />} />
       <Route path="/week" element={<Week />} />
       <Route path="/confidence/:week" element={<Confidence />} />

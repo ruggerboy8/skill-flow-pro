@@ -110,6 +110,8 @@ export type Database = {
           email: string
           id: string
           name: string
+          organization: string | null
+          primary_location: string | null
           role_id: number | null
           updated_at: string | null
           user_id: string | null
@@ -119,6 +121,8 @@ export type Database = {
           email: string
           id?: string
           name: string
+          organization?: string | null
+          primary_location?: string | null
           role_id?: number | null
           updated_at?: string | null
           user_id?: string | null
@@ -128,6 +132,8 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          organization?: string | null
+          primary_location?: string | null
           role_id?: number | null
           updated_at?: string | null
           user_id?: string | null

@@ -14,9 +14,16 @@ interface Role {
   role_name: string;
 }
 
+const organizationLocations = {
+  'Sprout': ['McKinney', 'Frisco', 'Allen'],
+  'Kid\'s Tooth Team': ['Buda', 'Kyle', 'South Austin', 'Steiner Ranch', 'Lake Orion']
+};
+
 export default function Setup() {
   const [name, setName] = useState('');
   const [roleId, setRoleId] = useState<string>('');
+  const [organization, setOrganization] = useState('');
+  const [primaryLocation, setPrimaryLocation] = useState('');
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
@@ -46,7 +53,7 @@ export default function Setup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !roleId || !user) return;
+    if (!name || !roleId || !organization || !primaryLocation || !user) return;
 
     setLoading(true);
     
@@ -56,7 +63,9 @@ export default function Setup() {
         user_id: user.id,
         email: user.email!,
         name,
-        role_id: parseInt(roleId)
+        role_id: parseInt(roleId),
+        organization,
+        primary_location: primaryLocation
       });
 
     if (error) {
@@ -114,11 +123,42 @@ export default function Setup() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="organization">Organization</Label>
+              <Select value={organization} onValueChange={(value) => {
+                setOrganization(value);
+                setPrimaryLocation(''); // Reset location when organization changes
+              }} required>
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Select your organization" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(organizationLocations).map((org) => (
+                    <SelectItem key={org} value={org}>{org}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">Primary Location</Label>
+              <Select value={primaryLocation} onValueChange={setPrimaryLocation} required disabled={!organization}>
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Select your primary location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {organization && organizationLocations[organization as keyof typeof organizationLocations]?.map((location) => (
+                    <SelectItem key={location} value={location}>{location}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             
             <Button 
               type="submit" 
               className="w-full h-12" 
-              disabled={loading || !name || !roleId}
+              disabled={loading || !name || !roleId || !organization || !primaryLocation}
             >
               {loading ? "Creating Profile..." : "Complete Setup"}
             </Button>

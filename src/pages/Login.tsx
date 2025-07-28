@@ -12,7 +12,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
-  const { signInWithOtp, signInWithPassword, signUpWithPassword } = useAuth();
+  const [showResetOption, setShowResetOption] = useState(false);
+  const { signInWithOtp, signInWithPassword, resetPassword } = useAuth();
   const { toast } = useToast();
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -37,43 +38,48 @@ export default function Login() {
     setLoading(false);
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) return;
-
-    if (password.length < 6) {
-      toast({
-        title: "Password too short",
-        description: "Password must be at least 6 characters long",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await signUpWithPassword(email, password);
-    
-    if (error) {
-      toast({
-        title: "Sign up failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    } else {
-      toast({
-        title: "Check your email",
-        description: "We've sent you a confirmation link to complete your signup"
-      });
-    }
-    setLoading(false);
-  };
-
-  const handleMagicLink = async (e: React.FormEvent) => {
+  const handleNewUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
 
     setLoading(true);
+    
+    // Try to send magic link - if user exists, Supabase will send a magic link
+    // If user doesn't exist, it will create them and send confirmation
     const { error } = await signInWithOtp(email);
+    
+    if (error) {
+      // If there's an error, it might be because the user already exists
+      // Show reset password option
+      if (error.message?.includes('already registered') || error.message?.includes('user already exists')) {
+        setShowResetOption(true);
+        toast({
+          title: "User already exists",
+          description: "This email is already registered. You can reset your password or try signing in.",
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    } else {
+      toast({
+        title: "Check your email",
+        description: "We've sent you a magic link to sign in or complete your registration"
+      });
+      setShowResetOption(false);
+    }
+    setLoading(false);
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email) return;
+
+    setLoading(true);
+    const { error } = await resetPassword(email);
     
     if (error) {
       toast({
@@ -83,11 +89,18 @@ export default function Login() {
       });
     } else {
       toast({
-        title: "Check your email",
-        description: "We've sent you a magic link to sign in"
+        title: "Password reset sent",
+        description: "Check your email for password reset instructions"
       });
+      setShowResetOption(false);
     }
     setLoading(false);
+  };
+
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setShowResetOption(false);
   };
 
   return (
@@ -96,15 +109,14 @@ export default function Login() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">SkillCheck</CardTitle>
           <CardDescription>
-            Sign in to your account or create a new one
+            Sign in to your account or register as a new user
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); resetForm(); }} className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              <TabsTrigger value="magic">Magic Link</TabsTrigger>
+              <TabsTrigger value="newuser">New User</TabsTrigger>
             </TabsList>
             
             <TabsContent value="signin">
@@ -141,46 +153,12 @@ export default function Login() {
               </form>
             </TabsContent>
 
-            <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
+            <TabsContent value="newuser">
+              <form onSubmit={handleNewUser} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="newuser-email">Email</Label>
                   <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="Choose a password (min 6 characters)"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={loading || !email || !password}
-                >
-                  {loading ? "Creating account..." : "Create Account"}
-                </Button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="magic">
-              <form onSubmit={handleMagicLink} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="magic-email">Email</Label>
-                  <Input
-                    id="magic-email"
+                    id="newuser-email"
                     type="email"
                     placeholder="your.email@example.com"
                     value={email}
@@ -195,8 +173,26 @@ export default function Login() {
                 >
                   {loading ? "Sending..." : "Send Magic Link"}
                 </Button>
+                
+                {showResetOption && (
+                  <div className="space-y-2 pt-4 border-t">
+                    <p className="text-sm text-muted-foreground text-center">
+                      This email is already registered
+                    </p>
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      className="w-full" 
+                      onClick={handlePasswordReset}
+                      disabled={loading}
+                    >
+                      Reset Password
+                    </Button>
+                  </div>
+                )}
+                
                 <p className="text-sm text-muted-foreground text-center">
-                  We'll send you a magic link to sign in without a password
+                  We'll send you a magic link to complete registration or sign in
                 </p>
               </form>
             </TabsContent>

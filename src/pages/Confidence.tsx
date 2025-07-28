@@ -17,7 +17,8 @@ interface Staff {
 interface WeeklyFocus {
   id: string;
   display_order: number;
-  pro_moves: {
+  action_statement?: string; // From RPC function
+  pro_moves?: {
     action_statement: string;
   };
 }
@@ -62,34 +63,12 @@ export default function Confidence() {
     console.log('Staff data loaded:', staffData);
     setStaff(staffData);
 
-    // Try a simpler query first to see if data exists
-    const { data: testData, error: testError } = await supabase
-      .from('weekly_focus')
-      .select('*')
-      .eq('iso_week', weekNum)
-      .eq('iso_year', yearNum)
-      .eq('role_id', staffData.role_id);
-
-    console.log('Test weekly_focus query:', { 
-      weekNum, 
-      yearNum, 
-      roleId: staffData.role_id, 
-      testData, 
-      testError 
-    });
-
-    // Load weekly focus with manual join
-    const { data: focusData, error: focusError } = await supabase
-      .from('weekly_focus')
-      .select(`
-        id,
-        display_order,
-        action_id
-      `)
-      .eq('iso_week', weekNum)
-      .eq('iso_year', yearNum)
-      .eq('role_id', staffData.role_id)
-      .order('display_order');
+    // Use the working RPC function to get weekly focus with domains
+    const { data: focusData, error: focusError } = await supabase.rpc('get_weekly_focus_with_domains', {
+      p_cycle: 1, // For now use cycle 1
+      p_week: weekNum, // Use the week number from the URL
+      p_role_id: staffData.role_id
+    }) as { data: any[] | null; error: any };
 
     if (focusError) {
       console.error('Focus error:', focusError);
@@ -115,36 +94,16 @@ export default function Confidence() {
 
     console.log('Focus data found:', focusData);
 
-    // Now fetch pro_moves for each action_id
-    const actionIds = focusData.map(f => f.action_id).filter(Boolean);
-    const { data: proMovesData, error: proMovesError } = await supabase
-      .from('pro_moves')
-      .select('action_id, action_statement')
-      .in('action_id', actionIds);
-
-    if (proMovesError) {
-      console.error('Pro moves error:', proMovesError);
-      toast({
-        title: "Error",
-        description: `Error loading pro moves: ${proMovesError.message}`,
-        variant: "destructive"
-      });
-      navigate('/week');
-      return;
-    }
-
-    console.log('Pro moves data:', proMovesData);
-
-    // Combine the data
-    const combinedData = focusData.map(focus => ({
+    // Transform the data to match the expected interface
+    const transformedData = focusData.map(focus => ({
       ...focus,
       pro_moves: {
-        action_statement: proMovesData?.find(pm => pm.action_id === focus.action_id)?.action_statement || 'No action statement'
+        action_statement: focus.action_statement
       }
     }));
 
-    console.log('Combined data:', combinedData);
-    setWeeklyFocus(combinedData);
+    console.log('Transformed data:', transformedData);
+    setWeeklyFocus(transformedData);
     setLoading(false);
   };
 
@@ -234,7 +193,7 @@ export default function Confidence() {
                   {index + 1}
                 </Badge>
                 <CardTitle className="text-sm font-medium leading-relaxed">
-                  {focus.pro_moves.action_statement}
+                  {focus.pro_moves?.action_statement || focus.action_statement || 'No action statement'}
                 </CardTitle>
               </div>
             </CardHeader>

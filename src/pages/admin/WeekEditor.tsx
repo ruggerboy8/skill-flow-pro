@@ -111,13 +111,12 @@ export default function WeekEditor() {
   const checkIfLocked = async () => {
     const { data } = await supabase
       .from('weekly_scores')
-      .select('id', { count: 'exact' })
+      .select('weekly_focus!inner(cycle, week_in_cycle, role_id)')
       .eq('weekly_focus.cycle', parseInt(cycle!))
       .eq('weekly_focus.week_in_cycle', parseInt(week!))
-      .eq('weekly_focus.role_id', parseInt(roleId!))
-      .maybeSingle();
+      .eq('weekly_focus.role_id', parseInt(roleId!));
 
-    setIsLocked((data as any)?.count > 0);
+    setIsLocked(data && data.length > 0);
   };
 
   const loadProMoves = async (competencyId: number) => {
@@ -145,6 +144,8 @@ export default function WeekEditor() {
 
     if (data && data.length > 0) {
       const newSlots = [...slots];
+      const competenciesToLoad = new Set<number>();
+      
       data.forEach((item, index) => {
         if (index < 3) {
           newSlots[index] = {
@@ -152,9 +153,20 @@ export default function WeekEditor() {
             action_id: item.action_id,
             is_self_select: item.self_select
           };
+          
+          // Collect competencies that need pro moves loaded
+          if (item.competency_id) {
+            competenciesToLoad.add(item.competency_id);
+          }
         }
       });
+      
       setSlots(newSlots);
+      
+      // Load pro moves for existing competencies
+      for (const competencyId of competenciesToLoad) {
+        await loadProMoves(competencyId);
+      }
     }
   };
 

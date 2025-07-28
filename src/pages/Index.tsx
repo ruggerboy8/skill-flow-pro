@@ -6,10 +6,20 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-interface WeeklyScore {
+interface WeeklyFocus {
+  id: string;
+  iso_week: number;
+  iso_year: number;
+  role_id: number;
+  action_id: number;
+}
+
+interface WeekStatus {
   weekly_focus_id: string;
   confidence_score: number | null;
   performance_score: number | null;
+  iso_week: number;
+  iso_year: number;
 }
 
 interface Staff {
@@ -19,7 +29,8 @@ interface Staff {
 
 export default function Index() {
   const [staff, setStaff] = useState<Staff | null>(null);
-  const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
+  const [weekStatuses, setWeekStatuses] = useState<WeekStatus[]>([]);
+  const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -33,7 +44,7 @@ export default function Index() {
 
   useEffect(() => {
     if (staff) {
-      loadWeeklyScores();
+      loadWeekData();
     }
   }, [staff]);
 
@@ -62,48 +73,116 @@ export default function Index() {
     }
   };
 
-  const loadWeeklyScores = async () => {
+  const loadWeekData = async () => {
     if (!staff) return;
 
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // Load weekly focus for this staff's role
+    const { data: focusData, error: focusError } = await supabase
+      .from('weekly_focus')
+      .select('id, iso_week, iso_year, role_id, action_id')
+      .eq('role_id', staff.role_id);
+
+    if (focusError) {
+      toast({
+        title: "Error",
+        description: "Failed to load weekly focus",
+        variant: "destructive"
+      });
+      setLoading(false);
+      return;
+    }
+
+    setWeeklyFocus(focusData || []);
+
+    // Load weekly scores for this staff
+    const { data: scoresData, error: scoresError } = await supabase
       .from('weekly_scores')
-      .select('weekly_focus_id, confidence_score, performance_score')
+      .select(`
+        weekly_focus_id, 
+        confidence_score, 
+        performance_score,
+        weekly_focus!inner(iso_week, iso_year)
+      `)
       .eq('staff_id', staff.id);
 
-    if (error) {
+    if (scoresError) {
       toast({
         title: "Error",
         description: "Failed to load scores",
         variant: "destructive"
       });
     } else {
-      setWeeklyScores(data || []);
+      // Transform the data to match our interface
+      const transformedData: WeekStatus[] = scoresData?.map(item => ({
+        weekly_focus_id: item.weekly_focus_id,
+        confidence_score: item.confidence_score,
+        performance_score: item.performance_score,
+        iso_week: (item.weekly_focus as any).iso_week,
+        iso_year: (item.weekly_focus as any).iso_year
+      })) || [];
+      
+      setWeekStatuses(transformedData);
     }
     setLoading(false);
   };
 
-  const getWeekStatus = (week: number, cycle: number) => {
-    // For now, mock the logic - in real implementation this would check 
-    // if weekly_focus exists for this week/cycle and if scores are complete
-    const hasConfidence = Math.random() > 0.5; // Mock data
-    const hasPerformance = Math.random() > 0.5; // Mock data
+  const getTileStatus = (week: number, year: number = new Date().getFullYear()): 'grey' | 'yellow' | 'green' => {
+    const weekStatus = weekStatuses.find(ws => ws.iso_week === week && ws.iso_year === year);
     
-    if (hasConfidence && hasPerformance) return 'completed';
-    if (hasConfidence) return 'partial';
-    return 'pending';
+    if (!weekStatus) return 'grey';
+    if (weekStatus.performance_score === null) return 'yellow';
+    return 'green';
   };
 
-  const getWeekColor = (status: string) => {
+  const getWeekColor = (status: 'grey' | 'yellow' | 'green') => {
     switch (status) {
-      case 'completed': return 'bg-green-500 hover:bg-green-600 text-white';
-      case 'partial': return 'bg-yellow-500 hover:bg-yellow-600 text-white';
-      default: return 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300';
+      case 'green': return 'bg-green-400 hover:bg-green-500 text-white';
+      case 'yellow': return 'bg-yellow-300 hover:bg-yellow-400 text-black';
+      default: return 'bg-gray-300 hover:bg-gray-400 text-black';
     }
   };
 
-  const handleWeekClick = (week: number, cycle: number) => {
-    navigate(`/week?cycle=${cycle}&week=${week}`);
+  const getTooltipText = (status: 'grey' | 'yellow' | 'green') => {
+    switch (status) {
+      case 'grey': return 'Not started';
+      case 'yellow': return 'Confidence submitted – performance pending';
+      case 'green': return 'All done – great job!';
+    }
+  };
+
+  const handleWeekClick = async (week: number, year: number = new Date().getFullYear()) => {
+    if (!staff) return;
+
+    // Check if weekly_focus exists for this week/year/role
+    const weekFocus = weeklyFocus.find(wf => wf.iso_week === week && wf.iso_year === year);
+    
+    if (!weekFocus) {
+      toast({
+        title: "No Pro Moves set yet",
+        description: `Week ${week} doesn't have any Pro Moves configured yet.`,
+        variant: "default"
+      });
+      return;
+    }
+
+    const status = getTileStatus(week, year);
+    
+    if (status === 'grey') {
+      // No scores yet, go to confidence
+      navigate(`/confidence/${week}`);
+    } else if (status === 'yellow') {
+      // Has confidence, missing performance
+      navigate(`/performance/${week}`);
+    } else {
+      // Already completed
+      toast({
+        title: "Already completed",
+        description: `Week ${week} is already completed. Great job!`,
+        variant: "default"
+      });
+    }
   };
 
   const handleSignOut = async () => {
@@ -142,22 +221,24 @@ export default function Index() {
                 <div className="grid grid-cols-3 gap-4">
                   {Array.from({ length: 6 }, (_, weekIndex) => {
                     const week = weekIndex + 1;
-                    const status = getWeekStatus(week, cycle);
+                    const currentYear = new Date().getFullYear();
+                    const status = getTileStatus(week, currentYear);
                     
                     return (
                       <Card 
                         key={`${cycle}-${week}`}
                         className={`cursor-pointer transition-all hover:scale-105 ${getWeekColor(status)}`}
-                        onClick={() => handleWeekClick(week, cycle)}
+                        onClick={() => handleWeekClick(week, currentYear)}
+                        title={getTooltipText(status)}
                       >
                         <CardContent className="p-6 text-center">
                           <div className="text-lg font-semibold">
                             Week {week}
                           </div>
                           <div className="text-sm mt-2 opacity-90">
-                            {status === 'completed' && '✓ Complete'}
-                            {status === 'partial' && '◐ Partial'}
-                            {status === 'pending' && '○ Pending'}
+                            {status === 'green' && '✓ All done – great job!'}
+                            {status === 'yellow' && '◐ Confidence submitted – performance pending'}
+                            {status === 'grey' && '○ Not started'}
                           </div>
                         </CardContent>
                       </Card>

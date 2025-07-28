@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface Role {
   role_id: number;
@@ -15,6 +16,8 @@ interface Role {
 interface Competency {
   competency_id: number;
   name: string;
+  code: string;
+  domain_name: string;
 }
 
 interface ProMove {
@@ -65,11 +68,24 @@ export default function WeekEditor() {
   const loadCompetencies = async () => {
     const { data } = await supabase
       .from('competencies')
-      .select('competency_id, name')
+      .select(`
+        competency_id, 
+        name, 
+        code,
+        domains!inner(domain_name)
+      `)
       .eq('role_id', parseInt(roleId!))
       .order('name');
     
-    if (data) setCompetencies(data);
+    if (data) {
+      const formattedCompetencies = data.map(item => ({
+        competency_id: item.competency_id,
+        name: item.name,
+        code: item.code,
+        domain_name: (item.domains as any).domain_name
+      }));
+      setCompetencies(formattedCompetencies);
+    }
   };
 
   const loadProMoves = async (competencyId: number) => {
@@ -133,6 +149,17 @@ export default function WeekEditor() {
     }
     setSlots(newSlots);
   };
+
+  // Group competencies by domain
+  const competenciesByDomain = competencies.reduce((acc, comp) => {
+    if (!acc[comp.domain_name]) {
+      acc[comp.domain_name] = [];
+    }
+    acc[comp.domain_name].push(comp);
+    return acc;
+  }, {} as Record<string, Competency[]>);
+
+  const domains = Object.keys(competenciesByDomain).sort();
 
   const canSave = () => {
     return slots.every(slot => 
@@ -208,21 +235,36 @@ export default function WeekEditor() {
             <CardContent className="space-y-4">
               <div>
                 <Label>Competency</Label>
-                <Select 
-                  value={slot.competency_id?.toString() || ""} 
-                  onValueChange={(value) => handleCompetencyChange(index, value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select competency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {competencies.map(comp => (
-                      <SelectItem key={comp.competency_id} value={comp.competency_id.toString()}>
-                        {comp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Select 
+                    value={slot.competency_id?.toString() || ""} 
+                    onValueChange={(value) => handleCompetencyChange(index, value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select competency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {domains.map(domainName => (
+                        <SelectGroup key={domainName}>
+                          <SelectLabel 
+                            style={{ color: getDomainColor(domainName) }}
+                            className="font-semibold"
+                          >
+                            {domainName}
+                          </SelectLabel>
+                          {competenciesByDomain[domainName].map(comp => (
+                            <SelectItem 
+                              key={comp.competency_id} 
+                              value={comp.competency_id.toString()}
+                              style={{ color: getDomainColor(domainName) }}
+                              className="ml-2"
+                            >
+                              {comp.code} - {comp.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ))}
+                    </SelectContent>
+                  </Select>
               </div>
 
               {slot.competency_id && (

@@ -5,11 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Login from "./pages/Login";
+import Layout from "./components/Layout";
 import Setup from "./pages/Setup";
 import Index from "./pages/Index";
 import Week from "./pages/Week";
 import Confidence from "./pages/Confidence";
 import Performance from "./pages/Performance";
+import Stats from "./pages/Stats";
+import Profile from "./pages/Profile";
 import AdminBuilder from "./pages/AdminBuilder";
 import NotFound from "./pages/NotFound";
 
@@ -32,13 +35,17 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/setup" element={<Setup />} />
-      <Route path="/week" element={<Week />} />
-      <Route path="/confidence/:week" element={<Confidence />} />
-      <Route path="/performance/:week" element={<Performance />} />
-      <Route path="/admin/builder" element={<AdminBuilder />} />
-      <Route path="*" element={<NotFound />} />
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Index />} />
+        <Route path="setup" element={<Setup />} />
+        <Route path="stats" element={<Stats />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="week" element={<Week />} />
+        <Route path="confidence/:week" element={<Confidence />} />
+        <Route path="performance/:week" element={<Performance />} />
+        <Route path="admin/builder" element={<AdminBuilder />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
     </Routes>
   );
 }

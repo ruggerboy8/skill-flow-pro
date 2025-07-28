@@ -10,8 +10,11 @@ import Setup from "./pages/Setup";
 import SetupPassword from "./pages/SetupPassword";
 import Index from "./pages/Index";
 import Week from "./pages/Week";
+import WeekInfo from "./pages/WeekInfo";
 import Confidence from "./pages/Confidence";
+import ConfidenceWizard from "./pages/ConfidenceWizard";
 import Performance from "./pages/Performance";
+import PerformanceWizard from "./pages/PerformanceWizard";
 import Stats from "./pages/Stats";
 import Profile from "./pages/Profile";
 import AdminBuilder from "./pages/AdminBuilder";
@@ -49,8 +52,11 @@ function AppRoutes() {
         <Route path="stats" element={<Stats />} />
         <Route path="profile" element={<Profile />} />
         <Route path="week" element={<Week />} />
+        <Route path="week-info/:cycle/:week" element={<WeekInfo />} />
         <Route path="confidence/:week" element={<Confidence />} />
+        <Route path="confidence/:focusId/:index" element={<ConfidenceWizard />} />
         <Route path="performance/:week" element={<Performance />} />
+        <Route path="performance/:focusId/:index" element={<PerformanceWizard />} />
         <Route path="admin/builder" element={<AdminBuilder />} />
         <Route path="*" element={<NotFound />} />
       </Route>

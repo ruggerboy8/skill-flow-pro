@@ -168,34 +168,26 @@ export default function Index() {
   const handleWeekClick = async (cycle: number, weekInCycle: number) => {
     if (!staff) return;
 
-    // Check if weekly_focus exists for this cycle/week/role
-    const weekFocus = weeklyFocus.filter(wf => wf.cycle === cycle && wf.week_in_cycle === weekInCycle);
+    // Check if weekly_focus exists for this cycle/week/role using new query
+    const { data: focusRows, error } = await supabase
+      .from('v_weekly_focus')
+      .select('id, display_order, action_statement')
+      .eq('cycle', cycle)
+      .eq('week_in_cycle', weekInCycle)
+      .eq('role_id', staff.role_id)
+      .order('display_order');
     
-    if (weekFocus.length === 0) {
+    if (error || !focusRows || focusRows.length === 0) {
       toast({
-        title: "No Pro Moves set yet",
+        title: "No Pro Moves",
         description: `Cycle ${cycle}, Week ${weekInCycle} doesn't have any Pro Moves configured yet.`,
         variant: "default"
       });
       return;
     }
 
-    const status = getTileStatus(cycle, weekInCycle);
-    
-    if (status === 'grey') {
-      // No scores yet, go to confidence
-      navigate(`/confidence/${cycle}-${weekInCycle}`);
-    } else if (status === 'yellow') {
-      // Has confidence, missing performance
-      navigate(`/performance/${cycle}-${weekInCycle}`);
-    } else {
-      // Already completed
-      toast({
-        title: "Already completed",
-        description: `Cycle ${cycle}, Week ${weekInCycle} is already completed. Great job!`,
-        variant: "default"
-      });
-    }
+    // Navigate to week info page
+    navigate(`/week-info/${cycle}/${weekInCycle}`);
   };
 
   const handleSignOut = async () => {

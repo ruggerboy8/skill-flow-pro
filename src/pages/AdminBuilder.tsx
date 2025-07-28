@@ -31,7 +31,7 @@ interface WeekListItem {
   display_order: number;
 }
 
-const ADMIN_EMAILS = ['manager@practice.com'];
+const ADMIN_EMAILS = ['johno@reallygoodconsulting.org'];
 
 export default function AdminBuilder() {
   const { user } = useAuth();

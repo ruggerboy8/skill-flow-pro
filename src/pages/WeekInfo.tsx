@@ -23,6 +23,7 @@ export default function WeekInfo() {
   const [staff, setStaff] = useState<Staff | null>(null);
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [hasConfidenceScores, setHasConfidenceScores] = useState(false);
+  const [hasPerformanceScores, setHasPerformanceScores] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -75,22 +76,35 @@ export default function WeekInfo() {
 
     setWeeklyFocus(focusData);
 
-    // Check if confidence scores already exist
+    // Check if confidence and performance scores already exist
     const focusIds = focusData.map(f => f.id);
     const { data: scoresData } = await supabase
       .from('weekly_scores')
-      .select('weekly_focus_id, confidence_score')
+      .select('weekly_focus_id, confidence_score, performance_score')
       .eq('staff_id', staffData.id)
-      .in('weekly_focus_id', focusIds)
-      .not('confidence_score', 'is', null);
+      .in('weekly_focus_id', focusIds);
 
-    setHasConfidenceScores(scoresData && scoresData.length === focusData.length);
+    const confidenceScores = scoresData?.filter(s => s.confidence_score !== null) || [];
+    const performanceScores = scoresData?.filter(s => s.performance_score !== null) || [];
+    
+    setHasConfidenceScores(confidenceScores.length === focusData.length);
+    setHasPerformanceScores(performanceScores.length === focusData.length);
     setLoading(false);
   };
 
-  const handleRateConfidence = () => {
+  const handleRateNext = () => {
     if (weeklyFocus.length > 0) {
-      navigate(`/confidence/${weeklyFocus[0].id}/1`);
+      const firstFocusId = weeklyFocus[0].id;
+      if (!hasConfidenceScores) {
+        navigate(`/confidence/${firstFocusId}/1`);
+      } else if (!hasPerformanceScores) {
+        navigate(`/performance/${firstFocusId}/1`);
+      } else {
+        toast({
+          title: "Week Complete",
+          description: "You've already completed both confidence and performance ratings for this week."
+        });
+      }
     }
   };
 
@@ -126,11 +140,15 @@ export default function WeekInfo() {
 
             <div className="space-y-2 pt-4">
               <Button 
-                onClick={handleRateConfidence}
-                disabled={hasConfidenceScores}
+                onClick={handleRateNext}
+                disabled={hasConfidenceScores && hasPerformanceScores}
                 className="w-full h-12"
               >
-                {hasConfidenceScores ? 'Confidence Already Submitted' : 'Rate your confidence'}
+                {hasConfidenceScores && hasPerformanceScores 
+                  ? 'Week Complete' 
+                  : hasConfidenceScores 
+                    ? 'Rate your performance' 
+                    : 'Rate your confidence'}
               </Button>
               
               <Button 

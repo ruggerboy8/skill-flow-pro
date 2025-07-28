@@ -20,7 +20,6 @@ export default function NumberScale({ value, onChange, disabled }: NumberScalePr
   const handleClick = (score: number) => {
     onChange(score);
     setShowTooltip(score);
-    setTimeout(() => setShowTooltip(null), 3000);
   };
 
   return (

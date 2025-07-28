@@ -44,6 +44,8 @@ export default function Confidence() {
   const loadData = async () => {
     if (!user) return;
 
+    console.log('Loading confidence data for week:', week, 'user:', user.id);
+
     // Load staff profile
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
@@ -52,19 +54,37 @@ export default function Confidence() {
       .single();
 
     if (staffError || !staffData) {
+      console.error('Staff error:', staffError);
       navigate('/setup');
       return;
     }
 
+    console.log('Staff data loaded:', staffData);
     setStaff(staffData);
 
-    // Load weekly focus
+    // Try a simpler query first to see if data exists
+    const { data: testData, error: testError } = await supabase
+      .from('weekly_focus')
+      .select('*')
+      .eq('iso_week', weekNum)
+      .eq('iso_year', yearNum)
+      .eq('role_id', staffData.role_id);
+
+    console.log('Test weekly_focus query:', { 
+      weekNum, 
+      yearNum, 
+      roleId: staffData.role_id, 
+      testData, 
+      testError 
+    });
+
+    // Load weekly focus with manual join
     const { data: focusData, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
         id,
         display_order,
-        pro_moves(action_statement)
+        action_id
       `)
       .eq('iso_week', weekNum)
       .eq('iso_year', yearNum)
@@ -93,7 +113,38 @@ export default function Confidence() {
       return;
     }
 
-    setWeeklyFocus(focusData);
+    console.log('Focus data found:', focusData);
+
+    // Now fetch pro_moves for each action_id
+    const actionIds = focusData.map(f => f.action_id).filter(Boolean);
+    const { data: proMovesData, error: proMovesError } = await supabase
+      .from('pro_moves')
+      .select('action_id, action_statement')
+      .in('action_id', actionIds);
+
+    if (proMovesError) {
+      console.error('Pro moves error:', proMovesError);
+      toast({
+        title: "Error",
+        description: `Error loading pro moves: ${proMovesError.message}`,
+        variant: "destructive"
+      });
+      navigate('/week');
+      return;
+    }
+
+    console.log('Pro moves data:', proMovesData);
+
+    // Combine the data
+    const combinedData = focusData.map(focus => ({
+      ...focus,
+      pro_moves: {
+        action_statement: proMovesData?.find(pm => pm.action_id === focus.action_id)?.action_statement || 'No action statement'
+      }
+    }));
+
+    console.log('Combined data:', combinedData);
+    setWeeklyFocus(combinedData);
     setLoading(false);
   };
 

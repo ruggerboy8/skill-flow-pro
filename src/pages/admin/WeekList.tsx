@@ -75,10 +75,9 @@ export default function WeekList() {
                   
                   <Button
                     variant={isLocked ? "secondary" : "default"}
-                    disabled={isLocked}
                     onClick={() => navigate(`/builder/${roleId}/${cycle}/week/${week}`)}
                   >
-                    {isLocked ? "Locked" : "Edit"}
+                    {isLocked ? "View" : "Edit"}
                   </Button>
                 </div>
               );

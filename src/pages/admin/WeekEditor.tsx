@@ -40,6 +40,7 @@ export default function WeekEditor() {
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [proMoves, setProMoves] = useState<{ [key: number]: ProMove[] }>({});
   const [loading, setLoading] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   
   const [slots, setSlots] = useState<SlotData[]>([
     { competency_id: null, action_id: null, is_self_select: false },
@@ -51,6 +52,7 @@ export default function WeekEditor() {
     if (roleId) {
       loadRole();
       loadCompetencies();
+      checkIfLocked();
       loadExistingData();
     }
   }, [roleId, cycle, week]);
@@ -104,6 +106,18 @@ export default function WeekEditor() {
       }));
       setCompetencies(formattedCompetencies);
     }
+  };
+
+  const checkIfLocked = async () => {
+    const { data } = await supabase
+      .from('weekly_scores')
+      .select('id', { count: 'exact' })
+      .eq('weekly_focus.cycle', parseInt(cycle!))
+      .eq('weekly_focus.week_in_cycle', parseInt(week!))
+      .eq('weekly_focus.role_id', parseInt(roleId!))
+      .maybeSingle();
+
+    setIsLocked((data as any)?.count > 0);
   };
 
   const loadProMoves = async (competencyId: number) => {
@@ -241,6 +255,7 @@ export default function WeekEditor() {
       <div className="sticky top-0 bg-background border-b mb-6 pb-4">
         <h1 className="text-3xl font-bold">
           {role?.role_name} · Cycle {cycle} · Week {week}
+          {isLocked && <span className="text-sm font-normal text-muted-foreground ml-2">(Read Only)</span>}
         </h1>
       </div>
       
@@ -253,10 +268,11 @@ export default function WeekEditor() {
             <CardContent className="space-y-4">
               <div>
                 <Label>Competency</Label>
-                  <Select 
-                    value={slot.competency_id?.toString() || ""} 
-                    onValueChange={(value) => handleCompetencyChange(index, value)}
-                  >
+                <Select 
+                  value={slot.competency_id?.toString() || ""} 
+                  onValueChange={(value) => handleCompetencyChange(index, value)}
+                  disabled={isLocked}
+                >
                     <SelectTrigger>
                       <SelectValue placeholder="Select competency" />
                     </SelectTrigger>
@@ -293,6 +309,7 @@ export default function WeekEditor() {
                   <Select 
                     value={slot.is_self_select ? 'self-select' : slot.action_id?.toString() || ""} 
                     onValueChange={(value) => handleProMoveChange(index, value)}
+                    disabled={isLocked}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select pro move" />
@@ -317,15 +334,17 @@ export default function WeekEditor() {
             variant="outline" 
             onClick={() => navigate(`/builder/${roleId}/${cycle}`)}
           >
-            Cancel
+            Back
           </Button>
-          <Button 
-            onClick={handleSave}
-            disabled={!canSave() || loading}
-            className="flex-1"
-          >
-            {loading ? "Saving..." : "Save Week"}
-          </Button>
+          {!isLocked && (
+            <Button 
+              onClick={handleSave}
+              disabled={!canSave() || loading}
+              className="flex-1"
+            >
+              {loading ? "Saving..." : "Save Week"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

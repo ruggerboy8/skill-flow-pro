@@ -66,23 +66,41 @@ export default function WeekEditor() {
   };
 
   const loadCompetencies = async () => {
-    const { data } = await supabase
+    // First try simple query to see if domain_name is directly available
+    const { data, error } = await supabase
       .from('competencies')
       .select(`
         competency_id, 
         name, 
         code,
-        domains!inner(domain_name)
+        domain_id
       `)
       .eq('role_id', parseInt(roleId!))
       .order('name');
     
+    if (error) {
+      console.error('Error loading competencies:', error);
+      return;
+    }
+    
     if (data) {
+      // Get domain names for the competencies
+      const domainIds = [...new Set(data.map(c => c.domain_id))];
+      const { data: domains } = await supabase
+        .from('domains')
+        .select('domain_id, domain_name')
+        .in('domain_id', domainIds);
+      
+      const domainMap = domains?.reduce((acc, d) => {
+        acc[d.domain_id] = d.domain_name;
+        return acc;
+      }, {} as Record<number, string>) || {};
+      
       const formattedCompetencies = data.map(item => ({
         competency_id: item.competency_id,
         name: item.name,
         code: item.code,
-        domain_name: (item.domains as any).domain_name
+        domain_name: domainMap[item.domain_id] || 'Unknown'
       }));
       setCompetencies(formattedCompetencies);
     }
@@ -242,7 +260,7 @@ export default function WeekEditor() {
                     <SelectTrigger>
                       <SelectValue placeholder="Select competency" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white z-50">
                       {domains.map(domainName => (
                         <SelectGroup key={domainName}>
                           <SelectLabel 
@@ -255,10 +273,12 @@ export default function WeekEditor() {
                             <SelectItem 
                               key={comp.competency_id} 
                               value={comp.competency_id.toString()}
-                              style={{ color: getDomainColor(domainName) }}
-                              className="ml-2"
+                              className="ml-2 text-slate-700"
                             >
-                              {comp.code} - {comp.name}
+                              <span style={{ color: getDomainColor(domainName) }} className="font-medium">
+                                {comp.code}
+                              </span>
+                              {' - '}{comp.name}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -277,7 +297,7 @@ export default function WeekEditor() {
                     <SelectTrigger>
                       <SelectValue placeholder="Select pro move" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white z-50">
                       <SelectItem value="self-select">Self-Select</SelectItem>
                       {proMoves[slot.competency_id]?.map(move => (
                         <SelectItem key={move.action_id} value={move.action_id.toString()}>

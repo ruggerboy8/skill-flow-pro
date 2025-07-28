@@ -12,15 +12,13 @@ interface WeeklyFocus {
   week_in_cycle: number;
   role_id: number;
   action_id: number;
-  action_statement: string;
 }
 
 interface WeekStatus {
-  weekly_focus_id: string;
-  confidence_score: number | null;
-  performance_score: number | null;
   cycle: number;
   week_in_cycle: number;
+  hasConfidence: boolean;
+  hasPerformance: boolean;
 }
 
 interface Staff {
@@ -79,11 +77,13 @@ export default function Index() {
 
     setLoading(true);
     
-    // Load weekly focus for this staff's role using the new view
+    // Load weekly focus for this staff's role for cycle 1
     const { data: focusData, error: focusError } = await supabase
-      .from('v_weekly_focus')
-      .select('id, cycle, week_in_cycle, role_id, action_id, action_statement')
-      .eq('role_id', staff.role_id);
+      .from('weekly_focus')
+      .select('id, cycle, week_in_cycle, role_id, action_id')
+      .eq('role_id', staff.role_id)
+      .eq('cycle', 1)
+      .order('week_in_cycle');
 
     if (focusError) {
       toast({
@@ -97,43 +97,44 @@ export default function Index() {
 
     setWeeklyFocus(focusData || []);
 
-    // Load weekly scores for this staff
-    const { data: scoresData, error: scoresError } = await supabase
-      .from('weekly_scores')
-      .select(`
-        weekly_focus_id, 
-        confidence_score, 
-        performance_score,
-        weekly_focus!inner(cycle, week_in_cycle)
-      `)
-      .eq('staff_id', staff.id);
-
-    if (scoresError) {
-      toast({
-        title: "Error",
-        description: "Failed to load scores",
-        variant: "destructive"
-      });
-    } else {
-      // Transform the data to match our interface
-      const transformedData: WeekStatus[] = scoresData?.map(item => ({
-        weekly_focus_id: item.weekly_focus_id,
-        confidence_score: item.confidence_score,
-        performance_score: item.performance_score,
-        cycle: (item.weekly_focus as any).cycle,
-        week_in_cycle: (item.weekly_focus as any).week_in_cycle
-      })) || [];
+    // Calculate week status based on completion
+    const weekStatusMap = new Map<string, WeekStatus>();
+    
+    // Get all unique weeks
+    const weeks = [...new Set(focusData?.map(f => f.week_in_cycle) || [])];
+    
+    for (const weekInCycle of weeks) {
+      const weekFocusItems = focusData?.filter(f => f.week_in_cycle === weekInCycle) || [];
+      const focusIds = weekFocusItems.map(f => f.id);
       
-      setWeekStatuses(transformedData);
+      if (focusIds.length > 0) {
+        const { data: scoresData } = await supabase
+          .from('weekly_scores')
+          .select('weekly_focus_id, confidence_score, performance_score')
+          .eq('staff_id', staff.id)
+          .in('weekly_focus_id', focusIds);
+        
+        const hasConfidence = (scoresData || []).every(score => score.confidence_score !== null);
+        const hasPerformance = (scoresData || []).every(score => score.performance_score !== null);
+        
+        weekStatusMap.set(`1-${weekInCycle}`, {
+          cycle: 1,
+          week_in_cycle: weekInCycle,
+          hasConfidence: hasConfidence && scoresData && scoresData.length === focusIds.length,
+          hasPerformance: hasPerformance && scoresData && scoresData.length === focusIds.length
+        });
+      }
     }
+    
+    setWeekStatuses(Array.from(weekStatusMap.values()));
     setLoading(false);
   };
 
   const getTileStatus = (cycle: number, weekInCycle: number): 'grey' | 'yellow' | 'green' => {
     const weekStatus = weekStatuses.find(ws => ws.cycle === cycle && ws.week_in_cycle === weekInCycle);
     
-    if (!weekStatus) return 'grey';
-    if (weekStatus.performance_score === null) return 'yellow';
+    if (!weekStatus || !weekStatus.hasConfidence) return 'grey';
+    if (!weekStatus.hasPerformance) return 'yellow';
     return 'green';
   };
 
@@ -153,13 +154,24 @@ export default function Index() {
     }
   };
 
+  const getNextIncompleteWeek = (): {cycle: number, week: number} | null => {
+    // Find the first week that isn't fully complete
+    for (let week = 1; week <= 6; week++) {
+      const status = getTileStatus(1, week);
+      if (status !== 'green') {
+        return { cycle: 1, week };
+      }
+    }
+    return null; // All weeks complete
+  };
+
   const handleWeekClick = async (cycle: number, weekInCycle: number) => {
     if (!staff) return;
 
     // Check if weekly_focus exists for this cycle/week/role
-    const weekFocus = weeklyFocus.find(wf => wf.cycle === cycle && wf.week_in_cycle === weekInCycle);
+    const weekFocus = weeklyFocus.filter(wf => wf.cycle === cycle && wf.week_in_cycle === weekInCycle);
     
-    if (!weekFocus) {
+    if (weekFocus.length === 0) {
       toast({
         title: "No Pro Moves set yet",
         description: `Cycle ${cycle}, Week ${weekInCycle} doesn't have any Pro Moves configured yet.`,
@@ -198,56 +210,63 @@ export default function Index() {
     );
   }
 
-  const totalCycles = 4; // Total number of cycles available
+  const nextWeek = getNextIncompleteWeek();
 
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">SkillCheck Cycles</h1>
+          <h1 className="text-3xl font-bold">SkillCheck Progress</h1>
           <Button onClick={handleSignOut} variant="outline">
             Sign Out
           </Button>
         </div>
 
-        <div className="space-y-12">
-          {Array.from({ length: totalCycles }, (_, cycleIndex) => {
-            const cycle = cycleIndex + 1;
-            return (
-              <div key={cycle} className="space-y-4">
-                <h2 className="text-xl font-semibold text-center">
-                  Cycle {cycle}
-                </h2>
+        {nextWeek && (
+          <div className="mb-8 p-6 bg-primary/10 rounded-lg border border-primary/20">
+            <h2 className="text-xl font-semibold mb-2">Continue Your Journey</h2>
+            <p className="text-muted-foreground mb-4">
+              You're currently on Cycle {nextWeek.cycle}, Week {nextWeek.week}
+            </p>
+            <Button onClick={() => handleWeekClick(nextWeek.cycle, nextWeek.week)} size="lg">
+              Continue Week {nextWeek.week}
+            </Button>
+          </div>
+        )}
+
+        <div className="space-y-8">
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-center">
+              Cycle 1 - Your Personal Journey
+            </h2>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }, (_, weekIndex) => {
+                const weekInCycle = weekIndex + 1;
+                const status = getTileStatus(1, weekInCycle);
                 
-                <div className="grid grid-cols-3 gap-4">
-                  {Array.from({ length: 6 }, (_, weekIndex) => {
-                    const weekInCycle = weekIndex + 1;
-                    const status = getTileStatus(cycle, weekInCycle);
-                    
-                    return (
-                      <Card 
-                        key={`${cycle}-${weekInCycle}`}
-                        className={`cursor-pointer transition-all hover:scale-105 ${getWeekColor(status)}`}
-                        onClick={() => handleWeekClick(cycle, weekInCycle)}
-                        title={getTooltipText(status)}
-                      >
-                        <CardContent className="p-6 text-center">
-                          <div className="text-lg font-semibold">
-                            Week {weekInCycle}
-                          </div>
-                          <div className="text-sm mt-2 opacity-90">
-                            {status === 'green' && '✓ All done – great job!'}
-                            {status === 'yellow' && '◐ Confidence submitted – performance pending'}
-                            {status === 'grey' && '○ Not started'}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+                return (
+                  <Card 
+                    key={`1-${weekInCycle}`}
+                    className={`cursor-pointer transition-all hover:scale-105 ${getWeekColor(status)}`}
+                    onClick={() => handleWeekClick(1, weekInCycle)}
+                    title={getTooltipText(status)}
+                  >
+                    <CardContent className="p-6 text-center">
+                      <div className="text-lg font-semibold">
+                        Week {weekInCycle}
+                      </div>
+                      <div className="text-sm mt-2 opacity-90">
+                        {status === 'green' && '✓ Completed'}
+                        {status === 'yellow' && '◐ In Progress'}
+                        {status === 'grey' && '○ Not Started'}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </div>

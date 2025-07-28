@@ -1,0 +1,42 @@
+-- Insert weekly_focus data for personalized progression system
+-- Setting iso_week and iso_year to defaults since we're moving to completion-based progression
+
+INSERT INTO public.weekly_focus (cycle, week_in_cycle, action_id, competency_id, role_id, display_order, self_select, iso_week, iso_year) VALUES
+-- Role 1 data
+(1, 1, 1, 9, 1, 1, false, 1, 2025),
+(1, 1, 2, 5, 1, 2, false, 1, 2025),
+(1, 1, 3, 6, 1, 3, false, 1, 2025),
+(1, 2, 4, 1, 1, 1, false, 2, 2025),
+(1, 2, 5, 8, 1, 2, false, 2, 2025),
+(1, 2, 6, 7, 1, 3, false, 2, 2025),
+(1, 3, 7, 10, 1, 1, false, 3, 2025),
+(1, 3, 8, 2, 1, 2, false, 3, 2025),
+(1, 3, 9, 11, 1, 3, false, 3, 2025),
+(1, 4, 10, 3, 1, 1, false, 4, 2025),
+(1, 4, 11, 4, 1, 2, false, 4, 2025),
+(1, 4, 12, 14, 1, 3, false, 4, 2025),
+(1, 5, 13, 13, 1, 1, false, 5, 2025),
+(1, 5, 14, 12, 1, 2, false, 5, 2025),
+(1, 5, 15, 15, 1, 3, false, 5, 2025),
+(1, 6, 16, 16, 1, 1, false, 6, 2025),
+(1, 6, 17, 1, 1, 2, false, 6, 2025),
+(1, 6, 18, 10, 1, 3, false, 6, 2025),
+-- Role 2 data  
+(1, 1, 19, 17, 2, 1, false, 1, 2025),
+(1, 1, 20, 27, 2, 2, false, 1, 2025),
+(1, 1, 21, 23, 2, 3, false, 1, 2025),
+(1, 2, 22, 20, 2, 1, false, 2, 2025),
+(1, 2, 23, 22, 2, 2, false, 2, 2025),
+(1, 2, 24, 26, 2, 3, false, 2, 2025),
+(1, 3, 25, 18, 2, 1, false, 3, 2025),
+(1, 3, 26, 21, 2, 2, false, 3, 2025),
+(1, 3, 27, 22, 2, 3, false, 3, 2025),
+(1, 4, 28, 19, 2, 1, false, 4, 2025),
+(1, 4, 29, 24, 2, 2, false, 4, 2025),
+(1, 4, 30, 25, 2, 3, false, 4, 2025),
+(1, 5, 31, 29, 2, 1, false, 5, 2025),
+(1, 5, 32, 28, 2, 2, false, 5, 2025),
+(1, 5, 33, 31, 2, 3, false, 5, 2025),
+(1, 6, 34, 32, 2, 1, false, 6, 2025),
+(1, 6, 35, 29, 2, 2, false, 6, 2025),
+(1, 6, 36, 31, 2, 3, false, 6, 2025);

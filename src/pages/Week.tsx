@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getISOWeek, getISOWeekYear } from 'date-fns';
 
 interface Staff {
   id: string;
@@ -17,9 +15,7 @@ interface Staff {
 interface WeeklyFocus {
   id: string;
   display_order: number;
-  pro_moves: {
-    action_statement: string;
-  };
+  action_statement: string;
 }
 
 interface WeeklyScore {
@@ -30,14 +26,15 @@ interface WeeklyScore {
 
 export default function Week() {
   const [staff, setStaff] = useState<Staff | null>(null);
-  const [currentWeek, setCurrentWeek] = useState(getISOWeek(new Date()));
-  const [currentYear, setCurrentYear] = useState(getISOWeekYear(new Date()));
+  const [cycle, setCycle] = useState(1);
+  const [weekInCycle, setWeekInCycle] = useState(1);
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const params = useParams();
 
   useEffect(() => {
     if (user) {
@@ -46,17 +43,26 @@ export default function Week() {
   }, [user]);
 
   useEffect(() => {
-    if (staff) {
+    // Parse cycle and week from URL params (format: "1-2" for cycle 1, week 2)
+    if (params.weekId) {
+      const [cycleStr, weekStr] = params.weekId.split('-');
+      setCycle(parseInt(cycleStr) || 1);
+      setWeekInCycle(parseInt(weekStr) || 1);
+    }
+  }, [params.weekId]);
+
+  useEffect(() => {
+    if (staff && cycle && weekInCycle) {
       loadWeekData();
     }
-  }, [staff, currentWeek, currentYear]);
+  }, [staff, cycle, weekInCycle]);
 
   const loadStaffProfile = async () => {
     const { data, error } = await supabase
       .from('staff')
       .select('id, role_id')
       .eq('user_id', user!.id)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       navigate('/setup');
@@ -71,16 +77,16 @@ export default function Week() {
     
     setLoading(true);
     
-    // Load weekly focus
+    // Load weekly focus with pro moves data
     const { data: focusData, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
         id,
         display_order,
-        pro_moves(action_statement)
+        pro_moves!inner(action_statement)
       `)
-      .eq('iso_week', currentWeek)
-      .eq('iso_year', currentYear)
+      .eq('cycle', cycle)
+      .eq('week_in_cycle', weekInCycle)
       .eq('role_id', staff.role_id)
       .order('display_order');
 
@@ -94,7 +100,14 @@ export default function Week() {
       return;
     }
 
-    setWeeklyFocus(focusData || []);
+    // Transform the data to flatten the pro_moves relation
+    const transformedFocus = (focusData || []).map(item => ({
+      id: item.id,
+      display_order: item.display_order,
+      action_statement: (item.pro_moves as any)?.action_statement || ''
+    }));
+
+    setWeeklyFocus(transformedFocus);
 
     // Load existing scores
     if (focusData && focusData.length > 0) {
@@ -136,17 +149,6 @@ export default function Week() {
     });
   };
 
-  const generateWeekOptions = () => {
-    const options = [];
-    for (let week = 1; week <= 52; week++) {
-      options.push(
-        <SelectItem key={week} value={week.toString()}>
-          Week {week}
-        </SelectItem>
-      );
-    }
-    return options;
-  };
 
   if (loading) {
     return (
@@ -163,23 +165,13 @@ export default function Week() {
           <CardHeader className="text-center">
             <CardTitle>No Pro Moves Set</CardTitle>
             <CardDescription>
-              No Pro Moves have been configured for Week {currentWeek}, {currentYear}
+              No Pro Moves have been configured for Cycle {cycle}, Week {weekInCycle}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Select value={currentWeek.toString()} onValueChange={(value) => setCurrentWeek(parseInt(value))}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateWeekOptions()}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" onClick={() => setCurrentYear(currentYear === 2024 ? 2025 : 2024)}>
-                {currentYear}
-              </Button>
-            </div>
+            <Button variant="outline" onClick={() => navigate('/')} className="w-full">
+              Back to Dashboard
+            </Button>
             <Button variant="outline" onClick={signOut} className="w-full">
               Sign Out
             </Button>
@@ -196,23 +188,10 @@ export default function Week() {
           <CardHeader>
             <CardTitle className="text-center">SkillCheck</CardTitle>
             <CardDescription className="text-center">
-              Week {currentWeek}, {currentYear}
+              Cycle {cycle}, Week {weekInCycle}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Select value={currentWeek.toString()} onValueChange={(value) => setCurrentWeek(parseInt(value))}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateWeekOptions()}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" onClick={() => setCurrentYear(currentYear === 2024 ? 2025 : 2024)}>
-                {currentYear}
-              </Button>
-            </div>
             
             <div className="space-y-3">
               <h3 className="font-medium">This Week's Pro Moves:</h3>
@@ -224,7 +203,7 @@ export default function Week() {
                       <Badge variant="outline" className="text-xs">
                         {index + 1}
                       </Badge>
-                      <p className="text-sm flex-1">{focus.pro_moves.action_statement}</p>
+                      <p className="text-sm flex-1">{focus.action_statement}</p>
                     </div>
                     <div className="flex gap-2 mt-2">
                       {score?.confidence_score && (
@@ -246,24 +225,24 @@ export default function Week() {
             <div className="space-y-2">
               {isWeekComplete() ? (
                 <Badge variant="default" className="w-full justify-center py-2">
-                  ✓ Completed for Week {currentWeek}
+                  ✓ Completed for Cycle {cycle}, Week {weekInCycle}
                 </Badge>
               ) : (
                 <>
                   {canRateConfidence() && (
                     <Button 
-                      onClick={() => navigate(`/confidence/${currentWeek}-${currentYear}`)}
+                      onClick={() => navigate(`/confidence/${cycle}-${weekInCycle}`)}
                       className="w-full h-12"
                     >
-                      Rate Confidence (Monday)
+                      Rate Confidence
                     </Button>
                   )}
                   {canRatePerformance() && (
                     <Button 
-                      onClick={() => navigate(`/performance/${currentWeek}-${currentYear}`)}
+                      onClick={() => navigate(`/performance/${cycle}-${weekInCycle}`)}
                       className="w-full h-12"
                     >
-                      Rate Performance (Thursday)
+                      Rate Performance
                     </Button>
                   )}
                 </>

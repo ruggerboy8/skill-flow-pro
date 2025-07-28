@@ -71,7 +71,19 @@ export default function Confidence() {
       .eq('role_id', staffData.role_id)
       .order('display_order');
 
-    if (focusError || !focusData || focusData.length === 0) {
+    if (focusError) {
+      console.error('Focus error:', focusError);
+      toast({
+        title: "Error",
+        description: `Database error: ${focusError.message}`,
+        variant: "destructive"
+      });
+      navigate('/week');
+      return;
+    }
+
+    if (!focusData || focusData.length === 0) {
+      console.log('No focus data found for:', { weekNum, yearNum, roleId: staffData.role_id });
       toast({
         title: "Error",
         description: "No Pro Moves found for this week",

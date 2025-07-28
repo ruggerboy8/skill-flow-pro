@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import Setup from "./pages/Setup";
 import SetupPassword from "./pages/SetupPassword";
+import Welcome from "./pages/Welcome";
 import Index from "./pages/Index";
 import Week from "./pages/Week";
 import WeekInfo from "./pages/WeekInfo";
@@ -54,6 +55,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
+        <Route path="welcome" element={<Welcome />} />
         <Route path="setup" element={<Setup />} />
         <Route path="create-password" element={<SetupPassword />} />
         <Route path="setup-password" element={<SetupPassword />} />

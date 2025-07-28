@@ -65,7 +65,7 @@ export default function SetupPassword() {
 
       // Redirect after a short delay
       setTimeout(() => {
-        navigate('/');
+        navigate('/welcome');
       }, 2000);
 
     } catch (error: any) {
@@ -89,8 +89,8 @@ export default function SetupPassword() {
             <p className="text-muted-foreground mb-4">
               You can now sign in with your email and password.
             </p>
-            <Button onClick={() => navigate('/')} className="w-full">
-              Go to Home →
+            <Button onClick={() => navigate('/welcome')} className="w-full">
+              Continue →
             </Button>
           </CardContent>
         </Card>

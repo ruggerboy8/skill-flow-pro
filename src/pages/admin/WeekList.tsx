@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Lock } from 'lucide-react';
+import { Lock, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Role {
@@ -51,7 +51,18 @@ export default function WeekList() {
   return (
     <div className="container mx-auto p-6">
       <div className="sticky top-0 bg-background border-b mb-6 pb-4">
-        <h1 className="text-3xl font-bold">{role?.role_name} · Cycle {cycle}</h1>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/builder/${roleId}`)}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Cycles
+          </Button>
+          <h1 className="text-3xl font-bold">{role?.role_name} · Cycle {cycle}</h1>
+        </div>
       </div>
       
       <Card>

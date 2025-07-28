@@ -348,7 +348,20 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      get_weekly_review: {
+        Args: {
+          p_cycle: number
+          p_week: number
+          p_role_id: number
+          p_staff_id: string
+        }
+        Returns: {
+          domain_name: string
+          action_statement: string
+          confidence_score: number
+          performance_score: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

@@ -151,6 +151,7 @@ export type Database = {
       weekly_focus: {
         Row: {
           action_id: number | null
+          competency_id: number | null
           created_at: string | null
           cycle: number
           display_order: number | null
@@ -158,10 +159,12 @@ export type Database = {
           iso_week: number
           iso_year: number
           role_id: number | null
+          self_select: boolean
           week_in_cycle: number
         }
         Insert: {
           action_id?: number | null
+          competency_id?: number | null
           created_at?: string | null
           cycle: number
           display_order?: number | null
@@ -169,10 +172,12 @@ export type Database = {
           iso_week: number
           iso_year: number
           role_id?: number | null
+          self_select?: boolean
           week_in_cycle: number
         }
         Update: {
           action_id?: number | null
+          competency_id?: number | null
           created_at?: string | null
           cycle?: number
           display_order?: number | null
@@ -180,6 +185,7 @@ export type Database = {
           iso_week?: number
           iso_year?: number
           role_id?: number | null
+          self_select?: boolean
           week_in_cycle?: number
         }
         Relationships: [
@@ -189,6 +195,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pro_moves"
             referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "weekly_focus_competency_id_fkey"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "competencies"
+            referencedColumns: ["competency_id"]
           },
           {
             foreignKeyName: "weekly_focus_role_id_fkey"
@@ -207,6 +220,7 @@ export type Database = {
           id: string
           performance_date: string | null
           performance_score: number | null
+          selected_action_id: number | null
           staff_id: string | null
           updated_at: string | null
           weekly_focus_id: string | null
@@ -218,6 +232,7 @@ export type Database = {
           id?: string
           performance_date?: string | null
           performance_score?: number | null
+          selected_action_id?: number | null
           staff_id?: string | null
           updated_at?: string | null
           weekly_focus_id?: string | null
@@ -229,11 +244,19 @@ export type Database = {
           id?: string
           performance_date?: string | null
           performance_score?: number | null
+          selected_action_id?: number | null
           staff_id?: string | null
           updated_at?: string | null
           weekly_focus_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "weekly_scores_selected_action_id_fkey"
+            columns: ["selected_action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
           {
             foreignKeyName: "weekly_scores_staff_id_fkey"
             columns: ["staff_id"]

@@ -152,29 +152,35 @@ export type Database = {
         Row: {
           action_id: number | null
           created_at: string | null
+          cycle: number
           display_order: number | null
           id: string
           iso_week: number
           iso_year: number
           role_id: number | null
+          week_in_cycle: number
         }
         Insert: {
           action_id?: number | null
           created_at?: string | null
+          cycle: number
           display_order?: number | null
           id?: string
           iso_week: number
           iso_year: number
           role_id?: number | null
+          week_in_cycle: number
         }
         Update: {
           action_id?: number | null
           created_at?: string | null
+          cycle?: number
           display_order?: number | null
           id?: string
           iso_week?: number
           iso_year?: number
           role_id?: number | null
+          week_in_cycle?: number
         }
         Relationships: [
           {
@@ -253,6 +259,13 @@ export type Database = {
             foreignKeyName: "weekly_scores_weekly_focus_id_fkey"
             columns: ["weekly_focus_id"]
             isOneToOne: false
+            referencedRelation: "v_weekly_focus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_weekly_focus_id_fkey"
+            columns: ["weekly_focus_id"]
+            isOneToOne: false
             referencedRelation: "weekly_focus"
             referencedColumns: ["id"]
           },
@@ -273,6 +286,36 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "staff_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+        ]
+      }
+      v_weekly_focus: {
+        Row: {
+          action_id: number | null
+          action_statement: string | null
+          created_at: string | null
+          cycle: number | null
+          display_order: number | null
+          id: string | null
+          iso_week: number | null
+          iso_year: number | null
+          role_id: number | null
+          week_in_cycle: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_focus_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "weekly_focus_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"

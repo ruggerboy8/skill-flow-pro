@@ -15,6 +15,7 @@ import Confidence from "./pages/Confidence";
 import ConfidenceWizard from "./pages/ConfidenceWizard";
 import Performance from "./pages/Performance";
 import PerformanceWizard from "./pages/PerformanceWizard";
+import Review from "./pages/Review";
 import Stats from "./pages/Stats";
 import Profile from "./pages/Profile";
 import AdminBuilder from "./pages/AdminBuilder";
@@ -57,6 +58,7 @@ function AppRoutes() {
         <Route path="confidence/:focusId/:index" element={<ConfidenceWizard />} />
         <Route path="performance/:week" element={<Performance />} />
         <Route path="performance/:focusId/:index" element={<PerformanceWizard />} />
+        <Route path="review/:cycle/:week" element={<Review />} />
         <Route path="admin/builder" element={<AdminBuilder />} />
         <Route path="*" element={<NotFound />} />
       </Route>

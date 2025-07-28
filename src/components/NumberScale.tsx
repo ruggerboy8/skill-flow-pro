@@ -8,7 +8,7 @@ interface NumberScaleProps {
 }
 
 export default function NumberScale({ value, onChange, disabled }: NumberScaleProps) {
-  const [showTooltip, setShowTooltip] = useState<number | null>(null);
+  const [persistentTooltip, setPersistentTooltip] = useState<number | null>(null);
 
   const tooltipText = {
     4: "Absolute PRO: you never miss, could teach a seminar.",
@@ -19,7 +19,7 @@ export default function NumberScale({ value, onChange, disabled }: NumberScalePr
 
   const handleClick = (score: number) => {
     onChange(score);
-    setShowTooltip(score);
+    setPersistentTooltip(score);
   };
 
   return (
@@ -31,6 +31,7 @@ export default function NumberScale({ value, onChange, disabled }: NumberScalePr
             variant={value === score ? "default" : "outline"}
             onClick={() => handleClick(score)}
             disabled={disabled}
+            aria-label={`${score === 4 ? 'Confidence' : 'Performance'} ${score} – ${tooltipText[score as keyof typeof tooltipText]}`}
             className={`h-12 text-lg font-semibold ${
               value === score 
                 ? 'bg-primary text-primary-foreground' 
@@ -42,9 +43,9 @@ export default function NumberScale({ value, onChange, disabled }: NumberScalePr
         ))}
       </div>
 
-      {showTooltip && (
-        <div className="text-sm text-muted-foreground p-3 bg-muted rounded-lg transition-opacity duration-150">
-          <strong>{showTooltip}</strong> – {tooltipText[showTooltip as keyof typeof tooltipText]}
+      {persistentTooltip && (
+        <div className="text-sm text-muted-foreground p-3 bg-muted rounded-lg">
+          <strong>{persistentTooltip}</strong> – {tooltipText[persistentTooltip as keyof typeof tooltipText]}
         </div>
       )}
     </div>

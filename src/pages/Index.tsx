@@ -168,6 +168,14 @@ export default function Index() {
   const handleWeekClick = async (cycle: number, weekInCycle: number) => {
     if (!staff) return;
 
+    const weekStatus = weekStatuses.find(ws => ws.cycle === cycle && ws.week_in_cycle === weekInCycle);
+    
+    // If week is completed, go to review
+    if (weekStatus && weekStatus.hasConfidence && weekStatus.hasPerformance) {
+      navigate(`/review/${cycle}/${weekInCycle}`);
+      return;
+    }
+
     // Check if weekly_focus exists for this cycle/week/role using new query
     const { data: focusRows, error } = await supabase
       .from('v_weekly_focus')

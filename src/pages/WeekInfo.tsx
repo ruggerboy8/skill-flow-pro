@@ -123,7 +123,7 @@ export default function WeekInfo() {
           <CardHeader>
             <CardTitle className="text-center">Consider the following Pro Moves</CardTitle>
             <CardDescription className="text-center">
-              <h2 className="text-lg font-semibold">Cycle {cycleNum} · Week {weekNum}</h2>
+              Cycle {cycleNum} · Week {weekNum}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

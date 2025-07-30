@@ -58,6 +58,13 @@ export default function CoachDetail() {
     }
   }, [staffId]);
 
+  useEffect(() => {
+    // Load week data when cycle changes
+    if (staffInfo && selectedCycle) {
+      loadAllWeeksForCycle(selectedCycle, staffInfo.role_id, staffInfo.id);
+    }
+  }, [selectedCycle, staffInfo]);
+
   const loadStaffInfo = async () => {
     if (!staffId) return;
 
@@ -102,13 +109,52 @@ export default function CoachDetail() {
 
         setCycles(cyclesWithWeeks);
         if (uniqueCycles.length > 0) {
-          setSelectedCycle(Math.max(...uniqueCycles));
+          const latestCycle = Math.max(...uniqueCycles);
+          setSelectedCycle(latestCycle);
+          // Load all week data for the latest cycle immediately
+          loadAllWeeksForCycle(latestCycle, staff.role_id, staff.id);
         }
       }
     } catch (error) {
       console.error('Error loading staff info:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAllWeeksForCycle = async (cycle: number, roleId: number, staffId: string) => {
+    // Load all 6 weeks for the cycle
+    for (let week = 1; week <= 6; week++) {
+      try {
+        const { data: weekData, error } = await supabase.rpc('get_weekly_review', {
+          p_cycle: cycle,
+          p_week: week,
+          p_role_id: roleId,
+          p_staff_id: staffId
+        });
+
+        if (error) throw error;
+
+        // Calculate missing scores
+        const confMissing = (weekData || []).filter((item: WeekData) => item.confidence_score === null).length;
+        const perfMissing = (weekData || []).filter((item: WeekData) => item.performance_score === null).length;
+
+        setCycles(prev => prev.map(c => {
+          if (c.cycle === cycle) {
+            const newWeeks = new Map(c.weeks);
+            newWeeks.set(week, {
+              loaded: true,
+              data: weekData || [],
+              confMissing,
+              perfMissing
+            });
+            return { ...c, weeks: newWeeks };
+          }
+          return c;
+        }));
+      } catch (error) {
+        console.error(`Error loading week ${week} data:`, error);
+      }
     }
   };
 

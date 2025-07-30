@@ -192,15 +192,12 @@ export default function CoachDashboard() {
           >
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <h3 className="font-semibold">{member.name}</h3>
-                    <p className="text-sm text-muted-foreground">{member.role_name}</p>
-                  </div>
-                  {getStatusBadge(member.conf_missing, member.perf_missing)}
-                </div>
-                <div className="text-right text-sm text-muted-foreground">
-                  {formatDate(member.last_updated)}
+                <div>
+                  <h3 className="font-semibold">{member.name}</h3>
+                  <p className="text-sm text-muted-foreground">{member.role_name}</p>
+                  {member.location && (
+                    <p className="text-xs text-muted-foreground">{member.location}</p>
+                  )}
                 </div>
               </div>
             </CardContent>

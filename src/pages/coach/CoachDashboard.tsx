@@ -51,7 +51,7 @@ export default function CoachDashboard() {
         .select(`
           id,
           name,
-          location,
+          primary_location,
           role_id,
           roles!inner(role_name),
           weekly_scores(
@@ -81,7 +81,7 @@ export default function CoachDashboard() {
           id: member.id,
           name: member.name,
           role_name: (member.roles as any).role_name,
-          location: member.location,
+          location: member.primary_location,
           conf_missing: confMissing,
           perf_missing: perfMissing,
           last_updated: lastUpdated ? new Date(lastUpdated).toISOString() : null

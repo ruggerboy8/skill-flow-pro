@@ -261,11 +261,14 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
   }
 
   const getStatusBadge = () => {
-    if (hasPerformance) {
-      return <Badge className="bg-green-500 text-white text-xs">Perf ✓</Badge>;
-    } else if (hasConfidence) {
-      return <Badge className="bg-yellow-500 text-white text-xs">Conf ✓</Badge>;
+    if (hasConfidence && hasPerformance) {
+      // Both completed - green checkmark
+      return <span className="text-green-600 text-lg font-bold">✓</span>;
+    } else if (hasConfidence || hasPerformance) {
+      // In progress - yellow dot
+      return <span className="text-yellow-600 text-lg font-bold">●</span>;
     }
+    // Not started - nothing
     return null;
   };
 

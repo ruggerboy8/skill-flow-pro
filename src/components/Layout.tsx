@@ -14,7 +14,6 @@ export default function Layout() {
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Stats', href: '/stats', icon: BarChart3 },
-    { name: 'Profile', href: '/profile', icon: User },
     ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
     ...(isAdmin ? [{ name: 'Builder', href: '/admin/builder', icon: Settings }] : [])
   ];

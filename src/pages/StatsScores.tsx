@@ -238,16 +238,37 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
   const checkConfidence = async () => {
     if (!staffData) return;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('weekly_scores')
       .select('confidence_score, performance_score, weekly_focus!inner(cycle, week_in_cycle)')
       .eq('staff_id', staffData.id)
       .eq('weekly_focus.cycle', cycle)
       .eq('weekly_focus.week_in_cycle', week);
 
-    const scores = data?.[0];
-    setHasConfidence(scores?.confidence_score !== null);
-    setHasPerformance(scores?.performance_score !== null);
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      setHasConfidence(false);
+      setHasPerformance(false);
+      return;
+    }
+
+    // Check if ALL items have confidence scores
+    const allHaveConfidence = data.every(r => r.confidence_score !== null);
+    // Check if ALL items have performance scores  
+    const allHavePerformance = data.every(r => r.performance_score !== null);
+    // Check if ANY items have confidence scores
+    const someHaveConfidence = data.some(r => r.confidence_score !== null);
+    // Check if ANY items have performance scores
+    const someHavePerformance = data.some(r => r.performance_score !== null);
+
+    // hasConfidence = true if at least some confidence scores exist (to show the week)
+    setHasConfidence(someHaveConfidence);
+    // hasPerformance = true only if ALL items are completely done (confidence + performance)
+    setHasPerformance(allHaveConfidence && allHavePerformance);
   };
 
   const handleExpand = () => {

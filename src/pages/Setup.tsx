@@ -79,7 +79,7 @@ export default function Setup() {
         title: "Profile created",
         description: "Welcome to SkillCheck!"
       });
-      navigate('/week');
+      navigate('/');
     }
     setLoading(false);
   };

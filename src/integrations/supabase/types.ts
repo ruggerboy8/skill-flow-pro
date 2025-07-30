@@ -42,7 +42,15 @@ export type Database = {
           role_id?: number | null
           status?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "competencies_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
+        ]
       }
       domains: {
         Row: {

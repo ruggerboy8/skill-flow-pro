@@ -34,7 +34,7 @@ export default function StatsGlance() {
 
       if (!staffData) return;
 
-      // Get latest completed cycle for this user
+      // Get latest cycle with performance data
       const { data: latestCycleData } = await supabase
         .from('weekly_scores')
         .select('weekly_focus!inner(cycle)')
@@ -51,48 +51,48 @@ export default function StatsGlance() {
       const cycle = (latestCycleData[0].weekly_focus as any).cycle;
       setLatestCycle(cycle);
 
-      // Get domain averages for that cycle
-      const { data: averagesData } = await supabase
-        .from('weekly_scores')
-        .select(`
-          performance_score,
-          weekly_focus!inner(
-            cycle,
-            action_id,
-            pro_moves!inner(
-              competency_id,
-              competencies!inner(
-                domain_id,
-                domains!inner(domain_name)
-              )
-            )
-          )
-        `)
-        .eq('staff_id', staffData.id)
-        .eq('weekly_focus.cycle', cycle)
-        .not('performance_score', 'is', null);
+      // Get all weeks for this cycle to calculate averages
+      const { data: weeksData } = await supabase
+        .from('weekly_focus')
+        .select('week_in_cycle')
+        .eq('role_id', staffData.role_id)
+        .eq('cycle', cycle)
+        .order('week_in_cycle');
 
-      if (averagesData) {
-        // Group by domain and calculate averages
-        const domainGroups = new Map<string, number[]>();
-        
-        averagesData.forEach(item => {
-          const domainName = (item.weekly_focus as any).pro_moves.competencies.domains.domain_name;
-          const score = item.performance_score;
-          
-          if (!domainGroups.has(domainName)) {
-            domainGroups.set(domainName, []);
-          }
-          domainGroups.get(domainName)!.push(score);
+      if (!weeksData) return;
+
+      const uniqueWeeks = [...new Set(weeksData.map(w => w.week_in_cycle))];
+      const domainScores = new Map<string, number[]>();
+
+      // Collect all performance data for each week using the RPC function
+      for (const week of uniqueWeeks) {
+        const { data: weekData } = await supabase.rpc('get_weekly_review', {
+          p_cycle: cycle,
+          p_week: week,
+          p_role_id: staffData.role_id,
+          p_staff_id: staffData.id
         });
 
-        const averages: DomainAverage[] = Array.from(domainGroups.entries()).map(([domain_name, scores]) => ({
-          domain_name,
-          perf_avg: Math.round((scores.reduce((sum, score) => sum + score, 0) / scores.length) * 100) / 100
-        }));
-
-        setDomainAverages(averages);
+        if (weekData) {
+          weekData.forEach((item: any) => {
+            if (item.performance_score !== null) {
+              const domain = item.domain_name;
+              if (!domainScores.has(domain)) {
+                domainScores.set(domain, []);
+              }
+              domainScores.get(domain)!.push(item.performance_score);
+            }
+          });
+        }
       }
+
+      // Calculate averages for each domain
+      const averages: DomainAverage[] = Array.from(domainScores.entries()).map(([domain_name, scores]) => ({
+        domain_name,
+        perf_avg: Math.round((scores.reduce((sum, score) => sum + score, 0) / scores.length) * 100) / 100
+      }));
+
+      setDomainAverages(averages);
     } catch (error) {
       console.error('Error loading glance data:', error);
     } finally {

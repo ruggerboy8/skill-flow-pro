@@ -396,6 +396,10 @@ export type Database = {
           performance_score: number
         }[]
       }
+      is_coach_or_admin: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

@@ -7,56 +7,51 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
-
 interface WeeklyFocus {
   id: string;
   display_order: number;
   action_statement: string;
   domain_name: string;
 }
-
 interface WeekStatus {
   cycle: number;
   week_in_cycle: number;
   hasConfidence: boolean;
   hasPerformance: boolean;
 }
-
 interface Staff {
   id: string;
   role_id: number;
 }
-
 export default function Index() {
   const [staff, setStaff] = useState<Staff | null>(null);
   const [weekStatuses, setWeekStatuses] = useState<WeekStatus[]>([]);
   const [currentWeekFocus, setCurrentWeekFocus] = useState<WeeklyFocus[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
+  const {
+    user,
+    signOut
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const navigate = useNavigate();
-
   useEffect(() => {
     if (user) {
       loadStaffProfile();
     }
   }, [user]);
-
   useEffect(() => {
     if (staff) {
       loadWeekData();
     }
   }, [staff]);
-
   const loadStaffProfile = async () => {
     if (!user) return;
-
-    const { data, error } = await supabase
-      .from('staff')
-      .select('id, role_id')
-      .eq('user_id', user.id)
-      .single();
-
+    const {
+      data,
+      error
+    } = await supabase.from('staff').select('id, role_id').eq('user_id', user.id).single();
     if (error) {
       if (error.code === 'PGRST116') {
         // No staff record found, redirect to setup
@@ -72,36 +67,24 @@ export default function Index() {
       setStaff(data);
     }
   };
-
   const loadWeekData = async () => {
     if (!staff) return;
-
     setLoading(true);
-    
+
     // Calculate week status based on completion for cycle 1
     const weekStatusMap = new Map<string, WeekStatus>();
-    
     for (let weekInCycle = 1; weekInCycle <= 6; weekInCycle++) {
       // Get weekly focus for this week
-      const { data: focusData } = await supabase
-        .from('weekly_focus')
-        .select('id')
-        .eq('role_id', staff.role_id)
-        .eq('cycle', 1)
-        .eq('week_in_cycle', weekInCycle);
-      
+      const {
+        data: focusData
+      } = await supabase.from('weekly_focus').select('id').eq('role_id', staff.role_id).eq('cycle', 1).eq('week_in_cycle', weekInCycle);
       const focusIds = focusData?.map(f => f.id) || [];
-      
       if (focusIds.length > 0) {
-        const { data: scoresData } = await supabase
-          .from('weekly_scores')
-          .select('weekly_focus_id, confidence_score, performance_score')
-          .eq('staff_id', staff.id)
-          .in('weekly_focus_id', focusIds);
-        
+        const {
+          data: scoresData
+        } = await supabase.from('weekly_scores').select('weekly_focus_id, confidence_score, performance_score').eq('staff_id', staff.id).in('weekly_focus_id', focusIds);
         const hasConfidence = (scoresData || []).every(score => score.confidence_score !== null);
         const hasPerformance = (scoresData || []).every(score => score.performance_score !== null);
-        
         weekStatusMap.set(`1-${weekInCycle}`, {
           cycle: 1,
           week_in_cycle: weekInCycle,
@@ -110,64 +93,71 @@ export default function Index() {
         });
       }
     }
-    
     setWeekStatuses(Array.from(weekStatusMap.values()));
 
     // Load current week's pro moves
     const nextWeek = getNextIncompleteWeek();
     if (nextWeek) {
-      const { data: currentFocusData } = await supabase.rpc('get_focus_cycle_week', {
+      const {
+        data: currentFocusData
+      } = (await supabase.rpc('get_focus_cycle_week', {
         p_cycle: nextWeek.cycle,
         p_week: nextWeek.week,
         p_role_id: staff.role_id
-      }) as { data: WeeklyFocus[] | null; error: any };
-      
+      })) as {
+        data: WeeklyFocus[] | null;
+        error: any;
+      };
       setCurrentWeekFocus(currentFocusData || []);
     }
-    
     setLoading(false);
   };
-
   const getTileStatus = (cycle: number, weekInCycle: number): 'grey' | 'yellow' | 'green' => {
     const weekStatus = weekStatuses.find(ws => ws.cycle === cycle && ws.week_in_cycle === weekInCycle);
-    
     if (!weekStatus || !weekStatus.hasConfidence) return 'grey';
     if (!weekStatus.hasPerformance) return 'yellow';
     return 'green';
   };
-
   const getWeekColor = (status: 'grey' | 'yellow' | 'green') => {
     switch (status) {
-      case 'green': return 'bg-green-400 hover:bg-green-500 text-white';
-      case 'yellow': return 'bg-yellow-300 hover:bg-yellow-400 text-black';
-      default: return 'bg-gray-300 hover:bg-gray-400 text-black';
+      case 'green':
+        return 'bg-green-400 hover:bg-green-500 text-white';
+      case 'yellow':
+        return 'bg-yellow-300 hover:bg-yellow-400 text-black';
+      default:
+        return 'bg-gray-300 hover:bg-gray-400 text-black';
     }
   };
-
   const getTooltipText = (status: 'grey' | 'yellow' | 'green') => {
     switch (status) {
-      case 'grey': return 'Not started';
-      case 'yellow': return 'Confidence submitted – performance pending';
-      case 'green': return 'All done – great job!';
+      case 'grey':
+        return 'Not started';
+      case 'yellow':
+        return 'Confidence submitted – performance pending';
+      case 'green':
+        return 'All done – great job!';
     }
   };
-
-  const getNextIncompleteWeek = (): {cycle: number, week: number} | null => {
+  const getNextIncompleteWeek = (): {
+    cycle: number;
+    week: number;
+  } | null => {
     // Find the first week that isn't fully complete
     for (let week = 1; week <= 6; week++) {
       const status = getTileStatus(1, week);
       if (status !== 'green') {
-        return { cycle: 1, week };
+        return {
+          cycle: 1,
+          week
+        };
       }
     }
     return null; // All weeks complete
   };
-
   const handleWeekClick = async (cycle: number, weekInCycle: number) => {
     if (!staff) return;
-
     const weekStatus = weekStatuses.find(ws => ws.cycle === cycle && ws.week_in_cycle === weekInCycle);
-    
+
     // If week is completed, go to review
     if (weekStatus && weekStatus.hasConfidence && weekStatus.hasPerformance) {
       navigate(`/review/${cycle}/${weekInCycle}`);
@@ -175,14 +165,10 @@ export default function Index() {
     }
 
     // Check if weekly_focus exists for this cycle/week/role using new query
-    const { data: focusRows, error } = await supabase
-      .from('v_weekly_focus')
-      .select('id, display_order, action_statement')
-      .eq('cycle', cycle)
-      .eq('week_in_cycle', weekInCycle)
-      .eq('role_id', staff.role_id)
-      .order('display_order');
-    
+    const {
+      data: focusRows,
+      error
+    } = await supabase.from('v_weekly_focus').select('id, display_order, action_statement').eq('cycle', cycle).eq('week_in_cycle', weekInCycle).eq('role_id', staff.role_id).order('display_order');
     if (error || !focusRows || focusRows.length === 0) {
       toast({
         title: "No Pro Moves",
@@ -195,64 +181,46 @@ export default function Index() {
     // Navigate to week info page
     navigate(`/week-info/${cycle}/${weekInCycle}`);
   };
-
   const handleSignOut = async () => {
     await signOut();
   };
-
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+    return <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">Loading...</div>
-      </div>
-    );
+      </div>;
   }
-
   const nextWeek = getNextIncompleteWeek();
-
-  return (
-    <div className="min-h-screen bg-background p-4">
+  return <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">SkillCheck Progress</h1>
-          <Button onClick={handleSignOut} variant="outline">
-            Sign Out
-          </Button>
+          
         </div>
 
-        {nextWeek && currentWeekFocus.length > 0 && (
-          <div className="mb-8 p-6 bg-primary/10 rounded-lg border border-primary/20">
+        {nextWeek && currentWeekFocus.length > 0 && <div className="mb-8 p-6 bg-primary/10 rounded-lg border border-primary/20">
             <h2 className="text-xl font-semibold mb-4">This Week's Pro Moves</h2>
             <p className="text-muted-foreground mb-4">
               Cycle {nextWeek.cycle}, Week {nextWeek.week}
             </p>
             <div className="space-y-3 mb-4">
-              {currentWeekFocus.map((focus, index) => (
-                <div 
-                  key={focus.id} 
-                  className="flex items-start gap-3 p-3 bg-background rounded-lg border"
-                >
+              {currentWeekFocus.map((focus, index) => <div key={focus.id} className="flex items-start gap-3 p-3 bg-background rounded-lg border">
                   <Badge variant="outline" className="text-xs">
                     {index + 1}
                   </Badge>
                   <div className="flex-1">
-                    <Badge 
-                      variant="secondary" 
-                      className="text-xs mb-2"
-                      style={{ backgroundColor: getDomainColor(focus.domain_name) }}
-                    >
+                    <Badge variant="secondary" className="text-xs mb-2" style={{
+                backgroundColor: getDomainColor(focus.domain_name)
+              }}>
                       {focus.domain_name}
                     </Badge>
                     <p className="text-sm">{focus.action_statement}</p>
                   </div>
-                </div>
-              ))}
+                </div>)}
             </div>
             <Button onClick={() => handleWeekClick(nextWeek.cycle, nextWeek.week)} size="lg">
               Start Week {nextWeek.week}
             </Button>
-          </div>
-        )}
+          </div>}
 
         <div className="space-y-8">
           <div className="space-y-4">
@@ -261,17 +229,12 @@ export default function Index() {
             </h2>
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }, (_, weekIndex) => {
-                const weekInCycle = weekIndex + 1;
-                const status = getTileStatus(1, weekInCycle);
-                
-                return (
-                  <Card 
-                    key={`1-${weekInCycle}`}
-                    className={`cursor-pointer transition-all hover:scale-105 ${getWeekColor(status)}`}
-                    onClick={() => handleWeekClick(1, weekInCycle)}
-                    title={getTooltipText(status)}
-                  >
+              {Array.from({
+              length: 6
+            }, (_, weekIndex) => {
+              const weekInCycle = weekIndex + 1;
+              const status = getTileStatus(1, weekInCycle);
+              return <Card key={`1-${weekInCycle}`} className={`cursor-pointer transition-all hover:scale-105 ${getWeekColor(status)}`} onClick={() => handleWeekClick(1, weekInCycle)} title={getTooltipText(status)}>
                     <CardContent className="p-3 sm:p-6 text-center">
                       <div className="text-lg font-semibold">
                         Week {weekInCycle}
@@ -282,13 +245,11 @@ export default function Index() {
                         {status === 'grey' && '○ Not Started'}
                       </div>
                     </CardContent>
-                  </Card>
-                );
-              })}
+                  </Card>;
+            })}
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 }

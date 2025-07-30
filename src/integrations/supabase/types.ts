@@ -109,6 +109,9 @@ export type Database = {
           created_at: string | null
           email: string
           id: string
+          is_coach: boolean
+          is_super_admin: boolean
+          location: string | null
           name: string
           organization: string | null
           primary_location: string | null
@@ -120,6 +123,9 @@ export type Database = {
           created_at?: string | null
           email: string
           id?: string
+          is_coach?: boolean
+          is_super_admin?: boolean
+          location?: string | null
           name: string
           organization?: string | null
           primary_location?: string | null
@@ -131,6 +137,9 @@ export type Database = {
           created_at?: string | null
           email?: string
           id?: string
+          is_coach?: boolean
+          is_super_admin?: boolean
+          location?: string | null
           name?: string
           organization?: string | null
           primary_location?: string | null
@@ -296,6 +305,14 @@ export type Database = {
       }
     }
     Views: {
+      v_admins: {
+        Row: {
+          coach: boolean | null
+          super_admin: boolean | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       v_staff_week_status: {
         Row: {
           confidence_score: number | null

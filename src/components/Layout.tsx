@@ -1,12 +1,12 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { Home, BarChart3, User, Settings } from 'lucide-react';
+import { Home, BarChart3, User, Settings, Users } from 'lucide-react';
 
 const ADMIN_EMAILS = ['johno@reallygoodconsulting.org'];
 
 export default function Layout() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isCoach } = useAuth();
   const location = useLocation();
   
   const isAdmin = user && ADMIN_EMAILS.includes(user.email || '');
@@ -15,6 +15,7 @@ export default function Layout() {
     { name: 'Home', href: '/', icon: Home },
     { name: 'Stats', href: '/stats', icon: BarChart3 },
     { name: 'Profile', href: '/profile', icon: User },
+    ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
     ...(isAdmin ? [{ name: 'Builder', href: '/admin/builder', icon: Settings }] : [])
   ];
 

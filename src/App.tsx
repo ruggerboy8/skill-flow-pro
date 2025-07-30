@@ -23,6 +23,8 @@ import StatsScores from "./pages/StatsScores";
 import StatsGlance from "./pages/StatsGlance";
 import StatsEval from "./pages/StatsEval";
 import Profile from "./pages/Profile";
+import CoachDashboard from "./pages/coach/CoachDashboard";
+import CoachDetail from "./pages/coach/CoachDetail";
 import RoleList from "./pages/admin/RoleList";
 import CycleList from "./pages/admin/CycleList";
 import WeekList from "./pages/admin/WeekList";
@@ -73,6 +75,8 @@ function AppRoutes() {
         <Route path="performance/:week" element={<Performance />} />
         <Route path="performance/:focusId/:index" element={<PerformanceWizard />} />
         <Route path="review/:cycle/:week" element={<Review />} />
+        <Route path="coach" element={<CoachDashboard />} />
+        <Route path="coach/:staffId" element={<CoachDetail />} />
         <Route path="builder" element={<RoleList />} />
         <Route path="builder/:roleId" element={<CycleList />} />
         <Route path="builder/:roleId/:cycle" element={<WeekList />} />

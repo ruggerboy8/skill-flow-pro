@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   needsPasswordSetup: boolean;
+  isCoach: boolean;
   signInWithOtp: (email: string) => Promise<{ error: any }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error: any }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error: any }>;
@@ -21,8 +22,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
+  const [isCoach, setIsCoach] = useState(false);
 
   useEffect(() => {
+    const checkCoachStatus = async (userId: string) => {
+      const { data } = await supabase
+        .from('staff')
+        .select('is_coach, is_super_admin')
+        .eq('user_id', userId)
+        .single();
+      
+      if (data) {
+        setIsCoach(data.is_coach || data.is_super_admin);
+      }
+    };
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -38,8 +52,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             setNeedsPasswordSetup(false);
           }
+          // Check coach status
+          checkCoachStatus(session.user.id);
         } else {
           setNeedsPasswordSetup(false);
+          setIsCoach(false);
         }
         
         setLoading(false);
@@ -55,8 +72,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         const hasPasswordSet = session.user.user_metadata?.password_set;
         setNeedsPasswordSetup(!hasPasswordSet);
+        // Check coach status
+        checkCoachStatus(session.user.id);
       } else {
         setNeedsPasswordSetup(false);
+        setIsCoach(false);
       }
       
       setLoading(false);
@@ -121,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       loading,
       needsPasswordSetup,
+      isCoach,
       signInWithOtp,
       signInWithPassword,
       signUpWithPassword,

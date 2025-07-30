@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getDomainColor } from '@/lib/domainColors';
@@ -220,7 +222,17 @@ export default function CoachDetail() {
     <div className="space-y-6">
       {/* Header */}
       <div className="space-y-4">
-        <h1 className="text-3xl font-bold">{staffInfo.role_name} · {staffInfo.name}</h1>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => navigate('/coach')}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Staff List
+          </Button>
+          <h1 className="text-3xl font-bold">{staffInfo.role_name} · {staffInfo.name}</h1>
+        </div>
         
         <Select value={selectedCycle.toString()} onValueChange={(value) => setSelectedCycle(parseInt(value))}>
           <SelectTrigger className="w-48">

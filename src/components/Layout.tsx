@@ -56,9 +56,11 @@ export default function Layout() {
               </div>
             </div>
 
-            <Button variant="outline" onClick={signOut}>
-              Sign Out
-            </Button>
+            <NavLink to="/profile">
+              <Button variant="outline" size="icon">
+                <User className="w-4 h-4" />
+              </Button>
+            </NavLink>
           </div>
         </div>
       </nav>

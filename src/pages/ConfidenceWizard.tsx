@@ -177,7 +177,7 @@ export default function ConfidenceWizard() {
   const isLastItem = currentIndex === weeklyFocus.length - 1;
 
   return (
-    <div className="min-h-screen p-4 bg-background">
+    <div className="min-h-screen p-2 sm:p-4 bg-background">
       <div className="max-w-md mx-auto space-y-4">
         <Card style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}>
           <CardHeader>
@@ -191,8 +191,8 @@ export default function ConfidenceWizard() {
               How confident are you that you'll do this 100% this week?
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="p-4 bg-white/80 rounded-lg">
+          <CardContent className="space-y-6 p-3 sm:p-6">
+            <div className="p-3 sm:p-4 bg-white/80 rounded-lg">
               <Badge 
                 variant="secondary" 
                 className="text-xs font-semibold mb-2 bg-white text-gray-900"

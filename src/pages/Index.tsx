@@ -272,7 +272,7 @@ export default function Index() {
                     onClick={() => handleWeekClick(1, weekInCycle)}
                     title={getTooltipText(status)}
                   >
-                    <CardContent className="p-6 text-center">
+                    <CardContent className="p-3 sm:p-6 text-center">
                       <div className="text-lg font-semibold">
                         Week {weekInCycle}
                       </div>

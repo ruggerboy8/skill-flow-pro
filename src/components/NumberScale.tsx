@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 interface NumberScaleProps {
@@ -9,6 +9,13 @@ interface NumberScaleProps {
 
 export default function NumberScale({ value, onChange, disabled }: NumberScaleProps) {
   const [persistentTooltip, setPersistentTooltip] = useState<number | null>(null);
+
+  // Reset tooltip when value becomes null or undefined
+  React.useEffect(() => {
+    if (value === null || value === undefined) {
+      setPersistentTooltip(null);
+    }
+  }, [value]);
 
   const tooltipText = {
     4: "Absolute PRO: you never miss, could teach a seminar.",

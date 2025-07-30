@@ -85,6 +85,27 @@ export default function Stats() {
     return 'destructive';
   };
 
+  const getCompletionStatus = (confidence: number | null, performance: number | null) => {
+    if (confidence !== null && performance !== null) {
+      return 'completed'; // Green check
+    } else if (confidence !== null || performance !== null) {
+      return 'in-progress'; // Yellow indicator
+    }
+    return 'not-started'; // Nothing
+  };
+
+  const getStatusIcon = (status: string) => {
+    if (status === 'completed') return '✓';
+    if (status === 'in-progress') return '●';
+    return null;
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === 'completed') return 'text-green-600';
+    if (status === 'in-progress') return 'text-yellow-600';
+    return '';
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Not completed';
     return new Date(dateString).toLocaleDateString();
@@ -120,13 +141,24 @@ export default function Stats() {
           <Card key={score.id}>
             <CardHeader>
               <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">
-                    Cycle {score.cycle}, Week {score.week_in_cycle}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {score.action_statement}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <div>
+                    <CardTitle className="text-lg">
+                      Cycle {score.cycle}, Week {score.week_in_cycle}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {score.action_statement}
+                    </p>
+                  </div>
+                  {(() => {
+                    const status = getCompletionStatus(score.confidence_score, score.performance_score);
+                    const icon = getStatusIcon(status);
+                    return icon ? (
+                      <span className={`text-lg font-bold ${getStatusColor(status)}`}>
+                        {icon}
+                      </span>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="flex gap-2">
                   <div className="text-center">

@@ -61,7 +61,19 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				brand: {
+					50: '#fdfefe',
+					600: '#124570',
+					900: '#080809'
+				},
+				slatebrand: {
+					400: '#949aa1',
+					600: '#515458'
 				}
+			},
+			fontFamily: {
+				sans: ['"Biondi Sans"', 'ui-sans-serif', 'system-ui']
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

@@ -32,7 +32,10 @@ export default function Layout() {
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center space-x-8">
-              <div className="font-bold text-xl">SkillCheck</div>
+              <div className="flex items-center space-x-2">
+                <img src="/brand/alcan-logo.svg" alt="Alcan" className="h-6" />
+                <span className="font-bold text-xl tracking-wide">SkillCheck</span>
+              </div>
               
               <div className="hidden md:flex space-x-1">
                 {navigation.map((item) => {

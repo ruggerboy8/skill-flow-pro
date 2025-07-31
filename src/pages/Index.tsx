@@ -142,16 +142,28 @@ export default function Index() {
     cycle: number;
     week: number;
   } | null => {
-    // Find the first week that isn't fully complete
+    // First priority: Find a week where confidence is done but performance is not (yellow status)
     for (let week = 1; week <= 6; week++) {
       const status = getTileStatus(1, week);
-      if (status !== 'green') {
+      if (status === 'yellow') {
         return {
           cycle: 1,
           week
         };
       }
     }
+    
+    // Second priority: Find the first week that hasn't been started yet (grey status)
+    for (let week = 1; week <= 6; week++) {
+      const status = getTileStatus(1, week);
+      if (status === 'grey') {
+        return {
+          cycle: 1,
+          week
+        };
+      }
+    }
+    
     return null; // All weeks complete
   };
   const handleWeekClick = async (cycle: number, weekInCycle: number) => {

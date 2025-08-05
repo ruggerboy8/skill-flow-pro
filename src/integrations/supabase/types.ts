@@ -343,14 +343,6 @@ export type Database = {
       }
     }
     Views: {
-      v_admins: {
-        Row: {
-          coach: boolean | null
-          super_admin: boolean | null
-          user_id: string | null
-        }
-        Relationships: []
-      }
       v_staff_week_status: {
         Row: {
           confidence_score: number | null
@@ -423,6 +415,14 @@ export type Database = {
           location: string
           is_coach: boolean
           is_super_admin: boolean
+        }[]
+      }
+      get_user_admin_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          user_id: string
+          coach: boolean
+          super_admin: boolean
         }[]
       }
       get_weekly_review: {

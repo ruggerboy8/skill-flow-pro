@@ -125,7 +125,7 @@ export type Database = {
           primary_location: string | null
           role_id: number | null
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string | null
@@ -139,7 +139,7 @@ export type Database = {
           primary_location?: string | null
           role_id?: number | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string | null
@@ -153,7 +153,7 @@ export type Database = {
           primary_location?: string | null
           role_id?: number | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -164,6 +164,36 @@ export type Database = {
             referencedColumns: ["role_id"]
           },
         ]
+      }
+      staff_audit: {
+        Row: {
+          changed_at: string | null
+          changed_by: string
+          field_changed: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          staff_id: string
+        }
+        Insert: {
+          changed_at?: string | null
+          changed_by: string
+          field_changed: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          staff_id: string
+        }
+        Update: {
+          changed_at?: string | null
+          changed_by?: string
+          field_changed?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          staff_id?: string
+        }
+        Relationships: []
       }
       weekly_focus: {
         Row: {
@@ -380,6 +410,19 @@ export type Database = {
           display_order: number
           action_statement: string
           domain_name: string
+        }[]
+      }
+      get_staff_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          staff_id: string
+          name: string
+          email: string
+          role_id: number
+          organization: string
+          location: string
+          is_coach: boolean
+          is_super_admin: boolean
         }[]
       }
       get_weekly_review: {

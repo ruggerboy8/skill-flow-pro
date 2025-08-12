@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getNowZ, getAnchors } from '@/lib/centralTime';
+import { getNowZ, getAnchors, isSameIsoWeek } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
@@ -40,13 +40,15 @@ export default function Performance() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [showCarryoverBanner, setShowCarryoverBanner] = useState<boolean>(Boolean((location.state as any)?.carryover));
 
-const weekNum = Number(week); // week param is now just "1", "2", etc.
+  const weekNum = Number(week); // week param is now just "1", "2", etc.
 
-// Central Time gating for Performance (opens Thu 00:00 CT)
-const nowZ = getNowZ();
-const { thuStartZ } = getAnchors(nowZ);
-const beforeThursday = nowZ < thuStartZ;
+  // Central Time gating for Performance (opens Thu 00:00 CT; allowed anytime for past weeks)
+  const nowZ = getNowZ();
+  const { thuStartZ } = getAnchors(nowZ);
+  const beforeThursday = nowZ < thuStartZ;
 
   useEffect(() => {
     if (user) {
@@ -78,6 +80,8 @@ const beforeThursday = nowZ < thuStartZ;
         id,
         display_order,
         self_select,
+        iso_year,
+        iso_week,
         pro_moves (
           action_statement
         ),
@@ -182,6 +186,11 @@ const beforeThursday = nowZ < thuStartZ;
     return score?.confidence_score || 0;
   };
 
+  // Determine if this screen is for the current ISO week
+  const isCurrentIsoWeek = weeklyFocus.length > 0
+    ? isSameIsoWeek(nowZ, (weeklyFocus as any)[0].iso_year as number, (weeklyFocus as any)[0].iso_week as number)
+    : true;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -205,8 +214,24 @@ const beforeThursday = nowZ < thuStartZ;
           </CardHeader>
         </Card>
 
+        {showCarryoverBanner && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center">Finish last week’s performance</CardTitle>
+              <CardDescription className="text-center">
+                Pick up where you left off — submit last week’s performance now.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" className="w-full" onClick={() => setShowCarryoverBanner(false)}>
+                Dismiss
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Early guard Mon–Wed: read-only message */}
-        {beforeThursday ? (
+        {isCurrentIsoWeek && beforeThursday ? (
           <>
             <Card>
               <CardHeader>

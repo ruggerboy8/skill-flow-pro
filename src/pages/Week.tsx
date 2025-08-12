@@ -73,6 +73,36 @@ export default function Week() {
     }
     
     setStaff(data);
+    await selectDefaultWeek(data);
+  };
+
+  const selectDefaultWeek = async (s: Staff) => {
+    let carryoverWeek: number | null = null;
+    let greyWeek: number | null = null;
+    for (let w = 1; w <= 6; w++) {
+      const { data: focusRows } = await supabase
+        .from('weekly_focus')
+        .select('id')
+        .eq('role_id', s.role_id)
+        .eq('cycle', 1)
+        .eq('week_in_cycle', w);
+      const focusIds = (focusRows || []).map((f: any) => f.id);
+      if (focusIds.length === 0) continue;
+      const { data: scoresData } = await supabase
+        .from('weekly_scores')
+        .select('weekly_focus_id, confidence_score, performance_score')
+        .eq('staff_id', s.id)
+        .in('weekly_focus_id', focusIds);
+      const total = focusIds.length;
+      const hasAllConf = (scoresData || []).length === total && (scoresData || []).every((r: any) => r.confidence_score !== null);
+      const hasAllPerf = (scoresData || []).length === total && (scoresData || []).every((r: any) => r.performance_score !== null);
+      if (hasAllConf && !hasAllPerf && carryoverWeek === null) carryoverWeek = w;
+      if (!hasAllConf && greyWeek === null) greyWeek = w;
+    }
+
+    const chosen = carryoverWeek ?? greyWeek ?? 1;
+    setCycle(1);
+    setWeekInCycle(chosen);
   };
 
   const loadWeekData = async () => {
@@ -125,6 +155,16 @@ export default function Week() {
         .in('weekly_focus_id', focusIds);
 
       setWeeklyScores(scoresData || []);
+
+      // Auto-route to Performance for carryover weeks (past ISO week)
+      const confDoneAll = (scoresData || []).every(s => s.confidence_score !== null);
+      const perfMissingAll = (scoresData || []).every(s => s.performance_score === null);
+      const focusMetaAny: any = focusData[0];
+      const isCurrent = focusMetaAny ? isSameIsoWeek(nowZ, focusMetaAny.iso_year as any, focusMetaAny.iso_week as any) : true;
+      if (confDoneAll && perfMissingAll && !isCurrent) {
+        navigate(`/performance/${weekInCycle}`, { state: { carryover: true } });
+        return;
+      }
     }
     
     setLoading(false);
@@ -265,7 +305,7 @@ export default function Week() {
 
                   {showConfidenceCTA && (
                     <Button 
-                      onClick={() => navigate(`/confidence/${cycle}-${weekInCycle}`)}
+                      onClick={() => navigate(`/confidence/${weekInCycle}`)}
                       className="w-full h-12"
                     >
                       Rate Confidence
@@ -284,7 +324,7 @@ export default function Week() {
 
                   {showPerformanceCTA && (
                     <Button 
-                      onClick={() => navigate(`/performance/${cycle}-${weekInCycle}`)}
+                      onClick={() => navigate(`/performance/${weekInCycle}`)}
                       className="w-full h-12"
                     >
                       Rate Performance

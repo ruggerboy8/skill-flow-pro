@@ -132,7 +132,7 @@ export default function WeekInfo() {
       setCarryoverPending({ cycle: wf.cycle, week_in_cycle: wf.week_in_cycle });
       if (wf.week_in_cycle !== weekNum || wf.cycle !== cycleNum) {
         // Auto-redirect to carryover week performance
-        navigate(`/performance/${wf.week_in_cycle}`, { state: { carryover: true } });
+        navigate(`/week/${wf.cycle}-${wf.week_in_cycle}`, { replace: true });
       }
     }
 
@@ -163,7 +163,7 @@ export default function WeekInfo() {
       }
       const idx = firstIncompleteConfIndex === -1 ? 0 : firstIncompleteConfIndex;
       const startFocus = weeklyFocus[idx];
-      navigate(`/confidence/${startFocus.id}/${idx + 1}`);
+      navigate(`/confidence/${weekNum}/step/${idx + 1}`);
       return;
     }
 
@@ -217,7 +217,7 @@ export default function WeekInfo() {
                         .eq('role_id', staff.role_id)
                         .order('display_order');
                       const focusIds = (focusData || []).map((f: any) => f.id);
-                      if (!focusIds.length) return navigate(`/performance/${carryoverPending.week_in_cycle}`, { state: { carryover: true } });
+                      if (!focusIds.length) return navigate(`/performance/${carryoverPending.week_in_cycle}/step/1`, { state: { carryover: true } });
                       const { data: scores } = await supabase
                         .from('weekly_scores')
                         .select('weekly_focus_id, performance_score')
@@ -227,7 +227,7 @@ export default function WeekInfo() {
                       const firstIdx = ordered.findIndex((f) => !scores?.find((s) => s.weekly_focus_id === f.id)?.performance_score);
                       const idx = firstIdx === -1 ? 0 : firstIdx;
                       const startFocus = ordered[idx];
-                      navigate(`/performance/${startFocus.id}/${idx + 1}`, { state: { carryover: true } });
+                      navigate(`/performance/${weekNum}/step/${idx + 1}`, { state: { carryover: true } });
                     }}
                   >
                     Finish Performance
@@ -293,7 +293,7 @@ export default function WeekInfo() {
                         onClick={() => {
                           const idx = firstIncompletePerfIndex === -1 ? 0 : firstIncompletePerfIndex;
                           const startFocus = weeklyFocus[idx];
-                          navigate(`/performance/${startFocus.id}/${idx + 1}`);
+                          navigate(`/performance/${weekNum}/step/${idx + 1}`);
                         }}
                         className="w-full h-12"
                       >
@@ -322,7 +322,7 @@ export default function WeekInfo() {
                     <p className="text-sm font-medium text-gray-900">{focus.action_statement}</p>
                     {unchosenSelfSelect && (
                       <div className="mt-1">
-                        <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate(`/confidence/${focus.id}/${index + 1}`)}>
+                        <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate(`/confidence/${weekNum}/step/${index + 1}`)}>
                           Choose your Pro Move
                         </Button>
                       </div>

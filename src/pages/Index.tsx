@@ -232,8 +232,8 @@ export default function Index() {
                   </div>
                 </div>)}
             </div>
-            <Button onClick={() => handleWeekClick(nextWeek.cycle, nextWeek.week)} size="lg">
-              Start Week {nextWeek.week}
+            <Button onClick={() => handleWeekClick(nextWeek.cycle, nextWeek.week)} size="lg" aria-label={`Open Week ${nextWeek.week}`}>
+              Open Week
             </Button>
           </div>}
 

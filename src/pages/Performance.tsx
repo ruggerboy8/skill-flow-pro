@@ -39,6 +39,7 @@ export default function Performance() {
   const [performanceScores, setPerformanceScores] = useState<{ [key: string]: number }>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isCarryoverWeek, setIsCarryoverWeek] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -51,6 +52,7 @@ export default function Performance() {
   const now = nowUtc();
   const { thuStartZ, mondayZ } = getAnchors(now);
   let beforeThursday = now < thuStartZ;
+  const beforeThursdayEffective = beforeThursday && !isCarryoverWeek;
 
   useEffect(() => {
     if (user) {
@@ -128,8 +130,8 @@ export default function Performance() {
     setExistingScores(scoresData);
 
     // If confidence was submitted before this Monday, this is a carryover week → allow performance even Mon–Wed
-    const isCarryoverWeek = (scoresData || []).some((s) => s.confidence_date && new Date(s.confidence_date) < mondayZ);
-beforeThursday = now < thuStartZ && !isCarryoverWeek;
+    const carryover = (scoresData || []).some((s) => s.confidence_date && new Date(s.confidence_date) < mondayZ);
+    setIsCarryoverWeek(carryover);
     setLoading(false);
   };
 
@@ -230,7 +232,7 @@ beforeThursday = now < thuStartZ && !isCarryoverWeek;
         )}
 
         {/* Early guard Mon–Wed: read-only message */}
-        {beforeThursday ? (
+        {beforeThursdayEffective ? (
           <>
             <Card>
               <CardHeader>

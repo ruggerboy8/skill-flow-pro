@@ -23,14 +23,12 @@ interface WeeklyFocus {
   domain_name?: string;
 }
 
-
 interface WeeklyScore {
   weekly_focus_id: string;
   confidence_score: number | null;
   performance_score: number | null;
   selected_action_id?: number | null;
 }
-
 
 export default function Week() {
   const [staff, setStaff] = useState<Staff | null>(null);
@@ -45,14 +43,12 @@ export default function Week() {
   const navigate = useNavigate();
   const params = useParams();
 
+  // ---------- load staff + choose default week ----------
   useEffect(() => {
-    if (user) {
-      loadStaffProfile();
-    }
+    if (user) loadStaffProfile();
   }, [user]);
 
   useEffect(() => {
-    // Parse cycle and week from URL params (format: "1-2" for cycle 1, week 2)
     if (params.weekId) {
       const [cycleStr, weekStr] = params.weekId.split('-');
       setCycle(parseInt(cycleStr) || 1);
@@ -61,9 +57,7 @@ export default function Week() {
   }, [params.weekId]);
 
   useEffect(() => {
-    if (staff && cycle && weekInCycle) {
-      loadWeekData();
-    }
+    if (staff && cycle && weekInCycle) loadWeekData();
   }, [staff, cycle, weekInCycle]);
 
   const loadStaffProfile = async () => {
@@ -77,7 +71,7 @@ export default function Week() {
       navigate('/setup');
       return;
     }
-    
+
     setStaff(data);
     await selectDefaultWeek(data);
   };
@@ -92,16 +86,24 @@ export default function Week() {
         .eq('role_id', s.role_id)
         .eq('cycle', 1)
         .eq('week_in_cycle', w);
+
       const focusIds = (focusRows || []).map((f: any) => f.id);
       if (focusIds.length === 0) continue;
+
       const { data: scoresData } = await supabase
         .from('weekly_scores')
         .select('weekly_focus_id, confidence_score, performance_score')
         .eq('staff_id', s.id)
         .in('weekly_focus_id', focusIds);
+
       const total = focusIds.length;
-      const hasAllConf = (scoresData || []).length === total && (scoresData || []).every((r: any) => r.confidence_score !== null);
-      const hasAllPerf = (scoresData || []).length === total && (scoresData || []).every((r: any) => r.performance_score !== null);
+      const hasAllConf =
+        (scoresData || []).length === total &&
+        (scoresData || []).every((r: any) => r.confidence_score !== null);
+      const hasAllPerf =
+        (scoresData || []).length === total &&
+        (scoresData || []).every((r: any) => r.performance_score !== null);
+
       if (hasAllConf && !hasAllPerf && carryoverWeek === null) carryoverWeek = w;
       if (!hasAllConf && greyWeek === null) greyWeek = w;
     }
@@ -111,12 +113,12 @@ export default function Week() {
     setWeekInCycle(chosen);
   };
 
+  // ---------- load week data ----------
   const loadWeekData = async () => {
     if (!staff) return;
-    
     setLoading(true);
-    
-    // Load weekly focus with pro moves and domain data (left joins to support self-select)
+
+    // Focus (left joins: pro_moves optional for self-select)
     const { data: focusData, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
@@ -134,9 +136,9 @@ export default function Week() {
 
     if (focusError) {
       toast({
-        title: "Error",
-        description: "Failed to load Pro Moves for this week",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to load Pro Moves for this week',
+        variant: 'destructive',
       });
       setLoading(false);
       return;
@@ -153,7 +155,7 @@ export default function Week() {
 
     setWeeklyFocus(transformedFocus);
 
-    // Load existing scores
+    // Scores
     if (focusData && focusData.length > 0) {
       const focusIds = focusData.map(f => f.id);
       const { data: scoresData } = await supabase
@@ -164,7 +166,7 @@ export default function Week() {
 
       setWeeklyScores(scoresData || []);
 
-      // Check for carryover (pending performance in most recent week)
+      // Carryover check (pending performance in the most recent week)
       const { data: pending } = await supabase
         .from('weekly_scores')
         .select('updated_at, weekly_focus!inner(cycle, week_in_cycle, role_id)')
@@ -176,82 +178,176 @@ export default function Week() {
         .limit(1);
 
       const wf: any = pending && pending[0] && (pending[0] as any).weekly_focus;
-        if (wf) {
-          // Auto-route directly to carryover performance wizard first incomplete step
-          const { data: focusData } = await supabase
-            .from('weekly_focus')
-            .select('id, display_order')
-            .eq('cycle', wf.cycle)
-            .eq('week_in_cycle', wf.week_in_cycle)
-            .eq('role_id', staff.role_id)
-            .order('display_order');
-          const focusIds = (focusData || []).map((f: any) => f.id);
-          if (!focusIds.length) return navigate(`/week/${wf.cycle}-${wf.week_in_cycle}`);
-          const { data: scores } = await supabase
-            .from('weekly_scores')
-            .select('weekly_focus_id, performance_score')
-            .eq('staff_id', staff.id)
-            .in('weekly_focus_id', focusIds);
-          const ordered = (focusData || []) as { id: string; display_order: number }[];
-          const firstIdx = ordered.findIndex((f) => !scores?.find((s) => s.weekly_focus_id === f.id)?.performance_score);
-          const idx = firstIdx === -1 ? 0 : firstIdx;
-          navigate(`/performance/${wf.week_in_cycle}/step/${idx + 1}`, { state: { carryover: true } });
-          return;
-        }
+      if (wf) {
+        setCarryoverPending({ cycle: wf.cycle, week_in_cycle: wf.week_in_cycle });
+        // Do not auto-navigate here; we’ll present a clear CTA instead.
+      }
     }
-    
+
     setLoading(false);
   };
 
-  const getScoreForFocus = (focusId: string) => {
-    return weeklyScores.find(score => score.weekly_focus_id === focusId);
-  };
+  // ---------- helpers / derived state ----------
+  const getScoreForFocus = (focusId: string) =>
+    weeklyScores.find(score => score.weekly_focus_id === focusId);
 
-  const canRateConfidence = () => {
-    return weeklyFocus.every(focus => {
-      const score = getScoreForFocus(focus.id);
-      return !score || score.confidence_score === null;
-    });
-  };
-
-  const canRatePerformance = () => {
-    return weeklyFocus.every(focus => {
-      const score = getScoreForFocus(focus.id);
-      return score && score.confidence_score !== null && score.performance_score === null;
-    });
-  };
-
-  const isWeekComplete = () => {
-    return weeklyFocus.every(focus => {
-      const score = getScoreForFocus(focus.id);
-      return score && score.confidence_score !== null && score.performance_score !== null;
-    });
-  };
-
-// Central Time gating + state
-  const now = nowUtc();
-  const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(now);
+  const total = weeklyFocus.length;
   const confCount = weeklyFocus.filter(f => getScoreForFocus(f.id)?.confidence_score != null).length;
   const perfCount = weeklyFocus.filter(f => getScoreForFocus(f.id)?.performance_score != null).length;
-  const total = weeklyFocus.length;
 
+  const firstIncompleteConfIndex = weeklyFocus.findIndex(
+    f => (getScoreForFocus(f.id)?.confidence_score ?? null) === null
+  );
+  const firstIncompletePerfIndex = weeklyFocus.findIndex(
+    f =>
+      (getScoreForFocus(f.id)?.confidence_score ?? null) !== null &&
+      (getScoreForFocus(f.id)?.performance_score ?? null) === null
+  );
+
+  // Central-Time gating
+  const now = nowUtc();
+  const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(now);
   const beforeCheckIn = now < monCheckInZ;
   const afterTueNoon = now >= tueDueZ;
   const beforeThursday = now < thuStartZ;
 
   const partialConfidence = confCount > 0 && confCount < total;
   const allConfidence = total > 0 && confCount === total;
-  const perfPending = allConfidence && perfCount === 0;
+  const perfPending = allConfidence && perfCount < total;
   const allDone = total > 0 && perfCount === total;
 
-  const carryoverConflict = !!carryoverPending && (carryoverPending!.week_in_cycle !== weekInCycle || carryoverPending!.cycle !== cycle);
+  const carryoverConflict =
+    !!carryoverPending &&
+    (carryoverPending!.week_in_cycle !== weekInCycle || carryoverPending!.cycle !== cycle);
 
-  const showSoftReset = !carryoverConflict && afterTueNoon && !allConfidence;
-  const showConfidenceCTA = !carryoverConflict && !beforeCheckIn && !afterTueNoon && confCount < total;
-  const showPerfLocked = !carryoverConflict && allConfidence && beforeThursday;
-  const showPerformanceCTA = !carryoverConflict && !beforeThursday && perfPending;
+  // ---------- dynamic message + CTA builder ----------
+  type CtaConfig = { label: string; onClick: () => void; disabled?: boolean } | null;
 
+  const buildBanner = (): { message: string; cta: CtaConfig } => {
+    // 1) Must finish last week's performance first
+    if (carryoverConflict && carryoverPending) {
+      return {
+        message:
+          'You still need to submit performance for last week before starting a new one.',
+        cta: {
+          label: 'Finish Performance',
+          onClick: async () => {
+            if (!staff) return;
+            const { data: focusData } = await supabase
+              .from('weekly_focus')
+              .select('id, display_order')
+              .eq('cycle', carryoverPending.cycle)
+              .eq('week_in_cycle', carryoverPending.week_in_cycle)
+              .eq('role_id', staff.role_id)
+              .order('display_order');
 
+            const focusIds = (focusData || []).map((f: any) => f.id);
+            if (!focusIds.length) {
+              navigate(`/performance/${carryoverPending.week_in_cycle}/step/1`, {
+                state: { carryover: true },
+              });
+              return;
+            }
+
+            const { data: scores } = await supabase
+              .from('weekly_scores')
+              .select('weekly_focus_id, performance_score')
+              .eq('staff_id', staff.id)
+              .in('weekly_focus_id', focusIds);
+
+            const ordered = (focusData || []) as { id: string; display_order: number }[];
+            const firstIdx = ordered.findIndex(
+              (f) => !scores?.find((s) => s.weekly_focus_id === f.id)?.performance_score
+            );
+            const idx = firstIdx === -1 ? 0 : firstIdx;
+            navigate(`/performance/${carryoverPending.week_in_cycle}/step/${idx + 1}`, {
+              state: { carryover: true },
+            });
+          },
+        },
+      };
+    }
+
+    // 2) All done for the week
+    if (allDone) {
+      return {
+        message: `✓ All set for this week. Great work!`,
+        cta: null,
+      };
+    }
+
+    // 3) Before Monday 9 AM CT
+    if (beforeCheckIn) {
+      return {
+        message: 'Confidence opens at 9:00 a.m. CT.',
+        cta: null,
+      };
+    }
+
+    // 4) Confidence window closed after Tue 12:00 CT (and not all confidence entered)
+    if (afterTueNoon && !allConfidence) {
+      return {
+        message: `Confidence window closed. You’ll get a fresh start on Mon, ${nextMondayStr(
+          now
+        )}.`,
+        cta: null,
+      };
+    }
+
+    // 5) Confidence window open (Mon 9:00 → Tue 11:59) and not all confidence done
+    if (!afterTueNoon && !allConfidence) {
+      const label = partialConfidence ? 'Finish Confidence' : 'Rate Confidence';
+      return {
+        message:
+          partialConfidence
+            ? `You're midway through Monday check-in. Finish your confidence ratings (${confCount}/${total}).`
+            : `Welcome back! Time to rate your confidence for this week’s Pro Moves.`,
+        cta: {
+          label,
+          onClick: () => {
+            const idx = firstIncompleteConfIndex === -1 ? 0 : firstIncompleteConfIndex;
+            navigate(`/confidence/${weekInCycle}/step/${idx + 1}`);
+          },
+        },
+      };
+    }
+
+    // 6) All confidence done; performance locked until Thursday (unless carryover, handled above)
+    if (allConfidence && beforeThursday) {
+      return {
+        message: 'Great! Come back Thursday to submit performance.',
+        cta: {
+          label: 'Performance opens Thursday',
+          onClick: () => {},
+          disabled: true,
+        },
+      };
+    }
+
+    // 7) Performance open (Thu+) and still pending
+    if (allConfidence && !beforeThursday && perfPending) {
+      return {
+        message:
+          perfCount === 0
+            ? 'Time to reflect. Rate your performance for this week’s Pro Moves.'
+            : `Pick up where you left off (${perfCount}/${total} complete).`,
+        cta: {
+          label: 'Rate Performance',
+          onClick: () => {
+            const idx = firstIncompletePerfIndex === -1 ? 0 : firstIncompletePerfIndex;
+            navigate(`/performance/${weekInCycle}/step/${idx + 1}`);
+          },
+        },
+      };
+    }
+
+    // Fallback (shouldn’t happen often)
+    return { message: 'Review your Pro Moves below.', cta: null };
+  };
+
+  const { message: bannerMessage, cta: bannerCta } = buildBanner();
+
+  // ---------- render ----------
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -290,158 +386,93 @@ export default function Week() {
               Cycle {cycle}, Week {weekInCycle}
             </CardDescription>
           </CardHeader>
+
           <CardContent className="space-y-4">
-            {/* Next Up orientation */}
-            {carryoverConflict ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-center">Finish last week before starting a new one</CardTitle>
-                  <CardDescription className="text-center">You still need to submit performance for last week.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    className="w-full h-12"
-                    onClick={async () => {
-                      if (!carryoverPending || !staff) return;
-                      // Fetch the carryover week's focus and find first incomplete performance item
-                      const { data: focusData } = await supabase
-                        .from('weekly_focus')
-                        .select('id, display_order')
-                        .eq('cycle', carryoverPending.cycle)
-                        .eq('week_in_cycle', carryoverPending.week_in_cycle)
-                        .eq('role_id', staff.role_id)
-                        .order('display_order');
-                      const focusIds = (focusData || []).map((f: any) => f.id);
-                      if (!focusIds.length) return navigate(`/performance/${carryoverPending.week_in_cycle}`, { state: { carryover: true } });
-                      const { data: scores } = await supabase
-                        .from('weekly_scores')
-                        .select('weekly_focus_id, performance_score')
-                        .eq('staff_id', staff.id)
-                        .in('weekly_focus_id', focusIds);
-                      const ordered = (focusData || []) as { id: string; display_order: number }[];
-                      const firstIdx = ordered.findIndex((f) => !scores?.find((s) => s.weekly_focus_id === f.id)?.performance_score);
-                      const idx = firstIdx === -1 ? 0 : firstIdx;
-                      const startFocus = ordered[idx];
-                      navigate(`/performance/${carryoverPending.week_in_cycle}/step/${idx + 1}`, { state: { carryover: true } });
-                    }}
-                  >
-                    Finish Performance
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {/* Completed state */}
-                {allDone && (
-                  <Badge variant="default" className="w-full justify-center py-2">
-                    ✓ Completed for Cycle {cycle}, Week {weekInCycle}
-                  </Badge>
-                )}
-
-                {/* Before check-in */}
-                {beforeCheckIn && !allDone && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-center">Confidence opens at 9:00 a.m. CT.</CardTitle>
-                    </CardHeader>
-                  </Card>
-                )}
-
-                {/* Confidence window closed */}
-                {!beforeCheckIn && afterTueNoon && !allConfidence && (
-                  <div className="p-3 rounded-md border bg-muted">
-                    <div className="font-medium">Confidence window closed</div>
-                    <div className="text-sm text-muted-foreground">You’ll get a fresh start on Mon, {nextMondayStr(now)}.</div>
-                  </div>
-                )}
-
-                {/* Confidence CTA (rate or finish) */}
-                {!beforeCheckIn && !afterTueNoon && !allConfidence && (
-                  <>
-                    <Button
-                      onClick={() => {
-                        const firstIdx = weeklyFocus.findIndex((f) => {
-                          const s = getScoreForFocus(f.id);
-                          return !s || s.confidence_score == null;
-                        });
-                        const idx = firstIdx === -1 ? 0 : firstIdx;
-                        navigate(`/confidence/${weekInCycle}/step/${idx + 1}`);
-                      }}
-                      className="w-full h-12"
-                    >
-                      {partialConfidence ? 'Finish Confidence' : 'Rate Confidence'}
-                    </Button>
-                    {partialConfidence && (
-                      <div className="text-xs text-muted-foreground text-center mt-1">{confCount}/{total} complete</div>
-                    )}
-                  </>
-                )}
-
-                {/* Performance locked until Thu */}
-                {allConfidence && beforeThursday && (
-                  <Button className="w-full h-12" variant="outline" disabled>
-                    Performance opens Thursday
-                  </Button>
-                )}
-
-                {/* Performance CTA */}
-                {allConfidence && !beforeThursday && perfPending && (
-                  <Button
-                    onClick={() => {
-                      const firstIdx = weeklyFocus.findIndex((f) => {
-                        const s = getScoreForFocus(f.id);
-                        return s && s.performance_score == null;
-                      });
-                      const idx = firstIdx === -1 ? 0 : firstIdx;
-                      navigate(`/performance/${weekInCycle}/step/${idx + 1}`);
-                    }}
-                    className="w-full h-12"
-                  >
-                    Rate Performance
-                  </Button>
-                )}
-              </>
-            )}
+            {/* Dynamic message + single appropriate CTA */}
+            <div className="rounded-md border bg-muted p-3">
+              <div className="font-medium text-sm text-foreground text-center">{bannerMessage}</div>
+              {bannerCta && (
+                <Button
+                  className="w-full h-12 mt-2"
+                  onClick={bannerCta.onClick}
+                  disabled={bannerCta.disabled}
+                >
+                  {bannerCta.label}
+                </Button>
+              )}
+              {!carryoverConflict && !afterTueNoon && confCount > 0 && confCount < total && (
+                <div className="text-xs text-muted-foreground text-center mt-1">
+                  {confCount}/{total} complete
+                </div>
+              )}
+            </div>
 
             {/* This Week's Pro Moves */}
             <div className="space-y-3">
-              <h3 className="font-medium">This Week's Pro Moves:</h3>
+              <h3 className="font-medium">This Week&apos;s Pro Moves:</h3>
               {weeklyFocus.map((focus, index) => {
                 const score = getScoreForFocus(focus.id);
-                const unchosenSelfSelect = !!focus.self_select && (!score || score.selected_action_id == null);
+                const unchosenSelfSelect =
+                  !!focus.self_select && (!score || score.selected_action_id == null);
+
                 return (
-                  <div key={focus.id} className="p-3 bg-muted rounded-lg">
+                  <div
+                    key={focus.id}
+                    className="rounded-lg p-4 border"
+                    style={{ backgroundColor: getDomainColor(focus.domain_name) }}
+                  >
+                    {focus.domain_name && (
+                      <Badge
+                        variant="secondary"
+                        className="text-xs font-semibold mb-2 bg-white/80 text-gray-900"
+                      >
+                        {focus.domain_name}
+                      </Badge>
+                    )}
                     <div className="flex items-start gap-2">
                       <Badge variant="outline" className="text-xs">{index + 1}</Badge>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          {focus.domain_name && (
-                            <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px]" style={{ backgroundColor: getDomainColor(focus.domain_name) }}>
-                              {focus.domain_name}
-                            </span>
-                          )}
-                          <p className="text-sm flex-1">{focus.action_statement}</p>
-                        </div>
-                        {unchosenSelfSelect && (
-                          <div className="mt-1">
-                            <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate(`/confidence/${weekInCycle}/step/${index + 1}`)}>
-                              Choose your Pro Move
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-sm font-medium text-gray-900 flex-1">
+                        {focus.action_statement}
+                      </p>
                     </div>
+
+                    {unchosenSelfSelect && (
+                      <div className="mt-1">
+                        <Button
+                          variant="link"
+                          className="h-auto p-0 text-xs"
+                          onClick={() => {
+                            // self-select happens during confidence flow; take them to that step
+                            navigate(`/confidence/${weekInCycle}/step/${index + 1}`);
+                          }}
+                        >
+                          Choose your Pro Move
+                        </Button>
+                      </div>
+                    )}
+
                     <div className="flex gap-2 mt-2">
                       {score?.confidence_score != null && (
-                        <Badge variant="secondary" className="text-xs">Confidence: {score.confidence_score}</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          Confidence: {score.confidence_score}
+                        </Badge>
                       )}
                       {score?.performance_score != null && (
-                        <Badge variant="secondary" className="text-xs">Performance: {score.performance_score}</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          Performance: {score.performance_score}
+                        </Badge>
                       )}
                     </div>
                   </div>
                 );
               })}
+            </div>
+
+            {/* Back to main dashboard */}
+            <div className="space-y-2 pt-2">
+              <Button variant="outline" onClick={() => navigate('/')} className="w-full">
+                Back to Dashboard
+              </Button>
             </div>
           </CardContent>
         </Card>

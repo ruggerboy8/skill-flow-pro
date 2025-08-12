@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
-
+import { getNowZ, getAnchors, nextMondayStr } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
@@ -33,6 +33,11 @@ export default function WeekInfo() {
 
   const cycleNum = parseInt(cycle || '1');
   const weekNum = parseInt(week || '1');
+
+  const nowZ = getNowZ();
+  const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(nowZ);
+  const beforeCheckIn = nowZ < monCheckInZ;
+  const afterTueNoon = nowZ >= tueDueZ;
 
   useEffect(() => {
     if (user) {
@@ -93,18 +98,41 @@ export default function WeekInfo() {
   };
 
   const handleRateNext = () => {
-    if (weeklyFocus.length > 0) {
-      const firstFocusId = weeklyFocus[0].id;
-      if (!hasConfidenceScores) {
-        navigate(`/confidence/${firstFocusId}/1`);
-      } else if (!hasPerformanceScores) {
-        navigate(`/performance/${firstFocusId}/1`);
-      } else {
+    if (weeklyFocus.length === 0) return;
+
+    const firstFocusId = weeklyFocus[0].id;
+
+    if (!hasConfidenceScores) {
+      if (afterTueNoon) {
         toast({
-          title: "Week Complete",
-          description: "You've already completed both confidence and performance ratings for this week."
+          title: "Confidence window closed",
+          description: `You’ll get a fresh start on Mon, ${nextMondayStr(nowZ)}.`
         });
+        navigate('/week');
+        return;
       }
+      if (beforeCheckIn) {
+        toast({
+          title: "Confidence opens at 9:00 a.m. CT.",
+          description: "Please come back after the window opens."
+        });
+        return;
+      }
+      navigate(`/confidence/${firstFocusId}/1`);
+    } else if (!hasPerformanceScores) {
+      if (nowZ < thuStartZ) {
+        toast({
+          title: "Performance opens Thursday",
+          description: "Please come back on Thu 12:00 a.m. CT."
+        });
+        return;
+      }
+      navigate(`/performance/${firstFocusId}/1`);
+    } else {
+      toast({
+        title: "Week Complete",
+        description: "You've already completed both confidence and performance ratings for this week."
+      });
     }
   };
 
@@ -148,14 +176,16 @@ export default function WeekInfo() {
             <div className="space-y-2 pt-4">
               <Button 
                 onClick={handleRateNext}
-                disabled={hasConfidenceScores && hasPerformanceScores}
+                disabled={(hasConfidenceScores && hasPerformanceScores) || (!hasConfidenceScores && (beforeCheckIn || afterTueNoon)) || (hasConfidenceScores && !hasPerformanceScores && nowZ < thuStartZ)}
                 className="w-full h-12"
               >
                 {hasConfidenceScores && hasPerformanceScores 
                   ? 'Week Complete' 
-                  : hasConfidenceScores 
-                    ? 'Rate your performance' 
-                    : 'Rate your confidence'}
+                  : !hasConfidenceScores
+                    ? (afterTueNoon 
+                        ? 'Confidence window closed' 
+                        : (beforeCheckIn ? 'Confidence opens at 9:00 a.m. CT' : 'Rate your confidence'))
+                    : (nowZ < thuStartZ ? 'Rate your performance (opens Thu)' : 'Rate your performance')}
               </Button>
               
               <Button 

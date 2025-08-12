@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
-
+import { getNowZ, getAnchors, nextMondayStr } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
@@ -30,10 +30,16 @@ export default function ConfidenceWizard() {
   const [currentFocus, setCurrentFocus] = useState<WeeklyFocus | null>(null);
   const [scores, setScores] = useState<{ [key: string]: number }>({});
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const navigate = useNavigate();
+const [submitting, setSubmitting] = useState(false);
+const [hasConfidence, setHasConfidence] = useState(false);
+const { user } = useAuth();
+const { toast } = useToast();
+const navigate = useNavigate();
+
+  const nowZ = getNowZ();
+  const { monCheckInZ, tueDueZ } = getAnchors(nowZ);
+  const beforeCheckIn = nowZ < monCheckInZ;
+  const afterTueNoon = nowZ >= tueDueZ;
 
   const currentIndex = parseInt(index || '1') - 1;
 
@@ -42,6 +48,25 @@ export default function ConfidenceWizard() {
       loadData();
     }
   }, [user, focusId]);
+
+  // Central Time gating and route guard
+  useEffect(() => {
+    if (!loading && weeklyFocus.length > 0) {
+      if (beforeCheckIn) {
+        toast({
+          title: "Confidence opens at 9:00 a.m. CT.",
+          description: "Please come back after the window opens."
+        });
+        navigate('/week');
+      } else if (afterTueNoon && !hasConfidence) {
+        toast({
+          title: "Confidence window closed",
+          description: `You’ll get a fresh start on Mon, ${nextMondayStr(nowZ)}.`
+        });
+        navigate('/week');
+      }
+    }
+  }, [loading, weeklyFocus, beforeCheckIn, afterTueNoon, hasConfidence, navigate]);
 
   const loadData = async () => {
     if (!user || !focusId) return;
@@ -94,9 +119,21 @@ export default function ConfidenceWizard() {
       return;
     }
 
-    setWeeklyFocus(focusData);
-    setCurrentFocus(focusData[currentIndex]);
-    setLoading(false);
+setWeeklyFocus(focusData);
+setCurrentFocus(focusData[currentIndex]);
+
+// Check if confidence already submitted for all focus items
+const focusIds = focusData.map(f => f.id);
+const { data: scoresData } = await supabase
+  .from('weekly_scores')
+  .select('weekly_focus_id, confidence_score')
+  .eq('staff_id', staffData.id)
+  .in('weekly_focus_id', focusIds);
+
+const submittedCount = (scoresData || []).filter((s) => s.confidence_score !== null).length;
+setHasConfidence(submittedCount === focusData.length);
+
+setLoading(false);
   };
 
   const handleNext = () => {

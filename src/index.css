@@ -61,8 +61,9 @@ All colors MUST be HSL.
 
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* Semantic tokens for deltas */
+    /* Semantic tokens for status/deltas */
     --positive: 160 84% 39%;
+    --warning: 45 93% 47%;
    }
 
   .dark {

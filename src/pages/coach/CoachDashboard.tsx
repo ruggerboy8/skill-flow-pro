@@ -4,29 +4,50 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import StaffRow from '@/components/coach/StaffRow';
+import { computeStaffStatus, getSortRank, type WeekKey } from '@/lib/coachStatus';
+import { getISOWeek, getISOWeekYear } from 'date-fns';
+interface StaffScore {
+  confidence_score: number | null;
+  performance_score: number | null;
+  updated_at: string | null;
+  weekly_focus: {
+    id: string;
+    cycle: number;
+    week_in_cycle: number;
+    iso_year: number;
+    iso_week: number;
+  };
+}
 
 interface StaffMember {
   id: string;
   name: string;
+  role_id: number;
   role_name: string;
   location: string | null;
-  conf_missing: number;
-  perf_missing: number;
-  last_updated: string | null;
+  weekly_scores: StaffScore[];
 }
 
 export default function CoachDashboard() {
   const navigate = useNavigate();
-  const { isCoach } = useAuth();
+  const { user, isCoach } = useAuth();
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [filteredStaff, setFilteredStaff] = useState<StaffMember[]>([]);
+  const [rows, setRows] = useState<{
+    member: { id: string; name: string; role_name: string; location: string | null };
+    status: ReturnType<typeof computeStaffStatus>;
+  }[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [selectedRole, setSelectedRole] = useState('all');
+  const [search, setSearch] = useState('');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [currentWeekByRole, setCurrentWeekByRole] = useState<Record<number, WeekKey>>({});
 
   // Redirect if not coach
   useEffect(() => {
@@ -58,7 +79,7 @@ export default function CoachDashboard() {
             confidence_score,
             performance_score,
             updated_at,
-            weekly_focus!inner(cycle, week_in_cycle)
+            weekly_focus!inner(id, cycle, week_in_cycle, iso_year, iso_week)
           )
         `);
 

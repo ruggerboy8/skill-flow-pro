@@ -71,14 +71,14 @@ export default function PerformanceWizard() {
   }, [loading, now, thuStartZ, navigate, isCarryoverWeek]);
 
   const loadData = async () => {
-    if (!user || !focusId) return;
+    if (!user) return;
 
     // Load staff profile
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
       .select('id, role_id')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (staffError || !staffData) {
       navigate('/setup');
@@ -87,37 +87,20 @@ export default function PerformanceWizard() {
 
     setStaff(staffData);
 
-    // Get the focus item details first
-    const { data: focusDetails, error: focusDetailsError } = await supabase
-      .from('weekly_focus')
-      .select('id, cycle, week_in_cycle')
-      .eq('id', focusId)
-      .single();
-
-    if (focusDetailsError || !focusDetails) {
-      toast({
-        title: "Error",
-        description: "Focus item not found",
-        variant: "destructive"
-      });
-      navigate('/');
-      return;
-    }
-
-    // Load all weekly focus for this cycle/week
+    // Load weekly focus for this week/cycle based on week param
     const { data: focusData, error: focusError } = await supabase.rpc('get_focus_cycle_week', {
-      p_cycle: focusDetails.cycle,
-      p_week: focusDetails.week_in_cycle,
+      p_cycle: 1,
+      p_week: weekNum,
       p_role_id: staffData.role_id
     }) as { data: WeeklyFocus[] | null; error: any };
 
-    if (focusError || !focusData) {
+    if (focusError || !focusData || focusData.length === 0) {
       toast({
-        title: "Error",
-        description: "Failed to load Pro Moves",
-        variant: "destructive"
+        title: 'Error',
+        description: 'No Pro Moves found for this week',
+        variant: 'destructive'
       });
-      navigate('/');
+      navigate('/week');
       return;
     }
 

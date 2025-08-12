@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import NumberScale from "@/components/NumberScale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { getDomainColor } from "@/lib/domainColors";
 
 interface Staff { id: string; role_id: number; }
 interface FocusBase { id: string; display_order: number; action_statement: string; domain_name: string; }
@@ -189,7 +190,13 @@ export default function BackfillWeek() {
           <Card key={item.id}>
             <CardContent className="p-4 space-y-4">
               <div className="flex items-center gap-2">
-                <Badge variant="secondary">{item.domain_name}</Badge>
+                <Badge
+                  variant="outline"
+                  className="text-foreground border-transparent"
+                  style={{ backgroundColor: getDomainColor(item.domain_name) }}
+                >
+                  {item.domain_name}
+                </Badge>
                 {item.universal && (
                   <Badge variant="outline" className="text-xs">Universal</Badge>
                 )}

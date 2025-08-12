@@ -8,7 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getNowZ, getAnchors, nextMondayStr, isSameIsoWeek } from '@/lib/centralTime';
+import { getNowZ, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface Staff {
   id: string;
@@ -18,11 +20,13 @@ interface Staff {
 interface WeeklyFocus {
   id: string;
   display_order: number;
-  action_statement?: string; // From RPC function
-  iso_year?: number;
-  iso_week?: number;
+  self_select?: boolean;
+  competency_id?: number;
   pro_moves?: {
     action_statement: string;
+  };
+  competencies?: {
+    domains?: { domain_name?: string }
   };
 }
 
@@ -33,11 +37,20 @@ export default function Confidence() {
   const [scores, setScores] = useState<{ [key: string]: number }>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submittedCount, setSubmittedCount] = useState(0);
+  const [selectedActions, setSelectedActions] = useState<{ [key: string]: string | null }>({});
+  const [optionsByCompetency, setOptionsByCompetency] = useState<{ [key: number]: { action_id: string; action_statement: string }[] }>({});
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const weekNum = Number(week); // week param is now just "1", "2", etc.
+
+  const nowZ = getNowZ();
+  const { monCheckInZ, tueDueZ } = getAnchors(nowZ);
+  const beforeCheckIn = nowZ < monCheckInZ;
+  const afterTueNoon = nowZ >= tueDueZ;
+  const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.length;
 
   useEffect(() => {
     if (user) {
@@ -122,20 +135,26 @@ export default function Confidence() {
   };
 
   const canSubmit = () => {
-    return weeklyFocus.every(focus => scores[focus.id] !== undefined);
+    const allScored = weeklyFocus.every(focus => scores[focus.id] !== undefined);
+    const selfSelectOk = weeklyFocus.every(focus => !focus.self_select || !!selectedActions[focus.id]);
+    return allScored && selfSelectOk;
   };
-
   const handleSubmit = async () => {
     if (!staff || !canSubmit()) return;
 
     setSubmitting(true);
 
-    const scoreInserts = weeklyFocus.map(focus => ({
-      staff_id: staff.id,
-      weekly_focus_id: focus.id,
-      confidence_score: scores[focus.id]
-    }));
-
+    const scoreInserts = weeklyFocus.map(focus => {
+      const base: any = {
+        staff_id: staff.id,
+        weekly_focus_id: focus.id,
+        confidence_score: scores[focus.id]
+      };
+      if (focus.self_select && selectedActions[focus.id]) {
+        base.selected_action_id = selectedActions[focus.id];
+      }
+      return base;
+    });
     const { error } = await supabase
       .from('weekly_scores')
       .upsert(scoreInserts, {
@@ -199,12 +218,47 @@ export default function Confidence() {
                 <Badge variant="outline" className="text-xs">
                   {index + 1}
                 </Badge>
-                <CardTitle className="text-sm font-medium leading-relaxed">
+                <CardTitle className="text-sm font-medium leading-relaxed flex items-center gap-2">
                   {focus.pro_moves?.action_statement || 'Self-Select'}
+                  {focus.competencies?.domains?.domain_name && (
+                    <span
+                      className="inline-flex items-center rounded px-2 py-0.5 text-[10px]"
+                      style={{ backgroundColor: getDomainColor(focus.competencies.domains.domain_name) }}
+                    >
+                      {focus.competencies.domains.domain_name}
+                    </span>
+                  )}
                 </CardTitle>
               </div>
             </CardHeader>
             <CardContent>
+              {focus.self_select && (
+                <div className="mb-3">
+                  <Label className="text-xs mb-1 block">Choose a Pro Move</Label>
+                  <Select
+                    value={selectedActions[focus.id] || ''}
+                    onValueChange={(value) => setSelectedActions(prev => ({ ...prev, [focus.id]: value }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a Pro Move" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {focus.competency_id && optionsByCompetency[focus.competency_id] ? (
+                        optionsByCompetency[focus.competency_id].map((opt) => (
+                          <SelectItem key={opt.action_id} value={opt.action_id}>
+                            {opt.action_statement}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="__none" disabled>
+                          No options available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <RadioGroup
                 value={scores[focus.id]?.toString() || ''}
                 onValueChange={(value) => handleScoreChange(focus.id, value)}

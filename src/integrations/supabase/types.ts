@@ -207,6 +207,7 @@ export type Database = {
           iso_year: number
           role_id: number | null
           self_select: boolean
+          universal: boolean
           week_in_cycle: number
         }
         Insert: {
@@ -220,6 +221,7 @@ export type Database = {
           iso_year: number
           role_id?: number | null
           self_select?: boolean
+          universal?: boolean
           week_in_cycle: number
         }
         Update: {
@@ -233,6 +235,7 @@ export type Database = {
           iso_year?: number
           role_id?: number | null
           self_select?: boolean
+          universal?: boolean
           week_in_cycle?: number
         }
         Relationships: [
@@ -262,11 +265,16 @@ export type Database = {
       weekly_scores: {
         Row: {
           confidence_date: string | null
+          confidence_estimated: boolean
           confidence_score: number | null
+          confidence_source: Database["public"]["Enums"]["score_source"]
           created_at: string | null
+          entered_by: string
           id: string
           performance_date: string | null
+          performance_estimated: boolean
           performance_score: number | null
+          performance_source: Database["public"]["Enums"]["score_source"]
           selected_action_id: number | null
           staff_id: string | null
           updated_at: string | null
@@ -274,11 +282,16 @@ export type Database = {
         }
         Insert: {
           confidence_date?: string | null
+          confidence_estimated?: boolean
           confidence_score?: number | null
+          confidence_source?: Database["public"]["Enums"]["score_source"]
           created_at?: string | null
+          entered_by?: string
           id?: string
           performance_date?: string | null
+          performance_estimated?: boolean
           performance_score?: number | null
+          performance_source?: Database["public"]["Enums"]["score_source"]
           selected_action_id?: number | null
           staff_id?: string | null
           updated_at?: string | null
@@ -286,11 +299,16 @@ export type Database = {
         }
         Update: {
           confidence_date?: string | null
+          confidence_estimated?: boolean
           confidence_score?: number | null
+          confidence_source?: Database["public"]["Enums"]["score_source"]
           created_at?: string | null
+          entered_by?: string
           id?: string
           performance_date?: string | null
+          performance_estimated?: boolean
           performance_score?: number | null
+          performance_source?: Database["public"]["Enums"]["score_source"]
           selected_action_id?: number | null
           staff_id?: string | null
           updated_at?: string | null
@@ -443,9 +461,13 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      is_super_admin: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      score_source: "live" | "backfill"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -572,6 +594,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      score_source: ["live", "backfill"],
+    },
   },
 } as const

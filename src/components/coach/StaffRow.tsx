@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 export interface StaffRowProps {
   member: {
@@ -12,6 +13,7 @@ export interface StaffRowProps {
     color: "grey" | "yellow" | "green";
     reason: string;
     subtext?: string;
+    tooltip?: string;
   };
   onClick: () => void;
 }
@@ -44,13 +46,31 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
             )}
           </div>
           <div className="text-right">
-            <div
-              className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${chipClass}`}
-              aria-label={`Status: ${status.color}`}
-            >
-              <span className="sr-only">{status.color}</span>
-            </div>
-            <div className="mt-1 text-sm">{status.reason}</div>
+            {status.tooltip ? (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${chipClass}`}
+                      aria-label={`Status: ${status.color}`}
+                    >
+                      <span className="sr-only">{status.color}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{status.tooltip}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <div
+                className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${chipClass}`}
+                aria-label={`Status: ${status.color}`}
+              >
+                <span className="sr-only">{status.color}</span>
+              </div>
+            )}
+            {status.reason && <div className="mt-1 text-sm">{status.reason}</div>}
             {status.subtext && (
               <div className="text-xs text-muted-foreground mt-0.5">{status.subtext}</div>
             )}

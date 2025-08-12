@@ -1,3 +1,6 @@
+import { startOfWeek, addDays, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
+import { toZonedTime, formatInTimeZone } from 'date-fns-tz';
+
 export type StatusColor = "grey" | "yellow" | "green";
 
 export interface WeekKey {
@@ -11,6 +14,7 @@ export interface StaffWeekStatus {
   color: StatusColor;
   reason: string;
   subtext?: string;
+  tooltip?: string;
   blocked: boolean;
   confCount: number;
   perfCount: number;
@@ -20,34 +24,24 @@ export interface StaffWeekStatus {
 // Helper to clamp counts to expected max of 3
 const clamp3 = (n: number) => Math.max(0, Math.min(3, n));
 
-function getPhase(now: Date, checkinHour = 8) {
-  const monday = new Date(now);
-  const day = monday.getDay(); // 0 Sun, 1 Mon
-  const diffToMonday = (day + 6) % 7; // ISO Monday offset
-  monday.setDate(monday.getDate() - diffToMonday);
-  monday.setHours(checkinHour, 0, 0, 0);
+function getPhase(now: Date, timeZone = 'America/Chicago') {
+  const nowZ = toZonedTime(now, timeZone);
 
-  const wedEnd = new Date(monday);
-  wedEnd.setDate(monday.getDate() + 2); // Wed
-  wedEnd.setHours(23, 59, 59, 999);
+  const mondayZ = startOfWeek(nowZ, { weekStartsOn: 1 }); // Mon 00:00 local
 
-  const thuStart = new Date(monday);
-  thuStart.setDate(monday.getDate() + 3); // Thu 00:00
-  thuStart.setHours(0, 0, 0, 0);
+  const tueDueZ = setMinutes(setHours(addDays(mondayZ, 1), 12), 0); // Tue 12:00
+  const thuStartZ = setHours(addDays(mondayZ, 3), 0); // Thu 00:00
+  const friStartZ = setHours(addDays(mondayZ, 4), 0); // Fri 00:00
+  const sunEndZ = setMilliseconds(
+    setSeconds(setMinutes(setHours(addDays(mondayZ, 6), 23), 59), 59),
+    999
+  ); // Sun 23:59:59.999
 
-  const thuDue = new Date(monday);
-  thuDue.setDate(monday.getDate() + 3); // Thu 17:00
-  thuDue.setHours(17, 0, 0, 0);
-
-  const sunEnd = new Date(monday);
-  sunEnd.setDate(monday.getDate() + 6); // Sun 23:59
-  sunEnd.setHours(23, 59, 59, 999);
-
-  if (now < monday) return "pre_checkin" as const;
-  if (now <= wedEnd) return "conf_window" as const;
-  if (now >= thuStart && now < thuDue) return "thu_due_today" as const;
-  if (now >= thuDue && now <= sunEnd) return "thu_after_due_to_sun" as const;
-  return "other" as const; // e.g., next Mon after check-in etc.
+  if (nowZ < tueDueZ) return 'before_tue_noon' as const;
+  if (nowZ < thuStartZ) return 'after_tue_before_thu' as const;
+  if (nowZ < friStartZ) return 'thu' as const;
+  if (nowZ <= sunEndZ) return 'fri_to_sun' as const;
+  return 'other' as const; // e.g., next Mon
 }
 
 export function computeStaffStatus(
@@ -113,63 +107,81 @@ export function computeStaffStatus(
     };
   }
 
-  const counts = countFor({ cycle: target.cycle, week_in_cycle: target.week_in_cycle });
-  const phase = getPhase(now);
+const counts = countFor({ cycle: target.cycle, week_in_cycle: target.week_in_cycle });
 
-  // Decide status color
-  let color: StatusColor = "grey";
-  if (counts.perf === 3) color = "green";
-  else if (counts.conf === 3) color = "yellow";
-  else color = "grey";
+// Decide status color
+let color: StatusColor = "grey";
+if (counts.perf === 3) color = "green";
+else if (counts.conf === 3) color = "yellow";
+else color = "grey";
 
-  // Reason logic
-  let reason = "On track";
+// Reason and tooltip logic (America/Chicago)
+let reason = "";
+let tooltip: string | undefined = undefined;
 
-  if (isBlocked) {
-    reason = "Finish last week before starting new";
-  } else if (color === "green") {
-    reason = "Complete";
-  } else if (color === "yellow") {
-    if (phase === "thu_due_today") reason = "Performance due today";
-    else if (phase === "thu_after_due_to_sun") reason = "Performance overdue";
-    else reason = "On track"; // Mon–Wed (locked), or other non-overdue times
+const phase = getPhase(now, 'America/Chicago');
+
+if (isBlocked) {
+  // Blocking takes precedence
+  color = "yellow";
+  reason = "Finish last week before starting new";
+} else if (!target) {
+  reason = "Not configured";
+} else if (counts.conf < 3) {
+  // Confidence incomplete
+  if (phase === 'before_tue_noon') {
+    reason = ""; // on track, quiet
   } else {
-    // Grey
-    if (phase === "pre_checkin") reason = "Check-in not started";
-    else reason = "Confidence overdue";
+    reason = "Needs confidence";
+    // Compute next Monday in Central
+    const nowZ = toZonedTime(now, 'America/Chicago');
+    const mondayZ = startOfWeek(nowZ, { weekStartsOn: 1 });
+    const nextMonZ = addDays(mondayZ, 7);
+    const nextMonStr = formatInTimeZone(nextMonZ, 'America/Chicago', 'EEE, MMM d');
+    tooltip = `Needs confidence — due Tue 12:00. Will reset on Mon, ${nextMonStr}.`;
   }
+} else if (counts.conf === 3 && counts.perf < 3) {
+  // Performance pending
+  if (phase === 'thu') {
+    reason = "Needs performance";
+    tooltip = "Needs performance — opens Thu.";
+  } else if (phase === 'fri_to_sun' || phase === 'other') {
+    reason = "Needs performance";
+    tooltip = "Needs performance.";
+  } else {
+    reason = ""; // Mon–Wed locked; quiet
+  }
+} else if (counts.perf === 3) {
+  // Complete, keep calm
+  reason = "";
+}
 
-  // Subtext for partials
-  let subtext: string | undefined;
-  if (color === "grey" && counts.conf > 0 && counts.conf < 3) {
-    subtext = `${counts.conf}/3 confidence`;
-  }
-  if (color === "yellow" && counts.perf > 0 && counts.perf < 3) {
-    subtext = `${counts.perf}/3 performance`;
-  }
+// Subtext for partials
+let subtext: string | undefined;
+if (color === "grey" && counts.conf > 0 && counts.conf < 3) {
+  subtext = `${counts.conf}/3 confidence`;
+}
+if (color === "yellow" && counts.perf > 0 && counts.perf < 3) {
+  subtext = `${counts.perf}/3 performance`;
+}
 
-  return {
-    color,
-    reason,
-    subtext,
-    blocked: isBlocked,
-    confCount: counts.conf,
-    perfCount: counts.perf,
-    target,
-  };
+return {
+  color,
+  reason,
+  subtext,
+  tooltip,
+  blocked: isBlocked,
+  confCount: counts.conf,
+  perfCount: counts.perf,
+  target,
+};
 }
 
 export function getSortRank(status: StaffWeekStatus): number {
-  const r = status.reason.toLowerCase();
-  if (
-    r.includes("overdue") ||
-    r.includes("finish last week") ||
-    r.includes("confidence overdue")
-  )
-    return 0; // Behind
-  if (r.includes("due today")) return 1; // Due today
-  if (r.includes("on track") || r.includes("check-in not started") || r.includes("not configured"))
-    return 2; // On-track / neutral
-  if (r.includes("complete")) return 3; // Complete
+  // Priority: Needs confidence (0) -> Needs performance / Finish last week (1) -> On-track/neutral (2) -> Complete (3)
+  const t = (status.tooltip || status.reason || '').toLowerCase();
+  if (t.includes('needs confidence')) return 0;
+  if (t.includes('needs performance') || status.reason.toLowerCase().includes('finish last week')) return 1;
+  if (status.color === 'green') return 3;
   return 2;
 }

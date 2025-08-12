@@ -37,6 +37,7 @@ export default function ThisWeekPanel() {
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScoreRow[]>([]);
   const [carryoverPending, setCarryoverPending] = useState<{ cycle: number; week_in_cycle: number } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [carryoverChecked, setCarryoverChecked] = useState<boolean>(false);
 
   useEffect(() => {
     if (user) loadStaff();
@@ -100,6 +101,7 @@ export default function ThisWeekPanel() {
   async function loadWeekData() {
     if (!staff) return;
     setLoading(true);
+    setCarryoverChecked(false);
 
     // Load focus rows with optional joins for action/domain
     const { data: focusData, error: focusError } = await supabase
@@ -162,6 +164,7 @@ export default function ThisWeekPanel() {
       setCarryoverPending(null);
     }
 
+    setCarryoverChecked(true);
     setLoading(false);
   }
 
@@ -200,7 +203,7 @@ export default function ThisWeekPanel() {
   type CtaConfig = { label: string; onClick: () => void } | null;
 
   function buildBanner(): { message: string; cta: CtaConfig } {
-    if (carryoverConflict && carryoverPending) {
+    if (carryoverChecked && carryoverConflict && carryoverPending) {
       return {
         message: 'You still need to submit performance for last week before starting a new one.',
         cta: {
@@ -322,6 +325,10 @@ export default function ThisWeekPanel() {
         </div>
 
         <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium">This Week&apos;s Pro Moves:</h3>
+            <span className="text-xs text-muted-foreground">Confidence</span>
+          </div>
           {weeklyFocus.map((focus, index) => {
             const score = weeklyScores.find(s => s.weekly_focus_id === focus.id);
             const unchosenSelfSelect = !!focus.self_select && (!score || score.selected_action_id == null);
@@ -335,9 +342,13 @@ export default function ThisWeekPanel() {
                     {domainName}
                   </Badge>
                 )}
-                <div className="flex items-start gap-2">
-                  <Badge variant="outline" className="text-xs">{index + 1}</Badge>
-                  <p className="text-sm font-medium flex-1">{focus.pro_moves?.action_statement || 'Self-Select'}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <p className="text-sm font-medium flex-1">{focus.pro_moves?.action_statement || 'Self-Select'}</p>
+                  </div>
+                  <div className="text-sm font-medium tabular-nums">
+                    {score?.confidence_score != null ? score.confidence_score : ''}
+                  </div>
                 </div>
 
                 {unchosenSelfSelect && (
@@ -349,9 +360,6 @@ export default function ThisWeekPanel() {
                 )}
 
                 <div className="flex gap-2 mt-2">
-                  {score?.confidence_score != null && (
-                    <Badge variant="secondary" className="text-xs">Confidence: {score.confidence_score}</Badge>
-                  )}
                   {score?.performance_score != null && (
                     <Badge variant="secondary" className="text-xs">Performance: {score.performance_score}</Badge>
                   )}

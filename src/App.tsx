@@ -72,11 +72,12 @@ function AppRoutes() {
         </Route>
         <Route path="profile" element={<Profile />} />
         <Route path="week" element={<Week />} />
+        <Route path="week/:weekId" element={<Week />} />
         <Route path="week-info/:cycle/:week" element={<WeekInfo />} />
         <Route path="confidence/:week" element={<Confidence />} />
-        <Route path="confidence/:focusId/:index" element={<ConfidenceWizard />} />
+        <Route path="confidence/:week/step/:n" element={<ConfidenceWizard />} />
         <Route path="performance/:week" element={<Performance />} />
-        <Route path="performance/:focusId/:index" element={<PerformanceWizard />} />
+        <Route path="performance/:week/step/:n" element={<PerformanceWizard />} />
         <Route path="review/:cycle/:week" element={<Review />} />
         <Route path="backfill" element={<BackfillIntro />} />
         <Route path="backfill/:week" element={<BackfillWeek />} />

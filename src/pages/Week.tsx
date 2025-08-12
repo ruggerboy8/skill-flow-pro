@@ -176,13 +176,28 @@ export default function Week() {
         .limit(1);
 
       const wf: any = pending && pending[0] && (pending[0] as any).weekly_focus;
-      if (wf) {
-        setCarryoverPending({ cycle: wf.cycle, week_in_cycle: wf.week_in_cycle });
-        if (wf.week_in_cycle !== weekInCycle || wf.cycle !== cycle) {
-          navigate(`/performance/${wf.week_in_cycle}`, { state: { carryover: true } });
+        if (wf) {
+          // Auto-route directly to carryover performance wizard first incomplete step
+          const { data: focusData } = await supabase
+            .from('weekly_focus')
+            .select('id, display_order')
+            .eq('cycle', wf.cycle)
+            .eq('week_in_cycle', wf.week_in_cycle)
+            .eq('role_id', staff.role_id)
+            .order('display_order');
+          const focusIds = (focusData || []).map((f: any) => f.id);
+          if (!focusIds.length) return navigate(`/week/${wf.cycle}-${wf.week_in_cycle}`);
+          const { data: scores } = await supabase
+            .from('weekly_scores')
+            .select('weekly_focus_id, performance_score')
+            .eq('staff_id', staff.id)
+            .in('weekly_focus_id', focusIds);
+          const ordered = (focusData || []) as { id: string; display_order: number }[];
+          const firstIdx = ordered.findIndex((f) => !scores?.find((s) => s.weekly_focus_id === f.id)?.performance_score);
+          const idx = firstIdx === -1 ? 0 : firstIdx;
+          navigate(`/performance/${wf.week_in_cycle}/step/${idx + 1}`, { state: { carryover: true } });
           return;
         }
-      }
     }
     
     setLoading(false);
@@ -307,7 +322,7 @@ export default function Week() {
                       const firstIdx = ordered.findIndex((f) => !scores?.find((s) => s.weekly_focus_id === f.id)?.performance_score);
                       const idx = firstIdx === -1 ? 0 : firstIdx;
                       const startFocus = ordered[idx];
-                      navigate(`/performance/${startFocus.id}/${idx + 1}`, { state: { carryover: true } });
+                      navigate(`/performance/${carryoverPending.week_in_cycle}/step/${idx + 1}`, { state: { carryover: true } });
                     }}
                   >
                     Finish Performance
@@ -350,8 +365,7 @@ export default function Week() {
                           return !s || s.confidence_score == null;
                         });
                         const idx = firstIdx === -1 ? 0 : firstIdx;
-                        const startFocus = weeklyFocus[idx];
-                        navigate(`/confidence/${startFocus.id}/${idx + 1}`);
+                        navigate(`/confidence/${weekInCycle}/step/${idx + 1}`);
                       }}
                       className="w-full h-12"
                     >
@@ -379,8 +393,7 @@ export default function Week() {
                         return s && s.performance_score == null;
                       });
                       const idx = firstIdx === -1 ? 0 : firstIdx;
-                      const startFocus = weeklyFocus[idx];
-                      navigate(`/performance/${startFocus.id}/${idx + 1}`);
+                      navigate(`/performance/${weekInCycle}/step/${idx + 1}`);
                     }}
                     className="w-full h-12"
                   >
@@ -411,7 +424,7 @@ export default function Week() {
                         </div>
                         {unchosenSelfSelect && (
                           <div className="mt-1">
-                            <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate(`/confidence/${focus.id}/${index + 1}`)}>
+                            <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate(`/confidence/${weekInCycle}/step/${index + 1}`)}>
                               Choose your Pro Move
                             </Button>
                           </div>

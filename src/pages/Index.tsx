@@ -194,7 +194,7 @@ export default function Index() {
     }
 
     // Navigate to week info page
-    navigate(`/week-info/${cycle}/${weekInCycle}`);
+    navigate(`/week/${cycle}-${weekInCycle}`);
   };
   const handleSignOut = async () => {
     await signOut();

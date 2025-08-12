@@ -37,6 +37,15 @@ export default function WeekInfo() {
   const cycleNum = parseInt(cycle || '1');
   const weekNum = parseInt(week || '1');
 
+  // Thin redirect to canonical Week route
+  const [redirected, setRedirected] = useState(false);
+  useEffect(() => {
+    if (!redirected) {
+      setRedirected(true);
+      navigate(`/week/${cycleNum}-${weekNum}`, { replace: true });
+    }
+  }, [redirected, cycleNum, weekNum, navigate]);
+
   const now = nowUtc();
   const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(now);
   const beforeCheckIn = now < monCheckInZ;
@@ -173,12 +182,8 @@ export default function WeekInfo() {
     toast({ title: 'Week Complete', description: "You've already completed both confidence and performance ratings for this week." });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">Loading...</div>
-      </div>
-    );
+  if (redirected) {
+    return null;
   }
 
   return (

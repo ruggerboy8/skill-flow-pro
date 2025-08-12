@@ -26,7 +26,7 @@ interface WeeklyFocus {
 }
 
 export default function ConfidenceWizard() {
-  const { focusId, index } = useParams();
+  const { week, n } = useParams();
   const [staff, setStaff] = useState<Staff | null>(null);
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [currentFocus, setCurrentFocus] = useState<WeeklyFocus | null>(null);
@@ -39,21 +39,22 @@ export default function ConfidenceWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [hasConfidence, setHasConfidence] = useState(false);
   const { user } = useAuth();
-const { toast } = useToast();
-const navigate = useNavigate();
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
+  const weekNum = Number(week);
   const now = nowUtc();
   const { monCheckInZ, tueDueZ } = getAnchors(now);
   const beforeCheckIn = now < monCheckInZ;
   const afterTueNoon = now >= tueDueZ;
 
-  const currentIndex = parseInt(index || '1') - 1;
+  const currentIndex = Math.max(0, (Number(n) || 1) - 1);
 
   useEffect(() => {
-    if (user && focusId) {
+    if (user) {
       loadData();
     }
-  }, [user, focusId]);
+  }, [user, week, n]);
 
   // Central Time gating and route guard
   useEffect(() => {
@@ -75,7 +76,7 @@ const navigate = useNavigate();
   }, [loading, weeklyFocus, beforeCheckIn, afterTueNoon, hasConfidence, navigate]);
 
   const loadData = async () => {
-    if (!user || !focusId) return;
+    if (!user) return;
 
     // Load staff profile
     const { data: staffData, error: staffError } = await supabase
@@ -91,100 +92,81 @@ const navigate = useNavigate();
 
     setStaff(staffData);
 
-    // Get the focus item details first
-    const { data: focusDetails, error: focusDetailsError } = await supabase
-      .from('weekly_focus')
-      .select('id, cycle, week_in_cycle')
-      .eq('id', focusId)
-      .single();
-
-    if (focusDetailsError || !focusDetails) {
-      toast({
-        title: "Error",
-        description: "Focus item not found",
-        variant: "destructive"
-      });
-      navigate('/');
-      return;
-    }
-
     // Load all weekly focus for this cycle/week
     const { data: focusData, error: focusError } = await supabase.rpc('get_focus_cycle_week', {
-      p_cycle: focusDetails.cycle,
-      p_week: focusDetails.week_in_cycle,
+      p_cycle: 1,
+      p_week: weekNum,
       p_role_id: staffData.role_id
     }) as { data: WeeklyFocus[] | null; error: any };
 
-    if (focusError || !focusData) {
+    if (focusError || !focusData || focusData.length === 0) {
       toast({
-        title: "Error",
-        description: "Failed to load Pro Moves",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to load Pro Moves',
+        variant: 'destructive'
       });
-      navigate('/');
+      navigate('/week');
       return;
     }
 
-setWeeklyFocus(focusData);
-setCurrentFocus(focusData[currentIndex]);
+    setWeeklyFocus(focusData);
+    setCurrentFocus(focusData[currentIndex]);
 
-// Check if confidence already submitted for all focus items and prefill selections
-const focusIds = focusData.map(f => f.id);
-const { data: scoresData } = await supabase
-  .from('weekly_scores')
-  .select('weekly_focus_id, confidence_score, selected_action_id')
-  .eq('staff_id', staffData.id)
-  .in('weekly_focus_id', focusIds);
+    // Check if confidence already submitted for all focus items and prefill selections
+    const focusIds = focusData.map(f => f.id);
+    const { data: scoresData } = await supabase
+      .from('weekly_scores')
+      .select('weekly_focus_id, confidence_score, selected_action_id')
+      .eq('staff_id', staffData.id)
+      .in('weekly_focus_id', focusIds);
 
-const submittedCount = (scoresData || []).filter((s) => s.confidence_score !== null).length;
-setHasConfidence(submittedCount === focusData.length);
+    const submittedCount = (scoresData || []).filter((s) => s.confidence_score !== null).length;
+    setHasConfidence(submittedCount === focusData.length);
 
-// Build selection map from existing
-const selectedByFocus: { [key: string]: string | null } = {};
-(scoresData || []).forEach((r) => {
-  if (r.selected_action_id) selectedByFocus[r.weekly_focus_id] = r.selected_action_id as unknown as string;
-});
-setSelectedActions(selectedByFocus);
+    const selectedByFocus: { [key: string]: string | null } = {};
+    (scoresData || []).forEach((r) => {
+      if (r.selected_action_id) selectedByFocus[r.weekly_focus_id] = String(r.selected_action_id);
+    });
+    setSelectedActions(selectedByFocus);
 
-// Load self-select metadata
-const { data: meta } = await supabase
-  .from('weekly_focus')
-  .select('id, self_select, competency_id')
-  .in('id', focusIds);
-const selfSel: Record<string, boolean> = {};
-const compMap: Record<string, number | null> = {};
-(meta || []).forEach((m: any) => {
-  selfSel[m.id] = !!m.self_select;
-  compMap[m.id] = (m.competency_id ?? null) as number | null;
-});
-setSelfSelectById(selfSel);
-setCompetencyById(compMap);
+    // Load self-select metadata
+    const { data: meta } = await supabase
+      .from('weekly_focus')
+      .select('id, self_select, competency_id')
+      .in('id', focusIds);
+    const selfSel: Record<string, boolean> = {};
+    const compMap: Record<string, number | null> = {};
+    (meta || []).forEach((m: any) => {
+      selfSel[m.id] = !!m.self_select;
+      compMap[m.id] = (m.competency_id ?? null) as number | null;
+    });
+    setSelfSelectById(selfSel);
+    setCompetencyById(compMap);
 
-// Fetch options for competencies
-const compIds = Array.from(new Set((meta || [])
-  .map((m: any) => m.competency_id)
-  .filter((cid: any) => !!cid)));
-if (compIds.length) {
-  const { data: opts } = await supabase
-    .from('pro_moves')
-    .select('action_id, action_statement, competency_id')
-    .in('competency_id', compIds)
-    .order('action_statement');
-  const grouped: { [key: number]: { action_id: string; action_statement: string }[] } = {};
-  (opts || []).forEach((o: any) => {
-    if (!grouped[o.competency_id]) grouped[o.competency_id] = [];
-    grouped[o.competency_id].push({ action_id: String(o.action_id), action_statement: o.action_statement });
-  });
-  setOptionsByCompetency(grouped);
-}
+    // Fetch options for competencies
+    const compIds = Array.from(new Set((meta || [])
+      .map((m: any) => m.competency_id)
+      .filter((cid: any) => !!cid)));
+    if (compIds.length) {
+      const { data: opts } = await supabase
+        .from('pro_moves')
+        .select('action_id, action_statement, competency_id')
+        .in('competency_id', compIds)
+        .order('action_statement');
+      const grouped: { [key: number]: { action_id: string; action_statement: string }[] } = {};
+      (opts || []).forEach((o: any) => {
+        if (!grouped[o.competency_id]) grouped[o.competency_id] = [];
+        grouped[o.competency_id].push({ action_id: String(o.action_id), action_statement: o.action_statement });
+      });
+      setOptionsByCompetency(grouped);
+    }
 
-setLoading(false);
+    setLoading(false);
   };
 
   const handleNext = () => {
     if (currentIndex < weeklyFocus.length - 1) {
-      const nextFocus = weeklyFocus[currentIndex + 1];
-      navigate(`/confidence/${nextFocus.id}/${currentIndex + 2}`);
+      navigate(`/confidence/${weekNum}/step/${currentIndex + 2}`);
     } else {
       handleSubmit();
     }
@@ -192,8 +174,7 @@ setLoading(false);
 
   const handleBack = () => {
     if (currentIndex > 0) {
-      const prevFocus = weeklyFocus[currentIndex - 1];
-      navigate(`/confidence/${prevFocus.id}/${currentIndex}`);
+      navigate(`/confidence/${weekNum}/step/${currentIndex}`);
     }
   };
 
@@ -214,11 +195,17 @@ setLoading(false);
 
     setSubmitting(true);
 
-    const scoreInserts = weeklyFocus.map(focus => ({
-      staff_id: staff.id,
-      weekly_focus_id: focus.id,
-      confidence_score: scores[focus.id] || 1
-    }));
+    const scoreInserts = weeklyFocus.map(focus => {
+      const base: any = {
+        staff_id: staff.id,
+        weekly_focus_id: focus.id,
+        confidence_score: scores[focus.id] || 1,
+      };
+      if (selfSelectById[focus.id] && selectedActions[focus.id]) {
+        base.selected_action_id = selectedActions[focus.id];
+      }
+      return base;
+    });
 
     const { error } = await supabase
       .from('weekly_scores')

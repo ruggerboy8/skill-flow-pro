@@ -31,7 +31,7 @@ interface WeeklyScore {
 }
 
 export default function PerformanceWizard() {
-  const { focusId, index } = useParams();
+  const { week, n } = useParams();
   const [staff, setStaff] = useState<Staff | null>(null);
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [currentFocus, setCurrentFocus] = useState<WeeklyFocus | null>(null);
@@ -47,13 +47,14 @@ export default function PerformanceWizard() {
   const now = nowUtc();
   const { thuStartZ, mondayZ } = getAnchors(now);
 
-  const currentIndex = parseInt(index || '1') - 1;
+  const weekNum = Number(week);
+  const currentIndex = Math.max(0, (Number(n) || 1) - 1);
 
   useEffect(() => {
-    if (user && focusId) {
+    if (user) {
       loadData();
     }
-  }, [user, focusId]);
+  }, [user, week, n]);
 
   // Central Time gating and route guard for Performance
   useEffect(() => {
@@ -152,8 +153,7 @@ export default function PerformanceWizard() {
 
   const handleNext = () => {
     if (currentIndex < weeklyFocus.length - 1) {
-      const nextFocus = weeklyFocus[currentIndex + 1];
-      navigate(`/performance/${nextFocus.id}/${currentIndex + 2}`);
+      navigate(`/performance/${weekNum}/step/${currentIndex + 2}`);
     } else {
       handleSubmit();
     }
@@ -161,8 +161,7 @@ export default function PerformanceWizard() {
 
   const handleBack = () => {
     if (currentIndex > 0) {
-      const prevFocus = weeklyFocus[currentIndex - 1];
-      navigate(`/performance/${prevFocus.id}/${currentIndex}`);
+      navigate(`/performance/${weekNum}/step/${currentIndex}`);
     }
   };
 

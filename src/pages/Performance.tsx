@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-
+import { getNowZ, getAnchors } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
@@ -41,7 +41,12 @@ export default function Performance() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const weekNum = Number(week); // week param is now just "1", "2", etc.
+const weekNum = Number(week); // week param is now just "1", "2", etc.
+
+// Central Time gating for Performance (opens Thu 00:00 CT)
+const nowZ = getNowZ();
+const { thuStartZ } = getAnchors(nowZ);
+const beforeThursday = nowZ < thuStartZ;
 
   useEffect(() => {
     if (user) {
@@ -200,61 +205,86 @@ export default function Performance() {
           </CardHeader>
         </Card>
 
-        {weeklyFocus.map((focus, index) => (
-          <Card key={focus.id}>
-            <CardHeader>
-              <div className="flex items-start gap-2">
-                <Badge variant="outline" className="text-xs">
-                  {index + 1}
-                </Badge>
-                <div className="flex-1">
-                  <CardTitle className="text-sm font-medium leading-relaxed mb-2">
-                    {focus.pro_moves?.action_statement || 'Self-Select'}
-                  </CardTitle>
-                  <Badge variant="secondary" className="text-xs">
-                    Monday Confidence: {getConfidenceScore(focus.id)}
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <RadioGroup
-                value={performanceScores[focus.id]?.toString() || ''}
-                onValueChange={(value) => handleScoreChange(focus.id, value)}
+        {/* Early guard Mon–Wed: read-only message */}
+        {beforeThursday ? (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-center">Performance opens Thursday.</CardTitle>
+                <CardDescription className="text-center">
+                  Come back Thursday to rate your performance. Confidence must be completed first.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <div className="space-y-2">
+              <Button 
+                variant="outline"
+                onClick={() => navigate('/week')}
+                className="w-full"
               >
-                {[1, 2, 3, 4].map((score) => (
-                  <div key={score} className="flex items-center space-x-3 py-2">
-                    <RadioGroupItem value={score.toString()} id={`${focus.id}-${score}`} />
-                    <Label 
-                      htmlFor={`${focus.id}-${score}`}
-                      className="flex-1 cursor-pointer py-2 text-sm"
-                    >
-                      {score} - {getScoreLabel(score)}
-                    </Label>
+                Back to Week View
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            {weeklyFocus.map((focus, index) => (
+              <Card key={focus.id}>
+                <CardHeader>
+                  <div className="flex items-start gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {index + 1}
+                    </Badge>
+                    <div className="flex-1">
+                      <CardTitle className="text-sm font-medium leading-relaxed mb-2">
+                        {focus.pro_moves?.action_statement || 'Self-Select'}
+                      </CardTitle>
+                      <Badge variant="secondary" className="text-xs">
+                        Monday Confidence: {getConfidenceScore(focus.id)}
+                      </Badge>
+                    </div>
                   </div>
-                ))}
-              </RadioGroup>
-            </CardContent>
-          </Card>
-        ))}
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup
+                    value={performanceScores[focus.id]?.toString() || ''}
+                    onValueChange={(value) => handleScoreChange(focus.id, value)}
+                  >
+                    {[1, 2, 3, 4].map((score) => (
+                      <div key={score} className="flex items-center space-x-3 py-2">
+                        <RadioGroupItem value={score.toString()} id={`${focus.id}-${score}`} />
+                        <Label 
+                          htmlFor={`${focus.id}-${score}`}
+                          className="flex-1 cursor-pointer py-2 text-sm"
+                        >
+                          {score} - {getScoreLabel(score)}
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </CardContent>
+              </Card>
+            ))}
 
-        <div className="space-y-2">
-          <Button 
-            onClick={handleSubmit}
-            disabled={!canSubmit() || submitting}
-            className="w-full h-12"
-          >
-            {submitting ? 'Saving...' : 'Save Performance Ratings'}
-          </Button>
-          
-          <Button 
-            variant="outline"
-            onClick={() => navigate('/week')}
-            className="w-full"
-          >
-            Back to Week View
-          </Button>
-        </div>
+            <div className="space-y-2">
+              <Button 
+                onClick={handleSubmit}
+                disabled={!canSubmit() || submitting}
+                className="w-full h-12"
+              >
+                {submitting ? 'Saving...' : 'Save Performance Ratings'}
+              </Button>
+              
+              <Button 
+                variant="outline"
+                onClick={() => navigate('/week')}
+                className="w-full"
+              >
+                Back to Week View
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

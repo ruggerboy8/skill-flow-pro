@@ -85,9 +85,8 @@ export default function Confidence() {
       .select(`
         id,
         display_order,
-        iso_year,
-        iso_week,
         self_select,
+        competency_id,
         pro_moves (
           action_statement
         ),
@@ -124,6 +123,62 @@ export default function Confidence() {
 
     console.log('Focus data found:', focusData);
     setWeeklyFocus(focusData);
+
+    // Load existing confidence scores for this week
+    const focusIds = focusData.map((f) => f.id);
+    const { data: existing, error: existingError } = await supabase
+      .from('weekly_scores')
+      .select('weekly_focus_id, confidence_score, selected_action_id')
+      .eq('staff_id', staffData.id)
+      .in('weekly_focus_id', focusIds);
+
+    if (existingError) {
+      console.error('Existing scores error:', existingError);
+    }
+
+    const submitted = existing?.filter((r) => r.confidence_score != null).length ?? 0;
+    setSubmittedCount(submitted);
+
+    // Pre-fill selected actions if previously chosen
+    const selectedByFocus: { [key: string]: string | null } = {};
+    (existing || []).forEach((r) => {
+      if (r.selected_action_id) {
+        selectedByFocus[r.weekly_focus_id] = r.selected_action_id as unknown as string;
+      }
+    });
+    if (Object.keys(selectedByFocus).length > 0) {
+      setSelectedActions((prev) => ({ ...prev, ...selectedByFocus }));
+    }
+
+    // Load self-select options for competencies
+    const compIds = Array.from(
+      new Set(
+        focusData
+          .filter((f) => f.self_select && !!f.competency_id)
+          .map((f) => f.competency_id as number)
+      )
+    );
+
+    if (compIds.length > 0) {
+      const { data: opts, error: optsError } = await supabase
+        .from('pro_moves')
+        .select('action_id, action_statement, competency_id')
+        .in('competency_id', compIds)
+        .order('action_statement');
+
+      if (optsError) {
+        console.error('Options load error:', optsError);
+      } else if (opts) {
+        const grouped: { [key: number]: { action_id: string; action_statement: string }[] } = {};
+        opts.forEach((o: any) => {
+          const cid = o.competency_id as number;
+          if (!grouped[cid]) grouped[cid] = [];
+          grouped[cid].push({ action_id: o.action_id, action_statement: o.action_statement });
+        });
+        setOptionsByCompetency(grouped);
+      }
+    }
+
     setLoading(false);
   };
 
@@ -211,91 +266,157 @@ export default function Confidence() {
           </CardHeader>
         </Card>
 
-        {weeklyFocus.map((focus, index) => (
-          <Card key={focus.id}>
-            <CardHeader>
-              <div className="flex items-start gap-2">
-                <Badge variant="outline" className="text-xs">
-                  {index + 1}
-                </Badge>
-                <CardTitle className="text-sm font-medium leading-relaxed flex items-center gap-2">
-                  {focus.pro_moves?.action_statement || 'Self-Select'}
-                  {focus.competencies?.domains?.domain_name && (
-                    <span
-                      className="inline-flex items-center rounded px-2 py-0.5 text-[10px]"
-                      style={{ backgroundColor: getDomainColor(focus.competencies.domains.domain_name) }}
-                    >
-                      {focus.competencies.domains.domain_name}
-                    </span>
-                  )}
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {focus.self_select && (
-                <div className="mb-3">
-                  <Label className="text-xs mb-1 block">Choose a Pro Move</Label>
-                  <Select
-                    value={selectedActions[focus.id] || ''}
-                    onValueChange={(value) => setSelectedActions(prev => ({ ...prev, [focus.id]: value }))}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a Pro Move" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {focus.competency_id && optionsByCompetency[focus.competency_id] ? (
-                        optionsByCompetency[focus.competency_id].map((opt) => (
-                          <SelectItem key={opt.action_id} value={opt.action_id}>
-                            {opt.action_statement}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="__none" disabled>
-                          No options available
-                        </SelectItem>
+        {/* Gating states based on Central Time */}
+        {beforeCheckIn && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-center">Opens at 9:00 a.m. CT</CardTitle>
+                <CardDescription className="text-center">
+                  Confidence ratings open Monday at 9:00 a.m. Central Time.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <Button 
+              variant="outline"
+              onClick={() => navigate('/week')}
+              className="w-full"
+            >
+              Back to Week View
+            </Button>
+          </>
+        )}
+
+        {!beforeCheckIn && afterTueNoon && !hasConfidence && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-center">Confidence window closed</CardTitle>
+                <CardDescription className="text-center">
+                  You’ll get a fresh start on Mon, {nextMondayStr(nowZ)}.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <Button 
+              variant="outline"
+              onClick={() => navigate('/week')}
+              className="w-full"
+            >
+              Back to Week View
+            </Button>
+          </>
+        )}
+
+        {hasConfidence && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-center">Confidence already submitted</CardTitle>
+                <CardDescription className="text-center">
+                  Thanks! You can rate performance starting Thursday.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <Button 
+              variant="outline"
+              onClick={() => navigate('/week')}
+              className="w-full"
+            >
+              Back to Week View
+            </Button>
+          </>
+        )}
+
+        {/* Active window: Mon 9:00 → Tue 11:59 and not submitted yet */}
+        {!beforeCheckIn && !afterTueNoon && !hasConfidence && (
+          <>
+            {weeklyFocus.map((focus, index) => (
+              <Card key={focus.id}>
+                <CardHeader>
+                  <div className="flex items-start gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {index + 1}
+                    </Badge>
+                    <CardTitle className="text-sm font-medium leading-relaxed flex items-center gap-2">
+                      {focus.pro_moves?.action_statement || 'Self-Select'}
+                      {focus.competencies?.domains?.domain_name && (
+                        <span
+                          className="inline-flex items-center rounded px-2 py-0.5 text-[10px]"
+                          style={{ backgroundColor: getDomainColor(focus.competencies.domains.domain_name) }}
+                        >
+                          {focus.competencies.domains.domain_name}
+                        </span>
                       )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <RadioGroup
-                value={scores[focus.id]?.toString() || ''}
-                onValueChange={(value) => handleScoreChange(focus.id, value)}
-              >
-                {[1, 2, 3, 4].map((score) => (
-                  <div key={score} className="flex items-center space-x-3 py-2">
-                    <RadioGroupItem value={score.toString()} id={`${focus.id}-${score}`} />
-                    <Label 
-                      htmlFor={`${focus.id}-${score}`}
-                      className="flex-1 cursor-pointer py-2 text-sm"
-                    >
-                      {score} - {getScoreLabel(score)}
-                    </Label>
+                    </CardTitle>
                   </div>
-                ))}
-              </RadioGroup>
-            </CardContent>
-          </Card>
-        ))}
+                </CardHeader>
+                <CardContent>
+                  {focus.self_select && (
+                    <div className="mb-3">
+                      <Label className="text-xs mb-1 block">Choose a Pro Move</Label>
+                      <Select
+                        value={selectedActions[focus.id] || ''}
+                        onValueChange={(value) => setSelectedActions(prev => ({ ...prev, [focus.id]: value }))}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a Pro Move" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {focus.competency_id && optionsByCompetency[focus.competency_id] ? (
+                            optionsByCompetency[focus.competency_id].map((opt) => (
+                              <SelectItem key={opt.action_id} value={opt.action_id}>
+                                {opt.action_statement}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="__none" disabled>
+                              No options available
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-        <div className="space-y-2">
-          <Button 
-            onClick={handleSubmit}
-            disabled={!canSubmit() || submitting}
-            className="w-full h-12"
-          >
-            {submitting ? 'Saving...' : 'Save Confidence Ratings'}
-          </Button>
-          
-          <Button 
-            variant="outline"
-            onClick={() => navigate('/week')}
-            className="w-full"
-          >
-            Back to Week View
-          </Button>
-        </div>
+                  <RadioGroup
+                    value={scores[focus.id]?.toString() || ''}
+                    onValueChange={(value) => handleScoreChange(focus.id, value)}
+                  >
+                    {[1, 2, 3, 4].map((score) => (
+                      <div key={score} className="flex items-center space-x-3 py-2">
+                        <RadioGroupItem value={score.toString()} id={`${focus.id}-${score}`} />
+                        <Label 
+                          htmlFor={`${focus.id}-${score}`}
+                          className="flex-1 cursor-pointer py-2 text-sm"
+                        >
+                          {score} - {getScoreLabel(score)}
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </CardContent>
+              </Card>
+            ))}
+
+            <div className="space-y-2">
+              <Button 
+                onClick={handleSubmit}
+                disabled={!canSubmit() || submitting}
+                className="w-full h-12"
+              >
+                {submitting ? 'Saving...' : 'Save Confidence Ratings'}
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => navigate('/week')}
+                className="w-full"
+              >
+                Back to Week View
+              </Button>
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   );

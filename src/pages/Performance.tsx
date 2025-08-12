@@ -60,6 +60,14 @@ export default function Performance() {
     }
   }, [user, week]);
 
+  // Hard guard: block deep-links before Thursday (unless carryover)
+  useEffect(() => {
+    if (!loading && beforeThursdayEffective) {
+      toast({ title: 'Performance opens Thursday (12:00 a.m. CT).' });
+      navigate('/');
+    }
+  }, [loading, beforeThursdayEffective, navigate]);
+
   const loadData = async () => {
     if (!user) return;
 

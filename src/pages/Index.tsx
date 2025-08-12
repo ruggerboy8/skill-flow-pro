@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
+import ThisWeekPanel from '@/components/home/ThisWeekPanel';
 interface WeeklyFocus {
   id: string;
   display_order: number;
@@ -212,31 +213,9 @@ export default function Index() {
           
         </div>
 
-        {nextWeek && currentWeekFocus.length > 0 && <div className="mb-8 p-6 bg-primary/10 rounded-lg border border-primary/20">
-            <h2 className="text-xl font-semibold mb-4">This Week's Pro Moves</h2>
-            <p className="text-muted-foreground mb-4">
-              Cycle {nextWeek.cycle}, Week {nextWeek.week}
-            </p>
-            <div className="space-y-3 mb-4">
-              {currentWeekFocus.map((focus, index) => <div key={focus.id} className="flex items-start gap-3 p-3 bg-background rounded-lg border">
-                  <Badge variant="outline" className="text-xs">
-                    {index + 1}
-                  </Badge>
-                  <div className="flex-1">
-                    <Badge variant="secondary" className="text-xs mb-2" style={{
-                backgroundColor: getDomainColor(focus.domain_name)
-              }}>
-                      {focus.domain_name}
-                    </Badge>
-                    <p className="text-sm">{focus.action_statement}</p>
-                  </div>
-                </div>)}
-            </div>
-            <Button onClick={() => handleWeekClick(nextWeek.cycle, nextWeek.week)} size="lg" aria-label={`Open Week ${nextWeek.week}`}>
-              Open Week
-            </Button>
-          </div>}
-
+            {/* Dynamic This Week panel with banner + single CTA */}
+            <ThisWeekPanel />
+          
         <div className="space-y-8">
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-center">

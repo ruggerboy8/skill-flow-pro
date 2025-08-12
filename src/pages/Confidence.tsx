@@ -58,14 +58,21 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     }
   }, [user, week]);
 
-  // Central Time route guard: after Tue 12:00 CT, block deep links if confidence not complete
+  // Route guards with toasts for deep-links
+  useEffect(() => {
+    if (!loading && weeklyFocus.length > 0 && beforeCheckIn) {
+      toast({ title: 'Confidence opens at 9:00 a.m. CT.' });
+      navigate('/');
+    }
+  }, [loading, weeklyFocus, beforeCheckIn, navigate]);
+
   useEffect(() => {
     if (!loading && weeklyFocus.length > 0 && afterTueNoon && !hasConfidence) {
       toast({
-        title: "Confidence window closed",
+        title: 'Confidence window closed',
         description: `You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`
       });
-      navigate('/week');
+      navigate('/');
     }
   }, [loading, weeklyFocus, afterTueNoon, hasConfidence, navigate]);
 
@@ -113,22 +120,11 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     if (focusError) {
       console.error('Focus error:', focusError);
       toast({
-        title: "Error",
-        description: `Database error: ${focusError.message}`,
-        variant: "destructive"
+        title: 'Error',
+        description: 'No Pro Moves found for this week',
+        variant: 'destructive'
       });
-      navigate('/week');
-      return;
-    }
-
-    if (!focusData || focusData.length === 0) {
-      console.log('No focus data found for:', { weekNum, cycle: 1, roleId: staffData.role_id });
-      toast({
-        title: "Error",
-        description: "No Pro Moves found for this week",
-        variant: "destructive"
-      });
-      navigate('/week');
+      navigate('/');
       return;
     }
 
@@ -220,7 +216,7 @@ setSubmitting(true);
           description: `You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`
         });
         setSubmitting(false);
-        navigate('/week');
+        navigate('/');
         return;
       }
     }
@@ -254,7 +250,7 @@ setSubmitting(true);
         title: "Confidence saved",
         description: "See you Thursday for performance rating!"
       });
-      navigate('/week');
+      navigate('/');
     }
 
     setSubmitting(false);
@@ -306,7 +302,7 @@ setSubmitting(true);
             </Card>
             <Button 
               variant="outline"
-              onClick={() => navigate('/week')}
+              onClick={() => navigate('/')}
               className="w-full"
             >
               Back to Week View
@@ -326,7 +322,7 @@ setSubmitting(true);
             </Card>
             <Button 
               variant="outline"
-              onClick={() => navigate('/week')}
+              onClick={() => navigate('/')}
               className="w-full"
             >
               Back to Week View
@@ -346,7 +342,7 @@ setSubmitting(true);
             </Card>
             <Button 
               variant="outline"
-              onClick={() => navigate('/week')}
+              onClick={() => navigate('/')}
               className="w-full"
             >
               Back to Week View
@@ -435,7 +431,7 @@ setSubmitting(true);
               </Button>
               <Button 
                 variant="outline"
-                onClick={() => navigate('/week')}
+                onClick={() => navigate('/')}
                 className="w-full"
               >
                 Back to Week View

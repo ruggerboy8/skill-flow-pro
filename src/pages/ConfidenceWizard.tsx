@@ -155,6 +155,18 @@ setLoading(false);
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
 
+    // Hard-guard: block late submissions after Tue 12:00 CT when not already complete
+    const nowSubmit = nowUtc();
+    const { tueDueZ } = getAnchors(nowSubmit);
+    if (nowSubmit >= tueDueZ && !hasConfidence) {
+      toast({
+        title: 'Confidence window closed',
+        description: `You’ll get a fresh start on Mon, ${nextMondayStr(nowSubmit)}.`,
+      });
+      navigate('/week');
+      return;
+    }
+
     setSubmitting(true);
 
     const scoreInserts = weeklyFocus.map(focus => ({

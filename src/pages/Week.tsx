@@ -284,20 +284,47 @@ export default function Week() {
                   <CardDescription className="text-center">You still need to submit performance for last week.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full h-12" onClick={() => navigate(`/performance/${carryoverPending!.week_in_cycle}`)}>
-                    Rate Performance
+                  <Button
+                    className="w-full h-12"
+                    onClick={async () => {
+                      if (!carryoverPending || !staff) return;
+                      // Fetch the carryover week's focus and find first incomplete performance item
+                      const { data: focusData } = await supabase
+                        .from('weekly_focus')
+                        .select('id, display_order')
+                        .eq('cycle', carryoverPending.cycle)
+                        .eq('week_in_cycle', carryoverPending.week_in_cycle)
+                        .eq('role_id', staff.role_id)
+                        .order('display_order');
+                      const focusIds = (focusData || []).map((f: any) => f.id);
+                      if (!focusIds.length) return navigate(`/performance/${carryoverPending.week_in_cycle}`, { state: { carryover: true } });
+                      const { data: scores } = await supabase
+                        .from('weekly_scores')
+                        .select('weekly_focus_id, performance_score')
+                        .eq('staff_id', staff.id)
+                        .in('weekly_focus_id', focusIds);
+                      const ordered = (focusData || []) as { id: string; display_order: number }[];
+                      const firstIdx = ordered.findIndex((f) => !scores?.find((s) => s.weekly_focus_id === f.id)?.performance_score);
+                      const idx = firstIdx === -1 ? 0 : firstIdx;
+                      const startFocus = ordered[idx];
+                      navigate(`/performance/${startFocus.id}/${idx + 1}`, { state: { carryover: true } });
+                    }}
+                  >
+                    Finish Performance
                   </Button>
                 </CardContent>
               </Card>
             ) : (
               <>
+                {/* Completed state */}
                 {allDone && (
                   <Badge variant="default" className="w-full justify-center py-2">
                     ✓ Completed for Cycle {cycle}, Week {weekInCycle}
                   </Badge>
                 )}
 
-                {beforeCheckIn && (
+                {/* Before check-in */}
+                {beforeCheckIn && !allDone && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-center">Confidence opens at 9:00 a.m. CT.</CardTitle>
@@ -305,16 +332,29 @@ export default function Week() {
                   </Card>
                 )}
 
-                {!beforeCheckIn && showSoftReset && (
+                {/* Confidence window closed */}
+                {!beforeCheckIn && afterTueNoon && !allConfidence && (
                   <div className="p-3 rounded-md border bg-muted">
                     <div className="font-medium">Confidence window closed</div>
                     <div className="text-sm text-muted-foreground">You’ll get a fresh start on Mon, {nextMondayStr(now)}.</div>
                   </div>
                 )}
 
-                {!beforeCheckIn && !showSoftReset && showConfidenceCTA && (
+                {/* Confidence CTA (rate or finish) */}
+                {!beforeCheckIn && !afterTueNoon && !allConfidence && (
                   <>
-                    <Button onClick={() => navigate(`/confidence/${weekInCycle}`)} className="w-full h-12">
+                    <Button
+                      onClick={() => {
+                        const firstIdx = weeklyFocus.findIndex((f) => {
+                          const s = getScoreForFocus(f.id);
+                          return !s || s.confidence_score == null;
+                        });
+                        const idx = firstIdx === -1 ? 0 : firstIdx;
+                        const startFocus = weeklyFocus[idx];
+                        navigate(`/confidence/${startFocus.id}/${idx + 1}`);
+                      }}
+                      className="w-full h-12"
+                    >
                       {partialConfidence ? 'Finish Confidence' : 'Rate Confidence'}
                     </Button>
                     {partialConfidence && (
@@ -323,14 +363,27 @@ export default function Week() {
                   </>
                 )}
 
-                {!beforeCheckIn && !showSoftReset && showPerfLocked && (
+                {/* Performance locked until Thu */}
+                {allConfidence && beforeThursday && (
                   <Button className="w-full h-12" variant="outline" disabled>
                     Performance opens Thursday
                   </Button>
                 )}
 
-                {!beforeCheckIn && !showSoftReset && showPerformanceCTA && (
-                  <Button onClick={() => navigate(`/performance/${weekInCycle}`)} className="w-full h-12">
+                {/* Performance CTA */}
+                {allConfidence && !beforeThursday && perfPending && (
+                  <Button
+                    onClick={() => {
+                      const firstIdx = weeklyFocus.findIndex((f) => {
+                        const s = getScoreForFocus(f.id);
+                        return s && s.performance_score == null;
+                      });
+                      const idx = firstIdx === -1 ? 0 : firstIdx;
+                      const startFocus = weeklyFocus[idx];
+                      navigate(`/performance/${startFocus.id}/${idx + 1}`);
+                    }}
+                    className="w-full h-12"
+                  >
                     Rate Performance
                   </Button>
                 )}
@@ -358,7 +411,7 @@ export default function Week() {
                         </div>
                         {unchosenSelfSelect && (
                           <div className="mt-1">
-                            <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate(`/confidence/${weekInCycle}`)}>
+                            <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate(`/confidence/${focus.id}/${index + 1}`)}>
                               Choose your Pro Move
                             </Button>
                           </div>

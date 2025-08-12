@@ -27,6 +27,7 @@ interface WeeklyScore {
   id: string;
   weekly_focus_id: string;
   confidence_score: number;
+  confidence_date?: string | null;
 }
 
 export default function PerformanceWizard() {
@@ -38,12 +39,13 @@ export default function PerformanceWizard() {
   const [performanceScores, setPerformanceScores] = useState<{ [key: string]: number }>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isCarryoverWeek, setIsCarryoverWeek] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
-const navigate = useNavigate();
+  const navigate = useNavigate();
 
   const now = nowUtc();
-  const { thuStartZ } = getAnchors(now);
+  const { thuStartZ, mondayZ } = getAnchors(now);
 
   const currentIndex = parseInt(index || '1') - 1;
 
@@ -56,7 +58,8 @@ const navigate = useNavigate();
   // Central Time gating and route guard for Performance
   useEffect(() => {
     if (!loading) {
-      if (now < thuStartZ) {
+      // Allow carryover weeks anytime (computed after data load)
+      if (now < thuStartZ && !isCarryoverWeek) {
         toast({
           title: 'Performance opens Thursday',
           description: 'Please come back on Thu 12:00 a.m. CT.'
@@ -64,7 +67,7 @@ const navigate = useNavigate();
         navigate('/week');
       }
     }
-  }, [loading, now, thuStartZ, navigate]);
+  }, [loading, now, thuStartZ, navigate, isCarryoverWeek]);
 
   const loadData = async () => {
     if (!user || !focusId) return;
@@ -123,7 +126,7 @@ const navigate = useNavigate();
     const focusIds = focusData.map(f => f.id);
     const { data: scoresData, error: scoresError } = await supabase
       .from('weekly_scores')
-      .select('id, weekly_focus_id, confidence_score')
+      .select('id, weekly_focus_id, confidence_score, confidence_date')
       .eq('staff_id', staffData.id)
       .in('weekly_focus_id', focusIds)
       .not('confidence_score', 'is', null);
@@ -139,6 +142,10 @@ const navigate = useNavigate();
     }
 
     setExistingScores(scoresData);
+    // Determine carryover if confidence was submitted before this Monday
+    const carryover = (scoresData || []).some((s) => s.confidence_date && new Date(s.confidence_date) < mondayZ);
+    setIsCarryoverWeek(carryover);
+
     setCurrentFocus(focusData[currentIndex]);
     setLoading(false);
   };
@@ -161,6 +168,18 @@ const navigate = useNavigate();
 
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
+
+    // Hard-guard: prevent too-early submit for current week
+    const nowSubmit = nowUtc();
+    const { thuStartZ: thuGuardZ } = getAnchors(nowSubmit);
+    if (nowSubmit < thuGuardZ && !isCarryoverWeek) {
+      toast({
+        title: 'Performance opens Thursday',
+        description: 'Please come back on Thu 12:00 a.m. CT.'
+      });
+      navigate('/week');
+      return;
+    }
 
     setSubmitting(true);
 

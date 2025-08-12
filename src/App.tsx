@@ -30,6 +30,9 @@ import CycleList from "./pages/admin/CycleList";
 import WeekList from "./pages/admin/WeekList";
 import WeekEditor from "./pages/admin/WeekEditor";
 import NotFound from "./pages/NotFound";
+import BackfillIntro from "./pages/backfill/BackfillIntro";
+import BackfillWeek from "./pages/backfill/BackfillWeek";
+import BackfillReview from "./pages/backfill/BackfillReview";
 
 const queryClient = new QueryClient();
 
@@ -75,6 +78,9 @@ function AppRoutes() {
         <Route path="performance/:week" element={<Performance />} />
         <Route path="performance/:focusId/:index" element={<PerformanceWizard />} />
         <Route path="review/:cycle/:week" element={<Review />} />
+        <Route path="backfill" element={<BackfillIntro />} />
+        <Route path="backfill/:week" element={<BackfillWeek />} />
+        <Route path="backfill/review" element={<BackfillReview />} />
         <Route path="coach" element={<CoachDashboard />} />
         <Route path="coach/:staffId" element={<CoachDetail />} />
         <Route path="builder" element={<RoleList />} />

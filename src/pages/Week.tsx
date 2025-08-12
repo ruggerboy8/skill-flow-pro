@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getNowZ, getAnchors, nextMondayStr, isSameIsoWeek } from '@/lib/centralTime';
+import { getNowZ, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface Staff {
   id: string;
@@ -17,9 +18,11 @@ interface WeeklyFocus {
   id: string;
   display_order: number;
   action_statement: string;
-  iso_year: number;
-  iso_week: number;
+  self_select?: boolean;
+  competency_id?: number;
+  domain_name?: string;
 }
+
 
 interface WeeklyScore {
   weekly_focus_id: string;
@@ -33,6 +36,7 @@ export default function Week() {
   const [weekInCycle, setWeekInCycle] = useState(1);
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
+  const [carryoverPending, setCarryoverPending] = useState<{ cycle: number; week_in_cycle: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -110,15 +114,16 @@ export default function Week() {
     
     setLoading(true);
     
-    // Load weekly focus with pro moves data
+    // Load weekly focus with pro moves and domain data (left joins to support self-select)
     const { data: focusData, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
         id,
         display_order,
-        iso_year,
-        iso_week,
-        pro_moves!inner(action_statement)
+        self_select,
+        competency_id,
+        pro_moves ( action_statement ),
+        competencies ( domains ( domain_name ) )
       `)
       .eq('cycle', cycle)
       .eq('week_in_cycle', weekInCycle)
@@ -138,9 +143,10 @@ export default function Week() {
     const transformedFocus = (focusData || []).map(item => ({
       id: item.id,
       display_order: item.display_order,
-      action_statement: (item.pro_moves as any)?.action_statement || '',
-      iso_year: (item as any).iso_year,
-      iso_week: (item as any).iso_week,
+      action_statement: (item.pro_moves as any)?.action_statement || 'Self-Select',
+      self_select: (item as any)?.self_select ?? false,
+      competency_id: (item as any)?.competency_id ?? undefined,
+      domain_name: ((item as any)?.competencies?.domains as any)?.domain_name ?? undefined,
     }));
 
     setWeeklyFocus(transformedFocus);
@@ -150,20 +156,30 @@ export default function Week() {
       const focusIds = focusData.map(f => f.id);
       const { data: scoresData } = await supabase
         .from('weekly_scores')
-        .select('weekly_focus_id, confidence_score, performance_score')
+        .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
         .eq('staff_id', staff.id)
         .in('weekly_focus_id', focusIds);
 
       setWeeklyScores(scoresData || []);
 
-      // Auto-route to Performance for carryover weeks (past ISO week)
-      const confDoneAll = (scoresData || []).every(s => s.confidence_score !== null);
-      const perfMissingAll = (scoresData || []).every(s => s.performance_score === null);
-      const focusMetaAny: any = focusData[0];
-      const isCurrent = focusMetaAny ? isSameIsoWeek(nowZ, focusMetaAny.iso_year as any, focusMetaAny.iso_week as any) : true;
-      if (confDoneAll && perfMissingAll && !isCurrent) {
-        navigate(`/performance/${weekInCycle}`, { state: { carryover: true } });
-        return;
+      // Check for carryover (pending performance in most recent week)
+      const { data: pending } = await supabase
+        .from('weekly_scores')
+        .select('updated_at, weekly_focus!inner(cycle, week_in_cycle, role_id)')
+        .eq('staff_id', staff.id)
+        .eq('weekly_focus.role_id', staff.role_id)
+        .not('confidence_score', 'is', null)
+        .is('performance_score', null)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      const wf: any = pending && pending[0] && (pending[0] as any).weekly_focus;
+      if (wf) {
+        setCarryoverPending({ cycle: wf.cycle, week_in_cycle: wf.week_in_cycle });
+        if (wf.week_in_cycle !== weekInCycle || wf.cycle !== cycle) {
+          navigate(`/performance/${wf.week_in_cycle}`, { state: { carryover: true } });
+          return;
+        }
       }
     }
     
@@ -195,24 +211,23 @@ export default function Week() {
     });
   };
 
-  // Central Time gating calculations
+  // Central Time gating + state
   const nowZ = getNowZ();
   const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(nowZ);
-  const confCount = weeklyFocus.filter(f => {
-    const s = getScoreForFocus(f.id);
-    return s && s.confidence_score !== null;
-  }).length;
-  const perfCount = weeklyFocus.filter(f => {
-    const s = getScoreForFocus(f.id);
-    return s && s.performance_score !== null;
-  }).length;
-  const focusMeta = weeklyFocus[0];
-  const isCurrentIsoWeek = focusMeta ? isSameIsoWeek(nowZ, focusMeta.iso_year, focusMeta.iso_week) : true;
+  const confCount = weeklyFocus.filter(f => getScoreForFocus(f.id)?.confidence_score != null).length;
+  const perfCount = weeklyFocus.filter(f => getScoreForFocus(f.id)?.performance_score != null).length;
+  const total = weeklyFocus.length;
 
-  const showConfidenceCTA = confCount === 0 && isCurrentIsoWeek && nowZ >= monCheckInZ && nowZ < tueDueZ;
-  const showSoftReset = confCount === 0 && ((isCurrentIsoWeek && nowZ >= tueDueZ) || !isCurrentIsoWeek);
-  const showPerformanceCTA = confCount > 0 && perfCount === 0 && ((!isCurrentIsoWeek) || (isCurrentIsoWeek && nowZ >= thuStartZ));
-  const showPerfLocked = confCount > 0 && perfCount === 0 && isCurrentIsoWeek && nowZ < thuStartZ;
+  const beforeCheckIn = nowZ < monCheckInZ;
+  const afterTueNoon = nowZ >= tueDueZ;
+  const beforeThursday = nowZ < thuStartZ;
+
+  const partialConfidence = confCount > 0 && confCount < total;
+  const allConfidence = total > 0 && confCount === total;
+  const perfPending = allConfidence && perfCount === 0;
+  const allDone = total > 0 && perfCount === total;
+
+  const carryoverConflict = !!carryoverPending && (carryoverPending!.week_in_cycle !== weekInCycle || carryoverPending!.cycle !== cycle);
 
 
   if (loading) {

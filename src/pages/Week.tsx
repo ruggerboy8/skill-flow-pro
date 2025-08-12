@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getNowZ, getAnchors, nextMondayStr, isSameIsoWeek } from '@/lib/centralTime';
 
 interface Staff {
   id: string;
@@ -16,6 +17,8 @@ interface WeeklyFocus {
   id: string;
   display_order: number;
   action_statement: string;
+  iso_year: number;
+  iso_week: number;
 }
 
 interface WeeklyScore {
@@ -83,6 +86,8 @@ export default function Week() {
       .select(`
         id,
         display_order,
+        iso_year,
+        iso_week,
         pro_moves!inner(action_statement)
       `)
       .eq('cycle', cycle)
@@ -100,11 +105,12 @@ export default function Week() {
       return;
     }
 
-    // Transform the data to flatten the pro_moves relation
     const transformedFocus = (focusData || []).map(item => ({
       id: item.id,
       display_order: item.display_order,
-      action_statement: (item.pro_moves as any)?.action_statement || ''
+      action_statement: (item.pro_moves as any)?.action_statement || '',
+      iso_year: (item as any).iso_year,
+      iso_week: (item as any).iso_week,
     }));
 
     setWeeklyFocus(transformedFocus);
@@ -148,6 +154,25 @@ export default function Week() {
       return score && score.confidence_score !== null && score.performance_score !== null;
     });
   };
+
+  // Central Time gating calculations
+  const nowZ = getNowZ();
+  const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(nowZ);
+  const confCount = weeklyFocus.filter(f => {
+    const s = getScoreForFocus(f.id);
+    return s && s.confidence_score !== null;
+  }).length;
+  const perfCount = weeklyFocus.filter(f => {
+    const s = getScoreForFocus(f.id);
+    return s && s.performance_score !== null;
+  }).length;
+  const focusMeta = weeklyFocus[0];
+  const isCurrentIsoWeek = focusMeta ? isSameIsoWeek(nowZ, focusMeta.iso_year, focusMeta.iso_week) : true;
+
+  const showConfidenceCTA = confCount === 0 && isCurrentIsoWeek && nowZ >= monCheckInZ && nowZ < tueDueZ;
+  const showSoftReset = confCount === 0 && ((isCurrentIsoWeek && nowZ >= tueDueZ) || !isCurrentIsoWeek);
+  const showPerformanceCTA = confCount > 0 && perfCount === 0 && ((!isCurrentIsoWeek) || (isCurrentIsoWeek && nowZ >= thuStartZ));
+  const showPerfLocked = confCount > 0 && perfCount === 0 && isCurrentIsoWeek && nowZ < thuStartZ;
 
 
   if (loading) {
@@ -229,7 +254,16 @@ export default function Week() {
                 </Badge>
               ) : (
                 <>
-                  {canRateConfidence() && (
+                  {showSoftReset && (
+                    <div className="p-3 rounded-md border bg-muted">
+                      <div className="font-medium">Confidence window closed</div>
+                      <div className="text-sm text-muted-foreground">
+                        You’ll get a fresh start on Mon, {nextMondayStr(nowZ)}.
+                      </div>
+                    </div>
+                  )}
+
+                  {showConfidenceCTA && (
                     <Button 
                       onClick={() => navigate(`/confidence/${cycle}-${weekInCycle}`)}
                       className="w-full h-12"
@@ -237,7 +271,18 @@ export default function Week() {
                       Rate Confidence
                     </Button>
                   )}
-                  {canRatePerformance() && (
+
+                  {showPerfLocked && (
+                    <Button 
+                      className="w-full h-12"
+                      variant="outline"
+                      disabled
+                    >
+                      Performance opens Thursday
+                    </Button>
+                  )}
+
+                  {showPerformanceCTA && (
                     <Button 
                       onClick={() => navigate(`/performance/${cycle}-${weekInCycle}`)}
                       className="w-full h-12"

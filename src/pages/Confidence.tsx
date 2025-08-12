@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getNowZ, getAnchors, nextMondayStr, isSameIsoWeek } from '@/lib/centralTime';
 
 interface Staff {
   id: string;
@@ -18,6 +19,8 @@ interface WeeklyFocus {
   id: string;
   display_order: number;
   action_statement?: string; // From RPC function
+  iso_year?: number;
+  iso_week?: number;
   pro_moves?: {
     action_statement: string;
   };
@@ -69,6 +72,8 @@ export default function Confidence() {
       .select(`
         id,
         display_order,
+        iso_year,
+        iso_week,
         self_select,
         pro_moves (
           action_statement

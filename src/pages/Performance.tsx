@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getNowZ, getAnchors, isSameIsoWeek } from '@/lib/centralTime';
+import { getNowZ, getAnchors } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
@@ -27,7 +27,9 @@ interface WeeklyScore {
   id: string;
   weekly_focus_id: string;
   confidence_score: number;
+  confidence_date?: string | null;
 }
+
 
 export default function Performance() {
   const { week } = useParams();
@@ -47,8 +49,8 @@ export default function Performance() {
 
   // Central Time gating for Performance (opens Thu 00:00 CT; allowed anytime for past weeks)
   const nowZ = getNowZ();
-  const { thuStartZ } = getAnchors(nowZ);
-  const beforeThursday = nowZ < thuStartZ;
+  const { thuStartZ, mondayZ } = getAnchors(nowZ);
+  let beforeThursday = nowZ < thuStartZ;
 
   useEffect(() => {
     if (user) {
@@ -80,8 +82,6 @@ export default function Performance() {
         id,
         display_order,
         self_select,
-        iso_year,
-        iso_week,
         pro_moves (
           action_statement
         ),
@@ -110,7 +110,7 @@ export default function Performance() {
     const focusIds = focusData.map(f => f.id);
     const { data: scoresData, error: scoresError } = await supabase
       .from('weekly_scores')
-      .select('id, weekly_focus_id, confidence_score')
+      .select('id, weekly_focus_id, confidence_score, confidence_date')
       .eq('staff_id', staffData.id)
       .in('weekly_focus_id', focusIds)
       .not('confidence_score', 'is', null);
@@ -126,6 +126,10 @@ export default function Performance() {
     }
 
     setExistingScores(scoresData);
+
+    // If confidence was submitted before this Monday, this is a carryover week → allow performance even Mon–Wed
+    const isCarryoverWeek = (scoresData || []).some((s) => s.confidence_date && new Date(s.confidence_date) < mondayZ);
+    beforeThursday = nowZ < thuStartZ && !isCarryoverWeek;
     setLoading(false);
   };
 
@@ -186,11 +190,6 @@ export default function Performance() {
     return score?.confidence_score || 0;
   };
 
-  // Determine if this screen is for the current ISO week
-  const isCurrentIsoWeek = weeklyFocus.length > 0
-    ? isSameIsoWeek(nowZ, (weeklyFocus as any)[0].iso_year as number, (weeklyFocus as any)[0].iso_week as number)
-    : true;
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -231,7 +230,7 @@ export default function Performance() {
         )}
 
         {/* Early guard Mon–Wed: read-only message */}
-        {isCurrentIsoWeek && beforeThursday ? (
+        {beforeThursday ? (
           <>
             <Card>
               <CardHeader>

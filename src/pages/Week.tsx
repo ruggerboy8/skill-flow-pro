@@ -28,7 +28,9 @@ interface WeeklyScore {
   weekly_focus_id: string;
   confidence_score: number | null;
   performance_score: number | null;
+  selected_action_id?: number | null;
 }
+
 
 export default function Week() {
   const [staff, setStaff] = useState<Staff | null>(null);
@@ -257,9 +259,6 @@ export default function Week() {
             <Button variant="outline" onClick={() => navigate('/')} className="w-full">
               Back to Dashboard
             </Button>
-            <Button variant="outline" onClick={signOut} className="w-full">
-              Sign Out
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -277,91 +276,107 @@ export default function Week() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            
+            {/* Next Up orientation */}
+            {carryoverConflict ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-center">Finish last week before starting a new one</CardTitle>
+                  <CardDescription className="text-center">You still need to submit performance for last week.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button className="w-full h-12" onClick={() => navigate(`/performance/${carryoverPending!.week_in_cycle}`)}>
+                    Rate Performance
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {allDone && (
+                  <Badge variant="default" className="w-full justify-center py-2">
+                    ✓ Completed for Cycle {cycle}, Week {weekInCycle}
+                  </Badge>
+                )}
+
+                {beforeCheckIn && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-center">Confidence opens at 9:00 a.m. CT.</CardTitle>
+                    </CardHeader>
+                  </Card>
+                )}
+
+                {!beforeCheckIn && showSoftReset && (
+                  <div className="p-3 rounded-md border bg-muted">
+                    <div className="font-medium">Confidence window closed</div>
+                    <div className="text-sm text-muted-foreground">You’ll get a fresh start on Mon, {nextMondayStr(nowZ)}.</div>
+                  </div>
+                )}
+
+                {!beforeCheckIn && !showSoftReset && showConfidenceCTA && (
+                  <>
+                    <Button onClick={() => navigate(`/confidence/${weekInCycle}`)} className="w-full h-12">
+                      {partialConfidence ? 'Finish Confidence' : 'Rate Confidence'}
+                    </Button>
+                    {partialConfidence && (
+                      <div className="text-xs text-muted-foreground text-center mt-1">{confCount}/{total} complete</div>
+                    )}
+                  </>
+                )}
+
+                {!beforeCheckIn && !showSoftReset && showPerfLocked && (
+                  <Button className="w-full h-12" variant="outline" disabled>
+                    Performance opens Thursday
+                  </Button>
+                )}
+
+                {!beforeCheckIn && !showSoftReset && showPerformanceCTA && (
+                  <Button onClick={() => navigate(`/performance/${weekInCycle}`)} className="w-full h-12">
+                    Rate Performance
+                  </Button>
+                )}
+              </>
+            )}
+
+            {/* This Week's Pro Moves */}
             <div className="space-y-3">
               <h3 className="font-medium">This Week's Pro Moves:</h3>
               {weeklyFocus.map((focus, index) => {
                 const score = getScoreForFocus(focus.id);
+                const unchosenSelfSelect = !!focus.self_select && (!score || score.selected_action_id == null);
                 return (
                   <div key={focus.id} className="p-3 bg-muted rounded-lg">
                     <div className="flex items-start gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {index + 1}
-                      </Badge>
-                      <p className="text-sm flex-1">{focus.action_statement}</p>
+                      <Badge variant="outline" className="text-xs">{index + 1}</Badge>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          {focus.domain_name && (
+                            <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px]" style={{ backgroundColor: getDomainColor(focus.domain_name) }}>
+                              {focus.domain_name}
+                            </span>
+                          )}
+                          <p className="text-sm flex-1">{focus.action_statement}</p>
+                        </div>
+                        {unchosenSelfSelect && (
+                          <div className="mt-1">
+                            <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate(`/confidence/${weekInCycle}`)}>
+                              Choose your Pro Move
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-2 mt-2">
-                      {score?.confidence_score && (
-                        <Badge variant="secondary" className="text-xs">
-                          Confidence: {score.confidence_score}
-                        </Badge>
+                      {score?.confidence_score != null && (
+                        <Badge variant="secondary" className="text-xs">Confidence: {score.confidence_score}</Badge>
                       )}
-                      {score?.performance_score && (
-                        <Badge variant="secondary" className="text-xs">
-                          Performance: {score.performance_score}
-                        </Badge>
+                      {score?.performance_score != null && (
+                        <Badge variant="secondary" className="text-xs">Performance: {score.performance_score}</Badge>
                       )}
                     </div>
                   </div>
                 );
               })}
             </div>
-
-            <div className="space-y-2">
-              {isWeekComplete() ? (
-                <Badge variant="default" className="w-full justify-center py-2">
-                  ✓ Completed for Cycle {cycle}, Week {weekInCycle}
-                </Badge>
-              ) : (
-                <>
-                  {showSoftReset && (
-                    <div className="p-3 rounded-md border bg-muted">
-                      <div className="font-medium">Confidence window closed</div>
-                      <div className="text-sm text-muted-foreground">
-                        You’ll get a fresh start on Mon, {nextMondayStr(nowZ)}.
-                      </div>
-                    </div>
-                  )}
-
-                  {showConfidenceCTA && (
-                    <>
-                      <Button 
-                        onClick={() => navigate(`/confidence/${weekInCycle}`)}
-                        className="w-full h-12"
-                      >
-                        {partialConfidence ? 'Finish Confidence' : 'Rate Confidence'}
-                      </Button>
-                      {partialConfidence && (
-                        <div className="text-xs text-muted-foreground text-center mt-1">{confCount}/{total} complete</div>
-                      )}
-                    </>
-                  )}
-
-                  {showPerfLocked && (
-                    <Button 
-                      className="w-full h-12"
-                      variant="outline"
-                      disabled
-                    >
-                      Performance opens Thursday
-                    </Button>
-                  )}
-
-                  {showPerformanceCTA && (
-                    <Button 
-                      onClick={() => navigate(`/performance/${weekInCycle}`)}
-                      className="w-full h-12"
-                    >
-                      Rate Performance
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-            
-            <Button variant="outline" onClick={signOut} className="w-full">
-              Sign Out
-            </Button>
           </CardContent>
         </Card>
       </div>

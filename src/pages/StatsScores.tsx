@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
+import { computeRowHighlight } from '@/lib/highlights';
 
 interface WeekData {
   domain_name: string;
@@ -281,16 +282,15 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
     return <div className="h-12 bg-gray-100 animate-pulse rounded" />;
   }
 
-  const getStatusBadge = () => {
-    if (hasConfidence && hasPerformance) {
-      // Both completed - green checkmark
-      return <span className="text-green-600 text-lg font-bold">✓</span>;
-    } else if (hasConfidence || hasPerformance) {
-      // In progress - yellow dot
-      return <span className="text-yellow-600 text-lg font-bold">●</span>;
-    }
-    // Not started - nothing
-    return null;
+  const getStatusBadge = (rows: any[] | null) => {
+    const total = rows?.length || 0;
+    if (total === 0) return null;
+    const confCount = (rows || []).filter(r => r.confidence_score !== null).length;
+    const perfCount = (rows || []).filter(r => r.performance_score !== null).length;
+    if (confCount === 0) return null; // Grey
+    if (perfCount === total) return <span className="text-green-600 text-lg font-bold">✓</span>; // Green
+    if (confCount === total && perfCount < total) return <span className="text-yellow-600 text-lg font-bold">●</span>; // Yellow
+    return null; // Grey for partial confidence
   };
 
   return (
@@ -307,41 +307,43 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
               <span className="text-xs text-muted-foreground">Submit confidence to unlock week</span>
             )}
           </div>
-          {getStatusBadge()}
+          {getStatusBadge(weekData)}
         </div>
       </AccordionTrigger>
       
       {hasConfidence && (
         <AccordionContent className="px-3 pb-3">
           <div className="space-y-2">
-            {weekData.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-              >
-                <Badge 
-                  className="text-xs font-semibold text-slate-800 rounded-full px-2 py-0.5"
-                  style={{ backgroundColor: getDomainColor(item.domain_name) }}
+            {weekData.map((item, index) => {
+              const h = computeRowHighlight(item.confidence_score, item.performance_score);
+              return (
+                <div
+                  key={index}
+                  className={`flex items-center gap-3 p-3 rounded-lg ${h.tintClass}`}
                 >
-                  {item.domain_name}
-                </Badge>
-                <span className="flex-1 text-sm text-slate-800">
-                  {item.action_statement}
-                </span>
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-xs text-muted-foreground">conf</span>
-                  <Badge className="bg-emerald-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold">
-                    {item.confidence_score || 'N/A'}
+                  <Badge 
+                    className="text-xs font-semibold ring-1 ring-border/50"
+                    style={{ backgroundColor: getDomainColor(item.domain_name) }}
+                  >
+                    {item.domain_name}
                   </Badge>
+                  <span className="flex-1 text-sm">
+                    {item.action_statement}
+                  </span>
+                  <div className="flex items-center gap-6 text-sm">
+                    <span className="font-semibold">{item.confidence_score ?? '-'}</span>
+                    <span className="font-semibold">{item.performance_score ?? '-'}</span>
+                  </div>
+                  {h.tags.length > 0 && (
+                    <div className="flex gap-2 ml-2">
+                      {h.tags.map((t: string) => (
+                        <Badge key={t} variant="outline" className="text-xs">{t}</Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-xs text-muted-foreground">perf</span>
-                  <Badge className="bg-indigo-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold">
-                    {item.performance_score || '—'}
-                  </Badge>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </AccordionContent>
       )}

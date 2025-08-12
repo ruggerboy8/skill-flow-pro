@@ -10,6 +10,7 @@ import { ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getDomainColor } from '@/lib/domainColors';
+import { computeRowHighlight } from '@/lib/highlights';
 
 interface StaffInfo {
   id: string;
@@ -215,17 +216,15 @@ export default function CoachDetail() {
     });
   };
 
-  const getStatusBadge = (confMissing: number, perfMissing: number, totalItems: number) => {
-    if (totalItems === 0) return null;
-    if (confMissing === totalItems) {
-      return null; // Grey - no badge shown
-    } else if (perfMissing === totalItems) {
-      return <Badge variant="outline" className="text-yellow-600 border-yellow-400">●</Badge>;
-    } else if (confMissing === 0 && perfMissing === 0) {
-      return <Badge variant="outline" className="text-green-600 border-green-400">✓</Badge>;
-    } else {
-      return <Badge variant="outline" className="text-yellow-600 border-yellow-400">●</Badge>;
-    }
+  const getStatusBadge = (rows: any[] | null) => {
+    const total = rows?.length || 0;
+    if (total === 0) return null;
+    const confCount = (rows || []).filter(r => r.confidence_score !== null).length;
+    const perfCount = (rows || []).filter(r => r.performance_score !== null).length;
+    if (confCount === 0) return null; // Grey
+    if (perfCount === total) return <Badge variant="outline" className="text-green-600 border-green-400">✓</Badge>;
+    if (confCount === total && perfCount < total) return <Badge variant="outline" className="text-yellow-600 border-yellow-400">●</Badge>;
+    return null;
   };
 
   const getRowHighlight = (confidence: number | null, performance: number | null) => {
@@ -310,7 +309,7 @@ export default function CoachDetail() {
                   <div className="flex items-center gap-3 w-full">
                     <span>Week {week}</span>
                     {weekData && weekData.loaded && 
-                      getStatusBadge(weekData.confMissing, weekData.perfMissing, weekData.data.length)
+                      getStatusBadge(weekData.data)
                     }
                   </div>
                 </AccordionTrigger>
@@ -318,40 +317,37 @@ export default function CoachDetail() {
                   {weekData?.loaded ? (
                     weekData.data.length > 0 ? (
                       <div className="space-y-3">
-                        {weekData.data.map((item, index) => (
-                          <Card 
-                            key={index} 
-                            className={`${getRowHighlight(item.confidence_score, item.performance_score)}`}
-                          >
-                            <CardContent className="p-4">
-                              <div className="flex items-center gap-4">
-                                <Badge 
-                                  style={{ backgroundColor: getDomainColor(item.domain_name) }}
-                                  className="text-gray-800 border-0"
-                                >
-                                  {item.domain_name}
-                                </Badge>
-                                <div className="flex-1">
-                                  <p className="text-sm">{item.action_statement}</p>
-                                </div>
-                                <div className="flex gap-4 text-sm">
-                                  <div>
-                                    <span className="text-muted-foreground">Conf: </span>
-                                    <span className="font-medium">
-                                      {item.confidence_score ?? '-'}
-                                    </span>
+                        {weekData.data.map((item, index) => {
+                          const h = computeRowHighlight(item.confidence_score, item.performance_score);
+                          return (
+                            <Card key={index} className={`${h.tintClass}`}>
+                              <CardContent className="p-4">
+                                <div className="flex items-center gap-4">
+                                  <Badge 
+                                    style={{ backgroundColor: getDomainColor(item.domain_name) }}
+                                    className="ring-1 ring-border/50 text-foreground"
+                                  >
+                                    {item.domain_name}
+                                  </Badge>
+                                  <div className="flex-1">
+                                    <p className="text-sm">{item.action_statement}</p>
                                   </div>
-                                  <div>
-                                    <span className="text-muted-foreground">Perf: </span>
-                                    <span className="font-medium">
-                                      {item.performance_score ?? '-'}
-                                    </span>
+                                  <div className="flex items-center gap-6 text-sm">
+                                    <span className="font-medium">{item.confidence_score ?? '-'}</span>
+                                    <span className="font-medium">{item.performance_score ?? '-'}</span>
                                   </div>
+                                  {h.tags.length > 0 && (
+                                    <div className="flex gap-2 ml-2">
+                                      {h.tags.map((t: string) => (
+                                        <Badge key={t} variant="outline" className="text-xs">{t}</Badge>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-muted-foreground py-4">No Pro-Moves scheduled for this week.</p>

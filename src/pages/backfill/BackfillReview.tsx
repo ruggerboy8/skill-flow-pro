@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { getDomainColor } from "@/lib/domainColors";
+import { computeRowHighlight } from "@/lib/highlights";
 
 interface Staff { id: string; role_id: number; }
 interface FocusRow { id: string; display_order: number; action_statement: string; domain_name: string; week_in_cycle: number; }
@@ -116,17 +118,26 @@ export default function BackfillReview() {
                   <Badge variant="outline">3 items</Badge>
                 </div>
                 <div className="space-y-2">
-                  {(byWeek[Number(wk)]||[]).map((r, idx) => (
-                    <div key={r.id} className="flex items-center justify-between gap-4 text-sm">
-                      <div className="flex-1">
-                        <div className="font-medium">{r.selected_action_statement || r.action_statement}</div>
-                        <div className="text-muted-foreground">
-                          C: {r.confidence_score ?? '-'} · P: {r.performance_score ?? '-'}
+                  {(byWeek[Number(wk)]||[]).map((r, idx) => {
+                    const h = computeRowHighlight(r.confidence_score ?? null, r.performance_score ?? null);
+                    return (
+                      <div key={r.id} className={`flex items-center justify-between gap-4 text-sm p-3 rounded ${h.tintClass}`}>
+                        <div className="flex items-center gap-3 flex-1">
+                          <Badge variant="secondary" className="ring-1 ring-border/50" style={{ backgroundColor: getDomainColor(r.domain_name) }}>
+                            {r.domain_name}
+                          </Badge>
+                          <div className="font-medium">{r.selected_action_statement || r.action_statement}</div>
                         </div>
+                        <div className="flex items-center gap-6">
+                          <span className="font-semibold">{r.confidence_score ?? '-'}</span>
+                          <span className="font-semibold">{r.performance_score ?? '-'}</span>
+                        </div>
+                        {h.tags.length > 0 && (
+                          <div className="flex gap-2 ml-2">{h.tags.map((t:string)=>(<Badge key={t} variant="outline" className="text-xs">{t}</Badge>))}</div>
+                        )}
                       </div>
-                      <Badge variant="secondary">{idx+1}/3</Badge>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

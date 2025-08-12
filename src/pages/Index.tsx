@@ -114,9 +114,12 @@ export default function Index() {
   };
   const getTileStatus = (cycle: number, weekInCycle: number): 'grey' | 'yellow' | 'green' => {
     const weekStatus = weekStatuses.find(ws => ws.cycle === cycle && ws.week_in_cycle === weekInCycle);
-    if (!weekStatus || !weekStatus.hasConfidence) return 'grey';
-    if (!weekStatus.hasPerformance) return 'yellow';
-    return 'green';
+    if (!weekStatus) return 'grey';
+    // Strict logic
+    if (!weekStatus.hasConfidence) return 'grey';
+    if (weekStatus.hasPerformance) return 'green';
+    // If all confidence but not all performance, show yellow elsewhere. Here we only know overall flags.
+    return 'yellow';
   };
   const getWeekColor = (status: 'grey' | 'yellow' | 'green') => {
     switch (status) {

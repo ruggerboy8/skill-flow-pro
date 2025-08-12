@@ -1,7 +1,7 @@
-import { startOfWeek, addDays, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
+import { startOfWeek, addDays, setHours, setMinutes, setSeconds, setMilliseconds, getISOWeek, getISOWeekYear } from 'date-fns';
 import { toZonedTime, formatInTimeZone } from 'date-fns-tz';
 
-export type StatusColor = "grey" | "yellow" | "green";
+export type StatusColor = "grey" | "yellow" | "green" | "red";
 
 export interface WeekKey {
   cycle: number;
@@ -109,60 +109,128 @@ export function computeStaffStatus(
 
 const counts = countFor({ cycle: target.cycle, week_in_cycle: target.week_in_cycle });
 
-// Decide status color
-let color: StatusColor = "grey";
-if (counts.perf === 3) color = "green";
-else if (counts.conf === 3) color = "yellow";
-else color = "grey";
-
-// Reason and tooltip logic (America/Chicago)
+// Decide status color based on expectation windows (America/Chicago)
+let color: StatusColor = "green";
 let reason = "";
 let tooltip: string | undefined = undefined;
 
+// Central-time anchors
+const nowZ = toZonedTime(now, 'America/Chicago');
+const mondayZ = startOfWeek(nowZ, { weekStartsOn: 1 });
+const monCheckInZ = setMinutes(setHours(mondayZ, 9), 0); // Mon 09:00
+const tueDueZ = setMinutes(setHours(addDays(mondayZ, 1), 12), 0); // Tue 12:00
+const thuStartZ = setHours(addDays(mondayZ, 3), 0); // Thu 00:00
+const friStartZ = setHours(addDays(mondayZ, 4), 0); // Fri 00:00
+const sunEndZ = setMilliseconds(
+  setSeconds(setMinutes(setHours(addDays(mondayZ, 6), 23), 59), 59),
+  999
+); // Sun 23:59:59.999
+
+// Phase still useful for some checks
 const phase = getPhase(now, 'America/Chicago');
 
-if (isBlocked) {
-  // Blocking takes precedence
-  color = "yellow";
-  reason = "Finish last week before starting new";
-} else if (!target) {
-  reason = "Not configured";
-} else if (counts.conf < 3) {
-  // Confidence incomplete
-  if (phase === 'before_tue_noon') {
-    reason = ""; // on track, quiet
+// Determine if we're still in the same ISO week as the last entry
+const nowIsoWeek = getISOWeek(nowZ);
+const nowIsoYear = getISOWeekYear(nowZ);
+const lastIsoWeek = lastEntry?.weekly_focus.iso_week;
+const lastIsoYear = lastEntry?.weekly_focus.iso_year;
+const sameIsoWeekAsLast = !!(lastIsoWeek && lastIsoYear && lastIsoWeek === nowIsoWeek && lastIsoYear === nowIsoYear);
+
+// Confidence expectation window
+if (counts.conf < 3) {
+  // Before Mon 09:00 → On Track (calm)
+  if (nowZ < monCheckInZ) {
+    color = "green"; // on track
+  } else if (nowZ < tueDueZ) {
+    // Mon 09:00 → Tue 11:59 → Needs Confidence
+    color = "yellow";
+    reason = "Needs Confidence Score";
+    tooltip = "Confidence due by Tue 12:00.";
   } else {
-    reason = "Needs confidence";
-    // Compute next Monday in Central
-    const nowZ = toZonedTime(now, 'America/Chicago');
-    const mondayZ = startOfWeek(nowZ, { weekStartsOn: 1 });
+    // After Tue 12:00 → Still Yellow with soft reset info
+    color = "yellow";
+    reason = "Needs Confidence Score";
     const nextMonZ = addDays(mondayZ, 7);
     const nextMonStr = formatInTimeZone(nextMonZ, 'America/Chicago', 'EEE, MMM d');
-    tooltip = `Needs confidence — due Tue 12:00. Will reset on Mon, ${nextMonStr}.`;
+    tooltip = `Confidence window passed. You’ll get a fresh start on Mon, ${nextMonStr}.`;
   }
 } else if (counts.conf === 3 && counts.perf < 3) {
   // Performance pending
-  if (phase === 'thu') {
-    reason = "Needs performance";
-    tooltip = "Needs performance — opens Thu.";
-  } else if (phase === 'fri_to_sun' || phase === 'other') {
-    reason = "Needs performance";
-    tooltip = "Needs performance.";
+  if (isBlocked) {
+    // Carryover rules (blocked by last week)
+    // Red threshold = following Tue 12:00 Central relative to the blocked week
+    const nextWeekMonZ = sameIsoWeekAsLast ? addDays(mondayZ, 7) : mondayZ;
+    const carryoverDeadlineZ = setMinutes(setHours(addDays(nextWeekMonZ, 1), 12), 0); // Next Tue 12:00 of the week after last
+
+    if (nowZ >= carryoverDeadlineZ) {
+      color = "red";
+      reason = "Carryover Required";
+      tooltip = "Last week’s performance wasn’t submitted. Close it out before starting a new week.";
+    } else {
+      if (sameIsoWeekAsLast) {
+        // Still in the original week
+        if (nowZ < thuStartZ) {
+          color = "green"; // performance locked Mon–Wed
+        } else if (nowZ < friStartZ) {
+          color = "yellow";
+          reason = "Needs Performance Score";
+          tooltip = "Performance opens Thu. Please submit today.";
+        } else if (nowZ <= sunEndZ) {
+          color = "yellow";
+          reason = "Needs Performance Score";
+          tooltip = "Please submit performance to close out this week.";
+        }
+      } else {
+        // In following week before red threshold (Mon morning or Tue morning)
+        color = "yellow";
+        reason = "Needs Performance Score";
+        tooltip = "Please submit performance to close out this week.";
+      }
+    }
   } else {
-    reason = ""; // Mon–Wed locked; quiet
+    // Not blocked: still on the current week
+    if (nowZ < thuStartZ) {
+      color = "green"; // performance locked Mon–Wed
+    } else if (nowZ < friStartZ) {
+      color = "yellow";
+      reason = "Needs Performance Score";
+      tooltip = "Performance opens Thu. Please submit today.";
+    } else if (nowZ <= sunEndZ) {
+      color = "yellow";
+      reason = "Needs Performance Score";
+      tooltip = "Please submit performance to close out this week.";
+    } else {
+      // Past Sun, before new conf window, remain calm unless blocked logic flips next week
+      color = "green";
+    }
   }
 } else if (counts.perf === 3) {
-  // Complete, keep calm
-  reason = "";
+  // Complete for the target week
+  color = "green";
 }
 
-// Subtext for partials
+
+// Subtext for partials (keep subtle)
 let subtext: string | undefined;
-if (color === "grey" && counts.conf > 0 && counts.conf < 3) {
+if (counts.conf > 0 && counts.conf < 3) {
   subtext = `${counts.conf}/3 confidence`;
 }
-if (color === "yellow" && counts.perf > 0 && counts.perf < 3) {
+if (counts.perf > 0 && counts.perf < 3) {
   subtext = `${counts.perf}/3 performance`;
+}
+
+// Not configured case
+if (!currentWeek && !isBlocked) {
+  return {
+    color: "grey",
+    reason: "",
+    subtext: "Not configured",
+    tooltip: undefined,
+    blocked: false,
+    confCount: counts.conf,
+    perfCount: counts.perf,
+    target,
+  };
 }
 
 return {
@@ -178,10 +246,10 @@ return {
 }
 
 export function getSortRank(status: StaffWeekStatus): number {
-  // Priority: Needs confidence (0) -> Needs performance / Finish last week (1) -> On-track/neutral (2) -> Complete (3)
-  const t = (status.tooltip || status.reason || '').toLowerCase();
-  if (t.includes('needs confidence')) return 0;
-  if (t.includes('needs performance') || status.reason.toLowerCase().includes('finish last week')) return 1;
-  if (status.color === 'green') return 3;
-  return 2;
+  // Priority: Red (0) -> Yellow (1) -> Green (2) -> Neutral/others (3)
+  if (status.color === 'red') return 0;
+  if (status.color === 'yellow') return 1;
+  if (status.color === 'green') return 2;
+  return 3;
 }
+

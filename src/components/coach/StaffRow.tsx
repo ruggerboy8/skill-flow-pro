@@ -10,7 +10,7 @@ export interface StaffRowProps {
     location: string | null;
   };
   status: {
-    color: "grey" | "yellow" | "green";
+    color: "grey" | "yellow" | "green" | "red";
     reason: string;
     subtext?: string;
     tooltip?: string;
@@ -24,13 +24,16 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
       ? "bg-[hsl(var(--positive))] text-white"
       : status.color === "yellow"
       ? "bg-[hsl(var(--warning))] text-white"
+      : status.color === "red"
+      ? "bg-destructive text-destructive-foreground"
       : "bg-secondary text-secondary-foreground";
 
   // Tiny visible text inside the chip (still calm)
   const chipText =
-    status.color === "green" ? "Complete" :
-    status.color === "yellow" ? "Confidence" :
-    "Not started";
+    status.color === "green" ? "On Track" :
+    status.color === "red" ? "Carryover Required" :
+    status.color === "yellow" ? (status.reason?.toLowerCase().includes("confidence") ? "Needs Confidence Score" : "Needs Performance Score") :
+    "On Track";
 
   // Compose an aria-label without "undefined"
   const aria = status.tooltip

@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { Home, BarChart3, User, Settings, Users } from 'lucide-react';
+import { Home, BarChart3, User, Settings, Users, ClipboardList } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const ADMIN_EMAILS = ['johno@reallygoodconsulting.org'];
 
@@ -9,11 +11,23 @@ export default function Layout() {
   const { user, signOut, isCoach } = useAuth();
   const location = useLocation();
   
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  useEffect(() => {
+    if (!user) { setIsSuperAdmin(false); return; }
+    supabase
+      .from('staff')
+      .select('is_super_admin')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsSuperAdmin(!!data?.is_super_admin));
+  }, [user]);
+  
   const isAdmin = user && ADMIN_EMAILS.includes(user.email || '');
   
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Stats', href: '/stats', icon: BarChart3 },
+    ...(isSuperAdmin ? [{ name: 'Backfill', href: '/backfill', icon: ClipboardList }] : []),
     ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
     ...(isAdmin ? [{ name: 'Builder', href: '/admin/builder', icon: Settings }] : [])
   ];

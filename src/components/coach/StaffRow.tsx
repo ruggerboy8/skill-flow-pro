@@ -26,14 +26,28 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
       ? "bg-[hsl(var(--warning))] text-white"
       : "bg-secondary text-secondary-foreground";
 
+  // Tiny visible text inside the chip (still calm)
+  const chipText =
+    status.color === "green" ? "Complete" :
+    status.color === "yellow" ? "Confidence" :
+    "Not started";
+
+  // Compose an aria-label without "undefined"
+  const aria = status.tooltip
+    ? `${member.name} — ${status.reason}`
+    : `${member.name}`;
+
   return (
-    <Card
-      className="cursor-pointer hover:shadow-md transition-shadow"
-      onClick={onClick}
-      aria-label={`${member.name} - ${status.reason}`}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
+    <Card className="transition-shadow hover:shadow-md">
+      <CardContent className="p-0">
+        {/* Make the row keyboard-accessible */}
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={aria}
+          className="w-full text-left p-4 focus:outline-none focus:ring-2 focus:ring-ring rounded-lg"
+        >
+          <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold truncate">{member.name}</h3>
@@ -51,10 +65,10 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${chipClass}`}
-                      aria-label={`Status: ${status.color}`}
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${chipClass}`}
+                      aria-label={`Status: ${chipText}`}
                     >
-                      <span className="sr-only">{status.color}</span>
+                      {chipText}
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -64,18 +78,21 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
               </TooltipProvider>
             ) : (
               <div
-                className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${chipClass}`}
-                aria-label={`Status: ${status.color}`}
+                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${chipClass}`}
+                aria-label={`Status: ${chipText}`}
               >
-                <span className="sr-only">{status.color}</span>
+                {chipText}
               </div>
             )}
-            {status.reason && <div className="mt-1 text-sm">{status.reason}</div>}
+            {status.tooltip && status.reason && (
+              <div className="mt-1 text-sm">{status.reason}</div>
+            )}
             {status.subtext && (
               <div className="text-xs text-muted-foreground mt-0.5">{status.subtext}</div>
             )}
           </div>
-        </div>
+          </div>
+        </button>
       </CardContent>
     </Card>
   );

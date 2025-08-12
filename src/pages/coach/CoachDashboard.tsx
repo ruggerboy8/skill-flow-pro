@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,18 +51,34 @@ export default function CoachDashboard() {
 
   // Redirect if not coach
   useEffect(() => {
-    if (!loading && !isCoach) {
+    if (!loading && !(isCoach || isSuperAdmin)) {
       navigate('/');
     }
-  }, [isCoach, loading, navigate]);
+  }, [isCoach, isSuperAdmin, loading, navigate]);
 
   useEffect(() => {
     loadStaffData();
   }, []);
 
   useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('staff')
+          .select('is_super_admin')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        setIsSuperAdmin(Boolean((data as any)?.is_super_admin));
+      } catch {
+        // ignore
+      }
+    })();
+  }, [user]);
+
+  useEffect(() => {
     applyFilters();
-  }, [staff, selectedLocation, selectedRole]);
+  }, [staff, selectedLocation, selectedRole, search]);
 
   const loadStaffData = async () => {
     try {
@@ -85,36 +101,37 @@ export default function CoachDashboard() {
 
       if (error) throw error;
 
-      // Process staff data to calculate missing scores
-      const processedStaff: StaffMember[] = staffData.map(member => {
-        const scores = member.weekly_scores || [];
-        
-        // Count missing scores for current week (assuming we're checking the latest week)
-        const confMissing = scores.filter(s => s.confidence_score === null).length;
-        const perfMissing = scores.filter(s => s.performance_score === null).length;
-        
-        // Get the latest update date
-        const lastUpdated = scores.length > 0 
-          ? Math.max(...scores.map(s => new Date(s.updated_at).getTime()))
-          : null;
-
-        return {
-          id: member.id,
-          name: member.name,
-          role_name: (member.roles as any).role_name,
-          location: member.primary_location,
-          conf_missing: confMissing,
-          perf_missing: perfMissing,
-          last_updated: lastUpdated ? new Date(lastUpdated).toISOString() : null
-        };
-      });
+      // Normalize staff data to our shape
+      const processedStaff: StaffMember[] = (staffData as any[]).map((member: any) => ({
+        id: member.id,
+        name: member.name,
+        role_id: member.role_id,
+        role_name: (member.roles as any).role_name,
+        location: member.primary_location ?? null,
+        weekly_scores: (member.weekly_scores || []).map((s: any) => ({
+          confidence_score: s.confidence_score,
+          performance_score: s.performance_score,
+          updated_at: s.updated_at,
+          weekly_focus: {
+            id: s.weekly_focus.id,
+            cycle: s.weekly_focus.cycle,
+            week_in_cycle: s.weekly_focus.week_in_cycle,
+            iso_year: s.weekly_focus.iso_year,
+            iso_week: s.weekly_focus.iso_week,
+          },
+        })),
+      }));
 
       setStaff(processedStaff);
 
       // Extract unique locations and roles for filters
-      const uniqueLocations = [...new Set(processedStaff.map(s => s.location).filter(Boolean))];
-      const uniqueRoles = [...new Set(processedStaff.map(s => s.role_name))];
-      
+      const uniqueLocations = [
+        ...new Set(processedStaff.map((s) => s.location).filter(Boolean)),
+      ] as string[];
+      const uniqueRoles = [
+        ...new Set(processedStaff.map((s) => s.role_name)),
+      ] as string[];
+
       setLocations(uniqueLocations);
       setRoles(uniqueRoles);
     } catch (error) {
@@ -128,30 +145,46 @@ export default function CoachDashboard() {
     let filtered = staff;
 
     if (selectedLocation !== 'all') {
-      filtered = filtered.filter(s => s.location === selectedLocation);
+      filtered = filtered.filter((s) => s.location === selectedLocation);
     }
 
     if (selectedRole !== 'all') {
-      filtered = filtered.filter(s => s.role_name === selectedRole);
+      filtered = filtered.filter((s) => s.role_name === selectedRole);
     }
 
-    setFilteredStaff(filtered);
-  };
-
-  const getStatusBadge = (confMissing: number, perfMissing: number) => {
-    if (confMissing === 3) {
-      return null; // Grey - no badge shown
-    } else if (perfMissing === 3) {
-      return <Badge variant="outline" className="text-yellow-600 border-yellow-400">●</Badge>;
-    } else {
-      return <Badge variant="outline" className="text-green-600 border-green-400">✓</Badge>;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter((s) => s.name.toLowerCase().includes(q));
     }
+
+    const now = new Date();
+    const mapped = filtered.map((s) => {
+      const last = [...s.weekly_scores].sort(
+        (a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
+      )[0];
+      const currentWeekGuess: WeekKey | undefined = last
+        ? {
+            cycle: last.weekly_focus.cycle,
+            week_in_cycle: last.weekly_focus.week_in_cycle,
+            iso_year: getISOWeekYear(now),
+            iso_week: getISOWeek(now),
+          }
+        : undefined;
+      const status = computeStaffStatus(s.weekly_scores, s.role_id, currentWeekGuess, now);
+      return {
+        member: { id: s.id, name: s.name, role_name: s.role_name, location: s.location },
+        status,
+      };
+    });
+
+    mapped.sort(
+      (a, b) => getSortRank(a.status) - getSortRank(b.status) || a.member.name.localeCompare(b.member.name)
+    );
+
+    setRows(mapped);
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Never';
-    return new Date(dateString).toLocaleDateString();
-  };
+
 
   if (loading) {
     return (
@@ -176,15 +209,17 @@ export default function CoachDashboard() {
 
       {/* Filters Bar */}
       <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4 mb-6">
-        <div className="flex gap-4">
+        <div className="flex gap-4 flex-wrap items-center">
           <Select value={selectedLocation} onValueChange={setSelectedLocation}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All Locations" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Locations</SelectItem>
-              {locations.map(location => (
-                <SelectItem key={location} value={location}>{location}</SelectItem>
+              {locations.map((location) => (
+                <SelectItem key={location} value={location}>
+                  {location}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -195,38 +230,37 @@ export default function CoachDashboard() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Positions</SelectItem>
-              {roles.map(role => (
-                <SelectItem key={role} value={role}>{role}</SelectItem>
+              {roles.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {role}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name"
+            className="w-64"
+            aria-label="Search staff by name"
+          />
         </div>
       </div>
 
       {/* Staff List */}
       <div className="grid gap-4">
-        {filteredStaff.map(member => (
-          <Card 
-            key={member.id} 
-            className="cursor-pointer hover:shadow-md transition-shadow"
+        {rows.map(({ member, status }) => (
+          <StaffRow
+            key={member.id}
+            member={member}
+            status={status}
             onClick={() => navigate(`/coach/${member.id}`)}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold">{member.name}</h3>
-                  <p className="text-sm text-muted-foreground">{member.role_name}</p>
-                  {member.location && (
-                    <p className="text-xs text-muted-foreground">{member.location}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          />
         ))}
       </div>
 
-      {filteredStaff.length === 0 && (
+      {rows.length === 0 && (
         <Card>
           <CardContent className="py-16 text-center">
             <p className="text-muted-foreground">No staff members match the selected filters.</p>

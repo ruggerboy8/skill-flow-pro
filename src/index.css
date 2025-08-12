@@ -60,7 +60,10 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+
+    /* Semantic tokens for deltas */
+    --positive: 160 84% 39%;
+   }
 
   .dark {
     --background: 222.2 84% 4.9%;

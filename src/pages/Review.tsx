@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
-import { computeRowHighlight } from '@/lib/highlights';
+import ConfPerfDelta from '@/components/ConfPerfDelta';
 
 interface ReviewData {
   domain_name: string;
@@ -104,41 +104,28 @@ export default function Review() {
               {reviewData.length === 0 && (
                 <div className="text-center text-muted-foreground py-6">No Pro Moves scheduled for this week.</div>
               )}
-              {reviewData.map((item, index) => {
-                const h = computeRowHighlight(item.confidence_score, item.performance_score);
-                return (
-                  <div 
-                    key={index}
-                    className={`grid grid-cols-4 gap-4 p-4 rounded-lg border ${h.tintClass}`}
-                  >
-                    <div className="flex items-center">
-                      <Badge 
-                        variant="secondary" 
-                        className="text-xs font-semibold ring-1 ring-border/50"
-                        style={{ backgroundColor: getDomainColor(item.domain_name) }}
-                      >
-                        {item.domain_name}
-                      </Badge>
-                    </div>
-                    <div className="text-sm font-medium">
-                      {item.action_statement}
-                    </div>
-                    <div className="text-center font-semibold">
-                      {item.confidence_score}
-                    </div>
-                    <div className="text-center font-semibold">
-                      {item.performance_score}
-                    </div>
-                    {h.tags.length > 0 && (
-                      <div className="col-span-4 flex gap-2 mt-2">
-                        {h.tags.map((t: string) => (
-                          <Badge key={t} variant="outline" className="text-xs">{t}</Badge>
-                        ))}
-                      </div>
-                    )}
+              {reviewData.map((item, index) => (
+                <div 
+                  key={index}
+                  className="grid grid-cols-4 gap-4 p-4 rounded-lg border"
+                >
+                  <div className="flex items-center">
+                    <Badge 
+                      variant="secondary" 
+                      className="text-xs font-semibold ring-1 ring-border/50"
+                      style={{ backgroundColor: getDomainColor(item.domain_name) }}
+                    >
+                      {item.domain_name}
+                    </Badge>
                   </div>
-                );
-              })}
+                  <div className="text-sm font-medium">
+                    {item.action_statement}
+                  </div>
+                  <div className="col-span-2 flex items-end justify-end">
+                    <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
+                  </div>
+                </div>
+              ))}
             </div>
             
             <div className="mt-8 text-center">

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
-import { computeRowHighlight } from '@/lib/highlights';
+import ConfPerfDelta from '@/components/ConfPerfDelta';
 
 interface WeekData {
   domain_name: string;
@@ -314,36 +314,23 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
       {hasConfidence && (
         <AccordionContent className="px-3 pb-3">
           <div className="space-y-2">
-            {weekData.map((item, index) => {
-              const h = computeRowHighlight(item.confidence_score, item.performance_score);
-              return (
-                <div
-                  key={index}
-                  className={`flex items-center gap-3 p-3 rounded-lg ${h.tintClass}`}
+            {weekData.map((item, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-3 p-3 rounded-lg"
+              >
+                <Badge 
+                  className="text-xs font-semibold ring-1 ring-border/50"
+                  style={{ backgroundColor: getDomainColor(item.domain_name) }}
                 >
-                  <Badge 
-                    className="text-xs font-semibold ring-1 ring-border/50"
-                    style={{ backgroundColor: getDomainColor(item.domain_name) }}
-                  >
-                    {item.domain_name}
-                  </Badge>
-                  <span className="flex-1 text-sm">
-                    {item.action_statement}
-                  </span>
-                  <div className="flex items-center gap-6 text-sm">
-                    <span className="font-semibold">{item.confidence_score ?? '-'}</span>
-                    <span className="font-semibold">{item.performance_score ?? '-'}</span>
-                  </div>
-                  {h.tags.length > 0 && (
-                    <div className="flex gap-2 ml-2">
-                      {h.tags.map((t: string) => (
-                        <Badge key={t} variant="outline" className="text-xs">{t}</Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                  {item.domain_name}
+                </Badge>
+                <span className="flex-1 text-sm">
+                  {item.action_statement}
+                </span>
+                <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
+              </div>
+            ))}
           </div>
         </AccordionContent>
       )}

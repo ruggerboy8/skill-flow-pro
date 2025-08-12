@@ -10,7 +10,7 @@ import { ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getDomainColor } from '@/lib/domainColors';
-import { computeRowHighlight } from '@/lib/highlights';
+import ConfPerfDelta from '@/components/ConfPerfDelta';
 
 interface StaffInfo {
   id: string;
@@ -227,15 +227,6 @@ export default function CoachDetail() {
     return null;
   };
 
-  const getRowHighlight = (confidence: number | null, performance: number | null) => {
-    if (confidence !== null && confidence <= 2) {
-      return 'bg-orange-50';
-    }
-    if (confidence !== null && performance !== null && (performance - confidence) >= 1) {
-      return 'bg-teal-50';
-    }
-    return '';
-  };
 
   if (loading) {
     return (
@@ -317,37 +308,24 @@ export default function CoachDetail() {
                   {weekData?.loaded ? (
                     weekData.data.length > 0 ? (
                       <div className="space-y-3">
-                        {weekData.data.map((item, index) => {
-                          const h = computeRowHighlight(item.confidence_score, item.performance_score);
-                          return (
-                            <Card key={index} className={`${h.tintClass}`}>
-                              <CardContent className="p-4">
-                                <div className="flex items-center gap-4">
-                                  <Badge 
-                                    style={{ backgroundColor: getDomainColor(item.domain_name) }}
-                                    className="ring-1 ring-border/50 text-foreground"
-                                  >
-                                    {item.domain_name}
-                                  </Badge>
-                                  <div className="flex-1">
-                                    <p className="text-sm">{item.action_statement}</p>
-                                  </div>
-                                  <div className="flex items-center gap-6 text-sm">
-                                    <span className="font-medium">{item.confidence_score ?? '-'}</span>
-                                    <span className="font-medium">{item.performance_score ?? '-'}</span>
-                                  </div>
-                                  {h.tags.length > 0 && (
-                                    <div className="flex gap-2 ml-2">
-                                      {h.tags.map((t: string) => (
-                                        <Badge key={t} variant="outline" className="text-xs">{t}</Badge>
-                                      ))}
-                                    </div>
-                                  )}
+                        {weekData.data.map((item, index) => (
+                          <Card key={index}>
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-4">
+                                <Badge 
+                                  style={{ backgroundColor: getDomainColor(item.domain_name) }}
+                                  className="ring-1 ring-border/50 text-foreground"
+                                >
+                                  {item.domain_name}
+                                </Badge>
+                                <div className="flex-1">
+                                  <p className="text-sm">{item.action_statement}</p>
                                 </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
+                                <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
                     ) : (
                       <p className="text-muted-foreground py-4">No Pro-Moves scheduled for this week.</p>

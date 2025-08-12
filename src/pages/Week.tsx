@@ -40,7 +40,7 @@ export default function Week() {
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
   const [carryoverPending, setCarryoverPending] = useState<{ cycle: number; week_in_cycle: number } | null>(null);
   const [loading, setLoading] = useState(true);
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const params = useParams();

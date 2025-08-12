@@ -58,6 +58,17 @@ export default function Confidence() {
     }
   }, [user, week]);
 
+  // Central Time route guard: after Tue 12:00 CT, block deep links if confidence not complete
+  useEffect(() => {
+    if (!loading && weeklyFocus.length > 0 && afterTueNoon && !hasConfidence) {
+      toast({
+        title: "Confidence window closed",
+        description: `You’ll get a fresh start on Mon, ${nextMondayStr(nowZ)}.`
+      });
+      navigate('/week');
+    }
+  }, [loading, weeklyFocus, afterTueNoon, hasConfidence, navigate]);
+
   const loadData = async () => {
     if (!user) return;
 

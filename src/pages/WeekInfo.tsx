@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
-import { getNowZ, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
@@ -34,10 +34,10 @@ export default function WeekInfo() {
   const cycleNum = parseInt(cycle || '1');
   const weekNum = parseInt(week || '1');
 
-  const nowZ = getNowZ();
-  const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(nowZ);
-  const beforeCheckIn = nowZ < monCheckInZ;
-  const afterTueNoon = nowZ >= tueDueZ;
+  const now = nowUtc();
+  const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(now);
+  const beforeCheckIn = now < monCheckInZ;
+  const afterTueNoon = now >= tueDueZ;
 
   useEffect(() => {
     if (user) {
@@ -106,7 +106,7 @@ export default function WeekInfo() {
       if (afterTueNoon) {
         toast({
           title: "Confidence window closed",
-          description: `You’ll get a fresh start on Mon, ${nextMondayStr(nowZ)}.`
+          description: `You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`
         });
         navigate('/week');
         return;
@@ -120,7 +120,7 @@ export default function WeekInfo() {
       }
       navigate(`/confidence/${firstFocusId}/1`);
     } else if (!hasPerformanceScores) {
-      if (nowZ < thuStartZ) {
+      if (now < thuStartZ) {
         toast({
           title: "Performance opens Thursday",
           description: "Please come back on Thu 12:00 a.m. CT."
@@ -176,7 +176,7 @@ export default function WeekInfo() {
             <div className="space-y-2 pt-4">
               <Button 
                 onClick={handleRateNext}
-                disabled={(hasConfidenceScores && hasPerformanceScores) || (!hasConfidenceScores && (beforeCheckIn || afterTueNoon)) || (hasConfidenceScores && !hasPerformanceScores && nowZ < thuStartZ)}
+                disabled={(hasConfidenceScores && hasPerformanceScores) || (!hasConfidenceScores && (beforeCheckIn || afterTueNoon)) || (hasConfidenceScores && !hasPerformanceScores && now < thuStartZ)}
                 className="w-full h-12"
               >
                 {hasConfidenceScores && hasPerformanceScores 
@@ -185,7 +185,7 @@ export default function WeekInfo() {
                     ? (afterTueNoon 
                         ? 'Confidence window closed' 
                         : (beforeCheckIn ? 'Confidence opens at 9:00 a.m. CT' : 'Rate your confidence'))
-                    : (nowZ < thuStartZ ? 'Rate your performance (opens Thu)' : 'Rate your performance')}
+                    : (now < thuStartZ ? 'Rate your performance (opens Thu)' : 'Rate your performance')}
               </Button>
               
               <Button 

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getNowZ, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getDomainColor } from '@/lib/domainColors';
 
@@ -46,11 +46,11 @@ export default function Confidence() {
 
   const weekNum = Number(week); // week param is now just "1", "2", etc.
 
-  const nowZ = getNowZ();
-  const { monCheckInZ, tueDueZ } = getAnchors(nowZ);
-  const beforeCheckIn = nowZ < monCheckInZ;
-  const afterTueNoon = nowZ >= tueDueZ;
-  const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.length;
+const now = nowUtc();
+const { monCheckInZ, tueDueZ } = getAnchors(now);
+const beforeCheckIn = now < monCheckInZ;
+const afterTueNoon = now >= tueDueZ;
+const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.length;
 
   useEffect(() => {
     if (user) {
@@ -63,7 +63,7 @@ export default function Confidence() {
     if (!loading && weeklyFocus.length > 0 && afterTueNoon && !hasConfidence) {
       toast({
         title: "Confidence window closed",
-        description: `You’ll get a fresh start on Mon, ${nextMondayStr(nowZ)}.`
+        description: `You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`
       });
       navigate('/week');
     }
@@ -208,7 +208,23 @@ export default function Confidence() {
   const handleSubmit = async () => {
     if (!staff || !canSubmit()) return;
 
-    setSubmitting(true);
+setSubmitting(true);
+
+    // Hard guard: block late submissions after Tue 12:00 CT
+    {
+      const now = nowUtc();
+      const { tueDueZ } = getAnchors(now);
+      if (now >= tueDueZ && !hasConfidence) {
+        toast({
+          title: "Confidence window closed",
+          description: `You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`
+        });
+        setSubmitting(false);
+        navigate('/week');
+        return;
+      }
+    }
+
 
     const scoreInserts = weeklyFocus.map(focus => {
       const base: any = {
@@ -304,7 +320,7 @@ export default function Confidence() {
               <CardHeader>
                 <CardTitle className="text-center">Confidence window closed</CardTitle>
                 <CardDescription className="text-center">
-                  You’ll get a fresh start on Mon, {nextMondayStr(nowZ)}.
+                  You’ll get a fresh start on Mon, {nextMondayStr(now)}.
                 </CardDescription>
               </CardHeader>
             </Card>

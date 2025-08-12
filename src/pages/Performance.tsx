@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getNowZ, getAnchors } from '@/lib/centralTime';
+import { nowUtc, getAnchors } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
@@ -47,10 +47,10 @@ export default function Performance() {
 
   const weekNum = Number(week); // week param is now just "1", "2", etc.
 
-  // Central Time gating for Performance (opens Thu 00:00 CT; allowed anytime for past weeks)
-  const nowZ = getNowZ();
-  const { thuStartZ, mondayZ } = getAnchors(nowZ);
-  let beforeThursday = nowZ < thuStartZ;
+// Central Time gating for Performance (opens Thu 00:00 CT; allowed anytime for past weeks)
+  const now = nowUtc();
+  const { thuStartZ, mondayZ } = getAnchors(now);
+  let beforeThursday = now < thuStartZ;
 
   useEffect(() => {
     if (user) {
@@ -129,7 +129,7 @@ export default function Performance() {
 
     // If confidence was submitted before this Monday, this is a carryover week → allow performance even Mon–Wed
     const isCarryoverWeek = (scoresData || []).some((s) => s.confidence_date && new Date(s.confidence_date) < mondayZ);
-    beforeThursday = nowZ < thuStartZ && !isCarryoverWeek;
+beforeThursday = now < thuStartZ && !isCarryoverWeek;
     setLoading(false);
   };
 

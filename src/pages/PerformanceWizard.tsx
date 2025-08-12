@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
-import { getNowZ, getAnchors } from '@/lib/centralTime';
+import { nowUtc, getAnchors } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
@@ -42,8 +42,8 @@ export default function PerformanceWizard() {
   const { toast } = useToast();
 const navigate = useNavigate();
 
-  const nowZ = getNowZ();
-  const { thuStartZ } = getAnchors(nowZ);
+  const now = nowUtc();
+  const { thuStartZ } = getAnchors(now);
 
   const currentIndex = parseInt(index || '1') - 1;
 
@@ -56,7 +56,7 @@ const navigate = useNavigate();
   // Central Time gating and route guard for Performance
   useEffect(() => {
     if (!loading) {
-      if (nowZ < thuStartZ) {
+      if (now < thuStartZ) {
         toast({
           title: 'Performance opens Thursday',
           description: 'Please come back on Thu 12:00 a.m. CT.'
@@ -64,7 +64,7 @@ const navigate = useNavigate();
         navigate('/week');
       }
     }
-  }, [loading, nowZ, thuStartZ, navigate]);
+  }, [loading, now, thuStartZ, navigate]);
 
   const loadData = async () => {
     if (!user || !focusId) return;

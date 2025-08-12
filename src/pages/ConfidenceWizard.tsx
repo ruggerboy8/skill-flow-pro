@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
-import { getNowZ, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
@@ -36,10 +36,10 @@ const { user } = useAuth();
 const { toast } = useToast();
 const navigate = useNavigate();
 
-  const nowZ = getNowZ();
-  const { monCheckInZ, tueDueZ } = getAnchors(nowZ);
-  const beforeCheckIn = nowZ < monCheckInZ;
-  const afterTueNoon = nowZ >= tueDueZ;
+  const now = nowUtc();
+  const { monCheckInZ, tueDueZ } = getAnchors(now);
+  const beforeCheckIn = now < monCheckInZ;
+  const afterTueNoon = now >= tueDueZ;
 
   const currentIndex = parseInt(index || '1') - 1;
 
@@ -61,7 +61,7 @@ const navigate = useNavigate();
       } else if (afterTueNoon && !hasConfidence) {
         toast({
           title: "Confidence window closed",
-          description: `You’ll get a fresh start on Mon, ${nextMondayStr(nowZ)}.`
+          description: `You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`
         });
         navigate('/week');
       }

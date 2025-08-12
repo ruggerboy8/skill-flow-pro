@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getNowZ, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { getDomainColor } from '@/lib/domainColors';
 
 interface Staff {
@@ -213,16 +213,16 @@ export default function Week() {
     });
   };
 
-  // Central Time gating + state
-  const nowZ = getNowZ();
-  const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(nowZ);
+// Central Time gating + state
+  const now = nowUtc();
+  const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(now);
   const confCount = weeklyFocus.filter(f => getScoreForFocus(f.id)?.confidence_score != null).length;
   const perfCount = weeklyFocus.filter(f => getScoreForFocus(f.id)?.performance_score != null).length;
   const total = weeklyFocus.length;
 
-  const beforeCheckIn = nowZ < monCheckInZ;
-  const afterTueNoon = nowZ >= tueDueZ;
-  const beforeThursday = nowZ < thuStartZ;
+  const beforeCheckIn = now < monCheckInZ;
+  const afterTueNoon = now >= tueDueZ;
+  const beforeThursday = now < thuStartZ;
 
   const partialConfidence = confCount > 0 && confCount < total;
   const allConfidence = total > 0 && confCount === total;
@@ -308,7 +308,7 @@ export default function Week() {
                 {!beforeCheckIn && showSoftReset && (
                   <div className="p-3 rounded-md border bg-muted">
                     <div className="font-medium">Confidence window closed</div>
-                    <div className="text-sm text-muted-foreground">You’ll get a fresh start on Mon, {nextMondayStr(nowZ)}.</div>
+                    <div className="text-sm text-muted-foreground">You’ll get a fresh start on Mon, {nextMondayStr(now)}.</div>
                   </div>
                 )}
 

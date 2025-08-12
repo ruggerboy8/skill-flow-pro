@@ -121,7 +121,7 @@ export default function BackfillReview() {
                       <div className="flex-1">
                         <div className="font-medium">{r.selected_action_statement || r.action_statement}</div>
                         <div className="text-muted-foreground">
-                          C: {r.confidence_score ?? '-'}{r.confidence_estimated ? ' • est.' : ''} · P: {r.performance_score ?? '-'}{r.performance_estimated ? ' • est.' : ''}
+                          C: {r.confidence_score ?? '-'} · P: {r.performance_score ?? '-'}
                         </div>
                       </div>
                       <Badge variant="secondary">{idx+1}/3</Badge>

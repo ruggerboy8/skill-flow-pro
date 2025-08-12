@@ -5,9 +5,10 @@ interface NumberScaleProps {
   value: number | null;
   onChange: (value: number) => void;
   disabled?: boolean;
+  hideTips?: boolean;
 }
 
-export default function NumberScale({ value, onChange, disabled }: NumberScaleProps) {
+export default function NumberScale({ value, onChange, disabled, hideTips }: NumberScaleProps) {
   const [persistentTooltip, setPersistentTooltip] = useState<number | null>(null);
 
   // Reset tooltip when value becomes null or undefined
@@ -50,7 +51,7 @@ export default function NumberScale({ value, onChange, disabled }: NumberScalePr
         ))}
       </div>
 
-      {persistentTooltip && (
+      {persistentTooltip && !hideTips && (
         <div className="text-sm text-muted-foreground p-3 bg-muted rounded-lg">
           <strong>{persistentTooltip}</strong> – {tooltipText[persistentTooltip as keyof typeof tooltipText]}
         </div>

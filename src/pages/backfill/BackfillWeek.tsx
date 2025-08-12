@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Label } from "@/components/ui/label";
 import NumberScale from "@/components/NumberScale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -229,32 +229,26 @@ export default function BackfillWeek() {
                   <NumberScale
                     value={item.confidence}
                     onChange={(val) => setFocusList((prev) => prev.map((f) => f.id === item.id ? { ...f, confidence: val } : f))}
+                    hideTips
                   />
-                  <div className="flex items-center gap-2">
-                    <Checkbox id={`c-est-${idx}`} checked={item.confidence_estimated} onCheckedChange={(v) => setFocusList((prev) => prev.map((f) => f.id === item.id ? { ...f, confidence_estimated: !!v } : f))} />
-                    <Label htmlFor={`c-est-${idx}`}>Estimated</Label>
-                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Performance</Label>
                   <NumberScale
                     value={item.performance}
                     onChange={(val) => setFocusList((prev) => prev.map((f) => f.id === item.id ? { ...f, performance: val } : f))}
+                    hideTips
                   />
-                  <div className="flex items-center gap-2">
-                    <Checkbox id={`p-est-${idx}`} checked={item.performance_estimated} onCheckedChange={(v) => setFocusList((prev) => prev.map((f) => f.id === item.id ? { ...f, performance_estimated: !!v } : f))} />
-                    <Label htmlFor={`p-est-${idx}`}>Estimated</Label>
-                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-between pt-2">
-                <Button variant="outline" onClick={handleSkip}>Skip this week</Button>
-                <Button onClick={handleSaveNext}>Save & Next</Button>
-              </div>
             </CardContent>
           </Card>
         ))}
+        <div className="flex justify-between pt-4">
+          <Button variant="outline" onClick={handleSkip}>Skip this week</Button>
+          <Button onClick={handleSaveNext}>Save & Next</Button>
+        </div>
       </section>
     </main>
   );

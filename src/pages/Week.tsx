@@ -229,6 +229,11 @@ export default function Week() {
 
   const carryoverConflict = !!carryoverPending && (carryoverPending!.week_in_cycle !== weekInCycle || carryoverPending!.cycle !== cycle);
 
+  const showSoftReset = !carryoverConflict && afterTueNoon && !allConfidence;
+  const showConfidenceCTA = !carryoverConflict && !beforeCheckIn && !afterTueNoon && confCount < total;
+  const showPerfLocked = !carryoverConflict && allConfidence && beforeThursday;
+  const showPerformanceCTA = !carryoverConflict && !beforeThursday && perfPending;
+
 
   if (loading) {
     return (
@@ -319,12 +324,17 @@ export default function Week() {
                   )}
 
                   {showConfidenceCTA && (
-                    <Button 
-                      onClick={() => navigate(`/confidence/${weekInCycle}`)}
-                      className="w-full h-12"
-                    >
-                      Rate Confidence
-                    </Button>
+                    <>
+                      <Button 
+                        onClick={() => navigate(`/confidence/${weekInCycle}`)}
+                        className="w-full h-12"
+                      >
+                        {partialConfidence ? 'Finish Confidence' : 'Rate Confidence'}
+                      </Button>
+                      {partialConfidence && (
+                        <div className="text-xs text-muted-foreground text-center mt-1">{confCount}/{total} complete</div>
+                      )}
+                    </>
                   )}
 
                   {showPerfLocked && (

@@ -327,7 +327,7 @@ export default function ThisWeekPanel() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-medium">This Week&apos;s Pro Moves:</h3>
-            <span className="text-xs text-muted-foreground">Confidence</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Confidence</span>
           </div>
           {weeklyFocus.map((focus, index) => {
             const score = weeklyScores.find(s => s.weekly_focus_id === focus.id);
@@ -346,8 +346,17 @@ export default function ThisWeekPanel() {
                   <div className="flex items-start gap-2">
                     <p className="text-sm font-medium flex-1">{focus.pro_moves?.action_statement || 'Self-Select'}</p>
                   </div>
-                  <div className="text-sm font-medium tabular-nums">
-                    {score?.confidence_score != null ? score.confidence_score : ''}
+                  <div className="min-w-12 flex justify-end">
+                    {score?.confidence_score != null ? (
+                      <span
+                        className="inline-flex items-center justify-center w-8 h-6 rounded-md bg-primary/10 text-primary text-sm font-semibold tabular-nums"
+                        aria-label={`Confidence ${score.confidence_score}`}
+                      >
+                        {score.confidence_score}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </div>
                 </div>
 

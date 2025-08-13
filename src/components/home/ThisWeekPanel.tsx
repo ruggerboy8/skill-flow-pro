@@ -1,3 +1,4 @@
+// src/components/ThisWeekPanel.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -33,14 +34,20 @@ export default function ThisWeekPanel() {
   const [staff, setStaff] = useState<Staff | null>(null);
   const [cycle] = useState<number>(1);
   const [weekInCycle, setWeekInCycle] = useState<number>(1);
+
+  // Data state
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocusRow[]>([]);
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScoreRow[]>([]);
   const [carryoverPending, setCarryoverPending] = useState<{ cycle: number; week_in_cycle: number } | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [carryoverChecked, setCarryoverChecked] = useState<boolean>(false);
 
+  // Loading/gating state
+  const [loading, setLoading] = useState<boolean>(true);
+  const [readyForBanner, setReadyForBanner] = useState<boolean>(false);
+
+  // ---------------- load staff + pick default week ----------------
   useEffect(() => {
-    if (user) loadStaff();
+    if (user) void loadStaff();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   async function loadStaff() {
@@ -94,16 +101,22 @@ export default function ThisWeekPanel() {
   }
 
   useEffect(() => {
-    if (staff) loadWeekData();
+    if (staff) void loadWeekData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [staff, weekInCycle]);
 
+  // ---------------- load week data (batched to avoid flicker) ----------------
   async function loadWeekData() {
     if (!staff) return;
-    setLoading(true);
-    setCarryoverChecked(false);
 
-    // Load focus rows with optional joins for action/domain
+    // Clear stale and hold UI until all decisions are computed
+    setLoading(true);
+    setReadyForBanner(false);
+    setWeeklyFocus([]);
+    setWeeklyScores([]);
+    setCarryoverPending(null);
+
+    // 1) Focus rows
     const { data: focusData, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
@@ -122,31 +135,39 @@ export default function ThisWeekPanel() {
     if (focusError) {
       toast({ title: 'Error', description: 'Failed to load Pro Moves', variant: 'destructive' });
       setLoading(false);
+      setReadyForBanner(true); // render empty state safely
       return;
     }
 
-    const transformed = (focusData || []).map((item: any) => ({
+    const transformed: WeeklyFocusRow[] = (focusData || []).map((item: any) => ({
       id: item.id,
       display_order: item.display_order,
       self_select: item.self_select ?? false,
       competency_id: item.competency_id ?? undefined,
       pro_moves: item.pro_moves ?? null,
       competencies: item.competencies ?? null,
-    })) as WeeklyFocusRow[];
-    setWeeklyFocus(transformed);
+    }));
 
-    if ((focusData || []).length > 0) {
-      const focusIds = (focusData || []).map((f: any) => f.id);
-      const { data: scores } = await supabase
+    // If no focus, finalize right away
+    if (transformed.length === 0) {
+      setWeeklyFocus([]);
+      setWeeklyScores([]);
+      setCarryoverPending(null);
+      setReadyForBanner(true);
+      setLoading(false);
+      return;
+    }
+
+    // 2) Scores + carryover (do not set state until we have both)
+    const focusIds = transformed.map(f => f.id);
+
+    const [{ data: scores }, { data: pending }] = await Promise.all([
+      supabase
         .from('weekly_scores')
         .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
         .eq('staff_id', staff.id)
-        .in('weekly_focus_id', focusIds);
-
-      setWeeklyScores(scores || []);
-
-      // Determine carryover (most recent week with perf pending)
-      const { data: pending } = await supabase
+        .in('weekly_focus_id', focusIds),
+      supabase
         .from('weekly_scores')
         .select('updated_at, weekly_focus!inner(cycle, week_in_cycle, role_id)')
         .eq('staff_id', staff.id)
@@ -154,20 +175,21 @@ export default function ThisWeekPanel() {
         .not('confidence_score', 'is', null)
         .is('performance_score', null)
         .order('updated_at', { ascending: false })
-        .limit(1);
+        .limit(1),
+    ]);
 
-      const wf: any = pending && pending[0] && (pending[0] as any).weekly_focus;
-      if (wf) setCarryoverPending({ cycle: wf.cycle, week_in_cycle: wf.week_in_cycle });
-      else setCarryoverPending(null);
-    } else {
-      setWeeklyScores([]);
-      setCarryoverPending(null);
-    }
+    const wf: any = pending && pending[0] && (pending[0] as any).weekly_focus;
+    const carry = wf ? { cycle: wf.cycle, week_in_cycle: wf.week_in_cycle } : null;
 
-    setCarryoverChecked(true);
+    // Single commit to state → avoids intermediate renders
+    setWeeklyFocus(transformed);
+    setWeeklyScores(scores || []);
+    setCarryoverPending(carry);
+    setReadyForBanner(true);
     setLoading(false);
   }
 
+  // ---------------- derived state ----------------
   const total = weeklyFocus.length;
   const confCount = useMemo(
     () => weeklyFocus.filter(f => (weeklyScores.find(s => s.weekly_focus_id === f.id)?.confidence_score ?? null) != null).length,
@@ -187,12 +209,18 @@ export default function ThisWeekPanel() {
     [weeklyFocus, weeklyScores]
   );
 
-  // Central-Time anchors
-  const now = nowUtc();
-  const { monCheckInZ, tueDueZ, thuStartZ } = getAnchors(now);
-  const beforeCheckIn = now < monCheckInZ;
-  const afterTueNoon = now >= tueDueZ;
-  const beforeThursday = now < thuStartZ;
+  // Memoize time anchors so gates don’t “bounce” mid-render
+  const { now, monCheckInZ, tueDueZ, thuStartZ, beforeCheckIn, afterTueNoon, beforeThursday } = useMemo(() => {
+    const n = nowUtc();
+    const a = getAnchors(n);
+    return {
+      now: n,
+      ...a,
+      beforeCheckIn: n < a.monCheckInZ,
+      afterTueNoon: n >= a.tueDueZ,
+      beforeThursday: n < a.thuStartZ,
+    };
+  }, []);
 
   const partialConfidence = confCount > 0 && confCount < total;
   const allConfidence = total > 0 && confCount === total;
@@ -202,14 +230,16 @@ export default function ThisWeekPanel() {
 
   type CtaConfig = { label: string; onClick: () => void } | null;
 
-  function buildBanner(): { message: string; cta: CtaConfig } {
-    if (carryoverChecked && carryoverConflict && carryoverPending) {
+  // Build banner only when fully ready (prevents flash)
+  const { bannerMessage, bannerCta }: { bannerMessage: string; bannerCta: CtaConfig } = useMemo(() => {
+    if (!readyForBanner || !staff) return { bannerMessage: '', bannerCta: null };
+
+    if (carryoverConflict && carryoverPending) {
       return {
-        message: 'You still need to submit performance for last week before starting a new one.',
-        cta: {
+        bannerMessage: 'You still need to submit performance for last week before starting a new one.',
+        bannerCta: {
           label: 'Finish Performance',
           onClick: async () => {
-            if (!staff) return;
             const { data: focusData } = await supabase
               .from('weekly_focus')
               .select('id, display_order')
@@ -239,19 +269,19 @@ export default function ThisWeekPanel() {
       };
     }
 
-    if (allDone) return { message: '✓ All set for this week. Great work!', cta: null };
-    if (beforeCheckIn) return { message: 'Confidence opens at 9:00 a.m. CT.', cta: null };
+    if (allDone) return { bannerMessage: '✓ All set for this week. Great work!', bannerCta: null };
+    if (beforeCheckIn) return { bannerMessage: 'Confidence opens at 9:00 a.m. CT.', bannerCta: null };
     if (afterTueNoon && !allConfidence) {
-      return { message: `Confidence window closed. You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`, cta: null };
+      return { bannerMessage: `Confidence window closed. You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`, bannerCta: null };
     }
 
     if (!afterTueNoon && !allConfidence) {
       const label = partialConfidence ? 'Finish Confidence' : 'Rate Confidence';
       return {
-        message: partialConfidence
+        bannerMessage: partialConfidence
           ? `You're midway through Monday check-in. Finish your confidence ratings (${confCount}/${total}).`
           : `Welcome back! Time to rate your confidence for this week’s Pro Moves.`,
-        cta: {
+        bannerCta: {
           label,
           onClick: () => {
             const idx = firstIncompleteConfIndex === -1 ? 0 : firstIncompleteConfIndex;
@@ -262,15 +292,15 @@ export default function ThisWeekPanel() {
     }
 
     if (allConfidence && beforeThursday) {
-      return { message: 'Great! Come back Thursday to submit performance.', cta: null };
+      return { bannerMessage: 'Great! Come back Thursday to submit performance.', bannerCta: null };
     }
 
     if (allConfidence && !beforeThursday && perfPending) {
       return {
-        message: perfCount === 0
+        bannerMessage: perfCount === 0
           ? 'Time to reflect. Rate your performance for this week’s Pro Moves.'
           : `Pick up where you left off (${perfCount}/${total} complete).`,
-        cta: {
+        bannerCta: {
           label: 'Rate Performance',
           onClick: () => {
             const idx = firstIncompletePerfIndex === -1 ? 0 : firstIncompletePerfIndex;
@@ -280,17 +310,42 @@ export default function ThisWeekPanel() {
       };
     }
 
-    return { message: 'Review your Pro Moves below.', cta: null };
-  }
+    return { bannerMessage: 'Review your Pro Moves below.', bannerCta: null };
+  }, [
+    readyForBanner,
+    staff,
+    carryoverConflict,
+    carryoverPending,
+    navigate,
+    allDone,
+    beforeCheckIn,
+    afterTueNoon,
+    allConfidence,
+    partialConfidence,
+    confCount,
+    total,
+    firstIncompleteConfIndex,
+    allConfidence,
+    beforeThursday,
+    perfPending,
+    perfCount,
+    firstIncompletePerfIndex,
+    weekInCycle,
+    now
+  ]);
 
-  // Only calculate banner when all data is ready
-  const { message: bannerMessage, cta: bannerCta } = (loading || !carryoverChecked || !staff) 
-    ? { message: '', cta: null } 
-    : buildBanner();
-
-  if (loading || !carryoverChecked || !staff) {
+  // ---------------- render ----------------
+  if (loading || !readyForBanner || !staff) {
     return (
-      <div className="p-6 bg-primary/10 rounded-lg border border-primary/20"><div>Loading...</div></div>
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>This Week&apos;s Pro Moves</CardTitle>
+          <CardDescription>Loading…</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-24 rounded-md bg-muted animate-pulse" />
+        </CardContent>
+      </Card>
     );
   }
 
@@ -315,23 +370,13 @@ export default function ThisWeekPanel() {
         <CardDescription>These are the 3 actions you’ll focus on this week.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-md border bg-muted p-3">
-          <div className="font-medium text-sm text-foreground text-center">{bannerMessage}</div>
-          {bannerCta && (
-            <Button className="w-full h-12 mt-2" onClick={bannerCta.onClick} aria-label="Next action">
-              {bannerCta.label}
-            </Button>
-          )}
-          {!carryoverPending && !afterTueNoon && confCount > 0 && confCount < total && (
-            <div className="text-xs text-muted-foreground text-center mt-1">{confCount}/{total} complete</div>
-          )}
-        </div>
-
+        {/* Pro Moves list */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-medium">This Week&apos;s Pro Moves:</h3>
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Confidence</span>
           </div>
+
           {weeklyFocus.map((focus, index) => {
             const score = weeklyScores.find(s => s.weekly_focus_id === focus.id);
             const unchosenSelfSelect = !!focus.self_select && (!score || score.selected_action_id == null);
@@ -345,6 +390,7 @@ export default function ThisWeekPanel() {
                     {domainName}
                   </Badge>
                 )}
+
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2">
                     <p className="text-sm font-medium flex-1">{focus.pro_moves?.action_statement || 'Self-Select'}</p>
@@ -365,7 +411,11 @@ export default function ThisWeekPanel() {
 
                 {unchosenSelfSelect && (
                   <div className="mt-1">
-                    <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate(`/confidence/${weekInCycle}/step/${index + 1}`)}>
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-xs"
+                      onClick={() => navigate(`/confidence/${weekInCycle}/step/${index + 1}`)}
+                    >
                       Choose your Pro Move
                     </Button>
                   </div>
@@ -379,6 +429,19 @@ export default function ThisWeekPanel() {
               </div>
             );
           })}
+        </div>
+
+        {/* Dynamic message + CTA — moved to BOTTOM of the panel */}
+        <div className="rounded-md border bg-muted p-3">
+          <div className="font-medium text-sm text-foreground text-center">{bannerMessage}</div>
+          {bannerCta && (
+            <Button className="w-full h-12 mt-2" onClick={bannerCta.onClick} aria-label="Next action">
+              {bannerCta.label}
+            </Button>
+          )}
+          {!carryoverPending && !afterTueNoon && confCount > 0 && confCount < total && (
+            <div className="text-xs text-muted-foreground text-center mt-1">{confCount}/{total} complete</div>
+          )}
         </div>
       </CardContent>
     </Card>

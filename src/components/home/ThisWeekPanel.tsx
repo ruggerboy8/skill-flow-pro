@@ -285,7 +285,7 @@ export default function ThisWeekPanel() {
 
   const { message: bannerMessage, cta: bannerCta } = buildBanner();
 
-  if (loading) {
+  if (loading || !carryoverChecked || !staff) {
     return (
       <div className="p-6 bg-primary/10 rounded-lg border border-primary/20"><div>Loading...</div></div>
     );

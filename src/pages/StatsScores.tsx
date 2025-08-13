@@ -17,6 +17,7 @@ interface WeekData {
 interface CycleData {
   cycle: number;
   weeks: Map<number, WeekData[]>;
+  weekStatuses: Map<number, { total: number; confCount: number; perfCount: number }>;
   hasAnyConfidence: boolean;
 }
 
@@ -88,18 +89,37 @@ export default function StatsScores() {
           .order('week_in_cycle');
 
         const weeks = new Map<number, WeekData[]>();
+        const weekStatuses = new Map<number, { total: number; confCount: number; perfCount: number }>();
         
         if (weeksData) {
           const uniqueWeeks = [...new Set(weeksData.map(w => w.week_in_cycle))];
           
           for (const week of uniqueWeeks) {
             weeks.set(week, []);
+            
+            // Load status counts for each week
+            const { data: statusData } = await supabase
+              .from('weekly_scores')
+              .select('confidence_score, performance_score, weekly_focus!inner(cycle, week_in_cycle)')
+              .eq('staff_id', staffData.id)
+              .eq('weekly_focus.cycle', cycle)
+              .eq('weekly_focus.week_in_cycle', week);
+            
+            if (statusData) {
+              const total = statusData.length;
+              const confCount = statusData.filter(r => r.confidence_score !== null).length;
+              const perfCount = statusData.filter(r => r.performance_score !== null).length;
+              weekStatuses.set(week, { total, confCount, perfCount });
+            } else {
+              weekStatuses.set(week, { total: 0, confCount: 0, perfCount: 0 });
+            }
           }
         }
 
         cyclesWithData.push({
           cycle,
           weeks,
+          weekStatuses,
           hasAnyConfidence
         });
       }
@@ -208,6 +228,7 @@ export default function StatsScores() {
                       staffData={staffData}
                       onExpand={() => onWeekExpand(cycleIndex, week)}
                       weekData={cycle.weeks.get(week) || []}
+                      weekStatus={cycle.weekStatuses.get(week) || { total: 0, confCount: 0, perfCount: 0 }}
                     />
                   ))}
                 </Accordion>
@@ -226,9 +247,10 @@ interface WeekAccordionProps {
   staffData: { id: string; role_id: number } | null;
   onExpand: () => void;
   weekData: WeekData[];
+  weekStatus: { total: number; confCount: number; perfCount: number };
 }
 
-function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccordionProps) {
+function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus }: WeekAccordionProps) {
   const [hasConfidence, setHasConfidence] = useState<boolean | null>(null);
   const [hasPerformance, setHasPerformance] = useState<boolean | null>(null);
 
@@ -282,11 +304,9 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
     return <div className="h-12 bg-gray-100 animate-pulse rounded" />;
   }
 
-  const getStatusBadge = (rows: any[] | null) => {
-    const total = rows?.length || 0;
+  const getStatusBadge = () => {
+    const { total, confCount, perfCount } = weekStatus;
     if (total === 0) return null;
-    const confCount = (rows || []).filter(r => r.confidence_score !== null).length;
-    const perfCount = (rows || []).filter(r => r.performance_score !== null).length;
     if (confCount === 0) return null; // Grey
     if (perfCount === total) return <span className="text-green-600 text-lg font-bold">✓</span>; // Green
     if (confCount === total && perfCount < total) return <span className="text-yellow-600 text-lg font-bold">●</span>; // Yellow
@@ -307,7 +327,7 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData }: WeekAccor
               <span className="text-xs text-muted-foreground">Submit confidence to unlock week</span>
             )}
           </div>
-          {getStatusBadge(weekData)}
+          {getStatusBadge()}
         </div>
       </AccordionTrigger>
       

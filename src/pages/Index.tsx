@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -200,11 +201,8 @@ export default function Index() {
   const handleSignOut = async () => {
     await signOut();
   };
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">Loading...</div>
-      </div>;
-  }
+  // Show skeleton layout instead of full loading screen
+  const showSkeletons = loading;
   const nextWeek = getNextIncompleteWeek();
   return <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto">
@@ -214,7 +212,21 @@ export default function Index() {
         </div>
 
             {/* Dynamic This Week panel with banner + single CTA */}
-            <ThisWeekPanel />
+            {showSkeletons ? (
+              <Card className="mb-8">
+                <CardContent className="p-6 space-y-4">
+                  <Skeleton className="h-6 w-48" />
+                  <div className="space-y-3">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                  <Skeleton className="h-12 w-full" />
+                </CardContent>
+              </Card>
+            ) : (
+              <ThisWeekPanel />
+            )}
           
         <div className="space-y-8">
           <div className="space-y-4">
@@ -223,24 +235,35 @@ export default function Index() {
             </h2>
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {Array.from({
-              length: 6
-            }, (_, weekIndex) => {
-              const weekInCycle = weekIndex + 1;
-              const status = getTileStatus(1, weekInCycle);
-              return <Card key={`1-${weekInCycle}`} className={`cursor-pointer transition-all hover:scale-105 ${getWeekColor(status)}`} onClick={() => handleWeekClick(1, weekInCycle)} title={getTooltipText(status)}>
-                    <CardContent className="p-3 sm:p-6 text-center">
-                      <div className="text-lg font-semibold">
-                        Week {weekInCycle}
-                      </div>
-                      <div className="text-sm mt-2 opacity-90">
-                        {status === 'green' && '✓ Completed'}
-                        {status === 'yellow' && '◐ In Progress'}
-                        {status === 'grey' && '○ Not Started'}
-                      </div>
+              {showSkeletons ? (
+                Array.from({ length: 6 }, (_, index) => (
+                  <Card key={`skeleton-${index}`} className="cursor-pointer">
+                    <CardContent className="p-3 sm:p-6 text-center space-y-2">
+                      <Skeleton className="h-6 w-16 mx-auto" />
+                      <Skeleton className="h-4 w-24 mx-auto" />
                     </CardContent>
-                  </Card>;
-            })}
+                  </Card>
+                ))
+              ) : (
+                Array.from({
+                  length: 6
+                }, (_, weekIndex) => {
+                  const weekInCycle = weekIndex + 1;
+                  const status = getTileStatus(1, weekInCycle);
+                  return <Card key={`1-${weekInCycle}`} className={`cursor-pointer transition-all hover:scale-105 ${getWeekColor(status)}`} onClick={() => handleWeekClick(1, weekInCycle)} title={getTooltipText(status)}>
+                        <CardContent className="p-3 sm:p-6 text-center">
+                          <div className="text-lg font-semibold">
+                            Week {weekInCycle}
+                          </div>
+                          <div className="text-sm mt-2 opacity-90">
+                            {status === 'green' && '✓ Completed'}
+                            {status === 'yellow' && '◐ In Progress'}
+                            {status === 'grey' && '○ Not Started'}
+                          </div>
+                        </CardContent>
+                      </Card>;
+                })
+              )}
             </div>
           </div>
         </div>

@@ -283,7 +283,10 @@ export default function ThisWeekPanel() {
     return { message: 'Review your Pro Moves below.', cta: null };
   }
 
-  const { message: bannerMessage, cta: bannerCta } = buildBanner();
+  // Only calculate banner when all data is ready
+  const { message: bannerMessage, cta: bannerCta } = (loading || !carryoverChecked || !staff) 
+    ? { message: '', cta: null } 
+    : buildBanner();
 
   if (loading || !carryoverChecked || !staff) {
     return (

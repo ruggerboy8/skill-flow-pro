@@ -43,7 +43,6 @@ export default function ThisWeekPanel() {
   // Loading/gating state
   const [loading, setLoading] = useState<boolean>(true);
   const [readyForBanner, setReadyForBanner] = useState<boolean>(false);
-  const [bannerReady, setBannerReady] = useState<boolean>(false);
 
   // ---------------- load staff + pick default week ----------------
   useEffect(() => {
@@ -113,7 +112,6 @@ export default function ThisWeekPanel() {
     // Clear stale and hold UI until all decisions are computed
     setLoading(true);
     setReadyForBanner(false);
-    setBannerReady(false);
     setWeeklyFocus([]);
     setWeeklyScores([]);
     setCarryoverPending(null);
@@ -189,9 +187,6 @@ export default function ThisWeekPanel() {
     setCarryoverPending(carry);
     setReadyForBanner(true);
     setLoading(false);
-    
-    // Add small delay to ensure banner logic is fully stabilized
-    setTimeout(() => setBannerReady(true), 25);
   }
 
   // ---------------- derived state ----------------
@@ -238,6 +233,11 @@ export default function ThisWeekPanel() {
   // Build banner only when fully ready (prevents flash)
   const { bannerMessage, bannerCta }: { bannerMessage: string; bannerCta: CtaConfig } = useMemo(() => {
     if (!readyForBanner || !staff) return { bannerMessage: '', bannerCta: null };
+    
+    // Ensure time calculations are defined before proceeding
+    if (typeof beforeThursday === 'undefined' || typeof beforeCheckIn === 'undefined' || typeof afterTueNoon === 'undefined') {
+      return { bannerMessage: '', bannerCta: null };
+    }
 
     if (carryoverConflict && carryoverPending) {
       return {
@@ -437,19 +437,17 @@ export default function ThisWeekPanel() {
         </div>
 
         {/* Dynamic message + CTA — moved to BOTTOM of the panel */}
-        {bannerReady && (
-          <div className="rounded-md border bg-muted p-3">
-            <div className="font-medium text-sm text-foreground text-center">{bannerMessage}</div>
-            {bannerCta && (
-              <Button className="w-full h-12 mt-2" onClick={bannerCta.onClick} aria-label="Next action">
-                {bannerCta.label}
-              </Button>
-            )}
-            {!carryoverPending && !afterTueNoon && confCount > 0 && confCount < total && (
-              <div className="text-xs text-muted-foreground text-center mt-1">{confCount}/{total} complete</div>
-            )}
-          </div>
-        )}
+        <div className="rounded-md border bg-muted p-3">
+          <div className="font-medium text-sm text-foreground text-center">{bannerMessage}</div>
+          {bannerCta && (
+            <Button className="w-full h-12 mt-2" onClick={bannerCta.onClick} aria-label="Next action">
+              {bannerCta.label}
+            </Button>
+          )}
+          {!carryoverPending && !afterTueNoon && confCount > 0 && confCount < total && (
+            <div className="text-xs text-muted-foreground text-center mt-1">{confCount}/{total} complete</div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

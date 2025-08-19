@@ -9,6 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
 import { nowUtc, getAnchors } from '@/lib/centralTime';
+import { useNow } from '@/providers/NowProvider';
+import { useSim } from '@/devtools/SimProvider';
 interface Staff {
   id: string;
   role_id: number;
@@ -21,6 +23,7 @@ interface WeeklyFocus {
   cycle: number;
   week_in_cycle: number;
   domain_name: string;
+  competency_name?: string;
 }
 
 interface WeeklyScore {
@@ -43,9 +46,12 @@ export default function PerformanceWizard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const now = useNow();
+  const { overrides } = useSim();
 
-  const now = nowUtc();
-  const { thuStartZ, mondayZ } = getAnchors(now);
+  // Use simulated time if available for time gating
+  const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
+  const { thuStartZ, mondayZ } = getAnchors(effectiveNow);
 
   const weekNum = Number(week);
   const currentIndex = Math.max(0, (Number(n) || 1) - 1);
@@ -60,7 +66,7 @@ export default function PerformanceWizard() {
   useEffect(() => {
     if (!loading) {
       // Allow carryover weeks anytime (computed after data load)
-      if (now < thuStartZ && !isCarryoverWeek) {
+      if (effectiveNow < thuStartZ && !isCarryoverWeek) {
         toast({
           title: 'Performance opens Thursday',
           description: 'Please come back on Thu 12:00 a.m. CT.'
@@ -68,7 +74,7 @@ export default function PerformanceWizard() {
         navigate('/week');
       }
     }
-  }, [loading, now, thuStartZ, navigate, isCarryoverWeek]);
+  }, [loading, effectiveNow, thuStartZ, navigate, isCarryoverWeek]);
 
   const loadData = async () => {
     if (!user) return;
@@ -87,12 +93,66 @@ export default function PerformanceWizard() {
 
     setStaff(staffData);
 
-    // Load weekly focus for this week/cycle based on week param
-    const { data: focusData, error: focusError } = await supabase.rpc('get_focus_cycle_week', {
-      p_cycle: 1,
-      p_week: weekNum,
-      p_role_id: staffData.role_id
-    }) as { data: WeeklyFocus[] | null; error: any };
+    // Determine user's current cycle/week position (same logic as confidence wizard)
+    // First try ISO week lookup
+    let { data: focusData, error: focusError } = await supabase
+      .from('weekly_focus')
+      .select(`
+        id,
+        display_order,
+        action_id,
+        competency_id,
+        cycle,
+        week_in_cycle,
+        self_select,
+        pro_moves(action_statement),
+        competencies(
+          domain_id,
+          domains(domain_name),
+          name
+        )
+      `)
+      .eq('iso_year', 2025)
+      .eq('iso_week', weekNum)
+      .eq('role_id', staffData.role_id)
+      .order('display_order');
+
+    // If no ISO week data, fall back to cycle/week logic
+    if (!focusData || focusData.length === 0) {
+      // Check if user completed backfill to determine cycle position
+      const { data: hasScores } = await supabase
+        .from('weekly_scores')
+        .select('id')
+        .eq('staff_id', staffData.id)
+        .limit(1);
+
+      if (hasScores && hasScores.length > 0) {
+        // User completed backfill, should be on cycle 2 week 1
+        const { data: cycle2Data } = await supabase
+          .from('weekly_focus')
+          .select(`
+            id,
+            display_order,
+            action_id,
+            competency_id,
+            cycle,
+            week_in_cycle,
+            self_select,
+            pro_moves(action_statement),
+            competencies(
+              domain_id,
+              domains(domain_name),
+              name
+            )
+          `)
+          .eq('cycle', 2)
+          .eq('week_in_cycle', 1)
+          .eq('role_id', staffData.role_id)
+          .order('display_order');
+        
+        if (cycle2Data) focusData = cycle2Data;
+      }
+    }
 
     if (focusError || !focusData || focusData.length === 0) {
       toast({
@@ -104,13 +164,11 @@ export default function PerformanceWizard() {
       return;
     }
 
-    setWeeklyFocus(focusData);
-
-    // Load existing confidence scores
-    const focusIds = focusData.map(f => f.id);
+    // Load existing confidence scores with selected action IDs
+    const focusIds = focusData.map((f: any) => f.id);
     const { data: scoresData, error: scoresError } = await supabase
       .from('weekly_scores')
-      .select('id, weekly_focus_id, confidence_score, confidence_date')
+      .select('id, weekly_focus_id, confidence_score, confidence_date, selected_action_id')
       .eq('staff_id', staffData.id)
       .in('weekly_focus_id', focusIds)
       .not('confidence_score', 'is', null);
@@ -125,12 +183,45 @@ export default function PerformanceWizard() {
       return;
     }
 
+    // Build the weekly focus with actual selected pro moves
+    const transformedFocusData: WeeklyFocus[] = await Promise.all(
+      focusData.map(async (item: any) => {
+        const score = scoresData.find((s: any) => s.weekly_focus_id === item.id);
+        let actionStatement = item.pro_moves?.action_statement || '';
+        
+        // If this is a self-select item, get the selected pro move
+        if (item.self_select && score?.selected_action_id) {
+          const { data: selectedProMove } = await supabase
+            .from('pro_moves')
+            .select('action_statement')
+            .eq('action_id', score.selected_action_id)
+            .single();
+          
+          if (selectedProMove) {
+            actionStatement = selectedProMove.action_statement;
+          }
+        }
+
+        return {
+          id: item.id,
+          display_order: item.display_order,
+          action_statement: actionStatement,
+          cycle: item.cycle,
+          week_in_cycle: item.week_in_cycle,
+          domain_name: item.competencies?.domains?.domain_name || 'Unknown',
+          competency_name: item.competencies?.name || undefined
+        };
+      })
+    );
+
+    setWeeklyFocus(transformedFocusData);
     setExistingScores(scoresData);
+    
     // Determine carryover if confidence was submitted before this Monday
-    const carryover = (scoresData || []).some((s) => s.confidence_date && new Date(s.confidence_date) < mondayZ);
+    const carryover = (scoresData || []).some((s: any) => s.confidence_date && new Date(s.confidence_date) < mondayZ);
     setIsCarryoverWeek(carryover);
 
-    setCurrentFocus(focusData[currentIndex]);
+    setCurrentFocus(transformedFocusData[currentIndex]);
     setLoading(false);
   };
 
@@ -152,9 +243,8 @@ export default function PerformanceWizard() {
     if (!staff || !currentFocus) return;
 
     // Hard-guard: prevent too-early submit for current week
-    const nowSubmit = nowUtc();
-    const { thuStartZ: thuGuardZ } = getAnchors(nowSubmit);
-    if (nowSubmit < thuGuardZ && !isCarryoverWeek) {
+    const { thuStartZ: thuGuardZ } = getAnchors(effectiveNow);
+    if (effectiveNow < thuGuardZ && !isCarryoverWeek) {
       toast({
         title: 'Performance opens Thursday',
         description: 'Please come back on Thu 12:00 a.m. CT.'
@@ -239,22 +329,35 @@ export default function PerformanceWizard() {
               </Badge>
             </div>
             <CardTitle className="text-center text-gray-900">Rate Your Performance</CardTitle>
-            <CardDescription className="text-center text-gray-800">
-              How often did you actually do this action this week?
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 p-3 sm:p-6">
             <div className="p-3 sm:p-4 bg-white/80 rounded-lg">
-              <Badge 
-                variant="secondary" 
-                className="text-xs font-semibold mb-2 bg-white text-gray-900"
-              >
-                {currentFocus.domain_name}
-              </Badge>
+              <div className="flex gap-2 mb-2">
+                <Badge 
+                  variant="secondary" 
+                  className="text-xs font-semibold bg-white text-gray-900"
+                >
+                  {currentFocus.domain_name}
+                </Badge>
+                {currentFocus.competency_name && (
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs font-semibold bg-white text-gray-700"
+                  >
+                    {currentFocus.competency_name}
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm font-medium mb-2 text-gray-900">{currentFocus.action_statement}</p>
               <Badge variant="secondary" className="text-xs bg-white text-gray-900">
                 Your confidence: {getConfidenceScore(currentFocus.id)}
               </Badge>
+            </div>
+
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-800 mb-4">
+                How often did you actually do this action this week?
+              </p>
             </div>
 
             <NumberScale

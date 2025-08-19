@@ -109,7 +109,10 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
           action_statement
         ),
         competencies (
-          domains ( domain_name )
+          name,
+          domains!competencies_domain_id_fkey (
+            domain_name
+          )
         )
       `)
       .eq('cycle', 1) // Use cycle 1 for now

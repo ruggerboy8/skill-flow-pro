@@ -27,9 +27,8 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
   const { overrides, updateOverrides, resetSimulation } = useSim();
   const [customDateTime, setCustomDateTime] = useState('');
 
-  if (!isOpen) return null;
-
   // Generate presets for the current week in Central Time
+  // This MUST be called before any conditional returns to avoid hook order issues
   const presets = useMemo(() => {
     const { mondayZ } = getWeekAnchors(new Date(), CT_TZ);
     return [
@@ -52,6 +51,15 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
     ];
   }, []);
 
+  // Current time display
+  const currentTime = overrides.nowISO 
+    ? formatInTimeZone(new Date(overrides.nowISO), CT_TZ, 'EEE MMM d, h:mm a zzz')
+    : 'Real time';
+
+  // Early return AFTER all hooks are called
+  if (!isOpen) return null;
+
+  // Event handlers
   const handlePresetClick = (datetime: string) => {
     updateOverrides({ nowISO: datetime });
   };
@@ -62,11 +70,6 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
       updateOverrides({ nowISO: date.toISOString() });
     }
   };
-
-  const currentTime = overrides.nowISO 
-    ? formatInTimeZone(new Date(overrides.nowISO), CT_TZ, 'EEE MMM d, h:mm a zzz')
-    : 'Real time';
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">

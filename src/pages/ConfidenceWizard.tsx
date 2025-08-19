@@ -37,6 +37,7 @@ export default function ConfidenceWizard() {
   const [selectedActions, setSelectedActions] = useState<{ [key: string]: string | null }>({});
   const [selfSelectById, setSelfSelectById] = useState<Record<string, boolean>>({});
   const [competencyById, setCompetencyById] = useState<Record<string, number | null>>({});
+  const [competencyNameById, setCompetencyNameById] = useState<Record<string, string>>({});
   const [optionsByCompetency, setOptionsByCompetency] = useState<{ [key: number]: { action_id: string; action_statement: string }[] }>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -202,19 +203,29 @@ export default function ConfidenceWizard() {
     });
     setSelectedActions(selectedByFocus);
 
-    // Load self-select metadata
+    // Load self-select metadata and competency names
     const { data: meta } = await supabase
       .from('weekly_focus')
-      .select('id, self_select, competency_id')
+      .select(`
+        id, 
+        self_select, 
+        competency_id,
+        competencies(name)
+      `)
       .in('id', focusIds);
     const selfSel: Record<string, boolean> = {};
     const compMap: Record<string, number | null> = {};
+    const compNameMap: Record<string, string> = {};
     (meta || []).forEach((m: any) => {
       selfSel[m.id] = !!m.self_select;
       compMap[m.id] = (m.competency_id ?? null) as number | null;
+      if (m.competencies?.name) {
+        compNameMap[m.id] = m.competencies.name;
+      }
     });
     setSelfSelectById(selfSel);
     setCompetencyById(compMap);
+    setCompetencyNameById(compNameMap);
 
     // Fetch options for competencies
     const compIds = Array.from(new Set((meta || [])
@@ -355,12 +366,12 @@ export default function ConfidenceWizard() {
                 >
                   {currentFocus.domain_name}
                 </Badge>
-                {selfSelectById[currentFocus.id] && competencyById[currentFocus.id] && (
+                {selfSelectById[currentFocus.id] && competencyNameById[currentFocus.id] && (
                   <Badge 
                     variant="outline" 
                     className="text-xs font-semibold bg-white text-gray-700"
                   >
-                    Competency {competencyById[currentFocus.id]}
+                    {competencyNameById[currentFocus.id]}
                   </Badge>
                 )}
               </div>
@@ -368,7 +379,7 @@ export default function ConfidenceWizard() {
               {selfSelectById[currentFocus.id] ? (
                 <div className="space-y-3">
                   <Label htmlFor="pro-move-select" className="text-sm font-medium text-gray-900">
-                    Select your Pro Move for this competency:
+                    Choose the Pro Move you'd like to focus on this week.
                   </Label>
                   <Select
                     value={selectedActions[currentFocus.id] || ""}

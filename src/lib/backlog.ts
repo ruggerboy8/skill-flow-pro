@@ -199,26 +199,12 @@ export async function assembleWeek(
     if (focusError && !weeklyFocus) throw focusError;
     if (!weeklyFocus) return [];
 
-    console.log('Weekly focus items found:', weeklyFocus);
-    console.log('Weekly focus count:', weeklyFocus?.length);
-    weeklyFocus?.forEach((item, index) => {
-      console.log(`Weekly focus ${index}:`, item);
-    });
-
     // 2. Get user's backlog items (FIFO order) with simulation support
-    console.log('=== DEBUGGING BACKLOG ===');
-    console.log('User ID:', userId);
-    console.log('Role ID:', roleId);
-    console.log('Simulation overrides:', simOverrides);
-    
     const backlogResult = await getOpenBacklogCount(userId, simOverrides);
     const backlogItems = backlogResult.items;
-    console.log('Backlog result:', backlogResult);
-    console.log('Backlog items:', backlogItems);
 
-    // 3. Get user's current selections for self-select slots
-    const focusIds = weeklyFocus.map((f: any) => f.id);
     // 3. Get user's current selections for self-select slots (unless simulating empty state)
+    const focusIds = weeklyFocus.map((f: any) => f.id);
     const shouldIgnoreSelections = simOverrides?.enabled && simOverrides?.forceBacklogCount === 0;
     
     let userSelections = null;
@@ -231,21 +217,15 @@ export async function assembleWeek(
       userSelections = data;
     }
 
-    console.log('User selections from database:', userSelections);
-    console.log('Should ignore selections (simulation):', shouldIgnoreSelections);
-
     const selectionMap = new Map();
     (userSelections || []).forEach((sel: any) => {
       selectionMap.set(sel.weekly_focus_id, sel);
     });
 
-    console.log('Selection map:', Array.from(selectionMap.entries()));
-
     let backlogIndex = 0;
 
     // 4. Process each focus item
     for (const focus of weeklyFocus as any[]) {
-      console.log(`Processing focus item ${focus.id}, self_select: ${focus.self_select}`);
       const domainName = focus.competencies?.domains?.domain_name || 'Unknown';
 
       if (!focus.self_select) {
@@ -266,7 +246,7 @@ export async function assembleWeek(
           locked: true,
           display_order: focus.display_order
         });
-        console.log('Created SITE assignment:', focus.action_id, proMoveData?.action_statement);
+        
       } else {
         // Self-select slot
         const selection = selectionMap.get(focus.id);
@@ -316,7 +296,7 @@ export async function assembleWeek(
           });
         } else {
           // Empty self-select slot
-          console.log('Creating EMPTY self-select assignment for focus:', focus.id);
+          
           assignments.push({
             weekly_focus_id: focus.id,
             type: 'selfSelect',

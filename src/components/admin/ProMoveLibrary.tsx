@@ -28,8 +28,8 @@ export function ProMoveLibrary() {
   // State management
   const [roles, setRoles] = useState<Role[]>([]);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
-  const [selectedRole, setSelectedRole] = useState<string>('');
-  const [selectedCompetency, setSelectedCompetency] = useState<string>('');
+  const [selectedRole, setSelectedRole] = useState<string>('all');
+  const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -131,7 +131,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
               <SelectValue placeholder="All roles" />
             </SelectTrigger>
             <SelectContent className="bg-background z-50">
-              <SelectItem value="">All roles</SelectItem>
+              <SelectItem value="all">All roles</SelectItem>
               {roles.map(role => (
                 <SelectItem key={role.role_id} value={role.role_id.toString()}>
                   {role.role_name}
@@ -148,7 +148,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
               <SelectValue placeholder="All competencies" />
             </SelectTrigger>
             <SelectContent className="bg-background z-50">
-              <SelectItem value="">All competencies</SelectItem>
+              <SelectItem value="all">All competencies</SelectItem>
               {competencies.map(competency => (
                 <SelectItem key={competency.competency_id} value={competency.competency_id.toString()}>
                   {competency.name}

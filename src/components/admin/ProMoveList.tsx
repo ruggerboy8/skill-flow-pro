@@ -76,11 +76,11 @@ export function ProMoveList({
         .order('updated_at', { ascending: false });
 
       // Apply filters
-      if (roleFilter) {
+      if (roleFilter && roleFilter !== 'all') {
         query = query.eq('role_id', parseInt(roleFilter));
       }
       
-      if (competencyFilter) {
+      if (competencyFilter && competencyFilter !== 'all') {
         query = query.eq('competency_id', parseInt(competencyFilter));
       }
       

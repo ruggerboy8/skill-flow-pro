@@ -65,7 +65,7 @@ export function ProMoveLibrary() {
           domain_name
         )
       `)
-      .order('name');
+      .order('competency_id');
     
     if (data) {
       const formattedCompetencies = data?.map(item => ({

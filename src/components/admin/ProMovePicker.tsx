@@ -68,7 +68,7 @@ export function ProMovePicker({
           )
         `)
         .eq('role_id', roleFilter)
-        .order('name');
+        .order('competency_id');
 
       if (error) throw error;
       

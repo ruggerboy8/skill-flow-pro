@@ -90,7 +90,7 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
             )
           `)
           .eq('role_id', parseInt(formData.role_id))
-          .order('name');
+          .order('competency_id');
 
         if (error) throw error;
         

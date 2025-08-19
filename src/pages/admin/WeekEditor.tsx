@@ -187,6 +187,9 @@ export default function WeekEditor() {
     if (value === 'self-select') {
       newSlots[slotIndex].action_id = null;
       newSlots[slotIndex].is_self_select = true;
+    } else if (value === '__placeholder') {
+      newSlots[slotIndex].action_id = null;
+      newSlots[slotIndex].is_self_select = false;
     } else {
       newSlots[slotIndex].action_id = parseInt(value);
       newSlots[slotIndex].is_self_select = false;
@@ -319,7 +322,7 @@ export default function WeekEditor() {
                 <div>
                   <Label>Pro Move</Label>
                   <Select 
-                    value={slot.is_self_select ? 'self-select' : slot.action_id?.toString() || ""} 
+                    value={slot.is_self_select ? 'self-select' : slot.action_id?.toString() || "__placeholder"} 
                     onValueChange={(value) => handleProMoveChange(index, value)}
                     disabled={isLocked}
                   >

@@ -92,13 +92,7 @@ export function ProMovePicker({
           action_id,
           action_statement,
           description,
-          competency_id,
-          competencies (
-            name,
-            domains (
-              domain_name
-            )
-          )
+          competency_id
         `)
         .eq('role_id', roleFilter)
         .eq('active', true)
@@ -121,13 +115,28 @@ export function ProMovePicker({
 
       if (error) throw error;
 
+      // Get competency and domain names separately
+      const competencyIds = [...new Set(data?.map(item => item.competency_id).filter(Boolean))];
+      const competenciesData = await supabase
+        .from('competencies')
+        .select('competency_id, name, domain_id, domains(domain_name)')
+        .in('competency_id', competencyIds);
+
+      const competenciesMap = new Map((competenciesData.data || []).map(c => [
+        c.competency_id, 
+        { 
+          name: c.name, 
+          domain_name: (c.domains as any)?.domain_name || 'Unknown' 
+        }
+      ]));
+
       const formattedData = data?.map(item => ({
         action_id: item.action_id,
         action_statement: item.action_statement,
         description: item.description,
         competency_id: item.competency_id,
-        competency_name: (item.competencies as any)?.name || 'Unknown',
-        domain_name: (item.competencies as any)?.domains?.domain_name || 'Unknown'
+        competency_name: competenciesMap.get(item.competency_id)?.name || 'Unknown',
+        domain_name: competenciesMap.get(item.competency_id)?.domain_name || 'Unknown'
       })) || [];
 
       setProMoves(formattedData);

@@ -72,12 +72,7 @@ export function ProMoveList({
           active,
           updated_at,
           role_id,
-          roles (
-            role_name
-          ),
-          competencies (
-            name
-          )
+          competency_id
         `)
         .order('updated_at', { ascending: false });
 
@@ -103,6 +98,18 @@ export function ProMoveList({
 
       if (error) throw error;
 
+      // Get role and competency names separately to avoid join issues
+      const roleIds = [...new Set(data?.map(item => item.role_id).filter(Boolean))];
+      const competencyIds = [...new Set(data?.map(item => item.competency_id).filter(Boolean))];
+      
+      const [rolesData, competenciesData] = await Promise.all([
+        roleIds.length > 0 ? supabase.from('roles').select('role_id, role_name').in('role_id', roleIds) : { data: [] },
+        competencyIds.length > 0 ? supabase.from('competencies').select('competency_id, name').in('competency_id', competencyIds) : { data: [] }
+      ]);
+
+      const rolesMap = new Map((rolesData.data || []).map(r => [r.role_id, r.role_name]));
+      const competenciesMap = new Map((competenciesData.data || []).map(c => [c.competency_id, c.name]));
+
       const formattedData = data?.map(item => ({
         action_id: item.action_id,
         action_statement: item.action_statement,
@@ -110,8 +117,8 @@ export function ProMoveList({
         resources_url: item.resources_url,
         active: item.active,
         updated_at: item.updated_at,
-        role_name: (item.roles as any)?.role_name || 'Unknown',
-        competency_name: (item.competencies as any)?.name || 'Unknown'
+        role_name: rolesMap.get(item.role_id) || 'Unknown',
+        competency_name: competenciesMap.get(item.competency_id) || 'Unknown'
       })) || [];
       
       console.log('=== FORMATTED PRO MOVES ===', formattedData);

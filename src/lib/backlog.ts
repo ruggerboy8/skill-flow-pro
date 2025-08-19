@@ -218,13 +218,21 @@ export async function assembleWeek(
 
     // 3. Get user's current selections for self-select slots
     const focusIds = weeklyFocus.map((f: any) => f.id);
-    const { data: userSelections } = await supabase
-      .from('weekly_self_select')
-      .select('weekly_focus_id, slot_index, selected_pro_move_id, source')
-      .eq('user_id', userId)
-      .in('weekly_focus_id', focusIds);
+    // 3. Get user's current selections for self-select slots (unless simulating empty state)
+    const shouldIgnoreSelections = simOverrides?.enabled && simOverrides?.forceBacklogCount === 0;
+    
+    let userSelections = null;
+    if (!shouldIgnoreSelections) {
+      const { data } = await supabase
+        .from('weekly_self_select')
+        .select('weekly_focus_id, slot_index, selected_pro_move_id, source')
+        .eq('user_id', userId)
+        .in('weekly_focus_id', focusIds);
+      userSelections = data;
+    }
 
     console.log('User selections from database:', userSelections);
+    console.log('Should ignore selections (simulation):', shouldIgnoreSelections);
 
     const selectionMap = new Map();
     (userSelections || []).forEach((sel: any) => {

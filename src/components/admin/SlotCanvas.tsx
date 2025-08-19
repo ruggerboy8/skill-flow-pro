@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, GripVertical, X, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ProMovePicker } from './ProMovePicker';
+import { CompetencyPicker } from './CompetencyPicker';
 
 interface Slot {
   id: string;
@@ -25,6 +26,7 @@ interface SlotCanvasProps {
 export function SlotCanvas({ slots, onUpdateSlots, roleFilter, competencyFilter }: SlotCanvasProps) {
   const { toast } = useToast();
   const [showProMovePicker, setShowProMovePicker] = useState(false);
+  const [showCompetencyPicker, setShowCompetencyPicker] = useState(false);
   const [addingToSlotIndex, setAddingToSlotIndex] = useState<number>(-1);
 
   const validateSlots = (newSlots: Slot[]) => {
@@ -97,16 +99,22 @@ export function SlotCanvas({ slots, onUpdateSlots, roleFilter, competencyFilter 
       return;
     }
 
+    setAddingToSlotIndex(slotIndex ?? slots.length);
+    setShowCompetencyPicker(true);
+  };
+
+  const handleCompetencySelected = (competency: any) => {
     const newSlot: Slot = {
       id: `self-select-${Date.now()}`,
       self_select: true,
-      competency_id: competencyFilter && competencyFilter !== 'all' ? parseInt(competencyFilter) : undefined
+      competency_id: competency.competency_id,
+      competency_name: competency.name
     };
 
     let newSlots;
-    if (slotIndex !== undefined && slotIndex < slots.length) {
+    if (addingToSlotIndex < slots.length) {
       newSlots = [...slots];
-      newSlots.splice(slotIndex, 0, newSlot);
+      newSlots.splice(addingToSlotIndex, 0, newSlot);
     } else {
       newSlots = [...slots, newSlot];
     }
@@ -114,6 +122,9 @@ export function SlotCanvas({ slots, onUpdateSlots, roleFilter, competencyFilter 
     if (validateSlots(newSlots)) {
       onUpdateSlots(newSlots);
     }
+    
+    setShowCompetencyPicker(false);
+    setAddingToSlotIndex(-1);
   };
 
   const handleProMoveSelected = (proMove: any) => {
@@ -284,6 +295,17 @@ export function SlotCanvas({ slots, onUpdateSlots, roleFilter, competencyFilter 
           </Card>
         )}
       </div>
+
+      {showCompetencyPicker && (
+        <CompetencyPicker
+          roleFilter={roleFilter}
+          onSelect={handleCompetencySelected}
+          onClose={() => {
+            setShowCompetencyPicker(false);
+            setAddingToSlotIndex(-1);
+          }}
+        />
+      )}
 
       {showProMovePicker && (
         <ProMovePicker

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { Home, BarChart3, User, Settings, Users, ClipboardList } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { SimFloatingButton } from '@/devtools/SimConsole';
 
 const ADMIN_EMAILS = ['johno@reallygoodconsulting.org'];
 
@@ -110,6 +111,9 @@ export default function Layout() {
       <main className="container mx-auto px-4 py-6">
         <Outlet />
       </main>
+      
+      {/* Global Simulation Tools */}
+      <SimFloatingButton isAdmin={isAdmin} />
     </div>
   );
 }

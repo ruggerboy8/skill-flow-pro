@@ -71,28 +71,46 @@ export type Database = {
         Row: {
           action_id: number
           action_statement: string | null
+          active: boolean | null
           competency_id: number | null
           date_added: string | null
+          description: string | null
+          resources_url: string | null
+          role_id: number | null
           status: string | null
           steps: string | null
+          updated_at: string | null
+          updated_by: string | null
           version: string | null
         }
         Insert: {
           action_id: number
           action_statement?: string | null
+          active?: boolean | null
           competency_id?: number | null
           date_added?: string | null
+          description?: string | null
+          resources_url?: string | null
+          role_id?: number | null
           status?: string | null
           steps?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
           version?: string | null
         }
         Update: {
           action_id?: number
           action_statement?: string | null
+          active?: boolean | null
           competency_id?: number | null
           date_added?: string | null
+          description?: string | null
+          resources_url?: string | null
+          role_id?: number | null
           status?: string | null
           steps?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
           version?: string | null
         }
         Relationships: []
@@ -476,6 +494,10 @@ export type Database = {
       }
     }
     Functions: {
+      bulk_upsert_pro_moves: {
+        Args: { pro_moves_data: Json }
+        Returns: Json
+      }
       get_focus_cycle_week: {
         Args: { p_cycle: number; p_role_id: number; p_week: number }
         Returns: {

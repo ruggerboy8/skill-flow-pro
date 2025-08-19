@@ -47,9 +47,12 @@ export default function ConfidenceWizard() {
   const { overrides } = useSim();
 
   const weekNum = Number(week);
-  const { monCheckInZ, tueDueZ } = getAnchors(now);
-  const beforeCheckIn = now < monCheckInZ;
-  const afterTueNoon = now >= tueDueZ;
+  
+  // Use simulated time if available for time gating
+  const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
+  const { monCheckInZ, tueDueZ } = getAnchors(effectiveNow);
+  const beforeCheckIn = effectiveNow < monCheckInZ;
+  const afterTueNoon = effectiveNow >= tueDueZ;
 
   const currentIndex = Math.max(0, (Number(n) || 1) - 1);
 
@@ -251,9 +254,8 @@ export default function ConfidenceWizard() {
     if (!staff || !currentFocus) return;
 
     // Hard-guard: block late submissions after Tue 12:00 CT when not already complete
-    const nowSubmit = now;
-    const { tueDueZ } = getAnchors(nowSubmit);
-    if (nowSubmit >= tueDueZ && !hasConfidence) {
+    const { tueDueZ } = getAnchors(effectiveNow);
+    if (effectiveNow >= tueDueZ && !hasConfidence) {
       toast({
         title: 'Confidence window closed',
         description: `You’ll get a fresh start on Mon, ${nextMondayStr(nowSubmit)}.`,

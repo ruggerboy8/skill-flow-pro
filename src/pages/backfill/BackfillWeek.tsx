@@ -220,7 +220,6 @@ export default function BackfillWeek() {
                       <SelectValue placeholder="— Select —" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">— Select —</SelectItem>
                       {(item.options || []).map((opt) => (
                         <SelectItem key={opt.action_id} value={opt.action_id.toString()}>
                           {opt.action_statement}

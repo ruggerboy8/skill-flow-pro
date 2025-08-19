@@ -13,6 +13,7 @@ import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+
 interface Staff {
   id: string;
   role_id: number;
@@ -74,7 +75,7 @@ export default function ConfidenceWizard() {
       } else if (afterTueNoon && !hasConfidence) {
         toast({
           title: "Confidence window closed",
-          description: `You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`
+          description: `You'll get a fresh start on Mon, ${nextMondayStr(now)}.`
         });
         navigate('/week');
       }
@@ -258,7 +259,7 @@ export default function ConfidenceWizard() {
     if (effectiveNow >= tueDueZ && !hasConfidence) {
       toast({
         title: 'Confidence window closed',
-        description: `You’ll get a fresh start on Mon, ${nextMondayStr(nowSubmit)}.`,
+        description: `You'll get a fresh start on Mon, ${nextMondayStr(effectiveNow)}.`,
       });
       navigate('/week');
       return;

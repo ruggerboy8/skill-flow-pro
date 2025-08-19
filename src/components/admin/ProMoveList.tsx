@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Edit, Eye, EyeOff } from 'lucide-react';
+import { getDomainColor } from '@/lib/domainColors';
 import {
   Table,
   TableBody,
@@ -33,6 +34,7 @@ interface ProMove {
   updated_at: string;
   role_name: string;
   competency_name: string;
+  domain_name: string;
 }
 
 interface ProMoveListProps {
@@ -40,6 +42,7 @@ interface ProMoveListProps {
   competencyFilter: string;
   searchTerm: string;
   activeOnly: boolean;
+  sortBy: 'domain' | 'competency' | 'updated';
   onEdit: (proMove: ProMove) => void;
 }
 
@@ -47,7 +50,8 @@ export function ProMoveList({
   roleFilter, 
   competencyFilter, 
   searchTerm, 
-  activeOnly, 
+  activeOnly,
+  sortBy, 
   onEdit 
 }: ProMoveListProps) {
   const { toast } = useToast();
@@ -56,7 +60,7 @@ export function ProMoveList({
 
   useEffect(() => {
     loadProMoves();
-  }, [roleFilter, competencyFilter, searchTerm, activeOnly]);
+  }, [roleFilter, competencyFilter, searchTerm, activeOnly, sortBy]);
 
   const loadProMoves = async () => {
     console.log('=== LOADING PRO MOVES ===', { roleFilter, competencyFilter, searchTerm, activeOnly });
@@ -104,13 +108,25 @@ export function ProMoveList({
       
       const [rolesData, competenciesData] = await Promise.all([
         roleIds.length > 0 ? supabase.from('roles').select('role_id, role_name').in('role_id', roleIds) : { data: [] },
-        competencyIds.length > 0 ? supabase.from('competencies').select('competency_id, name').in('competency_id', competencyIds) : { data: [] }
+        competencyIds.length > 0 ? supabase.from('competencies').select(`
+          competency_id, 
+          name, 
+          domains!competencies_domain_id_fkey (
+            domain_name
+          )
+        `).in('competency_id', competencyIds) : { data: [] }
       ]);
 
       const rolesMap = new Map((rolesData.data || []).map(r => [r.role_id, r.role_name]));
-      const competenciesMap = new Map((competenciesData.data || []).map(c => [c.competency_id, c.name]));
+      const competenciesMap = new Map((competenciesData.data || []).map(c => [
+        c.competency_id, 
+        { 
+          name: c.name, 
+          domain_name: (c.domains as any)?.domain_name || 'Unknown' 
+        }
+      ]));
 
-      const formattedData = data?.map(item => ({
+      let formattedData = data?.map(item => ({
         action_id: item.action_id,
         action_statement: item.action_statement,
         description: item.description,
@@ -118,8 +134,18 @@ export function ProMoveList({
         active: item.active,
         updated_at: item.updated_at,
         role_name: rolesMap.get(item.role_id) || 'Unknown',
-        competency_name: competenciesMap.get(item.competency_id) || 'Unknown'
+        competency_name: competenciesMap.get(item.competency_id)?.name || 'Unknown',
+        domain_name: competenciesMap.get(item.competency_id)?.domain_name || 'Unknown'
       })) || [];
+      
+      // Apply sorting
+      if (sortBy === 'domain') {
+        formattedData.sort((a, b) => a.domain_name.localeCompare(b.domain_name));
+      } else if (sortBy === 'competency') {
+        formattedData.sort((a, b) => a.competency_name.localeCompare(b.competency_name));
+      } else {
+        formattedData.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      }
       
       console.log('=== FORMATTED PRO MOVES ===', formattedData);
       setProMoves(formattedData);
@@ -181,8 +207,8 @@ export function ProMoveList({
           <TableRow>
             <TableHead>Pro-Move</TableHead>
             <TableHead>Role</TableHead>
+            <TableHead>Domain</TableHead>
             <TableHead>Competency</TableHead>
-            <TableHead>Status</TableHead>
             <TableHead>Updated</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -209,12 +235,22 @@ export function ProMoveList({
                 <Badge variant="outline">{proMove.role_name}</Badge>
               </TableCell>
               <TableCell>
-                <Badge variant="secondary">{proMove.competency_name}</Badge>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: getDomainColor(proMove.domain_name) }}
+                  />
+                  <span className="font-medium">{proMove.domain_name}</span>
+                </div>
               </TableCell>
               <TableCell>
-                <Badge variant={proMove.active ? "default" : "destructive"}>
-                  {proMove.active ? "Active" : "Retired"}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: getDomainColor(proMove.domain_name) }}
+                  />
+                  <Badge variant="secondary">{proMove.competency_name}</Badge>
+                </div>
               </TableCell>
               <TableCell>{formatDate(proMove.updated_at)}</TableCell>
               <TableCell className="text-right">

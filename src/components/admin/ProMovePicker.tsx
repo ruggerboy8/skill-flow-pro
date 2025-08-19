@@ -62,7 +62,8 @@ export function ProMovePicker({
         .select(`
           competency_id, 
           name,
-          domains (
+          domain_id,
+          domains!competencies_domain_id_fkey (
             domain_name
           )
         `)
@@ -74,7 +75,7 @@ export function ProMovePicker({
       const formattedCompetencies = data?.map(item => ({
         competency_id: item.competency_id,
         name: item.name,
-        domain_name: (item.domains as any)?.domain_name
+        domain_name: (item.domains as any)?.domain_name || 'Unknown'
       })) || [];
       
       setCompetencies(formattedCompetencies);
@@ -117,9 +118,22 @@ export function ProMovePicker({
 
       // Get competency and domain names separately
       const competencyIds = [...new Set(data?.map(item => item.competency_id).filter(Boolean))];
+      
+      if (competencyIds.length === 0) {
+        setProMoves([]);
+        return;
+      }
+      
       const competenciesData = await supabase
         .from('competencies')
-        .select('competency_id, name, domain_id, domains(domain_name)')
+        .select(`
+          competency_id, 
+          name, 
+          domain_id,
+          domains!competencies_domain_id_fkey (
+            domain_name
+          )
+        `)
         .in('competency_id', competencyIds);
 
       const competenciesMap = new Map((competenciesData.data || []).map(c => [

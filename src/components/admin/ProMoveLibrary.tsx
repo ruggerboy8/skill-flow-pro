@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Download } from 'lucide-react';
+import { Plus, Upload, Download, ArrowUpDown } from 'lucide-react';
+import { getDomainColor } from '@/lib/domainColors';
 
 import { ProMoveList } from '@/components/admin/ProMoveList';
 import { ProMoveForm } from '@/components/admin/ProMoveForm';
@@ -20,6 +21,7 @@ interface Role {
 interface Competency {
   competency_id: number;
   name: string;
+  domain_name?: string;
 }
 
 export function ProMoveLibrary() {
@@ -32,6 +34,7 @@ export function ProMoveLibrary() {
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
+  const [sortBy, setSortBy] = useState<'domain' | 'competency' | 'updated'>('updated');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingProMove, setEditingProMove] = useState<any>(null);
@@ -55,10 +58,23 @@ export function ProMoveLibrary() {
   const loadCompetencies = async () => {
     const { data } = await supabase
       .from('competencies')
-      .select('competency_id, name')
+      .select(`
+        competency_id, 
+        name,
+        domains!competencies_domain_id_fkey (
+          domain_name
+        )
+      `)
       .order('name');
     
-    if (data) setCompetencies(data);
+    if (data) {
+      const formattedCompetencies = data?.map(item => ({
+        competency_id: item.competency_id,
+        name: item.name,
+        domain_name: (item.domains as any)?.domain_name || 'Unknown'
+      })) || [];
+      setCompetencies(formattedCompetencies);
+    }
   };
 
   const downloadTemplate = () => {
@@ -124,7 +140,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-muted/50 rounded-lg">
         <div className="space-y-2">
           <Label>Role</Label>
           <Select value={selectedRole} onValueChange={setSelectedRole}>
@@ -152,7 +168,13 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
               <SelectItem value="all">All competencies</SelectItem>
               {competencies.map(competency => (
                 <SelectItem key={competency.competency_id} value={competency.competency_id.toString()}>
-                  {competency.name}
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: getDomainColor(competency.domain_name || '') }}
+                    />
+                    {competency.name}
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -166,6 +188,20 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Sort by</Label>
+          <Select value={sortBy} onValueChange={(value: 'domain' | 'competency' | 'updated') => setSortBy(value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              <SelectItem value="updated">Last Updated</SelectItem>
+              <SelectItem value="domain">Domain</SelectItem>
+              <SelectItem value="competency">Competency</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
@@ -188,6 +224,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
           competencyFilter={selectedCompetency}
           searchTerm={searchTerm}
           activeOnly={showActiveOnly}
+          sortBy={sortBy}
           onEdit={handleEditProMove}
         />
       </div>

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { getDomainColor } from "@/lib/domainColors";
-import { computeRowHighlight } from "@/lib/highlights";
+import ConfPerfDelta from "@/components/ConfPerfDelta";
 
 interface Staff { id: string; role_id: number; }
 interface FocusRow { id: string; display_order: number; action_statement: string; domain_name: string; week_in_cycle: number; }
@@ -119,22 +119,20 @@ export default function BackfillReview() {
                 </div>
                 <div className="space-y-2">
                   {(byWeek[Number(wk)]||[]).map((r, idx) => {
-                    const h = computeRowHighlight(r.confidence_score ?? null, r.performance_score ?? null);
                     return (
-                      <div key={r.id} className={`flex items-center justify-between gap-4 text-sm p-3 rounded ${h.tintClass}`}>
+                      <div key={r.id} className="flex items-center justify-between gap-4 text-sm p-3 rounded border">
                         <div className="flex items-center gap-3 flex-1">
                           <Badge variant="secondary" className="ring-1 ring-border/50" style={{ backgroundColor: getDomainColor(r.domain_name) }}>
                             {r.domain_name}
                           </Badge>
                           <div className="font-medium">{r.selected_action_statement || r.action_statement}</div>
                         </div>
-                        <div className="flex items-center gap-6">
-                          <span className="font-semibold">{r.confidence_score ?? '-'}</span>
-                          <span className="font-semibold">{r.performance_score ?? '-'}</span>
+                        <div className="flex items-center gap-4">
+                          <ConfPerfDelta 
+                            confidence={r.confidence_score} 
+                            performance={r.performance_score} 
+                          />
                         </div>
-                        {h.tags.length > 0 && (
-                          <div className="flex gap-2 ml-2">{h.tags.map((t:string)=>(<Badge key={t} variant="outline" className="text-xs">{t}</Badge>))}</div>
-                        )}
                       </div>
                     );
                   })}

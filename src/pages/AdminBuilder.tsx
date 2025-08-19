@@ -7,6 +7,7 @@ import { FocusBuilder } from '@/components/admin/FocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 
 export default function AdminBuilder() {
+  console.log('=== NEW ADMINBUILDER LOADING ===');
   const { user } = useAuth();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -16,6 +17,7 @@ export default function AdminBuilder() {
   }, [user]);
 
   const checkAdminStatus = async () => {
+    console.log('=== CHECKING ADMIN STATUS ===', user?.email);
     if (!user) {
       setLoading(false);
       return;
@@ -29,6 +31,7 @@ export default function AdminBuilder() {
         .single();
 
       setIsSuperAdmin(data?.is_super_admin || false);
+      console.log('=== ADMIN STATUS RESULT ===', data?.is_super_admin);
     } catch (error) {
       setIsSuperAdmin(false);
     } finally {
@@ -37,6 +40,7 @@ export default function AdminBuilder() {
   };
 
   if (loading) {
+    console.log('=== ADMINBUILDER LOADING ===');
     return (
       <div className="container mx-auto p-6">
         <div className="text-center">Loading...</div>
@@ -45,8 +49,11 @@ export default function AdminBuilder() {
   }
 
   if (!user || !isSuperAdmin) {
+    console.log('=== ACCESS DENIED ===', { user: !!user, isSuperAdmin });
     return <Navigate to="/" replace />;
   }
+
+  console.log('=== RENDERING NEW TABBED INTERFACE ===');
 
   return (
     <div className="container mx-auto p-6 space-y-6">

@@ -54,13 +54,25 @@ function AppRoutes() {
   // Check backfill status when user loads
   useEffect(() => {
     if (user && !loading && !needsPasswordSetup) {
-      detectBackfillStatus(user.id, overrides).then(status => {
-        setBackfillStatus({
-          needsBackfill: status.needsBackfill,
-          isComplete: status.isComplete,
-          checked: true
+      console.log('Detecting backfill status for user:', user.id);
+      detectBackfillStatus(user.id, overrides)
+        .then(status => {
+          console.log('Backfill status detected:', status);
+          setBackfillStatus({
+            needsBackfill: status.needsBackfill,
+            isComplete: status.isComplete,
+            checked: true
+          });
+        })
+        .catch(error => {
+          console.error('Error detecting backfill status:', error);
+          // Fallback to allow app to continue
+          setBackfillStatus({
+            needsBackfill: false,
+            isComplete: true,
+            checked: true
+          });
         });
-      });
     }
   }, [user, loading, needsPasswordSetup, overrides]);
 

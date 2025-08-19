@@ -209,9 +209,9 @@ export default function BackfillWeek() {
                 <div className="space-y-2">
                   <Label>Choose your Pro Move</Label>
                   <Select
-                    value={item.selected_action_id?.toString() ?? "__placeholder"}
+                    value={item.selected_action_id?.toString() ?? ""}
                     onValueChange={(v) => {
-                      const val = v === "__placeholder" ? null : Number(v);
+                      const val = v ? Number(v) : null;
                       setFocusList((prev) => prev.map((f) => f.id === item.id ? { ...f, selected_action_id: val } : f));
                     }}
                   >
@@ -219,7 +219,7 @@ export default function BackfillWeek() {
                       <SelectValue placeholder="— Select —" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__placeholder">— Select —</SelectItem>
+                      <SelectItem value="">— Select —</SelectItem>
                       {(item.options || []).map((opt) => (
                         <SelectItem key={opt.action_id} value={opt.action_id.toString()}>
                           {opt.action_statement}

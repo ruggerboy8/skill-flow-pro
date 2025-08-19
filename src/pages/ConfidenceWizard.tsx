@@ -11,7 +11,6 @@ import { getDomainColor } from '@/lib/domainColors';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
-import { detectBackfillStatus } from '@/lib/backfillDetection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 interface Staff {
@@ -96,13 +95,9 @@ export default function ConfidenceWizard() {
 
     setStaff(staffData);
 
-    // Determine cycle based on backfill completion
-    const backfillStatus = await detectBackfillStatus(user.id, overrides);
-    const currentCycle = backfillStatus.isComplete ? 2 : 1;
-    
     // Load all weekly focus for this cycle/week
     const { data: focusData, error: focusError } = await supabase.rpc('get_focus_cycle_week', {
-      p_cycle: currentCycle,
+      p_cycle: 1,
       p_week: weekNum,
       p_role_id: staffData.role_id
     }) as { data: WeeklyFocus[] | null; error: any };

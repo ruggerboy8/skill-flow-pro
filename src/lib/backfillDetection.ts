@@ -21,11 +21,10 @@ export async function detectBackfillStatus(
   // Check simulation overrides first
   if (simOverrides?.enabled) {
     if (simOverrides.forceNewUser === true) {
-      const backfillComplete = simOverrides.forceBackfillComplete === true;
       return { 
         needsBackfill: true, 
-        isComplete: backfillComplete,
-        progressCount: backfillComplete ? 6 : 0 
+        isComplete: simOverrides.forceBackfillComplete === true,
+        progressCount: 0 
       };
     }
     if (simOverrides.forceNewUser === false) {

@@ -44,7 +44,7 @@ const queryClient = new QueryClient();
 
 function AppRoutes() {
   const { user, loading, needsPasswordSetup } = useAuth();
-  // Temporarily remove simulation dependency
+  const { overrides } = useSim();
   const [backfillStatus, setBackfillStatus] = useState<{needsBackfill: boolean; isComplete: boolean; checked: boolean}>({
     needsBackfill: false,
     isComplete: false,
@@ -54,28 +54,15 @@ function AppRoutes() {
   // Check backfill status when user loads
   useEffect(() => {
     if (user && !loading && !needsPasswordSetup) {
-      console.log('Detecting backfill status for user:', user.id);
-      // Temporarily bypass simulation overrides to debug
-      detectBackfillStatus(user.id)
-        .then(status => {
-          console.log('Backfill status detected:', status);
-          setBackfillStatus({
-            needsBackfill: status.needsBackfill,
-            isComplete: status.isComplete,
-            checked: true
-          });
-        })
-        .catch(error => {
-          console.error('Error detecting backfill status:', error);
-          // Fallback to force backfill for testing
-          setBackfillStatus({
-            needsBackfill: true,
-            isComplete: false,
-            checked: true
-          });
+      detectBackfillStatus(user.id, overrides).then(status => {
+        setBackfillStatus({
+          needsBackfill: status.needsBackfill,
+          isComplete: status.isComplete,
+          checked: true
         });
+      });
     }
-  }, [user, loading, needsPasswordSetup]);
+  }, [user, loading, needsPasswordSetup, overrides]);
 
   if (loading || !backfillStatus.checked) {
     return (

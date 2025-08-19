@@ -301,24 +301,24 @@ export function SimBanner() {
     : 'Real time';
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 bg-yellow-100 border border-yellow-300 rounded-lg p-3 shadow-lg">
-      <div className="flex flex-wrap items-center justify-center gap-2 text-sm font-medium text-yellow-800">
+    <div className="fixed top-0 left-0 right-0 bg-warning text-warning-foreground p-2 z-40">
+      <div className="max-w-4xl mx-auto text-center text-sm font-medium">
         <Badge variant="secondary" className="mr-2">SIMULATION ACTIVE</Badge>
-        <span>Time: {currentTime}</span>
+        Time: {currentTime}
         {overrides.forceHasConfidence !== null && (
-          <span>• Confidence: {overrides.forceHasConfidence ? 'ON' : 'OFF'}</span>
+          <span className="mx-2">• Confidence: {overrides.forceHasConfidence ? 'ON' : 'OFF'}</span>
         )}
         {overrides.forceHasPerformance !== null && (
-          <span>• Performance: {overrides.forceHasPerformance ? 'ON' : 'OFF'}</span>
+          <span className="mx-2">• Performance: {overrides.forceHasPerformance ? 'ON' : 'OFF'}</span>
         )}
         {overrides.forceBacklogCount !== null && (
-          <span>• Backlog: {overrides.forceBacklogCount}</span>
+          <span className="mx-2">• Backlog: {overrides.forceBacklogCount}</span>
         )}
         {overrides.forceNewUser !== null && (
-          <span>• New User: {overrides.forceNewUser ? 'ON' : 'OFF'}</span>
+          <span className="mx-2">• New User: {overrides.forceNewUser ? 'ON' : 'OFF'}</span>
         )}
         {overrides.forceBackfillComplete !== null && (
-          <span>• Backfill: {overrides.forceBackfillComplete ? 'DONE' : 'PENDING'}</span>
+          <span className="mx-2">• Backfill: {overrides.forceBackfillComplete ? 'DONE' : 'PENDING'}</span>
         )}
       </div>
     </div>
@@ -332,8 +332,9 @@ interface SimFloatingButtonProps {
 export function SimFloatingButton({ isAdmin }: SimFloatingButtonProps) {
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
 
-  // Only show if admin 
-  if (!isAdmin) {
+  // Only show if admin and dev tools enabled
+  // Note: isAdmin should be checked for specific email in parent component
+  if (!isAdmin || import.meta.env.VITE_ENABLE_SIMTOOLS !== 'true') {
     return null;
   }
 
@@ -342,7 +343,7 @@ export function SimFloatingButton({ isAdmin }: SimFloatingButtonProps) {
       <Button
         variant="secondary"
         size="sm"
-        className="fixed bottom-20 right-4 z-30 shadow-lg"
+        className="fixed bottom-4 right-4 z-30 shadow-lg"
         onClick={() => setIsConsoleOpen(true)}
       >
         <Settings className="h-4 w-4 mr-1" />

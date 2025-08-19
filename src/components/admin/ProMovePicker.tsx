@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Search } from 'lucide-react';
+import { getDomainColor } from '@/lib/domainColors';
 import {
   Dialog,
   DialogContent,
@@ -19,11 +20,13 @@ interface ProMove {
   description: string | null;
   competency_id: number;
   competency_name: string;
+  domain_name: string;
 }
 
 interface Competency {
   competency_id: number;
   name: string;
+  domain_name?: string;
 }
 
 interface ProMovePickerProps {
@@ -56,12 +59,25 @@ export function ProMovePicker({
     try {
       const { data, error } = await supabase
         .from('competencies')
-        .select('competency_id, name')
+        .select(`
+          competency_id, 
+          name,
+          domains (
+            domain_name
+          )
+        `)
         .eq('role_id', roleFilter)
         .order('name');
 
       if (error) throw error;
-      setCompetencies(data || []);
+      
+      const formattedCompetencies = data?.map(item => ({
+        competency_id: item.competency_id,
+        name: item.name,
+        domain_name: (item.domains as any)?.domain_name
+      })) || [];
+      
+      setCompetencies(formattedCompetencies);
     } catch (error) {
       console.error('Error loading competencies:', error);
     }
@@ -77,7 +93,13 @@ export function ProMovePicker({
           action_statement,
           description,
           competency_id,
-          competencies!competency_id(name)
+          competencies (
+            competency_id,
+            name,
+            domains (
+              domain_name
+            )
+          )
         `)
         .eq('role_id', roleFilter)
         .eq('active', true)
@@ -105,7 +127,8 @@ export function ProMovePicker({
         action_statement: item.action_statement,
         description: item.description,
         competency_id: item.competency_id,
-        competency_name: (item.competencies as any)?.name || 'Unknown'
+        competency_name: (item.competencies as any)?.name || 'Unknown',
+        domain_name: (item.competencies as any)?.domains?.domain_name || 'Unknown'
       })) || [];
 
       setProMoves(formattedData);
@@ -136,7 +159,16 @@ export function ProMovePicker({
                   <SelectItem value="all">All competencies</SelectItem>
                   {competencies.map(competency => (
                     <SelectItem key={competency.competency_id} value={competency.competency_id.toString()}>
-                      {competency.name}
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: getDomainColor(competency.domain_name || '') }}
+                        />
+                        {competency.name} 
+                        {competency.domain_name && (
+                          <span className="text-xs text-muted-foreground">({competency.domain_name})</span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -175,9 +207,15 @@ export function ProMovePicker({
                   <div className="space-y-2">
                     <div className="flex items-start justify-between">
                       <p className="font-medium text-sm">{proMove.action_statement}</p>
-                      <Badge variant="outline" className="ml-2 shrink-0">
-                        {proMove.competency_name}
-                      </Badge>
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: getDomainColor(proMove.domain_name) }}
+                        />
+                        <Badge variant="outline">
+                          {proMove.competency_name}
+                        </Badge>
+                      </div>
                     </div>
                     {proMove.description && (
                       <p className="text-xs text-muted-foreground">{proMove.description}</p>

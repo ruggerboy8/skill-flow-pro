@@ -29,7 +29,6 @@ export function SlotCanvas({ slots, onUpdateSlots, roleFilter, competencyFilter 
 
   const validateSlots = (newSlots: Slot[]) => {
     const selfSelectCount = newSlots.filter(s => s.self_select).length;
-    const siteMovesCount = newSlots.filter(s => !s.self_select).length;
     
     if (newSlots.length > 3) {
       toast({
@@ -44,15 +43,6 @@ export function SlotCanvas({ slots, onUpdateSlots, roleFilter, competencyFilter 
       toast({
         title: "Too many self-select slots",
         description: "Maximum 2 self-select slots allowed per week.",
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    if (siteMovesCount < 1 && newSlots.length > 0) {
-      toast({
-        title: "Site move required",
-        description: "At least 1 site move required per week.",
         variant: "destructive"
       });
       return false;

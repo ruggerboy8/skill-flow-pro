@@ -114,10 +114,8 @@ export function SimpleFocusBuilder({ roleFilter }: SimpleFocusBuilderProps) {
     if (slots.length < 1 || slots.length > 3) return false;
     
     const selfSelectCount = slots.filter(s => s.self_select).length;
-    const siteMovesCount = slots.filter(s => !s.self_select).length;
     
     if (selfSelectCount > 2) return false;
-    if (siteMovesCount < 1) return false;
     
     // Check for duplicates
     const actionIds = slots.filter(s => !s.self_select && s.action_id).map(s => s.action_id);
@@ -202,19 +200,7 @@ export function SimpleFocusBuilder({ roleFilter }: SimpleFocusBuilderProps) {
       {/* Week Context Bar */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Week Builder</CardTitle>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-sm">
-                {getRoleName()}
-              </Badge>
-              {selectedCycle && selectedWeek && (
-                <Badge variant="default" className="text-sm">
-                  Cycle {selectedCycle}, Week {selectedWeek}
-                </Badge>
-              )}
-            </div>
-          </div>
+          <CardTitle className="text-lg">Week Builder</CardTitle>
         </CardHeader>
         <CardContent>
           <CycleWeekGrid 
@@ -248,9 +234,9 @@ export function SimpleFocusBuilder({ roleFilter }: SimpleFocusBuilderProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Week has {slots.length}–3 moves (max 2 self-select, min 1 site move)
-              </div>
+            <div className="text-sm text-muted-foreground">
+              Week has {slots.length}–3 moves (max 2 self-select)
+            </div>
               <Button
                 onClick={handleSave}
                 disabled={!canSave() || saving}

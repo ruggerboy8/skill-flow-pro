@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { getDomainColor } from '@/lib/domainColors';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ interface Role {
 interface Competency {
   competency_id: number;
   name: string;
+  domain_name?: string;
 }
 
 interface ProMove {
@@ -80,12 +82,25 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
       try {
         const { data, error } = await supabase
           .from('competencies')
-          .select('competency_id, name')
+          .select(`
+            competency_id, 
+            name,
+            domains (
+              domain_name
+            )
+          `)
           .eq('role_id', parseInt(formData.role_id))
           .order('name');
 
         if (error) throw error;
-        setFilteredCompetencies(data || []);
+        
+        const formattedCompetencies = data?.map(item => ({
+          competency_id: item.competency_id,
+          name: item.name,
+          domain_name: (item.domains as any)?.domain_name
+        })) || [];
+        
+        setFilteredCompetencies(formattedCompetencies);
         
         // Clear competency selection if current one doesn't match role
         if (formData.competency_id) {
@@ -207,7 +222,16 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
                 <SelectContent className="bg-background z-50">
                   {filteredCompetencies.map(competency => (
                     <SelectItem key={competency.competency_id} value={competency.competency_id.toString()}>
-                      {competency.name}
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: getDomainColor(competency.domain_name || '') }}
+                        />
+                        {competency.name}
+                        {competency.domain_name && (
+                          <span className="text-xs text-muted-foreground ml-1">({competency.domain_name})</span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>

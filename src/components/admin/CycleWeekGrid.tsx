@@ -22,7 +22,6 @@ interface WeekStatus {
 export function CycleWeekGrid({ selectedRole, onWeekSelect, selectedCycle, selectedWeek }: CycleWeekGridProps) {
   const [cycles, setCycles] = useState<number[]>([]);
   const [weekStatuses, setWeekStatuses] = useState<Map<string, WeekStatus>>(new Map());
-  const [newCycle, setNewCycle] = useState('');
 
   useEffect(() => {
     loadCycles();
@@ -89,12 +88,12 @@ export function CycleWeekGrid({ selectedRole, onWeekSelect, selectedCycle, selec
     setWeekStatuses(statusMap);
   };
 
-  const handleNewCycle = () => {
-    const cycleNum = parseInt(newCycle);
-    if (cycleNum && !cycles.includes(cycleNum)) {
-      setCycles([...cycles, cycleNum].sort());
-      setNewCycle('');
-    }
+  const handleNewCycle = async () => {
+    // Find the highest existing cycle and add 1
+    const maxCycle = cycles.length > 0 ? Math.max(...cycles) : 0;
+    const nextCycle = maxCycle + 1;
+    
+    setCycles([...cycles, nextCycle].sort());
   };
 
   const getWeekColor = (status: 'green' | 'yellow' | 'grey') => {
@@ -112,16 +111,11 @@ export function CycleWeekGrid({ selectedRole, onWeekSelect, selectedCycle, selec
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Cycle & Week Selection</CardTitle>
-        <div className="flex gap-2">
-          <Input
-            placeholder="New cycle"
-            value={newCycle}
-            onChange={(e) => setNewCycle(e.target.value)}
-            className="w-24"
-          />
+        <div className="flex items-center justify-between">
+          <CardTitle>Cycle & Week Selection</CardTitle>
           <Button onClick={handleNewCycle} size="sm">
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 mr-2" />
+            Add Cycle
           </Button>
         </div>
       </CardHeader>
@@ -141,8 +135,7 @@ export function CycleWeekGrid({ selectedRole, onWeekSelect, selectedCycle, selec
                       variant="outline"
                       className={`
                         h-12 text-xs flex flex-col items-center justify-center
-                        ${getWeekColor(status?.status || 'grey')}
-                        ${selected ? 'ring-2 ring-blue-500' : ''}
+                        ${selected ? 'ring-2 ring-blue-500 bg-blue-50' : 'bg-background hover:bg-muted'}
                       `}
                       onClick={() => onWeekSelect(cycle, week)}
                       disabled={!selectedRole}

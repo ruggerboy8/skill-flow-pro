@@ -201,6 +201,9 @@ export async function assembleWeek(
 
     console.log('Weekly focus items found:', weeklyFocus);
     console.log('Weekly focus count:', weeklyFocus?.length);
+    weeklyFocus?.forEach((item, index) => {
+      console.log(`Weekly focus ${index}:`, item);
+    });
 
     // 2. Get user's backlog items (FIFO order) with simulation support
     console.log('=== DEBUGGING BACKLOG ===');

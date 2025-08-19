@@ -229,45 +229,7 @@ export default function Index() {
               <ThisWeekPanel />
             )}
           
-        <div className="space-y-8">
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-center">
-              Cycle 1
-            </h2>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {showSkeletons ? (
-                Array.from({ length: 6 }, (_, index) => (
-                  <Card key={`skeleton-${index}`} className="cursor-pointer">
-                    <CardContent className="p-3 sm:p-6 text-center space-y-2">
-                      <Skeleton className="h-6 w-16 mx-auto" />
-                      <Skeleton className="h-4 w-24 mx-auto" />
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                Array.from({
-                  length: 6
-                }, (_, weekIndex) => {
-                  const weekInCycle = weekIndex + 1;
-                  const status = getTileStatus(1, weekInCycle);
-                  return <Card key={`1-${weekInCycle}`} className={`cursor-pointer transition-all hover:scale-105 ${getWeekColor(status)}`} onClick={() => handleWeekClick(1, weekInCycle)} title={getTooltipText(status)}>
-                        <CardContent className="p-3 sm:p-6 text-center">
-                          <div className="text-lg font-semibold">
-                            Week {weekInCycle}
-                          </div>
-                          <div className="text-sm mt-2 opacity-90">
-                            {status === 'green' && '✓ Completed'}
-                            {status === 'yellow' && '◐ In Progress'}
-                            {status === 'grey' && '○ Not Started'}
-                          </div>
-                        </CardContent>
-                      </Card>;
-                })
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Future space for notes, learning resources, etc. */}
       </div>
       
       <SimFloatingButton isAdmin={user?.email === 'johno@reallygoodconsulting.org'} />

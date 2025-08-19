@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { nowUtc, nextMondayStr } from '@/lib/centralTime';
+import { nowUtc, nextMondayStr, getWeekAnchors, CT_TZ } from '@/lib/centralTime';
 import { useNow } from '@/providers/NowProvider';
 import { getDomainColor } from '@/lib/domainColors';
 import { assembleWeek, WeekAssignment } from '@/lib/backlog';
 import { computeWeekState, WeekContext, getCurrentISOWeek } from '@/lib/weekValidationSim';
 import { useSim } from '@/devtools/SimProvider';
+import { formatInTimeZone } from 'date-fns-tz';
 
 interface Staff { id: string; role_id: number; }
 
@@ -158,13 +159,17 @@ export default function ThisWeekPanel() {
     );
   }
 
+  // Get Monday date for "Week of" display
+  const { mondayZ } = getWeekAnchors(now, CT_TZ);
+  const weekOfDate = formatInTimeZone(mondayZ, CT_TZ, 'MMM d, yyyy');
+
   // Show "missed checkin" state - hide pro moves and show message only
   if (weekContext.state === 'missed_checkin') {
     return (
       <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle>This Week&apos;s Pro Moves</CardTitle>
-          <CardDescription>Week {weekContext.iso_week}, {weekContext.iso_year}</CardDescription>
+          <CardDescription>Week of {weekOfDate}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted p-3">
@@ -180,13 +185,12 @@ export default function ThisWeekPanel() {
     <Card className="overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle>This Week&apos;s Pro Moves</CardTitle>
-        <CardDescription>Week {weekContext.iso_week}, {weekContext.iso_year} - These are the actions you'll focus on this week.</CardDescription>
+        <CardDescription>Week of {weekOfDate}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Pro Moves list */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium">This Week&apos;s Pro Moves:</h3>
+          <div className="flex items-center justify-end">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Confidence</span>
           </div>
 

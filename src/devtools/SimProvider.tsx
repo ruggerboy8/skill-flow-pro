@@ -6,6 +6,8 @@ export interface SimOverrides {
   forceHasConfidence?: boolean | null;
   forceHasPerformance?: boolean | null;
   forceBacklogCount?: number | null;
+  forceBackfillComplete?: boolean | null;
+  forceNewUser?: boolean | null;
 }
 
 interface SimContextValue {
@@ -25,10 +27,12 @@ const defaultOverrides: SimOverrides = {
   forceHasConfidence: null,
   forceHasPerformance: null,
   forceBacklogCount: null,
+  forceBackfillComplete: null,
+  forceNewUser: null,
 };
 
 interface SimProviderProps {
-  children: ReactNode;
+  children: ReactNode | ((props: { simulatedTime: Date | undefined }) => ReactNode);
 }
 
 export function SimProvider({ children }: SimProviderProps) {
@@ -63,7 +67,7 @@ export function SimProvider({ children }: SimProviderProps) {
       simulatedTime,
       resetSimulation 
     }}>
-      {children}
+      {typeof children === 'function' ? children({ simulatedTime }) : children}
     </SimContext.Provider>
   );
 }

@@ -114,6 +114,39 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
                   ))}
                 </div>
 
+                {/* Quick scenario buttons */}
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      updateOverrides({ 
+                        forceNewUser: true,
+                        forceBackfillComplete: false,
+                        forceBacklogCount: 0
+                      });
+                    }}
+                    className="w-full text-xs"
+                  >
+                    Simulate New User
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Clear backfill localStorage
+                      localStorage.removeItem('backfillProgress');
+                      updateOverrides({ 
+                        forceNewUser: false,
+                        forceBackfillComplete: false
+                      });
+                    }}
+                    className="w-full text-xs"
+                  >
+                    Clear Backfill Progress
+                  </Button>
+                </div>
+
                 <div className="flex gap-2">
                   <Input
                     type="datetime-local"
@@ -194,6 +227,55 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
                   <Label className="text-sm text-muted-foreground">items</Label>
                 </div>
               </div>
+
+              {/* User State Overrides */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">User State</Label>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Force New User</Label>
+                    <Select
+                      value={overrides.forceNewUser === null ? 'auto' : String(overrides.forceNewUser)}
+                      onValueChange={(value) => 
+                        updateOverrides({ 
+                          forceNewUser: value === 'auto' ? null : value === 'true' 
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Force Backfill Complete</Label>
+                    <Select
+                      value={overrides.forceBackfillComplete === null ? 'auto' : String(overrides.forceBackfillComplete)}
+                      onValueChange={(value) => 
+                        updateOverrides({ 
+                          forceBackfillComplete: value === 'auto' ? null : value === 'true' 
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
             </>
           )}
 
@@ -231,6 +313,12 @@ export function SimBanner() {
         )}
         {overrides.forceBacklogCount !== null && (
           <span className="mx-2">• Backlog: {overrides.forceBacklogCount}</span>
+        )}
+        {overrides.forceNewUser !== null && (
+          <span className="mx-2">• New User: {overrides.forceNewUser ? 'ON' : 'OFF'}</span>
+        )}
+        {overrides.forceBackfillComplete !== null && (
+          <span className="mx-2">• Backfill: {overrides.forceBackfillComplete ? 'DONE' : 'PENDING'}</span>
         )}
       </div>
     </div>

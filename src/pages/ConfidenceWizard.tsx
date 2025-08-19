@@ -9,6 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { useNow } from '@/providers/NowProvider';
+import { useSim } from '@/devtools/SimProvider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 interface Staff {
@@ -41,9 +43,10 @@ export default function ConfidenceWizard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const now = useNow();
+  const { overrides } = useSim();
 
   const weekNum = Number(week);
-  const now = nowUtc();
   const { monCheckInZ, tueDueZ } = getAnchors(now);
   const beforeCheckIn = now < monCheckInZ;
   const afterTueNoon = now >= tueDueZ;
@@ -121,7 +124,11 @@ export default function ConfidenceWizard() {
       .in('weekly_focus_id', focusIds);
 
     const submittedCount = (scoresData || []).filter((s) => s.confidence_score !== null).length;
-    setHasConfidence(submittedCount === focusData.length);
+    const hasConfidenceReal = submittedCount === focusData.length;
+    const hasConfidenceSimulated = overrides.enabled && overrides.forceHasConfidence !== null 
+      ? overrides.forceHasConfidence 
+      : hasConfidenceReal;
+    setHasConfidence(hasConfidenceSimulated);
 
     const selectedByFocus: { [key: string]: string | null } = {};
     (scoresData || []).forEach((r) => {
@@ -182,7 +189,7 @@ export default function ConfidenceWizard() {
     if (!staff || !currentFocus) return;
 
     // Hard-guard: block late submissions after Tue 12:00 CT when not already complete
-    const nowSubmit = nowUtc();
+    const nowSubmit = now;
     const { tueDueZ } = getAnchors(nowSubmit);
     if (nowSubmit >= tueDueZ && !hasConfidence) {
       toast({

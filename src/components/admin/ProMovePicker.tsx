@@ -96,12 +96,13 @@ export function ProMovePicker({
           competencies (
             competency_id,
             name,
+            role_id,
             domains (
               domain_name
             )
           )
         `)
-        .eq('role_id', roleFilter)
+        .eq('competencies.role_id', roleFilter)
         .eq('active', true)
         .order('action_statement');
 

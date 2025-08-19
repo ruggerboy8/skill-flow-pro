@@ -123,10 +123,9 @@ export async function resolveBacklogItem(userId: string, proMoveId: number, reso
 }
 
 // Assemble a week's assignments (site moves + backlog + self-select)
-export async function assembleWeek(userId: string, cycle: number, weekInCycle: number, roleId: number): Promise<WeekAssignment[]> {
+export async function assembleWeek(userId: string, isoYear: number, isoWeek: number, roleId: number): Promise<WeekAssignment[]> {
   try {
     const assignments: WeekAssignment[] = [];
-    const { iso_year, iso_week } = getCurrentISOWeek();
 
     // 1. Get all weekly focus items for the current ISO week
     const { data: weeklyFocus, error: focusError } = await supabase
@@ -142,8 +141,8 @@ export async function assembleWeek(userId: string, cycle: number, weekInCycle: n
           domains!inner(domain_name)
         )
       `)
-      .eq('iso_year', iso_year)
-      .eq('iso_week', iso_week)
+      .eq('iso_year', isoYear)
+      .eq('iso_week', isoWeek)
       .eq('role_id', roleId)
       .order('display_order');
 

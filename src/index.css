@@ -64,6 +64,7 @@ All colors MUST be HSL.
     /* Semantic tokens for status/deltas */
     --positive: 160 84% 39%;
     --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 9%;
    }
 
   .dark {

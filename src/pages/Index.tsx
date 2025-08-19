@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
 import ThisWeekPanel from '@/components/home/ThisWeekPanel';
+import { SimFloatingButton } from '@/devtools/SimConsole';
 interface WeeklyFocus {
   id: string;
   display_order: number;
@@ -268,5 +269,7 @@ export default function Index() {
           </div>
         </div>
       </div>
+      
+      <SimFloatingButton isAdmin={user?.email === 'johno@reallygoodconsulting.org'} />
     </div>;
 }

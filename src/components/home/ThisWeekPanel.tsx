@@ -7,16 +7,20 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, nextMondayStr } from '@/lib/centralTime';
+import { useNow } from '@/providers/NowProvider';
 import { getDomainColor } from '@/lib/domainColors';
 import { assembleWeek, WeekAssignment } from '@/lib/backlog';
-import { computeWeekState, WeekContext, getCurrentISOWeek } from '@/lib/weekValidation';
+import { computeWeekState, WeekContext, getCurrentISOWeek } from '@/lib/weekValidationSim';
+import { useSim } from '@/devtools/SimProvider';
 
 interface Staff { id: string; role_id: number; }
 
-export default function ThisWeekPanelNew() {
+export default function ThisWeekPanel() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const now = useNow();
+  const { overrides } = useSim();
 
   const [staff, setStaff] = useState<Staff | null>(null);
   const [weekContext, setWeekContext] = useState<WeekContext | null>(null);
@@ -54,13 +58,13 @@ export default function ThisWeekPanelNew() {
     setLoading(true);
 
     try {
-      // Compute current week state
-      const context = await computeWeekState(staff.id);
+      // Compute current week state with simulation overrides
+      const context = await computeWeekState(staff.id, now, overrides);
       setWeekContext(context);
 
       // Load current week assignments
-      const { iso_year, iso_week } = getCurrentISOWeek();
-      const assignments = await assembleWeek(user.id, 1, 1, staff.role_id); // cycle/weekInCycle don't matter now
+      const { iso_year, iso_week } = getCurrentISOWeek(now);
+      const assignments = await assembleWeek(user.id, iso_year, iso_week, staff.role_id);
       setWeekAssignments(assignments);
 
       setLoading(false);
@@ -75,7 +79,7 @@ export default function ThisWeekPanelNew() {
   const { bannerMessage, bannerCta } = useMemo(() => {
     if (!weekContext || !staff) return { bannerMessage: '', bannerCta: null };
 
-    const now = nowUtc();
+    // now comes from useNow() hook
 
     switch (weekContext.state) {
       case 'missed_checkin':

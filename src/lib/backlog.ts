@@ -199,6 +199,9 @@ export async function assembleWeek(
     if (focusError && !weeklyFocus) throw focusError;
     if (!weeklyFocus) return [];
 
+    console.log('Weekly focus items found:', weeklyFocus);
+    console.log('Weekly focus count:', weeklyFocus?.length);
+
     // 2. Get user's backlog items (FIFO order) with simulation support
     console.log('=== DEBUGGING BACKLOG ===');
     console.log('User ID:', userId);

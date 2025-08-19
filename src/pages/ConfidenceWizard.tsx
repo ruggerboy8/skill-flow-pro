@@ -327,6 +327,8 @@ export default function ConfidenceWizard() {
   }
 
   const hasScore = scores[currentFocus.id] !== undefined;
+  const hasRequiredSelection = !selfSelectById[currentFocus.id] || selectedActions[currentFocus.id];
+  const canProceed = hasScore && hasRequiredSelection;
   const isLastItem = currentIndex === weeklyFocus.length - 1;
 
   return (
@@ -346,13 +348,57 @@ export default function ConfidenceWizard() {
           </CardHeader>
           <CardContent className="space-y-6 p-3 sm:p-6">
             <div className="p-3 sm:p-4 bg-white/80 rounded-lg">
-              <Badge 
-                variant="secondary" 
-                className="text-xs font-semibold mb-2 bg-white text-gray-900"
-              >
-                {currentFocus.domain_name}
-              </Badge>
-              <p className="text-sm font-medium text-gray-900">{currentFocus.action_statement}</p>
+              <div className="flex gap-2 mb-2">
+                <Badge 
+                  variant="secondary" 
+                  className="text-xs font-semibold bg-white text-gray-900"
+                >
+                  {currentFocus.domain_name}
+                </Badge>
+                {selfSelectById[currentFocus.id] && competencyById[currentFocus.id] && (
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs font-semibold bg-white text-gray-700"
+                  >
+                    Competency {competencyById[currentFocus.id]}
+                  </Badge>
+                )}
+              </div>
+              
+              {selfSelectById[currentFocus.id] ? (
+                <div className="space-y-3">
+                  <Label htmlFor="pro-move-select" className="text-sm font-medium text-gray-900">
+                    Select your Pro Move for this competency:
+                  </Label>
+                  <Select
+                    value={selectedActions[currentFocus.id] || ""}
+                    onValueChange={(value) => {
+                      setSelectedActions(prev => ({
+                        ...prev,
+                        [currentFocus.id]: value
+                      }));
+                    }}
+                  >
+                    <SelectTrigger id="pro-move-select" className="w-full">
+                      <SelectValue placeholder="Choose a Pro Move..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border shadow-lg z-50">
+                      {competencyById[currentFocus.id] && 
+                       optionsByCompetency[competencyById[currentFocus.id]]?.map((option) => (
+                        <SelectItem 
+                          key={option.action_id} 
+                          value={option.action_id}
+                          className="cursor-pointer hover:bg-gray-100"
+                        >
+                          {option.action_statement}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <p className="text-sm font-medium text-gray-900">{currentFocus.action_statement}</p>
+              )}
             </div>
 
             <NumberScale
@@ -372,7 +418,7 @@ export default function ConfidenceWizard() {
               )}
               <Button 
                 onClick={handleNext}
-                disabled={!hasScore || submitting}
+                disabled={!canProceed || submitting}
                 className="flex-1"
               >
                 {submitting ? 'Saving...' : isLastItem ? 'Submit' : 'Next'}

@@ -95,8 +95,9 @@ export default function ConfidenceWizard() {
 
     setStaff(staffData);
 
-    // Load all weekly focus for this ISO week and role
-    const { data: focusData, error: focusError } = await supabase
+    // Determine user's current cycle/week position (like assembleWeek does)
+    // First try ISO week lookup
+    let { data: focusData, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
         id,
@@ -105,16 +106,53 @@ export default function ConfidenceWizard() {
         competency_id,
         cycle,
         week_in_cycle,
-        pro_moves!inner(action_statement),
-        competencies!inner(
+        self_select,
+        pro_moves(action_statement),
+        competencies(
           domain_id,
-          domains!inner(domain_name)
+          domains(domain_name)
         )
       `)
       .eq('iso_year', 2025)
       .eq('iso_week', weekNum)
       .eq('role_id', staffData.role_id)
       .order('display_order');
+
+    // If no ISO week data, fall back to cycle/week logic (like assembleWeek)
+    if (!focusData || focusData.length === 0) {
+      // Check if user completed backfill to determine cycle position
+      const { data: hasScores } = await supabase
+        .from('weekly_scores')
+        .select('id')
+        .eq('staff_id', staffData.id)
+        .limit(1);
+
+      if (hasScores && hasScores.length > 0) {
+        // User completed backfill, should be on cycle 2 week 1
+        const { data: cycle2Data } = await supabase
+          .from('weekly_focus')
+          .select(`
+            id,
+            display_order,
+            action_id,
+            competency_id,
+            cycle,
+            week_in_cycle,
+            self_select,
+            pro_moves(action_statement),
+            competencies(
+              domain_id,
+              domains(domain_name)
+            )
+          `)
+          .eq('cycle', 2)
+          .eq('week_in_cycle', 1)
+          .eq('role_id', staffData.role_id)
+          .order('display_order');
+        
+        if (cycle2Data) focusData = cycle2Data;
+      }
+    }
 
     if (focusError || !focusData || focusData.length === 0) {
       toast({
@@ -140,7 +178,7 @@ export default function ConfidenceWizard() {
     setCurrentFocus(transformedFocusData[currentIndex]);
 
     // Check if confidence already submitted for all focus items and prefill selections
-    const focusIds = focusData.map(f => f.id);
+    const focusIds = transformedFocusData.map(f => f.id);
     const { data: scoresData } = await supabase
       .from('weekly_scores')
       .select('weekly_focus_id, confidence_score, selected_action_id')

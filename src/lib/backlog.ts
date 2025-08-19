@@ -245,6 +245,7 @@ export async function assembleWeek(
 
     // 4. Process each focus item
     for (const focus of weeklyFocus as any[]) {
+      console.log(`Processing focus item ${focus.id}, self_select: ${focus.self_select}`);
       const domainName = focus.competencies?.domains?.domain_name || 'Unknown';
 
       if (!focus.self_select) {
@@ -265,6 +266,7 @@ export async function assembleWeek(
           locked: true,
           display_order: focus.display_order
         });
+        console.log('Created SITE assignment:', focus.action_id, proMoveData?.action_statement);
       } else {
         // Self-select slot
         const selection = selectionMap.get(focus.id);
@@ -314,6 +316,7 @@ export async function assembleWeek(
           });
         } else {
           // Empty self-select slot
+          console.log('Creating EMPTY self-select assignment for focus:', focus.id);
           assignments.push({
             weekly_focus_id: focus.id,
             type: 'selfSelect',

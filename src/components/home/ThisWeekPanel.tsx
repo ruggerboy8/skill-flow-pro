@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { getDomainColor } from '@/lib/domainColors';
+import { assembleWeek, WeekAssignment } from '@/lib/backlog';
 
 interface Staff { id: string; role_id: number; }
 interface WeeklyFocusRow {
@@ -38,6 +39,7 @@ export default function ThisWeekPanel() {
   // Data state
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocusRow[]>([]);
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScoreRow[]>([]);
+  const [weekAssignments, setWeekAssignments] = useState<WeekAssignment[]>([]);
   const [carryoverPending, setCarryoverPending] = useState<{ cycle: number; week_in_cycle: number } | null>(null);
 
   // Loading/gating state
@@ -107,67 +109,40 @@ export default function ThisWeekPanel() {
 
   // ---------------- load week data (batched to avoid flicker) ----------------
   async function loadWeekData() {
-    if (!staff) return;
+    if (!staff || !user) return;
 
     // Clear stale and hold UI until all decisions are computed
     setLoading(true);
     setReadyForBanner(false);
     setWeeklyFocus([]);
     setWeeklyScores([]);
+    setWeekAssignments([]);
     setCarryoverPending(null);
 
-    // 1) Focus rows
-    const { data: focusData, error: focusError } = await supabase
-      .from('weekly_focus')
-      .select(`
-        id,
-        display_order,
-        self_select,
-        competency_id,
-        pro_moves ( action_statement ),
-        competencies ( domains ( domain_name ) )
-      `)
-      .eq('cycle', cycle)
-      .eq('week_in_cycle', weekInCycle)
-      .eq('role_id', staff.role_id)
-      .order('display_order');
+    try {
+      // 1) Use assembleWeek to get the week's assignments (including backlog)
+      const assignments = await assembleWeek(user.id, cycle, weekInCycle, staff.role_id);
+      
+      if (assignments.length === 0) {
+        setWeeklyFocus([]);
+        setWeeklyScores([]);
+        setWeekAssignments([]);
+        setCarryoverPending(null);
+        setReadyForBanner(true);
+        setLoading(false);
+        return;
+      }
 
-    if (focusError) {
-      toast({ title: 'Error', description: 'Failed to load Pro Moves', variant: 'destructive' });
-      setLoading(false);
-      setReadyForBanner(true); // render empty state safely
-      return;
-    }
-
-    const transformed: WeeklyFocusRow[] = (focusData || []).map((item: any) => ({
-      id: item.id,
-      display_order: item.display_order,
-      self_select: item.self_select ?? false,
-      competency_id: item.competency_id ?? undefined,
-      pro_moves: item.pro_moves ?? null,
-      competencies: item.competencies ?? null,
-    }));
-
-    // If no focus, finalize right away
-    if (transformed.length === 0) {
-      setWeeklyFocus([]);
-      setWeeklyScores([]);
-      setCarryoverPending(null);
-      setReadyForBanner(true);
-      setLoading(false);
-      return;
-    }
-
-    // 2) Scores + carryover (do not set state until we have both)
-    const focusIds = transformed.map(f => f.id);
-
-    const [{ data: scores }, { data: pending }] = await Promise.all([
-      supabase
+      // 2) Get scores for all weekly focus IDs
+      const focusIds = assignments.map(a => a.weekly_focus_id);
+      const { data: scores } = await supabase
         .from('weekly_scores')
         .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
         .eq('staff_id', staff.id)
-        .in('weekly_focus_id', focusIds),
-      supabase
+        .in('weekly_focus_id', focusIds);
+
+      // 3) Check for carryover performance tasks
+      const { data: pending } = await supabase
         .from('weekly_scores')
         .select('updated_at, weekly_focus!inner(cycle, week_in_cycle, role_id)')
         .eq('staff_id', staff.id)
@@ -175,18 +150,35 @@ export default function ThisWeekPanel() {
         .not('confidence_score', 'is', null)
         .is('performance_score', null)
         .order('updated_at', { ascending: false })
-        .limit(1),
-    ]);
+        .limit(1);
 
-    const wf: any = pending && pending[0] && (pending[0] as any).weekly_focus;
-    const carry = wf ? { cycle: wf.cycle, week_in_cycle: wf.week_in_cycle } : null;
+      const wf: any = pending && pending[0] && (pending[0] as any).weekly_focus;
+      const carry = wf ? { cycle: wf.cycle, week_in_cycle: wf.week_in_cycle } : null;
 
-    // Single commit to state → avoids intermediate renders
-    setWeeklyFocus(transformed);
-    setWeeklyScores(scores || []);
-    setCarryoverPending(carry);
-    setReadyForBanner(true);
-    setLoading(false);
+      // Transform assignments to legacy format for compatibility
+      const transformed: WeeklyFocusRow[] = assignments.map(assignment => ({
+        id: assignment.weekly_focus_id,
+        display_order: assignment.display_order,
+        self_select: assignment.type === 'selfSelect',
+        competency_id: undefined,
+        pro_moves: { action_statement: assignment.action_statement },
+        competencies: { domains: { domain_name: assignment.domain_name } },
+      }));
+
+      // Single commit to state → avoids intermediate renders
+      setWeeklyFocus(transformed);
+      setWeeklyScores(scores || []);
+      setWeekAssignments(assignments);
+      setCarryoverPending(carry);
+      setReadyForBanner(true);
+      setLoading(false);
+
+    } catch (error) {
+      console.error('Error loading week data:', error);
+      toast({ title: 'Error', description: 'Failed to load Pro Moves', variant: 'destructive' });
+      setLoading(false);
+      setReadyForBanner(true);
+    }
   }
 
   // ---------------- derived state ----------------
@@ -398,7 +390,7 @@ export default function ThisWeekPanel() {
 
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2">
-                    <p className="text-sm font-medium flex-1">{focus.pro_moves?.action_statement || 'Self-Select'}</p>
+                    <p className="text-sm font-medium flex-1">{focus.pro_moves?.action_statement || 'Check-In to choose this Pro-Move for the week.'}</p>
                   </div>
                   <div className="min-w-12 flex justify-end">
                     {score?.confidence_score != null ? (
@@ -414,17 +406,6 @@ export default function ThisWeekPanel() {
                   </div>
                 </div>
 
-                {unchosenSelfSelect && (
-                  <div className="mt-1">
-                    <Button
-                      variant="link"
-                      className="h-auto p-0 text-xs"
-                      onClick={() => navigate(`/confidence/${weekInCycle}/step/${index + 1}`)}
-                    >
-                      Choose your Pro Move
-                    </Button>
-                  </div>
-                )}
 
                 <div className="flex gap-2 mt-2">
                   {score?.performance_score != null && (

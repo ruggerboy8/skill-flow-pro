@@ -64,13 +64,17 @@ export default function ThisWeekPanel() {
       console.log('Staff:', staff);
       console.log('Simulation overrides:', overrides);
       
+      // Use simulated time if available
+      const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
+      console.log('Effective time being used:', effectiveNow);
+      
       // Compute current week state with simulation overrides
-      const context = await computeWeekState(staff.id, now, overrides);
+      const context = await computeWeekState(staff.id, effectiveNow, overrides);
       console.log('Week context:', context);
       setWeekContext(context);
 
       // Load current week assignments with simulation support
-      const { iso_year, iso_week } = getCurrentISOWeek(now);
+      const { iso_year, iso_week } = getCurrentISOWeek(effectiveNow);
       console.log('ISO week calculation:', { iso_year, iso_week });
       
       const assignments = await assembleWeek(user.id, iso_year, iso_week, staff.role_id, overrides);

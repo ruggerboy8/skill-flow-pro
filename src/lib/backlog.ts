@@ -200,8 +200,15 @@ export async function assembleWeek(
     if (!weeklyFocus) return [];
 
     // 2. Get user's backlog items (FIFO order) with simulation support
+    console.log('=== DEBUGGING BACKLOG ===');
+    console.log('User ID:', userId);
+    console.log('Role ID:', roleId);
+    console.log('Simulation overrides:', simOverrides);
+    
     const backlogResult = await getOpenBacklogCount(userId, simOverrides);
     const backlogItems = backlogResult.items;
+    console.log('Backlog result:', backlogResult);
+    console.log('Backlog items:', backlogItems);
 
     // 3. Get user's current selections for self-select slots
     const focusIds = weeklyFocus.map((f: any) => f.id);

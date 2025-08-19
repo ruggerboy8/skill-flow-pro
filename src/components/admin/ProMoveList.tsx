@@ -70,20 +70,19 @@ export function ProMoveList({
           resources_url,
           active,
           updated_at,
+          role_id,
+          roles (
+            role_name
+          ),
           competencies (
-            competency_id,
-            name,
-            role_id,
-            roles (
-              role_name
-            )
+            name
           )
         `)
         .order('updated_at', { ascending: false });
 
-      // Apply role filter through competencies
+      // Apply filters
       if (roleFilter && roleFilter !== 'all') {
-        query = query.eq('competencies.role_id', parseInt(roleFilter));
+        query = query.eq('role_id', parseInt(roleFilter));
       }
       
       if (competencyFilter && competencyFilter !== 'all') {
@@ -109,7 +108,7 @@ export function ProMoveList({
         resources_url: item.resources_url,
         active: item.active,
         updated_at: item.updated_at,
-        role_name: (item.competencies as any)?.roles?.role_name || 'Unknown',
+        role_name: (item.roles as any)?.role_name || 'Unknown',
         competency_name: (item.competencies as any)?.name || 'Unknown'
       })) || [];
 

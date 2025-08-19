@@ -50,6 +50,20 @@ export type Database = {
             referencedRelation: "domains"
             referencedColumns: ["domain_id"]
           },
+          {
+            foreignKeyName: "fk_competencies_domain_id"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
+          {
+            foreignKeyName: "fk_competencies_role_id"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
         ]
       }
       domains: {
@@ -113,7 +127,22 @@ export type Database = {
           updated_by?: string | null
           version?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_pro_moves_competency_id"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "competencies"
+            referencedColumns: ["competency_id"]
+          },
+          {
+            foreignKeyName: "fk_pro_moves_role_id"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+        ]
       }
       roles: {
         Row: {

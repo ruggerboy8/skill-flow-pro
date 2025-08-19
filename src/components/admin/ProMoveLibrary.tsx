@@ -38,6 +38,7 @@ export function ProMoveLibrary() {
 
   // Load initial data
   useEffect(() => {
+    console.log('=== PROMOVE LIBRARY MOUNTING ===');
     loadRoles();
     loadCompetencies();
   }, []);
@@ -180,13 +181,16 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
       </div>
 
       {/* Pro-Move List */}
-      <ProMoveList
-        roleFilter={selectedRole}
-        competencyFilter={selectedCompetency}
-        searchTerm={searchTerm}
-        activeOnly={showActiveOnly}
-        onEdit={handleEditProMove}
-      />
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Pro-Move List</h3>
+        <ProMoveList
+          roleFilter={selectedRole}
+          competencyFilter={selectedCompetency}
+          searchTerm={searchTerm}
+          activeOnly={showActiveOnly}
+          onEdit={handleEditProMove}
+        />
+      </div>
 
       {/* Modals */}
       {showAddForm && (

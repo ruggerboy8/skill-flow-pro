@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getAnchors, nowUtc } from "@/lib/centralTime";
+import { getCurrentISOWeek } from './weekValidation';
 
 export interface BacklogItem {
   id: string;
@@ -125,14 +126,26 @@ export async function resolveBacklogItem(userId: string, proMoveId: number, reso
 export async function assembleWeek(userId: string, cycle: number, weekInCycle: number, roleId: number): Promise<WeekAssignment[]> {
   try {
     const assignments: WeekAssignment[] = [];
+    const { iso_year, iso_week } = getCurrentISOWeek();
 
-    // 1. Get all weekly focus items for this week
+    // 1. Get all weekly focus items for the current ISO week
     const { data: weeklyFocus, error: focusError } = await supabase
-      .rpc('get_focus_cycle_week', {
-        p_cycle: cycle,
-        p_week: weekInCycle,
-        p_role_id: roleId
-      });
+      .from('weekly_focus')
+      .select(`
+        id,
+        display_order,
+        self_select,
+        action_id,
+        competency_id,
+        competencies!inner(
+          domain_id,
+          domains!inner(domain_name)
+        )
+      `)
+      .eq('iso_year', iso_year)
+      .eq('iso_week', iso_week)
+      .eq('role_id', roleId)
+      .order('display_order');
 
     if (focusError) throw focusError;
     if (!weeklyFocus) return [];
@@ -140,81 +153,103 @@ export async function assembleWeek(userId: string, cycle: number, weekInCycle: n
     // 2. Get user's backlog items (FIFO order)
     const backlogItems = await getOpenBacklog(userId);
 
-    // 3. Separate site moves from self-select slots
-    const siteMoves = weeklyFocus.filter(item => item.action_statement !== 'Self-Select');
-    const selfSelectSlots = weeklyFocus.filter(item => item.action_statement === 'Self-Select');
+    // 3. Get user's current selections for self-select slots
+    const focusIds = weeklyFocus.map((f: any) => f.id);
+    const { data: userSelections } = await supabase
+      .from('weekly_self_select')
+      .select('weekly_focus_id, slot_index, selected_pro_move_id, source')
+      .eq('user_id', userId)
+      .in('weekly_focus_id', focusIds);
 
-    // 4. Add site moves (always locked and required)
-    siteMoves.forEach(item => {
-      assignments.push({
-        weekly_focus_id: item.id,
-        type: 'site',
-        pro_move_id: undefined, // Site moves use action_id from weekly_focus
-        action_statement: item.action_statement,
-        domain_name: item.domain_name,
-        required: true,
-        locked: true,
-        display_order: item.display_order
-      });
+    const selectionMap = new Map();
+    (userSelections || []).forEach((sel: any) => {
+      selectionMap.set(sel.weekly_focus_id, sel);
     });
 
-    // 5. Fill self-select slots with backlog items first (FIFO)
     let backlogIndex = 0;
-    let slotIndex = 0;
 
-    for (const slot of selfSelectSlots) {
-      if (backlogIndex < backlogItems.length) {
-        // Fill with backlog item
-        const backlogItem = backlogItems[backlogIndex];
-        
-        // Get pro move details for this backlog item
-        const { data: proMove } = await supabase
+    // 4. Process each focus item
+    for (const focus of weeklyFocus as any[]) {
+      const domainName = focus.competencies?.domains?.domain_name || 'Unknown';
+
+      if (!focus.self_select) {
+        // Site move - mandatory with predefined action
+        const { data: proMoveData } = await supabase
           .from('pro_moves')
-          .select(`
-            action_statement, 
-            competencies!inner(
-              domains!inner(domain_name)
-            )
-          `)
-          .eq('action_id', backlogItem.pro_move_id)
+          .select('action_statement')
+          .eq('action_id', focus.action_id)
           .single();
 
-        if (proMove && proMove.competencies) {
-          const competency = Array.isArray(proMove.competencies) 
-            ? proMove.competencies[0] 
-            : proMove.competencies;
-          const domain = Array.isArray(competency.domains) 
-            ? competency.domains[0] 
-            : competency.domains;
+        assignments.push({
+          weekly_focus_id: focus.id,
+          type: 'site',
+          pro_move_id: focus.action_id,
+          action_statement: proMoveData?.action_statement || 'Site Move',
+          domain_name: domainName,
+          required: true,
+          locked: true,
+          display_order: focus.display_order
+        });
+      } else {
+        // Self-select slot
+        const selection = selectionMap.get(focus.id);
+        
+        if (selection) {
+          // User has made a selection
+          const { data: proMoveData } = await supabase
+            .from('pro_moves')
+            .select('action_statement')
+            .eq('action_id', selection.selected_pro_move_id)
+            .single();
 
           assignments.push({
-            weekly_focus_id: slot.id,
+            weekly_focus_id: focus.id,
+            type: selection.source === 'backlog' ? 'backlog' : 'selfSelect',
+            pro_move_id: selection.selected_pro_move_id,
+            action_statement: proMoveData?.action_statement || 'Selected Move',
+            domain_name: domainName,
+            required: false,
+            locked: areSelectionsLocked(),
+            slot_index: selection.slot_index,
+            display_order: focus.display_order
+          });
+        } else if (backlogIndex < backlogItems.length) {
+          // Auto-assign from backlog
+          const backlogItem = backlogItems[backlogIndex++];
+          const { data: proMoveData } = await supabase
+            .from('pro_moves')
+            .select('action_statement')
+            .eq('action_id', backlogItem.pro_move_id)
+            .single();
+
+          // Save the auto-assignment
+          await saveUserSelection(userId, focus.id, 0, backlogItem.pro_move_id, 'backlog');
+
+          assignments.push({
+            weekly_focus_id: focus.id,
             type: 'backlog',
             pro_move_id: backlogItem.pro_move_id,
-            action_statement: proMove.action_statement,
-            domain_name: domain.domain_name,
-            required: true,
-            locked: true, // Backlog items are locked (invisible to user)
+            action_statement: proMoveData?.action_statement || 'Backlog Item',
+            domain_name: domainName,
+            required: false,
+            locked: areSelectionsLocked(),
             backlog_id: backlogItem.id,
-            slot_index: slotIndex,
-            display_order: slot.display_order
+            slot_index: 0,
+            display_order: focus.display_order
+          });
+        } else {
+          // Empty self-select slot
+          assignments.push({
+            weekly_focus_id: focus.id,
+            type: 'selfSelect',
+            action_statement: '', // Empty - user needs to choose
+            domain_name: domainName,
+            required: false,
+            locked: areSelectionsLocked(),
+            display_order: focus.display_order
           });
         }
-        backlogIndex++;
-      } else {
-        // Fill with choosable self-select slot
-        assignments.push({
-          weekly_focus_id: slot.id,
-          type: 'selfSelect',
-          action_statement: 'Check-In to choose this Pro-Move for the week.',
-          domain_name: slot.domain_name,
-          required: false,
-          locked: false, // User can choose
-          slot_index: slotIndex,
-          display_order: slot.display_order
-        });
       }
-      slotIndex++;
     }
 
     // Sort by display order

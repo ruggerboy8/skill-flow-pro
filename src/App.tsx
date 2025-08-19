@@ -4,9 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { SimProvider } from "@/devtools/SimProvider";
 import { NowProvider } from "@/providers/NowProvider";
-import { SimBanner } from "@/devtools/SimConsole";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import Setup from "./pages/Setup";
@@ -36,45 +34,13 @@ import NotFound from "./pages/NotFound";
 import BackfillIntro from "./pages/backfill/BackfillIntro";
 import BackfillWeek from "./pages/backfill/BackfillWeek";
 import BackfillReview from "./pages/backfill/BackfillReview";
-import { useSim } from "@/devtools/SimProvider";
-import { detectBackfillStatus } from "@/lib/backfillDetection";
-import { useState, useEffect } from "react";
 
 const queryClient = new QueryClient();
 
 function AppRoutes() {
   const { user, loading, needsPasswordSetup } = useAuth();
-  const { overrides } = useSim();
-  const [backfillStatus, setBackfillStatus] = useState<{needsBackfill: boolean; isComplete: boolean; checked: boolean}>({
-    needsBackfill: false,
-    isComplete: false,
-    checked: false
-  });
 
-  // Check backfill status when user loads
-  useEffect(() => {
-    if (user && !loading && !needsPasswordSetup) {
-      detectBackfillStatus(user.id, overrides)
-        .then(status => {
-          setBackfillStatus({
-            needsBackfill: status.needsBackfill,
-            isComplete: status.isComplete,
-            checked: true
-          });
-        })
-        .catch(error => {
-          console.error('Error detecting backfill status:', error);
-          // Default to requiring backfill if there's an error
-          setBackfillStatus({
-            needsBackfill: true,
-            isComplete: false,
-            checked: true
-          });
-        });
-    }
-  }, [user, loading, needsPasswordSetup, overrides]);
-
-  if (loading || !backfillStatus.checked) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">Loading...</div>
@@ -89,23 +55,6 @@ function AppRoutes() {
   // If user needs to set up a password, show password setup page
   if (needsPasswordSetup) {
     return <SetupPassword />;
-  }
-
-  // If user needs backfill and it's not complete, redirect to backfill
-  if (backfillStatus.needsBackfill && !backfillStatus.isComplete) {
-    // Allow access to backfill routes and logout
-    const currentPath = window.location.pathname;
-    if (!currentPath.startsWith('/backfill') && currentPath !== '/profile') {
-      return (
-        <Routes>
-          <Route path="/backfill" element={<BackfillIntro />} />
-          <Route path="/backfill/:week" element={<BackfillWeek />} />
-          <Route path="/backfill/review" element={<BackfillReview />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="*" element={<Navigate to="/backfill" replace />} />
-        </Routes>
-      );
-    }
   }
 
   return (
@@ -153,16 +102,11 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <SimProvider>
-          {({ simulatedTime }) => (
-            <NowProvider simulatedTime={simulatedTime}>
-              <BrowserRouter>
-                <SimBanner />
-                <AppRoutes />
-              </BrowserRouter>
-            </NowProvider>
-          )}
-        </SimProvider>
+        <NowProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </NowProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

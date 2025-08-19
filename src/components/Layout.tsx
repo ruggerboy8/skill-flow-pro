@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { useBackfillStatus } from '@/hooks/useBackfillStatus';
 import { Home, BarChart3, User, Settings, Users, ClipboardList } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -9,6 +10,7 @@ const ADMIN_EMAILS = ['johno@reallygoodconsulting.org'];
 
 export default function Layout() {
   const { user, signOut, isCoach } = useAuth();
+  const { isBackfillComplete } = useBackfillStatus();
   const location = useLocation();
   
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -27,7 +29,8 @@ export default function Layout() {
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Stats', href: '/stats', icon: BarChart3 },
-    ...(isSuperAdmin ? [{ name: 'Backfill', href: '/backfill', icon: ClipboardList }] : []),
+    // Show backfill button for all users when not complete
+    ...(isBackfillComplete === false ? [{ name: 'Backfill', href: '/backfill', icon: ClipboardList }] : []),
     ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
     ...(isAdmin ? [{ name: 'Builder', href: '/admin/builder', icon: Settings }] : [])
   ];

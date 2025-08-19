@@ -108,7 +108,7 @@ export default function ThisWeekPanel() {
           bannerMessage: 'Welcome back! Time to rate your confidence for this week\'s Pro Moves.',
           bannerCta: {
             label: 'Rate Confidence',
-            onClick: () => navigate(`/confidence/1/step/1`) // Use ISO week as week param
+            onClick: () => navigate(`/confidence/${weekContext.iso_week}/step/1`)
           }
         };
 
@@ -123,7 +123,7 @@ export default function ThisWeekPanel() {
           bannerMessage: 'Time to reflect. Rate your performance for this week\'s Pro Moves.',
           bannerCta: {
             label: 'Rate Performance',
-            onClick: () => navigate(`/performance/1/step/1`) // Use ISO week as week param
+            onClick: () => navigate(`/performance/${weekContext.iso_week}/step/1`)
           }
         };
 

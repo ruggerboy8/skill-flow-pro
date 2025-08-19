@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getAnchors, nowUtc } from "@/lib/centralTime";
-import { getCurrentISOWeek } from './weekValidation';
+import { getOpenBacklogCount } from '@/lib/weekValidationSim';
 
 export interface BacklogItem {
   id: string;
@@ -123,7 +123,13 @@ export async function resolveBacklogItem(userId: string, proMoveId: number, reso
 }
 
 // Assemble a week's assignments (site moves + backlog + self-select)
-export async function assembleWeek(userId: string, isoYear: number, isoWeek: number, roleId: number): Promise<WeekAssignment[]> {
+export async function assembleWeek(
+  userId: string, 
+  isoYear: number, 
+  isoWeek: number, 
+  roleId: number,
+  simOverrides?: any
+): Promise<WeekAssignment[]> {
   try {
     const assignments: WeekAssignment[] = [];
 
@@ -149,8 +155,9 @@ export async function assembleWeek(userId: string, isoYear: number, isoWeek: num
     if (focusError) throw focusError;
     if (!weeklyFocus) return [];
 
-    // 2. Get user's backlog items (FIFO order)
-    const backlogItems = await getOpenBacklog(userId);
+    // 2. Get user's backlog items (FIFO order) with simulation support
+    const backlogResult = await getOpenBacklogCount(userId, simOverrides);
+    const backlogItems = backlogResult.items;
 
     // 3. Get user's current selections for self-select slots
     const focusIds = weeklyFocus.map((f: any) => f.id);

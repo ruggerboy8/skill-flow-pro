@@ -50,7 +50,7 @@ export default function ThisWeekPanel() {
   // Load current week data and compute state
   useEffect(() => {
     if (staff) void loadCurrentWeek();
-  }, [staff]);
+  }, [staff, overrides]); // Re-run when simulation overrides change
 
   async function loadCurrentWeek() {
     if (!staff || !user) return;
@@ -62,9 +62,9 @@ export default function ThisWeekPanel() {
       const context = await computeWeekState(staff.id, now, overrides);
       setWeekContext(context);
 
-      // Load current week assignments
+      // Load current week assignments with simulation support
       const { iso_year, iso_week } = getCurrentISOWeek(now);
-      const assignments = await assembleWeek(user.id, iso_year, iso_week, staff.role_id);
+      const assignments = await assembleWeek(user.id, iso_year, iso_week, staff.role_id, overrides);
       setWeekAssignments(assignments);
 
       setLoading(false);

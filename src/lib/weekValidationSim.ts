@@ -1,6 +1,6 @@
-import { nowUtc, getWeekAnchors } from './centralTime';
+import { getWeekAnchors, CT_TZ } from './centralTime';
 import { supabase } from '@/integrations/supabase/client';
-import { useSim } from '@/devtools/SimProvider';
+import { SimOverrides } from '@/devtools/SimProvider';
 
 export type WeekState = 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'wait_for_thu' | 'done';
 
@@ -14,7 +14,7 @@ export interface WeekContext {
 }
 
 // Get current ISO week and year
-export function getCurrentISOWeek(now: Date = nowUtc()): { iso_year: number; iso_week: number } {
+export function getCurrentISOWeek(now: Date): { iso_year: number; iso_week: number } {
   const tempDate = new Date(now.getTime());
   tempDate.setUTCDate(tempDate.getUTCDate() + 4 - (tempDate.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1));
@@ -22,34 +22,49 @@ export function getCurrentISOWeek(now: Date = nowUtc()): { iso_year: number; iso
   return { iso_year: tempDate.getUTCFullYear(), iso_week: weekNo };
 }
 
-// Check if staff has valid scores for current week (with simulation overrides)
-export async function hasValidScores(staffId: string, now: Date = nowUtc(), simOverrides?: any): Promise<{
-  hasValidConfidence: boolean;
-  hasValidPerformance: boolean;
-}> {
+// Read-override hook: Check if staff has valid confidence for current week
+export async function hasCurrentWeekConfidence(
+  staffId: string, 
+  weekId: { iso_year: number; iso_week: number }, 
+  anchors: ReturnType<typeof getWeekAnchors>,
+  simOverrides?: SimOverrides
+): Promise<boolean> {
   // If simulation is active, check overrides first
-  if (simOverrides?.enabled) {
-    const hasValidConfidence = simOverrides.forceHasConfidence ?? await checkRealConfidence(staffId, now);
-    const hasValidPerformance = simOverrides.forceHasPerformance ?? await checkRealPerformance(staffId, now);
-    return { hasValidConfidence, hasValidPerformance };
+  if (simOverrides?.enabled && simOverrides.forceHasConfidence !== null) {
+    return simOverrides.forceHasConfidence;
   }
 
   // Otherwise, check real data
-  const hasValidConfidence = await checkRealConfidence(staffId, now);
-  const hasValidPerformance = await checkRealPerformance(staffId, now);
-  return { hasValidConfidence, hasValidPerformance };
+  return await checkRealConfidence(staffId, weekId, anchors);
 }
 
-async function checkRealConfidence(staffId: string, now: Date): Promise<boolean> {
-  const { iso_year, iso_week } = getCurrentISOWeek(now);
-  const anchors = getWeekAnchors(now);
+// Read-override hook: Check if staff has valid performance for current week  
+export async function hasCurrentWeekPerformance(
+  staffId: string,
+  weekId: { iso_year: number; iso_week: number },
+  anchors: ReturnType<typeof getWeekAnchors>,
+  simOverrides?: SimOverrides
+): Promise<boolean> {
+  // If simulation is active, check overrides first
+  if (simOverrides?.enabled && simOverrides.forceHasPerformance !== null) {
+    return simOverrides.forceHasPerformance;
+  }
 
+  // Otherwise, check real data
+  return await checkRealPerformance(staffId, weekId, anchors);
+}
+
+async function checkRealConfidence(
+  staffId: string, 
+  weekId: { iso_year: number; iso_week: number }, 
+  anchors: ReturnType<typeof getWeekAnchors>
+): Promise<boolean> {
   // Get weekly focus for current week
   const { data: weeklyFocus } = await supabase
     .from('weekly_focus')
     .select('id')
-    .eq('iso_year', iso_year)
-    .eq('iso_week', iso_week);
+    .eq('iso_year', weekId.iso_year)
+    .eq('iso_week', weekId.iso_week);
 
   if (!weeklyFocus?.length) return false;
 
@@ -68,16 +83,17 @@ async function checkRealConfidence(staffId: string, now: Date): Promise<boolean>
   return (scores?.length || 0) === focusIds.length;
 }
 
-async function checkRealPerformance(staffId: string, now: Date): Promise<boolean> {
-  const { iso_year, iso_week } = getCurrentISOWeek(now);
-  const anchors = getWeekAnchors(now);
-
+async function checkRealPerformance(
+  staffId: string,
+  weekId: { iso_year: number; iso_week: number },
+  anchors: ReturnType<typeof getWeekAnchors>
+): Promise<boolean> {
   // Get weekly focus for current week
   const { data: weeklyFocus } = await supabase
     .from('weekly_focus')
     .select('id')
-    .eq('iso_year', iso_year)
-    .eq('iso_week', iso_week);
+    .eq('iso_year', weekId.iso_year)
+    .eq('iso_week', weekId.iso_week);
 
   if (!weeklyFocus?.length) return false;
 
@@ -96,20 +112,66 @@ async function checkRealPerformance(staffId: string, now: Date): Promise<boolean
   return (scores?.length || 0) === focusIds.length;
 }
 
-// Compute the current week state (with simulation support)
-export async function computeWeekState(staffId: string, now: Date = nowUtc(), simOverrides?: any): Promise<WeekContext> {
+// Read-override hook: Get backlog count (with simulation override)
+export async function getOpenBacklogCount(
+  userId: string,
+  simOverrides?: SimOverrides
+): Promise<{ count: number; items: any[] }> {
+  // If simulation is active and backlog count is forced
+  if (simOverrides?.enabled && simOverrides.forceBacklogCount !== null) {
+    const count = simOverrides.forceBacklogCount;
+    // Generate synthetic backlog items for UI rendering
+    const items = Array.from({ length: count }, (_, i) => ({
+      id: `__sim_${i}`,
+      __sim: true, // Mark as simulated
+      pro_move_id: i + 1,
+      status: 'open',
+      action_statement: `Simulated Backlog Item ${i + 1}`,
+    }));
+    return { count, items };
+  }
+
+  // Otherwise, get real backlog data
+  const { data: backlog } = await supabase
+    .from('user_backlog')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'open');
+
+  return { count: backlog?.length || 0, items: backlog || [] };
+}
+
+// Compute the current week state with proper read masking
+export async function computeWeekState(
+  staffId: string, 
+  now: Date, 
+  simOverrides?: SimOverrides
+): Promise<WeekContext> {
   const { iso_year, iso_week } = getCurrentISOWeek(now);
-  const anchors = getWeekAnchors(now);
+  const anchors = getWeekAnchors(now, CT_TZ);
   
-  const { hasValidConfidence, hasValidPerformance } = await hasValidScores(staffId, now, simOverrides);
+  const hasValidConfidence = await hasCurrentWeekConfidence(
+    staffId, 
+    { iso_year, iso_week }, 
+    anchors, 
+    simOverrides
+  );
+  
+  const hasValidPerformance = await hasCurrentWeekPerformance(
+    staffId, 
+    { iso_year, iso_week }, 
+    anchors, 
+    simOverrides
+  );
 
   let state: WeekState;
 
+  // State machine logic based on time and submissions
   if (now < anchors.confidence_deadline) {
-    // Before Tuesday 12:00 CT - can check in
+    // Before Tuesday 12:00 - can check in
     state = 'can_checkin';
   } else if (!hasValidConfidence) {
-    // After Tuesday 12:00 CT with no confidence - missed checkin
+    // After Tuesday 12:00 with no confidence - missed checkin
     state = 'missed_checkin';
   } else if (now < anchors.checkout_open) {
     // Wednesday - wait for Thursday

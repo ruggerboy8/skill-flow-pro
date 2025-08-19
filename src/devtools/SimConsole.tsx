@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,9 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSim } from './SimProvider';
-import { formatInTimeZone } from 'date-fns-tz';
-import { CT_TZ } from '@/lib/centralTime';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { addDays } from 'date-fns';
+import { CT_TZ, getWeekAnchors } from '@/lib/centralTime';
 import { X, Settings } from 'lucide-react';
+
+// Helper function (same as in centralTime.ts)
+function ctUtcForTz(dayRefUtc: Date, timeHHMMSS: string, tz: string): Date {
+  const dayStr = formatInTimeZone(dayRefUtc, tz, 'yyyy-MM-dd');
+  return fromZonedTime(`${dayStr}T${timeHHMMSS}`, tz);
+}
 
 interface SimConsoleProps {
   isOpen: boolean;
@@ -22,12 +29,28 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
 
   if (!isOpen) return null;
 
-  const presets = [
-    { label: 'Mon 9am', datetime: '2025-01-20T09:00:00.000Z' },
-    { label: 'Tue 2pm', datetime: '2025-01-21T14:00:00.000Z' },
-    { label: 'Thu 9am', datetime: '2025-01-23T09:00:00.000Z' },
-    { label: 'Sun 9pm', datetime: '2025-01-26T21:00:00.000Z' },
-  ];
+  // Generate presets for the current week in Central Time
+  const presets = useMemo(() => {
+    const { mondayZ } = getWeekAnchors(new Date(), CT_TZ);
+    return [
+      { 
+        label: 'Mon 9am', 
+        datetime: ctUtcForTz(mondayZ, '09:00:00', CT_TZ).toISOString() 
+      },
+      { 
+        label: 'Tue 2pm', 
+        datetime: ctUtcForTz(addDays(mondayZ, 1), '14:00:00', CT_TZ).toISOString() 
+      },
+      { 
+        label: 'Thu 9am', 
+        datetime: ctUtcForTz(addDays(mondayZ, 3), '09:00:00', CT_TZ).toISOString() 
+      },
+      { 
+        label: 'Sun 9pm', 
+        datetime: ctUtcForTz(addDays(mondayZ, 6), '21:00:00', CT_TZ).toISOString() 
+      },
+    ];
+  }, []);
 
   const handlePresetClick = (datetime: string) => {
     updateOverrides({ nowISO: datetime });
@@ -219,6 +242,7 @@ export function SimFloatingButton({ isAdmin }: SimFloatingButtonProps) {
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
 
   // Only show if admin and dev tools enabled
+  // Note: isAdmin should be checked for specific email in parent component
   if (!isAdmin || import.meta.env.VITE_ENABLE_SIMTOOLS !== 'true') {
     return null;
   }

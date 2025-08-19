@@ -15,6 +15,13 @@ function ctUtcFor(dayRefUtc: Date, timeHHMMSS: string): Date {
   return fromZonedTime(`${dayStr}T${timeHHMMSS}`, CT_TZ);
 }
 
+// Helper: build a UTC instant for any timezone
+function ctUtcForTz(dayRefUtc: Date, timeHHMMSS: string, tz: string): Date {
+  const dayStr = formatInTimeZone(dayRefUtc, tz, 'yyyy-MM-dd'); // timezone calendar date
+  // Convert "that timezone wall time" into a UTC instant
+  return fromZonedTime(`${dayStr}T${timeHHMMSS}`, tz);
+}
+
 export function getAnchors(now: Date = nowUtc()) {
   // ISO weekday in CT: 1=Mon..7=Sun
   const isoDow = Number(formatInTimeZone(now, CT_TZ, 'i'));
@@ -33,19 +40,20 @@ export function getAnchors(now: Date = nowUtc()) {
 }
 
 // Enhanced anchors with all time windows for current week
-export function getWeekAnchors(now: Date = nowUtc()) {
-  // ISO weekday in CT: 1=Mon..7=Sun
-  const isoDow = Number(formatInTimeZone(now, CT_TZ, 'i'));
-  // Get CT "today" at 00:00 as a UTC instant
-  const todayMidnightCtUtc = ctUtcFor(now, '00:00:00');
-  // Roll back to Monday 00:00 CT (as UTC instant)
-  const mondayZ = addDays(todayMidnightCtUtc, -(isoDow - 1));
+// Enhanced anchors with all time windows for current week
+export function getWeekAnchors(now: Date = nowUtc(), tz: string = CT_TZ) {
+  // ISO weekday in specified timezone: 1=Mon..7=Sun
+  const isoDow = Number(formatInTimeZone(now, tz, 'i'));
+  // Get timezone "today" at 00:00 as a UTC instant
+  const todayMidnightUtc = ctUtcForTz(now, '00:00:00', tz);
+  // Roll back to Monday 00:00 in timezone (as UTC instant)
+  const mondayZ = addDays(todayMidnightUtc, -(isoDow - 1));
 
-  const checkin_open = ctUtcFor(mondayZ, '00:00:00');           // Mon 00:00 CT
-  const confidence_deadline = ctUtcFor(addDays(mondayZ, 1), '12:00:00'); // Tue 12:00 CT
-  const checkout_open = ctUtcFor(addDays(mondayZ, 3), '00:00:00'); // Thu 00:00 CT
-  const performance_deadline = ctUtcFor(addDays(mondayZ, 3), '23:59:59'); // Thu 23:59 CT
-  const week_end = ctUtcFor(addDays(mondayZ, 6), '23:59:59'); // Sun 23:59:59 CT
+  const checkin_open = ctUtcForTz(mondayZ, '00:00:00', tz);           // Mon 00:00 TZ
+  const confidence_deadline = ctUtcForTz(addDays(mondayZ, 1), '12:00:00', tz); // Tue 12:00 TZ
+  const checkout_open = ctUtcForTz(addDays(mondayZ, 3), '00:00:00', tz); // Thu 00:00 TZ
+  const performance_deadline = ctUtcForTz(addDays(mondayZ, 3), '23:59:59', tz); // Thu 23:59 TZ
+  const week_end = ctUtcForTz(addDays(mondayZ, 6), '23:59:59', tz); // Sun 23:59:59 TZ
 
   return { 
     checkin_open, 
@@ -55,11 +63,11 @@ export function getWeekAnchors(now: Date = nowUtc()) {
     week_end,
     // Legacy compatibility
     mondayZ, 
-    monCheckInZ: ctUtcFor(mondayZ, '09:00:00'), 
+    monCheckInZ: ctUtcForTz(mondayZ, '09:00:00', tz), 
     tueDueZ: confidence_deadline, 
     thuStartZ: checkout_open, 
-    friStartZ: ctUtcFor(addDays(mondayZ, 4), '00:00:00'), 
-    sunEndZ: week_end 
+    friStartZ: ctUtcForTz(addDays(mondayZ, 4), '00:00:00', tz), 
+    sunEndZ: week_end
   };
 }
 

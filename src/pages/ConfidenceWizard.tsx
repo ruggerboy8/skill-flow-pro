@@ -95,12 +95,26 @@ export default function ConfidenceWizard() {
 
     setStaff(staffData);
 
-    // Load all weekly focus for this cycle/week
-    const { data: focusData, error: focusError } = await supabase.rpc('get_focus_cycle_week', {
-      p_cycle: 1,
-      p_week: weekNum,
-      p_role_id: staffData.role_id
-    }) as { data: WeeklyFocus[] | null; error: any };
+    // Load all weekly focus for this ISO week and role
+    const { data: focusData, error: focusError } = await supabase
+      .from('weekly_focus')
+      .select(`
+        id,
+        display_order,
+        action_id,
+        competency_id,
+        cycle,
+        week_in_cycle,
+        pro_moves!inner(action_statement),
+        competencies!inner(
+          domain_id,
+          domains!inner(domain_name)
+        )
+      `)
+      .eq('iso_year', 2025)
+      .eq('iso_week', weekNum)
+      .eq('role_id', staffData.role_id)
+      .order('display_order');
 
     if (focusError || !focusData || focusData.length === 0) {
       toast({
@@ -112,8 +126,18 @@ export default function ConfidenceWizard() {
       return;
     }
 
-    setWeeklyFocus(focusData);
-    setCurrentFocus(focusData[currentIndex]);
+    // Transform the data to match WeeklyFocus interface
+    const transformedFocusData: WeeklyFocus[] = focusData.map((item: any) => ({
+      id: item.id,
+      display_order: item.display_order,
+      action_statement: item.pro_moves?.action_statement || '',
+      cycle: item.cycle,
+      week_in_cycle: item.week_in_cycle,
+      domain_name: item.competencies?.domains?.domain_name || 'Unknown'
+    }));
+
+    setWeeklyFocus(transformedFocusData);
+    setCurrentFocus(transformedFocusData[currentIndex]);
 
     // Check if confidence already submitted for all focus items and prefill selections
     const focusIds = focusData.map(f => f.id);

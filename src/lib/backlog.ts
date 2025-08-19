@@ -224,10 +224,14 @@ export async function assembleWeek(
       .eq('user_id', userId)
       .in('weekly_focus_id', focusIds);
 
+    console.log('User selections from database:', userSelections);
+
     const selectionMap = new Map();
     (userSelections || []).forEach((sel: any) => {
       selectionMap.set(sel.weekly_focus_id, sel);
     });
+
+    console.log('Selection map:', Array.from(selectionMap.entries()));
 
     let backlogIndex = 0;
 

@@ -353,9 +353,6 @@ export default function ConfidenceWizard() {
               </Badge>
             </div>
             <CardTitle className="text-center text-gray-900">Rate Your Confidence</CardTitle>
-            <CardDescription className="text-center text-gray-800">
-              How confident are you that you'll do this 100% this week?
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 p-3 sm:p-6">
             <div className="p-3 sm:p-4 bg-white/80 rounded-lg">
@@ -410,6 +407,12 @@ export default function ConfidenceWizard() {
               ) : (
                 <p className="text-sm font-medium text-gray-900">{currentFocus.action_statement}</p>
               )}
+            </div>
+
+            <div className="text-center">
+              <p className="text-sm font-medium text-gray-800 mb-4">
+                How confident are you that you'll do this 100% this week?
+              </p>
             </div>
 
             <NumberScale

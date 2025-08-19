@@ -59,12 +59,43 @@ async function checkRealConfidence(
   weekId: { iso_year: number; iso_week: number }, 
   anchors: ReturnType<typeof getWeekAnchors>
 ): Promise<boolean> {
-  // Get weekly focus for current week
-  const { data: weeklyFocus } = await supabase
+  // First try to get weekly focus for current ISO week
+  let { data: weeklyFocus } = await supabase
     .from('weekly_focus')
     .select('id')
     .eq('iso_year', weekId.iso_year)
     .eq('iso_week', weekId.iso_week);
+
+  // If no results, try cycle 2 week 1 (post-backfill)
+  if (!weeklyFocus?.length) {
+    const { data: staffData } = await supabase
+      .from('staff')
+      .select('id, role_id')
+      .eq('id', staffId)
+      .single();
+
+    if (staffData) {
+      // Check if user completed backfill
+      const { data: hasScores } = await supabase
+        .from('weekly_scores')
+        .select('id')
+        .eq('staff_id', staffId)
+        .limit(1);
+
+      if (hasScores && hasScores.length > 0) {
+        const { data: cycle2Focus } = await supabase
+          .from('weekly_focus')
+          .select('id')
+          .eq('cycle', 2)
+          .eq('week_in_cycle', 1)
+          .eq('role_id', staffData.role_id);
+        
+        if (cycle2Focus) {
+          weeklyFocus = cycle2Focus;
+        }
+      }
+    }
+  }
 
   if (!weeklyFocus?.length) return false;
 
@@ -88,12 +119,43 @@ async function checkRealPerformance(
   weekId: { iso_year: number; iso_week: number },
   anchors: ReturnType<typeof getWeekAnchors>
 ): Promise<boolean> {
-  // Get weekly focus for current week
-  const { data: weeklyFocus } = await supabase
+  // First try to get weekly focus for current ISO week
+  let { data: weeklyFocus } = await supabase
     .from('weekly_focus')
     .select('id')
     .eq('iso_year', weekId.iso_year)
     .eq('iso_week', weekId.iso_week);
+
+  // If no results, try cycle 2 week 1 (post-backfill)
+  if (!weeklyFocus?.length) {
+    const { data: staffData } = await supabase
+      .from('staff')
+      .select('id, role_id')
+      .eq('id', staffId)
+      .single();
+
+    if (staffData) {
+      // Check if user completed backfill
+      const { data: hasScores } = await supabase
+        .from('weekly_scores')
+        .select('id')
+        .eq('staff_id', staffId)
+        .limit(1);
+
+      if (hasScores && hasScores.length > 0) {
+        const { data: cycle2Focus } = await supabase
+          .from('weekly_focus')
+          .select('id')
+          .eq('cycle', 2)
+          .eq('week_in_cycle', 1)
+          .eq('role_id', staffData.role_id);
+        
+        if (cycle2Focus) {
+          weeklyFocus = cycle2Focus;
+        }
+      }
+    }
+  }
 
   if (!weeklyFocus?.length) return false;
 

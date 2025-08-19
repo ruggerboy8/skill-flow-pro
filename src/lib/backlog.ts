@@ -133,8 +133,8 @@ export async function assembleWeek(
   try {
     const assignments: WeekAssignment[] = [];
 
-    // 1. Get all weekly focus items for the current ISO week
-    const { data: weeklyFocus, error: focusError } = await supabase
+    // 1. First try to get weekly focus items by ISO week
+    let { data: weeklyFocus, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
         id,
@@ -152,7 +152,51 @@ export async function assembleWeek(
       .eq('role_id', roleId)
       .order('display_order');
 
-    if (focusError) throw focusError;
+    // 2. If no results from ISO week lookup, try to find current cycle/week
+    if (!weeklyFocus || weeklyFocus.length === 0) {
+      // Determine which cycle/week the user should be on after backfill
+      const { data: staffData } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (staffData) {
+        // Check if user completed backfill (has any weekly_scores)
+        const { data: hasScores } = await supabase
+          .from('weekly_scores')
+          .select('id')
+          .eq('staff_id', staffData.id)
+          .limit(1);
+
+        if (hasScores && hasScores.length > 0) {
+          // User completed backfill, should be on cycle 2 week 1
+          const { data: cycle2Focus, error: cycle2Error } = await supabase
+            .from('weekly_focus')
+            .select(`
+              id,
+              display_order,
+              self_select,
+              action_id,
+              competency_id,
+              competencies!inner(
+                domain_id,
+                domains!inner(domain_name)
+              )
+            `)
+            .eq('cycle', 2)
+            .eq('week_in_cycle', 1)
+            .eq('role_id', roleId)
+            .order('display_order');
+
+          if (!cycle2Error && cycle2Focus) {
+            weeklyFocus = cycle2Focus;
+          }
+        }
+      }
+    }
+
+    if (focusError && !weeklyFocus) throw focusError;
     if (!weeklyFocus) return [];
 
     // 2. Get user's backlog items (FIFO order) with simulation support

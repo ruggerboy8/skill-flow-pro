@@ -195,6 +195,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
           onClose={handleFormClose}
           roles={roles}
           competencies={competencies}
+          selectedRole={selectedRole}
         />
       )}
 

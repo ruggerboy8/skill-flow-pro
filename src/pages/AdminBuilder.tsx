@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FocusBuilder } from '@/components/admin/FocusBuilder';
+import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 
 export default function AdminBuilder() {
@@ -67,11 +67,11 @@ export default function AdminBuilder() {
         </TabsList>
         
         <TabsContent value="dfi" className="space-y-6">
-          <FocusBuilder roleFilter={1} />
+          <SimpleFocusBuilder roleFilter={1} />
         </TabsContent>
-        
+
         <TabsContent value="rda" className="space-y-6">
-          <FocusBuilder roleFilter={2} />
+          <SimpleFocusBuilder roleFilter={2} />
         </TabsContent>
         
         <TabsContent value="promoves" className="space-y-6">

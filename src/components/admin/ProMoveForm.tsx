@@ -39,9 +39,10 @@ interface ProMoveFormProps {
   onClose: () => void;
   roles: Role[];
   competencies: Competency[];
+  selectedRole?: string; // Add role filter support
 }
 
-export function ProMoveForm({ proMove, onClose, roles, competencies }: ProMoveFormProps) {
+export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRole }: ProMoveFormProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -51,6 +52,7 @@ export function ProMoveForm({ proMove, onClose, roles, competencies }: ProMoveFo
     description: '',
     resources_url: ''
   });
+  const [filteredCompetencies, setFilteredCompetencies] = useState<Competency[]>(competencies);
 
   useEffect(() => {
     if (proMove) {
@@ -61,8 +63,45 @@ export function ProMoveForm({ proMove, onClose, roles, competencies }: ProMoveFo
         description: proMove.description || '',
         resources_url: proMove.resources_url || ''
       });
+    } else if (selectedRole && selectedRole !== 'all') {
+      // Pre-select role when adding new pro-move with role filter
+      setFormData(prev => ({ ...prev, role_id: selectedRole }));
     }
-  }, [proMove]);
+  }, [proMove, selectedRole]);
+
+  // Filter competencies by selected role
+  useEffect(() => {
+    const loadFilteredCompetencies = async () => {
+      if (!formData.role_id || formData.role_id === 'all') {
+        setFilteredCompetencies(competencies);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('competencies')
+          .select('competency_id, name')
+          .eq('role_id', parseInt(formData.role_id))
+          .order('name');
+
+        if (error) throw error;
+        setFilteredCompetencies(data || []);
+        
+        // Clear competency selection if current one doesn't match role
+        if (formData.competency_id) {
+          const isValidCompetency = data?.some(c => c.competency_id.toString() === formData.competency_id);
+          if (!isValidCompetency) {
+            setFormData(prev => ({ ...prev, competency_id: '' }));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading competencies:', error);
+        setFilteredCompetencies([]);
+      }
+    };
+
+    loadFilteredCompetencies();
+  }, [formData.role_id, competencies]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,7 +205,7 @@ export function ProMoveForm({ proMove, onClose, roles, competencies }: ProMoveFo
                   <SelectValue placeholder="Select competency" />
                 </SelectTrigger>
                 <SelectContent className="bg-background z-50">
-                  {competencies.map(competency => (
+                  {filteredCompetencies.map(competency => (
                     <SelectItem key={competency.competency_id} value={competency.competency_id.toString()}>
                       {competency.name}
                     </SelectItem>

@@ -550,6 +550,15 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      replace_weekly_focus: {
+        Args: {
+          p_cycle: number
+          p_role_id: number
+          p_slots: Json
+          p_week_in_cycle: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
       score_source: "live" | "backfill"

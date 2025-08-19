@@ -32,7 +32,7 @@ export default function Layout() {
     // Show backfill button for all users when not complete
     ...(isBackfillComplete === false ? [{ name: 'Backfill', href: '/backfill', icon: ClipboardList }] : []),
     ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
-    ...(isAdmin ? [{ name: 'Builder', href: '/admin/builder', icon: Settings }] : [])
+    ...(isSuperAdmin ? [{ name: 'Builder', href: '/builder', icon: Settings }] : [])
   ];
 
   const isActive = (href: string) => {

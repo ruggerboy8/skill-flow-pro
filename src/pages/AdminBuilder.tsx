@@ -3,6 +3,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FocusBuilder } from '@/components/admin/FocusBuilder';
+import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 
 export default function AdminBuilder() {
   console.log('=== NEW ADMINBUILDER LOADING ===');
@@ -65,15 +67,15 @@ export default function AdminBuilder() {
         </TabsList>
         
         <TabsContent value="dfi" className="space-y-6">
-          <div className="text-center p-8">DFI Focus Builder - Coming Soon</div>
+          <FocusBuilder roleFilter={1} />
         </TabsContent>
         
         <TabsContent value="rda" className="space-y-6">
-          <div className="text-center p-8">RDA Focus Builder - Coming Soon</div>
+          <FocusBuilder roleFilter={2} />
         </TabsContent>
         
         <TabsContent value="promoves" className="space-y-6">
-          <div className="text-center p-8">Pro-Move Library - Coming Soon</div>
+          <ProMoveLibrary />
         </TabsContent>
       </Tabs>
     </div>

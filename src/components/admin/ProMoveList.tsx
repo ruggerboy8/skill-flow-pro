@@ -59,6 +59,7 @@ export function ProMoveList({
   }, [roleFilter, competencyFilter, searchTerm, activeOnly]);
 
   const loadProMoves = async () => {
+    console.log('=== LOADING PRO MOVES ===', { roleFilter, competencyFilter, searchTerm, activeOnly });
     setLoading(true);
     try {
       let query = supabase
@@ -98,6 +99,7 @@ export function ProMoveList({
       }
 
       const { data, error } = await query;
+      console.log('=== PRO MOVES QUERY RESULT ===', { data, error });
 
       if (error) throw error;
 
@@ -111,7 +113,8 @@ export function ProMoveList({
         role_name: (item.roles as any)?.role_name || 'Unknown',
         competency_name: (item.competencies as any)?.name || 'Unknown'
       })) || [];
-
+      
+      console.log('=== FORMATTED PRO MOVES ===', formattedData);
       setProMoves(formattedData);
     } catch (error) {
       toast({

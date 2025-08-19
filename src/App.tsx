@@ -26,7 +26,7 @@ import StatsEval from "./pages/StatsEval";
 import Profile from "./pages/Profile";
 import CoachDashboard from "./pages/coach/CoachDashboard";
 import CoachDetail from "./pages/coach/CoachDetail";
-import RoleList from "./pages/admin/RoleList";
+import AdminBuilder from "./pages/AdminBuilder";
 import CycleList from "./pages/admin/CycleList";
 import WeekList from "./pages/admin/WeekList";
 import WeekEditor from "./pages/admin/WeekEditor";
@@ -85,7 +85,7 @@ function AppRoutes() {
         <Route path="backfill/review" element={<BackfillReview />} />
         <Route path="coach" element={<CoachDashboard />} />
         <Route path="coach/:staffId" element={<CoachDetail />} />
-        <Route path="builder" element={<RoleList />} />
+        <Route path="builder" element={<AdminBuilder />} />
         <Route path="builder/:roleId" element={<CycleList />} />
         <Route path="builder/:roleId/:cycle" element={<WeekList />} />
         <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />

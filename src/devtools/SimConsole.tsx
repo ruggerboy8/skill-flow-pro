@@ -332,9 +332,8 @@ interface SimFloatingButtonProps {
 export function SimFloatingButton({ isAdmin }: SimFloatingButtonProps) {
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
 
-  // Only show if admin and dev tools enabled
-  // Note: isAdmin should be checked for specific email in parent component
-  if (!isAdmin || import.meta.env.VITE_ENABLE_SIMTOOLS !== 'true') {
+  // Only show if admin 
+  if (!isAdmin) {
     return null;
   }
 

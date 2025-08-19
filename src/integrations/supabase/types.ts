@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -195,6 +195,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_backlog: {
+        Row: {
+          added_week_id: string
+          created_at: string
+          id: string
+          pro_move_id: number
+          resolved_week_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          added_week_id: string
+          created_at?: string
+          id?: string
+          pro_move_id: number
+          resolved_week_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          added_week_id?: string
+          created_at?: string
+          id?: string
+          pro_move_id?: number
+          resolved_week_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       weekly_focus: {
         Row: {
           action_id: number | null
@@ -359,6 +389,39 @@ export type Database = {
           },
         ]
       }
+      weekly_self_select: {
+        Row: {
+          created_at: string
+          id: string
+          selected_pro_move_id: number
+          slot_index: number
+          source: string
+          updated_at: string
+          user_id: string
+          weekly_focus_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          selected_pro_move_id: number
+          slot_index: number
+          source?: string
+          updated_at?: string
+          user_id: string
+          weekly_focus_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          selected_pro_move_id?: number
+          slot_index?: number
+          source?: string
+          updated_at?: string
+          user_id?: string
+          weekly_focus_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       v_staff_week_status: {
@@ -414,46 +477,46 @@ export type Database = {
     }
     Functions: {
       get_focus_cycle_week: {
-        Args: { p_cycle: number; p_week: number; p_role_id: number }
+        Args: { p_cycle: number; p_role_id: number; p_week: number }
         Returns: {
-          id: string
-          display_order: number
           action_statement: string
+          display_order: number
           domain_name: string
+          id: string
         }[]
       }
       get_staff_summary: {
         Args: Record<PropertyKey, never>
         Returns: {
-          staff_id: string
-          name: string
           email: string
-          role_id: number
-          organization: string
-          location: string
           is_coach: boolean
           is_super_admin: boolean
+          location: string
+          name: string
+          organization: string
+          role_id: number
+          staff_id: string
         }[]
       }
       get_user_admin_status: {
         Args: Record<PropertyKey, never>
         Returns: {
-          user_id: string
           coach: boolean
           super_admin: boolean
+          user_id: string
         }[]
       }
       get_weekly_review: {
         Args: {
           p_cycle: number
-          p_week: number
           p_role_id: number
           p_staff_id: string
+          p_week: number
         }
         Returns: {
-          domain_name: string
           action_statement: string
           confidence_score: number
+          domain_name: string
           performance_score: number
         }[]
       }

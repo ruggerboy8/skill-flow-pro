@@ -342,7 +342,7 @@ export function SimFloatingButton({ isAdmin }: SimFloatingButtonProps) {
       <Button
         variant="secondary"
         size="sm"
-        className="fixed bottom-4 right-4 z-30 shadow-lg"
+        className="fixed bottom-20 right-4 z-30 shadow-lg"
         onClick={() => setIsConsoleOpen(true)}
       >
         <Settings className="h-4 w-4 mr-1" />

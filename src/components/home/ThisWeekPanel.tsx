@@ -10,7 +10,7 @@ import { nowUtc, nextMondayStr, getWeekAnchors, CT_TZ } from '@/lib/centralTime'
 import { useNow } from '@/providers/NowProvider';
 import { getDomainColor } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
-import { computeWeekState, StaffStatus, getSiteWeekContext, SiteWeekContext } from '@/lib/siteState';
+import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -25,7 +25,7 @@ export default function ThisWeekPanel() {
 
   const [staff, setStaff] = useState<Staff | null>(null);
   const [weekContext, setWeekContext] = useState<StaffStatus | null>(null);
-  const [siteWeekContext, setSiteWeekContext] = useState<SiteWeekContext | null>(null);
+  const [locationWeekContext, setLocationWeekContext] = useState<LocationWeekContext | null>(null);
   const [weekAssignments, setWeekAssignments] = useState<WeekAssignment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -65,22 +65,33 @@ export default function ThisWeekPanel() {
       console.log('Staff:', staff);
       console.log('Simulation overrides:', overrides);
       
+      // Get staff info including location
+      const { data: staffData } = await supabase
+        .from('staff')
+        .select('id, role_id, primary_location_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!staffData?.primary_location_id) {
+        throw new Error('Staff member has no assigned location');
+      }
+
       // Use simulated time if available
       const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
       console.log('Effective time being used:', effectiveNow);
       
-      // Get site week context for cycle and week info
-      const siteContext = await getSiteWeekContext('main', effectiveNow);
-      console.log('Site week context:', siteContext);
-      setSiteWeekContext(siteContext);
+      // Get location week context for cycle and week info
+      const locationContext = await getLocationWeekContext(staffData.primary_location_id, effectiveNow);
+      console.log('Location week context:', locationContext);
+      setLocationWeekContext(locationContext);
       
-      // Compute current week state with simulation overrides (site-based unified)
+      // Compute current week state with simulation overrides (location-based unified)
       const context = await computeWeekState({
         userId: user.id,
-        siteId: 'main', // Use the main site that exists in DB
-        roleId: staff.role_id,
+        locationId: staffData.primary_location_id,
+        roleId: staffData.role_id,
         now: effectiveNow,
-        simOverrides: overrides
+        simOverrides: overrides.enabled ? overrides : undefined
       });
       console.log('Week context:', context);
       setWeekContext(context);
@@ -176,10 +187,10 @@ export default function ThisWeekPanel() {
         <CardHeader>
           <CardTitle>This Week&apos;s Pro Moves</CardTitle>
           <CardDescription>Week of {weekOfDate}</CardDescription>
-          {siteWeekContext && (
+          {locationWeekContext && (
             <div className="flex items-center gap-2 mt-2">
               <Badge variant="outline" className="text-xs">
-                Cycle {siteWeekContext.cycle}, Week {siteWeekContext.weekInCycle}
+                Cycle {locationWeekContext.cycleNumber}, Week {locationWeekContext.weekInCycle}
               </Badge>
             </div>
           )}
@@ -200,10 +211,10 @@ export default function ThisWeekPanel() {
         <CardHeader>
           <CardTitle>This Week&apos;s Pro Moves</CardTitle>
           <CardDescription>Week of {weekOfDate}</CardDescription>
-          {siteWeekContext && (
+          {locationWeekContext && (
             <div className="flex items-center gap-2 mt-2">
               <Badge variant="outline" className="text-xs">
-                Cycle {siteWeekContext.cycle}, Week {siteWeekContext.weekInCycle}
+                Cycle {locationWeekContext.cycleNumber}, Week {locationWeekContext.weekInCycle}
               </Badge>
             </div>
           )}
@@ -225,10 +236,10 @@ export default function ThisWeekPanel() {
       <CardHeader className="pb-2">
         <CardTitle>This Week&apos;s Pro Moves</CardTitle>
         <CardDescription>Week of {weekOfDate}</CardDescription>
-        {siteWeekContext && (
+        {locationWeekContext && (
           <div className="flex items-center gap-2 mt-2">
             <Badge variant="outline" className="text-xs">
-              Cycle {siteWeekContext.cycle}, Week {siteWeekContext.weekInCycle}
+              Cycle {locationWeekContext.cycleNumber}, Week {locationWeekContext.weekInCycle}
             </Badge>
           </div>
         )}

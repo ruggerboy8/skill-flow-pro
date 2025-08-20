@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getSiteWeekContext, assembleWeek as siteAssembleWeek } from './siteState';
+import { getLocationWeekContext, assembleWeek as locationAssembleWeek } from './locationState';
 import { getOpenBacklogCount, areSelectionsLocked, saveUserSelection } from './backlog';
 import { nowUtc, getAnchors } from "./centralTime";
 
@@ -17,20 +17,20 @@ export interface WeekAssignment {
 }
 
 /**
- * Assemble a user's current week assignments using site-based approach (unified)
+ * Assemble a user's current week assignments using location-based approach (unified)
  */
 export async function assembleCurrentWeek(
   userId: string,
   simOverrides?: any
 ): Promise<WeekAssignment[]> {
   try {
-    console.log('=== ASSEMBLING CURRENT WEEK (SITE-BASED) ===');
+    console.log('=== ASSEMBLING CURRENT WEEK (LOCATION-BASED) ===');
     console.log('Input params:', { userId, simOverrides });
     
-    // Get staff info
+    // Get staff info including location
     const { data: staffData } = await supabase
       .from('staff')
-      .select('id, role_id')
+      .select('id, role_id, primary_location_id')
       .eq('user_id', userId)
       .single();
 
@@ -38,20 +38,31 @@ export async function assembleCurrentWeek(
       throw new Error('Staff record not found');
     }
 
+    if (!staffData.primary_location_id) {
+      throw new Error('Staff member has no assigned location');
+    }
+
     console.log('Staff data:', staffData);
 
-    // Use site-based approach (single source of truth)
-    const siteId = 'main'; // Use the main site that exists in DB
-    const siteAssignments = await siteAssembleWeek({
+    // Get location context
+    const effectiveNow = simOverrides?.enabled && simOverrides.nowISO ? new Date(simOverrides.nowISO) : new Date();
+    const locationContext = await getLocationWeekContext(staffData.primary_location_id, effectiveNow);
+    
+    console.log('Location context:', locationContext);
+
+    // Use location-based approach
+    const locationAssignments = await locationAssembleWeek({
       userId,
       roleId: staffData.role_id,
-      siteId,
+      locationId: staffData.primary_location_id,
+      cycleNumber: locationContext.cycleNumber,
+      weekInCycle: locationContext.weekInCycle,
       simOverrides
     });
 
-    console.log('Site-based assignments:', siteAssignments);
+    console.log('Location-based assignments:', locationAssignments);
     
-    return siteAssignments.sort((a, b) => a.display_order - b.display_order);
+    return locationAssignments.sort((a, b) => a.display_order - b.display_order);
 
   } catch (error) {
     console.error('Error assembling current week:', error);

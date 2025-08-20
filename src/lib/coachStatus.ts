@@ -1,6 +1,5 @@
-import { getWeekAnchors, CT_TZ } from './centralTime';
-import { getSiteWeekContext, computeWeekState, isEligibleForProMoves } from './siteState';
 import { supabase } from '@/integrations/supabase/client';
+import { computeWeekState as computeLocationWeekState, StaffStatus } from '@/lib/locationState';
 
 export type StatusColor = "grey" | "yellow" | "green" | "red";
 export type WeekState = 'onboarding' | 'no_assignments' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'missed_checkout' | 'done';
@@ -34,13 +33,33 @@ export interface StaffWeekStatus {
  */
 export async function computeStaffStatusNew(
   userId: string,
-  staffData: { id: string; role_id: number; hire_date?: string | null; onboarding_weeks: number },
-  now: Date = new Date()
+  staffData: {
+    id: string;
+    role_id: number;
+    hire_date?: string | null;
+    onboarding_weeks: number;
+    primary_location_id?: string | null;
+  },
+  now?: Date
 ): Promise<StaffWeekStatus> {
   try {
-    // Use unified computation
-    const status = await computeWeekState({
+    if (!staffData.primary_location_id) {
+      return {
+        color: 'grey' as StatusColor,
+        reason: 'No location assigned',
+        state: 'no_assignments',
+        blocked: false,
+        confCount: 0,
+        perfCount: 0,
+        backlogCount: 0,
+        selectionPending: false
+      };
+    }
+
+    // Use the location-based computeWeekState
+    const status = await computeLocationWeekState({
       userId,
+      locationId: staffData.primary_location_id,
       roleId: staffData.role_id,
       now
     });
@@ -70,8 +89,8 @@ export async function computeStaffStatusNew(
       subtext: status.state === 'onboarding' ? 'Not participating yet' : undefined,
       tooltip: getTooltipForState(status.state, status.deadlineAt),
       blocked: status.state === 'missed_checkout',
-      confCount: 0, // TODO: Get actual counts if needed
-      perfCount: 0, // TODO: Get actual counts if needed
+      confCount: 0,
+      perfCount: 0,
       nextAction: status.nextAction,
       deadlineAt: status.deadlineAt,
       backlogCount: status.backlogCount,

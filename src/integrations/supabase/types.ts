@@ -81,6 +81,68 @@ export type Database = {
         }
         Relationships: []
       }
+      locations: {
+        Row: {
+          created_at: string
+          cycle_length_weeks: number
+          id: string
+          name: string
+          organization_id: string
+          program_start_date: string
+          slug: string
+          timezone: string
+        }
+        Insert: {
+          created_at?: string
+          cycle_length_weeks?: number
+          id?: string
+          name: string
+          organization_id: string
+          program_start_date: string
+          slug: string
+          timezone?: string
+        }
+        Update: {
+          created_at?: string
+          cycle_length_weeks?: number
+          id?: string
+          name?: string
+          organization_id?: string
+          program_start_date?: string
+          slug?: string
+          timezone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       pro_moves: {
         Row: {
           action_id: number
@@ -202,6 +264,7 @@ export type Database = {
           onboarding_weeks: number
           organization: string | null
           primary_location: string | null
+          primary_location_id: string | null
           role_id: number | null
           updated_at: string | null
           user_id: string
@@ -218,6 +281,7 @@ export type Database = {
           onboarding_weeks?: number
           organization?: string | null
           primary_location?: string | null
+          primary_location_id?: string | null
           role_id?: number | null
           updated_at?: string | null
           user_id: string
@@ -234,11 +298,19 @@ export type Database = {
           onboarding_weeks?: number
           organization?: string | null
           primary_location?: string | null
+          primary_location_id?: string | null
           role_id?: number | null
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "staff_primary_location_id_fkey"
+            columns: ["primary_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "staff_role_id_fkey"
             columns: ["role_id"]

@@ -128,7 +128,7 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
                     }}
                     className="w-full text-xs"
                   >
-                    Simulate New User
+                    New User (Backfill Needed)
                   </Button>
                   <Button
                     variant="outline"
@@ -231,6 +231,9 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
               {/* User State Overrides */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">User State</Label>
+                <div className="text-xs text-muted-foreground mb-2">
+                  To simulate incomplete backfill: Set "Force New User" = Yes + "Force Backfill Complete" = No
+                </div>
                 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -253,6 +256,9 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="text-xs text-muted-foreground">
+                    Yes = No database scores (backfill needed) • No = Has database scores (no backfill)
+                  </div>
 
                   <div className="flex items-center justify-between">
                     <Label className="text-sm">Force Backfill Complete</Label>
@@ -273,6 +279,9 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
                         <SelectItem value="false">No</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Only applies when backfill is needed. Yes = Complete • No = Incomplete
                   </div>
                 </div>
               </div>

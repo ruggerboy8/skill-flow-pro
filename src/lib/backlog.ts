@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getAnchors, nowUtc } from "@/lib/centralTime";
-import { getOpenBacklogCount } from '@/lib/weekValidationSim';
+import { SimOverrides } from '@/devtools/SimProvider';
 
 export interface BacklogItem {
   id: string;
@@ -122,246 +122,36 @@ export async function resolveBacklogItem(userId: string, proMoveId: number, reso
   }
 }
 
-// Assemble a week's assignments (site moves + backlog + self-select)
-export async function assembleWeek(
-  userId: string, 
-  isoYear: number, 
-  isoWeek: number, 
-  roleId: number,
-  simOverrides?: any
-): Promise<WeekAssignment[]> {
-  try {
-    console.log('=== ASSEMBLING WEEK ===');
-    console.log('Input params:', { userId, isoYear, isoWeek, roleId, simOverrides });
-    
-    const assignments: WeekAssignment[] = [];
-
-    // 1. First try to get weekly focus items by ISO week
-    let { data: weeklyFocus, error: focusError } = await supabase
-      .from('weekly_focus')
-      .select(`
-        id,
-        display_order,
-        self_select,
-        action_id,
-        competency_id,
-        cycle,
-        week_in_cycle,
-        competencies!inner(
-          domain_id,
-          domains!inner(domain_name)
-        )
-      `)
-      .eq('cycle', 2)
-      .eq('week_in_cycle', 1)
-      .eq('role_id', roleId)
-      .order('display_order');
-
-    console.log('ISO week query result:', { weeklyFocus, focusError, query: { isoYear, isoWeek, roleId } });
-
-    // 2. If no results from ISO week lookup, try to find current cycle/week
-    if (!weeklyFocus || weeklyFocus.length === 0) {
-      console.log('No weekly focus found for ISO week, trying cycle-based approach...');
-      
-      // Determine which cycle/week the user should be on after backfill
-      const { data: staffData } = await supabase
-        .from('staff')
-        .select('id')
-        .eq('user_id', userId)
-        .single();
-
-      console.log('Staff data for user:', staffData);
-
-      if (staffData) {
-        // Check if user completed backfill (has any weekly_scores)
-        const { data: hasScores } = await supabase
-          .from('weekly_scores')
-          .select('id')
-          .eq('staff_id', staffData.id)
-          .limit(1);
-
-        console.log('User has historical scores:', hasScores?.length > 0);
-
-        if (hasScores && hasScores.length > 0) {
-          // User completed backfill, should be on cycle 2 week 1
-          console.log('Querying for Cycle 2, Week 1...');
-          const { data: cycle2Focus, error: cycle2Error } = await supabase
-            .from('weekly_focus')
-            .select(`
-              id,
-              display_order,
-              self_select,
-              action_id,
-              competency_id,
-              cycle,
-              week_in_cycle,
-              competencies!inner(
-                domain_id,
-                domains!inner(domain_name)
-              )
-            `)
-            .eq('cycle', 2)
-            .eq('week_in_cycle', 1)
-            .eq('role_id', roleId)
-            .order('display_order');
-
-          console.log('Cycle 2 query result:', { cycle2Focus, cycle2Error });
-
-          if (!cycle2Error && cycle2Focus) {
-            weeklyFocus = cycle2Focus;
-          }
-        } else {
-          console.log('User has not completed backfill, should be on Cycle 1');
-        }
-      }
-    }
-
-    if (focusError && !weeklyFocus) throw focusError;
-    if (!weeklyFocus) {
-      console.log('No weekly focus found - returning empty assignments');
-      return [];
-    }
-    
-    console.log('Final weekly focus to process:', weeklyFocus);
-
-    // 2. Get user's backlog items (FIFO order) with simulation support
-    const backlogResult = await getOpenBacklogCount(userId, simOverrides);
-    const backlogItems = backlogResult.items;
-
-    // 3. Get user's current selections for self-select slots (unless simulating empty state)
-    const focusIds = weeklyFocus.map((f: any) => f.id);
-    const shouldIgnoreSelections = simOverrides?.enabled && simOverrides?.forceBacklogCount === 0;
-    
-    let userSelections = null;
-    if (!shouldIgnoreSelections) {
-      const { data } = await supabase
-        .from('weekly_self_select')
-        .select('weekly_focus_id, slot_index, selected_pro_move_id, source')
-        .eq('user_id', userId)
-        .in('weekly_focus_id', focusIds);
-      userSelections = data;
-    }
-
-    const selectionMap = new Map();
-    (userSelections || []).forEach((sel: any) => {
-      selectionMap.set(sel.weekly_focus_id, sel);
-    });
-
-    let backlogIndex = 0;
-
-    // 4. Process each focus item
-    for (const focus of weeklyFocus as any[]) {
-      const domainName = focus.competencies?.domains?.domain_name || 'Unknown';
-
-      if (!focus.self_select) {
-        // Site move - mandatory with predefined action
-        const { data: proMoveData } = await supabase
-          .from('pro_moves')
-          .select('action_statement')
-          .eq('action_id', focus.action_id)
-          .single();
-
-        assignments.push({
-          weekly_focus_id: focus.id,
-          type: 'site',
-          pro_move_id: focus.action_id,
-          action_statement: proMoveData?.action_statement || 'Site Move',
-          domain_name: domainName,
-          required: true,
-          locked: true,
-          display_order: focus.display_order
-        });
-        
-      } else {
-        // Self-select slot
-        const selection = selectionMap.get(focus.id);
-        
-        if (selection) {
-          // User has made a selection
-          const { data: proMoveData } = await supabase
-            .from('pro_moves')
-            .select('action_statement')
-            .eq('action_id', selection.selected_pro_move_id)
-            .single();
-
-          assignments.push({
-            weekly_focus_id: focus.id,
-            type: selection.source === 'backlog' ? 'backlog' : 'selfSelect',
-            pro_move_id: selection.selected_pro_move_id,
-            action_statement: proMoveData?.action_statement || 'Selected Move',
-            domain_name: domainName,
-            required: false,
-            locked: areSelectionsLocked(),
-            slot_index: selection.slot_index,
-            display_order: focus.display_order
-          });
-        } else if (backlogIndex < backlogItems.length) {
-          // Auto-assign from backlog
-          const backlogItem = backlogItems[backlogIndex++];
-          const { data: proMoveData } = await supabase
-            .from('pro_moves')
-            .select('action_statement')
-            .eq('action_id', backlogItem.pro_move_id)
-            .single();
-
-          // Save the auto-assignment
-          await saveUserSelection(userId, focus.id, 0, backlogItem.pro_move_id, 'backlog');
-
-          assignments.push({
-            weekly_focus_id: focus.id,
-            type: 'backlog',
-            pro_move_id: backlogItem.pro_move_id,
-            action_statement: proMoveData?.action_statement || 'Backlog Item',
-            domain_name: domainName,
-            required: false,
-            locked: areSelectionsLocked(),
-            backlog_id: backlogItem.id,
-            slot_index: 0,
-            display_order: focus.display_order
-          });
-        } else {
-          // Empty self-select slot
-          
-          assignments.push({
-            weekly_focus_id: focus.id,
-            type: 'selfSelect',
-            action_statement: '', // Empty - user needs to choose
-            domain_name: domainName,
-            required: false,
-            locked: areSelectionsLocked(),
-            display_order: focus.display_order
-          });
-        }
-      }
-    }
-
-    // Sort by display order
-    return assignments.sort((a, b) => a.display_order - b.display_order);
-
-  } catch (error) {
-    console.error('Error assembling week:', error);
-    return [];
+// Get open backlog count (with simulation override) - moved from weekValidationSim.ts
+export async function getOpenBacklogCount(
+  userId: string,
+  simOverrides?: SimOverrides
+): Promise<{ count: number; items: any[] }> {
+  // If simulation is active and backlog count is forced
+  if (simOverrides?.enabled && simOverrides.forceBacklogCount !== null) {
+    const count = simOverrides.forceBacklogCount;
+    // Generate synthetic backlog items for UI rendering
+    const items = Array.from({ length: count }, (_, i) => ({
+      id: `__sim_${i}`,
+      __sim: true, // Mark as simulated
+      pro_move_id: i + 1,
+      status: 'open',
+      action_statement: `Simulated Backlog Item ${i + 1}`,
+    }));
+    return { count, items };
   }
+
+  // Otherwise, get real backlog data
+  const { data: backlog } = await supabase
+    .from('user_backlog')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'open');
+
+  return { count: backlog?.length || 0, items: backlog || [] };
 }
 
-// Get user's current selections for choosable self-select slots
-export async function getUserSelections(userId: string, weeklyFocusIds: string[]): Promise<any[]> {
-  try {
-    const { data, error } = await supabase
-      .from('weekly_self_select')
-      .select('*')
-      .eq('user_id', userId)
-      .in('weekly_focus_id', weeklyFocusIds);
-
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching user selections:', error);
-    return [];
-  }
-}
-
-// Save user's selection for a self-select slot
+// Save user's selection for a self-select slot  
 export async function saveUserSelection(
   userId: string, 
   weeklyFocusId: string, 

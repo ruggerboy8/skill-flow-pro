@@ -100,7 +100,7 @@ export default function ConfidenceWizard() {
 
     setStaff(staffData);
 
-    // Use the new progress-based approach to get current week assignments
+    // Use the unified site-based approach to get current week assignments
     const assignments = await assembleCurrentWeek(user.id, overrides);
 
     if (!assignments || assignments.length === 0) {

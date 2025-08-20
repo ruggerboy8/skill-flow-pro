@@ -1,13 +1,16 @@
 import { getWeekAnchors, CT_TZ } from './centralTime';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { getOpenBacklogCount } from './backlog';
 
 export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'wait_for_thu' | 'done' | 'missed_checkout' | 'no_assignments';
 
 export interface SiteWeekContext {
   weekInCycle: number;
+  cycle: number;
   anchors: ReturnType<typeof getWeekAnchors>;
   timezone: string;
+  siteId: string;
 }
 
 export interface StaffStatus {
@@ -40,8 +43,10 @@ export async function getSiteWeekContext(siteId: string = 'main', now: Date = ne
 
   return {
     weekInCycle,
+    cycle: 1, // For now, enforce Cycle 1 everywhere
     anchors,
-    timezone: siteState.timezone
+    timezone: siteState.timezone,
+    siteId
   };
 }
 
@@ -343,15 +348,14 @@ export async function computeWeekState(params: {
     new Date(s.performance_date) <= anchors.performance_deadline
   ) || [];
 
-  const hasConfidence = confidenceScores.length >= 3;
-  const hasPerformance = performanceScores.length >= 3;
+  // Dynamic completion check based on actual assignment count
+  const requiredCount = assignments.length;
+  const hasConfidence = confidenceScores.length >= requiredCount;
+  const hasPerformance = performanceScores.length >= requiredCount;
 
-  // Get backlog count
-  const { count: backlogCount } = await supabase
-    .from('user_backlog')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('status', 'open');
+  // Get backlog count with simulation support
+  const backlogResult = await getOpenBacklogCount(userId, simOverrides);
+  const backlogCount = backlogResult.count;
 
   // Check for selection pending
   const selectionPending = assignments.some(a => a.status === 'empty');
@@ -388,7 +392,7 @@ export async function computeWeekState(params: {
       state: 'can_checkin',
       nextAction: 'Confidence',
       deadlineAt: anchors.confidence_deadline,
-      backlogCount: backlogCount || 0,
+      backlogCount,
       selectionPending,
       lastActivity
     };
@@ -399,7 +403,7 @@ export async function computeWeekState(params: {
       state: 'wait_for_thu',
       nextAction: 'Performance opens Thursday',
       deadlineAt: anchors.checkout_open,
-      backlogCount: backlogCount || 0,
+      backlogCount,
       selectionPending,
       lastActivity
     };
@@ -410,7 +414,7 @@ export async function computeWeekState(params: {
       state: 'can_checkout',
       nextAction: 'Performance',
       deadlineAt: anchors.performance_deadline,
-      backlogCount: backlogCount || 0,
+      backlogCount,
       selectionPending,
       lastActivity
     };
@@ -421,7 +425,7 @@ export async function computeWeekState(params: {
       state: 'missed_checkout',
       nextAction: 'Overdue',
       deadlineAt: anchors.performance_deadline,
-      backlogCount: backlogCount || 0,
+      backlogCount,
       selectionPending,
       lastActivity
     };
@@ -431,7 +435,7 @@ export async function computeWeekState(params: {
     return {
       state: 'done',
       nextAction: undefined,
-      backlogCount: backlogCount || 0,
+      backlogCount,
       selectionPending,
       lastActivity
     };
@@ -441,7 +445,7 @@ export async function computeWeekState(params: {
   return {
     state: 'no_assignments',
     nextAction: undefined,
-    backlogCount: backlogCount || 0,
+      backlogCount,
     selectionPending,
     lastActivity
   };

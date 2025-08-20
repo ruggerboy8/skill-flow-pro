@@ -10,7 +10,7 @@ import { nowUtc, nextMondayStr, getWeekAnchors, CT_TZ } from '@/lib/centralTime'
 import { useNow } from '@/providers/NowProvider';
 import { getDomainColor } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
-import { computeProgressWeekState, WeekContext } from '@/lib/progressTracking';
+import { computeWeekState, StaffStatus } from '@/lib/siteState';
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -24,7 +24,7 @@ export default function ThisWeekPanel() {
   const { overrides } = useSim();
 
   const [staff, setStaff] = useState<Staff | null>(null);
-  const [weekContext, setWeekContext] = useState<WeekContext | null>(null);
+  const [weekContext, setWeekContext] = useState<StaffStatus | null>(null);
   const [weekAssignments, setWeekAssignments] = useState<WeekAssignment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -68,8 +68,14 @@ export default function ThisWeekPanel() {
       const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
       console.log('Effective time being used:', effectiveNow);
       
-      // Compute current week state with simulation overrides (progress-based)
-      const context = await computeProgressWeekState(user.id, effectiveNow, overrides);
+      // Compute current week state with simulation overrides (site-based unified)
+      const context = await computeWeekState({
+        userId: user.id,
+        siteId: 'default', // For now, use default site
+        roleId: staff.role_id,
+        now: effectiveNow,
+        simOverrides: overrides
+      });
       console.log('Week context:', context);
       setWeekContext(context);
 

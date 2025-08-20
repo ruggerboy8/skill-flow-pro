@@ -294,7 +294,7 @@ export default function Week() {
     // 2) All done for the week
     if (allDone) {
       return {
-        bannerMessage: '✓ All set for this week. Great work!',
+        bannerMessage: 'Nice work! That\'s it for now, see you next week!',
         bannerCta: null,
       };
     }

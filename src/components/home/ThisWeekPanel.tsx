@@ -13,8 +13,14 @@ import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
 import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
+import ConfPerfDelta from '@/components/ConfPerfDelta';
 
 interface Staff { id: string; role_id: number; }
+interface WeeklyScore { 
+  weekly_focus_id: string; 
+  confidence_score: number | null; 
+  performance_score: number | null; 
+}
 
 export default function ThisWeekPanel() {
   const { user } = useAuth();
@@ -27,6 +33,7 @@ export default function ThisWeekPanel() {
   const [weekContext, setWeekContext] = useState<StaffStatus | null>(null);
   const [locationWeekContext, setLocationWeekContext] = useState<LocationWeekContext | null>(null);
   const [weekAssignments, setWeekAssignments] = useState<WeekAssignment[]>([]);
+  const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Load staff profile
@@ -102,6 +109,20 @@ export default function ThisWeekPanel() {
       console.log('Staff role_id:', staff.role_id);
       setWeekAssignments(assignments);
 
+      // Load weekly scores for the assignments
+      if (assignments.length > 0) {
+        const focusIds = assignments.map(a => a.weekly_focus_id);
+        const { data: scores } = await supabase
+          .from('weekly_scores')
+          .select('weekly_focus_id, confidence_score, performance_score')
+          .eq('staff_id', staffData.id)
+          .in('weekly_focus_id', focusIds);
+        
+        setWeeklyScores(scores || []);
+      } else {
+        setWeeklyScores([]);
+      }
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading current week:', error);
@@ -149,7 +170,7 @@ export default function ThisWeekPanel() {
 
       case 'done':
         return {
-          bannerMessage: '✓ All set for this week. Great work!',
+          bannerMessage: 'Nice work! That\'s it for now, see you next week!',
           bannerCta: null
         };
 
@@ -247,14 +268,13 @@ export default function ThisWeekPanel() {
       <CardContent className="space-y-4">
         {/* Pro Moves list */}
         <div className="space-y-3">
-          <div className="flex items-center justify-end">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Confidence</span>
-          </div>
-
           {weekAssignments.map((assignment, index) => {
             const domainName = assignment.domain_name;
             const bgColor = domainName ? getDomainColor(domainName) : undefined;
             const isUnchosen = assignment.type === 'selfSelect' && !assignment.action_statement;
+            
+            // Find scores for this assignment
+            const scores = weeklyScores.find(s => s.weekly_focus_id === assignment.weekly_focus_id);
 
             return (
               <div key={assignment.weekly_focus_id} className="rounded-lg p-4 border" style={bgColor ? { backgroundColor: bgColor } : undefined}>
@@ -264,14 +284,17 @@ export default function ThisWeekPanel() {
                   </Badge>
                 )}
 
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-2">
-                    <p className="text-sm font-medium flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-2 flex-1">
+                    <p className="text-sm font-medium">
                       {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
                     </p>
                   </div>
-                  <div className="min-w-12 flex justify-end">
-                    <span className="text-muted-foreground">—</span>
+                  <div className="flex-shrink-0">
+                    <ConfPerfDelta 
+                      confidence={scores?.confidence_score} 
+                      performance={scores?.performance_score} 
+                    />
                   </div>
                 </div>
               </div>

@@ -9,8 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, nextMondayStr, getWeekAnchors, CT_TZ } from '@/lib/centralTime';
 import { useNow } from '@/providers/NowProvider';
 import { getDomainColor } from '@/lib/domainColors';
-import { assembleWeek, WeekAssignment } from '@/lib/backlog';
-import { computeWeekState, WeekContext, getCurrentISOWeek } from '@/lib/weekValidationSim';
+import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
+import { computeProgressWeekState, WeekContext } from '@/lib/progressTracking';
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -68,16 +68,13 @@ export default function ThisWeekPanel() {
       const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
       console.log('Effective time being used:', effectiveNow);
       
-      // Compute current week state with simulation overrides
-      const context = await computeWeekState(staff.id, effectiveNow, overrides);
+      // Compute current week state with simulation overrides (progress-based)
+      const context = await computeProgressWeekState(user.id, effectiveNow, overrides);
       console.log('Week context:', context);
       setWeekContext(context);
 
-      // Load current week assignments with simulation support
-      const { iso_year, iso_week } = getCurrentISOWeek(effectiveNow);
-      console.log('ISO week calculation:', { iso_year, iso_week });
-      
-      const assignments = await assembleWeek(user.id, iso_year, iso_week, staff.role_id, overrides);
+      // Load current week assignments with simulation support (progress-based)
+      const assignments = await assembleCurrentWeek(user.id, overrides);
       console.log('Week assignments:', assignments);
       console.log('Staff role_id:', staff.role_id);
       setWeekAssignments(assignments);
@@ -108,7 +105,7 @@ export default function ThisWeekPanel() {
           bannerMessage: 'Welcome back! Time to rate your confidence for this week\'s Pro Moves.',
           bannerCta: {
             label: 'Rate Confidence',
-            onClick: () => navigate(`/confidence/${weekContext.iso_week}/step/1`)
+            onClick: () => navigate(`/confidence/current/step/1`)
           }
         };
 
@@ -123,7 +120,7 @@ export default function ThisWeekPanel() {
           bannerMessage: 'Time to reflect. Rate your performance for this week\'s Pro Moves.',
           bannerCta: {
             label: 'Rate Performance',
-            onClick: () => navigate(`/performance/${weekContext.iso_week}/step/1`)
+            onClick: () => navigate(`/performance/current/step/1`)
           }
         };
 

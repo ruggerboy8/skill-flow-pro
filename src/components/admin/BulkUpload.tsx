@@ -225,11 +225,19 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                   className="hidden"
                   id="file-upload"
                 />
-                <label htmlFor="file-upload">
+                 <label htmlFor="file-upload">
                   <Button asChild>
                     <span>Choose File</span>
                   </Button>
                 </label>
+                <div className="mt-4">
+                  <Button variant="outline" asChild>
+                    <a href="/pro-moves-template.csv" download="pro-moves-template.csv">
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Template
+                    </a>
+                  </Button>
+                </div>
               </div>
               
               <div className="text-sm text-gray-600">

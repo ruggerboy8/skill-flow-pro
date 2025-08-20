@@ -59,9 +59,9 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
           aria-label={aria}
           className="w-full text-left p-4 focus:outline-none focus:ring-2 focus:ring-ring rounded-lg"
         >
-          <div className="flex items-start justify-between gap-4">
-            {/* Name and Role */}
-            <div className="min-w-0 flex-1">
+          <div className="grid grid-cols-12 gap-4 items-start">
+            {/* Name and Role - col-span-4 to match header */}
+            <div className="col-span-4 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold truncate">{member.name}</h3>
                 <Badge variant="secondary" className="shrink-0">
@@ -73,8 +73,8 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
               )}
             </div>
 
-            {/* Last Activity */}
-            <div className="min-w-0 flex-1 max-w-40">
+            {/* Last Activity - col-span-3 to match header */}
+            <div className="col-span-3">
               {status.lastActivity ? (
                 <div className="text-right">
                   <div className="flex items-center justify-end gap-2 mb-1">
@@ -98,8 +98,8 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
               )}
             </div>
 
-            {/* Status */}
-            <div className="text-right min-w-0 flex-shrink-0">
+            {/* Status - col-span-5 to match header */}
+            <div className="col-span-5 text-right">
               {status.tooltip ? (
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>

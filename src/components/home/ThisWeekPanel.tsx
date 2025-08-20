@@ -10,7 +10,7 @@ import { nowUtc, nextMondayStr, getWeekAnchors, CT_TZ } from '@/lib/centralTime'
 import { useNow } from '@/providers/NowProvider';
 import { getDomainColor } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
-import { computeWeekState, StaffStatus } from '@/lib/siteState';
+import { computeWeekState, StaffStatus, getSiteWeekContext, SiteWeekContext } from '@/lib/siteState';
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -25,6 +25,7 @@ export default function ThisWeekPanel() {
 
   const [staff, setStaff] = useState<Staff | null>(null);
   const [weekContext, setWeekContext] = useState<StaffStatus | null>(null);
+  const [siteWeekContext, setSiteWeekContext] = useState<SiteWeekContext | null>(null);
   const [weekAssignments, setWeekAssignments] = useState<WeekAssignment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -67,6 +68,11 @@ export default function ThisWeekPanel() {
       // Use simulated time if available
       const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
       console.log('Effective time being used:', effectiveNow);
+      
+      // Get site week context for cycle and week info
+      const siteContext = await getSiteWeekContext('main', effectiveNow);
+      console.log('Site week context:', siteContext);
+      setSiteWeekContext(siteContext);
       
       // Compute current week state with simulation overrides (site-based unified)
       const context = await computeWeekState({
@@ -170,6 +176,13 @@ export default function ThisWeekPanel() {
         <CardHeader>
           <CardTitle>This Week&apos;s Pro Moves</CardTitle>
           <CardDescription>Week of {weekOfDate}</CardDescription>
+          {siteWeekContext && (
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="outline" className="text-xs">
+                Cycle {siteWeekContext.cycle}, Week {siteWeekContext.weekInCycle}
+              </Badge>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted p-3">
@@ -187,6 +200,13 @@ export default function ThisWeekPanel() {
         <CardHeader>
           <CardTitle>This Week&apos;s Pro Moves</CardTitle>
           <CardDescription>Week of {weekOfDate}</CardDescription>
+          {siteWeekContext && (
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="outline" className="text-xs">
+                Cycle {siteWeekContext.cycle}, Week {siteWeekContext.weekInCycle}
+              </Badge>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted p-3">
@@ -205,6 +225,13 @@ export default function ThisWeekPanel() {
       <CardHeader className="pb-2">
         <CardTitle>This Week&apos;s Pro Moves</CardTitle>
         <CardDescription>Week of {weekOfDate}</CardDescription>
+        {siteWeekContext && (
+          <div className="flex items-center gap-2 mt-2">
+            <Badge variant="outline" className="text-xs">
+              Cycle {siteWeekContext.cycle}, Week {siteWeekContext.weekInCycle}
+            </Badge>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Pro Moves list */}

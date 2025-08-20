@@ -6,17 +6,20 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
+import { QuarterlyEvalsTab } from '@/components/coach/QuarterlyEvalsTab';
 
 interface StaffInfo {
   id: string;
   name: string;
   role_name: string;
   role_id: number;
+  location_id?: string;
 }
 
 interface WeekData {
@@ -39,7 +42,7 @@ interface CycleData {
 export default function CoachDetail() {
   const { staffId } = useParams<{ staffId: string }>();
   const navigate = useNavigate();
-  const { isCoach } = useAuth();
+  const { isCoach, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
   const [cycles, setCycles] = useState<CycleData[]>([]);
@@ -73,7 +76,7 @@ export default function CoachDetail() {
       // Get staff info
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
-        .select('id, name, role_id, roles!inner(role_name)')
+        .select('id, name, role_id, primary_location_id, roles!inner(role_name)')
         .eq('id', staffId)
         .single();
 
@@ -84,7 +87,8 @@ export default function CoachDetail() {
         id: staffData.id,
         name: staffData.name,
         role_name: (staffData.roles as any).role_name,
-        role_id: staffData.role_id
+        role_id: staffData.role_id,
+        location_id: staffData.primary_location_id
       };
 
       setStaffInfo(staff);
@@ -269,88 +273,108 @@ export default function CoachDetail() {
           </Button>
           <h1 className="text-3xl font-bold">{staffInfo.role_name} · {staffInfo.name}</h1>
         </div>
-        
-        <Select value={selectedCycle.toString()} onValueChange={(value) => setSelectedCycle(parseInt(value))}>
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {cycles.map(cycle => (
-              <SelectItem key={cycle.cycle} value={cycle.cycle.toString()}>
-                Cycle {cycle.cycle}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
-      {/* Week Accordion */}
-      {currentCycle && (
-        <Accordion type="multiple" value={Array.from(expandedWeeks)}>
-          {[1, 2, 3, 4, 5, 6].map(week => {
-            const weekData = currentCycle.weeks.get(week);
-            const cycleWeekKey = `${selectedCycle}-${week}`;
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="performance" className="w-full">
+        <TabsList>
+          <TabsTrigger value="performance">Performance History</TabsTrigger>
+          <TabsTrigger value="quarterly-evals">Quarterly Evals</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="performance" className="space-y-4">
+          <Select value={selectedCycle.toString()} onValueChange={(value) => setSelectedCycle(parseInt(value))}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {cycles.map(cycle => (
+                <SelectItem key={cycle.cycle} value={cycle.cycle.toString()}>
+                  Cycle {cycle.cycle}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            return (
-              <AccordionItem key={week} value={cycleWeekKey}>
-                <AccordionTrigger 
-                  onClick={() => handleWeekExpand(cycleWeekKey)}
-                  className="hover:no-underline"
-                >
-                  <div className="flex items-center gap-3 w-full">
-                    <span>Week {week}</span>
-                    {weekData && weekData.loaded && 
-                      getStatusBadge(weekData.data)
-                    }
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  {weekData?.loaded ? (
-                    weekData.data.length > 0 ? (
-                      <div className="space-y-3">
-                        {weekData.data.map((item, index) => (
-                          <Card key={index}>
-                            <CardContent className="p-4">
-                              <div className="flex items-center gap-4">
-                                <Badge 
-                                  style={{ backgroundColor: getDomainColor(item.domain_name) }}
-                                  className="ring-1 ring-border/50 text-foreground"
-                                >
-                                  {item.domain_name}
-                                </Badge>
-                                <div className="flex-1">
-                                  <p className="text-sm">{item.action_statement}</p>
-                                </div>
-                                <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+          {/* Week Accordion */}
+          {currentCycle && (
+            <Accordion type="multiple" value={Array.from(expandedWeeks)}>
+              {[1, 2, 3, 4, 5, 6].map(week => {
+                const weekData = currentCycle.weeks.get(week);
+                const cycleWeekKey = `${selectedCycle}-${week}`;
+
+                return (
+                  <AccordionItem key={week} value={cycleWeekKey}>
+                    <AccordionTrigger 
+                      onClick={() => handleWeekExpand(cycleWeekKey)}
+                      className="hover:no-underline"
+                    >
+                      <div className="flex items-center gap-3 w-full">
+                        <span>Week {week}</span>
+                        {weekData && weekData.loaded && 
+                          getStatusBadge(weekData.data)
+                        }
                       </div>
-                    ) : (
-                      <p className="text-muted-foreground py-4">No Pro-Moves scheduled for this week.</p>
-                    )
-                  ) : (
-                    <div className="space-y-3">
-                      {[...Array(3)].map((_, i) => (
-                        <Skeleton key={i} className="h-16 w-full" />
-                      ))}
-                    </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
-      )}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      {weekData?.loaded ? (
+                        weekData.data.length > 0 ? (
+                          <div className="space-y-3">
+                            {weekData.data.map((item, index) => (
+                              <Card key={index}>
+                                <CardContent className="p-4">
+                                  <div className="flex items-center gap-4">
+                                    <Badge 
+                                      style={{ backgroundColor: getDomainColor(item.domain_name) }}
+                                      className="ring-1 ring-border/50 text-foreground"
+                                    >
+                                      {item.domain_name}
+                                    </Badge>
+                                    <div className="flex-1">
+                                      <p className="text-sm">{item.action_statement}</p>
+                                    </div>
+                                    <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground py-4">No Pro-Moves scheduled for this week.</p>
+                        )
+                      ) : (
+                        <div className="space-y-3">
+                          {[...Array(3)].map((_, i) => (
+                            <Skeleton key={i} className="h-16 w-full" />
+                          ))}
+                        </div>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          )}
 
-      {cycles.length === 0 && (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <p className="text-muted-foreground">No cycles found for this staff member.</p>
-          </CardContent>
-        </Card>
-      )}
+          {cycles.length === 0 && (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <p className="text-muted-foreground">No cycles found for this staff member.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="quarterly-evals">
+          {user && staffInfo && (
+            <QuarterlyEvalsTab 
+              staffId={staffInfo.id}
+              staffInfo={staffInfo}
+              currentUserId={user.id}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

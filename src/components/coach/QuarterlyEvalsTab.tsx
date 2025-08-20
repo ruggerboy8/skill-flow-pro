@@ -1,0 +1,325 @@
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon, Plus, Eye, FileEdit } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
+import { getEvaluationsForStaff, createDraftEvaluation } from '@/lib/evaluations';
+import { Database } from '@/integrations/supabase/types';
+
+type Evaluation = Database['public']['Tables']['evaluations']['Row'];
+
+interface QuarterlyEvalsTabProps {
+  staffId: string;
+  staffInfo: {
+    name: string;
+    role_id: number;
+    location_id?: string;
+  };
+  currentUserId: string;
+}
+
+export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: QuarterlyEvalsTabProps) {
+  const [evaluations, setEvaluations] = useState<{ drafts: Evaluation[]; submitted: Evaluation[] }>({
+    drafts: [],
+    submitted: []
+  });
+  const [loading, setLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // Form state for new evaluation
+  const [newEvalForm, setNewEvalForm] = useState({
+    quarter: '' as 'Q1' | 'Q2' | 'Q3' | 'Q4' | '',
+    programYear: new Date().getFullYear(),
+    observedAt: undefined as Date | undefined
+  });
+
+  useEffect(() => {
+    loadEvaluations();
+  }, [staffId]);
+
+  const loadEvaluations = async () => {
+    try {
+      setLoading(true);
+      const data = await getEvaluationsForStaff(staffId);
+      setEvaluations(data);
+    } catch (error) {
+      console.error('Failed to load evaluations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load evaluations",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateEvaluation = async () => {
+    if (!newEvalForm.quarter || !staffInfo.location_id) {
+      toast({
+        title: "Error",
+        description: "Please select a quarter and ensure location is set",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      const result = await createDraftEvaluation({
+        staffId,
+        roleId: staffInfo.role_id,
+        locationId: staffInfo.location_id,
+        quarter: newEvalForm.quarter,
+        programYear: newEvalForm.programYear,
+        evaluatorId: currentUserId,
+        observedAt: newEvalForm.observedAt
+      });
+
+      toast({
+        title: "Success",
+        description: "Evaluation created successfully"
+      });
+
+      setShowCreateDialog(false);
+      setNewEvalForm({
+        quarter: '',
+        programYear: new Date().getFullYear(),
+        observedAt: undefined
+      });
+
+      // Navigate to evaluation hub
+      navigate(`/coach/${staffId}/eval/${result.evaluation.id}`);
+    } catch (error) {
+      console.error('Failed to create evaluation:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create evaluation",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const formatEvaluationSubtitle = (evaluation: Evaluation) => {
+    const status = evaluation.status === 'draft' ? 'Draft' : 'Submitted';
+    const timeAgo = new Date(evaluation.updated_at).toLocaleDateString();
+    return `${evaluation.quarter} '${evaluation.program_year.toString().slice(-2)} • ${status} • ${timeAgo}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">Quarterly Evaluations</h3>
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-4">
+                <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
+                <div className="h-3 bg-muted rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">Quarterly Evaluations</h3>
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              New Evaluation
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create New Evaluation</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="quarter">Quarter *</Label>
+                <Select 
+                  value={newEvalForm.quarter} 
+                  onValueChange={(value: 'Q1' | 'Q2' | 'Q3' | 'Q4') => 
+                    setNewEvalForm(prev => ({ ...prev, quarter: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select quarter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
+                    <SelectItem value="Q2">Q2 (Apr-Jun)</SelectItem>
+                    <SelectItem value="Q3">Q3 (Jul-Sep)</SelectItem>
+                    <SelectItem value="Q4">Q4 (Oct-Dec)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="programYear">Program Year</Label>
+                <Select 
+                  value={newEvalForm.programYear.toString()} 
+                  onValueChange={(value) => 
+                    setNewEvalForm(prev => ({ ...prev, programYear: parseInt(value) }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[2024, 2025, 2026].map(year => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Observation Date (Optional)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !newEvalForm.observedAt && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newEvalForm.observedAt ? format(newEvalForm.observedAt, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={newEvalForm.observedAt}
+                      onSelect={(date) => setNewEvalForm(prev => ({ ...prev, observedAt: date }))}
+                      className="p-3 pointer-events-auto"
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowCreateDialog(false)}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateEvaluation}
+                  disabled={isCreating || !newEvalForm.quarter}
+                >
+                  {isCreating ? "Creating..." : "Create Evaluation"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* In Progress Section */}
+      <div className="space-y-3">
+        <h4 className="font-medium text-muted-foreground">In Progress</h4>
+        {evaluations.drafts.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              No evaluations in progress
+            </CardContent>
+          </Card>
+        ) : (
+          evaluations.drafts.map(evaluation => (
+            <Card key={evaluation.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="font-medium">
+                      {evaluation.quarter} {evaluation.program_year} Evaluation
+                    </h5>
+                    <p className="text-sm text-muted-foreground">
+                      {formatEvaluationSubtitle(evaluation)}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="secondary">Draft</Badge>
+                    <Button 
+                      size="sm"
+                      onClick={() => navigate(`/coach/${staffId}/eval/${evaluation.id}`)}
+                    >
+                      <FileEdit className="w-4 h-4 mr-1" />
+                      Continue
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Submitted Section */}
+      <div className="space-y-3">
+        <h4 className="font-medium text-muted-foreground">Submitted</h4>
+        {evaluations.submitted.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              No submitted evaluations
+            </CardContent>
+          </Card>
+        ) : (
+          evaluations.submitted.map(evaluation => (
+            <Card key={evaluation.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="font-medium">
+                      {evaluation.quarter} {evaluation.program_year} Evaluation
+                    </h5>
+                    <p className="text-sm text-muted-foreground">
+                      {formatEvaluationSubtitle(evaluation)}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="default">Submitted</Badge>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => navigate(`/coach/${staffId}/eval/${evaluation.id}`)}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      View
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

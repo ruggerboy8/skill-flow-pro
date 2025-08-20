@@ -159,15 +159,47 @@ export type Database = {
         }
         Relationships: []
       }
+      site_cycle_state: {
+        Row: {
+          created_at: string
+          cycle_length_weeks: number
+          cycle_start_date: string
+          id: string
+          site_id: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cycle_length_weeks?: number
+          cycle_start_date: string
+          id?: string
+          site_id: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cycle_length_weeks?: number
+          cycle_start_date?: string
+          id?: string
+          site_id?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       staff: {
         Row: {
           created_at: string | null
           email: string
+          hire_date: string | null
           id: string
           is_coach: boolean
           is_super_admin: boolean
           location: string | null
           name: string
+          onboarding_weeks: number
           organization: string | null
           primary_location: string | null
           role_id: number | null
@@ -177,11 +209,13 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email: string
+          hire_date?: string | null
           id?: string
           is_coach?: boolean
           is_super_admin?: boolean
           location?: string | null
           name: string
+          onboarding_weeks?: number
           organization?: string | null
           primary_location?: string | null
           role_id?: number | null
@@ -191,11 +225,13 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string
+          hire_date?: string | null
           id?: string
           is_coach?: boolean
           is_super_admin?: boolean
           location?: string | null
           name?: string
+          onboarding_weeks?: number
           organization?: string | null
           primary_location?: string | null
           role_id?: number | null
@@ -481,6 +517,14 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_week_in_cycle: {
+        Args: {
+          check_date?: string
+          cycle_length_weeks: number
+          cycle_start_date: string
+        }
+        Returns: number
+      }
       get_weekly_review: {
         Args: {
           p_cycle: number
@@ -497,6 +541,14 @@ export type Database = {
       }
       is_coach_or_admin: {
         Args: { _user_id: string }
+        Returns: boolean
+      }
+      is_eligible_for_pro_moves: {
+        Args: {
+          check_date?: string
+          hire_date: string
+          onboarding_weeks: number
+        }
         Returns: boolean
       }
       is_super_admin: {

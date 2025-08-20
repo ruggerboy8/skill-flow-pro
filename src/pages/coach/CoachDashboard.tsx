@@ -243,15 +243,25 @@ export default function CoachDashboard() {
       </div>
 
       {/* Staff List */}
-      <div className="grid gap-4">
-        {rows.map(({ member, status }) => (
-          <StaffRow
-            key={member.id}
-            member={member}
-            status={status}
-            onClick={() => navigate(`/coach/${member.id}`)}
-          />
-        ))}
+      <div className="space-y-4">
+        {/* Column Headers */}
+        <div className="grid grid-cols-12 gap-4 px-4 py-2 text-sm font-medium text-muted-foreground border-b">
+          <div className="col-span-4">Staff Member</div>
+          <div className="col-span-3 text-right">Last Activity</div>
+          <div className="col-span-5 text-right">Status</div>
+        </div>
+        
+        {/* Staff Rows */}
+        <div className="space-y-2">
+          {rows.map(({ member, status }) => (
+            <StaffRow
+              key={member.id}
+              member={member}
+              status={status}
+              onClick={() => navigate(`/coach/${member.id}`)}
+            />
+          ))}
+        </div>
       </div>
 
       {rows.length === 0 && (

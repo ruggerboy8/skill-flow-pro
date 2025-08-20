@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { format } from 'date-fns';
 
 export interface StaffRowProps {
   member: {
@@ -14,6 +15,7 @@ export interface StaffRowProps {
     reason: string;
     subtext?: string;
     tooltip?: string;
+    lastActivity?: { kind: 'confidence' | 'performance'; at: Date };
   };
   onClick: () => void;
 }
@@ -58,49 +60,77 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
           className="w-full text-left p-4 focus:outline-none focus:ring-2 focus:ring-ring rounded-lg"
         >
           <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold truncate">{member.name}</h3>
-              <Badge variant="secondary" className="shrink-0">
-                {member.role_name}
-              </Badge>
-            </div>
-            {member.location && (
-              <p className="text-xs text-muted-foreground mt-0.5">{member.location}</p>
-            )}
-          </div>
-          <div className="text-right">
-            {status.tooltip ? (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${chipClass}`}
-                      aria-label={`Status: ${chipText}`}
-                    >
-                      {chipText}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{status.tooltip}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : (
-              <div
-                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${chipClass}`}
-                aria-label={`Status: ${chipText}`}
-              >
-                {chipText}
+            {/* Name and Role */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold truncate">{member.name}</h3>
+                <Badge variant="secondary" className="shrink-0">
+                  {member.role_name}
+                </Badge>
               </div>
-            )}
-            {status.tooltip && status.reason && (
-              <div className="mt-1 text-sm">{status.reason}</div>
-            )}
-            {status.subtext && (
-              <div className="text-xs text-muted-foreground mt-0.5">{status.subtext}</div>
-            )}
-          </div>
+              {member.location && (
+                <p className="text-xs text-muted-foreground mt-0.5">{member.location}</p>
+              )}
+            </div>
+
+            {/* Last Activity */}
+            <div className="min-w-0 flex-1 max-w-40">
+              {status.lastActivity ? (
+                <div className="text-right">
+                  <div className="flex items-center justify-end gap-2 mb-1">
+                    <Badge 
+                      variant={status.lastActivity.kind === 'confidence' ? 'default' : 'secondary'}
+                      className="text-xs"
+                    >
+                      {status.lastActivity.kind === 'confidence' ? 'Confidence' : 'Performance'}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {format(status.lastActivity.at, 'M/d')} at {format(status.lastActivity.at, 'h:mm a')}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground">
+                    No activity
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Status */}
+            <div className="text-right min-w-0 flex-shrink-0">
+              {status.tooltip ? (
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${chipClass}`}
+                        aria-label={`Status: ${chipText}`}
+                      >
+                        {chipText}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{status.tooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <div
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${chipClass}`}
+                  aria-label={`Status: ${chipText}`}
+                >
+                  {chipText}
+                </div>
+              )}
+              {status.tooltip && status.reason && (
+                <div className="mt-1 text-sm">{status.reason}</div>
+              )}
+              {status.subtext && (
+                <div className="text-xs text-muted-foreground mt-0.5">{status.subtext}</div>
+              )}
+            </div>
           </div>
         </button>
       </CardContent>

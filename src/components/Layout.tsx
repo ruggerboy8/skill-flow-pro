@@ -39,6 +39,8 @@ export default function Layout() {
     ] : [])
   ];
 
+  console.log('Layout - isBackfillComplete:', isBackfillComplete, 'navigation length:', navigation.length);
+
   const isActive = (href: string) => {
     if (href === '/') {
       return location.pathname === '/';

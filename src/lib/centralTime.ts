@@ -51,7 +51,7 @@ export function getWeekAnchors(now: Date = nowUtc(), tz: string = CT_TZ) {
 
   const checkin_open = ctUtcForTz(mondayZ, '00:00:00', tz);           // Mon 00:00 TZ
   const confidence_deadline = ctUtcForTz(addDays(mondayZ, 1), '12:00:00', tz); // Tue 12:00 TZ
-  const checkout_open = ctUtcForTz(addDays(mondayZ, 3), '12:01:00', tz); // Thu 12:01 TZ
+  const checkout_open = ctUtcForTz(addDays(mondayZ, 3), '00:01:00', tz); // Thu 00:01 TZ
   const performance_deadline = ctUtcForTz(addDays(mondayZ, 4), '17:00:00', tz); // Fri 17:00 TZ
   const week_end = ctUtcForTz(addDays(mondayZ, 6), '23:59:59', tz); // Sun 23:59:59 TZ
 

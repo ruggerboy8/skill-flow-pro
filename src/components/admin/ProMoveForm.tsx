@@ -80,31 +80,54 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
       }
 
       try {
+        console.log('Loading competencies for role_id:', formData.role_id);
+        
         const { data, error } = await supabase
           .from('competencies')
           .select(`
             competency_id, 
             name,
-            domains (
-              domain_name
-            )
+            domain_id
           `)
           .eq('role_id', parseInt(formData.role_id))
           .order('competency_id');
 
-        if (error) throw error;
+        if (error) {
+          console.error('Competencies query error:', error);
+          throw error;
+        }
+
+        console.log('Raw competencies data:', data);
+
+        // Get domain names for each competency
+        const competenciesWithDomains = await Promise.all(
+          (data || []).map(async (competency) => {
+            if (!competency.domain_id) {
+              return {
+                ...competency,
+                domain_name: 'General'
+              };
+            }
+
+            const { data: domainData } = await supabase
+              .from('domains')
+              .select('domain_name')
+              .eq('domain_id', competency.domain_id)
+              .maybeSingle();
+
+            return {
+              ...competency,
+              domain_name: domainData?.domain_name || 'General'
+            };
+          })
+        );
         
-        const formattedCompetencies = data?.map(item => ({
-          competency_id: item.competency_id,
-          name: item.name,
-          domain_name: (item.domains as any)?.domain_name
-        })) || [];
-        
-        setFilteredCompetencies(formattedCompetencies);
+        console.log('Processed competencies with domains:', competenciesWithDomains);
+        setFilteredCompetencies(competenciesWithDomains);
         
         // Clear competency selection if current one doesn't match role
         if (formData.competency_id) {
-          const isValidCompetency = data?.some(c => c.competency_id.toString() === formData.competency_id);
+          const isValidCompetency = competenciesWithDomains.some(c => c.competency_id.toString() === formData.competency_id);
           if (!isValidCompetency) {
             setFormData(prev => ({ ...prev, competency_id: '' }));
           }
@@ -112,11 +135,16 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
       } catch (error) {
         console.error('Error loading competencies:', error);
         setFilteredCompetencies([]);
+        toast({
+          title: "Error",
+          description: "Failed to load competencies for selected role",
+          variant: "destructive"
+        });
       }
     };
 
     loadFilteredCompetencies();
-  }, [formData.role_id, competencies]);
+  }, [formData.role_id, competencies, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

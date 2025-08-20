@@ -30,6 +30,8 @@ import AdminBuilder from "./pages/AdminBuilder";
 import CycleList from "./pages/admin/CycleList";
 import WeekList from "./pages/admin/WeekList";
 import WeekEditor from "./pages/admin/WeekEditor";
+import OrganizationList from "./pages/admin/OrganizationList";
+import LocationList from "./pages/admin/LocationList";
 import NotFound from "./pages/NotFound";
 import BackfillIntro from "./pages/backfill/BackfillIntro";
 import BackfillWeek from "./pages/backfill/BackfillWeek";
@@ -89,6 +91,8 @@ function AppRoutes() {
         <Route path="builder/:roleId" element={<CycleList />} />
         <Route path="builder/:roleId/:cycle" element={<WeekList />} />
         <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />
+        <Route path="admin/organizations" element={<OrganizationList />} />
+        <Route path="admin/locations" element={<LocationList />} />
         <Route path="admin/builder" element={<Navigate to="/builder" replace />} />
         <Route path="*" element={<NotFound />} />
       </Route>

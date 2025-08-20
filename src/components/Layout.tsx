@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useBackfillStatus } from '@/hooks/useBackfillStatus';
-import { Home, BarChart3, User, Settings, Users, ClipboardList } from 'lucide-react';
+import { Home, BarChart3, User, Settings, Users, ClipboardList, Building, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const ADMIN_EMAILS = ['johno@reallygoodconsulting.org'];
@@ -32,7 +32,11 @@ export default function Layout() {
     // Show backfill button for all users when not complete
     ...(isBackfillComplete === false ? [{ name: 'Backfill', href: '/backfill', icon: ClipboardList }] : []),
     ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
-    ...(isSuperAdmin ? [{ name: 'Builder', href: '/builder', icon: Settings }] : [])
+    ...(isSuperAdmin ? [
+      { name: 'Builder', href: '/builder', icon: Settings },
+      { name: 'Organizations', href: '/admin/organizations', icon: Building },
+      { name: 'Locations', href: '/admin/locations', icon: MapPin }
+    ] : [])
   ];
 
   const isActive = (href: string) => {

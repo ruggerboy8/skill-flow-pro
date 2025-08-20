@@ -81,6 +81,89 @@ export type Database = {
         }
         Relationships: []
       }
+      evaluation_items: {
+        Row: {
+          competency_id: number
+          competency_name_snapshot: string
+          evaluation_id: string
+          observer_note: string | null
+          observer_score: number | null
+          self_note: string | null
+          self_score: number | null
+        }
+        Insert: {
+          competency_id: number
+          competency_name_snapshot: string
+          evaluation_id: string
+          observer_note?: string | null
+          observer_score?: number | null
+          self_note?: string | null
+          self_score?: number | null
+        }
+        Update: {
+          competency_id?: number
+          competency_name_snapshot?: string
+          evaluation_id?: string
+          observer_note?: string | null
+          observer_score?: number | null
+          self_note?: string | null
+          self_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_items_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "evaluations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evaluations: {
+        Row: {
+          created_at: string
+          evaluator_id: string
+          id: string
+          location_id: string
+          observed_at: string | null
+          program_year: number
+          quarter: string
+          role_id: number
+          staff_id: string
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          evaluator_id: string
+          id?: string
+          location_id: string
+          observed_at?: string | null
+          program_year: number
+          quarter: string
+          role_id: number
+          staff_id: string
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          evaluator_id?: string
+          id?: string
+          location_id?: string
+          observed_at?: string | null
+          program_year?: number
+          quarter?: string
+          role_id?: number
+          staff_id?: string
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       locations: {
         Row: {
           created_at: string

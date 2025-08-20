@@ -293,7 +293,7 @@ export async function computeWeekState(params: {
     .from('staff')
     .select('*')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   if (!staff) {
     throw new Error('Staff member not found');
@@ -329,7 +329,7 @@ export async function computeWeekState(params: {
     };
   }
 
-  // Get current week's scores within time windows
+  // Get current week's scores within time windows (for completion status)
   const currentCycle = 1; // For now, assume cycle 1
   const { data: scores } = await supabase
     .from('weekly_scores')
@@ -341,7 +341,7 @@ export async function computeWeekState(params: {
     .eq('weekly_focus.cycle', currentCycle)
     .eq('weekly_focus.week_in_cycle', weekInCycle);
 
-  // Count valid scores within time windows
+  // Count valid scores within time windows (for completion status)
   const confidenceScores = scores?.filter(s => 
     s.confidence_score !== null && 
     s.confidence_date && 
@@ -368,18 +368,41 @@ export async function computeWeekState(params: {
   // Check for selection pending
   const selectionPending = assignments.some(a => a.type === 'selfSelect' && !a.action_statement);
 
-  // Get last activity
-  let lastActivity: { kind: 'confidence' | 'performance'; at: Date } | undefined;
-  const allScores = [...confidenceScores, ...performanceScores].sort(
-    (a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
-  );
+  // Get last activity (ALL historical activity, not just current week)
+  const { data: allScores } = await supabase
+    .from('weekly_scores')
+    .select('confidence_date, performance_date, updated_at')
+    .eq('staff_id', staff.id)
+    .or('confidence_date.not.is.null,performance_date.not.is.null')
+    .order('updated_at', { ascending: false })
+    .limit(50); // Get recent activity
 
-  if (allScores.length > 0) {
-    const latest = allScores[0];
-    if (latest.confidence_date && (!latest.performance_date || new Date(latest.confidence_date) > new Date(latest.performance_date))) {
-      lastActivity = { kind: 'confidence', at: new Date(latest.confidence_date) };
-    } else if (latest.performance_date) {
-      lastActivity = { kind: 'performance', at: new Date(latest.performance_date) };
+  let lastActivity: { kind: 'confidence' | 'performance'; at: Date } | undefined;
+  
+  if (allScores && allScores.length > 0) {
+    // Find the most recent activity by comparing all confidence and performance dates
+    let latestDate: Date | null = null;
+    let latestKind: 'confidence' | 'performance' | null = null;
+    
+    for (const score of allScores) {
+      if (score.confidence_date) {
+        const confDate = new Date(score.confidence_date);
+        if (!latestDate || confDate > latestDate) {
+          latestDate = confDate;
+          latestKind = 'confidence';
+        }
+      }
+      if (score.performance_date) {
+        const perfDate = new Date(score.performance_date);
+        if (!latestDate || perfDate > latestDate) {
+          latestDate = perfDate;
+          latestKind = 'performance';
+        }
+      }
+    }
+    
+    if (latestDate && latestKind) {
+      lastActivity = { kind: latestKind, at: latestDate };
     }
   }
 

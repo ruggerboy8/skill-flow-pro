@@ -10,6 +10,7 @@ import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
+import { supabase } from '@/integrations/supabase/client';
 import {
   getEvaluation,
   setObserverScore,
@@ -35,6 +36,7 @@ export function EvaluationHub() {
   const { toast } = useToast();
 
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
+  const [staffName, setStaffName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,6 +67,17 @@ export function EvaluationHub() {
         return;
       }
       setEvaluation(data);
+
+      // Fetch staff information
+      const { data: staffData } = await supabase
+        .from('staff')
+        .select('name')
+        .eq('id', data.staff_id)
+        .single();
+      
+      if (staffData) {
+        setStaffName(staffData.name);
+      }
     } catch (error) {
       console.error('Failed to load evaluation:', error);
       toast({
@@ -285,7 +298,7 @@ export function EvaluationHub() {
               {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
             </h1>
             <p className="text-muted-foreground">
-              Staff Member • {evaluation.status === 'draft' ? 'Draft' : 'Submitted'}
+              {staffName || 'Staff Member'} • {evaluation.status === 'draft' ? 'Draft' : 'Submitted'}
             </p>
           </div>
         </div>

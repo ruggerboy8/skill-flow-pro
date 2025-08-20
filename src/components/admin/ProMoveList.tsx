@@ -32,6 +32,8 @@ interface ProMove {
   resources_url: string | null;
   active: boolean;
   updated_at: string;
+  role_id: number;
+  competency_id: number;
   role_name: string;
   competency_name: string;
   domain_name: string;
@@ -133,6 +135,8 @@ export function ProMoveList({
         resources_url: item.resources_url,
         active: item.active,
         updated_at: item.updated_at,
+        role_id: item.role_id,
+        competency_id: item.competency_id,
         role_name: rolesMap.get(item.role_id) || 'Unknown',
         competency_name: competenciesMap.get(item.competency_id)?.name || 'Unknown',
         domain_name: competenciesMap.get(item.competency_id)?.domain_name || 'Unknown'

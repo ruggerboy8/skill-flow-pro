@@ -57,18 +57,24 @@ export default function Layout() {
               <div className="hidden md:flex space-x-1">
                 {navigation.map((item) => {
                   const Icon = item.icon;
+                  const isBackfillButton = item.name === 'Backfill';
+                  const needsHighlight = isBackfillButton && isBackfillComplete === false;
+                  
                   return (
                     <NavLink
                       key={item.name}
                       to={item.href}
-                      className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      className={`relative flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         isActive(item.href)
                           ? 'bg-primary text-primary-foreground'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                      }`}
+                      } ${needsHighlight ? 'animate-pulse' : ''}`}
                     >
                       <Icon className="w-4 h-4" />
                       <span>{item.name}</span>
+                      {needsHighlight && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full animate-ping" />
+                      )}
                     </NavLink>
                   );
                 })}
@@ -90,18 +96,24 @@ export default function Layout() {
           <div className="flex space-x-1 py-2 overflow-x-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
+              const isBackfillButton = item.name === 'Backfill';
+              const needsHighlight = isBackfillButton && isBackfillComplete === false;
+              
               return (
                 <NavLink
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                  className={`relative flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
                     isActive(item.href)
                       ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
+                  } ${needsHighlight ? 'animate-pulse' : ''}`}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{item.name}</span>
+                  {needsHighlight && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full animate-ping" />
+                  )}
                 </NavLink>
               );
             })}

@@ -156,28 +156,11 @@ export default function ThisWeekPanel() {
     );
   }
 
-  // Show empty state when no pro moves found
-  if (weekAssignments.length === 0) {
-    return (
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>This Week&apos;s Pro Moves</CardTitle>
-          <CardDescription>No Pro Moves found for the current week.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" className="w-full" onClick={() => navigate('/')}>
-            Back to Dashboard
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
   // Get Monday date for "Week of" display
   const { mondayZ } = getWeekAnchors(now, CT_TZ);
   const weekOfDate = formatInTimeZone(mondayZ, CT_TZ, 'MMM d, yyyy');
 
-  // Show "missed checkin" state - hide pro moves and show message only
+  // Show "missed checkin" state - hide pro moves and show message only (priority over empty state)
   if (weekContext.state === 'missed_checkin') {
     return (
       <Card className="overflow-hidden">
@@ -188,6 +171,25 @@ export default function ThisWeekPanel() {
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted p-3">
             <div className="font-medium text-sm text-foreground text-center">{bannerMessage}</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show empty state when no pro moves found (only if not in missed_checkin state)
+  if (weekAssignments.length === 0) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>This Week&apos;s Pro Moves</CardTitle>
+          <CardDescription>Week of {weekOfDate}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-md border bg-muted p-3">
+            <div className="font-medium text-sm text-foreground text-center">
+              No Pro Moves configured for this week. Please contact your administrator.
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -31,6 +31,7 @@ export async function createDraftEvaluation({
   staffId,
   roleId,
   locationId,
+  type,
   quarter,
   programYear,
   evaluatorId,
@@ -39,20 +40,28 @@ export async function createDraftEvaluation({
   staffId: string;
   roleId: number;
   locationId: string;
-  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  type: 'Baseline' | 'Midpoint' | 'Quarterly';
+  quarter?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
   programYear: number;
   evaluatorId: string;
   observedAt?: Date;
 }): Promise<{ evaluation: Evaluation; items: EvaluationItem[] }> {
   // Check if draft already exists (idempotent)
-  const { data: existingEval } = await supabase
+  let query = supabase
     .from('evaluations')
     .select('*, evaluation_items(*)')
     .eq('staff_id', staffId)
     .eq('program_year', programYear)
-    .eq('quarter', quarter)
-    .eq('status', 'draft')
-    .maybeSingle();
+    .eq('type', type)
+    .eq('status', 'draft');
+
+  if (quarter) {
+    query = query.eq('quarter', quarter);
+  } else {
+    query = query.is('quarter', null);
+  }
+
+  const { data: existingEval } = await query.maybeSingle();
 
   if (existingEval) {
     return {
@@ -80,7 +89,8 @@ export async function createDraftEvaluation({
     staff_id: staffId,
     role_id: roleId,
     location_id: locationId,
-    quarter,
+    type,
+    quarter: quarter || null,
     program_year: programYear,
     evaluator_id: evaluatorId,
     observed_at: observedAt?.toISOString()

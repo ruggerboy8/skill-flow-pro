@@ -127,7 +127,7 @@ export type Database = {
           location_id: string
           observed_at: string | null
           program_year: number
-          quarter: string
+          quarter: string | null
           role_id: number
           staff_id: string
           status: string
@@ -141,7 +141,7 @@ export type Database = {
           location_id: string
           observed_at?: string | null
           program_year: number
-          quarter: string
+          quarter?: string | null
           role_id: number
           staff_id: string
           status?: string
@@ -155,7 +155,7 @@ export type Database = {
           location_id?: string
           observed_at?: string | null
           program_year?: number
-          quarter?: string
+          quarter?: string | null
           role_id?: number
           staff_id?: string
           status?: string

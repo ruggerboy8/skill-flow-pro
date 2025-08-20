@@ -40,6 +40,7 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
 
   // Form state for new evaluation
   const [newEvalForm, setNewEvalForm] = useState({
+    type: '' as 'Baseline' | 'Midpoint' | 'Quarterly' | '',
     quarter: '' as 'Q1' | 'Q2' | 'Q3' | 'Q4' | '',
     programYear: new Date().getFullYear(),
     observedAt: undefined as Date | undefined
@@ -67,10 +68,19 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
   };
 
   const handleCreateEvaluation = async () => {
-    if (!newEvalForm.quarter || !staffInfo.location_id) {
+    if (!newEvalForm.type || !staffInfo.location_id) {
       toast({
         title: "Error",
-        description: "Please select a quarter and ensure location is set",
+        description: "Please select a type and ensure location is set",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (newEvalForm.type === 'Quarterly' && !newEvalForm.quarter) {
+      toast({
+        title: "Error",
+        description: "Please select a quarter for quarterly evaluations",
         variant: "destructive"
       });
       return;
@@ -82,7 +92,8 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
         staffId,
         roleId: staffInfo.role_id,
         locationId: staffInfo.location_id,
-        quarter: newEvalForm.quarter,
+        type: newEvalForm.type,
+        quarter: newEvalForm.type === 'Quarterly' ? (newEvalForm.quarter as 'Q1' | 'Q2' | 'Q3' | 'Q4') : undefined,
         programYear: newEvalForm.programYear,
         evaluatorId: currentUserId,
         observedAt: newEvalForm.observedAt
@@ -95,6 +106,7 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
 
       setShowCreateDialog(false);
       setNewEvalForm({
+        type: '',
         quarter: '',
         programYear: new Date().getFullYear(),
         observedAt: undefined
@@ -117,7 +129,8 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
   const formatEvaluationSubtitle = (evaluation: Evaluation) => {
     const status = evaluation.status === 'draft' ? 'Draft' : 'Submitted';
     const timeAgo = new Date(evaluation.updated_at).toLocaleDateString();
-    return `${evaluation.quarter} '${evaluation.program_year.toString().slice(-2)} • ${status} • ${timeAgo}`;
+    const quarterPart = evaluation.quarter ? `${evaluation.quarter} ` : '';
+    return `${quarterPart}'${evaluation.program_year.toString().slice(-2)} • ${status} • ${timeAgo}`;
   };
 
   if (loading) {
@@ -157,24 +170,45 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="quarter">Quarter *</Label>
+                <Label htmlFor="type">Evaluation Type *</Label>
                 <Select 
-                  value={newEvalForm.quarter} 
-                  onValueChange={(value: 'Q1' | 'Q2' | 'Q3' | 'Q4') => 
-                    setNewEvalForm(prev => ({ ...prev, quarter: value }))
+                  value={newEvalForm.type} 
+                  onValueChange={(value: 'Baseline' | 'Midpoint' | 'Quarterly') => 
+                    setNewEvalForm(prev => ({ ...prev, type: value, quarter: value !== 'Quarterly' ? '' : prev.quarter }))
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select quarter" />
+                    <SelectValue placeholder="Select evaluation type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
-                    <SelectItem value="Q2">Q2 (Apr-Jun)</SelectItem>
-                    <SelectItem value="Q3">Q3 (Jul-Sep)</SelectItem>
-                    <SelectItem value="Q4">Q4 (Oct-Dec)</SelectItem>
+                    <SelectItem value="Baseline">Baseline</SelectItem>
+                    <SelectItem value="Midpoint">Midpoint</SelectItem>
+                    <SelectItem value="Quarterly">Quarterly</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {newEvalForm.type === 'Quarterly' && (
+                <div className="space-y-2">
+                  <Label htmlFor="quarter">Quarter *</Label>
+                  <Select 
+                    value={newEvalForm.quarter} 
+                    onValueChange={(value: 'Q1' | 'Q2' | 'Q3' | 'Q4') => 
+                      setNewEvalForm(prev => ({ ...prev, quarter: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select quarter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
+                      <SelectItem value="Q2">Q2 (Apr-Jun)</SelectItem>
+                      <SelectItem value="Q3">Q3 (Jul-Sep)</SelectItem>
+                      <SelectItem value="Q4">Q4 (Oct-Dec)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="programYear">Program Year</Label>
@@ -232,7 +266,7 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                 </Button>
                 <Button 
                   onClick={handleCreateEvaluation}
-                  disabled={isCreating || !newEvalForm.quarter}
+                  disabled={isCreating || !newEvalForm.type || (newEvalForm.type === 'Quarterly' && !newEvalForm.quarter)}
                 >
                   {isCreating ? "Creating..." : "Create Evaluation"}
                 </Button>
@@ -258,7 +292,7 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                 <div className="flex items-center justify-between">
                   <div>
                     <h5 className="font-medium">
-                      {evaluation.quarter} {evaluation.program_year} Evaluation
+                      {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
                     </h5>
                     <p className="text-sm text-muted-foreground">
                       {formatEvaluationSubtitle(evaluation)}
@@ -297,7 +331,7 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                 <div className="flex items-center justify-between">
                   <div>
                     <h5 className="font-medium">
-                      {evaluation.quarter} {evaluation.program_year} Evaluation
+                      {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
                     </h5>
                     <p className="text-sm text-muted-foreground">
                       {formatEvaluationSubtitle(evaluation)}

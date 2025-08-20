@@ -276,7 +276,7 @@ export function EvaluationHub() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">
-              {evaluation.quarter} {evaluation.program_year} Evaluation
+              {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
             </h1>
             <p className="text-muted-foreground">
               Staff Member • {evaluation.status === 'draft' ? 'Draft' : 'Submitted'}

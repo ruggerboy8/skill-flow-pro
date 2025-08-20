@@ -28,11 +28,18 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
       ? "bg-destructive text-destructive-foreground"
       : "bg-secondary text-secondary-foreground";
 
-  // Tiny visible text inside the chip (still calm)
+  // Map status reason to chip text based on new canonical states
   const chipText =
+    status.reason === "No assignments" ? "No Assignments" :
+    status.reason === "Missed check-in" ? "Missed Check-in" :
+    status.reason === "Can check in" ? "Can Check In" :
+    status.reason === "Waiting for Thursday" ? "Waiting" :
+    status.reason === "Can check out" ? "Can Check Out" :
+    status.reason === "Missed check-out" ? "Missed Check-out" :
+    status.reason === "Complete" ? "Complete" :
     status.color === "green" ? "On Track" :
-    status.color === "red" ? "Carryover Required" :
-    status.color === "yellow" ? (status.reason?.toLowerCase().includes("confidence") ? "Needs Confidence Score" : "Needs Performance Score") :
+    status.color === "red" ? "Action Required" :
+    status.color === "yellow" ? "Pending Action" :
     "On Track";
 
   // Compose an aria-label without "undefined"

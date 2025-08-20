@@ -2,7 +2,7 @@ import { getWeekAnchors, CT_TZ } from './centralTime';
 import { supabase } from '@/integrations/supabase/client';
 import { SimOverrides } from '@/devtools/SimProvider';
 
-export type WeekState = 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'wait_for_thu' | 'done';
+export type WeekState = 'no_assignments' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'missed_checkout' | 'done';
 
 export interface WeekContext {
   state: WeekState;
@@ -228,22 +228,28 @@ export async function computeWeekState(
 
   let state: WeekState;
 
-  // State machine logic based on time and submissions
-  if (now < anchors.confidence_deadline) {
-    // Before Tuesday 12:00 - can check in
+  // State machine logic based on time and submissions (priority order)
+  if (now < anchors.confidence_deadline && !hasValidConfidence) {
+    // Before Tuesday 12:00 with no confidence - can check in
     state = 'can_checkin';
-  } else if (!hasValidConfidence) {
+  } else if (now > anchors.confidence_deadline && !hasValidConfidence) {
     // After Tuesday 12:00 with no confidence - missed checkin
     state = 'missed_checkin';
-  } else if (now < anchors.checkout_open) {
-    // Wednesday - wait for Thursday
+  } else if (hasValidConfidence && now < anchors.checkout_open) {
+    // Confidence in, before Thursday 12:01 - wait for Thursday
     state = 'wait_for_thu';
-  } else if (now <= anchors.performance_deadline && !hasValidPerformance) {
-    // Thursday until end - can checkout
+  } else if (hasValidConfidence && !hasValidPerformance && now >= anchors.checkout_open && now <= anchors.performance_deadline) {
+    // Thursday 12:01 to Friday 17:00, confidence in, performance not - can checkout
     state = 'can_checkout';
-  } else {
-    // Week complete
+  } else if (hasValidConfidence && !hasValidPerformance && now > anchors.performance_deadline) {
+    // After Friday 17:00, confidence in, performance not - missed checkout
+    state = 'missed_checkout';
+  } else if (hasValidConfidence && hasValidPerformance) {
+    // Both confidence and performance in - done
     state = 'done';
+  } else {
+    // Fallback
+    state = 'can_checkin';
   }
 
   return {

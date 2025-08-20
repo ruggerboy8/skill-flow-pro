@@ -147,15 +147,13 @@ export async function assembleWeek(
         competency_id,
         cycle,
         week_in_cycle,
-        iso_year,
-        iso_week,
         competencies!inner(
           domain_id,
           domains!inner(domain_name)
         )
       `)
-      .eq('iso_year', isoYear)
-      .eq('iso_week', isoWeek)
+      .eq('cycle', 2)
+      .eq('week_in_cycle', 1)
       .eq('role_id', roleId)
       .order('display_order');
 
@@ -197,8 +195,6 @@ export async function assembleWeek(
               competency_id,
               cycle,
               week_in_cycle,
-              iso_year,
-              iso_week,
               competencies!inner(
                 domain_id,
                 domains!inner(domain_name)

@@ -131,6 +131,9 @@ export async function assembleWeek(
   simOverrides?: any
 ): Promise<WeekAssignment[]> {
   try {
+    console.log('=== ASSEMBLING WEEK ===');
+    console.log('Input params:', { userId, isoYear, isoWeek, roleId, simOverrides });
+    
     const assignments: WeekAssignment[] = [];
 
     // 1. First try to get weekly focus items by ISO week
@@ -142,6 +145,10 @@ export async function assembleWeek(
         self_select,
         action_id,
         competency_id,
+        cycle,
+        week_in_cycle,
+        iso_year,
+        iso_week,
         competencies!inner(
           domain_id,
           domains!inner(domain_name)
@@ -152,14 +159,20 @@ export async function assembleWeek(
       .eq('role_id', roleId)
       .order('display_order');
 
+    console.log('ISO week query result:', { weeklyFocus, focusError, query: { isoYear, isoWeek, roleId } });
+
     // 2. If no results from ISO week lookup, try to find current cycle/week
     if (!weeklyFocus || weeklyFocus.length === 0) {
+      console.log('No weekly focus found for ISO week, trying cycle-based approach...');
+      
       // Determine which cycle/week the user should be on after backfill
       const { data: staffData } = await supabase
         .from('staff')
         .select('id')
         .eq('user_id', userId)
         .single();
+
+      console.log('Staff data for user:', staffData);
 
       if (staffData) {
         // Check if user completed backfill (has any weekly_scores)
@@ -169,8 +182,11 @@ export async function assembleWeek(
           .eq('staff_id', staffData.id)
           .limit(1);
 
+        console.log('User has historical scores:', hasScores?.length > 0);
+
         if (hasScores && hasScores.length > 0) {
           // User completed backfill, should be on cycle 2 week 1
+          console.log('Querying for Cycle 2, Week 1...');
           const { data: cycle2Focus, error: cycle2Error } = await supabase
             .from('weekly_focus')
             .select(`
@@ -179,6 +195,10 @@ export async function assembleWeek(
               self_select,
               action_id,
               competency_id,
+              cycle,
+              week_in_cycle,
+              iso_year,
+              iso_week,
               competencies!inner(
                 domain_id,
                 domains!inner(domain_name)
@@ -189,15 +209,24 @@ export async function assembleWeek(
             .eq('role_id', roleId)
             .order('display_order');
 
+          console.log('Cycle 2 query result:', { cycle2Focus, cycle2Error });
+
           if (!cycle2Error && cycle2Focus) {
             weeklyFocus = cycle2Focus;
           }
+        } else {
+          console.log('User has not completed backfill, should be on Cycle 1');
         }
       }
     }
 
     if (focusError && !weeklyFocus) throw focusError;
-    if (!weeklyFocus) return [];
+    if (!weeklyFocus) {
+      console.log('No weekly focus found - returning empty assignments');
+      return [];
+    }
+    
+    console.log('Final weekly focus to process:', weeklyFocus);
 
     // 2. Get user's backlog items (FIFO order) with simulation support
     const backlogResult = await getOpenBacklogCount(userId, simOverrides);

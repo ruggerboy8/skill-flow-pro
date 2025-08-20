@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useSim } from '@/devtools/SimProvider';
+import { detectBackfillStatus } from '@/lib/backfillDetection';
 
 export function useBackfillStatus() {
   const { user } = useAuth();
+  const { overrides } = useSim();
   const [isBackfillComplete, setIsBackfillComplete] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -14,43 +17,9 @@ export function useBackfillStatus() {
 
     async function checkBackfillStatus() {
       try {
-        // Check if user has any historical weekly scores
-        const { data: staffData } = await supabase
-          .from('staff')
-          .select('id')
-          .eq('user_id', user!.id)
-          .single();
-
-        if (!staffData) {
-          setIsBackfillComplete(false);
-          return;
-        }
-
-        const { data: existingScores } = await supabase
-          .from('weekly_scores')
-          .select('id')
-          .eq('staff_id', staffData.id)
-          .limit(1);
-
-        // If user has existing scores, backfill is complete
-        if (existingScores && existingScores.length > 0) {
-          setIsBackfillComplete(true);
-          return;
-        }
-
-        // Check localStorage for backfill progress
-        try {
-          const raw = localStorage.getItem('backfillProgress');
-          if (raw) {
-            const progress = JSON.parse(raw) as Record<string, boolean>;
-            const progressCount = Object.values(progress).filter(Boolean).length;
-            setIsBackfillComplete(progressCount >= 6);
-          } else {
-            setIsBackfillComplete(false);
-          }
-        } catch {
-          setIsBackfillComplete(false);
-        }
+        // Use the centralized backfill detection logic that supports simulation
+        const status = await detectBackfillStatus(user.id, overrides.enabled ? overrides : undefined);
+        setIsBackfillComplete(status.isComplete);
       } catch (error) {
         console.error('Error checking backfill status:', error);
         setIsBackfillComplete(false);
@@ -58,7 +27,7 @@ export function useBackfillStatus() {
     }
 
     checkBackfillStatus();
-  }, [user]);
+  }, [user, overrides]); // Add overrides as dependency
 
   return { isBackfillComplete };
 }

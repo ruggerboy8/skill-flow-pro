@@ -182,7 +182,8 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
         competency_id,
         description,
         interview_prompt,
-        domains!inner(domain_name)
+        domain_id,
+        domains(domain_name)
       `)
       .in('competency_id', competencyIds);
 
@@ -199,7 +200,7 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
         ...item,
         competency_description: competency?.description || '',
         interview_prompt: competency?.interview_prompt || '',
-        domain_name: competency?.domains?.domain_name || ''
+        domain_name: competency?.domains.domain_name || ''
       };
     });
 

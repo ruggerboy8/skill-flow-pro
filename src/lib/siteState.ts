@@ -358,8 +358,19 @@ export async function computeWeekState(params: {
 
   // Dynamic completion check based on actual assignment count
   const requiredCount = assignments.length;
-  const hasConfidence = confidenceScores.length >= requiredCount;
-  const hasPerformance = performanceScores.length >= requiredCount;
+  
+  // Apply simulation overrides for confidence/performance status
+  let hasConfidence = confidenceScores.length >= requiredCount;
+  let hasPerformance = performanceScores.length >= requiredCount;
+  
+  if (simOverrides?.enabled) {
+    if (simOverrides.forceHasConfidence !== null && simOverrides.forceHasConfidence !== undefined) {
+      hasConfidence = simOverrides.forceHasConfidence;
+    }
+    if (simOverrides.forceHasPerformance !== null && simOverrides.forceHasPerformance !== undefined) {
+      hasPerformance = simOverrides.forceHasPerformance;
+    }
+  }
 
   // Get backlog count with simulation support
   const backlogResult = await getOpenBacklogCount(userId, simOverrides);

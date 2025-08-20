@@ -71,7 +71,7 @@ export default function ThisWeekPanel() {
       // Compute current week state with simulation overrides (site-based unified)
       const context = await computeWeekState({
         userId: user.id,
-        siteId: 'default', // For now, use default site
+        siteId: 'main', // Use the main site that exists in DB
         roleId: staff.role_id,
         now: effectiveNow,
         simOverrides: overrides

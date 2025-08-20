@@ -31,7 +31,7 @@ export async function getSiteWeekContext(siteId: string = 'main', now: Date = ne
     .from('site_cycle_state')
     .select('*')
     .eq('site_id', siteId)
-    .single();
+    .maybeSingle();
 
   if (!siteState) {
     throw new Error(`Site state not found for site: ${siteId}`);
@@ -152,23 +152,25 @@ export async function assembleWeek(params: {
             competencies(name, domain_id)
           `)
           .eq('action_id', selection.selected_pro_move_id)
-          .single();
+          .maybeSingle();
 
         // Get domain for the competency
         const { data: domain } = await supabase
           .from('domains')
           .select('domain_name')
           .eq('domain_id', selectedProMove?.competencies?.domain_id)
-          .single();
+          .maybeSingle();
 
         if (selectedProMove) {
           assignments.push({
-            type: 'self_select',
-            focus,
+            weekly_focus_id: focus.id,
+            type: 'selfSelect',
+            pro_move_id: selectedProMove.action_id,
             action_statement: selectedProMove.action_statement,
-            domain: domain?.domain_name || 'General',
-            status: 'selected',
-            locked: false
+            domain_name: domain?.domain_name || 'General',
+            required: false,
+            locked: false,
+            display_order: focus.display_order
           });
         }
       } else {
@@ -184,22 +186,25 @@ export async function assembleWeek(params: {
               competencies(name, domain_id)
             `)
             .eq('action_id', backlogItem.pro_move_id)
-            .single();
+            .maybeSingle();
 
           // Get domain for the competency
           const { data: domain } = await supabase
             .from('domains')
             .select('domain_name')
             .eq('domain_id', backlogProMove?.competencies?.domain_id)
-            .single();
+            .maybeSingle();
 
           assignments.push({
+            weekly_focus_id: focus.id,
             type: 'backlog',
-            focus,
+            pro_move_id: backlogProMove?.action_id,
             action_statement: backlogProMove?.action_statement || 'Backlog item',
-            domain: domain?.domain_name || 'General',
-            status: 'auto_assigned',
-            locked: false
+            domain_name: domain?.domain_name || 'General',
+            required: false,
+            locked: false,
+            backlog_id: backlogItem.id,
+            display_order: focus.display_order
           });
           backlogIndex++;
         } else {
@@ -211,26 +216,27 @@ export async function assembleWeek(params: {
               .from('competencies')
               .select('domain_id')
               .eq('competency_id', focus.competency_id)
-              .single();
+              .maybeSingle();
 
             if (competency?.domain_id) {
               const { data: domain } = await supabase
                 .from('domains')
                 .select('domain_name')
                 .eq('domain_id', competency.domain_id)
-                .single();
+                .maybeSingle();
               
               domainName = domain?.domain_name || 'General';
             }
           }
 
           assignments.push({
-            type: 'self_select',
-            focus,
+            weekly_focus_id: focus.id,
+            type: 'selfSelect',
             action_statement: 'Choose a pro-move',
-            domain: domainName,
-            status: 'empty',
-            locked: false
+            domain_name: domainName,
+            required: false,
+            locked: false,
+            display_order: focus.display_order
           });
         }
       }
@@ -244,28 +250,30 @@ export async function assembleWeek(params: {
             competencies(name, domain_id)
           `)
           .eq('action_id', focus.action_id)
-          .single();
+          .maybeSingle();
 
         // Get domain for the competency
         const { data: domain } = await supabase
           .from('domains')
           .select('domain_name')
           .eq('domain_id', siteProMove?.competencies?.domain_id)
-          .single();
+          .maybeSingle();
 
         assignments.push({
+          weekly_focus_id: focus.id,
           type: 'site',
-          focus,
+          pro_move_id: siteProMove?.action_id,
           action_statement: siteProMove?.action_statement || 'Site move',
-          domain: domain?.domain_name || 'General',
-          status: 'required',
-          locked: true
+          domain_name: domain?.domain_name || 'General',
+          required: true,
+          locked: true,
+          display_order: focus.display_order
         });
       }
     }
   }
 
-  return assignments.sort((a, b) => a.focus.display_order - b.focus.display_order);
+  return assignments.sort((a, b) => a.display_order - b.display_order);
 }
 
 /**
@@ -358,7 +366,7 @@ export async function computeWeekState(params: {
   const backlogCount = backlogResult.count;
 
   // Check for selection pending
-  const selectionPending = assignments.some(a => a.status === 'empty');
+  const selectionPending = assignments.some(a => a.type === 'selfSelect' && !a.action_statement);
 
   // Get last activity
   let lastActivity: { kind: 'confidence' | 'performance'; at: Date } | undefined;
@@ -381,7 +389,7 @@ export async function computeWeekState(params: {
       state: 'missed_checkin',
       nextAction: 'Overdue',
       deadlineAt: anchors.confidence_deadline,
-      backlogCount: backlogCount || 0,
+      backlogCount,
       selectionPending,
       lastActivity
     };
@@ -445,7 +453,7 @@ export async function computeWeekState(params: {
   return {
     state: 'no_assignments',
     nextAction: undefined,
-      backlogCount,
+    backlogCount,
     selectionPending,
     lastActivity
   };

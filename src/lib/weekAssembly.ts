@@ -41,7 +41,7 @@ export async function assembleCurrentWeek(
     console.log('Staff data:', staffData);
 
     // Use site-based approach (single source of truth)
-    const siteId = 'default'; // For now, use default site
+    const siteId = 'main'; // Use the main site that exists in DB
     const siteAssignments = await siteAssembleWeek({
       userId,
       roleId: staffData.role_id,

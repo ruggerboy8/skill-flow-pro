@@ -38,6 +38,7 @@ export function ProMoveLibrary() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingProMove, setEditingProMove] = useState<any>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Load initial data
   useEffect(() => {
@@ -109,6 +110,8 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
   const handleFormClose = () => {
     setShowAddForm(false);
     setEditingProMove(null);
+    // Trigger a refresh of the pro-moves list
+    setRefreshKey(prev => prev + 1);
   };
 
   const handleBulkUploadClose = () => {
@@ -220,6 +223,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
       <div>
         <h3 className="text-lg font-semibold mb-4">Pro-Move List</h3>
         <ProMoveList
+          key={refreshKey}
           roleFilter={selectedRole}
           competencyFilter={selectedCompetency}
           searchTerm={searchTerm}

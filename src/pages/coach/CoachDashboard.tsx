@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import StaffRow from '@/components/coach/StaffRow';
-import { computeStaffStatus, getSortRank, type WeekKey } from '@/lib/coachStatus';
+import { computeStaffStatusNew, getSortRank } from '@/lib/coachStatus';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 interface StaffScore {
   confidence_score: number | null;
@@ -29,6 +29,9 @@ interface StaffMember {
   role_id: number;
   role_name: string;
   location: string | null;
+  user_id: string;
+  hire_date?: string | null;
+  onboarding_weeks: number;
   weekly_scores: StaffScore[];
 }
 
@@ -39,7 +42,7 @@ export default function CoachDashboard() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [rows, setRows] = useState<{
     member: { id: string; name: string; role_name: string; location: string | null };
-    status: ReturnType<typeof computeStaffStatus>;
+    status: Awaited<ReturnType<typeof computeStaffStatusNew>>;
   }[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
@@ -47,7 +50,6 @@ export default function CoachDashboard() {
   const [selectedRole, setSelectedRole] = useState('all');
   const [search, setSearch] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [currentWeekByRole, setCurrentWeekByRole] = useState<Record<number, WeekKey>>({});
 
   // Redirect if not coach
   useEffect(() => {
@@ -84,21 +86,18 @@ export default function CoachDashboard() {
     try {
       const now = new Date();
       
-      // Get staff roster with score status
+      // Get staff roster with additional fields needed for new system
       const { data: staffData, error } = await supabase
         .from('staff')
         .select(`
           id,
           name,
+          user_id,
           primary_location,
           role_id,
-          roles!inner(role_name),
-          weekly_scores(
-            confidence_score,
-            performance_score,
-            updated_at,
-            weekly_focus!inner(id, cycle, week_in_cycle)
-          )
+          hire_date,
+          onboarding_weeks,
+          roles!inner(role_name)
         `);
 
       if (error) throw error;
@@ -110,18 +109,10 @@ export default function CoachDashboard() {
         role_id: member.role_id,
         role_name: (member.roles as any).role_name,
         location: member.primary_location ?? null,
-        weekly_scores: (member.weekly_scores || []).map((s: any) => ({
-          confidence_score: s.confidence_score,
-          performance_score: s.performance_score,
-          updated_at: s.updated_at,
-          weekly_focus: {
-            id: s.weekly_focus.id,
-            cycle: s.weekly_focus.cycle,
-            week_in_cycle: s.weekly_focus.week_in_cycle,
-            iso_year: getISOWeekYear(now),
-            iso_week: getISOWeek(now),
-          },
-        })),
+        user_id: member.user_id,
+        hire_date: member.hire_date,
+        onboarding_weeks: member.onboarding_weeks || 6,
+        weekly_scores: []
       }));
 
       setStaff(processedStaff);
@@ -143,7 +134,7 @@ export default function CoachDashboard() {
     }
   };
 
-  const applyFilters = () => {
+  const applyFilters = async () => {
     let filtered = staff;
 
     if (selectedLocation !== 'all') {
@@ -160,24 +151,25 @@ export default function CoachDashboard() {
     }
 
     const now = new Date();
-    const mapped = filtered.map((s) => {
-      const last = [...s.weekly_scores].sort(
-        (a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
-      )[0];
-      const currentWeekGuess: WeekKey | undefined = last
-        ? {
-            cycle: last.weekly_focus.cycle,
-            week_in_cycle: last.weekly_focus.week_in_cycle,
-            iso_year: getISOWeekYear(now),
-            iso_week: getISOWeek(now),
-          }
-        : undefined;
-      const status = computeStaffStatus(s.weekly_scores, s.role_id, currentWeekGuess, now);
-      return {
+    const mapped = [];
+    
+    for (const s of filtered) {
+      const status = await computeStaffStatusNew(
+        s.user_id, 
+        { 
+          id: s.id, 
+          role_id: s.role_id, 
+          hire_date: s.hire_date, 
+          onboarding_weeks: s.onboarding_weeks 
+        }, 
+        now
+      );
+      
+      mapped.push({
         member: { id: s.id, name: s.name, role_name: s.role_name, location: s.location },
         status,
-      };
-    });
+      });
+    }
 
     mapped.sort(
       (a, b) => getSortRank(a.status) - getSortRank(b.status) || a.member.name.localeCompare(b.member.name)

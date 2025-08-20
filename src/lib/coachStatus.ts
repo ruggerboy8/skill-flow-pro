@@ -1,8 +1,9 @@
-import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { getWeekAnchors, CT_TZ } from './centralTime';
+import { getSiteWeekContext, computeWeekState, isEligibleForProMoves } from './siteState';
+import { supabase } from '@/integrations/supabase/client';
 
 export type StatusColor = "grey" | "yellow" | "green" | "red";
-export type WeekState = 'no_assignments' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'missed_checkout' | 'done';
+export type WeekState = 'onboarding' | 'no_assignments' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'missed_checkout' | 'done';
 
 export interface WeekKey {
   cycle: number;
@@ -20,12 +21,99 @@ export interface StaffWeekStatus {
   blocked: boolean;
   confCount: number;
   perfCount: number;
-  target?: WeekKey;
+  nextAction?: string;
+  deadlineAt?: Date;
+  backlogCount: number;
+  selectionPending: boolean;
+  lastActivity?: { kind: 'confidence' | 'performance'; at: Date };
+  onboardingWeeksLeft?: number;
 }
 
-// Helper to clamp counts to expected max of 3
-const clamp3 = (n: number) => Math.max(0, Math.min(3, n));
+/**
+ * Compute staff status using new unified site-centric model
+ */
+export async function computeStaffStatusNew(
+  userId: string,
+  staffData: { id: string; role_id: number; hire_date?: string | null; onboarding_weeks: number },
+  now: Date = new Date()
+): Promise<StaffWeekStatus> {
+  try {
+    // Use unified computation
+    const status = await computeWeekState({
+      userId,
+      roleId: staffData.role_id,
+      now
+    });
 
+    // Map to old format for compatibility
+    const color: StatusColor = 
+      status.state === 'onboarding' ? 'grey' :
+      status.state === 'no_assignments' ? 'grey' :
+      status.state === 'missed_checkin' || status.state === 'missed_checkout' ? 'red' :
+      status.state === 'can_checkin' || status.state === 'can_checkout' ? 'yellow' :
+      status.state === 'wait_for_thu' || status.state === 'done' ? 'green' : 'grey';
+
+    const reason = 
+      status.state === 'onboarding' ? `Onboarding (${status.onboardingWeeksLeft || 0} wks left)` :
+      status.state === 'no_assignments' ? 'No assignments' :
+      status.state === 'missed_checkin' ? 'Missed check-in' :
+      status.state === 'can_checkin' ? 'Can check in' :
+      status.state === 'wait_for_thu' ? 'Waiting for Thursday' :
+      status.state === 'can_checkout' ? 'Can check out' :
+      status.state === 'missed_checkout' ? 'Missed check-out' :
+      status.state === 'done' ? 'Complete' : 'Unknown';
+
+    return {
+      color,
+      reason,
+      state: status.state,
+      subtext: status.state === 'onboarding' ? 'Not participating yet' : undefined,
+      tooltip: getTooltipForState(status.state, status.deadlineAt),
+      blocked: status.state === 'missed_checkout',
+      confCount: 0, // TODO: Get actual counts if needed
+      perfCount: 0, // TODO: Get actual counts if needed
+      nextAction: status.nextAction,
+      deadlineAt: status.deadlineAt,
+      backlogCount: status.backlogCount,
+      selectionPending: status.selectionPending,
+      lastActivity: status.lastActivity,
+      onboardingWeeksLeft: status.onboardingWeeksLeft
+    };
+  } catch (error) {
+    console.error('Error computing staff status:', error);
+    return {
+      color: 'grey',
+      reason: 'Error',
+      state: 'no_assignments',
+      blocked: false,
+      confCount: 0,
+      perfCount: 0,
+      backlogCount: 0,
+      selectionPending: false
+    };
+  }
+}
+
+function getTooltipForState(state: WeekState, deadlineAt?: Date): string | undefined {
+  switch (state) {
+    case 'can_checkin':
+      return `Confidence due by Tuesday 12:00 PM`;
+    case 'missed_checkin':
+      return `Confidence was due by Tuesday 12:00 PM`;
+    case 'wait_for_thu':
+      return `Performance opens Thursday 12:01 PM`;
+    case 'can_checkout':
+      return `Performance due by Friday 5:00 PM`;
+    case 'missed_checkout':
+      return `Performance was due by Friday 5:00 PM`;
+    case 'done':
+      return `Week completed successfully`;
+    default:
+      return undefined;
+  }
+}
+
+// Legacy function for backward compatibility
 export function computeStaffStatus(
   weeklyScores: Array<{
     confidence_score: number | null;
@@ -40,140 +128,19 @@ export function computeStaffStatus(
     };
   }>,
   roleId: number,
-  currentWeek: WeekKey | undefined,
+  currentWeek: any,
   now: Date = new Date()
 ): StaffWeekStatus {
-  // Get consistent time anchors
-  const anchors = getWeekAnchors(now, CT_TZ);
-  const nowIsoWeek = getISOWeek(now);
-  const nowIsoYear = getISOWeekYear(now);
-
-  // Helper to count scores for a specific week
-  const countFor = (wk?: { cycle: number; week_in_cycle: number }) => {
-    if (!wk) return { conf: 0, perf: 0 };
-    const subset = weeklyScores.filter(
-      (s) =>
-        s.weekly_focus.cycle === wk.cycle &&
-        s.weekly_focus.week_in_cycle === wk.week_in_cycle
-    );
-    const conf = clamp3(subset.filter((s) => s.confidence_score !== null).length);
-    const perf = clamp3(subset.filter((s) => s.performance_score !== null).length);
-    return { conf, perf };
-  };
-
-  // Priority order evaluation (return first match)
-  
-  // 1. no_assignments - Check if current week has no configured pro-moves
-  if (!currentWeek || countFor(currentWeek).conf === 0) {
-    return {
-      color: "grey",
-      reason: "No assignments",
-      state: "no_assignments",
-      subtext: "Not configured",
-      blocked: false,
-      confCount: 0,
-      perfCount: 0,
-      target: currentWeek,
-    };
-  }
-
-  const currentCounts = countFor(currentWeek);
-  const hasConfidence = currentCounts.conf >= 3;
-  const hasPerformance = currentCounts.perf >= 3;
-
-  // 2. missed_checkin - After Tue 12:00 with no confidence
-  if (now > anchors.confidence_deadline && !hasConfidence) {
-    return {
-      color: "red",
-      reason: "Missed check-in",
-      state: "missed_checkin",
-      tooltip: "Confidence was due by Tuesday 12:00 PM",
-      blocked: false,
-      confCount: currentCounts.conf,
-      perfCount: currentCounts.perf,
-      target: currentWeek,
-    };
-  }
-
-  // 3. can_checkin - Before Tue 12:00 with no confidence
-  if (now <= anchors.confidence_deadline && !hasConfidence) {
-    return {
-      color: "yellow",
-      reason: "Can check in",
-      state: "can_checkin",
-      tooltip: "Confidence due by Tuesday 12:00 PM",
-      blocked: false,
-      confCount: currentCounts.conf,
-      perfCount: currentCounts.perf,
-      target: currentWeek,
-    };
-  }
-
-  // 4. wait_for_thu - Confidence is in, before Thu 12:01
-  if (hasConfidence && now < anchors.checkout_open) {
-    return {
-      color: "green",
-      reason: "Waiting for Thursday",
-      state: "wait_for_thu",
-      tooltip: "Performance opens Thursday 12:01 PM",
-      blocked: false,
-      confCount: currentCounts.conf,
-      perfCount: currentCounts.perf,
-      target: currentWeek,
-    };
-  }
-
-  // 5. can_checkout - Thu 12:01 → Fri 17:00, confidence in, performance not
-  if (hasConfidence && !hasPerformance && now >= anchors.checkout_open && now <= anchors.performance_deadline) {
-    return {
-      color: "yellow",
-      reason: "Can check out",
-      state: "can_checkout",
-      tooltip: "Performance due by Friday 5:00 PM",
-      blocked: false,
-      confCount: currentCounts.conf,
-      perfCount: currentCounts.perf,
-      target: currentWeek,
-    };
-  }
-
-  // 6. missed_checkout - After Fri 17:00, confidence in, performance not
-  if (hasConfidence && !hasPerformance && now > anchors.performance_deadline) {
-    return {
-      color: "red",
-      reason: "Missed check-out",
-      state: "missed_checkout",
-      tooltip: "Performance was due by Friday 5:00 PM",
-      blocked: true,
-      confCount: currentCounts.conf,
-      perfCount: currentCounts.perf,
-      target: currentWeek,
-    };
-  }
-
-  // 7. done - Both confidence and performance are in
-  if (hasConfidence && hasPerformance) {
-    return {
-      color: "green",
-      reason: "Complete",
-      state: "done",
-      tooltip: "Week completed successfully",
-      blocked: false,
-      confCount: currentCounts.conf,
-      perfCount: currentCounts.perf,
-      target: currentWeek,
-    };
-  }
-
-  // Fallback (shouldn't reach here)
+  // Legacy implementation - simplified
   return {
     color: "grey",
-    reason: "Unknown state",
+    reason: "Use new computeStaffStatusNew function",
     state: "no_assignments",
     blocked: false,
-    confCount: currentCounts.conf,
-    perfCount: currentCounts.perf,
-    target: currentWeek,
+    confCount: 0,
+    perfCount: 0,
+    backlogCount: 0,
+    selectionPending: false
   };
 }
 

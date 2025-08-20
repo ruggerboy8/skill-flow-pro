@@ -160,16 +160,7 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
     .from('evaluations')
     .select(`
       *,
-      evaluation_items(
-        *,
-        competencies!inner(
-          description,
-          interview_prompt,
-          domains!inner(
-            domain_name
-          )
-        )
-      )
+      evaluation_items(*)
     `)
     .eq('id', evalId)
     .maybeSingle();
@@ -180,17 +171,47 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
 
   if (!data) return null;
 
-  // Transform the items to include competency details at the top level
-  const transformedItems = (data.evaluation_items || []).map((item: any) => ({
-    ...item,
-    competency_description: item.competencies?.description || '',
-    interview_prompt: item.competencies?.interview_prompt || '',
-    domain_name: item.competencies?.domains?.domain_name || ''
-  }));
+  // Fetch competency details separately for each item
+  const items = data.evaluation_items || [];
+  const competencyIds = items.map(item => item.competency_id);
+  
+  if (competencyIds.length > 0) {
+    const { data: competencies } = await supabase
+      .from('competencies')
+      .select(`
+        competency_id,
+        description,
+        interview_prompt,
+        domains!inner(domain_name)
+      `)
+      .in('competency_id', competencyIds);
+
+    // Create a map for quick lookup
+    const competencyMap = new Map();
+    competencies?.forEach(comp => {
+      competencyMap.set(comp.competency_id, comp);
+    });
+
+    // Transform the items to include competency details
+    const transformedItems = items.map(item => {
+      const competency = competencyMap.get(item.competency_id);
+      return {
+        ...item,
+        competency_description: competency?.description || '',
+        interview_prompt: competency?.interview_prompt || '',
+        domain_name: competency?.domains?.domain_name || ''
+      };
+    });
+
+    return {
+      ...data,
+      items: transformedItems
+    };
+  }
 
   return {
     ...data,
-    items: transformedItems
+    items: items
   };
 }
 

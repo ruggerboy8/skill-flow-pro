@@ -18,47 +18,39 @@ export async function detectBackfillStatus(
   userId: string, 
   simOverrides?: SimOverrides
 ): Promise<BackfillStatus> {
-  // Check simulation overrides first
-  if (simOverrides?.enabled) {
-    if (simOverrides.forceNewUser === true) {
-      return { 
-        needsBackfill: true, 
-        isComplete: simOverrides.forceBackfillComplete === true,
-        progressCount: 0 
-      };
+  // Check simulation overrides for forcing new user state
+  let hasExistingScores = false;
+
+  if (simOverrides?.enabled && simOverrides.forceNewUser !== null) {
+    // Simulation override: forceNewUser controls whether user appears to have existing scores
+    hasExistingScores = !simOverrides.forceNewUser;
+  } else {
+    // Normal logic: check if user has any historical weekly scores
+    const { data: staffData } = await supabase
+      .from('staff')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+
+    if (!staffData) {
+      return { needsBackfill: true, isComplete: false, progressCount: 0 };
     }
-    if (simOverrides.forceNewUser === false) {
-      return { 
-        needsBackfill: false, 
-        isComplete: true,
-        progressCount: 6 
-      };
-    }
+
+    const { data: existingScores } = await supabase
+      .from('weekly_scores')
+      .select('id')
+      .eq('staff_id', staffData.id)
+      .limit(1);
+
+    hasExistingScores = !!(existingScores && existingScores.length > 0);
   }
-
-  // Check if user has any historical weekly scores
-  const { data: staffData } = await supabase
-    .from('staff')
-    .select('id')
-    .eq('user_id', userId)
-    .single();
-
-  if (!staffData) {
-    return { needsBackfill: true, isComplete: false, progressCount: 0 };
-  }
-
-  const { data: existingScores } = await supabase
-    .from('weekly_scores')
-    .select('id')
-    .eq('staff_id', staffData.id)
-    .limit(1);
 
   // If user has existing scores, they don't need backfill
-  if (existingScores && existingScores.length > 0) {
+  if (hasExistingScores) {
     return { needsBackfill: false, isComplete: true, progressCount: 6 };
   }
 
-  // Check localStorage for backfill progress
+  // User needs backfill - check localStorage for progress
   let progressCount = 0;
   let isComplete = false;
 

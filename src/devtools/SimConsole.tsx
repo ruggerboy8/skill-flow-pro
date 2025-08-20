@@ -301,8 +301,8 @@ export function SimBanner() {
     : 'Real time';
 
   return (
-    <div className="fixed top-0 left-0 right-0 bg-warning text-warning-foreground p-2 z-40">
-      <div className="max-w-4xl mx-auto text-center text-sm font-medium">
+    <div className="bg-warning text-warning-foreground p-2 rounded-md mt-4">
+      <div className="text-center text-sm font-medium">
         <Badge variant="secondary" className="mr-2">SIMULATION ACTIVE</Badge>
         Time: {currentTime}
         {overrides.forceHasConfidence !== null && (

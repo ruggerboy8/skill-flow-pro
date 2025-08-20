@@ -35,6 +35,18 @@ export default function ThisWeekPanel() {
   const [weekAssignments, setWeekAssignments] = useState<WeekAssignment[]>([]);
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [SimBannerComponent, setSimBannerComponent] = useState<React.ComponentType | null>(null);
+
+  // Load dev tools conditionally
+  useEffect(() => {
+    if (import.meta.env.VITE_ENABLE_SIMTOOLS === 'true') {
+      import('@/devtools/SimConsole').then(module => {
+        setSimBannerComponent(() => module.SimBanner);
+      }).catch(() => {
+        // Dev tools not available
+      });
+    }
+  }, []);
 
   // Load staff profile
   useEffect(() => {
@@ -311,6 +323,9 @@ export default function ThisWeekPanel() {
             </Button>
           )}
         </div>
+
+        {/* Simulation status below CTA when active */}
+        {SimBannerComponent && <SimBannerComponent />}
       </CardContent>
     </Card>
   );

@@ -9,13 +9,11 @@ async function renderApp() {
   if (enableSimTools) {
     const { NowProvider } = await import('./providers/NowProvider');
     const { SimProvider, useSim } = await import('./devtools/SimProvider');
-    const { SimBanner } = await import('./devtools/SimConsole');
     
     function AppWithDevTools() {
       return (
         <SimProvider>
           <SimTimeWrapper>
-            <SimBanner />
             <App />
           </SimTimeWrapper>
         </SimProvider>

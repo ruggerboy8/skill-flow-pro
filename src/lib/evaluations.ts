@@ -153,9 +153,10 @@ export async function getEvaluationsForStaff(staffId: string) {
 }
 
 /**
- * Get a single evaluation with all items
+ * Get a single evaluation with all items and competency details
  */
 export async function getEvaluation(evalId: string): Promise<EvaluationWithItems | null> {
+  // First get the evaluation and basic items
   const { data, error } = await supabase
     .from('evaluations')
     .select(`
@@ -171,48 +172,79 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
 
   if (!data) return null;
 
-  // Fetch competency details separately for each item
   const items = data.evaluation_items || [];
+
+  // Get competency details separately
   const competencyIds = items.map(item => item.competency_id);
   
-  if (competencyIds.length > 0) {
-    const { data: competencies } = await supabase
-      .from('competencies')
-      .select(`
-        competency_id,
-        description,
-        interview_prompt,
-        domain_id,
-        domains(domain_name)
-      `)
-      .in('competency_id', competencyIds);
-
-    // Create a map for quick lookup
-    const competencyMap = new Map();
-    competencies?.forEach(comp => {
-      competencyMap.set(comp.competency_id, comp);
-    });
-
-    // Transform the items to include competency details
-    const transformedItems = items.map(item => {
-      const competency = competencyMap.get(item.competency_id);
-      return {
-        ...item,
-        competency_description: competency?.description || '',
-        interview_prompt: competency?.interview_prompt || '',
-        domain_name: competency?.domains.domain_name || ''
-      };
-    });
-
+  if (competencyIds.length === 0) {
     return {
       ...data,
-      items: transformedItems
+      items: []
     };
   }
 
+  // Use a simple query to get competency details
+  const { data: competencies, error: competencyError } = await supabase
+    .from('competencies')
+    .select(`
+      competency_id,
+      description,
+      interview_prompt,
+      domain_id
+    `)
+    .in('competency_id', competencyIds);
+
+  if (competencyError) {
+    console.error('Error fetching competency details:', competencyError);
+  }
+
+  // Get domains separately
+  const domainIds = competencies?.map(c => c.domain_id).filter(id => id !== null) || [];
+  let domains: any[] = [];
+  
+  if (domainIds.length > 0) {
+    const { data: domainsData } = await supabase
+      .from('domains')
+      .select('domain_id, domain_name')
+      .in('domain_id', domainIds);
+    domains = domainsData || [];
+  }
+
+  // Create domain map
+  const domainMap = new Map();
+  domains.forEach(domain => {
+    domainMap.set(domain.domain_id, domain.domain_name);
+  });
+
+  // Create a map for quick lookup
+  const competencyMap = new Map();
+  if (competencies) {
+    competencies.forEach((comp: any) => {
+      competencyMap.set(comp.competency_id, {
+        description: comp.description,
+        interview_prompt: comp.interview_prompt,
+        domain_name: domainMap.get(comp.domain_id) || ''
+      });
+    });
+  }
+
+  // Transform the items to include competency details
+  const transformedItems = items.map(item => {
+    const competency = competencyMap.get(item.competency_id);
+    return {
+      ...item,
+      competency_description: competency?.description || '',
+      interview_prompt: competency?.interview_prompt || '',
+      domain_name: competency?.domain_name || ''
+    };
+  });
+
+  console.log('Transformed evaluation items:', transformedItems.slice(0, 2)); // Debug log
+
   return {
     ...data,
-    items: items
+    items: transformedItems
   };
 }
 

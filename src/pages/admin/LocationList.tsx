@@ -178,7 +178,7 @@ export default function LocationList() {
                     <TableCell>
                       {location.currentWeek && location.currentCycle ? (
                         <Badge variant="outline" className="text-xs">
-                          Week {location.currentWeek} · Cycle {location.currentCycle}
+                          Cycle {location.currentCycle} · Week {location.currentWeek}
                         </Badge>
                       ) : (
                         <span className="text-muted-foreground">—</span>

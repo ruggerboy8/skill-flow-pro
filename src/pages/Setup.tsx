@@ -14,17 +14,28 @@ interface Role {
   role_name: string;
 }
 
-const organizationLocations = {
-  'Sprout': ['McKinney', 'Frisco', 'Allen'],
-  'Kid\'s Tooth Team': ['Buda', 'Kyle', 'South Austin', 'Steiner Ranch', 'Lake Orion']
-};
+interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  slug: string;
+  organization_id: string;
+}
 
 export default function Setup() {
   const [name, setName] = useState('');
   const [roleId, setRoleId] = useState<string>('');
-  const [organization, setOrganization] = useState('');
-  const [primaryLocation, setPrimaryLocation] = useState('');
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState('');
+  const [selectedLocationId, setSelectedLocationId] = useState('');
   const [roles, setRoles] = useState<Role[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -32,7 +43,20 @@ export default function Setup() {
 
   useEffect(() => {
     loadRoles();
+    loadOrganizations();
+    loadLocations();
   }, []);
+
+  // Filter locations when organization changes
+  useEffect(() => {
+    if (selectedOrganizationId) {
+      const filtered = locations.filter(loc => loc.organization_id === selectedOrganizationId);
+      setAvailableLocations(filtered);
+      setSelectedLocationId(''); // Reset location selection
+    } else {
+      setAvailableLocations([]);
+    }
+  }, [selectedOrganizationId, locations]);
 
   const loadRoles = async () => {
     const { data, error } = await supabase
@@ -51,9 +75,43 @@ export default function Setup() {
     }
   };
 
+  const loadOrganizations = async () => {
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .order('name');
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load organizations",
+        variant: "destructive"
+      });
+    } else {
+      setOrganizations(data || []);
+    }
+  };
+
+  const loadLocations = async () => {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .order('name');
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load locations",
+        variant: "destructive"
+      });
+    } else {
+      setLocations(data || []);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !roleId || !organization || !primaryLocation || !user) return;
+    if (!name || !roleId || !selectedOrganizationId || !selectedLocationId || !user) return;
 
     setLoading(true);
     
@@ -64,8 +122,7 @@ export default function Setup() {
         email: user.email!,
         name,
         role_id: parseInt(roleId),
-        organization,
-        primary_location: primaryLocation
+        primary_location_id: selectedLocationId // Use the UUID location ID
       });
 
     if (error) {
@@ -126,16 +183,13 @@ export default function Setup() {
 
             <div className="space-y-2">
               <Label htmlFor="organization">Organization</Label>
-              <Select value={organization} onValueChange={(value) => {
-                setOrganization(value);
-                setPrimaryLocation(''); // Reset location when organization changes
-              }} required>
+              <Select value={selectedOrganizationId} onValueChange={setSelectedOrganizationId} required>
                 <SelectTrigger className="h-12">
                   <SelectValue placeholder="Select your organization" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.keys(organizationLocations).map((org) => (
-                    <SelectItem key={org} value={org}>{org}</SelectItem>
+                  {organizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -143,13 +197,13 @@ export default function Setup() {
 
             <div className="space-y-2">
               <Label htmlFor="location">Primary Location</Label>
-              <Select value={primaryLocation} onValueChange={setPrimaryLocation} required disabled={!organization}>
+              <Select value={selectedLocationId} onValueChange={setSelectedLocationId} required disabled={!selectedOrganizationId}>
                 <SelectTrigger className="h-12">
                   <SelectValue placeholder="Select your primary location" />
                 </SelectTrigger>
                 <SelectContent>
-                  {organization && organizationLocations[organization as keyof typeof organizationLocations]?.map((location) => (
-                    <SelectItem key={location} value={location}>{location}</SelectItem>
+                  {availableLocations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -158,7 +212,7 @@ export default function Setup() {
             <Button 
               type="submit" 
               className="w-full h-12" 
-              disabled={loading || !name || !roleId || !organization || !primaryLocation}
+              disabled={loading || !name || !roleId || !selectedOrganizationId || !selectedLocationId}
             >
               {loading ? "Creating Profile..." : "Complete Setup"}
             </Button>

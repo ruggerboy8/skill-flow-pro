@@ -32,6 +32,7 @@ interface StaffMember {
   user_id: string;
   hire_date?: string | null;
   onboarding_weeks: number;
+  primary_location_id?: string | null;
   weekly_scores: StaffScore[];
 }
 
@@ -93,11 +94,12 @@ export default function CoachDashboard() {
           id,
           name,
           user_id,
-          primary_location,
+          primary_location_id,
           role_id,
           hire_date,
           onboarding_weeks,
-          roles!inner(role_name)
+          roles!inner(role_name),
+          locations(name)
         `);
 
       if (error) throw error;
@@ -108,10 +110,11 @@ export default function CoachDashboard() {
         name: member.name,
         role_id: member.role_id,
         role_name: (member.roles as any).role_name,
-        location: member.primary_location ?? null,
+        location: member.locations?.name ?? null,
         user_id: member.user_id,
         hire_date: member.hire_date,
         onboarding_weeks: member.onboarding_weeks || 6,
+        primary_location_id: member.primary_location_id,
         weekly_scores: []
       }));
 
@@ -160,7 +163,8 @@ export default function CoachDashboard() {
           id: s.id, 
           role_id: s.role_id, 
           hire_date: s.hire_date, 
-          onboarding_weeks: s.onboarding_weeks 
+          onboarding_weeks: s.onboarding_weeks,
+          primary_location_id: s.primary_location_id
         }, 
         now
       );

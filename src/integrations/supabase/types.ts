@@ -20,6 +20,7 @@ export type Database = {
           competency_id: number
           description: string | null
           domain_id: number | null
+          interview_prompt: string | null
           name: string | null
           role_id: number | null
           status: string | null
@@ -29,6 +30,7 @@ export type Database = {
           competency_id: number
           description?: string | null
           domain_id?: number | null
+          interview_prompt?: string | null
           name?: string | null
           role_id?: number | null
           status?: string | null
@@ -38,6 +40,7 @@ export type Database = {
           competency_id?: number
           description?: string | null
           domain_id?: number | null
+          interview_prompt?: string | null
           name?: string | null
           role_id?: number | null
           status?: string | null

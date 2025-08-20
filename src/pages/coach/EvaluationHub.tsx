@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Save } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { getDomainColor } from '@/lib/domainColors';
 import {
   getEvaluation,
   setObserverScore,
@@ -17,7 +18,6 @@ import {
   setSelfNote,
   submitEvaluation,
   isEvaluationComplete,
-  SELF_ASSESSMENT_PROMPTS,
   type EvaluationWithItems
 } from '@/lib/evaluations';
 
@@ -40,6 +40,8 @@ export function EvaluationHub() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState(searchParams.get('phase') === 'self' ? 'self-assessment' : 'observation');
   const [currentSelfIndex, setCurrentSelfIndex] = useState(0);
+  const [showObserverNotes, setShowObserverNotes] = useState<Record<number, boolean>>({});
+  const [showSelfNote, setShowSelfNote] = useState(false);
 
   useEffect(() => {
     if (evalId) {
@@ -261,6 +263,10 @@ export function EvaluationHub() {
   const completionStatus = isEvaluationComplete(evaluation);
   const isReadOnly = evaluation.status === 'submitted';
   const currentItem = evaluation.items[currentSelfIndex];
+  
+  // Calculate observation completion count
+  const observerScoresCount = evaluation.items.filter(item => item.observer_score !== null).length;
+  const totalItems = evaluation.items.length;
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -299,11 +305,11 @@ export function EvaluationHub() {
                     <div className="w-5 h-5 rounded-full border-2 border-muted-foreground"></div>
                   )}
                   <span className={cn(
-                    "font-medium",
-                    completionStatus.observerComplete ? "text-green-600" : "text-muted-foreground"
-                  )}>
-                    Observation
-                  </span>
+                     "font-medium",
+                     completionStatus.observerComplete ? "text-green-600" : "text-muted-foreground"
+                   )}>
+                     Observation ({observerScoresCount}/{totalItems})
+                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
                   {completionStatus.selfComplete ? (
@@ -346,7 +352,27 @@ export function EvaluationHub() {
             <CardContent className="space-y-6">
               {evaluation.items.map((item) => (
                 <div key={item.competency_id} className="border rounded-lg p-4 space-y-4">
-                  <h4 className="font-medium">{item.competency_name_snapshot}</h4>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h4 className="font-medium">{item.competency_name_snapshot}</h4>
+                    {item.domain_name && (
+                      <Badge 
+                        variant="secondary" 
+                        className="text-xs"
+                        style={{ 
+                          backgroundColor: getDomainColor(item.domain_name),
+                          color: '#000'
+                        }}
+                      >
+                        {item.domain_name}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {item.competency_description && (
+                    <p className="text-sm text-muted-foreground italic">
+                      {item.competency_description}
+                    </p>
+                  )}
                   
                   {/* Score Pills */}
                   <div className="flex space-x-2">
@@ -368,14 +394,27 @@ export function EvaluationHub() {
                     ))}
                   </div>
 
-                  {/* Notes */}
-                  <Textarea
-                    placeholder="Optional notes..."
-                    value={item.observer_note || ''}
-                    onChange={(e) => !isReadOnly && handleObserverNoteChange(item.competency_id, e.target.value)}
-                    disabled={isReadOnly}
-                    className="min-h-[80px]"
-                  />
+                  {/* Conditional Notes */}
+                  {showObserverNotes[item.competency_id] ? (
+                    <Textarea
+                      placeholder="Add your notes..."
+                      value={item.observer_note || ''}
+                      onChange={(e) => !isReadOnly && handleObserverNoteChange(item.competency_id, e.target.value)}
+                      disabled={isReadOnly}
+                      className="min-h-[80px]"
+                    />
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowObserverNotes(prev => ({ ...prev, [item.competency_id]: true }))}
+                      disabled={isReadOnly}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Note
+                    </Button>
+                  )}
                 </div>
               ))}
             </CardContent>
@@ -413,9 +452,30 @@ export function EvaluationHub() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <h4 className="font-medium text-lg mb-2">{currentItem.competency_name_snapshot}</h4>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h4 className="font-medium text-lg">{currentItem.competency_name_snapshot}</h4>
+                    {currentItem.domain_name && (
+                      <Badge 
+                        variant="secondary" 
+                        className="text-xs"
+                        style={{ 
+                          backgroundColor: getDomainColor(currentItem.domain_name),
+                          color: '#000'
+                        }}
+                      >
+                        {currentItem.domain_name}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {currentItem.competency_description && (
+                    <p className="text-sm text-muted-foreground italic mb-4">
+                      {currentItem.competency_description}
+                    </p>
+                  )}
+                  
                   <p className="text-muted-foreground mb-4">
-                    {SELF_ASSESSMENT_PROMPTS[currentItem.competency_id] || SELF_ASSESSMENT_PROMPTS[1]}
+                    <strong>Interview Prompt:</strong> {currentItem.interview_prompt || 'No interview prompt available for this competency.'}
                   </p>
                 </div>
 
@@ -442,17 +502,30 @@ export function EvaluationHub() {
                   </div>
                 </div>
 
-                {/* Notes */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Self-Assessment Notes</label>
-                  <Textarea
-                    placeholder="Please share your thoughts and examples..."
-                    value={currentItem.self_note || ''}
-                    onChange={(e) => !isReadOnly && handleSelfNoteChange(currentItem.competency_id, e.target.value)}
+                {/* Conditional Notes */}
+                {showSelfNote ? (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Self-Assessment Notes</label>
+                    <Textarea
+                      placeholder="Please share your thoughts and examples..."
+                      value={currentItem.self_note || ''}
+                      onChange={(e) => !isReadOnly && handleSelfNoteChange(currentItem.competency_id, e.target.value)}
+                      disabled={isReadOnly}
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSelfNote(true)}
                     disabled={isReadOnly}
-                    className="min-h-[120px]"
-                  />
-                </div>
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Note
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}

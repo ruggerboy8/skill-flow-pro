@@ -6,7 +6,11 @@ type EvaluationInsert = Database['public']['Tables']['evaluations']['Insert'];
 type EvaluationItem = Database['public']['Tables']['evaluation_items']['Row'];
 
 export interface EvaluationWithItems extends Evaluation {
-  items: EvaluationItem[];
+  items: (EvaluationItem & {
+    competency_description?: string;
+    interview_prompt?: string;
+    domain_name?: string;
+  })[];
 }
 
 export interface QuarterWindow {
@@ -156,7 +160,16 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
     .from('evaluations')
     .select(`
       *,
-      evaluation_items(*)
+      evaluation_items(
+        *,
+        competencies!inner(
+          description,
+          interview_prompt,
+          domains!inner(
+            domain_name
+          )
+        )
+      )
     `)
     .eq('id', evalId)
     .maybeSingle();
@@ -167,9 +180,17 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
 
   if (!data) return null;
 
+  // Transform the items to include competency details at the top level
+  const transformedItems = (data.evaluation_items || []).map((item: any) => ({
+    ...item,
+    competency_description: item.competencies?.description || '',
+    interview_prompt: item.competencies?.interview_prompt || '',
+    domain_name: item.competencies?.domains?.domain_name || ''
+  }));
+
   return {
     ...data,
-    items: data.evaluation_items || []
+    items: transformedItems
   };
 }
 

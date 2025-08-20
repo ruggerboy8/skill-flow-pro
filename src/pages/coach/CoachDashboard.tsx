@@ -82,6 +82,8 @@ export default function CoachDashboard() {
 
   const loadStaffData = async () => {
     try {
+      const now = new Date();
+      
       // Get staff roster with score status
       const { data: staffData, error } = await supabase
         .from('staff')
@@ -95,7 +97,7 @@ export default function CoachDashboard() {
             confidence_score,
             performance_score,
             updated_at,
-            weekly_focus!inner(id, cycle, week_in_cycle, iso_year, iso_week)
+            weekly_focus!inner(id, cycle, week_in_cycle)
           )
         `);
 
@@ -116,8 +118,8 @@ export default function CoachDashboard() {
             id: s.weekly_focus.id,
             cycle: s.weekly_focus.cycle,
             week_in_cycle: s.weekly_focus.week_in_cycle,
-            iso_year: s.weekly_focus.iso_year,
-            iso_week: s.weekly_focus.iso_week,
+            iso_year: getISOWeekYear(now),
+            iso_week: getISOWeek(now),
           },
         })),
       }));

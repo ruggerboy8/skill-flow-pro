@@ -116,7 +116,7 @@ export function LocationDialog({ open, onClose, location }: LocationDialogProps)
 
     try {
       // Validate that program start date is a Monday
-      const startDate = new Date(formData.program_start_date);
+      const startDate = new Date(formData.program_start_date + 'T00:00:00'); // Force local timezone
       const dayOfWeek = startDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
       
       if (dayOfWeek !== 1) {

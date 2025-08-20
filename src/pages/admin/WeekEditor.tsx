@@ -224,8 +224,8 @@ export default function WeekEditor() {
         action_id: slot.action_id,
         self_select: slot.is_self_select,
         display_order: index + 1,
-        iso_year: new Date().getFullYear(), // Legacy field for types
-        iso_week: 1 // Legacy field for types
+        iso_year: 2025, // Legacy field for database compatibility - will be removed
+        iso_week: 1 // Legacy field for database compatibility - will be removed
       }));
 
       const { error } = await supabase

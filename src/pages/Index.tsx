@@ -182,11 +182,19 @@ export default function Index() {
       return;
     }
 
-    // Check if weekly_focus exists for this cycle/week/role using new query
-    const {
-      data: focusRows,
-      error
-    } = await supabase.from('v_weekly_focus').select('id, display_order, action_statement').eq('cycle', cycle).eq('week_in_cycle', weekInCycle).eq('role_id', staff.role_id).order('display_order');
+    // Check if weekly_focus exists for this cycle/week/role using direct table query
+    const { data: focusRows, error } = await supabase
+      .from('weekly_focus')
+      .select(`
+        id, 
+        display_order, 
+        pro_moves(action_statement)
+      `)
+      .eq('cycle', cycle)
+      .eq('week_in_cycle', weekInCycle)
+      .eq('role_id', staff.role_id)
+      .order('display_order');
+
     if (error || !focusRows || focusRows.length === 0) {
       toast({
         title: "No Pro Moves",

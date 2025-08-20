@@ -159,8 +159,8 @@ export function FocusBuilder({ roleFilter }: FocusBuilderProps) {
         action_id: slot.action_id,
         self_select: slot.self_select,
         display_order: slot.display_order,
-        iso_year: new Date().getFullYear(), // Legacy field for types
-        iso_week: 1 // Legacy field for types
+        iso_year: 2025, // Legacy field for database compatibility - will be removed
+        iso_week: 1 // Legacy field for database compatibility - will be removed
       }));
 
       const { error } = await supabase

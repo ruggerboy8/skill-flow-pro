@@ -1,3 +1,4 @@
+// Updated Performance Wizard to use progress-based approach instead of ISO week
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,8 @@ import { getDomainColor } from '@/lib/domainColors';
 import { nowUtc, getAnchors } from '@/lib/centralTime';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
+import { assembleCurrentWeek } from '@/lib/weekAssembly';
+
 interface Staff {
   id: string;
   role_id: number;
@@ -34,7 +37,7 @@ interface WeeklyScore {
 }
 
 export default function PerformanceWizard() {
-  const { week, n } = useParams();
+  const { n } = useParams();
   const [staff, setStaff] = useState<Staff | null>(null);
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [currentFocus, setCurrentFocus] = useState<WeeklyFocus | null>(null);
@@ -53,14 +56,13 @@ export default function PerformanceWizard() {
   const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
   const { thuStartZ, mondayZ } = getAnchors(effectiveNow);
 
-  const weekNum = Number(week);
   const currentIndex = Math.max(0, (Number(n) || 1) - 1);
 
   useEffect(() => {
     if (user) {
       loadData();
     }
-  }, [user, week, n]);
+  }, [user, n]);
 
   // Central Time gating and route guard for Performance
   useEffect(() => {
@@ -93,68 +95,10 @@ export default function PerformanceWizard() {
 
     setStaff(staffData);
 
-    // Determine user's current cycle/week position (same logic as confidence wizard)
-    // First try ISO week lookup
-    let { data: focusData, error: focusError } = await supabase
-      .from('weekly_focus')
-      .select(`
-        id,
-        display_order,
-        action_id,
-        competency_id,
-        cycle,
-        week_in_cycle,
-        self_select,
-        pro_moves(action_statement),
-        competencies(
-          domain_id,
-          domains(domain_name),
-          name
-        )
-      `)
-      .eq('iso_year', 2025)
-      .eq('iso_week', weekNum)
-      .eq('role_id', staffData.role_id)
-      .order('display_order');
+    // Use the new progress-based approach to get current week assignments
+    const assignments = await assembleCurrentWeek(user.id, overrides);
 
-    // If no ISO week data, fall back to cycle/week logic
-    if (!focusData || focusData.length === 0) {
-      // Check if user completed backfill to determine cycle position
-      const { data: hasScores } = await supabase
-        .from('weekly_scores')
-        .select('id')
-        .eq('staff_id', staffData.id)
-        .limit(1);
-
-      if (hasScores && hasScores.length > 0) {
-        // User completed backfill, should be on cycle 2 week 1
-        const { data: cycle2Data } = await supabase
-          .from('weekly_focus')
-          .select(`
-            id,
-            display_order,
-            action_id,
-            competency_id,
-            cycle,
-            week_in_cycle,
-            self_select,
-            pro_moves(action_statement),
-            competencies(
-              domain_id,
-              domains(domain_name),
-              name
-            )
-          `)
-          .eq('cycle', 2)
-          .eq('week_in_cycle', 1)
-          .eq('role_id', staffData.role_id)
-          .order('display_order');
-        
-        if (cycle2Data) focusData = cycle2Data;
-      }
-    }
-
-    if (focusError || !focusData || focusData.length === 0) {
+    if (!assignments || assignments.length === 0) {
       toast({
         title: 'Error',
         description: 'No Pro Moves found for this week',
@@ -165,7 +109,7 @@ export default function PerformanceWizard() {
     }
 
     // Load existing confidence scores with selected action IDs
-    const focusIds = focusData.map((f: any) => f.id);
+    const focusIds = assignments.map(a => a.weekly_focus_id);
     const { data: scoresData, error: scoresError } = await supabase
       .from('weekly_scores')
       .select('id, weekly_focus_id, confidence_score, confidence_date, selected_action_id')
@@ -173,7 +117,7 @@ export default function PerformanceWizard() {
       .in('weekly_focus_id', focusIds)
       .not('confidence_score', 'is', null);
 
-    if (scoresError || !scoresData || scoresData.length !== focusData.length) {
+    if (scoresError || !scoresData || scoresData.length !== assignments.length) {
       toast({
         title: "Error",
         description: "Please complete confidence ratings first",
@@ -184,35 +128,15 @@ export default function PerformanceWizard() {
     }
 
     // Build the weekly focus with actual selected pro moves
-    const transformedFocusData: WeeklyFocus[] = await Promise.all(
-      focusData.map(async (item: any) => {
-        const score = scoresData.find((s: any) => s.weekly_focus_id === item.id);
-        let actionStatement = item.pro_moves?.action_statement || '';
-        
-        // If this is a self-select item, get the selected pro move
-        if (item.self_select && score?.selected_action_id) {
-          const { data: selectedProMove } = await supabase
-            .from('pro_moves')
-            .select('action_statement')
-            .eq('action_id', score.selected_action_id)
-            .single();
-          
-          if (selectedProMove) {
-            actionStatement = selectedProMove.action_statement;
-          }
-        }
-
-        return {
-          id: item.id,
-          display_order: item.display_order,
-          action_statement: actionStatement,
-          cycle: item.cycle,
-          week_in_cycle: item.week_in_cycle,
-          domain_name: item.competencies?.domains?.domain_name || 'Unknown',
-          competency_name: item.competencies?.name || undefined
-        };
-      })
-    );
+    const transformedFocusData: WeeklyFocus[] = assignments.map((assignment) => ({
+      id: assignment.weekly_focus_id,
+      display_order: assignment.display_order,
+      action_statement: assignment.action_statement || '',
+      cycle: 1, // Will be updated when we have cycle info in assignments
+      week_in_cycle: 1, // Will be updated when we have week info in assignments
+      domain_name: assignment.domain_name,
+      competency_name: undefined // Could be added to assignments if needed
+    }));
 
     setWeeklyFocus(transformedFocusData);
     setExistingScores(scoresData);
@@ -227,7 +151,7 @@ export default function PerformanceWizard() {
 
   const handleNext = () => {
     if (currentIndex < weeklyFocus.length - 1) {
-      navigate(`/performance/${weekNum}/step/${currentIndex + 2}`);
+      navigate(`/performance/current/step/${currentIndex + 2}`);
     } else {
       handleSubmit();
     }
@@ -235,7 +159,7 @@ export default function PerformanceWizard() {
 
   const handleBack = () => {
     if (currentIndex > 0) {
-      navigate(`/performance/${weekNum}/step/${currentIndex}`);
+      navigate(`/performance/current/step/${currentIndex}`);
     }
   };
 

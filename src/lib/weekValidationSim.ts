@@ -63,8 +63,8 @@ async function checkRealConfidence(
   let { data: weeklyFocus } = await supabase
     .from('weekly_focus')
     .select('id')
-    .eq('iso_year', weekId.iso_year)
-    .eq('iso_week', weekId.iso_week);
+    .eq('cycle', 2)
+    .eq('week_in_cycle', 1);
 
   // If no results, try cycle 2 week 1 (post-backfill)
   if (!weeklyFocus?.length) {
@@ -123,8 +123,8 @@ async function checkRealPerformance(
   let { data: weeklyFocus } = await supabase
     .from('weekly_focus')
     .select('id')
-    .eq('iso_year', weekId.iso_year)
-    .eq('iso_week', weekId.iso_week);
+    .eq('cycle', 2)
+    .eq('week_in_cycle', 1);
 
   // If no results, try cycle 2 week 1 (post-backfill)
   if (!weeklyFocus?.length) {

@@ -37,10 +37,18 @@ export default function BackfillReview() {
       if (!staffRow) return;
       setStaff(staffRow);
 
-      // All focus for cycle 1 weeks 1..6
+      // All focus for cycle 1 weeks 1..6 using direct table query
       const { data: focus } = await supabase
-        .from("v_weekly_focus")
-        .select("id, display_order, action_statement, week_in_cycle, role_id, cycle")
+        .from("weekly_focus")
+        .select(`
+          id, 
+          display_order, 
+          action_id,
+          week_in_cycle, 
+          role_id, 
+          cycle,
+          pro_moves(action_statement)
+        `)
         .eq("cycle", 1)
         .eq("role_id", staffRow.role_id)
         .in("week_in_cycle", [1,2,3,4,5,6])
@@ -67,7 +75,7 @@ export default function BackfillReview() {
         return {
           id: f.id,
           display_order: f.display_order,
-          action_statement: f.action_statement,
+          action_statement: f.pro_moves?.action_statement || '',
           week_in_cycle: f.week_in_cycle,
           domain_name: "", // optional in review
           selected_action_statement: s?.selected_action_id ? (actionMap[s.selected_action_id] || null) : null,

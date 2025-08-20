@@ -160,7 +160,7 @@ export type Database = {
           version: string | null
         }
         Insert: {
-          action_id: number
+          action_id?: number
           action_statement?: string | null
           active?: boolean | null
           competency_id?: number | null

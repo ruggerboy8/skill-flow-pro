@@ -32,7 +32,11 @@ export interface WeekContext {
 /**
  * Determines what cycle/week the user should currently be on based on their progress
  */
-export async function getUserCurrentWeek(userId: string): Promise<UserProgress> {
+export async function getUserCurrentWeek(userId: string, simOverrides?: SimOverrides): Promise<UserProgress> {
+  console.log('=== getUserCurrentWeek ===');
+  console.log('userId:', userId);
+  console.log('simOverrides:', simOverrides);
+  
   // Get staff info
   const { data: staffData } = await supabase
     .from('staff')
@@ -44,17 +48,29 @@ export async function getUserCurrentWeek(userId: string): Promise<UserProgress> 
     throw new Error('Staff record not found');
   }
 
-  // Check if user has completed backfill (has any weekly_scores)
-  const { data: hasScores } = await supabase
-    .from('weekly_scores')
-    .select('id')
-    .eq('staff_id', staffData.id)
-    .limit(1);
+  console.log('staffData:', staffData);
 
-  const completed_backfill = hasScores && hasScores.length > 0;
+  // Check simulation override first
+  let completed_backfill = false;
+  
+  if (simOverrides?.enabled && simOverrides.forceBackfillComplete !== null) {
+    completed_backfill = simOverrides.forceBackfillComplete;
+    console.log('Using simulation override for backfill completion:', completed_backfill);
+  } else {
+    // Check if user has completed backfill (has any weekly_scores)
+    const { data: hasScores } = await supabase
+      .from('weekly_scores')
+      .select('id')
+      .eq('staff_id', staffData.id)
+      .limit(1);
+
+    completed_backfill = hasScores && hasScores.length > 0;
+    console.log('Real backfill completion check:', completed_backfill, 'hasScores:', hasScores?.length);
+  }
 
   if (completed_backfill) {
     // Post-backfill: User should be on Cycle 2, Week 1
+    console.log('User is post-backfill: Cycle 2, Week 1');
     return {
       cycle: 2,
       week_in_cycle: 1,
@@ -62,6 +78,7 @@ export async function getUserCurrentWeek(userId: string): Promise<UserProgress> 
     };
   } else {
     // Pre-backfill: User should be on Cycle 1, Week 1
+    console.log('User is pre-backfill: Cycle 1, Week 1');
     return {
       cycle: 1,
       week_in_cycle: 1,
@@ -218,11 +235,13 @@ export async function computeProgressWeekState(
     throw new Error('Staff record not found');
   }
 
-  // Get user's current progress week
-  const userProgress = await getUserCurrentWeek(userId);
+  // Get user's current progress week (with simulation support)
+  const userProgress = await getUserCurrentWeek(userId, simOverrides);
+  console.log('User progress from getUserCurrentWeek:', userProgress);
   
   // Get focus items for current week
   const weekFocus = await getWeekAssignments(staffData.role_id, userProgress.cycle, userProgress.week_in_cycle);
+  console.log('Week focus assignments:', weekFocus.length, 'items for Cycle', userProgress.cycle, 'Week', userProgress.week_in_cycle);
   const focusIds = weekFocus.map(f => f.id);
   
   // Get time-based rules

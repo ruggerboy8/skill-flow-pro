@@ -40,13 +40,13 @@ export async function assembleCurrentWeek(
 
     console.log('Staff data:', staffData);
 
-    // Get user's current progress week
-    const userProgress = await getUserCurrentWeek(userId);
+    // Get user's current progress week (with simulation support)
+    const userProgress = await getUserCurrentWeek(userId, simOverrides);
     console.log('User progress:', userProgress);
 
     // Get focus items for current week
     const weekFocus = await getWeekAssignments(staffData.role_id, userProgress.cycle, userProgress.week_in_cycle);
-    console.log('Week focus items:', weekFocus);
+    console.log('Week focus items:', weekFocus.length, 'items found for Cycle', userProgress.cycle, 'Week', userProgress.week_in_cycle);
 
     if (weekFocus.length === 0) {
       console.log('No weekly focus found - returning empty assignments');

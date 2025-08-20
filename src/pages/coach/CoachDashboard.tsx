@@ -154,9 +154,9 @@ export default function CoachDashboard() {
     }
 
     const now = new Date();
-    const mapped = [];
     
-    for (const s of filtered) {
+    // Compute status for all staff members in parallel instead of sequentially
+    const statusPromises = filtered.map(async (s) => {
       const status = await computeStaffStatusNew(
         s.user_id, 
         { 
@@ -169,11 +169,13 @@ export default function CoachDashboard() {
         now
       );
       
-      mapped.push({
+      return {
         member: { id: s.id, name: s.name, role_name: s.role_name, location: s.location },
         status,
-      });
-    }
+      };
+    });
+
+    const mapped = await Promise.all(statusPromises);
 
     mapped.sort(
       (a, b) => getSortRank(a.status) - getSortRank(b.status) || a.member.name.localeCompare(b.member.name)

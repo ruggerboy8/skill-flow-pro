@@ -365,15 +365,13 @@ export default function ConfidenceWizard() {
             />
 
             <div className="flex gap-2">
-              {currentIndex > 0 && (
-                <Button 
-                  variant="outline" 
-                  onClick={handleBack}
-                  className="flex-1"
-                >
-                  Back
-                </Button>
-              )}
+              <Button 
+                variant="outline" 
+                onClick={() => currentIndex > 0 ? handleBack() : navigate('/')}
+                className="flex-1"
+              >
+                {currentIndex > 0 ? 'Back' : 'Home'}
+              </Button>
               <Button 
                 onClick={handleNext}
                 disabled={!canProceed || submitting}

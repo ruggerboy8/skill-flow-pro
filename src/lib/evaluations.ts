@@ -339,6 +339,31 @@ export async function submitEvaluation(evalId: string) {
 }
 
 /**
+ * Delete an evaluation and all its items
+ */
+export async function deleteEvaluation(evalId: string) {
+  // First delete evaluation items
+  const { error: itemsError } = await supabase
+    .from('evaluation_items')
+    .delete()
+    .eq('evaluation_id', evalId);
+
+  if (itemsError) {
+    throw new Error(`Failed to delete evaluation items: ${itemsError.message}`);
+  }
+
+  // Then delete the evaluation
+  const { error: evalError } = await supabase
+    .from('evaluations')
+    .delete()
+    .eq('id', evalId);
+
+  if (evalError) {
+    throw new Error(`Failed to delete evaluation: ${evalError.message}`);
+  }
+}
+
+/**
  * Check if evaluation is complete (all items have both observer and self scores)
  */
 export function isEvaluationComplete(evaluation: EvaluationWithItems): { 

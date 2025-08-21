@@ -6,7 +6,18 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
@@ -18,6 +29,7 @@ import {
   setSelfScore,
   setSelfNote,
   submitEvaluation,
+  deleteEvaluation,
   isEvaluationComplete,
   type EvaluationWithItems
 } from '@/lib/evaluations';
@@ -44,6 +56,7 @@ export function EvaluationHub() {
   const [currentSelfIndex, setCurrentSelfIndex] = useState(0);
   const [showObserverNotes, setShowObserverNotes] = useState<Record<number, boolean>>({});
   const [showSelfNote, setShowSelfNote] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (evalId) {
@@ -247,6 +260,33 @@ export function EvaluationHub() {
     }
   };
 
+  const handleDeleteEvaluation = async () => {
+    if (!evalId) return;
+    
+    try {
+      setIsDeleting(true);
+      await deleteEvaluation(evalId);
+      
+      toast({
+        title: "Success",
+        description: "Evaluation deleted successfully",
+        variant: "default"
+      });
+
+      // Navigate back to staff detail page
+      navigate(`/coach/${staffId}`);
+    } catch (error) {
+      console.error('Failed to delete evaluation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete evaluation",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto p-6">
@@ -302,7 +342,40 @@ export function EvaluationHub() {
             </p>
           </div>
         </div>
-        {isReadOnly && <Badge variant="default">Submitted</Badge>}
+        <div className="flex items-center space-x-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                disabled={isDeleting}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Evaluation</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. Are you sure you want to delete this evaluation report?
+                  This will permanently remove the evaluation and all associated data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleDeleteEvaluation}
+                  disabled={isDeleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          {isReadOnly && <Badge variant="default">Submitted</Badge>}
+        </div>
       </div>
 
       {/* Progress & Submit Bar */}

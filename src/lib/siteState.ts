@@ -1,7 +1,7 @@
 import { getWeekAnchors, CT_TZ } from './centralTime';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { getOpenBacklogCount } from './backlog';
+import { getOpenBacklogCount, populateBacklogForMissedWeek, isBacklogPopulatedForWeek } from './backlog';
 
 export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'wait_for_thu' | 'done' | 'missed_checkout' | 'no_assignments';
 
@@ -419,6 +419,9 @@ export async function computeWeekState(params: {
 
   // Determine state and next action
   if (now > anchors.confidence_deadline && !hasConfidence) {
+    // Populate backlog for missed checkin (async, don't await to avoid blocking UI)
+    populateMissedWeekBacklog(userId, assignments, { weekInCycle: context.weekInCycle, cycleNumber: context.cycle });
+    
     return {
       state: 'missed_checkin',
       nextAction: 'Overdue',
@@ -463,6 +466,9 @@ export async function computeWeekState(params: {
   }
 
   if (hasConfidence && !hasPerformance && now > anchors.performance_deadline) {
+    // Populate backlog for missed checkout (async, don't await to avoid blocking UI)
+    populateMissedWeekBacklog(userId, assignments, { weekInCycle: context.weekInCycle, cycleNumber: context.cycle });
+    
     return {
       state: 'missed_checkout',
       nextAction: 'Overdue',
@@ -491,4 +497,28 @@ export async function computeWeekState(params: {
     selectionPending,
     lastActivity
   };
+}
+
+// Helper function to populate backlog for missed weeks (with guard to prevent duplicates)
+async function populateMissedWeekBacklog(
+  userId: string, 
+  assignments: any[], 
+  weekContext: { weekInCycle: number; cycleNumber: number }
+) {
+  try {
+    const weeklyFocusIds = assignments.map(a => a.weekly_focus_id).filter(Boolean);
+    if (weeklyFocusIds.length === 0) return;
+
+    // Check if we've already populated backlog for this week to avoid duplicates
+    const alreadyPopulated = await isBacklogPopulatedForWeek(userId, weeklyFocusIds);
+    if (alreadyPopulated) {
+      console.log('Backlog already populated for this week, skipping');
+      return;
+    }
+
+    // Populate backlog for missed week
+    await populateBacklogForMissedWeek(userId, assignments, weekContext);
+  } catch (error) {
+    console.error('Error in populateMissedWeekBacklog:', error);
+  }
 }

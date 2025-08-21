@@ -87,6 +87,55 @@ export async function addToBacklog(userId: string, proMoveId: number, weekId: st
   }
 }
 
+// Populate backlog for a specific missed week (current week assignments that weren't completed)
+export async function populateBacklogForMissedWeek(
+  userId: string,
+  assignments: any[],
+  weekContext: { weekInCycle: number; cycleNumber: number }
+): Promise<void> {
+  try {
+    console.log('=== POPULATING BACKLOG FOR MISSED WEEK ===');
+    console.log('User:', userId);
+    console.log('Week context:', weekContext);
+    console.log('Assignments:', assignments);
+
+    // Only add site moves (not self-selects) to backlog
+    const siteMoves = assignments.filter(a => a.type === 'site' && a.pro_move_id);
+    
+    console.log('Site moves to add to backlog:', siteMoves.length);
+
+    for (const assignment of siteMoves) {
+      await addToBacklog(userId, assignment.pro_move_id, assignment.weekly_focus_id);
+      console.log(`Added pro move ${assignment.pro_move_id} to backlog for user ${userId}`);
+    }
+  } catch (error) {
+    console.error('Error populating backlog for missed week:', error);
+  }
+}
+
+// Check if backlog has already been populated for this week to avoid duplicates
+export async function isBacklogPopulatedForWeek(
+  userId: string, 
+  weeklyFocusIds: string[]
+): Promise<boolean> {
+  try {
+    if (weeklyFocusIds.length === 0) return false;
+    
+    const { data, error } = await supabase
+      .from('user_backlog')
+      .select('id')
+      .eq('user_id', userId)
+      .in('added_week_id', weeklyFocusIds)
+      .limit(1);
+
+    if (error) throw error;
+    return (data?.length || 0) > 0;
+  } catch (error) {
+    console.error('Error checking if backlog populated for week:', error);
+    return false; // Assume not populated on error to be safe
+  }
+}
+
 // Get open backlog items for a user (FIFO order)
 export async function getOpenBacklog(userId: string): Promise<BacklogItem[]> {
   try {

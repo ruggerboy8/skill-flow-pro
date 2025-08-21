@@ -3,16 +3,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Eye, FileEdit } from 'lucide-react';
+import { CalendarIcon, Plus, Eye, FileEdit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { getEvaluationsForStaff, createDraftEvaluation } from '@/lib/evaluations';
+import { getEvaluationsForStaff, createDraftEvaluation, deleteEvaluation } from '@/lib/evaluations';
 import { Database } from '@/integrations/supabase/types';
 
 type Evaluation = Database['public']['Tables']['evaluations']['Row'];
@@ -35,6 +46,7 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [deletingEvalId, setDeletingEvalId] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -123,6 +135,30 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
       });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleDeleteEvaluation = async (evalId: string) => {
+    try {
+      setDeletingEvalId(evalId);
+      await deleteEvaluation(evalId);
+      
+      toast({
+        title: "Success",
+        description: "Evaluation deleted successfully"
+      });
+      
+      // Reload evaluations after deletion
+      await loadEvaluations();
+    } catch (error) {
+      console.error('Failed to delete evaluation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete evaluation",
+        variant: "destructive"
+      });
+    } finally {
+      setDeletingEvalId(null);
     }
   };
 
@@ -300,6 +336,36 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                   </div>
                   <div className="flex items-center space-x-2">
                     <Badge variant="secondary">Draft</Badge>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          disabled={deletingEvalId === evaluation.id}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Evaluation</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. Are you sure you want to delete this evaluation report?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => handleDeleteEvaluation(evaluation.id)}
+                            disabled={deletingEvalId === evaluation.id}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {deletingEvalId === evaluation.id ? "Deleting..." : "Delete"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                     <Button 
                       size="sm"
                       onClick={() => navigate(`/coach/${staffId}/eval/${evaluation.id}`)}
@@ -339,6 +405,36 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                   </div>
                   <div className="flex items-center space-x-2">
                     <Badge variant="default">Submitted</Badge>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          disabled={deletingEvalId === evaluation.id}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Evaluation</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. Are you sure you want to delete this evaluation report?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => handleDeleteEvaluation(evaluation.id)}
+                            disabled={deletingEvalId === evaluation.id}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {deletingEvalId === evaluation.id ? "Deleting..." : "Delete"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                     <Button 
                       size="sm" 
                       variant="outline"

@@ -47,6 +47,13 @@ export function ProMoveLibrary() {
     loadCompetencies();
   }, []);
 
+  // Reload competencies when role selection changes
+  useEffect(() => {
+    loadCompetencies();
+    // Reset competency selection when role changes
+    setSelectedCompetency('all');
+  }, [selectedRole]);
+
   const loadRoles = async () => {
     const { data } = await supabase
       .from('roles')
@@ -57,7 +64,7 @@ export function ProMoveLibrary() {
   };
 
   const loadCompetencies = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('competencies')
       .select(`
         competency_id, 
@@ -65,8 +72,14 @@ export function ProMoveLibrary() {
         domains!competencies_domain_id_fkey (
           domain_name
         )
-      `)
-      .order('competency_id');
+      `);
+
+    // Filter by role if one is selected
+    if (selectedRole !== 'all') {
+      query = query.eq('role_id', parseInt(selectedRole));
+    }
+
+    const { data } = await query.order('competency_id');
     
     if (data) {
       const formattedCompetencies = data?.map(item => ({

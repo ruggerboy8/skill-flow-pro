@@ -213,32 +213,13 @@ export default function ThisWeekPanel() {
   const { mondayZ } = getWeekAnchors(now, CT_TZ);
   const weekOfDate = formatInTimeZone(mondayZ, CT_TZ, 'MMM d, yyyy');
 
-  // Show "missed checkin" state - hide pro moves and show message only (priority over empty state)
-  if (weekContext.state === 'missed_checkin') {
-    return (
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>This Week&apos;s Pro Moves</CardTitle>
-          <CardDescription>Week of {weekOfDate}</CardDescription>
-          {locationWeekContext && (
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="outline" className="text-xs">
-                Cycle {locationWeekContext.cycleNumber}, Week {locationWeekContext.weekInCycle}
-              </Badge>
-            </div>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-md border bg-muted p-3">
-            <div className="font-medium text-sm text-foreground text-center">{bannerMessage}</div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Filter assignments for missed states - only show site moves, not self-selects
+  const displayAssignments = (weekContext.state === 'missed_checkin' || weekContext.state === 'missed_checkout') 
+    ? weekAssignments.filter(assignment => assignment.type === 'site')
+    : weekAssignments;
 
-  // Show empty state when no pro moves found (only if not in missed_checkin state)
-  if (weekAssignments.length === 0) {
+  // Show empty state when no pro moves found (or no site moves for missed states)
+  if (displayAssignments.length === 0) {
     return (
       <Card className="overflow-hidden">
         <CardHeader>
@@ -280,7 +261,7 @@ export default function ThisWeekPanel() {
       <CardContent className="space-y-4">
         {/* Pro Moves list */}
         <div className="space-y-3">
-          {weekAssignments.map((assignment, index) => {
+          {displayAssignments.map((assignment, index) => {
             const domainName = assignment.domain_name;
             const bgColor = domainName ? getDomainColor(domainName) : undefined;
             const isUnchosen = assignment.type === 'selfSelect' && !assignment.action_statement;

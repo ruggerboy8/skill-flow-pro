@@ -84,9 +84,9 @@ export default function PerformanceWizard() {
     setStaff(staffData);
 
     // Use the unified site-based approach to get current week assignments
-    const weekData = await assembleCurrentWeek(user.id, overrides);
+    const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);
 
-    if (!weekData || !weekData.assignments || weekData.assignments.length === 0) {
+    if (!assignments || assignments.length === 0) {
       toast({
         title: 'Error',
         description: 'No Pro Moves found for this week',
@@ -97,7 +97,7 @@ export default function PerformanceWizard() {
     }
 
     // Load existing confidence scores with selected action IDs
-    const focusIds = weekData.assignments.map(a => a.weekly_focus_id);
+    const focusIds = assignments.map(a => a.weekly_focus_id);
     const { data: scoresData, error: scoresError } = await supabase
       .from('weekly_scores')
       .select('id, weekly_focus_id, confidence_score, confidence_date, selected_action_id')
@@ -105,7 +105,7 @@ export default function PerformanceWizard() {
       .in('weekly_focus_id', focusIds)
       .not('confidence_score', 'is', null);
 
-    if (scoresError || !scoresData || scoresData.length !== weekData.assignments.length) {
+    if (scoresError || !scoresData || scoresData.length !== assignments.length) {
       toast({
         title: "Error",
         description: "Please complete confidence ratings first",
@@ -116,12 +116,12 @@ export default function PerformanceWizard() {
     }
 
     // Build the weekly focus with actual selected pro moves
-    const transformedFocusData: WeeklyFocus[] = weekData.assignments.map((assignment) => ({
+    const transformedFocusData: WeeklyFocus[] = assignments.map((assignment) => ({
       id: assignment.weekly_focus_id,
       display_order: assignment.display_order,
       action_statement: assignment.action_statement || '',
-      cycle: 1, // Will be updated when we have cycle info in assignments
-      week_in_cycle: 1, // Will be updated when we have week info in assignments
+      cycle: cycleNumber,
+      week_in_cycle: weekInCycle,
       domain_name: assignment.domain_name,
       competency_name: undefined // Could be added to assignments if needed
     }));

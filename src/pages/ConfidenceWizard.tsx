@@ -90,8 +90,9 @@ export default function ConfidenceWizard() {
     setStaff(staffData);
 
     // Use the unified site-based approach to get current week assignments
-    const {assignments} = await assembleCurrentWeek(user.id, overrides);
-    console.log('assignemnts', assignments)
+    const {assignments, cycleNumber, weekInCycle} = await assembleCurrentWeek(user.id, overrides);
+    console.log('assignments', assignments);
+    console.log('cycle info:', { cycleNumber, weekInCycle });
 
     if (!assignments || assignments.length === 0) {
       toast({
@@ -103,13 +104,13 @@ export default function ConfidenceWizard() {
       return;
     }
 
-    // Transform assignments to WeeklyFocus format
+    // Transform assignments to WeeklyFocus format with correct cycle info
     const transformedFocusData: WeeklyFocus[] = assignments.map((assignment) => ({
       id: assignment.weekly_focus_id,
       display_order: assignment.display_order,
       action_statement: assignment.action_statement || '',
-      cycle: 1, // Will be updated when we have cycle info in assignments
-      week_in_cycle: 1, // Will be updated when we have week info in assignments
+      cycle: cycleNumber || 1,
+      week_in_cycle: weekInCycle || 1,
       domain_name: assignment.domain_name
     }));
 
@@ -198,17 +199,7 @@ export default function ConfidenceWizard() {
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
 
-    // Hard-guard: block late submissions after Tue 12:00 CT when not already complete
-    const { tueDueZ } = getAnchors(effectiveNow);
-    if (effectiveNow >= tueDueZ && !hasConfidence) {
-      toast({
-        title: 'Confidence window closed',
-        description: `You'll get a fresh start on Mon, ${nextMondayStr(effectiveNow)}.`,
-      });
-      navigate('/week');
-      return;
-    }
-
+    // Remove time gating - allow submissions anytime
     setSubmitting(true);
 
     // Debug logging to track self-select state
@@ -256,7 +247,14 @@ export default function ConfidenceWizard() {
         title: "Confidence saved",
         description: "Great! Come back later to rate your performance."
       });
-      navigate('/');
+      
+      // Navigate to the correct week review page with current cycle/week
+      const focusItem = weeklyFocus[0];
+      if (focusItem) {
+        navigate(`/review/${focusItem.cycle}/${focusItem.week_in_cycle}`);
+      } else {
+        navigate('/');
+      }
     }
 
     setSubmitting(false);

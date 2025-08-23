@@ -165,7 +165,7 @@ export default function Week() {
       return;
     }
 
-    // Get self-select choices separately
+    // Get self-select choices separately - check both weekly_self_select and weekly_scores
     const allFocusIds = (focusData || []).map(f => f.id);
     console.log('Focus IDs for selections query:', allFocusIds);
     
@@ -181,27 +181,66 @@ export default function Week() {
 
     console.log('Selections data result:', { selectionsData, selectionsError });
 
-      const transformedFocus: WeeklyFocus[] = (focusData || []).map(item => {
-        const isSelSelect = (item as any)?.self_select ?? false;
-        const siteMove = (item as any)?.pro_moves;
-        
-        // Find user's selection for this focus if it's self-select
-        const userSelection = isSelSelect ? selectionsData?.find(s => s.weekly_focus_id === item.id) : null;
-        const selectedMove = userSelection?.pro_moves as any;
-        
-        return {
-          id: item.id,
-          display_order: item.display_order,
-          action_statement: isSelSelect 
-            ? (selectedMove?.action_statement || 'Choose a pro-move')
-            : (siteMove?.action_statement || 'Unknown move'),
-          self_select: isSelSelect,
-          competency_id: (item as any)?.competency_id ?? undefined,
-          domain_name: isSelSelect 
-            ? (selectedMove?.competencies?.domains?.domain_name || ((item as any)?.competencies?.domains as any)?.domain_name)
-            : ((item as any)?.competencies?.domains as any)?.domain_name,
-        };
-      });
+    // Also get scores to check for selected_action_id as fallback
+    const { data: scoresData } = await supabase
+      .from('weekly_scores')
+      .select('weekly_focus_id, selected_action_id')
+      .eq('staff_id', staff.id)
+      .in('weekly_focus_id', allFocusIds);
+
+    // Get pro moves for any selected_action_ids from scores
+    const selectedActionIds = (scoresData || [])
+      .map(s => s.selected_action_id)
+      .filter(Boolean);
+    
+    let actionProMovesData: any[] = [];
+    if (selectedActionIds.length > 0) {
+      const { data: pmData } = await supabase
+        .from('pro_moves')
+        .select(`
+          action_id,
+          action_statement,
+          competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
+        `)
+        .in('action_id', selectedActionIds);
+      actionProMovesData = pmData || [];
+    }
+
+    const transformedFocus: WeeklyFocus[] = (focusData || []).map(item => {
+      const isSelSelect = (item as any)?.self_select ?? false;
+      const siteMove = (item as any)?.pro_moves;
+      
+      // Find user's selection - check weekly_self_select first, then fall back to weekly_scores
+      let userSelection = null;
+      let selectedMove = null;
+      
+      if (isSelSelect) {
+        // First try weekly_self_select
+        userSelection = selectionsData?.find(s => s.weekly_focus_id === item.id);
+        if (userSelection) {
+          selectedMove = userSelection.pro_moves as any;
+        } else {
+          // Fall back to selected_action_id from weekly_scores
+          const scoreRecord = scoresData?.find(s => s.weekly_focus_id === item.id);
+          if (scoreRecord?.selected_action_id) {
+            selectedMove = actionProMovesData.find(pm => pm.action_id === scoreRecord.selected_action_id);
+          }
+        }
+      }
+      
+      return {
+        id: item.id,
+        display_order: item.display_order,
+        action_statement: isSelSelect 
+          ? (selectedMove?.action_statement || 'Choose a pro-move')
+          : (siteMove?.action_statement || 'Unknown move'),
+        self_select: isSelSelect,
+        competency_id: (item as any)?.competency_id ?? undefined,
+        domain_name: isSelSelect 
+          ? (selectedMove?.competencies?.domains?.domain_name || ((item as any)?.competencies?.domains as any)?.domain_name)
+          : ((item as any)?.competencies?.domains as any)?.domain_name,
+      };
+    });
 
     console.log('Transformed focus data:', transformedFocus);
 
@@ -235,13 +274,13 @@ export default function Week() {
 
     // Scores
     const scoreFocusIds = transformedFocus.map(f => f.id);
-    const { data: scoresData } = await supabase
+    const { data: weeklyScoresData } = await supabase
       .from('weekly_scores')
       .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
       .eq('staff_id', staff.id)
       .in('weekly_focus_id', scoreFocusIds);
 
-    setWeeklyScores(scoresData || []);
+    setWeeklyScores(weeklyScoresData || []);
 
     // Carryover check (pending performance in the most recent week)
     const { data: pending } = await supabase
@@ -480,7 +519,7 @@ export default function Week() {
               {weeklyFocus.map((focus, index) => {
                 const score = getScoreForFocus(focus.id);
                 const unchosenSelfSelect =
-                  !!focus.self_select && (!score || score.selected_action_id == null);
+                  !!focus.self_select && focus.action_statement === 'Choose a pro-move';
 
                 return (
                   <div

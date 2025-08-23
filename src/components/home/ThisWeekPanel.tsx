@@ -153,8 +153,11 @@ export default function ThisWeekPanel() {
     switch (weekContext.state) {
       case 'missed_checkin':
         return {
-          bannerMessage: "Oops! You forgot to submit your Confidence scores this week. Don't worry, we'll get you back on track next week.",
-          bannerCta: null
+          bannerMessage: 'Welcome back! Time to rate your confidence for this week\'s Pro Moves.',
+          bannerCta: {
+            label: 'Rate Confidence',
+            onClick: () => navigate(`/confidence/current/step/1`)
+          }
         };
 
       case 'can_checkin':
@@ -169,6 +172,15 @@ export default function ThisWeekPanel() {
       // Removed wait_for_thu case - no longer needed
 
       case 'can_checkout':
+        return {
+          bannerMessage: 'Time to reflect. Rate your performance for this week\'s Pro Moves.',
+          bannerCta: {
+            label: 'Rate Performance',
+            onClick: () => navigate(`/performance/current/step/1`)
+          }
+        };
+
+      case 'missed_checkout':
         return {
           bannerMessage: 'Time to reflect. Rate your performance for this week\'s Pro Moves.',
           bannerCta: {

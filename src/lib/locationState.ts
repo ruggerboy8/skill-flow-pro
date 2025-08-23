@@ -175,6 +175,7 @@ export async function assembleWeek(params: {
             type: 'selfSelect',
             pro_move_id: selectedProMove.action_id,
             action_statement: selectedProMove.action_statement,
+            competency_name: selectedProMove.competencies?.name || 'General',
             domain_name: domain?.domain_name || 'General',
             required: false,
             locked: false,
@@ -182,51 +183,21 @@ export async function assembleWeek(params: {
           });
         }
       } else {
-        // Auto-fill from backlog if available
-        if (backlog && backlogIndex < backlog.length) {
-          const backlogItem = backlog[backlogIndex];
-          
-          // Get pro move details for backlog item
-          const { data: backlogProMove } = await supabase
-            .from('pro_moves')
-            .select(`
-              *,
-              competencies(name, domain_id)
-            `)
-            .eq('action_id', backlogItem.pro_move_id)
-            .eq('role_id', roleId)
+        // No user selection - show empty self-select slot (don't auto-fill from backlog)
+        let domainName = 'General';
+        let competencyName = 'Select Competency';
+        
+        if (focus.competency_id) {
+          const { data: competency } = await supabase
+            .from('competencies')
+            .select('name, domain_id')
+            .eq('competency_id', focus.competency_id)
             .maybeSingle();
 
-          // Get domain for the competency
-          const { data: domain } = await supabase
-            .from('domains')
-            .select('domain_name')
-            .eq('domain_id', backlogProMove?.competencies?.domain_id)
-            .maybeSingle();
-
-          assignments.push({
-            weekly_focus_id: focus.id,
-            type: 'backlog',
-            pro_move_id: backlogProMove?.action_id,
-            action_statement: backlogProMove?.action_statement || 'Backlog item',
-            domain_name: domain?.domain_name || 'General',
-            required: false,
-            locked: false,
-            backlog_id: backlogItem.id,
-            display_order: focus.display_order
-          });
-          backlogIndex++;
-        } else {
-          // Empty self-select slot
-          let domainName = 'General';
-          if (focus.competency_id) {
-            const { data: competency } = await supabase
-              .from('competencies')
-              .select('domain_id')
-              .eq('competency_id', focus.competency_id)
-              .maybeSingle();
-
-            if (competency?.domain_id) {
+          if (competency) {
+            competencyName = competency.name || 'Select Competency';
+            
+            if (competency.domain_id) {
               const { data: domain } = await supabase
                 .from('domains')
                 .select('domain_name')
@@ -236,17 +207,18 @@ export async function assembleWeek(params: {
               domainName = domain?.domain_name || 'General';
             }
           }
-
-          assignments.push({
-            weekly_focus_id: focus.id,
-            type: 'selfSelect',
-            action_statement: 'Choose a pro-move',
-            domain_name: domainName,
-            required: false,
-            locked: false,
-            display_order: focus.display_order
-          });
         }
+
+        assignments.push({
+          weekly_focus_id: focus.id,
+          type: 'selfSelect',
+          action_statement: 'Choose a pro-move',
+          competency_name: competencyName,
+          domain_name: domainName,
+          required: false,
+          locked: false,
+          display_order: focus.display_order
+        });
       }
     } else {
       // Site move (or self-select slot in foundation - treat as site move)
@@ -269,9 +241,10 @@ export async function assembleWeek(params: {
 
         assignments.push({
           weekly_focus_id: focus.id,
-          type: 'site',
+          type: 'siteMove',
           pro_move_id: siteProMove?.action_id,
           action_statement: siteProMove?.action_statement || 'Site move',
+          competency_name: siteProMove?.competencies?.name || 'General',
           domain_name: domain?.domain_name || 'General',
           required: true,
           locked: true,

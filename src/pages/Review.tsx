@@ -115,7 +115,7 @@ export default function Review() {
       // Get scores for this week
       const { data: scoresData } = await supabase
         .from('weekly_scores')
-        .select('weekly_focus_id, confidence_score, performance_score')
+        .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
         .eq('staff_id', staffData.id)
         .in('weekly_focus_id', focusData.map(f => f.id));
 
@@ -138,8 +138,22 @@ export default function Review() {
               actionStatement = 'Selected move not found';
             }
           } else {
-            actionStatement = 'No selection made';
-            domainName = focus.competencies?.domains?.domain_name || domainName;
+            // Check if there's a score with selected_action_id as fallback
+            const fallbackAction = scores?.selected_action_id;
+            if (fallbackAction) {
+              const fallbackProMove = proMovesData.find(pm => pm.action_id === fallbackAction);
+              if (fallbackProMove) {
+                actionStatement = fallbackProMove.action_statement;
+                domainName = fallbackProMove.competencies?.domains?.domain_name || domainName;
+              } else {
+                actionStatement = 'No selection made';
+              }
+            } else {
+              actionStatement = 'No selection made';
+            }
+            if (!fallbackAction) {
+              domainName = focus.competencies?.domains?.domain_name || domainName;
+            }
           }
         } else {
           actionStatement = focus.pro_moves?.action_statement || actionStatement;

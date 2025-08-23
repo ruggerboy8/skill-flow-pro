@@ -660,6 +660,10 @@ export type Database = {
         Args: { pro_moves_data: Json }
         Returns: Json
       }
+      delete_latest_week_data: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       get_focus_cycle_week: {
         Args: { p_cycle: number; p_role_id: number; p_week: number }
         Returns: {

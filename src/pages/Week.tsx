@@ -145,7 +145,7 @@ export default function Week() {
         competency_id,
         action_id,
         pro_moves!weekly_focus_action_id_fkey ( action_statement ),
-        competencies ( domains ( domain_name ) )
+        competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
       `)
       .eq('cycle', cycle)
       .eq('week_in_cycle', weekInCycle)
@@ -173,7 +173,7 @@ export default function Week() {
       .select(`
         weekly_focus_id,
         selected_pro_move_id,
-        pro_moves ( action_statement, competencies ( domains ( domain_name ) ) )
+        pro_moves ( action_statement, competencies ( domains!competencies_domain_id_fkey ( domain_name ) ) )
       `)
       .eq('user_id', user!.id)
       .in('weekly_focus_id', allFocusIds);

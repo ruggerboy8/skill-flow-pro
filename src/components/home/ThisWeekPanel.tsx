@@ -100,10 +100,15 @@ export default function ThisWeekPanel() {
       const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
       console.log('Effective time being used:', effectiveNow);
       
-      // Get location week context for cycle and week info
-      const locationContext = await getLocationWeekContext(staffData.primary_location_id, effectiveNow);
-      console.log('Location week context:', locationContext);
-      setLocationWeekContext(locationContext);
+      // Load current week assignments and context based on user progress
+      const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);
+      console.log('Progress-based assignments:', assignments);
+      console.log('Progress-based week:', { cycleNumber, weekInCycle });
+      setWeekAssignments(assignments);
+
+      // Get location-specific time anchors for state computation
+      const locationTimeContext = await getLocationWeekContext(staffData.primary_location_id, effectiveNow);
+      setLocationWeekContext({ ...locationTimeContext, cycleNumber, weekInCycle });
       
       // Compute current week state with simulation overrides (location-based unified)
       const context = await computeWeekState({
@@ -111,16 +116,11 @@ export default function ThisWeekPanel() {
         locationId: staffData.primary_location_id,
         roleId: staffData.role_id,
         now: effectiveNow,
-        simOverrides: overrides.enabled ? overrides : undefined
+        simOverrides: overrides.enabled ? overrides : undefined,
+        weekContext: { cycleNumber, weekInCycle }
       });
       console.log('Week context:', context);
       setWeekContext(context);
-
-      // Load current week assignments with simulation support (progress-based)
-      const assignments = await assembleCurrentWeek(user.id, overrides);
-      console.log('Week assignments:', assignments);
-      console.log('Staff role_id:', staff.role_id);
-      setWeekAssignments(assignments);
 
       // Load weekly scores for the assignments
       if (assignments.length > 0) {
@@ -232,7 +232,7 @@ export default function ThisWeekPanel() {
     return (
       <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle>This Week&apos;s Pro Moves</CardTitle>
+          <CardTitle>This Week's Pro Moves</CardTitle>
           <CardDescription>Week of {weekOfDate}</CardDescription>
           {locationWeekContext && (
             <div className="flex items-center gap-2 mt-2">
@@ -257,7 +257,7 @@ export default function ThisWeekPanel() {
   return (
     <Card className="overflow-hidden">
       <CardHeader className="pb-2">
-        <CardTitle>This Week&apos;s Pro Moves</CardTitle>
+        <CardTitle>This Week's Pro Moves</CardTitle>
         <CardDescription>Week of {weekOfDate}</CardDescription>
         {locationWeekContext && (
           <div className="flex items-center gap-2 mt-2">
@@ -281,7 +281,7 @@ export default function ThisWeekPanel() {
             return (
               <div key={assignment.weekly_focus_id} className="rounded-lg p-4 border" style={bgColor ? { backgroundColor: bgColor } : undefined}>
                 {domainName && (
-                  <Badge variant="secondary" className="text-xs font-semibold mb-2 bg-white/80 text-gray-900" aria-label={`Domain: ${domainName}`}>
+                  <Badge variant="secondary" className="text-xs font-semibold mb-2 bg-white/80 text-gray-900" aria-label={`Domain: ${domainName}`}> 
                     {domainName}
                   </Badge>
                 )}

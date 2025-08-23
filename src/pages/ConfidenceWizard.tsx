@@ -62,7 +62,13 @@ export default function ConfidenceWizard() {
     if (user) {
       loadData();
     }
-  }, [user, n]);
+  }, [user]);
+
+  useEffect(() => {
+    if (weeklyFocus.length > 0 && currentIndex < weeklyFocus.length) {
+      setCurrentFocus(weeklyFocus[currentIndex]);
+    }
+  }, [currentIndex, weeklyFocus]);
 
   // Removed time gating - allow access anytime
 
@@ -84,7 +90,8 @@ export default function ConfidenceWizard() {
     setStaff(staffData);
 
     // Use the unified site-based approach to get current week assignments
-    const assignments = await assembleCurrentWeek(user.id, overrides);
+    const {assignments} = await assembleCurrentWeek(user.id, overrides);
+    console.log('assignemnts', assignments)
 
     if (!assignments || assignments.length === 0) {
       toast({
@@ -107,7 +114,6 @@ export default function ConfidenceWizard() {
     }));
 
     setWeeklyFocus(transformedFocusData);
-    setCurrentFocus(transformedFocusData[currentIndex]);
 
     // Check if confidence already submitted for all focus items and prefill selections
     const focusIds = transformedFocusData.map(f => f.id);

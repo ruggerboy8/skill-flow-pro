@@ -62,16 +62,102 @@ export default function Review() {
     });
 
     if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load review data",
-        variant: "destructive"
-      });
-      navigate('/');
-      return;
-    }
+      console.error('RPC error, falling back to manual query:', error);
+      
+      // Fallback: manually construct the review data
+      const { data: focusData } = await supabase
+        .from('weekly_focus')
+        .select(`
+          id,
+          display_order,
+          self_select,
+          action_id,
+          pro_moves!weekly_focus_action_id_fkey ( action_statement ),
+          competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
+        `)
+        .eq('cycle', parseInt(cycle))
+        .eq('week_in_cycle', parseInt(week))
+        .eq('role_id', staffData.role_id)
+        .order('display_order');
 
-    setReviewData(data || []);
+      if (!focusData || focusData.length === 0) {
+        setReviewData([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get self-select choices for this week
+      const { data: selectionsData } = await supabase
+        .from('weekly_self_select')
+        .select(`
+          weekly_focus_id,
+          selected_pro_move_id
+        `)
+        .eq('user_id', user.id)
+        .in('weekly_focus_id', focusData.map(f => f.id));
+
+      // Get pro moves for selected actions
+      const selectedProMoveIds = selectionsData?.map(s => s.selected_pro_move_id).filter(Boolean) || [];
+      let proMovesData: any[] = [];
+      
+      if (selectedProMoveIds.length > 0) {
+        const { data: pmData } = await supabase
+          .from('pro_moves')
+          .select(`
+            action_id,
+            action_statement,
+            competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
+          `)
+          .in('action_id', selectedProMoveIds);
+        proMovesData = pmData || [];
+      }
+
+      // Get scores for this week
+      const { data: scoresData } = await supabase
+        .from('weekly_scores')
+        .select('weekly_focus_id, confidence_score, performance_score')
+        .eq('staff_id', staffData.id)
+        .in('weekly_focus_id', focusData.map(f => f.id));
+
+      // Transform data manually
+      const manualReviewData: ReviewData[] = focusData.map((focus: any) => {
+        const isSelSelect = focus.self_select;
+        const scores = scoresData?.find(s => s.weekly_focus_id === focus.id);
+        
+        let actionStatement = 'Unknown move';
+        let domainName = 'Unknown';
+
+        if (isSelSelect) {
+          const userSelection = selectionsData?.find(s => s.weekly_focus_id === focus.id);
+          if (userSelection?.selected_pro_move_id) {
+            const selectedProMove = proMovesData.find(pm => pm.action_id === userSelection.selected_pro_move_id);
+            if (selectedProMove) {
+              actionStatement = selectedProMove.action_statement;
+              domainName = selectedProMove.competencies?.domains?.domain_name || domainName;
+            } else {
+              actionStatement = 'Selected move not found';
+            }
+          } else {
+            actionStatement = 'No selection made';
+            domainName = focus.competencies?.domains?.domain_name || domainName;
+          }
+        } else {
+          actionStatement = focus.pro_moves?.action_statement || actionStatement;
+          domainName = focus.competencies?.domains?.domain_name || domainName;
+        }
+
+        return {
+          domain_name: domainName,
+          action_statement: actionStatement,
+          confidence_score: scores?.confidence_score || 0,
+          performance_score: scores?.performance_score || 0
+        };
+      });
+
+      setReviewData(manualReviewData);
+    } else {
+      setReviewData(data || []);
+    }
 
     setLoading(false);
   };

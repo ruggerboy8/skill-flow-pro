@@ -39,6 +39,7 @@ export default function Week() {
   // data
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
+  const [competencyNameById, setCompetencyNameById] = useState<Record<string, string>>({});
   const [carryoverPending, setCarryoverPending] = useState<{ cycle: number; week_in_cycle: number } | null>(null);
 
   // loading flags (separate “page loading” vs “banner decision ready”)
@@ -180,27 +181,27 @@ export default function Week() {
 
     console.log('Selections data result:', { selectionsData, selectionsError });
 
-    const transformedFocus: WeeklyFocus[] = (focusData || []).map(item => {
-      const isSelSelect = (item as any)?.self_select ?? false;
-      const siteMove = (item as any)?.pro_moves;
-      
-      // Find user's selection for this focus if it's self-select
-      const userSelection = isSelSelect ? selectionsData?.find(s => s.weekly_focus_id === item.id) : null;
-      const selectedMove = userSelection?.pro_moves as any;
-      
-      return {
-        id: item.id,
-        display_order: item.display_order,
-        action_statement: isSelSelect 
-          ? (selectedMove?.action_statement || 'Choose a pro-move')
-          : (siteMove?.action_statement || 'Unknown move'),
-        self_select: isSelSelect,
-        competency_id: (item as any)?.competency_id ?? undefined,
-        domain_name: isSelSelect 
-          ? (selectedMove?.competencies?.domains?.domain_name || ((item as any)?.competencies?.domains as any)?.domain_name)
-          : ((item as any)?.competencies?.domains as any)?.domain_name,
-      };
-    });
+      const transformedFocus: WeeklyFocus[] = (focusData || []).map(item => {
+        const isSelSelect = (item as any)?.self_select ?? false;
+        const siteMove = (item as any)?.pro_moves;
+        
+        // Find user's selection for this focus if it's self-select
+        const userSelection = isSelSelect ? selectionsData?.find(s => s.weekly_focus_id === item.id) : null;
+        const selectedMove = userSelection?.pro_moves as any;
+        
+        return {
+          id: item.id,
+          display_order: item.display_order,
+          action_statement: isSelSelect 
+            ? (selectedMove?.action_statement || 'Choose a pro-move')
+            : (siteMove?.action_statement || 'Unknown move'),
+          self_select: isSelSelect,
+          competency_id: (item as any)?.competency_id ?? undefined,
+          domain_name: isSelSelect 
+            ? (selectedMove?.competencies?.domains?.domain_name || ((item as any)?.competencies?.domains as any)?.domain_name)
+            : ((item as any)?.competencies?.domains as any)?.domain_name,
+        };
+      });
 
     console.log('Transformed focus data:', transformedFocus);
 
@@ -213,6 +214,24 @@ export default function Week() {
     }
 
     setWeeklyFocus(transformedFocus);
+
+    // Load competency names for display
+    const focusWithCompetency = transformedFocus.filter(f => f.competency_id);
+    if (focusWithCompetency.length > 0) {
+      const { data: competencyData } = await supabase
+        .from('competencies')
+        .select('competency_id, name')
+        .in('competency_id', focusWithCompetency.map(f => f.competency_id));
+      
+      const compNameMap: Record<string, string> = {};
+      focusWithCompetency.forEach(focus => {
+        const comp = competencyData?.find(c => c.competency_id === focus.competency_id);
+        if (comp) {
+          compNameMap[focus.id] = comp.name;
+        }
+      });
+      setCompetencyNameById(compNameMap);
+    }
 
     // Scores
     const scoreFocusIds = transformedFocus.map(f => f.id);
@@ -469,14 +488,24 @@ export default function Week() {
                     className="rounded-lg p-4 border"
                     style={{ backgroundColor: getDomainColor(focus.domain_name) }}
                   >
-                    {focus.domain_name && (
-                      <Badge
-                        variant="secondary"
-                        className="text-xs font-semibold mb-2 bg-white/80 text-gray-900"
-                      >
-                        {focus.domain_name}
-                      </Badge>
-                    )}
+                     {focus.domain_name && (
+                       <div className="flex gap-2 mb-2">
+                         <Badge
+                           variant="secondary"
+                           className="text-xs font-semibold bg-white/80 text-gray-900"
+                         >
+                           {focus.domain_name}
+                         </Badge>
+                         {focus.competency_id && competencyNameById[focus.id] && (
+                           <Badge 
+                             variant="outline" 
+                             className="text-xs font-semibold bg-white/20 text-gray-700 border-white/30"
+                           >
+                             {competencyNameById[focus.id]}
+                           </Badge>
+                         )}
+                       </div>
+                     )}
                     <div className="flex items-start gap-2">
                       <Badge variant="outline" className="text-xs">{index + 1}</Badge>
                       <p className="text-sm font-medium text-gray-900 flex-1">

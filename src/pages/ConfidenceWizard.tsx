@@ -230,31 +230,58 @@ export default function ConfidenceWizard() {
       return base;
     });
 
-    const { error } = await supabase
+    // Save weekly scores
+    const { error: scoresError } = await supabase
       .from('weekly_scores')
       .upsert(scoreInserts, {
         onConflict: 'staff_id,weekly_focus_id'
       });
 
-    if (error) {
+    if (scoresError) {
       toast({
         title: "Error",
-        description: error.message,
+        description: scoresError.message,
         variant: "destructive"
       });
-    } else {
-      toast({
-        title: "Confidence saved",
-        description: "Great! Come back later to rate your performance."
-      });
-      
-      // Navigate to the correct week review page with current cycle/week
-      const focusItem = weeklyFocus[0];
-      if (focusItem) {
-        navigate(`/review/${focusItem.cycle}/${focusItem.week_in_cycle}`);
-      } else {
-        navigate('/');
+      setSubmitting(false);
+      return;
+    }
+
+    // Save self-select choices to weekly_self_select table
+    const selfSelectInserts = weeklyFocus
+      .filter(focus => selfSelectById[focus.id] && selectedActions[focus.id] && selectedActions[focus.id] !== "")
+      .map(focus => ({
+        user_id: user!.id,
+        weekly_focus_id: focus.id,
+        selected_pro_move_id: parseInt(selectedActions[focus.id]!, 10),
+        slot_index: focus.display_order || 1,
+        source: 'manual'
+      }));
+
+    if (selfSelectInserts.length > 0) {
+      const { error: selectError } = await supabase
+        .from('weekly_self_select')
+        .upsert(selfSelectInserts, {
+          onConflict: 'user_id,weekly_focus_id'
+        });
+
+      if (selectError) {
+        console.error('Error saving self-selections:', selectError);
+        // Don't fail the entire submission for this
       }
+    }
+    
+    toast({
+      title: "Confidence saved",
+      description: "Great! Come back later to rate your performance."
+    });
+    
+    // Navigate to the correct week review page with current cycle/week
+    const focusItem = weeklyFocus[0];
+    if (focusItem) {
+      navigate(`/review/${focusItem.cycle}/${focusItem.week_in_cycle}`);
+    } else {
+      navigate('/');
     }
 
     setSubmitting(false);

@@ -436,6 +436,21 @@ export type Database = {
         }
         Relationships: []
       }
+      staging_prompts: {
+        Row: {
+          competency_id: number
+          interview_prompt: string | null
+        }
+        Insert: {
+          competency_id: number
+          interview_prompt?: string | null
+        }
+        Update: {
+          competency_id?: number
+          interview_prompt?: string | null
+        }
+        Relationships: []
+      }
       user_backlog: {
         Row: {
           added_week_id: string

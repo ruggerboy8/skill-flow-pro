@@ -315,7 +315,34 @@ export function EvaluationHub() {
 
   const completionStatus = isEvaluationComplete(evaluation);
   const isReadOnly = evaluation.status === 'submitted';
-  const currentItem = evaluation.items[currentSelfIndex];
+  
+  // Group and sort items by domain and competency ID
+  const domainOrder = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+  const groupedItems = evaluation.items.reduce((acc, item) => {
+    const domain = item.domain_name || 'Other';
+    if (!acc[domain]) {
+      acc[domain] = [];
+    }
+    acc[domain].push(item);
+    return acc;
+  }, {} as Record<string, typeof evaluation.items>);
+  
+  // Sort items within each domain by competency_id, then arrange domains in order
+  const sortedItems = domainOrder
+    .filter(domain => groupedItems[domain])
+    .flatMap(domain => 
+      groupedItems[domain].sort((a, b) => a.competency_id - b.competency_id)
+    )
+    .concat(
+      // Add any domains not in the predefined order
+      Object.keys(groupedItems)
+        .filter(domain => !domainOrder.includes(domain))
+        .flatMap(domain => 
+          groupedItems[domain].sort((a, b) => a.competency_id - b.competency_id)
+        )
+    );
+  
+  const currentItem = sortedItems[currentSelfIndex];
   
   // Calculate observation completion count
   const observerScoresCount = evaluation.items.filter(item => item.observer_score !== null).length;
@@ -512,7 +539,7 @@ export function EvaluationHub() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Self-Assessment ({currentSelfIndex + 1} of {evaluation.items.length})</CardTitle>
+                  <CardTitle>Self-Assessment ({currentSelfIndex + 1} of {sortedItems.length})</CardTitle>
                   <div className="flex items-center space-x-2">
                     <Button 
                       variant="outline" 
@@ -526,15 +553,15 @@ export function EvaluationHub() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => setCurrentSelfIndex(Math.min(evaluation.items.length - 1, currentSelfIndex + 1))}
-                      disabled={currentSelfIndex === evaluation.items.length - 1}
+                      onClick={() => setCurrentSelfIndex(Math.min(sortedItems.length - 1, currentSelfIndex + 1))}
+                      disabled={currentSelfIndex === sortedItems.length - 1}
                     >
                       Next
                       <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
-                <Progress value={((currentSelfIndex + 1) / evaluation.items.length) * 100} className="w-full" />
+                <Progress value={((currentSelfIndex + 1) / sortedItems.length) * 100} className="w-full" />
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>

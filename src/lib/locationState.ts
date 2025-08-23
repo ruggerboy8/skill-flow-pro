@@ -180,6 +180,36 @@ export async function assembleWeek(params: {
             locked: false,
             display_order: focus.display_order
           });
+        } else {
+          // Selection exists but pro_move is not valid for this role - show placeholder
+          let domainName = 'General';
+          if (focus.competency_id) {
+            const { data: competency } = await supabase
+              .from('competencies')
+              .select('domain_id')
+              .eq('competency_id', focus.competency_id)
+              .maybeSingle();
+
+            if (competency?.domain_id) {
+              const { data: domain } = await supabase
+                .from('domains')
+                .select('domain_name')
+                .eq('domain_id', competency.domain_id)
+                .maybeSingle();
+              
+              domainName = domain?.domain_name || 'General';
+            }
+          }
+
+          assignments.push({
+            weekly_focus_id: focus.id,
+            type: 'selfSelect',
+            action_statement: 'Choose a pro-move',
+            domain_name: domainName,
+            required: false,
+            locked: false,
+            display_order: focus.display_order
+          });
         }
       } else {
         // Auto-fill from backlog if available

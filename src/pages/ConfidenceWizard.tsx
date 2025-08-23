@@ -62,7 +62,13 @@ export default function ConfidenceWizard() {
     if (user) {
       loadData();
     }
-  }, [user, n]);
+  }, [user]);
+
+  useEffect(() => {
+    if (weeklyFocus.length > 0 && currentIndex < weeklyFocus.length) {
+      setCurrentFocus(weeklyFocus[currentIndex]);
+    }
+  }, [currentIndex, weeklyFocus]);
 
   // Central Time gating and route guard
   useEffect(() => {
@@ -125,7 +131,6 @@ export default function ConfidenceWizard() {
     }));
 
     setWeeklyFocus(transformedFocusData);
-    setCurrentFocus(transformedFocusData[currentIndex]);
 
     // Check if confidence already submitted for all focus items and prefill selections
     const focusIds = transformedFocusData.map(f => f.id);

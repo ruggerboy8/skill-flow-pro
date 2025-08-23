@@ -132,7 +132,7 @@ export default function Week() {
     setWeeklyScores([]);
     setCarryoverPending(null);
 
-    // Focus (left joins: pro_moves optional for self-select)
+    // Focus (left joins: pro_moves for both site moves and self-select choices)
     const { data: focusData, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
@@ -140,12 +140,18 @@ export default function Week() {
         display_order,
         self_select,
         competency_id,
-        pro_moves ( action_statement ),
-        competencies ( domains ( domain_name ) )
+        action_id,
+        pro_moves!weekly_focus_action_id_fkey ( action_statement ),
+        competencies ( domains ( domain_name ) ),
+        weekly_self_select (
+          selected_pro_move_id,
+          pro_moves!weekly_self_select_selected_pro_move_id_fkey ( action_statement, competencies ( domains ( domain_name ) ) )
+        )
       `)
       .eq('cycle', cycle)
       .eq('week_in_cycle', weekInCycle)
       .eq('role_id', staff.role_id)
+      .eq('weekly_self_select.user_id', user!.id)
       .order('display_order');
 
     if (focusError) {
@@ -158,14 +164,25 @@ export default function Week() {
       return;
     }
 
-    const transformedFocus: WeeklyFocus[] = (focusData || []).map(item => ({
-      id: item.id,
-      display_order: item.display_order,
-      action_statement: (item.pro_moves as any)?.action_statement || 'Self-Select',
-      self_select: (item as any)?.self_select ?? false,
-      competency_id: (item as any)?.competency_id ?? undefined,
-      domain_name: ((item as any)?.competencies?.domains as any)?.domain_name ?? undefined,
-    }));
+    const transformedFocus: WeeklyFocus[] = (focusData || []).map(item => {
+      const isSelSelect = (item as any)?.self_select ?? false;
+      const siteMove = (item as any)?.pro_moves;
+      const selfSelectData = (item as any)?.weekly_self_select?.[0];
+      const selectedMove = selfSelectData?.pro_moves;
+      
+      return {
+        id: item.id,
+        display_order: item.display_order,
+        action_statement: isSelSelect 
+          ? (selectedMove?.action_statement || 'Choose a pro-move')
+          : (siteMove?.action_statement || 'Self-Select'),
+        self_select: isSelSelect,
+        competency_id: (item as any)?.competency_id ?? undefined,
+        domain_name: isSelSelect 
+          ? (selectedMove?.competencies?.domains?.domain_name || ((item as any)?.competencies?.domains as any)?.domain_name)
+          : ((item as any)?.competencies?.domains as any)?.domain_name,
+      };
+    });
 
     // If no focus, stop here
     if (transformedFocus.length === 0) {

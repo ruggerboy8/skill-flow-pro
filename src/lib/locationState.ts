@@ -291,8 +291,9 @@ export async function computeWeekState(params: {
   roleId?: number;
   now?: Date;
   simOverrides?: any;
+  weekContext?: { cycleNumber: number; weekInCycle: number };
 }): Promise<StaffStatus> {
-  const { userId, locationId, now = new Date(), simOverrides } = params;
+  const { userId, locationId, now = new Date(), simOverrides, weekContext } = params;
 
   // Get staff information
   const { data: staff } = await supabase
@@ -319,9 +320,9 @@ export async function computeWeekState(params: {
     };
   }
 
-  // Get location week context
-  const context = await getLocationWeekContext(locationId, now);
-  const { weekInCycle, cycleNumber, anchors } = context;
+  // Use provided week context or calculate from time
+  const { cycleNumber, weekInCycle } = weekContext || await getLocationWeekContext(locationId, now);
+  const { anchors } = await getLocationWeekContext(locationId, now);
 
   // Get weekly assignments
   const assignments = await assembleWeek({ 

@@ -101,7 +101,8 @@ export default function ConfidenceWizard() {
     setStaff(staffData);
 
     // Use the unified site-based approach to get current week assignments
-    const assignments = await assembleCurrentWeek(user.id, overrides);
+    const {assignments} = await assembleCurrentWeek(user.id, overrides);
+    console.log('assignemnts', assignments)
 
     if (!assignments || assignments.length === 0) {
       toast({

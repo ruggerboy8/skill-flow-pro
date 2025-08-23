@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getLocationWeekContext, assembleWeek as locationAssembleWeek } from './locationState';
+import { assembleWeek as locationAssembleWeek } from './locationState';
 import { getOpenBacklogCount, areSelectionsLocked, saveUserSelection } from './backlog';
 import { nowUtc, getAnchors } from "./centralTime";
 
@@ -17,14 +17,93 @@ export interface WeekAssignment {
 }
 
 /**
- * Assemble a user's current week assignments using location-based approach (unified)
+ * Finds a user's active week based on their scoring progress.
+ */
+async function findUserActiveWeek(
+  userId: string,
+  staffId: string,
+  roleId: number,
+  locationId: string,
+  simOverrides?: any
+): Promise<{ cycleNumber: number; weekInCycle: number }> {
+  
+  const { data: locationData } = await supabase
+    .from('locations')
+    .select('cycle_length_weeks')
+    .eq('id', locationId)
+    .single();
+
+  if (!locationData) {
+    throw new Error(`Location not found for locationId: ${locationId}`);
+  }
+  const cycleLength = locationData.cycle_length_weeks;
+
+  // Find the most recent week the user has scores for
+  const { data: lastScoredFocus } = await supabase
+    .from('weekly_scores')
+    .select('weekly_focus!inner(id, cycle, week_in_cycle)')
+    .eq('staff_id', staffId)
+    .order('weekly_focus(cycle)', { ascending: false })
+    .order('weekly_focus(week_in_cycle)', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!lastScoredFocus || !lastScoredFocus.weekly_focus) {
+    // No scores at all, brand new user. Start them at the beginning.
+    return { cycleNumber: 1, weekInCycle: 1 };
+  }
+
+  const lastCycle = lastScoredFocus.weekly_focus.cycle;
+  const lastWeekInCycle = lastScoredFocus.weekly_focus.week_in_cycle;
+
+  // Now, check if that week is fully complete
+  const assignmentsForLastWeek = await locationAssembleWeek({
+    userId,
+    roleId,
+    locationId,
+    cycleNumber: lastCycle,
+    weekInCycle: lastWeekInCycle,
+    simOverrides,
+  });
+
+  const { data: scoresForLastWeek } = await supabase
+    .from('weekly_scores')
+    .select('confidence_score, performance_score')
+    .eq('staff_id', staffId)
+    .in('weekly_focus_id', assignmentsForLastWeek.map(a => a.weekly_focus_id));
+
+  const requiredCount = assignmentsForLastWeek.length;
+  const confidenceCount = scoresForLastWeek?.filter(s => s.confidence_score !== null).length || 0;
+  const performanceCount = scoresForLastWeek?.filter(s => s.performance_score !== null).length || 0;
+
+  if (requiredCount > 0 && confidenceCount >= requiredCount && performanceCount >= requiredCount) {
+    // Last scored week is complete, advance to the next week
+    let nextCycle = lastCycle;
+    let nextWeekInCycle = lastWeekInCycle + 1;
+    if (nextWeekInCycle > cycleLength) {
+      nextWeekInCycle = 1;
+      nextCycle++;
+    }
+    return { cycleNumber: nextCycle, weekInCycle: nextWeekInCycle };
+  } else {
+    // Last scored week is incomplete, so that's the active week
+    return { cycleNumber: lastCycle, weekInCycle: lastWeekInCycle };
+  }
+}
+
+/**
+ * Assemble a user's current week assignments based on their progress.
  */
 export async function assembleCurrentWeek(
   userId: string,
   simOverrides?: any
-): Promise<WeekAssignment[]> {
+): Promise<{
+  assignments: WeekAssignment[];
+  cycleNumber: number;
+  weekInCycle: number;
+}> {
   try {
-    console.log('=== ASSEMBLING CURRENT WEEK (LOCATION-BASED) ===');
+    console.log('=== ASSEMBLING CURRENT WEEK (PROGRESS-BASED) ===');
     console.log('Input params:', { userId, simOverrides });
     
     // Get staff info including location
@@ -44,29 +123,38 @@ export async function assembleCurrentWeek(
 
     console.log('Staff data:', staffData);
 
-    // Get location context
-    const effectiveNow = simOverrides?.enabled && simOverrides.nowISO ? new Date(simOverrides.nowISO) : new Date();
-    const locationContext = await getLocationWeekContext(staffData.primary_location_id, effectiveNow);
+    // Determine user's active week based on their progress
+    const { cycleNumber, weekInCycle } = await findUserActiveWeek(
+      userId,
+      staffData.id,
+      staffData.role_id,
+      staffData.primary_location_id,
+      simOverrides
+    );
     
-    console.log('Location context:', locationContext);
+    console.log('User-specific active week:', { cycleNumber, weekInCycle });
 
-    // Use location-based approach
-    const locationAssignments = await locationAssembleWeek({
+    // Use location-based assembly logic with the progress-based week
+    const assignments = await locationAssembleWeek({
       userId,
       roleId: staffData.role_id,
       locationId: staffData.primary_location_id,
-      cycleNumber: locationContext.cycleNumber,
-      weekInCycle: locationContext.weekInCycle,
+      cycleNumber: cycleNumber,
+      weekInCycle: weekInCycle,
       simOverrides
     });
 
-    console.log('Location-based assignments:', locationAssignments);
+    console.log('Progress-based assignments:', assignments);
     
-    return locationAssignments.sort((a, b) => a.display_order - b.display_order);
+    return {
+      assignments: assignments.sort((a, b) => a.display_order - b.display_order),
+      cycleNumber,
+      weekInCycle
+    };
 
   } catch (error) {
     console.error('Error assembling current week:', error);
-    return [];
+    return { assignments: [], cycleNumber: 1, weekInCycle: 1 };
   }
 }
 

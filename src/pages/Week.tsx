@@ -125,14 +125,12 @@ export default function Week() {
   const loadWeekData = async () => {
     if (!staff) return;
 
-    // Prevent “flash”: clear everything and keep pageLoading true until all decisions ready.
     setPageLoading(true);
     setBannerReady(false);
     setWeeklyFocus([]);
     setWeeklyScores([]);
     setCarryoverPending(null);
 
-    // Focus (left joins: pro_moves optional for self-select)
     const { data: focusData, error: focusError } = await supabase
       .from('weekly_focus')
       .select(`
@@ -140,7 +138,7 @@ export default function Week() {
         display_order,
         self_select,
         competency_id,
-        pro_moves ( action_statement ),
+        pro_move_id,
         competencies ( domains ( domain_name ) )
       `)
       .eq('cycle', cycle)
@@ -151,43 +149,76 @@ export default function Week() {
     if (focusError) {
       toast({
         title: 'Error',
-        description: 'Failed to load Pro Moves for this week',
+        description: 'Failed to load Pro Moves for this week. ' + focusError.message,
         variant: 'destructive',
       });
       setPageLoading(false);
       return;
     }
 
-    const transformedFocus: WeeklyFocus[] = (focusData || []).map(item => ({
-      id: item.id,
-      display_order: item.display_order,
-      action_statement: (item.pro_moves as any)?.action_statement || 'Self-Select',
-      self_select: (item as any)?.self_select ?? false,
-      competency_id: (item as any)?.competency_id ?? undefined,
-      domain_name: ((item as any)?.competencies?.domains as any)?.domain_name ?? undefined,
-    }));
-
-    // If no focus, stop here
-    if (transformedFocus.length === 0) {
+    if (!focusData || focusData.length === 0) {
       setWeeklyFocus([]);
       setPageLoading(false);
-      setBannerReady(true); // ready to render the “no pro moves” card
+      setBannerReady(true);
       return;
     }
 
-    setWeeklyFocus(transformedFocus);
-
-    // Scores
-    const focusIds = transformedFocus.map(f => f.id);
+    const focusIds = focusData.map(f => f.id);
     const { data: scoresData } = await supabase
       .from('weekly_scores')
       .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
       .eq('staff_id', staff.id)
       .in('weekly_focus_id', focusIds);
 
+    const scoresByFocusId = (scoresData || []).reduce((acc, score) => {
+      acc[score.weekly_focus_id] = score;
+      return acc;
+    }, {} as Record<string, WeeklyScore>);
+
+    const proMoveActionIds = new Set<number>();
+    focusData.forEach((f: any) => {
+      if (f.pro_move_id) proMoveActionIds.add(f.pro_move_id);
+    });
+    (scoresData || []).forEach(s => {
+      if (s.selected_action_id) proMoveActionIds.add(s.selected_action_id);
+    });
+
+    let proMovesMap: Record<number, string> = {};
+    if (proMoveActionIds.size > 0) {
+      const { data: proMovesData } = await supabase
+        .from('pro_moves')
+        .select('action_id, action_statement')
+        .in('action_id', Array.from(proMoveActionIds));
+      
+      (proMovesData || []).forEach((p: any) => {
+        proMovesMap[p.action_id] = p.action_statement;
+      });
+    }
+
+    const transformedFocus: WeeklyFocus[] = focusData.map((item: any) => {
+      let action_statement = 'Choose your Pro Move';
+      if (item.self_select) {
+        const score = scoresByFocusId[item.id];
+        if (score && score.selected_action_id && proMovesMap[score.selected_action_id]) {
+          action_statement = proMovesMap[score.selected_action_id];
+        }
+      } else if (item.pro_move_id && proMovesMap[item.pro_move_id]) {
+        action_statement = proMovesMap[item.pro_move_id];
+      }
+
+      return {
+        id: item.id,
+        display_order: item.display_order,
+        action_statement,
+        self_select: item.self_select ?? false,
+        competency_id: item.competency_id ?? undefined,
+        domain_name: (item.competencies?.domains as any)?.domain_name ?? undefined,
+      };
+    });
+
+    setWeeklyFocus(transformedFocus);
     setWeeklyScores(scoresData || []);
 
-    // Carryover check (pending performance in the most recent week)
     const { data: pending } = await supabase
       .from('weekly_scores')
       .select('updated_at, weekly_focus!inner(cycle, week_in_cycle, role_id)')
@@ -203,7 +234,6 @@ export default function Week() {
       setCarryoverPending({ cycle: wf.cycle, week_in_cycle: wf.week_in_cycle });
     }
 
-    // All inputs for banner are present now → safe to render banner without flicker
     setBannerReady(true);
     setPageLoading(false);
   };
@@ -310,7 +340,7 @@ export default function Week() {
     // 4) Confidence window closed after Tue 12:00 CT (and not all confidence entered)
     if (afterTueNoon && !allConfidence) {
       return {
-        bannerMessage: `Confidence window closed. You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`,
+        bannerMessage: `Confidence window closed. You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`, 
         bannerCta: null,
       };
     }

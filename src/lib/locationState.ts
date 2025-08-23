@@ -159,6 +159,7 @@ export async function assembleWeek(params: {
             competencies(name, domain_id)
           `)
           .eq('action_id', selection.selected_pro_move_id)
+          .eq('role_id', roleId)
           .maybeSingle();
 
         // Get domain for the competency
@@ -193,6 +194,7 @@ export async function assembleWeek(params: {
               competencies(name, domain_id)
             `)
             .eq('action_id', backlogItem.pro_move_id)
+            .eq('role_id', roleId)
             .maybeSingle();
 
           // Get domain for the competency

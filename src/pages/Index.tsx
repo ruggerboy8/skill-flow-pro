@@ -240,6 +240,6 @@ export default function Index() {
         {/* Future space for notes, learning resources, etc. */}
       </div>
       
-      <SimFloatingButton isAdmin={user?.email === 'johno@reallygoodconsulting.org'} />
+      <SimFloatingButton isAdmin={user?.email === 'johno@reallygoodconsulting.org' || user?.email === 'ryanjoberly@gmail.com'} />
     </div>;
 }

@@ -62,15 +62,26 @@ export default function ConfidenceWizard() {
     if (user) {
       loadData();
     }
-  }, [user]);
+  }, [user, n]);
 
+  // Central Time gating and route guard
   useEffect(() => {
-    if (weeklyFocus.length > 0 && currentIndex < weeklyFocus.length) {
-      setCurrentFocus(weeklyFocus[currentIndex]);
+    if (!loading && weeklyFocus.length > 0) {
+      if (beforeCheckIn) {
+        toast({
+          title: "Confidence opens at 9:00 a.m. CT.",
+          description: "Please come back after the window opens."
+        });
+        navigate('/week');
+      } else if (afterTueNoon && !hasConfidence) {
+        toast({
+          title: "Confidence window closed",
+          description: `You'll get a fresh start on Mon, ${nextMondayStr(now)}.`
+        });
+        navigate('/week');
+      }
     }
-  }, [currentIndex, weeklyFocus]);
-
-  // Removed time gating - allow access anytime
+  }, [loading, weeklyFocus, beforeCheckIn, afterTueNoon, hasConfidence, navigate]);
 
   const loadData = async () => {
     if (!user) return;
@@ -91,7 +102,6 @@ export default function ConfidenceWizard() {
 
     // Use the unified site-based approach to get current week assignments
     const {assignments} = await assembleCurrentWeek(user.id, overrides);
-    console.log('assignemnts', assignments)
 
     if (!assignments || assignments.length === 0) {
       toast({
@@ -114,6 +124,7 @@ export default function ConfidenceWizard() {
     }));
 
     setWeeklyFocus(transformedFocusData);
+    setCurrentFocus(transformedFocusData[currentIndex]);
 
     // Check if confidence already submitted for all focus items and prefill selections
     const focusIds = transformedFocusData.map(f => f.id);

@@ -222,12 +222,9 @@ export default function ThisWeekPanel() {
   const { mondayZ } = getWeekAnchors(now, CT_TZ);
   const weekOfDate = formatInTimeZone(mondayZ, CT_TZ, 'MMM d, yyyy');
 
-  // Filter assignments for missed states - only show site moves, not self-selects
-  const displayAssignments = (weekContext.state === 'missed_checkin' || weekContext.state === 'missed_checkout') 
-    ? weekAssignments.filter(assignment => assignment.type === 'site')
-    : weekAssignments;
+  const displayAssignments = weekAssignments;
 
-  // Show empty state when no pro moves found (or no site moves for missed states)
+  // Show empty state when no pro moves found
   if (displayAssignments.length === 0) {
     return (
       <Card className="overflow-hidden">

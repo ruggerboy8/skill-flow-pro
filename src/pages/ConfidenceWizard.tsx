@@ -64,24 +64,7 @@ export default function ConfidenceWizard() {
     }
   }, [user, n]);
 
-  // Central Time gating and route guard
-  useEffect(() => {
-    if (!loading && weeklyFocus.length > 0) {
-      if (beforeCheckIn) {
-        toast({
-          title: "Confidence opens at 9:00 a.m. CT.",
-          description: "Please come back after the window opens."
-        });
-        navigate('/week');
-      } else if (afterTueNoon && !hasConfidence) {
-        toast({
-          title: "Confidence window closed",
-          description: `You'll get a fresh start on Mon, ${nextMondayStr(now)}.`
-        });
-        navigate('/week');
-      }
-    }
-  }, [loading, weeklyFocus, beforeCheckIn, afterTueNoon, hasConfidence, navigate]);
+  // Removed time gating - allow access anytime
 
   const loadData = async () => {
     if (!user) return;

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,17 +37,62 @@ export default function ThisWeekPanel() {
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [SimBannerComponent, setSimBannerComponent] = useState<React.ComponentType | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Load dev tools conditionally
+  // Check if user is super admin
   useEffect(() => {
-    if (import.meta.env.VITE_ENABLE_SIMTOOLS === 'true') {
-      import('@/devtools/SimConsole').then(module => {
-        setSimBannerComponent(() => module.SimBanner);
-      }).catch(() => {
-        // Dev tools not available
-      });
+    if (user) {
+      checkSuperAdminStatus();
     }
-  }, []);
+  }, [user]);
+
+  async function checkSuperAdminStatus() {
+    try {
+      const { data } = await supabase.rpc('is_super_admin', { _user_id: user!.id });
+      setIsSuperAdmin(!!data);
+    } catch (error) {
+      console.error('Error checking super admin status:', error);
+    }
+  }
+
+  // Delete latest week data function
+  async function handleDeleteLatestWeek() {
+    if (!user) return;
+    
+    setDeleteLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('delete_latest_week_data', { 
+        p_user_id: user.id 
+      });
+      
+      if (error) throw error;
+      
+      const result = data as { success: boolean; message: string; deleted_scores?: number; deleted_selections?: number };
+      
+      if (result.success) {
+        toast({ 
+          title: 'Success', 
+          description: `Deleted ${result.deleted_scores || 0} scores and ${result.deleted_selections || 0} selections from latest week.` 
+        });
+        // Reload the current week data
+        await loadCurrentWeek();
+      } else {
+        toast({ title: 'Info', description: result.message });
+      }
+    } catch (error: any) {
+      console.error('Error deleting latest week:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to delete latest week data', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteDialog(false);
+    }
+  }
 
   // Load staff profile
   useEffect(() => {
@@ -165,11 +211,7 @@ export default function ThisWeekPanel() {
           }
         };
 
-      case 'wait_for_thu':
-        return {
-          bannerMessage: 'Great! Come back Thursday to submit performance.',
-          bannerCta: null
-        };
+      // Removed wait_for_thu case - no longer needed
 
       case 'can_checkout':
         return {
@@ -303,7 +345,44 @@ export default function ThisWeekPanel() {
               {bannerCta.label}
             </Button>
           )}
+          
+          {/* Super Admin Delete Button */}
+          {isSuperAdmin && weekContext.state === 'done' && (
+            <Button 
+              variant="destructive" 
+              className="w-full mt-2"
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete Last Week (Admin)'}
+            </Button>
+          )}
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Latest Week Data</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete your most recent week's confidence and performance scores, 
+                as well as any self-selection data. This action cannot be undone.
+                
+                Are you sure you want to continue?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteLatestWeek}
+                disabled={deleteLoading}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Simulation status below CTA when active */}
         {SimBannerComponent && <SimBannerComponent />}

@@ -195,7 +195,19 @@ export function ProMoveList({
         .delete()
         .eq('action_id', proMove.action_id);
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a foreign key constraint violation
+        if (error.message.includes('violates foreign key constraint') || 
+            error.message.includes('weekly_focus_action_id_fkey')) {
+          toast({
+            title: "Cannot Delete Pro-Move",
+            description: "This pro-move is currently assigned in weekly focus schedules and cannot be deleted. Please retire it instead.",
+            variant: "destructive"
+          });
+          return;
+        }
+        throw error;
+      }
 
       toast({
         title: "Success",

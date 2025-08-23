@@ -64,19 +64,7 @@ export default function PerformanceWizard() {
     }
   }, [user, n]);
 
-  // Central Time gating and route guard for Performance
-  useEffect(() => {
-    if (!loading) {
-      // Allow carryover weeks anytime (computed after data load)
-      if (effectiveNow < thuStartZ && !isCarryoverWeek) {
-        toast({
-          title: 'Performance opens Thursday',
-          description: 'Please come back on Thu 12:00 a.m. CT.'
-        });
-        navigate('/week');
-      }
-    }
-  }, [loading, effectiveNow, thuStartZ, navigate, isCarryoverWeek]);
+  // Removed time gating - allow access anytime
 
   const loadData = async () => {
     if (!user) return;

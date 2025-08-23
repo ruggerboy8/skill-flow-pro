@@ -443,16 +443,7 @@ export async function computeWeekState(params: {
     };
   }
 
-  if (hasConfidence && now < anchors.checkout_open) {
-    return {
-      state: 'wait_for_thu',
-      nextAction: 'Performance opens Thursday',
-      deadlineAt: anchors.checkout_open,
-      backlogCount,
-      selectionPending,
-      lastActivity
-    };
-  }
+  // Skip wait_for_thu state - allow immediate transition to performance
 
   if (hasConfidence && !hasPerformance && now >= anchors.checkout_open && now <= anchors.performance_deadline) {
     return {

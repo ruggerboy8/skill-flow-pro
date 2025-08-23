@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -165,11 +166,7 @@ export default function ThisWeekPanel() {
           }
         };
 
-      case 'wait_for_thu':
-        return {
-          bannerMessage: 'Great! Come back Thursday to submit performance.',
-          bannerCta: null
-        };
+      // Removed wait_for_thu case - no longer needed
 
       case 'can_checkout':
         return {

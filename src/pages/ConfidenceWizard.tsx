@@ -70,24 +70,7 @@ export default function ConfidenceWizard() {
     }
   }, [currentIndex, weeklyFocus]);
 
-  // Central Time gating and route guard
-  useEffect(() => {
-    if (!loading && weeklyFocus.length > 0) {
-      if (beforeCheckIn) {
-        toast({
-          title: "Confidence opens at 9:00 a.m. CT.",
-          description: "Please come back after the window opens."
-        });
-        navigate('/week');
-      } else if (afterTueNoon && !hasConfidence) {
-        toast({
-          title: "Confidence window closed",
-          description: `You'll get a fresh start on Mon, ${nextMondayStr(now)}.`
-        });
-        navigate('/week');
-      }
-    }
-  }, [loading, weeklyFocus, beforeCheckIn, afterTueNoon, hasConfidence, navigate]);
+  // Removed time gating - allow access anytime
 
   const loadData = async () => {
     if (!user) return;
@@ -228,15 +211,31 @@ export default function ConfidenceWizard() {
 
     setSubmitting(true);
 
+    // Debug logging to track self-select state
+    console.log('Submit debug - selectedActions:', selectedActions);
+    console.log('Submit debug - selfSelectById:', selfSelectById);
+    console.log('Submit debug - weeklyFocus:', weeklyFocus.map(f => ({ id: f.id, action_statement: f.action_statement })));
+
     const scoreInserts = weeklyFocus.map(focus => {
       const base: any = {
         staff_id: staff.id,
         weekly_focus_id: focus.id,
         confidence_score: scores[focus.id] || 1,
       };
-      if (selfSelectById[focus.id] && selectedActions[focus.id]) {
-        base.selected_action_id = selectedActions[focus.id];
+      
+      // Fix: Check for valid, non-empty selection and convert to number
+      if (selfSelectById[focus.id] && selectedActions[focus.id] && selectedActions[focus.id] !== "") {
+        const actionId = parseInt(selectedActions[focus.id]!, 10);
+        if (!isNaN(actionId)) {
+          base.selected_action_id = actionId;
+          console.log(`Setting selected_action_id for focus ${focus.id}: ${actionId}`);
+        } else {
+          console.error(`Invalid action_id for focus ${focus.id}: ${selectedActions[focus.id]}`);
+        }
+      } else if (selfSelectById[focus.id]) {
+        console.warn(`Missing selection for self-select focus ${focus.id}`);
       }
+      
       return base;
     });
 
@@ -288,7 +287,7 @@ export default function ConfidenceWizard() {
   }
 
   const hasScore = scores[currentFocus.id] !== undefined;
-  const hasRequiredSelection = !selfSelectById[currentFocus.id] || selectedActions[currentFocus.id];
+  const hasRequiredSelection = !selfSelectById[currentFocus.id] || (selectedActions[currentFocus.id] && selectedActions[currentFocus.id] !== "");
   const canProceed = hasScore && hasRequiredSelection;
   const isLastItem = currentIndex === weeklyFocus.length - 1;
 
@@ -331,6 +330,7 @@ export default function ConfidenceWizard() {
                   <Select
                     value={selectedActions[currentFocus.id] || ""}
                     onValueChange={(value) => {
+                      console.log(`Selection changed for focus ${currentFocus.id}: ${value}`);
                       setSelectedActions(prev => ({
                         ...prev,
                         [currentFocus.id]: value
@@ -353,6 +353,11 @@ export default function ConfidenceWizard() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {selfSelectById[currentFocus.id] && !hasRequiredSelection && (
+                    <p className="text-sm text-red-600 mt-1">
+                      Please select a Pro Move to continue.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm font-medium text-gray-900">{currentFocus.action_statement}</p>

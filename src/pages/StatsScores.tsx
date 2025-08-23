@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
+import { Trash2 } from 'lucide-react';
 
 interface WeekData {
   domain_name: string;
@@ -229,6 +233,7 @@ export default function StatsScores() {
                       onExpand={() => onWeekExpand(cycleIndex, week)}
                       weekData={cycle.weeks.get(week) || []}
                       weekStatus={cycle.weekStatuses.get(week) || { total: 0, confCount: 0, perfCount: 0 }}
+                      onWeekDeleted={() => loadCycleData()}
                     />
                   ))}
                 </Accordion>
@@ -248,15 +253,91 @@ interface WeekAccordionProps {
   onExpand: () => void;
   weekData: WeekData[];
   weekStatus: { total: number; confCount: number; perfCount: number };
+  onWeekDeleted: () => void;
 }
 
-function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus }: WeekAccordionProps) {
+function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus, onWeekDeleted }: WeekAccordionProps) {
   const [hasConfidence, setHasConfidence] = useState<boolean | null>(null);
   const [hasPerformance, setHasPerformance] = useState<boolean | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     checkConfidence();
   }, [cycle, week, staffData]);
+
+  useEffect(() => {
+    if (user) {
+      checkSuperAdminStatus();
+    }
+  }, [user]);
+
+  async function checkSuperAdminStatus() {
+    if (!user) return;
+    try {
+      const { data } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      setIsSuperAdmin(!!data);
+    } catch (error) {
+      console.error('Error checking super admin status:', error);
+    }
+  }
+
+  // Delete this specific week's data function
+  async function handleDeleteThisWeek() {
+    if (!user || !staffData) return;
+    
+    setDeleteLoading(true);
+    try {
+      // Delete weekly scores for this specific week/cycle
+      const { error: scoresError } = await supabase
+        .from('weekly_scores')
+        .delete()
+        .eq('staff_id', staffData.id)
+        .in('weekly_focus_id', await getWeeklyFocusIds());
+
+      if (scoresError) throw scoresError;
+
+      // Delete weekly self-selections for this specific week/cycle
+      const { error: selectionsError } = await supabase
+        .from('weekly_self_select')
+        .delete()
+        .eq('user_id', user.id)
+        .in('weekly_focus_id', await getWeeklyFocusIds());
+
+      if (selectionsError) throw selectionsError;
+
+      toast({ 
+        title: 'Success', 
+        description: `Deleted data for Cycle ${cycle}, Week ${week}.` 
+      });
+      
+      onWeekDeleted(); // Refresh parent data
+    } catch (error: any) {
+      console.error('Error deleting week data:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to delete week data', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteDialog(false);
+    }
+  }
+
+  async function getWeeklyFocusIds(): Promise<string[]> {
+    const { data } = await supabase
+      .from('weekly_focus')
+      .select('id')
+      .eq('cycle', cycle)
+      .eq('week_in_cycle', week)
+      .eq('role_id', staffData!.role_id);
+    
+    return data?.map(f => f.id) || [];
+  }
 
   const checkConfidence = async () => {
     if (!staffData) return;
@@ -314,46 +395,90 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus 
   };
 
   return (
-    <AccordionItem value={`week-${cycle}-${week}`} className="border rounded">
-      <AccordionTrigger 
-        className={`px-3 py-2 text-sm ${!hasConfidence ? 'opacity-50 cursor-not-allowed' : ''}`}
-        disabled={!hasConfidence}
-        onClick={handleExpand}
-      >
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-3">
-            <span className="font-medium">Week {week}</span>
-            {!hasConfidence && (
-              <span className="text-xs text-muted-foreground">Submit confidence to unlock week</span>
-            )}
-          </div>
-          {getStatusBadge()}
-        </div>
-      </AccordionTrigger>
-      
-      {hasConfidence && (
-        <AccordionContent className="px-3 pb-3">
-          <div className="space-y-2">
-            {weekData.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-3 p-3 rounded-lg"
-              >
-                <Badge 
-                  className="text-xs font-semibold ring-1 ring-border/50"
-                  style={{ backgroundColor: getDomainColor(item.domain_name) }}
+    <>
+      <AccordionItem value={`week-${cycle}-${week}`} className="border rounded">
+        <AccordionTrigger 
+          className={`px-3 py-2 text-sm ${!hasConfidence ? 'opacity-50 cursor-not-allowed' : ''}`}
+          disabled={!hasConfidence}
+          onClick={handleExpand}
+        >
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-3">
+              <span className="font-medium">Week {week}</span>
+              {!hasConfidence && (
+                <span className="text-xs text-muted-foreground">Submit confidence to unlock week</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {getStatusBadge()}
+              {/* Super Admin Delete Button */}
+              {isSuperAdmin && hasConfidence && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDeleteDialog(true);
+                  }}
+                  disabled={deleteLoading}
                 >
-                  {item.domain_name}
-                </Badge>
-                <span className="flex-1 text-sm">
-                  {item.action_statement}
-                </span>
-                <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
-              </div>
-            ))}
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
-        </AccordionContent>
-      )}
-    </AccordionItem>
+        </AccordionTrigger>
+        
+        {hasConfidence && (
+          <AccordionContent className="px-3 pb-3">
+            <div className="space-y-2">
+              {weekData.map((item, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-3 p-3 rounded-lg"
+                >
+                  <Badge 
+                    className="text-xs font-semibold ring-1 ring-border/50"
+                    style={{ backgroundColor: getDomainColor(item.domain_name) }}
+                  >
+                    {item.domain_name}
+                  </Badge>
+                  <span className="flex-1 text-sm">
+                    {item.action_statement}
+                  </span>
+                  <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
+                </div>
+              ))}
+            </div>
+          </AccordionContent>
+        )}
+      </AccordionItem>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Week Data</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all confidence and performance scores, as well as any self-selection data 
+              for Cycle {cycle}, Week {week}. This action cannot be undone.
+              
+              Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteThisWeek}
+              disabled={deleteLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete Week'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

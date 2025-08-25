@@ -14,6 +14,61 @@ interface PerformanceTrajectoryPanelProps {
   loading: boolean;
 }
 
+function tryParseCycleWeek(key: string) {
+  // supports "1-3", "C1-W3", "Cycle 1 • Week 3", etc. (very tolerant)
+  const m = key.match(/(\d+)[^\d]+(\d+)/);
+  if (!m) return null;
+  return { cycle: Number(m[1]), week: Number(m[2]) };
+}
+
+function sortChrono(points: { week_key: string; value: number }[]) {
+  if (!points || points.length < 2) return points ?? [];
+  const copy = [...points];
+
+  // Prefer cycle-week parsing
+  const A = tryParseCycleWeek(copy[0].week_key);
+  const B = tryParseCycleWeek(copy[copy.length - 1].week_key);
+  if (A && B) {
+    return copy.sort((p, q) => {
+      const ap = tryParseCycleWeek(p.week_key)!;
+      const aq = tryParseCycleWeek(q.week_key)!;
+      return ap.cycle === aq.cycle ? ap.week - aq.week : ap.cycle - aq.cycle;
+    });
+  }
+
+  // Fallback: try Date.parse (if week_key is date-like)
+  const d0 = Date.parse(copy[0].week_key);
+  const d1 = Date.parse(copy[copy.length - 1].week_key);
+  if (!Number.isNaN(d0) && !Number.isNaN(d1)) {
+    return copy.sort((p, q) => Date.parse(p.week_key) - Date.parse(q.week_key));
+  }
+
+  // Otherwise, leave order as-is
+  return copy;
+}
+
+function computeTrendLabel(points: { value: number }[]) {
+  if (!points || points.length < 2) return 'Not enough data';
+
+  // simple linear regression slope on x = 1..n
+  const n = points.length;
+  const xs = Array.from({ length: n }, (_, i) => i + 1);
+  const ys = points.map(p => p.value);
+  const meanX = (n + 1) / 2;
+  const meanY = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (xs[i] - meanX) * (ys[i] - meanY);
+    den += (xs[i] - meanX) * (xs[i] - meanX);
+  }
+  const slope = den === 0 ? 0 : num / den;
+
+  // thresholds: tweak as you like
+  if (slope > 0.05) return 'Improving';
+  if (slope < -0.05) return 'Declining';
+  return 'Holding steady';
+}
+
 function orderDomains(data: TrajectoryData) {
   const map = new Map(data.map(d => [d.domain_name, d]));
   const ordered = DOMAIN_ORDER.map(d => map.get(d)).filter(Boolean) as DomainTrend[];
@@ -119,7 +174,13 @@ export default function PerformanceTrajectoryPanel({ data, loading }: Performanc
   };
 
   const generateNarrative = () => {
-    const validTrends = ordered.filter(d => d.label !== 'Not enough data');
+    const validTrends = ordered.map(domain => {
+      const pointsChrono = sortChrono(domain.points);
+      const hasEnough = (pointsChrono?.length ?? 0) >= 2;
+      const computedLabel = hasEnough ? computeTrendLabel(pointsChrono) : 'Not enough data';
+      return { domain_name: domain.domain_name, label: computedLabel };
+    }).filter(d => d.label !== 'Not enough data');
+    
     if (validTrends.length === 0) return "Not enough data to analyze trends yet.";
     
     const improving = validTrends.filter(d => d.label === 'Improving').map(d => d.domain_name);
@@ -146,9 +207,13 @@ export default function PerformanceTrajectoryPanel({ data, loading }: Performanc
         {/* 2x2 Grid */}
         <div className="grid grid-cols-2 gap-4">
           {ordered.map((domain) => {
-            const hasEnough = (domain.points?.length ?? 0) >= 2;
-            const last = domain.points?.[domain.points.length - 1]?.value ?? null;
+            const pointsChrono = sortChrono(domain.points);
+            const hasEnough = (pointsChrono?.length ?? 0) >= 2;
+            const last = pointsChrono?.[pointsChrono.length - 1]?.value ?? null;
             const lastLabel = last != null ? Number(last.toFixed(1)) : '—';
+
+            // compute label on client using chrono order
+            const computedLabel = hasEnough ? computeTrendLabel(pointsChrono) : 'Not enough data';
 
             return (
               <div 
@@ -159,11 +224,11 @@ export default function PerformanceTrajectoryPanel({ data, loading }: Performanc
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm text-slate-800">{domain.domain_name}</h4>
                   <div className="flex items-center justify-between">
-                    <Sparkline points={domain.points} />
+                    <Sparkline points={pointsChrono} />
                     <span className="text-sm font-semibold text-slate-900">{lastLabel}</span>
                   </div>
-                  <Badge variant={getTrendVariant(domain.label)} className="text-xs">
-                    {hasEnough ? domain.label : 'Not enough data'}
+                  <Badge variant={getTrendVariant(computedLabel)} className="text-xs">
+                    {computedLabel}
                   </Badge>
                 </div>
               </div>

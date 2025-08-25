@@ -75,10 +75,10 @@ export default function ConfidenceWizard() {
   const loadData = async () => {
     if (!user) return;
 
-    // Load staff profile
+    // Load staff profile with location info
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
-      .select('id, role_id')
+      .select('id, role_id, primary_location_id')
       .eq('user_id', user.id)
       .single();
 
@@ -170,6 +170,7 @@ export default function ConfidenceWizard() {
         .from('pro_moves')
         .select('action_id, action_statement, competency_id')
         .in('competency_id', compIds)
+        .eq('active', true)
         .order('action_statement');
       const grouped: { [key: number]: { action_id: string; action_statement: string }[] } = {};
       (opts || []).forEach((o: any) => {
@@ -206,8 +207,21 @@ export default function ConfidenceWizard() {
     console.log('Submit debug - selfSelectById:', selfSelectById);
     console.log('Submit debug - weeklyFocus:', weeklyFocus.map(f => ({ id: f.id, action_statement: f.action_statement })));
 
-    // Check if late submission (after Tue 12:00 CT)
-    const { confidence_deadline } = getWeekAnchors(effectiveNow);
+    // Get location timezone for proper deadline calculation
+    let timezone = 'America/Chicago'; // default fallback
+    if (staff && 'primary_location_id' in staff && (staff as any).primary_location_id) {
+      const { data: locationData } = await supabase
+        .from('locations')
+        .select('timezone')
+        .eq('id', (staff as any).primary_location_id)
+        .maybeSingle();
+      if (locationData?.timezone) {
+        timezone = locationData.timezone;
+      }
+    }
+
+    // Check if late submission using location timezone
+    const { confidence_deadline } = await import('@/v2/time').then(t => t.getWeekAnchors(effectiveNow, timezone));
     const isLate = effectiveNow > confidence_deadline;
 
     const scoreInserts = weeklyFocus.map(focus => {
@@ -215,6 +229,7 @@ export default function ConfidenceWizard() {
         staff_id: staff.id,
         weekly_focus_id: focus.id,
         confidence_score: scores[focus.id] || 1,
+        confidence_source: 'live' as const,
         confidence_late: isLate, // Set late flag
       };
       
@@ -290,7 +305,7 @@ export default function ConfidenceWizard() {
       const { error: selectError } = await supabase
         .from('weekly_self_select')
         .upsert(selfSelectInserts, {
-          onConflict: 'user_id,weekly_focus_id'
+          onConflict: 'user_id,weekly_focus_id,slot_index'
         });
 
       if (selectError) {

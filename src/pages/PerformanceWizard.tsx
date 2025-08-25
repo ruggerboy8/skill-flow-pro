@@ -69,10 +69,10 @@ export default function PerformanceWizard() {
   const loadData = async () => {
     if (!user) return;
 
-    // Load staff profile
+    // Load staff profile with location info
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
-      .select('id, role_id')
+      .select('id, role_id, primary_location_id')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -154,21 +154,23 @@ export default function PerformanceWizard() {
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
 
-    // Hard-guard: prevent too-early submit for current week
-    const { thuStartZ: thuGuardZ } = getAnchors(effectiveNow);
-    if (effectiveNow < thuGuardZ && !isCarryoverWeek) {
-      toast({
-        title: 'Performance opens Thursday',
-        description: 'Please come back on Thu 12:00 a.m. CT.'
-      });
-      navigate('/week');
-      return;
-    }
-
     setSubmitting(true);
 
-    // Check if late submission (after Fri 5:00 PM CT)
-    const { performance_deadline } = getWeekAnchors(effectiveNow);
+    // Get location timezone for proper deadline calculation
+    let timezone = 'America/Chicago'; // default fallback
+    if (staff && 'primary_location_id' in staff && (staff as any).primary_location_id) {
+      const { data: locationData } = await supabase
+        .from('locations')
+        .select('timezone')
+        .eq('id', (staff as any).primary_location_id)
+        .maybeSingle();
+      if (locationData?.timezone) {
+        timezone = locationData.timezone;
+      }
+    }
+
+    // Check if late submission using location timezone
+    const { performance_deadline } = await import('@/v2/time').then(t => t.getWeekAnchors(effectiveNow, timezone));
     const isLate = effectiveNow > performance_deadline;
 
     const updates = existingScores.map(score => ({
@@ -176,6 +178,7 @@ export default function PerformanceWizard() {
       staff_id: staff.id,
       weekly_focus_id: score.weekly_focus_id,
       performance_score: performanceScores[score.weekly_focus_id] || 1,
+      performance_source: 'live' as const,
       performance_late: isLate, // Set late flag
     }));
 

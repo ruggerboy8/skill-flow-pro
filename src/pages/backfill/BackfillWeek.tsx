@@ -92,7 +92,7 @@ export default function BackfillWeek() {
             .from("pro_moves")
             .select("action_id, action_statement")
             .eq("competency_id", item.competency_id)
-            .eq("status", "active")
+            .eq("active", true)
             .order("action_statement");
           item.options = opts || [];
         }

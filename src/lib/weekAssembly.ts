@@ -38,57 +38,29 @@ async function findUserActiveWeek(
   }
   const cycleLength = locationData.cycle_length_weeks;
 
-  // Find the most recent week the user has scores for
-  const { data: lastScoredFocus } = await supabase
-    .from('weekly_scores')
-    .select('weekly_focus!inner(id, cycle, week_in_cycle)')
-    .eq('staff_id', staffId)
-    .order('weekly_focus(cycle)', { ascending: false })
-    .order('weekly_focus(week_in_cycle)', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!lastScoredFocus || !lastScoredFocus.weekly_focus) {
-    // No scores at all, brand new user. Start them at the beginning.
-    return { cycleNumber: 1, weekInCycle: 1 };
-  }
-
-  const lastCycle = lastScoredFocus.weekly_focus.cycle;
-  const lastWeekInCycle = lastScoredFocus.weekly_focus.week_in_cycle;
-
-  // Now, check if that week is fully complete
-  const assignmentsForLastWeek = await locationAssembleWeek({
-    userId,
-    roleId,
-    locationId,
-    cycleNumber: lastCycle,
-    weekInCycle: lastWeekInCycle,
-    simOverrides,
+  // Use the new RPC to get last progress week
+  const { data, error } = await supabase.rpc('get_last_progress_week', { 
+    p_staff_id: staffId 
   });
-
-  const { data: scoresForLastWeek } = await supabase
-    .from('weekly_scores')
-    .select('confidence_score, performance_score')
-    .eq('staff_id', staffId)
-    .in('weekly_focus_id', assignmentsForLastWeek.map(a => a.weekly_focus_id));
-
-  const requiredCount = assignmentsForLastWeek.length;
-  const confidenceCount = scoresForLastWeek?.filter(s => s.confidence_score !== null).length || 0;
-  const performanceCount = scoresForLastWeek?.filter(s => s.performance_score !== null).length || 0;
-
-  if (requiredCount > 0 && confidenceCount >= requiredCount && performanceCount >= requiredCount) {
-    // Last scored week is complete, advance to the next week
-    let nextCycle = lastCycle;
-    let nextWeekInCycle = lastWeekInCycle + 1;
-    if (nextWeekInCycle > cycleLength) {
-      nextWeekInCycle = 1;
-      nextCycle++;
-    }
-    return { cycleNumber: nextCycle, weekInCycle: nextWeekInCycle };
-  } else {
-    // Last scored week is incomplete, so that's the active week
-    return { cycleNumber: lastCycle, weekInCycle: lastWeekInCycle };
+  
+  if (error) {
+    throw error;
   }
+
+  let cycleNumber = data?.[0]?.last_cycle ?? 1;
+  let weekInCycle = data?.[0]?.last_week ?? 1;
+  const isComplete = !!data?.[0]?.is_complete;
+
+  if (isComplete) {
+    // Week is complete, advance to next week
+    weekInCycle += 1;
+    if (weekInCycle > cycleLength) {
+      weekInCycle = 1;
+      cycleNumber += 1;
+    }
+  }
+
+  return { cycleNumber, weekInCycle };
 }
 
 /**

@@ -762,6 +762,14 @@ export type Database = {
           id: string
         }[]
       }
+      get_last_progress_week: {
+        Args: { p_staff_id: string }
+        Returns: {
+          is_complete: boolean
+          last_cycle: number
+          last_week: number
+        }[]
+      }
       get_staff_summary: {
         Args: Record<PropertyKey, never>
         Returns: {

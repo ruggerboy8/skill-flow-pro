@@ -5,6 +5,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper: is it Monday between 00:01 and 01:01 in tz?
+function inRolloverWindow(now: Date, tz: string): boolean {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour12: false,
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(now);
+
+  const weekday = parts.find(p => p.type === 'weekday')?.value || '';
+  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+
+  const mins = hour * 60 + minute;
+  // Monday (Mon), from 00:01 inclusive to 01:01 exclusive
+  return weekday.toLowerCase().startsWith('mon') && mins >= 1 && mins < 61;
+}
+
 // Helper to enforce weekly rollover for a single staff member
 async function enforceWeeklyRolloverNow(args: {
   userId: string;
@@ -13,53 +32,39 @@ async function enforceWeeklyRolloverNow(args: {
   locationId: string;
   now: Date;
 }) {
-  const { userId, staffId, roleId, locationId, now } = args;
-  
+  const { staffId, roleId, locationId, now } = args;
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-  )
+  );
 
-  // Get location timezone and config
+  // 1) Location
   const { data: loc, error: locErr } = await supabase
     .from('locations')
     .select('timezone, program_start_date, cycle_length_weeks')
     .eq('id', locationId)
     .maybeSingle();
-
   if (locErr || !loc) {
     console.log(`Location not found: ${locationId}`);
     return;
   }
 
-  // Calculate rollover threshold (Monday 00:01 local)
-  const mondayStart = new Date(now);
-  mondayStart.setUTCHours(0, 0, 0, 0);
-  const dayOfWeek = mondayStart.getUTCDay();
-  const daysUntilMonday = dayOfWeek === 0 ? 0 : (7 - dayOfWeek);
-  mondayStart.setUTCDate(mondayStart.getUTCDate() + daysUntilMonday);
-  
-  // Adjust for timezone - this is simplified, real implementation would use date-fns-tz
-  const timezoneOffset = loc.timezone === 'America/Chicago' ? -6 : 0; // Central time approximation
-  const rolloverThreshold = new Date(mondayStart.getTime() + (1 * 60 * 1000)); // 00:01
-  
-  if (now < rolloverThreshold) {
-    console.log(`Not rollover time yet for location ${locationId}`);
-    return;
-  }
+  // IMPORTANT: No inner Monday/threshold gate here — the caller already ran the window check.
 
-  // Get previous week (subtract 7 days)
-  const prevWeekDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-  
-  // Calculate previous cycle/week - simplified logic
-  const daysSinceStart = Math.floor((prevWeekDate.getTime() - new Date(loc.program_start_date).getTime()) / (24 * 60 * 60 * 1000));
-  const totalWeeks = Math.floor(daysSinceStart / 7);
+  // 2) Previous week (simple -7d)
+  const prevWeekDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  // 3) Map prev date -> cycle/week (same approach as before)
+  const start = new Date(loc.program_start_date);
+  const daysSinceStart = Math.floor((prevWeekDate.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  const totalWeeks = Math.max(0, Math.floor(daysSinceStart / 7));
   const prevCycle = Math.floor(totalWeeks / loc.cycle_length_weeks) + 1;
   const prevWeek = (totalWeeks % loc.cycle_length_weeks) + 1;
 
   console.log(`Processing rollover for staff ${staffId}, prev cycle ${prevCycle}, week ${prevWeek}`);
 
-  // Find all weekly_focus rows for prev cycle/week/role
+  // 4) Focus rows
   const { data: focusRows } = await supabase
     .from('weekly_focus')
     .select('id, action_id, self_select')
@@ -69,46 +74,48 @@ async function enforceWeeklyRolloverNow(args: {
 
   const focusIds = (focusRows || []).map(f => f.id);
   if (!focusIds.length) {
-    console.log(`No focus rows found for cycle ${prevCycle}, week ${prevWeek}`);
+    console.log(`No focus rows for cycle ${prevCycle}, week ${prevWeek}`);
     return;
   }
 
-  // Check completion: do we have performance for ALL of them?
+  // 5) Score status with hadAnyConfidence guard
   const { data: prevScores } = await supabase
     .from('weekly_scores')
-    .select('id, weekly_focus_id, confidence_score, confidence_date, performance_score')
+    .select('id, weekly_focus_id, confidence_score, performance_score')
     .eq('staff_id', staffId)
     .in('weekly_focus_id', focusIds);
 
   const required = focusIds.length;
+  const confCount = (prevScores || []).filter(s => s.confidence_score !== null).length;
   const perfCount = (prevScores || []).filter(s => s.performance_score !== null).length;
   const fullyPerformed = perfCount >= required;
+  const hadAnyConfidence = confCount > 0;
 
   if (fullyPerformed) {
-    console.log(`Week already fully performed for staff ${staffId}`);
-    return; 
+    console.log('Week fully performed — nothing to do');
+    return;
+  }
+  if (!hadAnyConfidence) {
+    console.log('No confidence was submitted — skipping backlog');
+    return;
   }
 
-  console.log(`Adding site moves to backlog for staff ${staffId}`);
-
-  // 1) Add SITE moves from that week to backlog
+  // 6) Backlog site moves (RPC dedups)
   const siteActionIds = (focusRows || [])
     .filter(f => !f.self_select && f.action_id)
     .map(f => f.action_id as number);
 
   for (const actionId of siteActionIds) {
-    await supabase.rpc('add_backlog_if_missing', { 
-      p_staff_id: staffId, 
-      p_action_id: actionId, 
-      p_cycle: prevCycle, 
-      p_week: prevWeek 
+    await supabase.rpc('add_backlog_if_missing', {
+      p_staff_id: staffId,
+      p_action_id: actionId,
+      p_cycle: prevCycle,
+      p_week: prevWeek
     });
   }
 
-  // 2) Clear confidence for items that still lack performance
-  const toClear = (prevScores || [])
-    .filter(r => r.performance_score === null);
-    
+  // 7) Clear confidence if performance missing
+  const toClear = (prevScores || []).filter(r => r.performance_score === null);
   if (toClear.length) {
     const updates = toClear.map(r => ({
       id: r.id,
@@ -118,7 +125,7 @@ async function enforceWeeklyRolloverNow(args: {
       confidence_date: null,
     }));
     await supabase.from('weekly_scores').upsert(updates);
-    console.log(`Cleared confidence for ${updates.length} incomplete items`);
+    console.log(`Cleared confidence for ${updates.length} rows`);
   }
 
   console.log(`Rollover complete for staff ${staffId}`);
@@ -128,6 +135,25 @@ Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // DEV hook: POST a JSON body to force-run for one staff now
+  if (req.method === 'POST') {
+    const body = await req.json().catch(() => ({}));
+    if (body && body.staffId && body.roleId && body.locationId && body.userId) {
+      const now = body.nowISO ? new Date(body.nowISO) : new Date();
+      await enforceWeeklyRolloverNow({
+        userId: body.userId,
+        staffId: body.staffId,
+        roleId: Number(body.roleId),
+        locationId: body.locationId,
+        now
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
   }
 
   try {
@@ -144,19 +170,9 @@ Deno.serve(async (req) => {
       .from('locations')
       .select('id, name, timezone, program_start_date, cycle_length_weeks');
 
-    const locationsToProcess: string[] = [];
-
-    for (const location of locations || []) {
-      // Simple timezone check - in production would use proper timezone libraries
-      const localHour = now.getUTCHours() + (location.timezone === 'America/Chicago' ? -6 : 0);
-      const dayOfWeek = now.getUTCDay();
-      
-      // Check if it's Monday 00:01-01:01 local time
-      if (dayOfWeek === 1 && localHour >= 0 && localHour < 1) {
-        locationsToProcess.push(location.id);
-        console.log(`Location ${location.name} is in rollover window`);
-      }
-    }
+    const locationsToProcess = (locations || [])
+      .filter(loc => inRolloverWindow(now, loc.timezone || 'America/Chicago'))
+      .map(loc => loc.id);
 
     if (locationsToProcess.length === 0) {
       console.log('No locations in rollover window');

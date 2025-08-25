@@ -17,6 +17,7 @@ import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekCont
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
+import { buildWeekBanner } from '@/v2/weekCta';
 
 interface Staff { id: string; role_id: number; }
 interface WeeklyScore { 
@@ -157,64 +158,17 @@ export default function ThisWeekPanel() {
     }
   }
 
-  // Banner message and CTA based on current week state
-  const { bannerMessage, bannerCta } = useMemo(() => {
-    if (!weekContext || !staff) return { bannerMessage: '', bannerCta: null };
-
-    // now comes from useNow() hook
-
-    switch (weekContext.state) {
-      case 'missed_checkin':
-        return {
-          bannerMessage: 'Welcome back! Time to rate your confidence for this week\'s Pro Moves.',
-          bannerCta: {
-            label: 'Rate Confidence',
-            onClick: () => navigate(`/confidence/current/step/1`)
-          }
-        };
-
-      case 'can_checkin':
-        return {
-          bannerMessage: 'Welcome back! Time to rate your confidence for this week\'s Pro Moves.',
-          bannerCta: {
-            label: 'Rate Confidence',
-            onClick: () => navigate(`/confidence/current/step/1`)
-          }
-        };
-
-      // Removed wait_for_thu case - no longer needed
-
-      case 'can_checkout':
-        return {
-          bannerMessage: 'Time to reflect. Rate your performance for this week\'s Pro Moves.',
-          bannerCta: {
-            label: 'Rate Performance',
-            onClick: () => navigate(`/performance/current/step/1`)
-          }
-        };
-
-      case 'missed_checkout':
-        return {
-          bannerMessage: 'Time to reflect. Rate your performance for this week\'s Pro Moves.',
-          bannerCta: {
-            label: 'Rate Performance',
-            onClick: () => navigate(`/performance/current/step/1`)
-          }
-        };
-
-      case 'done':
-        return {
-          bannerMessage: 'Nice work! That\'s it for now, see you next week!',
-          bannerCta: null
-        };
-
-      default:
-        return {
-          bannerMessage: 'Review your Pro Moves below.',
-          bannerCta: null
-        };
+  // Banner message + CTA via centralized helper
+  const banner = useMemo(() => {
+    if (!weekContext || !locationWeekContext) {
+      return { message: '', cta: undefined };
     }
-  }, [weekContext, staff, navigate]);
+    return buildWeekBanner({
+      status: weekContext,
+      location: locationWeekContext,
+      now
+    });
+  }, [weekContext, locationWeekContext, now]);
 
   // Show loading state
   if (loading || !weekContext || !staff) {
@@ -315,10 +269,14 @@ export default function ThisWeekPanel() {
 
         {/* Dynamic banner message */}
         <div className="rounded-md border bg-muted p-3">
-          <div className="font-medium text-sm text-foreground text-center">{bannerMessage}</div>
-          {bannerCta && (
-            <Button className="w-full h-12 mt-2" onClick={bannerCta.onClick} aria-label="Next action">
-              {bannerCta.label}
+          <div className="font-medium text-sm text-foreground text-center">{banner.message}</div>
+          {banner.cta && (
+            <Button
+              className="w-full h-12 mt-2"
+              onClick={() => navigate(banner.cta!.to)}
+              aria-label="Next action"
+            >
+              {banner.cta.label}
             </Button>
           )}
         </div>

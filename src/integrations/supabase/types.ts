@@ -71,14 +71,17 @@ export type Database = {
       }
       domains: {
         Row: {
+          color_hex: string | null
           domain_id: number
           domain_name: string | null
         }
         Insert: {
+          color_hex?: string | null
           domain_id: number
           domain_name?: string | null
         }
         Update: {
+          color_hex?: string | null
           domain_id?: number
           domain_name?: string | null
         }
@@ -86,33 +89,52 @@ export type Database = {
       }
       evaluation_items: {
         Row: {
+          competency_description_snapshot: string | null
           competency_id: number
           competency_name_snapshot: string
+          domain_id: number | null
+          domain_name: string | null
           evaluation_id: string
+          interview_prompt_snapshot: string | null
           observer_note: string | null
           observer_score: number | null
           self_note: string | null
           self_score: number | null
         }
         Insert: {
+          competency_description_snapshot?: string | null
           competency_id: number
           competency_name_snapshot: string
+          domain_id?: number | null
+          domain_name?: string | null
           evaluation_id: string
+          interview_prompt_snapshot?: string | null
           observer_note?: string | null
           observer_score?: number | null
           self_note?: string | null
           self_score?: number | null
         }
         Update: {
+          competency_description_snapshot?: string | null
           competency_id?: number
           competency_name_snapshot?: string
+          domain_id?: number | null
+          domain_name?: string | null
           evaluation_id?: string
+          interview_prompt_snapshot?: string | null
           observer_note?: string | null
           observer_score?: number | null
           self_note?: string | null
           self_score?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "evaluation_items_domain_id_fk"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
           {
             foreignKeyName: "evaluation_items_evaluation_id_fkey"
             columns: ["evaluation_id"]
@@ -481,6 +503,54 @@ export type Database = {
         }
         Relationships: []
       }
+      user_backlog_v2: {
+        Row: {
+          action_id: number
+          assigned_on: string
+          created_at: string
+          id: string
+          resolved_on: string | null
+          source_cycle: number | null
+          source_week: number | null
+          staff_id: string
+        }
+        Insert: {
+          action_id: number
+          assigned_on?: string
+          created_at?: string
+          id?: string
+          resolved_on?: string | null
+          source_cycle?: number | null
+          source_week?: number | null
+          staff_id: string
+        }
+        Update: {
+          action_id?: number
+          assigned_on?: string
+          created_at?: string
+          id?: string
+          resolved_on?: string | null
+          source_cycle?: number | null
+          source_week?: number | null
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_backlog_v2_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "user_backlog_v2_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       weekly_focus: {
         Row: {
           action_id: number | null
@@ -545,51 +615,54 @@ export type Database = {
       weekly_scores: {
         Row: {
           confidence_date: string | null
-          confidence_estimated: boolean
+          confidence_late: boolean | null
           confidence_score: number | null
           confidence_source: Database["public"]["Enums"]["score_source"]
           created_at: string | null
           entered_by: string
           id: string
           performance_date: string | null
-          performance_estimated: boolean
+          performance_late: boolean | null
           performance_score: number | null
           performance_source: Database["public"]["Enums"]["score_source"]
           selected_action_id: number | null
+          site_action_id: number | null
           staff_id: string | null
           updated_at: string | null
           weekly_focus_id: string | null
         }
         Insert: {
           confidence_date?: string | null
-          confidence_estimated?: boolean
+          confidence_late?: boolean | null
           confidence_score?: number | null
           confidence_source?: Database["public"]["Enums"]["score_source"]
           created_at?: string | null
           entered_by?: string
           id?: string
           performance_date?: string | null
-          performance_estimated?: boolean
+          performance_late?: boolean | null
           performance_score?: number | null
           performance_source?: Database["public"]["Enums"]["score_source"]
           selected_action_id?: number | null
+          site_action_id?: number | null
           staff_id?: string | null
           updated_at?: string | null
           weekly_focus_id?: string | null
         }
         Update: {
           confidence_date?: string | null
-          confidence_estimated?: boolean
+          confidence_late?: boolean | null
           confidence_score?: number | null
           confidence_source?: Database["public"]["Enums"]["score_source"]
           created_at?: string | null
           entered_by?: string
           id?: string
           performance_date?: string | null
-          performance_estimated?: boolean
+          performance_late?: boolean | null
           performance_score?: number | null
           performance_source?: Database["public"]["Enums"]["score_source"]
           selected_action_id?: number | null
+          site_action_id?: number | null
           staff_id?: string | null
           updated_at?: string | null
           weekly_focus_id?: string | null
@@ -598,6 +671,13 @@ export type Database = {
           {
             foreignKeyName: "weekly_scores_selected_action_id_fkey"
             columns: ["selected_action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_site_action_fk"
+            columns: ["site_action_id"]
             isOneToOne: false
             referencedRelation: "pro_moves"
             referencedColumns: ["action_id"]
@@ -656,6 +736,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_backlog_if_missing: {
+        Args: {
+          p_action_id: number
+          p_cycle: number
+          p_staff_id: string
+          p_week: number
+        }
+        Returns: undefined
+      }
       bulk_upsert_pro_moves: {
         Args: { pro_moves_data: Json }
         Returns: Json
@@ -740,6 +829,10 @@ export type Database = {
           p_week_in_cycle: number
         }
         Returns: Json
+      }
+      resolve_backlog_item: {
+        Args: { p_action_id: number; p_staff_id: string }
+        Returns: undefined
       }
     }
     Enums: {

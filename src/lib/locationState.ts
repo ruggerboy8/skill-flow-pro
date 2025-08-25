@@ -431,6 +431,16 @@ export async function computeWeekState(params: {
         selectionPending,
         lastActivity
       };
+    } else if (now < anchors.checkout_open) {
+      // Confidence submitted but performance not yet available
+      return {
+        state: 'wait_for_thu',
+        nextAction: 'Performance',
+        deadlineAt: anchors.checkout_open,
+        backlogCount,
+        selectionPending,
+        lastActivity
+      };
     } else {
       return {
         state: 'can_checkout',

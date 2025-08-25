@@ -2,7 +2,7 @@ import { getWeekAnchors } from './centralTime';
 import { supabase } from '@/integrations/supabase/client';
 import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 
-export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'done' | 'missed_checkout' | 'no_assignments';
+export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'done' | 'missed_checkout' | 'no_assignments';
 
 export interface LocationWeekContext {
   weekInCycle: number;

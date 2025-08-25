@@ -32,6 +32,11 @@ export function buildWeekBanner(args: {
         cta: { label: 'Rate Confidence', to: '/confidence/current/step/1' }
       };
 
+    case 'wait_for_thu':
+      return {
+        message: `Thanks for submitting your confidence. Come back Thursday (${fmt(anchors.checkout_open, timezone)}) to rate your performance.`
+      };
+
     case 'can_checkout':
       return {
         message: `Time to reflect. Rate your performance for this week's Pro Moves.`,

@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { computeWeekState as computeLocationWeekState, StaffStatus } from '@/lib/locationState';
 
 export type StatusColor = "grey" | "yellow" | "green" | "red";
-export type WeekState = 'onboarding' | 'no_assignments' | 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'missed_checkout' | 'done';
+export type WeekState = 'onboarding' | 'no_assignments' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'missed_checkout' | 'done';
 
 export interface WeekKey {
   cycle: number;
@@ -70,13 +70,14 @@ export async function computeStaffStatusNew(
       status.state === 'no_assignments' ? 'grey' :
       status.state === 'missed_checkin' || status.state === 'missed_checkout' ? 'red' :
       status.state === 'can_checkin' || status.state === 'can_checkout' ? 'yellow' :
-      status.state === 'done' ? 'green' : 'grey';
+      status.state === 'wait_for_thu' || status.state === 'done' ? 'green' : 'grey';
 
     const reason = 
       status.state === 'onboarding' ? `Onboarding (${status.onboardingWeeksLeft || 0} wks left)` :
       status.state === 'no_assignments' ? 'No assignments' :
       status.state === 'missed_checkin' ? 'Missed check-in' :
       status.state === 'can_checkin' ? 'Can check in' :
+      status.state === 'wait_for_thu' ? 'Waiting for Thursday' :
       status.state === 'can_checkout' ? 'Can check out' :
       status.state === 'missed_checkout' ? 'Missed check-out' :
       status.state === 'done' ? 'Complete' : 'Unknown';
@@ -118,6 +119,8 @@ function getTooltipForState(state: WeekState, deadlineAt?: Date): string | undef
       return `Confidence due by Tuesday 12:00 PM`;
     case 'missed_checkin':
       return `Confidence was due by Tuesday 12:00 PM`;
+    case 'wait_for_thu':
+      return `Confidence submitted, performance opens Thursday`;
     case 'can_checkout':
       return `Performance due by Friday 5:00 PM`;
     case 'missed_checkout':

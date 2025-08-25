@@ -1,241 +1,168 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { getDomainColor } from '@/lib/domainColors';
-import ConfPerfDelta from '@/components/ConfPerfDelta';
+// src/pages/Review.tsx
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import ConfPerfDelta from "@/components/ConfPerfDelta";
 
-interface ReviewData {
-  domain_name: string;
-  action_statement: string;
-  confidence_score: number;
-  performance_score: number;
-}
-
-interface Staff {
+type Staff = { id: string; role_id: number };
+type FocusRow = {
   id: string;
-  role_id: number;
-}
+  display_order: number;
+  action_id: number | null;
+  self_select: boolean;
+  // site move text (if this slot is a site move)
+  site_action_statement: string | null;
+};
+type ScoreRow = {
+  weekly_focus_id: string;
+  confidence_score: number | null;
+  performance_score: number | null;
+  selected_action_id: number | null;
+};
 
 export default function Review() {
   const { cycle, week } = useParams();
-  const [staff, setStaff] = useState<Staff | null>(null);
-  const [reviewData, setReviewData] = useState<ReviewData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cycleNum = Number(cycle || 1);
+  const weekNum = Number(week || 1);
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
 
+  const [staff, setStaff] = useState<Staff | null>(null);
+  const [rows, setRows] = useState<
+    (FocusRow & {
+      final_action_statement: string;
+      confidence_score: number | null;
+      performance_score: number | null;
+    })[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    if (user && cycle && week) {
-      loadData();
-    }
-  }, [user, cycle, week]);
+    (async () => {
+      if (!user) return;
+      // staff info
+      const { data: staffRow } = await supabase
+        .from("staff")
+        .select("id, role_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!staffRow) return;
+      setStaff(staffRow);
 
-  const loadData = async () => {
-    if (!user || !cycle || !week) return;
-
-    // Load staff profile
-    const { data: staffData, error: staffError } = await supabase
-      .from('staff')
-      .select('id, role_id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (staffError || !staffData) {
-      navigate('/setup');
-      return;
-    }
-
-    setStaff(staffData);
-
-    // Load review data with domain information
-    const { data, error } = await supabase.rpc('get_weekly_review', {
-      p_cycle: parseInt(cycle),
-      p_week: parseInt(week),
-      p_role_id: staffData.role_id,
-      p_staff_id: staffData.id
-    });
-
-    if (error) {
-      console.error('RPC error, falling back to manual query:', error);
-      
-      // Fallback: manually construct the review data
-      const { data: focusData } = await supabase
-        .from('weekly_focus')
+      // weekly_focus for this cycle/week/role
+      const { data: wf } = await supabase
+        .from("weekly_focus")
         .select(`
           id,
           display_order,
-          self_select,
           action_id,
-          pro_moves!weekly_focus_action_id_fkey ( action_statement ),
-          competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
+          self_select,
+          pro_moves:action_id(action_statement)
         `)
-        .eq('cycle', parseInt(cycle))
-        .eq('week_in_cycle', parseInt(week))
-        .eq('role_id', staffData.role_id)
-        .order('display_order');
+        .eq("role_id", staffRow.role_id)
+        .eq("cycle", cycleNum)
+        .eq("week_in_cycle", weekNum)
+        .order("display_order");
 
-      if (!focusData || focusData.length === 0) {
-        setReviewData([]);
-        setLoading(false);
-        return;
+      const focus: FocusRow[] =
+        (wf || []).map((w: any) => ({
+          id: w.id,
+          display_order: w.display_order,
+          action_id: w.action_id ?? null,
+          self_select: !!w.self_select,
+          site_action_statement: w.pro_moves?.action_statement ?? null,
+        })) ?? [];
+
+      // scores for this user + these focus ids
+      const focusIds = focus.map((f) => f.id);
+      const { data: scores } = await supabase
+        .from("weekly_scores")
+        .select("weekly_focus_id, confidence_score, performance_score, selected_action_id")
+        .eq("staff_id", staffRow.id)
+        .in("weekly_focus_id", focusIds);
+
+      const scoreByFocus: Record<string, ScoreRow> = {};
+      (scores || []).forEach((s: any) => (scoreByFocus[s.weekly_focus_id] = s));
+
+      // fetch selected pro-move texts for any self-selects
+      const selectedIds = Array.from(
+        new Set(
+          (scores || [])
+            .map((s: any) => s.selected_action_id)
+            .filter(Boolean)
+        )
+      ) as number[];
+      let selectedMap: Record<number, string> = {};
+      if (selectedIds.length) {
+        const { data: actions } = await supabase
+          .from("pro_moves")
+          .select("action_id, action_statement")
+          .in("action_id", selectedIds);
+        (actions || []).forEach((a) => (selectedMap[a.action_id] = a.action_statement));
       }
 
-      // Get self-select choices for this week
-      const { data: selectionsData } = await supabase
-        .from('weekly_self_select')
-        .select(`
-          weekly_focus_id,
-          selected_pro_move_id
-        `)
-        .eq('user_id', user.id)
-        .in('weekly_focus_id', focusData.map(f => f.id));
-
-      // Get pro moves for selected actions
-      const selectedProMoveIds = selectionsData?.map(s => s.selected_pro_move_id).filter(Boolean) || [];
-      let proMovesData: any[] = [];
-      
-      if (selectedProMoveIds.length > 0) {
-        const { data: pmData } = await supabase
-          .from('pro_moves')
-          .select(`
-            action_id,
-            action_statement,
-            competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
-          `)
-          .in('action_id', selectedProMoveIds);
-        proMovesData = pmData || [];
-      }
-
-      // Get scores for this week
-      const { data: scoresData } = await supabase
-        .from('weekly_scores')
-        .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
-        .eq('staff_id', staffData.id)
-        .in('weekly_focus_id', focusData.map(f => f.id));
-
-      // Transform data manually
-      const manualReviewData: ReviewData[] = focusData.map((focus: any) => {
-        const isSelSelect = focus.self_select;
-        const scores = scoresData?.find(s => s.weekly_focus_id === focus.id);
-        
-        let actionStatement = 'Unknown move';
-        let domainName = 'Unknown';
-
-        if (isSelSelect) {
-          const userSelection = selectionsData?.find(s => s.weekly_focus_id === focus.id);
-          if (userSelection?.selected_pro_move_id) {
-            const selectedProMove = proMovesData.find(pm => pm.action_id === userSelection.selected_pro_move_id);
-            if (selectedProMove) {
-              actionStatement = selectedProMove.action_statement;
-              domainName = selectedProMove.competencies?.domains?.domain_name || domainName;
-            } else {
-              actionStatement = 'Selected move not found';
-            }
-          } else {
-            // Check if there's a score with selected_action_id as fallback
-            const fallbackAction = scores?.selected_action_id;
-            if (fallbackAction) {
-              const fallbackProMove = proMovesData.find(pm => pm.action_id === fallbackAction);
-              if (fallbackProMove) {
-                actionStatement = fallbackProMove.action_statement;
-                domainName = fallbackProMove.competencies?.domains?.domain_name || domainName;
-              } else {
-                actionStatement = 'No selection made';
-              }
-            } else {
-              actionStatement = 'No selection made';
-            }
-            if (!fallbackAction) {
-              domainName = focus.competencies?.domains?.domain_name || domainName;
-            }
-          }
-        } else {
-          actionStatement = focus.pro_moves?.action_statement || actionStatement;
-          domainName = focus.competencies?.domains?.domain_name || domainName;
-        }
-
+      // build display rows
+      const merged = focus.map((f) => {
+        const sc = scoreByFocus[f.id];
+        const pickedStatement =
+          f.self_select && sc?.selected_action_id
+            ? selectedMap[sc.selected_action_id] || "(selected move)"
+            : f.site_action_statement || "(site move)";
         return {
-          domain_name: domainName,
-          action_statement: actionStatement,
-          confidence_score: scores?.confidence_score || 0,
-          performance_score: scores?.performance_score || 0
+          ...f,
+          final_action_statement: pickedStatement,
+          confidence_score: sc?.confidence_score ?? null,
+          performance_score: sc?.performance_score ?? null,
         };
       });
 
-      setReviewData(manualReviewData);
-    } else {
-      setReviewData(data || []);
-    }
-
-    setLoading(false);
-  };
+      setRows(merged);
+      setLoading(false);
+    })();
+  }, [user, cycleNum, weekNum]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">Loading...</div>
-      </div>
+      <main className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <div>Loading…</div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen p-4 bg-background">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <main className="min-h-screen bg-background p-4">
+      <section className="max-w-3xl mx-auto space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-center">
-              Week Complete - Cycle {cycle}, Week {week}
+            <CardTitle>
+              Review — Cycle {cycleNum}, Week {weekNum}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-4 font-semibold text-sm bg-muted p-3 rounded-lg">
-                <div>Domain</div>
-                <div>Pro Move</div>
-                <div>Confidence</div>
-                <div>Performance</div>
-              </div>
-              {reviewData.length === 0 && (
-                <div className="text-center text-muted-foreground py-6">No Pro Moves scheduled for this week.</div>
-              )}
-              {reviewData.map((item, index) => (
-                <div 
-                  key={index}
-                  className="grid grid-cols-4 gap-4 p-4 rounded-lg border"
-                >
-                  <div className="flex items-center">
-                    <Badge 
-                      variant="secondary" 
-                      className="text-xs font-semibold ring-1 ring-border/50"
-                      style={{ backgroundColor: getDomainColor(item.domain_name) }}
-                    >
-                      {item.domain_name}
-                    </Badge>
-                  </div>
-                  <div className="text-sm font-medium">
-                    {item.action_statement}
-                  </div>
-                  <div className="col-span-2 flex items-end justify-end">
-                    <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
-                  </div>
+          <CardContent className="space-y-3">
+            {rows.map((r, idx) => (
+              <div key={r.id} className="flex items-center justify-between gap-4 text-sm p-3 rounded border">
+                <div className="flex items-center gap-3 flex-1">
+                  <Badge variant="secondary" className="ring-1 ring-border/50">
+                    {idx + 1}/3
+                  </Badge>
+                  <div className="font-medium">{r.final_action_statement}</div>
                 </div>
-              ))}
-            </div>
-            
-            <div className="mt-8 text-center">
-              <Button onClick={() => navigate('/')} size="lg">
-                Back to Home
-              </Button>
+                <ConfPerfDelta confidence={r.confidence_score} performance={r.performance_score} />
+              </div>
+            ))}
+            {!rows.length && (
+              <div className="text-sm text-muted-foreground">No pro moves configured for this week.</div>
+            )}
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => navigate("/")}>Done</Button>
             </div>
           </CardContent>
         </Card>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

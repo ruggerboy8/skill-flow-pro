@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import ConfPerfDelta from "@/components/ConfPerfDelta";
+import { getDomainColor } from "@/lib/domainColors";
 
 type Staff = { id: string; role_id: number };
 type FocusRow = {
@@ -16,6 +17,7 @@ type FocusRow = {
   self_select: boolean;
   // site move text (if this slot is a site move)
   site_action_statement: string | null;
+  domain_name: string | null;
 };
 type ScoreRow = {
   weekly_focus_id: string;
@@ -53,7 +55,7 @@ export default function Review() {
       if (!staffRow) return;
       setStaff(staffRow);
 
-      // weekly_focus for this cycle/week/role
+      // weekly_focus for this cycle/week/role with domain information
       const { data: wf } = await supabase
         .from("weekly_focus")
         .select(`
@@ -61,7 +63,8 @@ export default function Review() {
           display_order,
           action_id,
           self_select,
-          pro_moves:action_id(action_statement)
+          pro_moves:action_id(action_statement),
+          competencies!inner(domains!inner(domain_name))
         `)
         .eq("role_id", staffRow.role_id)
         .eq("cycle", cycleNum)
@@ -75,6 +78,7 @@ export default function Review() {
           action_id: w.action_id ?? null,
           self_select: !!w.self_select,
           site_action_statement: w.pro_moves?.action_statement ?? null,
+          domain_name: w.competencies?.domains?.domain_name ?? null,
         })) ?? [];
 
       // scores for this user + these focus ids
@@ -144,12 +148,21 @@ export default function Review() {
           </CardHeader>
           <CardContent className="space-y-3">
             {rows.map((r, idx) => (
-              <div key={r.id} className="flex items-center justify-between gap-4 text-sm p-3 rounded border">
+              <div 
+                key={r.id} 
+                className="flex items-center justify-between gap-4 text-sm p-3 rounded border"
+                style={{ backgroundColor: r.domain_name ? getDomainColor(r.domain_name) : undefined }}
+              >
                 <div className="flex items-center gap-3 flex-1">
-                  <Badge variant="secondary" className="ring-1 ring-border/50">
+                  <Badge variant="secondary" className="ring-1 ring-border/50 bg-white/90 text-gray-900">
                     {idx + 1}/3
                   </Badge>
-                  <div className="font-medium">{r.final_action_statement}</div>
+                  {r.domain_name && (
+                    <Badge variant="outline" className="bg-white/80 text-gray-900 border-white/50">
+                      {r.domain_name}
+                    </Badge>
+                  )}
+                  <div className="font-medium text-gray-900">{r.final_action_statement}</div>
                 </div>
                 <ConfPerfDelta confidence={r.confidence_score} performance={r.performance_score} />
               </div>

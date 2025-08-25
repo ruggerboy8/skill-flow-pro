@@ -753,6 +753,14 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      get_calibration: {
+        Args: { p_role_id: number; p_staff_id: string; p_window?: number }
+        Returns: Json
+      }
+      get_consistency: {
+        Args: { p_staff_id: string; p_tz?: string; p_weeks?: number }
+        Returns: Json
+      }
       get_focus_cycle_week: {
         Args: { p_cycle: number; p_role_id: number; p_week: number }
         Returns: {
@@ -769,6 +777,10 @@ export type Database = {
           last_cycle: number
           last_week: number
         }[]
+      }
+      get_performance_trend: {
+        Args: { p_role_id: number; p_staff_id: string; p_window?: number }
+        Returns: Json
       }
       get_staff_summary: {
         Args: Record<PropertyKey, never>

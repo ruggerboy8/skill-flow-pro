@@ -21,7 +21,7 @@ import Review from "./pages/Review";
 import Stats from "./pages/Stats";
 import StatsLayout from "./pages/StatsLayout";
 import StatsScores from "./pages/StatsScores";
-import StatsGlance from "./pages/StatsGlance";
+import AtAGlance from "./pages/stats/AtAGlance";
 import StatsEval from "./pages/StatsEval";
 import Profile from "./pages/Profile";
 import CoachDashboard from "./pages/coach/CoachDashboard";
@@ -69,8 +69,8 @@ function AppRoutes() {
         <Route path="create-password" element={<SetupPassword />} />
         <Route path="setup-password" element={<SetupPassword />} />
         <Route path="stats" element={<StatsLayout />}>
-          <Route index element={<StatsGlance />} />
-          <Route path="glance" element={<StatsGlance />} />
+          <Route index element={<AtAGlance />} />
+          <Route path="glance" element={<AtAGlance />} />
           <Route path="scores" element={<StatsScores />} />
           <Route path="evaluations" element={<StatsEval />} />
         </Route>

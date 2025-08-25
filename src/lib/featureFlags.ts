@@ -1,0 +1,1 @@
+export const isV2 = import.meta.env.VITE_APP_MODE === 'v2';

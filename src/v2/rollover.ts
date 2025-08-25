@@ -16,15 +16,8 @@ export async function enforceWeeklyRolloverNow(args: {
   roleId: number;
   locationId: string;
   now: Date;
-  debug?: boolean;
-}): Promise<{ executed: boolean; reason: string; prevWeek?: { cycle: number; week: number } }> {
-  const { userId, staffId, roleId, locationId, now, debug = false } = args;
-
-  const log = (msg: string, data?: any) => {
-    if (debug) console.log(`[ROLLOVER] ${msg}`, data || '');
-  };
-
-  log('Starting rollover check', { userId, staffId, roleId, locationId, now: now.toISOString() });
+}): Promise<void> {
+  const { userId, staffId, roleId, locationId, now } = args;
 
   // Get location (tz, program_start_date, cycle_length)
   const { data: loc, error: locErr } = await supabase
@@ -32,25 +25,17 @@ export async function enforceWeeklyRolloverNow(args: {
     .select('timezone, program_start_date, cycle_length_weeks')
     .eq('id', locationId)
     .maybeSingle();
-  if (locErr || !loc) {
-    log('Location not found or error', { locErr });
-    return { executed: false, reason: 'Location not found' };
-  }
+  if (locErr || !loc) return;
 
   // Is it >= Monday 12:01am local?
   const currAnchors = getWeekAnchors(now, loc.timezone);
   const rolloverThreshold = addMinutes(currAnchors.checkin_open, 1); // Mon 00:01 local
-  if (now < rolloverThreshold) {
-    log('Not rollover time yet', { now, threshold: rolloverThreshold });
-    return { executed: false, reason: 'Not rollover time yet' };
-  }
+  if (now < rolloverThreshold) return; // not time yet
 
   // Get previous week's cycle/week using our location context (time-shift by -7 days)
   const prevCtx = await getLocationWeekContext(locationId, subDays(now, 7));
   const prevCycle = prevCtx.cycleNumber;
   const prevWeek  = prevCtx.weekInCycle;
-
-  log('Previous week context', { prevCycle, prevWeek });
 
   // Find all weekly_focus rows for prev cycle/week/role
   const { data: focusRows } = await supabase
@@ -61,12 +46,7 @@ export async function enforceWeeklyRolloverNow(args: {
     .eq('week_in_cycle', prevWeek);
 
   const focusIds = (focusRows || []).map(f => f.id);
-  if (!focusIds.length) {
-    log('No focus rows for previous week', { prevCycle, prevWeek, roleId });
-    return { executed: false, reason: 'No focus rows for previous week', prevWeek: { cycle: prevCycle, week: prevWeek } };
-  }
-
-  log('Found focus rows', { count: focusIds.length, focusIds });
+  if (!focusIds.length) return;
 
   // Check completion: do we have performance for ALL of them?
   const { data: prevScores } = await supabase
@@ -79,12 +59,7 @@ export async function enforceWeeklyRolloverNow(args: {
   const perfCount = (prevScores || []).filter(s => s.performance_score !== null).length;
   const fullyPerformed = perfCount >= required;
 
-  log('Performance check', { required, perfCount, fullyPerformed, scores: prevScores });
-
-  if (fullyPerformed) {
-    log('Week fully performed, no rollover needed');
-    return { executed: false, reason: 'Week fully performed', prevWeek: { cycle: prevCycle, week: prevWeek } };
-  }
+  if (fullyPerformed) return; // nothing to rollover
 
   // 1) Add SITE moves from that week to backlog (dedup handled by RPC)
   const assignments = await assembleLocationWeek({
@@ -96,19 +71,13 @@ export async function enforceWeeklyRolloverNow(args: {
   });
 
   const siteMoves = assignments.filter((a: any) => a.type === 'site' && a.pro_move_id);
-  log('Found site moves to add to backlog', { count: siteMoves.length, moves: siteMoves.map(s => ({ id: s.pro_move_id, statement: s.action_statement })) });
-
   for (const s of siteMoves) {
     await addToBacklogV2(staffId, s.pro_move_id, prevCycle, prevWeek);
-    log('Added to backlog', { actionId: s.pro_move_id, statement: s.action_statement });
   }
 
   // 2) Clear confidence for items that still lack performance
   const toClear = (prevScores || [])
     .filter(r => r.performance_score === null); // only where perf is missing
-  
-  log('Clearing confidence for incomplete items', { count: toClear.length });
-  
   if (toClear.length) {
     const updates = toClear.map(r => ({
       id: r.id,
@@ -118,13 +87,5 @@ export async function enforceWeeklyRolloverNow(args: {
       confidence_date: null,
     }));
     await supabase.from('weekly_scores').upsert(updates);
-    log('Cleared confidence scores', { count: updates.length });
   }
-
-  log('Rollover completed successfully', { siteMoves: siteMoves.length, clearedConfidence: toClear.length });
-  return { 
-    executed: true, 
-    reason: `Rolled over ${siteMoves.length} site moves, cleared ${toClear.length} confidence scores`,
-    prevWeek: { cycle: prevCycle, week: prevWeek }
-  };
 }

@@ -1,19 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSim } from './SimProvider';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { addDays } from 'date-fns';
 import { CT_TZ, getWeekAnchors } from '@/lib/centralTime';
-import { X, Settings, Clock, Bug, FlaskConical } from 'lucide-react';
-import { BacklogDebugPanel } from '@/components/debug/BacklogDebugPanel';
-import { TestScenarioBuilder } from '@/components/debug/TestScenarioBuilder';
+import { X, Settings } from 'lucide-react';
 
 // Helper function (same as in centralTime.ts)
 function ctUtcForTz(dayRefUtc: Date, timeHHMMSS: string, tz: string): Date {
@@ -73,12 +70,11 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
       updateOverrides({ nowISO: date.toISOString() });
     }
   };
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="text-lg flex items-center gap-2">
             <Settings className="h-5 w-5" />
             Simulation Console
           </CardTitle>
@@ -86,246 +82,218 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
             <X className="h-4 w-4" />
           </Button>
         </CardHeader>
-        
-        <CardContent>
-          <Tabs defaultValue="simulation" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="simulation">
-                <Clock className="h-4 w-4 mr-2" />
-                Simulation
-              </TabsTrigger>
-              <TabsTrigger value="backlog">
-                <Bug className="h-4 w-4 mr-2" />
-                Backlog Debug
-              </TabsTrigger>
-              <TabsTrigger value="testing">
-                <FlaskConical className="h-4 w-4 mr-2" />
-                Test Scenarios
-              </TabsTrigger>
-            </TabsList>
+        <CardContent className="space-y-6">
+          {/* Enable simulation */}
+          <div className="flex items-center justify-between">
+            <Label htmlFor="enable-sim">Enable Simulation</Label>
+            <Switch
+              id="enable-sim"
+              checked={overrides.enabled}
+              onCheckedChange={(enabled) => updateOverrides({ enabled })}
+            />
+          </div>
 
-            <TabsContent value="simulation" className="space-y-6">
-              {/* Enable simulation */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="enable-sim">Enable Simulation</Label>
-                <Switch
-                  id="enable-sim"
-                  checked={overrides.enabled}
-                  onCheckedChange={(enabled) => updateOverrides({ enabled })}
-                />
+          {overrides.enabled && (
+            <>
+              {/* Time Travel */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Time Travel</Label>
+                <div className="text-xs text-muted-foreground">Current: {currentTime}</div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  {presets.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePresetClick(preset.datetime)}
+                      className="text-xs"
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Quick scenario buttons */}
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      updateOverrides({ 
+                        forceNewUser: true,
+                        forceBackfillComplete: false,
+                        forceBacklogCount: 0
+                      });
+                    }}
+                    className="w-full text-xs"
+                  >
+                    New User (Backfill Needed)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Clear backfill localStorage
+                      localStorage.removeItem('backfillProgress');
+                      updateOverrides({ 
+                        forceNewUser: false,
+                        forceBackfillComplete: false
+                      });
+                    }}
+                    className="w-full text-xs"
+                  >
+                    Clear Backfill Progress
+                  </Button>
+                </div>
+
+                <div className="flex gap-2">
+                  <Input
+                    type="datetime-local"
+                    value={customDateTime}
+                    onChange={(e) => setCustomDateTime(e.target.value)}
+                    className="text-xs"
+                  />
+                  <Button size="sm" onClick={handleCustomDateTime}>Set</Button>
+                </div>
               </div>
 
-              {overrides.enabled && (
-                <>
-                  {/* Time Travel */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Time Travel</Label>
-                    <div className="text-xs text-muted-foreground">Current: {currentTime}</div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      {presets.map((preset) => (
-                        <Button
-                          key={preset.label}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePresetClick(preset.datetime)}
-                          className="text-xs"
-                        >
-                          {preset.label}
-                        </Button>
-                      ))}
-                    </div>
-
-                    {/* Quick scenario buttons */}
-                    <div className="space-y-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          updateOverrides({ 
-                            forceNewUser: true,
-                            forceBackfillComplete: false,
-                            forceBacklogCount: 0
-                          });
-                        }}
-                        className="w-full text-xs"
-                      >
-                        New User (Backfill Needed)
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          // Clear backfill localStorage
-                          localStorage.removeItem('backfillProgress');
-                          updateOverrides({ 
-                            forceNewUser: false,
-                            forceBackfillComplete: false
-                          });
-                        }}
-                        className="w-full text-xs"
-                      >
-                        Clear Backfill Progress
-                      </Button>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Input
-                        type="datetime-local"
-                        value={customDateTime}
-                        onChange={(e) => setCustomDateTime(e.target.value)}
-                        className="text-xs"
-                      />
-                      <Button size="sm" onClick={handleCustomDateTime}>Set</Button>
-                    </div>
+              {/* Score Overrides */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Score Overrides</Label>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="force-confidence" className="text-sm">Force Has Confidence</Label>
+                    <Select
+                      value={overrides.forceHasConfidence === null ? 'auto' : String(overrides.forceHasConfidence)}
+                      onValueChange={(value) => 
+                        updateOverrides({ 
+                          forceHasConfidence: value === 'auto' ? null : value === 'true' 
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Score Overrides */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Score Overrides</Label>
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="force-confidence" className="text-sm">Force Has Confidence</Label>
-                        <Select
-                          value={overrides.forceHasConfidence === null ? 'auto' : String(overrides.forceHasConfidence)}
-                          onValueChange={(value) => 
-                            updateOverrides({ 
-                              forceHasConfidence: value === 'auto' ? null : value === 'true' 
-                            })
-                          }
-                        >
-                          <SelectTrigger className="w-20">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="auto">Auto</SelectItem>
-                            <SelectItem value="true">Yes</SelectItem>
-                            <SelectItem value="false">No</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="force-performance" className="text-sm">Force Has Performance</Label>
-                        <Select
-                          value={overrides.forceHasPerformance === null ? 'auto' : String(overrides.forceHasPerformance)}
-                          onValueChange={(value) => 
-                            updateOverrides({ 
-                              forceHasPerformance: value === 'auto' ? null : value === 'true' 
-                            })
-                          }
-                        >
-                          <SelectTrigger className="w-20">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="auto">Auto</SelectItem>
-                            <SelectItem value="true">Yes</SelectItem>
-                            <SelectItem value="false">No</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="force-performance" className="text-sm">Force Has Performance</Label>
+                    <Select
+                      value={overrides.forceHasPerformance === null ? 'auto' : String(overrides.forceHasPerformance)}
+                      onValueChange={(value) => 
+                        updateOverrides({ 
+                          forceHasPerformance: value === 'auto' ? null : value === 'true' 
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  {/* Backlog Override */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Backlog Override</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="10"
-                        placeholder="Auto"
-                        value={overrides.forceBacklogCount ?? ''}
-                        onChange={(e) => 
-                          updateOverrides({ 
-                            forceBacklogCount: e.target.value ? Number(e.target.value) : null 
-                          })
-                        }
-                        className="w-20"
-                      />
-                      <Label className="text-sm text-muted-foreground">items</Label>
-                    </div>
-                  </div>
-
-                  {/* User State Overrides */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">User State</Label>
-                    <div className="text-xs text-muted-foreground mb-2">
-                      To simulate incomplete backfill: Set "Force New User" = Yes + "Force Backfill Complete" = No
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm">Force New User</Label>
-                        <Select
-                          value={overrides.forceNewUser === null ? 'auto' : String(overrides.forceNewUser)}
-                          onValueChange={(value) => 
-                            updateOverrides({ 
-                              forceNewUser: value === 'auto' ? null : value === 'true' 
-                            })
-                          }
-                        >
-                          <SelectTrigger className="w-20">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="auto">Auto</SelectItem>
-                            <SelectItem value="true">Yes</SelectItem>
-                            <SelectItem value="false">No</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Yes = No database scores (backfill needed) • No = Has database scores (no backfill)
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm">Force Backfill Complete</Label>
-                        <Select
-                          value={overrides.forceBackfillComplete === null ? 'auto' : String(overrides.forceBackfillComplete)}
-                          onValueChange={(value) => 
-                            updateOverrides({ 
-                              forceBackfillComplete: value === 'auto' ? null : value === 'true' 
-                            })
-                          }
-                        >
-                          <SelectTrigger className="w-20">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="auto">Auto</SelectItem>
-                            <SelectItem value="true">Yes</SelectItem>
-                            <SelectItem value="false">No</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Only applies when backfill is needed. Yes = Complete • No = Incomplete
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Reset */}
-              <div className="pt-4 border-t">
-                <Button variant="outline" onClick={resetSimulation} className="w-full">
-                  Reset All Settings
-                </Button>
+                </div>
               </div>
-            </TabsContent>
 
-            <TabsContent value="backlog">
-              <BacklogDebugPanel />
-            </TabsContent>
+              {/* Backlog Override */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Backlog Override</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="10"
+                    placeholder="Auto"
+                    value={overrides.forceBacklogCount ?? ''}
+                    onChange={(e) => 
+                      updateOverrides({ 
+                        forceBacklogCount: e.target.value ? Number(e.target.value) : null 
+                      })
+                    }
+                    className="w-20"
+                  />
+                  <Label className="text-sm text-muted-foreground">items</Label>
+                </div>
+              </div>
 
-            <TabsContent value="testing">
-              <TestScenarioBuilder />
-            </TabsContent>
-          </Tabs>
+              {/* User State Overrides */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">User State</Label>
+                <div className="text-xs text-muted-foreground mb-2">
+                  To simulate incomplete backfill: Set "Force New User" = Yes + "Force Backfill Complete" = No
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Force New User</Label>
+                    <Select
+                      value={overrides.forceNewUser === null ? 'auto' : String(overrides.forceNewUser)}
+                      onValueChange={(value) => 
+                        updateOverrides({ 
+                          forceNewUser: value === 'auto' ? null : value === 'true' 
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Yes = No database scores (backfill needed) • No = Has database scores (no backfill)
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Force Backfill Complete</Label>
+                    <Select
+                      value={overrides.forceBackfillComplete === null ? 'auto' : String(overrides.forceBackfillComplete)}
+                      onValueChange={(value) => 
+                        updateOverrides({ 
+                          forceBackfillComplete: value === 'auto' ? null : value === 'true' 
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Only applies when backfill is needed. Yes = Complete • No = Incomplete
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Reset */}
+          <div className="pt-4 border-t">
+            <Button variant="outline" onClick={resetSimulation} className="w-full">
+              Reset All Settings
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

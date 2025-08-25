@@ -24,100 +24,59 @@ export default function AtAGlance() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user) {
-      loadStaffData();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (staff) {
-      loadConsistency();
-      loadTrajectory();
-      loadCalibration();
-    }
-  }, [staff]);
-
-  const loadStaffData = async () => {
     if (!user) return;
+    let cancelled = false;
 
-    try {
-      const { data: staffData } = await supabase
-        .from('staff')
-        .select(`
-          id,
-          role_id,
-          primary_location_id,
-          locations!primary_location_id(timezone)
-        `)
-        .eq('user_id', user.id)
-        .single();
+    (async () => {
+      try {
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select(`
+            id, role_id, primary_location_id,
+            locations!primary_location_id(timezone)
+          `)
+          .eq('user_id', user.id)
+          .single();
 
-      if (staffData) {
+        if (!staffData || cancelled) return;
+
         setStaff({
           id: staffData.id,
           role_id: staffData.role_id,
           primary_location_id: staffData.primary_location_id,
           timezone: (staffData.locations as any)?.timezone
         });
+      } catch (e) {
+        if (!cancelled) console.error('Error loading staff data:', e);
       }
-    } catch (error) {
-      console.error('Error loading staff data:', error);
-    }
-  };
+    })();
 
-  const loadConsistency = async () => {
+    return () => { cancelled = true; };
+  }, [user]);
+
+  useEffect(() => {
     if (!staff) return;
+    let cancelled = false;
 
-    try {
-      const { data } = await supabase.rpc('get_consistency', {
-        p_staff_id: staff.id,
-        p_weeks: 6,
-        p_tz: staff.timezone || 'America/Chicago'
-      });
+    const run = async () => {
+      try {
+        const [{ data: c }, { data: t }, { data: k }] = await Promise.all([
+          supabase.rpc('get_consistency', { p_staff_id: staff.id, p_weeks: 6, p_tz: staff.timezone || 'America/Chicago' }),
+          supabase.rpc('get_performance_trend', { p_staff_id: staff.id, p_role_id: staff.role_id, p_window: 6 }),
+          supabase.rpc('get_calibration', { p_staff_id: staff.id, p_role_id: staff.role_id, p_window: 6 }),
+        ]);
+        if (cancelled) return;
+        setConsistency(c); setTrajectory(t); setCalibration(k);
+      } catch (e) {
+        if (!cancelled) console.error(e);
+      } finally {
+        if (!cancelled) { setLoadingConsistency(false); setLoadingTrajectory(false); setLoadingCalibration(false); }
+      }
+    };
 
-      setConsistency(data);
-    } catch (error) {
-      console.error('Error loading consistency data:', error);
-    } finally {
-      setLoadingConsistency(false);
-    }
-  };
-
-  const loadTrajectory = async () => {
-    if (!staff) return;
-
-    try {
-      const { data } = await supabase.rpc('get_performance_trend', {
-        p_staff_id: staff.id,
-        p_role_id: staff.role_id,
-        p_window: 6
-      });
-
-      setTrajectory(data);
-    } catch (error) {
-      console.error('Error loading trajectory data:', error);
-    } finally {
-      setLoadingTrajectory(false);
-    }
-  };
-
-  const loadCalibration = async () => {
-    if (!staff) return;
-
-    try {
-      const { data } = await supabase.rpc('get_calibration', {
-        p_staff_id: staff.id,
-        p_role_id: staff.role_id,
-        p_window: 6
-      });
-
-      setCalibration(data);
-    } catch (error) {
-      console.error('Error loading calibration data:', error);
-    } finally {
-      setLoadingCalibration(false);
-    }
-  };
+    run();
+    return () => { cancelled = true; };
+  }, [staff]);
 
   if (!staff) {
     return (
@@ -131,7 +90,7 @@ export default function AtAGlance() {
 
   return (
     <div className="space-y-6">
-      <ConsistencyPanel data={consistency} loading={loadingConsistency} />
+      <ConsistencyPanel data={consistency} loading={loadingConsistency} tz={staff?.timezone} />
       <PerformanceTrajectoryPanel data={trajectory} loading={loadingTrajectory} />
       <CalibrationPanel data={calibration} loading={loadingCalibration} />
     </div>

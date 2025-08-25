@@ -3,6 +3,15 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 
+const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+
+const orderDomains = (rows: CalibrationData) => {
+  const map = new Map(rows.map(r => [r.domain_name, r]));
+  const ordered = DOMAIN_ORDER.map(d => map.get(d)).filter(Boolean) as CalibrationRow[];
+  for (const r of rows) if (!DOMAIN_ORDER.includes(r.domain_name)) ordered.push(r);
+  return ordered;
+};
+
 type CalibrationRow = {
   domain_name: string;
   mean_conf: number | null;
@@ -21,7 +30,7 @@ interface CalibrationPanelProps {
 export default function CalibrationPanel({ data, loading }: CalibrationPanelProps) {
   if (loading) {
     return (
-      <Card>
+      <Card className="ring-1 ring-border/50">
         <CardHeader>
           <CardTitle>How does my confidence compare with my performance?</CardTitle>
         </CardHeader>
@@ -43,7 +52,7 @@ export default function CalibrationPanel({ data, loading }: CalibrationPanelProp
 
   if (!data || data.length === 0) {
     return (
-      <Card>
+      <Card className="ring-1 ring-border/50">
         <CardHeader>
           <CardTitle>How does my confidence compare with my performance?</CardTitle>  
         </CardHeader>
@@ -53,6 +62,8 @@ export default function CalibrationPanel({ data, loading }: CalibrationPanelProp
       </Card>
     );
   }
+
+  const rows = orderDomains(data);
 
   const getBadgeVariant = (label: string) => {
     switch (label) {
@@ -64,7 +75,7 @@ export default function CalibrationPanel({ data, loading }: CalibrationPanelProp
   };
 
   const generateNarrative = () => {
-    const validDomains = data.filter(d => d.label !== 'Not enough data' && d.mean_delta !== null);
+    const validDomains = rows.filter(d => d.label !== 'Not enough data' && d.mean_delta !== null);
     if (validDomains.length === 0) return "Not enough data to assess calibration yet.";
     
     const significantMisalignments = validDomains.filter(d => Math.abs(d.mean_delta!) >= 0.5);
@@ -86,7 +97,7 @@ export default function CalibrationPanel({ data, loading }: CalibrationPanelProp
   };
 
   return (
-    <Card>
+    <Card className="ring-1 ring-border/50">
       <CardHeader>
         <CardTitle>How does my confidence compare with my performance?</CardTitle>
         <div className="text-xs text-muted-foreground">Last 6 weeks</div>
@@ -94,28 +105,29 @@ export default function CalibrationPanel({ data, loading }: CalibrationPanelProp
       <CardContent className="space-y-4">
         {/* Domain Rows */}
         <div className="space-y-3">
-          {data.map((row) => (
-            <div key={row.domain_name} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="font-medium text-sm w-20">{row.domain_name}</span>
-                {row.mean_conf !== null && row.mean_perf !== null ? (
-                  <ConfPerfDelta 
-                    confidence={row.mean_conf} 
-                    performance={row.mean_perf} 
-                  />
-                ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
-                )}
+          {rows.map((row) => {
+            const conf = row.mean_conf == null ? null : Number(row.mean_conf.toFixed(1));
+            const perf = row.mean_perf == null ? null : Number(row.mean_perf.toFixed(1));
+            return (
+              <div key={row.domain_name} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium text-sm w-24">{row.domain_name}</span>
+                  {(conf !== null && perf !== null) ? (
+                    <ConfPerfDelta confidence={conf} performance={perf} />
+                  ) : (
+                    <span className="text-sm text-muted-foreground">—</span>
+                  )}
+                </div>
+                <Badge variant={getBadgeVariant(row.label)} className="capitalize">
+                  {row.label.replace('-', ' ')}
+                </Badge>
               </div>
-              <Badge variant={getBadgeVariant(row.label)} className="capitalize">
-                {row.label.replace('-', ' ')}
-              </Badge>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Empty state notes for individual domains */}
-        {data.some(row => row.label === 'Not enough data') && (
+        {rows.some(row => row.label === 'Not enough data') && (
           <div className="text-xs text-muted-foreground">
             * Not enough data domains need more weeks with both confidence and performance scores
           </div>

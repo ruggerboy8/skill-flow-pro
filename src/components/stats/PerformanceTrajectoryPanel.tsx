@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDomainColor } from '@/lib/domainColors';
 
+const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+
 type TrendPoint = { week_key: string; value: number };
 type DomainTrend = { domain_name: string; points: TrendPoint[]; slope: number; label: string };
 type TrajectoryData = DomainTrend[];
@@ -12,10 +14,18 @@ interface PerformanceTrajectoryPanelProps {
   loading: boolean;
 }
 
+function orderDomains(data: TrajectoryData) {
+  const map = new Map(data.map(d => [d.domain_name, d]));
+  const ordered = DOMAIN_ORDER.map(d => map.get(d)).filter(Boolean) as DomainTrend[];
+  // append unexpected domains at the end
+  for (const d of data) if (!DOMAIN_ORDER.includes(d.domain_name)) ordered.push(d);
+  return ordered;
+}
+
 // Simple sparkline component
 function Sparkline({ points }: { points: TrendPoint[] }) {
   if (!points || points.length < 2) {
-    return <div className="w-24 h-8 bg-gray-100 rounded" />;
+    return <div className="w-24 h-8 bg-gray-100 rounded flex items-center justify-center text-[10px] text-muted-foreground">n/a</div>;
   }
 
   const values = points.map(p => p.value);
@@ -57,7 +67,7 @@ function Sparkline({ points }: { points: TrendPoint[] }) {
           className="text-blue-600"
         />
       </svg>
-      <span className="text-sm font-medium">{lastPoint.value}</span>
+      <span className="text-sm font-medium">{Number(lastPoint.value.toFixed(1))}</span>
     </div>
   );
 }
@@ -65,7 +75,7 @@ function Sparkline({ points }: { points: TrendPoint[] }) {
 export default function PerformanceTrajectoryPanel({ data, loading }: PerformanceTrajectoryPanelProps) {
   if (loading) {
     return (
-      <Card>
+      <Card className="ring-1 ring-border/50">
         <CardHeader>
           <CardTitle>How am I performing in each domain?</CardTitle>
         </CardHeader>
@@ -86,7 +96,7 @@ export default function PerformanceTrajectoryPanel({ data, loading }: Performanc
 
   if (!data || data.length === 0) {
     return (
-      <Card>
+      <Card className="ring-1 ring-border/50">
         <CardHeader>
           <CardTitle>How am I performing in each domain?</CardTitle>
         </CardHeader>
@@ -96,6 +106,8 @@ export default function PerformanceTrajectoryPanel({ data, loading }: Performanc
       </Card>
     );
   }
+
+  const ordered = orderDomains(data);
 
   const getTrendVariant = (label: string) => {
     switch (label) {
@@ -107,7 +119,7 @@ export default function PerformanceTrajectoryPanel({ data, loading }: Performanc
   };
 
   const generateNarrative = () => {
-    const validTrends = data.filter(d => d.label !== 'Not enough data');
+    const validTrends = ordered.filter(d => d.label !== 'Not enough data');
     if (validTrends.length === 0) return "Not enough data to analyze trends yet.";
     
     const improving = validTrends.filter(d => d.label === 'Improving').map(d => d.domain_name);
@@ -125,7 +137,7 @@ export default function PerformanceTrajectoryPanel({ data, loading }: Performanc
   };
 
   return (
-    <Card>
+    <Card className="ring-1 ring-border/50">
       <CardHeader>
         <CardTitle>How am I performing in each domain?</CardTitle>
         <div className="text-xs text-muted-foreground">Last 6 weeks</div>
@@ -133,21 +145,30 @@ export default function PerformanceTrajectoryPanel({ data, loading }: Performanc
       <CardContent className="space-y-4">
         {/* 2x2 Grid */}
         <div className="grid grid-cols-2 gap-4">
-          {data.map((domain) => (
-            <div 
-              key={domain.domain_name}
-              className="p-3 rounded-lg border"
-              style={{ backgroundColor: getDomainColor(domain.domain_name) }}
-            >
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm text-slate-800">{domain.domain_name}</h4>
-                <Sparkline points={domain.points} />
-                <Badge variant={getTrendVariant(domain.label)} className="text-xs">
-                  {domain.label}
-                </Badge>
+          {ordered.map((domain) => {
+            const hasEnough = (domain.points?.length ?? 0) >= 2;
+            const last = domain.points?.[domain.points.length - 1]?.value ?? null;
+            const lastLabel = last != null ? Number(last.toFixed(1)) : '—';
+
+            return (
+              <div 
+                key={domain.domain_name}
+                className="p-3 rounded-lg border ring-1 ring-border/50"
+                style={{ backgroundColor: getDomainColor(domain.domain_name) }}
+              >
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-slate-800">{domain.domain_name}</h4>
+                  <div className="flex items-center justify-between">
+                    <Sparkline points={domain.points} />
+                    <span className="text-sm font-semibold text-slate-900">{lastLabel}</span>
+                  </div>
+                  <Badge variant={getTrendVariant(domain.label)} className="text-xs">
+                    {hasEnough ? domain.label : 'Not enough data'}
+                  </Badge>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Narrative */}

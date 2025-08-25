@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatInTimeZone } from 'date-fns-tz';
 
 type WeekCell = {
   conf_status: 'on_time' | 'late' | 'missing';
@@ -22,9 +23,10 @@ type ConsistencyData = {
 interface ConsistencyPanelProps {
   data: ConsistencyData | null;
   loading: boolean;
+  tz?: string;
 }
 
-export default function ConsistencyPanel({ data, loading }: ConsistencyPanelProps) {
+export default function ConsistencyPanel({ data, loading, tz = 'America/Chicago' }: ConsistencyPanelProps) {
   if (loading) {
     return (
       <Card>
@@ -72,10 +74,21 @@ export default function ConsistencyPanel({ data, loading }: ConsistencyPanelProp
     return 'bg-gray-200 border-gray-300';
   };
 
-  const formatStatus = (status: string, timestamp: string | null) => {
-    if (status === 'missing') return '—';
-    if (status === 'on_time') return timestamp ? '✓' : '✓';
-    return '●'; // late
+  const sortWeeksOldestFirst = (weeks: WeekCell[]) => {
+    return [...weeks].sort((a,b) => 
+      a.cycle === b.cycle ? a.week_in_cycle - b.week_in_cycle : a.cycle - b.cycle
+    );
+  };
+
+  const fmt = (iso: string | null) => {
+    if (!iso) return '—';
+    try { return formatInTimeZone(new Date(iso), tz, "EEE h:mmaaa"); } catch { return '—'; }
+  };
+
+  const line = (label: 'Confidence'|'Performance', status: string, ts: string | null) => {
+    if (status === 'missing') return `${label}: —`;
+    if (status === 'on_time') return `${label}: ✓ ${fmt(ts)}`;
+    return `${label}: ● ${fmt(ts)}`; // late
   };
 
   const getNarrative = () => {
@@ -89,8 +102,10 @@ export default function ConsistencyPanel({ data, loading }: ConsistencyPanelProp
     }
   };
 
+  const weeks = data ? sortWeeksOldestFirst(data.weeks) : [];
+
   return (
-    <Card>
+    <Card className="ring-1 ring-border/50">
       <CardHeader>
         <CardTitle>How consistently am I showing up?</CardTitle>
         <div className="text-xs text-muted-foreground">Last 6 weeks</div>
@@ -112,22 +127,26 @@ export default function ConsistencyPanel({ data, loading }: ConsistencyPanelProp
         {/* Week Strip */}
         <TooltipProvider>
           <div className="flex gap-2">
-            {data.weeks.map((week, index) => (
-              <Tooltip key={index}>
-                <TooltipTrigger>
-                  <div className={`w-12 h-12 rounded border ${getWeekBackground(week)} flex flex-col items-center justify-center text-xs`}>
-                    <div>W{week.week_in_cycle}</div>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-xs">
-                    <div>Week {week.cycle}-{week.week_in_cycle}</div>
-                    <div>Confidence: {formatStatus(week.conf_status, week.conf_ts)}</div>
-                    <div>Performance: {formatStatus(week.perf_status, week.perf_ts)}</div>
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            ))}
+            {weeks.map((week, index) => {
+              const bg = getWeekBackground(week);
+              const aria = `Week ${week.cycle}-${week.week_in_cycle}: confidence ${week.conf_status}, performance ${week.perf_status}`;
+              return (
+                <Tooltip key={`${week.cycle}-${week.week_in_cycle}-${index}`}>
+                  <TooltipTrigger aria-label={aria}>
+                    <div className={`w-12 h-12 rounded-md border ${bg} ring-1 ring-border/50 flex items-center justify-center text-xs font-medium`}>
+                      W{week.week_in_cycle}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-xs space-y-1">
+                      <div>Week {week.cycle}-{week.week_in_cycle}</div>
+                      <div>{line('Confidence', week.conf_status, week.conf_ts)}</div>
+                      <div>{line('Performance', week.perf_status, week.perf_ts)}</div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
           </div>
         </TooltipProvider>
 

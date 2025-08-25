@@ -18,6 +18,7 @@ import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { buildWeekBanner } from '@/v2/weekCta';
+import { enforceWeeklyRolloverNow } from '@/v2/rollover';
 
 interface Staff { id: string; role_id: number; }
 interface WeeklyScore { 
@@ -103,6 +104,15 @@ export default function ThisWeekPanel() {
       // Use simulated time if available
       const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
       console.log('Effective time being used:', effectiveNow);
+      
+      // Enforce weekly rollover (idempotent)
+      await enforceWeeklyRolloverNow({
+        userId: user.id,
+        staffId: staffData.id,
+        roleId: staffData.role_id,
+        locationId: staffData.primary_location_id,
+        now: effectiveNow,
+      });
       
       // Load current week assignments and context based on user progress
       const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);

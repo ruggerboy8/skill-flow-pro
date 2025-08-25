@@ -59,76 +59,47 @@ export default function StatsScores() {
 
   const loadCycleData = async () => {
     if (!staffData) return;
-
+    setLoading(true);
+    
     try {
-      // Get all cycles that have weekly_focus data for this role
-      const { data: cycleData } = await supabase
+      // 1: discover cycles for this role (unchanged)
+      const { data: cycleRows } = await supabase
         .from('weekly_focus')
         .select('cycle')
         .eq('role_id', staffData.role_id)
         .order('cycle');
+      const cyclesUnique = [...new Set((cycleRows ?? []).map(c => c.cycle))];
 
-      if (!cycleData) return;
+      // 2: bulk status per week via RPC
+      const { data: statusRows } = await supabase.rpc('get_cycle_week_status', {
+        p_staff_id: staffData.id,
+        p_role_id: staffData.role_id
+      });
 
-      const uniqueCycles = [...new Set(cycleData.map(c => c.cycle))];
-      const cyclesWithData: CycleData[] = [];
-
-      for (const cycle of uniqueCycles) {
-        // Check if this cycle has any confidence scores
-        const { data: confidenceCheck } = await supabase
-          .from('weekly_scores')
-          .select('confidence_score, weekly_focus!inner(cycle)')
-          .eq('staff_id', staffData.id)
-          .eq('weekly_focus.cycle', cycle)
-          .not('confidence_score', 'is', null);
-
-        const hasAnyConfidence = (confidenceCheck?.length || 0) > 0;
-
-        // Get all weeks for this cycle
-        const { data: weeksData } = await supabase
-          .from('weekly_focus')
-          .select('week_in_cycle')
-          .eq('role_id', staffData.role_id)
-          .eq('cycle', cycle)
-          .order('week_in_cycle');
-
-        const weeks = new Map<number, WeekData[]>();
-        const weekStatuses = new Map<number, { total: number; confCount: number; perfCount: number }>();
-        
-        if (weeksData) {
-          const uniqueWeeks = [...new Set(weeksData.map(w => w.week_in_cycle))];
-          
-          for (const week of uniqueWeeks) {
-            weeks.set(week, []);
-            
-            // Load status counts for each week
-            const { data: statusData } = await supabase
-              .from('weekly_scores')
-              .select('confidence_score, performance_score, weekly_focus!inner(cycle, week_in_cycle)')
-              .eq('staff_id', staffData.id)
-              .eq('weekly_focus.cycle', cycle)
-              .eq('weekly_focus.week_in_cycle', week);
-            
-            if (statusData) {
-              const total = statusData.length;
-              const confCount = statusData.filter(r => r.confidence_score !== null).length;
-              const perfCount = statusData.filter(r => r.performance_score !== null).length;
-              weekStatuses.set(week, { total, confCount, perfCount });
-            } else {
-              weekStatuses.set(week, { total: 0, confCount: 0, perfCount: 0 });
-            }
-          }
-        }
-
-        cyclesWithData.push({
-          cycle,
-          weeks,
-          weekStatuses,
-          hasAnyConfidence
-        });
+      const byCycle = new Map<number, { weeks: Map<number, any>, hasAnyConfidence: boolean }>();
+      for (const c of cyclesUnique) {
+        byCycle.set(c, { weeks: new Map(), hasAnyConfidence: false });
       }
 
-      setCycles(cyclesWithData);
+      for (const r of (statusRows ?? [])) {
+        const bucket = byCycle.get(r.cycle);
+        if (!bucket) continue;
+        bucket.weeks.set(r.week_in_cycle, {
+          total: r.total,
+          confCount: r.conf_count,
+          perfCount: r.perf_count
+        });
+        if (r.conf_count > 0) bucket.hasAnyConfidence = true;
+      }
+
+      const result = cyclesUnique.map(cycle => ({
+        cycle,
+        weeks: new Map<number, WeekData[]>(), // Start empty for lazy loading
+        weekStatuses: byCycle.get(cycle)?.weeks ?? new Map(),
+        hasAnyConfidence: byCycle.get(cycle)?.hasAnyConfidence ?? false
+      }));
+
+      setCycles(result);
     } catch (error) {
       console.error('Error loading cycle data:', error);
     } finally {
@@ -202,6 +173,13 @@ export default function StatsScores() {
 
   return (
     <div className="space-y-4">
+      {/* Status Legend */}
+      <div className="flex items-center gap-4 text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
+        <span>✓ all done</span>
+        <span>● in progress / late</span>
+        <span>— not started</span>
+      </div>
+      
       <Accordion type="multiple" className="space-y-4">
         {cycles.map((cycle, cycleIndex) => (
           <AccordionItem
@@ -224,7 +202,7 @@ export default function StatsScores() {
             {cycle.hasAnyConfidence && (
               <AccordionContent className="px-4 pb-4">
                 <Accordion type="multiple" className="space-y-2">
-                  {Array.from(cycle.weeks.keys()).map(week => (
+                  {Array.from(cycle.weekStatuses.keys()).map(week => (
                     <WeekAccordion
                       key={week}
                       cycle={cycle.cycle}
@@ -291,27 +269,18 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
     
     setDeleteLoading(true);
     try {
-      // Delete weekly scores for this specific week/cycle
-      const { error: scoresError } = await supabase
-        .from('weekly_scores')
-        .delete()
-        .eq('staff_id', staffData.id)
-        .in('weekly_focus_id', await getWeeklyFocusIds());
+      const { data, error } = await supabase.rpc('delete_week_data', {
+        p_staff_id: staffData.id,
+        p_role_id: staffData.role_id,
+        p_cycle: cycle,
+        p_week: week
+      });
 
-      if (scoresError) throw scoresError;
-
-      // Delete weekly self-selections for this specific week/cycle
-      const { error: selectionsError } = await supabase
-        .from('weekly_self_select')
-        .delete()
-        .eq('user_id', user.id)
-        .in('weekly_focus_id', await getWeeklyFocusIds());
-
-      if (selectionsError) throw selectionsError;
+      if (error) throw error;
 
       toast({ 
         title: 'Success', 
-        description: `Deleted data for Cycle ${cycle}, Week ${week}.` 
+        description: (data as any)?.message || `Deleted data for Cycle ${cycle}, Week ${week}.` 
       });
       
       onWeekDeleted(); // Refresh parent data
@@ -326,17 +295,6 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
       setDeleteLoading(false);
       setShowDeleteDialog(false);
     }
-  }
-
-  async function getWeeklyFocusIds(): Promise<string[]> {
-    const { data } = await supabase
-      .from('weekly_focus')
-      .select('id')
-      .eq('cycle', cycle)
-      .eq('week_in_cycle', week)
-      .eq('role_id', staffData!.role_id);
-    
-    return data?.map(f => f.id) || [];
   }
 
   const checkConfidence = async () => {

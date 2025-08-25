@@ -22,7 +22,7 @@ import Stats from "./pages/Stats";
 import StatsLayout from "./pages/StatsLayout";
 import StatsScores from "./pages/StatsScores";
 import AtAGlance from "./pages/stats/AtAGlance";
-import StatsEval from "./pages/StatsEval";
+import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import Profile from "./pages/Profile";
 import CoachDashboard from "./pages/coach/CoachDashboard";
 import CoachDetail from "./pages/coach/CoachDetail";
@@ -72,7 +72,7 @@ function AppRoutes() {
           <Route index element={<AtAGlance />} />
           <Route path="glance" element={<AtAGlance />} />
           <Route path="scores" element={<StatsScores />} />
-          <Route path="evaluations" element={<StatsEval />} />
+          <Route path="evaluations" element={<StatsEvaluations />} />
         </Route>
         <Route path="profile" element={<Profile />} />
         <Route path="week" element={<Week />} />

@@ -753,6 +753,15 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      delete_week_data: {
+        Args: {
+          p_cycle: number
+          p_role_id: number
+          p_staff_id: string
+          p_week: number
+        }
+        Returns: Json
+      }
       get_calibration: {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json
@@ -760,6 +769,31 @@ export type Database = {
       get_consistency: {
         Args: { p_staff_id: string; p_tz?: string; p_weeks?: number }
         Returns: Json
+      }
+      get_cycle_week_status: {
+        Args: { p_role_id: number; p_staff_id: string }
+        Returns: {
+          conf_count: number
+          cycle: number
+          perf_count: number
+          total: number
+          week_in_cycle: number
+        }[]
+      }
+      get_evaluations_summary: {
+        Args: { p_staff_id: string }
+        Returns: {
+          avg_observer: number
+          avg_self: number
+          delta: number
+          domain_name: string
+          eval_id: string
+          program_year: number
+          quarter: string
+          status: string
+          submitted_at: string
+          type: string
+        }[]
       }
       get_focus_cycle_week: {
         Args: { p_cycle: number; p_role_id: number; p_week: number }

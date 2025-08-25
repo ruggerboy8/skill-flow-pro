@@ -157,6 +157,28 @@ export default function BackfillWeek() {
       return toast({ title: "Save failed", description: error.message, variant: "destructive" });
     }
 
+    // After successful upsert, run timestamp backfill for week 6
+    try {
+      if (weekNum >= 6 && staff?.id) {
+        const ran = localStorage.getItem("bf_ts_fixed");
+        if (!ran) {
+          const { data, error } = await supabase.rpc('backfill_historical_score_timestamps', {
+            p_staff_id: staff.id,
+            p_only_backfill: true,
+            p_jitter_minutes: 30
+          });
+          if (error) {
+            console.error('Timestamp backfill RPC failed:', error);
+          } else {
+            console.log('Timestamp backfill RPC ok:', data);
+            localStorage.setItem("bf_ts_fixed", "1");
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to run timestamp backfill RPC:', e);
+    }
+
     try {
       const raw = localStorage.getItem("backfillProgress");
       const obj = raw ? JSON.parse(raw) : {};

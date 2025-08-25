@@ -56,10 +56,13 @@ export async function enforceWeeklyRolloverNow(args: {
     .in('weekly_focus_id', focusIds);
 
   const required = focusIds.length;
+  const confCount = (prevScores || []).filter(s => s.confidence_score !== null).length;
   const perfCount = (prevScores || []).filter(s => s.performance_score !== null).length;
   const fullyPerformed = perfCount >= required;
+  const hadAnyConfidence = confCount > 0;
 
   if (fullyPerformed) return; // nothing to rollover
+  if (!hadAnyConfidence) return; // don't backlog a week that had no check-in
 
   // 1) Add SITE moves from that week to backlog (dedup handled by RPC)
   const siteActionIds = (focusRows || [])

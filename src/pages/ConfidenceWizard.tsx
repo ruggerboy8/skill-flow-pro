@@ -9,7 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
-import { nowUtc, getAnchors, nextMondayStr, getWeekAnchors } from '@/lib/centralTime';
+import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -221,7 +222,7 @@ export default function ConfidenceWizard() {
     }
 
     // Check if late submission using location timezone
-    const { confidence_deadline } = await import('@/v2/time').then(t => t.getWeekAnchors(effectiveNow, timezone));
+    const { confidence_deadline } = getWeekAnchors(effectiveNow, timezone);
     const isLate = effectiveNow > confidence_deadline;
 
     const scoreInserts = weeklyFocus.map(focus => {

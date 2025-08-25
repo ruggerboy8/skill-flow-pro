@@ -9,7 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
-import { nowUtc, getAnchors, getWeekAnchors } from '@/lib/centralTime';
+import { nowUtc, getAnchors } from '@/lib/centralTime';
+import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
@@ -170,7 +171,7 @@ export default function PerformanceWizard() {
     }
 
     // Check if late submission using location timezone
-    const { performance_deadline } = await import('@/v2/time').then(t => t.getWeekAnchors(effectiveNow, timezone));
+    const { performance_deadline } = getWeekAnchors(effectiveNow, timezone);
     const isLate = effectiveNow > performance_deadline;
 
     const updates = existingScores.map(score => ({

@@ -90,7 +90,7 @@ export default function StatsEvaluations() {
       <Card>
         <CardContent className="py-12 text-center">
           <p className="text-muted-foreground">
-            No evaluations yet. Once your manager starts one, you'll see it here.
+            No evaluations yet. Once we start one, you'll see it here.
           </p>
         </CardContent>
       </Card>

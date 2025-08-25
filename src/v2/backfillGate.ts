@@ -1,67 +1,52 @@
-// V2 server-truth gating for Backfill logic
 import { supabase } from '@/integrations/supabase/client';
 
-export interface BackfillGateResult {
+type GateResult = {
   missingCount: number;
-  totalSlots: number;
-}
+  missingWeeks: number[]; // week_in_cycle numbers (1..6)
+};
 
-/**
- * Check if staff member needs backfill based on actual completion of Cycle 1, Weeks 1-6
- * Returns missing count and total slots for those weeks
- */
-export async function needsBackfill(staffId: string, roleId: number): Promise<BackfillGateResult> {
-  try {
-    // Get all weekly_focus slots for Cycle 1, Weeks 1-6 for this role
-    const { data: weeklyFocusSlots, error: focusError } = await supabase
-      .from('weekly_focus')
-      .select('id')
-      .eq('cycle', 1)
-      .in('week_in_cycle', [1, 2, 3, 4, 5, 6])
-      .eq('role_id', roleId);
+// A week counts as "complete" when ALL focus rows for that (cycle=1, week=1..6, role)
+// have BOTH confidence_score and performance_score for this staff member.
+export async function needsBackfill(staffId: string, roleId: number): Promise<GateResult> {
+  // Pull all weekly_focus ids for Cycle 1, Weeks 1..6 for this role
+  const { data: focus } = await supabase
+    .from('weekly_focus')
+    .select('id, week_in_cycle')
+    .eq('cycle', 1)
+    .eq('role_id', roleId)
+    .in('week_in_cycle', [1,2,3,4,5,6]);
 
-    if (focusError) {
-      console.error('Error fetching weekly focus slots:', focusError);
-      return { missingCount: 0, totalSlots: 0 };
-    }
+  if (!focus || focus.length === 0) {
+    return { missingCount: 0, missingWeeks: [] }; // nothing configured
+  }
 
-    const totalSlots = weeklyFocusSlots?.length || 0;
+  // Group focus ids by week
+  const byWeek = new Map<number, string[]>();
+  for (const row of focus) {
+    const wk = row.week_in_cycle!;
+    if (!byWeek.has(wk)) byWeek.set(wk, []);
+    byWeek.get(wk)!.push(row.id);
+  }
 
-    if (totalSlots === 0) {
-      // No slots configured for this role - no backfill needed
-      return { missingCount: 0, totalSlots: 0 };
-    }
+  const missingWeeks: number[] = [];
 
-    const weeklyFocusIds = weeklyFocusSlots.map(slot => slot.id);
-
-    // Count completed scores (both confidence and performance non-null)
-    const { data: completedScores, error: scoresError } = await supabase
+  // For each week, check if all focus rows have both scores
+  for (const [week, ids] of byWeek.entries()) {
+    const { data: scores } = await supabase
       .from('weekly_scores')
-      .select('id')
+      .select('weekly_focus_id, confidence_score, performance_score')
       .eq('staff_id', staffId)
-      .in('weekly_focus_id', weeklyFocusIds)
-      .not('confidence_score', 'is', null)
-      .not('performance_score', 'is', null);
+      .in('weekly_focus_id', ids);
 
-    if (scoresError) {
-      console.error('Error fetching completed scores:', scoresError);
-      return { missingCount: totalSlots, totalSlots };
-    }
-
-    const completedCount = completedScores?.length || 0;
-    const missingCount = Math.max(0, totalSlots - completedCount);
-
-    console.log('Backfill gate check:', {
-      staffId,
-      roleId,
-      totalSlots,
-      completedCount,
-      missingCount
+    // Must have one score row per focus id AND both scores present
+    const scoreMap = new Map(scores?.map(s => [s.weekly_focus_id, s]) ?? []);
+    const allComplete = ids.every(id => {
+      const s = scoreMap.get(id);
+      return s && s.confidence_score != null && s.performance_score != null;
     });
 
-    return { missingCount, totalSlots };
-  } catch (error) {
-    console.error('Error in needsBackfill:', error);
-    return { missingCount: 0, totalSlots: 0 };
+    if (!allComplete) missingWeeks.push(week);
   }
+
+  return { missingCount: missingWeeks.length, missingWeeks: missingWeeks.sort((a,b)=>a-b) };
 }

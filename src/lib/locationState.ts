@@ -102,6 +102,17 @@ export async function assembleWeek(params: {
 }): Promise<any[]> {
   const { userId, roleId, locationId, cycleNumber, weekInCycle, simOverrides } = params;
   
+  // Get staff information to get staff_id for backlog queries
+  const { data: staff } = await supabase
+    .from('staff')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!staff) {
+    throw new Error('Staff member not found');
+  }
+  
   // Fetch weekly focus for this role/cycle/week
   const { data: weeklyFocus } = await supabase
     .from('weekly_focus')
@@ -129,15 +140,18 @@ export async function assembleWeek(params: {
     selections = userSelections || [];
   }
 
-  // Get user's backlog items (only if not in foundation)
+  // Get user's backlog items (only if not in foundation) - use v2 table with staff_id
   let backlog: any[] = [];
   if (!isFoundation) {
     const { data: userBacklog } = await supabase
-      .from('user_backlog')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', 'open')
-      .order('created_at');
+      .from('user_backlog_v2')
+      .select(`
+        *,
+        pro_moves!inner(action_id, action_statement, competency_id)
+      `)
+      .eq('staff_id', staff.id)
+      .is('resolved_on', null)  // Only unresolved items
+      .order('assigned_on');     // FIFO order
     backlog = userBacklog || [];
   }
 
@@ -182,42 +196,93 @@ export async function assembleWeek(params: {
           });
         }
       } else {
-        // No user selection - show empty self-select slot (don't auto-fill from backlog)
-        let domainName = 'General';
-        let competencyName = 'Select Competency';
+        // No user selection - check if we can replace with backlog item
+        let backlogReplacement = null;
         
-        if (focus.competency_id) {
+        // Find oldest non-duplicate backlog item
+        while (backlogIndex < backlog.length) {
+          const backlogItem = backlog[backlogIndex];
+          
+          // Check if this backlog item would duplicate an already assigned move
+          const isDuplicate = assignments.some(a => a.pro_move_id === backlogItem.action_id);
+          
+          if (!isDuplicate) {
+            backlogReplacement = backlogItem;
+            backlogIndex++; // Consume this backlog item
+            break;
+          }
+          
+          backlogIndex++; // Skip duplicate but don't consume
+        }
+        
+        if (backlogReplacement) {
+          // Replace self-select slot with backlog item (treat as locked site move)
           const { data: competency } = await supabase
             .from('competencies')
             .select('name, domain_id')
-            .eq('competency_id', focus.competency_id)
+            .eq('competency_id', backlogReplacement.pro_moves.competency_id)
             .maybeSingle();
 
-          if (competency) {
-            competencyName = competency.name || 'Select Competency';
-            
-            if (competency.domain_id) {
-              const { data: domain } = await supabase
-                .from('domains')
-                .select('domain_name')
-                .eq('domain_id', competency.domain_id)
-                .maybeSingle();
+          let domainName = 'General';
+          if (competency?.domain_id) {
+            const { data: domain } = await supabase
+              .from('domains')
+              .select('domain_name')
+              .eq('domain_id', competency.domain_id)
+              .maybeSingle();
+            domainName = domain?.domain_name || 'General';
+          }
+
+          assignments.push({
+            weekly_focus_id: focus.id,
+            type: 'site', // Treat backlog replacement as locked site move
+            pro_move_id: backlogReplacement.action_id,
+            action_statement: backlogReplacement.pro_moves.action_statement,
+            competency_name: competency?.name || 'General',
+            domain_name: domainName,
+            required: true,
+            locked: true, // Backlog replacements are locked (no dropdown)
+            display_order: focus.display_order,
+            from_backlog: true // Flag to identify backlog replacements
+          });
+        } else {
+          // No backlog replacement available - show empty self-select slot
+          let domainName = 'General';
+          let competencyName = 'Select Competency';
+          
+          if (focus.competency_id) {
+            const { data: competency } = await supabase
+              .from('competencies')
+              .select('name, domain_id')
+              .eq('competency_id', focus.competency_id)
+              .maybeSingle();
+
+            if (competency) {
+              competencyName = competency.name || 'Select Competency';
               
-              domainName = domain?.domain_name || 'General';
+              if (competency.domain_id) {
+                const { data: domain } = await supabase
+                  .from('domains')
+                  .select('domain_name')
+                  .eq('domain_id', competency.domain_id)
+                  .maybeSingle();
+                
+                domainName = domain?.domain_name || 'General';
+              }
             }
           }
-        }
 
-        assignments.push({
-          weekly_focus_id: focus.id,
-          type: 'selfSelect',
-          action_statement: 'Choose a pro-move',
-          competency_name: competencyName,
-          domain_name: domainName,
-          required: false,
-          locked: false,
-          display_order: focus.display_order
-        });
+          assignments.push({
+            weekly_focus_id: focus.id,
+            type: 'selfSelect',
+            action_statement: 'Choose a pro-move',
+            competency_name: competencyName,
+            domain_name: domainName,
+            required: false,
+            locked: false,
+            display_order: focus.display_order
+          });
+        }
       }
     } else {
       // Site move (or self-select slot in foundation - treat as site move)

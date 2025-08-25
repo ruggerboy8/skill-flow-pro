@@ -34,7 +34,7 @@ export function buildWeekBanner(args: {
 
     case 'wait_for_thu':
       return {
-        message: `Thanks for submitting your confidence. Come back Thursday (${fmt(anchors.checkout_open, timezone)}) to rate your performance.`,
+        message: `Thanks for submitting your confidence. Come back Thursday to rate your performance.`,
         cta: { label: 'Rate Performance', to: '/performance/current/step/1' }
       };
 

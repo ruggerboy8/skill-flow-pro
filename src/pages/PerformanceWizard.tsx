@@ -15,6 +15,15 @@ import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
 
+interface Assignment {
+  weekly_focus_id: string;
+  type: string;
+  pro_move_id?: number;
+  display_order: number;
+  action_statement: string;
+  domain_name: string;
+}
+
 interface Staff {
   id: string;
   role_id: number;
@@ -35,6 +44,7 @@ interface WeeklyScore {
   weekly_focus_id: string;
   confidence_score: number;
   confidence_date?: string | null;
+  selected_action_id?: number | null;
 }
 
 export default function PerformanceWizard() {
@@ -44,6 +54,7 @@ export default function PerformanceWizard() {
   const [currentFocus, setCurrentFocus] = useState<WeeklyFocus | null>(null);
   const [existingScores, setExistingScores] = useState<WeeklyScore[]>([]);
   const [performanceScores, setPerformanceScores] = useState<{ [key: string]: number }>({});
+  const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isCarryoverWeek, setIsCarryoverWeek] = useState(false);
@@ -85,9 +96,9 @@ export default function PerformanceWizard() {
     setStaff(staffData);
 
     // Use the unified site-based approach to get current week assignments
-    const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);
+    const { assignments: weekAssignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);
 
-    if (!assignments || assignments.length === 0) {
+    if (!weekAssignments || weekAssignments.length === 0) {
       toast({
         title: 'Error',
         description: 'No Pro Moves found for this week',
@@ -97,8 +108,10 @@ export default function PerformanceWizard() {
       return;
     }
 
+    setAssignments(weekAssignments);
+
     // Load existing confidence scores with selected action IDs
-    const focusIds = assignments.map(a => a.weekly_focus_id);
+    const focusIds = weekAssignments.map(a => a.weekly_focus_id);
     const { data: scoresData, error: scoresError } = await supabase
       .from('weekly_scores')
       .select('id, weekly_focus_id, confidence_score, confidence_date, selected_action_id')
@@ -106,7 +119,7 @@ export default function PerformanceWizard() {
       .in('weekly_focus_id', focusIds)
       .not('confidence_score', 'is', null);
 
-    if (scoresError || !scoresData || scoresData.length !== assignments.length) {
+    if (scoresError || !scoresData || scoresData.length !== weekAssignments.length) {
       toast({
         title: "Error",
         description: "Please complete confidence ratings first",
@@ -117,7 +130,7 @@ export default function PerformanceWizard() {
     }
 
     // Build the weekly focus with actual selected pro moves
-    const transformedFocusData: WeeklyFocus[] = assignments.map((assignment) => ({
+    const transformedFocusData: WeeklyFocus[] = weekAssignments.map((assignment) => ({
       id: assignment.weekly_focus_id,
       display_order: assignment.display_order,
       action_statement: assignment.action_statement || '',

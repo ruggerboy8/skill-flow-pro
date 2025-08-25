@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Home, BarChart3, User, Settings, Users, ClipboardList, Building, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { isV2 } from '@/lib/featureFlags';
-import { needsBackfill } from '@/v2/backfillGate';
+// Server-side backfill detection via RPC
 
 export default function Layout() {
   const { user, signOut, isCoach } = useAuth();
@@ -40,8 +40,8 @@ export default function Layout() {
               p_staff_id: staffData.id,
               p_role_id: staffData.role_id
             });
-            if (!error && backfillResult) {
-              setBackfillMissingCount(backfillResult.missingCount || 0);
+            if (!error && backfillResult && typeof backfillResult === 'object') {
+              setBackfillMissingCount((backfillResult as any).missingCount || 0);
             }
           }
         }

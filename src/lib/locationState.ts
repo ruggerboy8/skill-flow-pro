@@ -2,7 +2,7 @@ import { getWeekAnchors } from './centralTime';
 import { supabase } from '@/integrations/supabase/client';
 import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 
-export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'wait_for_thu' | 'done' | 'missed_checkout' | 'no_assignments';
+export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'done' | 'missed_checkout' | 'no_assignments';
 
 export interface LocationWeekContext {
   weekInCycle: number;
@@ -240,7 +240,7 @@ export async function assembleWeek(params: {
 
         assignments.push({
           weekly_focus_id: focus.id,
-          type: 'siteMove',
+          type: 'site',
           pro_move_id: siteProMove?.action_id,
           action_statement: siteProMove?.action_statement || 'Site move',
           competency_name: siteProMove?.competencies?.name || 'General',
@@ -328,27 +328,14 @@ export async function computeWeekState(params: {
     .eq('weekly_focus.cycle', cycleNumber)
     .eq('weekly_focus.week_in_cycle', weekInCycle);
 
-  // Count valid scores within time windows (for completion status)
-  const confidenceScores = scores?.filter(s => 
-    s.confidence_score !== null && 
-    s.confidence_date && 
-    new Date(s.confidence_date) >= anchors.checkin_open &&
-    new Date(s.confidence_date) <= anchors.confidence_deadline
-  ) || [];
-
-  const performanceScores = scores?.filter(s => 
-    s.performance_score !== null && 
-    s.performance_date && 
-    new Date(s.performance_date) >= anchors.checkout_open &&
-    new Date(s.performance_date) <= anchors.performance_deadline
-  ) || [];
-
-  // Dynamic completion check based on actual assignment count
+  // Advisory: completion = "is there a score?", regardless of timestamp
   const requiredCount = assignments.length;
+  const confFilled = (scores || []).filter(s => s.confidence_score !== null).length;
+  const perfFilled = (scores || []).filter(s => s.performance_score !== null).length;
   
   // Apply simulation overrides for confidence/performance status
-  let hasConfidence = confidenceScores.length >= requiredCount;
-  let hasPerformance = performanceScores.length >= requiredCount;
+  let hasConfidence = confFilled >= requiredCount;
+  let hasPerformance = perfFilled >= requiredCount;
   
   if (simOverrides?.enabled) {
     if (simOverrides.forceHasConfidence !== null && simOverrides.forceHasConfidence !== undefined) {
@@ -404,8 +391,15 @@ export async function computeWeekState(params: {
     }
   }
 
-  // Determine state and next action
+  // Determine state and next action (advisory gating)
   if (now > anchors.confidence_deadline && !hasConfidence) {
+    // Auto-populate backlog v2 when check-in is missed
+    try {
+      await populateBacklogV2ForMissedWeek(staff.id, assignments, { weekInCycle, cycleNumber });
+    } catch (e) {
+      console.warn('Backlog v2 population failed (non-fatal):', e);
+    }
+    
     return {
       state: 'missed_checkin',
       nextAction: 'Overdue',
@@ -416,7 +410,7 @@ export async function computeWeekState(params: {
     };
   }
 
-  if (now <= anchors.confidence_deadline && !hasConfidence) {
+  if (!hasConfidence) {
     return {
       state: 'can_checkin',
       nextAction: 'Confidence',
@@ -427,37 +421,26 @@ export async function computeWeekState(params: {
     };
   }
 
-  if (hasConfidence && now < anchors.checkout_open) {
-    return {
-      state: 'wait_for_thu',
-      nextAction: 'Performance opens Thursday',
-      deadlineAt: anchors.checkout_open,
-      backlogCount,
-      selectionPending,
-      lastActivity
-    };
-  }
-
-  if (hasConfidence && !hasPerformance && now >= anchors.checkout_open && now <= anchors.performance_deadline) {
-    return {
-      state: 'can_checkout',
-      nextAction: 'Performance',
-      deadlineAt: anchors.performance_deadline,
-      backlogCount,
-      selectionPending,
-      lastActivity
-    };
-  }
-
-  if (hasConfidence && !hasPerformance && now > anchors.performance_deadline) {
-    return {
-      state: 'missed_checkout',
-      nextAction: 'Overdue',
-      deadlineAt: anchors.performance_deadline,
-      backlogCount,
-      selectionPending,
-      lastActivity
-    };
+  if (hasConfidence && !hasPerformance) {
+    if (now > anchors.performance_deadline) {
+      return {
+        state: 'missed_checkout',
+        nextAction: 'Overdue',
+        deadlineAt: anchors.performance_deadline,
+        backlogCount,
+        selectionPending,
+        lastActivity
+      };
+    } else {
+      return {
+        state: 'can_checkout',
+        nextAction: 'Performance',
+        deadlineAt: anchors.performance_deadline,
+        backlogCount,
+        selectionPending,
+        lastActivity
+      };
+    }
   }
 
   if (hasConfidence && hasPerformance) {

@@ -62,17 +62,12 @@ export async function enforceWeeklyRolloverNow(args: {
   if (fullyPerformed) return; // nothing to rollover
 
   // 1) Add SITE moves from that week to backlog (dedup handled by RPC)
-  const assignments = await assembleLocationWeek({
-    userId,
-    roleId,
-    locationId,
-    cycleNumber: prevCycle,
-    weekInCycle: prevWeek,
-  });
+  const siteActionIds = (focusRows || [])
+    .filter(f => !f.self_select && f.action_id)     // site slots only
+    .map(f => f.action_id as number);
 
-  const siteMoves = assignments.filter((a: any) => a.type === 'site' && a.pro_move_id);
-  for (const s of siteMoves) {
-    await addToBacklogV2(staffId, s.pro_move_id, prevCycle, prevWeek);
+  for (const actionId of siteActionIds) {
+    await addToBacklogV2(staffId, actionId, prevCycle, prevWeek); // RPC dedups
   }
 
   // 2) Clear confidence for items that still lack performance

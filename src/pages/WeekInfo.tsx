@@ -283,8 +283,11 @@ export default function WeekInfo() {
                     )}
 
                     {allConfidence && beforeThursday && (
-                      <Button className="w-full h-12" variant="outline" disabled>
-                        Performance opens Thursday
+                      <Button 
+                        onClick={() => navigate(`/performance/${weekNum}/step/1`)}
+                        className="w-full h-12"
+                      >
+                        Rate Performance
                       </Button>
                     )}
 

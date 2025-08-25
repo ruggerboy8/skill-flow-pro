@@ -60,13 +60,7 @@ export default function Performance() {
     }
   }, [user, week]);
 
-  // Hard guard: block deep-links before Thursday (unless carryover)
-  useEffect(() => {
-    if (!loading && beforeThursdayEffective) {
-      toast({ title: 'Performance opens Thursday (12:00 a.m. CT).' });
-      navigate('/');
-    }
-  }, [loading, beforeThursdayEffective, navigate]);
+  // No longer blocking access - users can submit anytime
 
   const loadData = async () => {
     if (!user) return;
@@ -239,30 +233,20 @@ export default function Performance() {
           </Card>
         )}
 
-        {/* Early guard Mon–Wed: read-only message */}
-        {beforeThursdayEffective ? (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-center">Performance opens Thursday.</CardTitle>
-                <CardDescription className="text-center">
-                  Come back Thursday to rate your performance. Confidence must be completed first.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-            <div className="space-y-2">
-              <Button 
-                variant="outline"
-                onClick={() => navigate('/week')}
-                className="w-full"
-              >
-                Back to Week View
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            {weeklyFocus.map((focus, index) => (
+        {/* Early submission message - no longer blocking */}
+        {beforeThursdayEffective && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center">Early Performance Submission</CardTitle>
+              <CardDescription className="text-center">
+                You can submit performance now, or come back Thursday during normal hours.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+
+        {/* Show performance form for all users */}
+        {weeklyFocus.map((focus, index) => (
               <Card key={focus.id}>
                 <CardHeader>
                   <div className="flex items-start gap-2">
@@ -317,8 +301,6 @@ export default function Performance() {
                 Back to Week View
               </Button>
             </div>
-          </>
-        )}
       </div>
     </div>
   );

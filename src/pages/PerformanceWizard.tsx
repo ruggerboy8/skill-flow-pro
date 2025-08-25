@@ -194,6 +194,42 @@ export default function PerformanceWizard() {
         variant: "destructive"
       });
     } else {
+      // Resolve any open backlog items that match this week's actions
+      try {
+        const actedOnIds = new Set<number>();
+        
+        // Collect action_ids from both selected and site actions
+        for (const update of updates) {
+          const score = existingScores.find(s => s.id === update.id);
+          if (score?.selected_action_id) {
+            actedOnIds.add(score.selected_action_id);
+          }
+          // For site moves, we need to get the action_id from the weekly_focus
+          const focusItem = weeklyFocus.find(wf => wf.id === score?.weekly_focus_id);
+          if (focusItem) {
+            // Get the action_id from the assignment data (site moves)
+            const { data: focusData } = await supabase
+              .from('weekly_focus')
+              .select('action_id')
+              .eq('id', focusItem.id)
+              .maybeSingle();
+            if (focusData?.action_id) {
+              actedOnIds.add(focusData.action_id);
+            }
+          }
+        }
+
+        // Resolve backlog items for these action_ids
+        for (const actionId of actedOnIds) {
+          await supabase.rpc('resolve_backlog_item', {
+            p_staff_id: staff.id,
+            p_action_id: actionId
+          });
+        }
+      } catch (backlogError) {
+        console.error('Error resolving backlog items:', backlogError);
+      }
+
       toast({
         title: "Great week!",
         description: "Enjoy your weekend!"

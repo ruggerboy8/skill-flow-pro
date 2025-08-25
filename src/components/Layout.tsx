@@ -34,10 +34,15 @@ export default function Layout() {
         if (staffData) {
           setIsSuperAdmin(!!staffData.is_super_admin);
           
-          // Check backfill status using server-side logic
+          // Check backfill status using server-side RPC
           if (isV2 && staffData.id && staffData.role_id) {
-            const backfillResult = await needsBackfill(staffData.id, staffData.role_id);
-            setBackfillMissingCount(backfillResult.missingCount);
+            const { data: backfillResult, error } = await supabase.rpc('needs_backfill', {
+              p_staff_id: staffData.id,
+              p_role_id: staffData.role_id
+            });
+            if (!error && backfillResult) {
+              setBackfillMissingCount(backfillResult.missingCount || 0);
+            }
           }
         }
       } catch (error) {

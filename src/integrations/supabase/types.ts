@@ -829,6 +829,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      needs_backfill: {
+        Args: { p_role_id: number; p_staff_id: string }
+        Returns: Json
+      }
       replace_weekly_focus: {
         Args: {
           p_cycle: number

@@ -58,7 +58,7 @@ export default function BackfillReview() {
       const focusIds = (focus || []).map((f:any) => f.id);
       const { data: scores } = await supabase
         .from("weekly_scores")
-        .select("weekly_focus_id, selected_action_id, confidence_score, performance_score, confidence_estimated, performance_estimated")
+        .select("weekly_focus_id, selected_action_id, confidence_score, performance_score")
         .eq("staff_id", staffRow.id)
         .in("weekly_focus_id", focusIds);
 
@@ -81,8 +81,6 @@ export default function BackfillReview() {
           selected_action_statement: s?.selected_action_id ? (actionMap[s.selected_action_id] || null) : null,
           confidence_score: s?.confidence_score ?? null,
           performance_score: s?.performance_score ?? null,
-          confidence_estimated: s?.confidence_estimated ?? false,
-          performance_estimated: s?.performance_estimated ?? false,
         } as FocusRow & any;
       });
 

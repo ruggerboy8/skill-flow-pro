@@ -1,6 +1,6 @@
 import { getWeekAnchors } from './centralTime';
 import { supabase } from '@/integrations/supabase/client';
-import { getOpenBacklogCount } from './backlog';
+import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 
 export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'wait_for_thu' | 'done' | 'missed_checkout' | 'no_assignments';
 
@@ -360,7 +360,7 @@ export async function computeWeekState(params: {
   }
 
   // Get backlog count with simulation support
-  const backlogResult = await getOpenBacklogCount(userId, simOverrides);
+  const backlogResult = await getOpenBacklogCountV2(staff.id, simOverrides);
   const backlogCount = backlogResult.count;
 
   // Check for selection pending

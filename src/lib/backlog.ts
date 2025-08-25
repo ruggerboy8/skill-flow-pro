@@ -2,13 +2,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAnchors, nowUtc } from "@/lib/centralTime";
 import { SimOverrides } from '@/devtools/SimProvider';
 
-export interface BacklogItem {
+// Updated backlog interfaces for v2
+export interface BacklogItemV2 {
   id: string;
-  user_id: string;
-  pro_move_id: number;
-  added_week_id: string;
-  status: 'open' | 'done';
-  resolved_week_id?: string;
+  staff_id: string;
+  action_id: number;
+  source_cycle?: number;
+  source_week?: number;
+  assigned_on: string;
+  resolved_on?: string | null;
   created_at: string;
 }
 
@@ -25,155 +27,92 @@ export interface WeekAssignment {
   display_order: number;
 }
 
-// Detect incomplete weeks where site moves weren't finished
-export async function detectIncompleteWeeks(staffId: string): Promise<void> {
+// Add a site move to backlog v2 using RPC
+export async function addToBacklogV2(
+  staffId: string, 
+  actionId: number, 
+  sourceCycle: number, 
+  sourceWeek: number
+): Promise<void> {
   try {
-    // Get all weeks for this user's role where site moves exist but aren't completed
-    const { data: staffData } = await supabase
-      .from('staff')
-      .select('role_id')
-      .eq('id', staffId)
-      .single();
-
-    if (!staffData) return;
-
-    // Find weeks with incomplete site moves (missing both confidence and performance)
-    const { data: incompleteWeeks } = await supabase
-      .from('weekly_focus')
-      .select(`
-        id,
-        cycle,
-        week_in_cycle,
-        action_id,
-        weekly_scores!left(confidence_score, performance_score)
-      `)
-      .eq('role_id', staffData.role_id)
-      .eq('self_select', false) // Only site moves
-      .not('action_id', 'is', null);
-
-    if (!incompleteWeeks) return;
-
-    for (const week of incompleteWeeks) {
-      const scores = week.weekly_scores || [];
-      const userScore = scores.find((s: any) => s);
-      
-      // If no scores at all, or incomplete scores, add to backlog
-      if (!userScore || !userScore.confidence_score || !userScore.performance_score) {
-        await addToBacklog(staffId, week.action_id, week.id);
-      }
-    }
+    await supabase.rpc('add_backlog_if_missing', {
+      p_staff_id: staffId,
+      p_action_id: actionId,
+      p_cycle: sourceCycle,
+      p_week: sourceWeek
+    });
   } catch (error) {
-    console.error('Error detecting incomplete weeks:', error);
+    console.error('Error adding to backlog v2:', error);
   }
 }
 
-// Add a pro move to the user's backlog
-export async function addToBacklog(userId: string, proMoveId: number, weekId: string): Promise<void> {
+// Resolve a backlog item using RPC
+export async function resolveBacklogItemV2(
+  staffId: string, 
+  actionId: number
+): Promise<void> {
   try {
-    // Use upsert to avoid duplicates
-    await supabase
-      .from('user_backlog')
-      .upsert({
-        user_id: userId,
-        pro_move_id: proMoveId,
-        added_week_id: weekId,
-        status: 'open'
-      }, {
-        onConflict: 'user_id,pro_move_id,status',
-        ignoreDuplicates: true
-      });
+    await supabase.rpc('resolve_backlog_item', {
+      p_staff_id: staffId,
+      p_action_id: actionId
+    });
   } catch (error) {
-    console.error('Error adding to backlog:', error);
+    console.error('Error resolving backlog item v2:', error);
   }
 }
 
-// Populate backlog for a specific missed week (current week assignments that weren't completed)
-export async function populateBacklogForMissedWeek(
-  userId: string,
+// Get open backlog items v2 for a staff member (FIFO order)
+export async function getOpenBacklogV2(staffId: string): Promise<BacklogItemV2[]> {
+  try {
+    const { data, error } = await supabase
+      .from('user_backlog_v2')
+      .select('*')
+      .eq('staff_id', staffId)
+      .is('resolved_on', null)
+      .order('assigned_on', { ascending: true }); // FIFO
+
+    if (error) throw error;
+    return (data || []) as BacklogItemV2[];
+  } catch (error) {
+    console.error('Error fetching backlog v2:', error);
+    return [];
+  }
+}
+
+// Populate backlog v2 for a missed week (confidence not submitted by Tue noon)
+export async function populateBacklogV2ForMissedWeek(
+  staffId: string,
   assignments: any[],
   weekContext: { weekInCycle: number; cycleNumber: number }
 ): Promise<void> {
   try {
-    console.log('=== POPULATING BACKLOG FOR MISSED WEEK ===');
-    console.log('User:', userId);
+    console.log('=== POPULATING BACKLOG V2 FOR MISSED WEEK ===');
+    console.log('Staff:', staffId);
     console.log('Week context:', weekContext);
     console.log('Assignments:', assignments);
 
     // Only add site moves (not self-selects) to backlog
     const siteMoves = assignments.filter(a => a.type === 'site' && a.pro_move_id);
     
-    console.log('Site moves to add to backlog:', siteMoves.length);
+    console.log('Site moves to add to backlog v2:', siteMoves.length);
 
     for (const assignment of siteMoves) {
-      await addToBacklog(userId, assignment.pro_move_id, assignment.weekly_focus_id);
-      console.log(`Added pro move ${assignment.pro_move_id} to backlog for user ${userId}`);
+      await addToBacklogV2(
+        staffId, 
+        assignment.pro_move_id, 
+        weekContext.cycleNumber, 
+        weekContext.weekInCycle
+      );
+      console.log(`Added action ${assignment.pro_move_id} to backlog v2 for staff ${staffId}`);
     }
   } catch (error) {
-    console.error('Error populating backlog for missed week:', error);
+    console.error('Error populating backlog v2 for missed week:', error);
   }
 }
 
-// Check if backlog has already been populated for this week to avoid duplicates
-export async function isBacklogPopulatedForWeek(
-  userId: string, 
-  weeklyFocusIds: string[]
-): Promise<boolean> {
-  try {
-    if (weeklyFocusIds.length === 0) return false;
-    
-    const { data, error } = await supabase
-      .from('user_backlog')
-      .select('id')
-      .eq('user_id', userId)
-      .in('added_week_id', weeklyFocusIds)
-      .limit(1);
-
-    if (error) throw error;
-    return (data?.length || 0) > 0;
-  } catch (error) {
-    console.error('Error checking if backlog populated for week:', error);
-    return false; // Assume not populated on error to be safe
-  }
-}
-
-// Get open backlog items for a user (FIFO order)
-export async function getOpenBacklog(userId: string): Promise<BacklogItem[]> {
-  try {
-    const { data, error } = await supabase
-      .from('user_backlog')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', 'open')
-      .order('created_at', { ascending: true }); // FIFO
-
-    if (error) throw error;
-    return (data || []) as BacklogItem[];
-  } catch (error) {
-    console.error('Error fetching backlog:', error);
-    return [];
-  }
-}
-
-// Resolve a backlog item when the user completes it
-export async function resolveBacklogItem(userId: string, proMoveId: number, resolvedWeekId: string): Promise<void> {
-  try {
-    await supabase
-      .from('user_backlog')
-      .update({
-        status: 'done',
-        resolved_week_id: resolvedWeekId
-      })
-      .eq('user_id', userId)
-      .eq('pro_move_id', proMoveId)
-      .eq('status', 'open');
-  } catch (error) {
-    console.error('Error resolving backlog item:', error);
-  }
-}
-
-// Get open backlog count (with simulation override) - moved from weekValidationSim.ts
-export async function getOpenBacklogCount(
-  userId: string,
+// Get open backlog count v2 (with simulation override)
+export async function getOpenBacklogCountV2(
+  staffId: string,
   simOverrides?: SimOverrides
 ): Promise<{ count: number; items: any[] }> {
   // If simulation is active and backlog count is forced
@@ -183,19 +122,19 @@ export async function getOpenBacklogCount(
     const items = Array.from({ length: count }, (_, i) => ({
       id: `__sim_${i}`,
       __sim: true, // Mark as simulated
-      pro_move_id: i + 1,
-      status: 'open',
+      action_id: i + 1,
+      resolved_on: null,
       action_statement: `Simulated Backlog Item ${i + 1}`,
     }));
     return { count, items };
   }
 
-  // Otherwise, get real backlog data
+  // Otherwise, get real backlog data from v2
   const { data: backlog } = await supabase
-    .from('user_backlog')
+    .from('user_backlog_v2')
     .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'open');
+    .eq('staff_id', staffId)
+    .is('resolved_on', null);
 
   return { count: backlog?.length || 0, items: backlog || [] };
 }

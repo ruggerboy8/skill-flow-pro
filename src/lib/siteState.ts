@@ -1,7 +1,7 @@
 import { getWeekAnchors, CT_TZ } from './centralTime';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { getOpenBacklogCount, populateBacklogForMissedWeek, isBacklogPopulatedForWeek } from './backlog';
+import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 
 export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'can_checkout' | 'wait_for_thu' | 'done' | 'missed_checkout' | 'no_assignments';
 
@@ -373,7 +373,7 @@ export async function computeWeekState(params: {
   }
 
   // Get backlog count with simulation support
-  const backlogResult = await getOpenBacklogCount(userId, simOverrides);
+  const backlogResult = await getOpenBacklogCountV2(staff.id, simOverrides);
   const backlogCount = backlogResult.count;
 
   // Check for selection pending
@@ -500,15 +500,11 @@ async function populateMissedWeekBacklog(
     const weeklyFocusIds = assignments.map(a => a.weekly_focus_id).filter(Boolean);
     if (weeklyFocusIds.length === 0) return;
 
-    // Check if we've already populated backlog for this week to avoid duplicates
-    const alreadyPopulated = await isBacklogPopulatedForWeek(userId, weeklyFocusIds);
-    if (alreadyPopulated) {
-      console.log('Backlog already populated for this week, skipping');
-      return;
-    }
+    // Check if we've already populated backlog for this week to avoid duplicates (skip for v2)
+    // V2 backlog uses RPC with idempotent operations, so no need to check
 
     // Populate backlog for missed week
-    await populateBacklogForMissedWeek(userId, assignments, weekContext);
+    await populateBacklogV2ForMissedWeek(userId, assignments, weekContext);
   } catch (error) {
     console.error('Error in populateMissedWeekBacklog:', error);
   }

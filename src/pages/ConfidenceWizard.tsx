@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
-import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { nowUtc, getAnchors, nextMondayStr, getWeekAnchors } from '@/lib/centralTime';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -199,7 +199,6 @@ export default function ConfidenceWizard() {
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
 
-    // Remove time gating - allow submissions anytime
     setSubmitting(true);
 
     // Debug logging to track self-select state
@@ -207,14 +206,19 @@ export default function ConfidenceWizard() {
     console.log('Submit debug - selfSelectById:', selfSelectById);
     console.log('Submit debug - weeklyFocus:', weeklyFocus.map(f => ({ id: f.id, action_statement: f.action_statement })));
 
+    // Check if late submission (after Tue 12:00 CT)
+    const { confidence_deadline } = getWeekAnchors(effectiveNow);
+    const isLate = effectiveNow > confidence_deadline;
+
     const scoreInserts = weeklyFocus.map(focus => {
       const base: any = {
         staff_id: staff.id,
         weekly_focus_id: focus.id,
         confidence_score: scores[focus.id] || 1,
+        confidence_late: isLate, // Set late flag
       };
       
-      // Fix: Check for valid, non-empty selection and convert to number
+      // For self-select slots: set selected_action_id
       if (selfSelectById[focus.id] && selectedActions[focus.id] && selectedActions[focus.id] !== "") {
         const actionId = parseInt(selectedActions[focus.id]!, 10);
         if (!isNaN(actionId)) {
@@ -225,15 +229,39 @@ export default function ConfidenceWizard() {
         }
       } else if (selfSelectById[focus.id]) {
         console.warn(`Missing selection for self-select focus ${focus.id}`);
+      } else {
+        // For site slots: get the action_id from weekly_focus and set site_action_id
+        const weeklyFocusData = weeklyFocus.find(wf => wf.id === focus.id);
+        if (weeklyFocusData) {
+          // We need to get the action_id from the weekly_focus table
+          // This will be set in the database query below
+        }
       }
       
       return base;
     });
 
+    // Get weekly_focus data to set site_action_id for site slots
+    const { data: weeklyFocusData } = await supabase
+      .from('weekly_focus')
+      .select('id, action_id, self_select')
+      .in('id', weeklyFocus.map(f => f.id));
+
+    const focusMap = new Map(weeklyFocusData?.map(wf => [wf.id, wf]) || []);
+
+    // Update scoreInserts with site_action_id for site slots
+    const finalScoreInserts = scoreInserts.map(insert => {
+      const focusData = focusMap.get(insert.weekly_focus_id);
+      if (focusData && !focusData.self_select && focusData.action_id) {
+        insert.site_action_id = focusData.action_id;
+      }
+      return insert;
+    });
+
     // Save weekly scores
     const { error: scoresError } = await supabase
       .from('weekly_scores')
-      .upsert(scoreInserts, {
+      .upsert(finalScoreInserts, {
         onConflict: 'staff_id,weekly_focus_id'
       });
 

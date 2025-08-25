@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { assembleWeek as locationAssembleWeek } from './locationState';
-import { getOpenBacklogCount, areSelectionsLocked, saveUserSelection } from './backlog';
+import { getOpenBacklogCountV2, areSelectionsLocked, saveUserSelection } from './backlog';
 import { nowUtc, getAnchors } from "./centralTime";
 
 export interface WeekAssignment {

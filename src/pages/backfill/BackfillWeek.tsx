@@ -34,8 +34,6 @@ export default function BackfillWeek() {
     selected_action_id: number | null;
     confidence: number | null;
     performance: number | null;
-    confidence_estimated: boolean;
-    performance_estimated: boolean;
   })[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -84,8 +82,6 @@ export default function BackfillWeek() {
           selected_action_id: null,
           confidence: null,
           performance: null,
-          confidence_estimated: false,
-          performance_estimated: false,
         };
       });
 
@@ -105,7 +101,7 @@ export default function BackfillWeek() {
       const focusIds = merged.map((m) => m.id);
       const { data: prev } = await supabase
         .from("weekly_scores")
-        .select("weekly_focus_id, selected_action_id, confidence_score, performance_score, confidence_estimated, performance_estimated")
+        .select("weekly_focus_id, selected_action_id, confidence_score, performance_score")
         .eq("staff_id", staffRow.id)
         .in("weekly_focus_id", focusIds);
 
@@ -115,8 +111,6 @@ export default function BackfillWeek() {
           item.selected_action_id = row.selected_action_id;
           item.confidence = row.confidence_score;
           item.performance = row.performance_score;
-          item.confidence_estimated = row.confidence_estimated ?? false;
-          item.performance_estimated = row.performance_estimated ?? false;
         }
       }
 
@@ -155,8 +149,6 @@ export default function BackfillWeek() {
       performance_score: i.performance,
       confidence_source: "backfill",
       performance_source: "backfill",
-      confidence_estimated: !!i.confidence_estimated,
-      performance_estimated: !!i.performance_estimated,
       entered_by: user?.id,
     }));
 

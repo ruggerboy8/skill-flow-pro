@@ -40,7 +40,7 @@ export async function getOpenBacklogCount(
   console.warn('getOpenBacklogCount from weekValidationSim.ts is deprecated. Use backlog.ts instead');
   
   // Re-export from backlog.ts for compatibility
-  const { getOpenBacklogCount: getBacklogCount } = await import('./backlog');
+  const { getOpenBacklogCountV2: getBacklogCount } = await import('./backlog');
   return getBacklogCount(userId, simOverrides);
 }
 

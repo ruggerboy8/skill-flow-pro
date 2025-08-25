@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
-import { nowUtc, getAnchors } from '@/lib/centralTime';
+import { nowUtc, getAnchors, getWeekAnchors } from '@/lib/centralTime';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
@@ -167,11 +167,16 @@ export default function PerformanceWizard() {
 
     setSubmitting(true);
 
+    // Check if late submission (after Fri 5:00 PM CT)
+    const { performance_deadline } = getWeekAnchors(effectiveNow);
+    const isLate = effectiveNow > performance_deadline;
+
     const updates = existingScores.map(score => ({
       id: score.id,
       staff_id: staff.id,
       weekly_focus_id: score.weekly_focus_id,
-      performance_score: performanceScores[score.weekly_focus_id] || 1
+      performance_score: performanceScores[score.weekly_focus_id] || 1,
+      performance_late: isLate, // Set late flag
     }));
 
     const { error } = await supabase

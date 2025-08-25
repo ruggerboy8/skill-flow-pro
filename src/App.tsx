@@ -69,10 +69,10 @@ function AppRoutes() {
         <Route path="create-password" element={<SetupPassword />} />
         <Route path="setup-password" element={<SetupPassword />} />
         <Route path="stats" element={<StatsLayout />}>
-          <Route index element={<StatsScores />} />
-          <Route path="scores" element={<StatsScores />} />
+          <Route index element={<StatsGlance />} />
           <Route path="glance" element={<StatsGlance />} />
-          <Route path="eval" element={<StatsEval />} />
+          <Route path="scores" element={<StatsScores />} />
+          <Route path="evaluations" element={<StatsEval />} />
         </Route>
         <Route path="profile" element={<Profile />} />
         <Route path="week" element={<Week />} />

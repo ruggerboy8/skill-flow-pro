@@ -7,7 +7,7 @@ export default function StatsLayout() {
   const navigate = useNavigate();
   
   // Extract the tab from the pathname
-  const currentTab = location.pathname.split('/').pop() || 'scores';
+  const currentTab = location.pathname.split('/').pop() || 'glance';
   
   const handleTabChange = (value: string) => {
     navigate(`/stats/${value}`);
@@ -19,9 +19,9 @@ export default function StatsLayout() {
       
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="scores">Scores</TabsTrigger>
           <TabsTrigger value="glance">At-a-Glance</TabsTrigger>
-          <TabsTrigger value="eval">6-Week Eval</TabsTrigger>
+          <TabsTrigger value="scores">Weekly Scores</TabsTrigger>
+          <TabsTrigger value="evaluations">Evaluations</TabsTrigger>
         </TabsList>
         
         <TabsContent value={currentTab} className="mt-6">

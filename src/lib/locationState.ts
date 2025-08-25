@@ -100,225 +100,167 @@ export async function assembleWeek(params: {
   weekInCycle: number;
   simOverrides?: any;
 }): Promise<any[]> {
-  const { userId, roleId, locationId, cycleNumber, weekInCycle, simOverrides } = params;
-  
-  // Get staff information to get staff_id for backlog queries
-  const { data: staff } = await supabase
-    .from('staff')
-    .select('id')
-    .eq('user_id', userId)
-    .maybeSingle();
+  const { userId, roleId, cycleNumber, weekInCycle } = params;
 
-  if (!staff) {
-    throw new Error('Staff member not found');
-  }
-  
-  // Fetch weekly focus for this role/cycle/week
+  // 1) Load weekly_focus for this role/week
   const { data: weeklyFocus } = await supabase
     .from('weekly_focus')
-    .select('*')
+    .select('id, display_order, self_select, action_id, competency_id')
     .eq('role_id', roleId)
     .eq('cycle', cycleNumber)
     .eq('week_in_cycle', weekInCycle)
     .order('display_order');
 
-  if (!weeklyFocus || weeklyFocus.length === 0) {
-    return [];
-  }
+  if (!weeklyFocus || weeklyFocus.length === 0) return [];
 
-  // Foundation rule: In Cycle 1, force site moves only (block self-select)
   const isFoundation = cycleNumber === 1;
 
-  // Get user's self-selections (only if not in foundation)
-  let selections: any[] = [];
+  // 2) Build set of "already assigned" action_ids (site moves first)
+  const assignedActionIds = new Set<number>();
+  const siteFocus = weeklyFocus.filter(wf => !wf.self_select && wf.action_id);
+  if (siteFocus.length) {
+    const { data: siteMoves } = await supabase
+      .from('pro_moves')
+      .select('action_id')
+      .in('action_id', siteFocus.map(wf => wf.action_id as number));
+    (siteMoves || []).forEach(m => assignedActionIds.add(m.action_id));
+  }
+
+  // 3) Load backlog FIFO (only if not foundation)
+  let backlog: { id: string; action_id: number }[] = [];
   if (!isFoundation) {
-    const { data: userSelections } = await supabase
-      .from('weekly_self_select')
-      .select('*')
+    // We need staff_id for backlog; fetch once
+    const { data: staff } = await supabase
+      .from('staff')
+      .select('id')
       .eq('user_id', userId)
-      .in('weekly_focus_id', weeklyFocus.map(w => w.id));
-    selections = userSelections || [];
-  }
-
-  // Get user's backlog items (only if not in foundation) - use v2 table with staff_id
-  let backlog: any[] = [];
-  if (!isFoundation) {
-    const { data: userBacklog } = await supabase
-      .from('user_backlog_v2')
-      .select(`
-        *,
-        pro_moves!inner(action_id, action_statement, competency_id)
-      `)
-      .eq('staff_id', staff.id)
-      .is('resolved_on', null)  // Only unresolved items
-      .order('assigned_on');     // FIFO order
-    backlog = userBacklog || [];
-  }
-
-  const assignments: any[] = [];
-  let backlogIndex = 0;
-
-  // Process each weekly focus slot
-  for (const focus of weeklyFocus) {
-    if (focus.self_select && !isFoundation) {
-      // Self-select slot in flexible cycles (≥2)
-      const selection = selections.find(s => s.weekly_focus_id === focus.id);
-      
-      if (selection) {
-        // User has made a selection
-        const { data: selectedProMove } = await supabase
-          .from('pro_moves')
-          .select(`
-            *,
-            competencies(name, domain_id)
-          `)
-          .eq('action_id', selection.selected_pro_move_id)
-          .maybeSingle();
-
-        // Get domain for the competency
-        const { data: domain } = await supabase
-          .from('domains')
-          .select('domain_name')
-          .eq('domain_id', selectedProMove?.competencies?.domain_id)
-          .maybeSingle();
-
-        if (selectedProMove) {
-          assignments.push({
-            weekly_focus_id: focus.id,
-            type: 'selfSelect',
-            pro_move_id: selectedProMove.action_id,
-            action_statement: selectedProMove.action_statement,
-            competency_name: selectedProMove.competencies?.name || 'General',
-            domain_name: domain?.domain_name || 'General',
-            required: false,
-            locked: false,
-            display_order: focus.display_order
-          });
-        }
-      } else {
-        // No user selection - check if we can replace with backlog item
-        let backlogReplacement = null;
-        
-        // Find oldest non-duplicate backlog item
-        while (backlogIndex < backlog.length) {
-          const backlogItem = backlog[backlogIndex];
-          
-          // Check if this backlog item would duplicate an already assigned move
-          const isDuplicate = assignments.some(a => a.pro_move_id === backlogItem.action_id);
-          
-          if (!isDuplicate) {
-            backlogReplacement = backlogItem;
-            backlogIndex++; // Consume this backlog item
-            break;
-          }
-          
-          backlogIndex++; // Skip duplicate but don't consume
-        }
-        
-        if (backlogReplacement) {
-          // Replace self-select slot with backlog item (treat as locked site move)
-          const { data: competency } = await supabase
-            .from('competencies')
-            .select('name, domain_id')
-            .eq('competency_id', backlogReplacement.pro_moves.competency_id)
-            .maybeSingle();
-
-          let domainName = 'General';
-          if (competency?.domain_id) {
-            const { data: domain } = await supabase
-              .from('domains')
-              .select('domain_name')
-              .eq('domain_id', competency.domain_id)
-              .maybeSingle();
-            domainName = domain?.domain_name || 'General';
-          }
-
-          assignments.push({
-            weekly_focus_id: focus.id,
-            type: 'site', // Treat backlog replacement as locked site move
-            pro_move_id: backlogReplacement.action_id,
-            action_statement: backlogReplacement.pro_moves.action_statement,
-            competency_name: competency?.name || 'General',
-            domain_name: domainName,
-            required: true,
-            locked: true, // Backlog replacements are locked (no dropdown)
-            display_order: focus.display_order,
-            from_backlog: true // Flag to identify backlog replacements
-          });
-        } else {
-          // No backlog replacement available - show empty self-select slot
-          let domainName = 'General';
-          let competencyName = 'Select Competency';
-          
-          if (focus.competency_id) {
-            const { data: competency } = await supabase
-              .from('competencies')
-              .select('name, domain_id')
-              .eq('competency_id', focus.competency_id)
-              .maybeSingle();
-
-            if (competency) {
-              competencyName = competency.name || 'Select Competency';
-              
-              if (competency.domain_id) {
-                const { data: domain } = await supabase
-                  .from('domains')
-                  .select('domain_name')
-                  .eq('domain_id', competency.domain_id)
-                  .maybeSingle();
-                
-                domainName = domain?.domain_name || 'General';
-              }
-            }
-          }
-
-          assignments.push({
-            weekly_focus_id: focus.id,
-            type: 'selfSelect',
-            action_statement: 'Choose a pro-move',
-            competency_name: competencyName,
-            domain_name: domainName,
-            required: false,
-            locked: false,
-            display_order: focus.display_order
-          });
-        }
-      }
-    } else {
-      // Site move (or self-select slot in foundation - treat as site move)
-      if (focus.action_id) {
-        const { data: siteProMove } = await supabase
-          .from('pro_moves')
-          .select(`
-            *,
-            competencies(name, domain_id)
-          `)
-          .eq('action_id', focus.action_id)
-          .maybeSingle();
-
-        // Get domain for the competency
-        const { data: domain } = await supabase
-          .from('domains')
-          .select('domain_name')
-          .eq('domain_id', siteProMove?.competencies?.domain_id)
-          .maybeSingle();
-
-        assignments.push({
-          weekly_focus_id: focus.id,
-          type: 'site',
-          pro_move_id: siteProMove?.action_id,
-          action_statement: siteProMove?.action_statement || 'Site move',
-          competency_name: siteProMove?.competencies?.name || 'General',
-          domain_name: domain?.domain_name || 'General',
-          required: true,
-          locked: true,
-          display_order: focus.display_order
-        });
-      }
+      .maybeSingle();
+    if (staff?.id) {
+      const { data: open } = await supabase
+        .from('user_backlog_v2')
+        .select('id, action_id')
+        .eq('staff_id', staff.id)
+        .is('resolved_on', null)
+        .order('assigned_on', { ascending: true });
+      backlog = (open || []) as any[];
     }
   }
 
-  return assignments.sort((a, b) => a.display_order - b.display_order);
+  // helper: fetch pro move + domain for a given action_id
+  async function hydrateAction(actionId: number) {
+    const { data: pm } = await supabase
+      .from('pro_moves')
+      .select('action_id, action_statement, competencies!inner(name, domain_id)')
+      .eq('action_id', actionId)
+      .maybeSingle();
+
+    let domainName = 'General';
+    if (pm?.competencies?.domain_id) {
+      const { data: d } = await supabase
+        .from('domains')
+        .select('domain_name')
+        .eq('domain_id', pm.competencies.domain_id)
+        .maybeSingle();
+      domainName = d?.domain_name || 'General';
+    }
+
+    return {
+      pro_move_id: pm?.action_id,
+      action_statement: pm?.action_statement || 'Pro Move',
+      competency_name: pm?.competencies?.name || 'General',
+      domain_name: domainName
+    };
+  }
+
+  const result: any[] = [];
+
+  // 4) Build assignments slot by slot (dedup against assignedActionIds)
+  for (const wf of weeklyFocus) {
+    if (!wf.self_select) {
+      // SITE move
+      if (wf.action_id) {
+        const info = await hydrateAction(wf.action_id);
+        result.push({
+          weekly_focus_id: wf.id,
+          type: 'site',
+          ...info,
+          required: true,
+          locked: true,
+          display_order: wf.display_order
+        });
+        if (info.pro_move_id) assignedActionIds.add(info.pro_move_id);
+      }
+      continue;
+    }
+
+    // SELF-SELECT slot
+    if (isFoundation) {
+      // Foundation = force site moves only; treat as "choose later"
+      result.push({
+        weekly_focus_id: wf.id,
+        type: 'selfSelect',
+        action_statement: 'Choose a pro-move',
+        domain_name: 'General',
+        required: false,
+        locked: false,
+        display_order: wf.display_order
+      });
+      continue;
+    }
+
+    // Try to consume oldest non-duplicate backlog item
+    let usedBacklog: { id: string; action_id: number } | undefined;
+    for (const item of backlog) {
+      if (!assignedActionIds.has(item.action_id)) {
+        usedBacklog = item;
+        break;
+      }
+    }
+
+    if (usedBacklog) {
+      const info = await hydrateAction(usedBacklog.action_id);
+      result.push({
+        weekly_focus_id: wf.id,
+        type: 'backlog',
+        backlog_id: usedBacklog.id,
+        ...info,
+        required: false,
+        locked: true,            // locked: no dropdown
+        display_order: wf.display_order
+      });
+      if (info.pro_move_id) assignedActionIds.add(info.pro_move_id);
+    } else {
+      // No eligible backlog -> normal self-select
+      // Optional: look up competency/domain for nicer badge (same as your current code)
+      let domainName = 'General';
+      if (wf.competency_id) {
+        const { data: comp } = await supabase
+          .from('competencies')
+          .select('name, domain_id')
+          .eq('competency_id', wf.competency_id)
+          .maybeSingle();
+        if (comp?.domain_id) {
+          const { data: d } = await supabase
+            .from('domains')
+            .select('domain_name')
+            .eq('domain_id', comp.domain_id)
+            .maybeSingle();
+          domainName = d?.domain_name || 'General';
+        }
+      }
+      result.push({
+        weekly_focus_id: wf.id,
+        type: 'selfSelect',
+        action_statement: 'Choose a pro-move',
+        domain_name: domainName,
+        required: false,
+        locked: false,
+        display_order: wf.display_order
+      });
+    }
+  }
+
+  return result.sort((a, b) => a.display_order - b.display_order);
 }
 
 /**

@@ -117,13 +117,36 @@ export default function BackfillReview() {
   }, [user]);
 
   const handleFinish = async () => {
+    if (!staff) return;
+    
     try {
+      // Backfill historical timestamps for realistic dates
+      const { data: updatedCount, error } = await supabase.rpc('backfill_historical_score_timestamps', {
+        p_staff_id: staff.id,
+        p_only_backfill: true,
+        p_jitter_minutes: 30
+      });
+
+      if (error) {
+        console.error('Error backfilling timestamps:', error);
+        toast({ 
+          title: "Error", 
+          description: "There was an issue setting historical dates. Your scores are saved but may show recent timestamps.",
+          variant: "destructive"
+        });
+      } else {
+        console.log(`Backfilled timestamps for ${updatedCount} score entries`);
+      }
+
       localStorage.setItem("backfillDone", "true");
       const raw = localStorage.getItem("backfillProgress");
       const progress = raw ? JSON.parse(raw) : {};
       for (let w=1; w<=6; w++) if (!progress[w]) progress[w] = true;
       localStorage.setItem("backfillProgress", JSON.stringify(progress));
-    } catch {}
+    } catch (err) {
+      console.error('Backfill completion error:', err);
+    }
+    
     toast({ title: "Backfill complete", description: "Thanks! Your stats are ready." });
     navigate("/");
   };

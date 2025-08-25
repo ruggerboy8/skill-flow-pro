@@ -745,6 +745,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      backfill_historical_score_timestamps: {
+        Args: {
+          p_jitter_minutes?: number
+          p_only_backfill?: boolean
+          p_staff_id: string
+        }
+        Returns: number
+      }
       bulk_upsert_pro_moves: {
         Args: { pro_moves_data: Json }
         Returns: Json

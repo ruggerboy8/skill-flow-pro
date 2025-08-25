@@ -7,7 +7,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { nowUtc, nextMondayStr, getWeekAnchors, CT_TZ } from '@/lib/centralTime';
+import { nowUtc, nextMondayStr, CT_TZ } from '@/lib/centralTime';
+import { getWeekAnchors } from '@/v2/time';
+import { isV2 } from '@/lib/featureFlags';
 import { useNow } from '@/providers/NowProvider';
 import { getDomainColor } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
@@ -36,6 +38,7 @@ export default function ThisWeekPanel() {
   const [weekAssignments, setWeekAssignments] = useState<WeekAssignment[]>([]);
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [weekOfDate, setWeekOfDate] = useState<string>('');
   const [SimBannerComponent, setSimBannerComponent] = useState<React.ComponentType | null>(null);
 
   // Load dev tools conditionally
@@ -109,6 +112,16 @@ export default function ThisWeekPanel() {
       // Get location-specific time anchors for state computation
       const locationTimeContext = await getLocationWeekContext(staffData.primary_location_id, effectiveNow);
       setLocationWeekContext({ ...locationTimeContext, cycleNumber, weekInCycle });
+      
+      // Calculate week of date using location timezone
+      if (isV2) {
+        const locationAnchors = await getWeekAnchors(effectiveNow, locationTimeContext.timezone);
+        setWeekOfDate(formatInTimeZone(locationAnchors.mondayZ, locationTimeContext.timezone, 'MMM d, yyyy'));
+      } else {
+        const { getWeekAnchors: v1GetWeekAnchors } = await import('@/lib/centralTime');
+        const { mondayZ } = v1GetWeekAnchors(effectiveNow, CT_TZ);
+        setWeekOfDate(formatInTimeZone(mondayZ, CT_TZ, 'MMM d, yyyy'));
+      }
       
       // Compute current week state with simulation overrides (location-based unified)
       const context = await computeWeekState({
@@ -218,9 +231,7 @@ export default function ThisWeekPanel() {
     );
   }
 
-  // Get Monday date for "Week of" display
-  const { mondayZ } = getWeekAnchors(now, CT_TZ);
-  const weekOfDate = formatInTimeZone(mondayZ, CT_TZ, 'MMM d, yyyy');
+  // Get Monday date for "Week of" display using location timezone - calculated in loadCurrentWeek
 
   // Show all assignments regardless of state - user wants to see self-select moves too
   const displayAssignments = weekAssignments;

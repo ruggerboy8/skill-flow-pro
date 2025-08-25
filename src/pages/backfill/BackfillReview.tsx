@@ -47,7 +47,7 @@ export default function BackfillReview() {
           week_in_cycle, 
           role_id, 
           cycle,
-          pro_moves(action_statement)
+          pro_moves(action_statement, competency_id)
         `)
         .eq("cycle", 1)
         .eq("role_id", staffRow.role_id)
@@ -70,14 +70,42 @@ export default function BackfillReview() {
         (acts||[]).forEach(a => { actionMap[a.action_id] = a.action_statement; });
       }
 
+      // Build competency_id → domain_name map
+      const competencyIds = Array.from(new Set((focus||[]).map((f:any) => f.pro_moves?.competency_id).filter(Boolean))) as number[];
+      let domainMap: Record<number, string> = {};
+      if (competencyIds.length) {
+        const { data: competencies } = await supabase
+          .from("competencies")
+          .select("competency_id, domain_id")
+          .in("competency_id", competencyIds);
+        
+        const domainIds = Array.from(new Set((competencies||[]).map(c => c.domain_id).filter(Boolean)));
+        if (domainIds.length) {
+          const { data: domains } = await supabase
+            .from("domains")
+            .select("domain_id, domain_name")
+            .in("domain_id", domainIds);
+          
+          const domainIdToName: Record<number, string> = {};
+          (domains||[]).forEach(d => { domainIdToName[d.domain_id] = d.domain_name; });
+          
+          (competencies||[]).forEach(c => {
+            if (c.domain_id && domainIdToName[c.domain_id]) {
+              domainMap[c.competency_id] = domainIdToName[c.domain_id];
+            }
+          });
+        }
+      }
+
       const merged = (focus||[]).map((f:any) => {
         const s = (scores||[]).find((r)=>r.weekly_focus_id===f.id);
+        const competencyId = f.pro_moves?.competency_id;
         return {
           id: f.id,
           display_order: f.display_order,
           action_statement: f.pro_moves?.action_statement || '',
           week_in_cycle: f.week_in_cycle,
-          domain_name: "", // optional in review
+          domain_name: competencyId ? (domainMap[competencyId] || "General") : "General",
           selected_action_statement: s?.selected_action_id ? (actionMap[s.selected_action_id] || null) : null,
           confidence_score: s?.confidence_score ?? null,
           performance_score: s?.performance_score ?? null,
@@ -121,7 +149,7 @@ export default function BackfillReview() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="font-semibold">Week {wk}</div>
-                  <Badge variant="outline">3 items</Badge>
+                  <Badge variant="outline">{byWeek[Number(wk)].length} items</Badge>
                 </div>
                 <div className="space-y-2">
                   {(byWeek[Number(wk)]||[]).map((r, idx) => {

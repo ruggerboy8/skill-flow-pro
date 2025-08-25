@@ -2,35 +2,59 @@ import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { useBackfillStatus } from '@/hooks/useBackfillStatus';
 import { Home, BarChart3, User, Settings, Users, ClipboardList, Building, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-
-const ADMIN_EMAILS = ['johno@reallygoodconsulting.org'];
+import { isV2 } from '@/lib/featureFlags';
+import { needsBackfill } from '@/v2/backfillGate';
 
 export default function Layout() {
   const { user, signOut, isCoach } = useAuth();
-  const { isBackfillComplete } = useBackfillStatus();
   const location = useLocation();
   
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [backfillMissingCount, setBackfillMissingCount] = useState(0);
+  const [isLoadingBackfill, setIsLoadingBackfill] = useState(true);
+
   useEffect(() => {
-    if (!user) { setIsSuperAdmin(false); return; }
-    supabase
-      .from('staff')
-      .select('is_super_admin')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => setIsSuperAdmin(!!data?.is_super_admin));
+    if (!user) { 
+      setIsSuperAdmin(false);
+      setBackfillMissingCount(0);
+      setIsLoadingBackfill(false);
+      return; 
+    }
+
+    async function loadStaffData() {
+      try {
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select('id, role_id, is_super_admin')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (staffData) {
+          setIsSuperAdmin(!!staffData.is_super_admin);
+          
+          // Check backfill status using server-side logic
+          if (isV2 && staffData.id && staffData.role_id) {
+            const backfillResult = await needsBackfill(staffData.id, staffData.role_id);
+            setBackfillMissingCount(backfillResult.missingCount);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading staff data:', error);
+      } finally {
+        setIsLoadingBackfill(false);
+      }
+    }
+
+    loadStaffData();
   }, [user]);
-  
-  const isAdmin = user && ADMIN_EMAILS.includes(user.email || '');
   
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Stats', href: '/stats', icon: BarChart3 },
-    // Show backfill button for all users when not complete
-    ...(isBackfillComplete === false ? [{ name: 'Backfill', href: '/backfill', icon: ClipboardList }] : []),
+    // Show backfill button when server indicates missing completion data
+    ...(isV2 && !isLoadingBackfill && backfillMissingCount > 0 ? [{ name: 'Backfill', href: '/backfill', icon: ClipboardList }] : []),
     ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
     ...(isSuperAdmin ? [
       { name: 'Builder', href: '/builder', icon: Settings },
@@ -39,7 +63,7 @@ export default function Layout() {
     ] : [])
   ];
 
-  console.log('Layout - isBackfillComplete:', isBackfillComplete, 'navigation length:', navigation.length);
+  console.log('Layout - backfillMissingCount:', backfillMissingCount, 'isV2:', isV2, 'navigation length:', navigation.length);
 
   const isActive = (href: string) => {
     if (href === '/') {
@@ -64,7 +88,7 @@ export default function Layout() {
                 {navigation.map((item) => {
                   const Icon = item.icon;
                   const isBackfillButton = item.name === 'Backfill';
-                  const needsHighlight = isBackfillButton && isBackfillComplete === false;
+                  const needsHighlight = isBackfillButton && backfillMissingCount > 0;
                   
                   return (
                     <NavLink
@@ -103,7 +127,7 @@ export default function Layout() {
             {navigation.map((item) => {
               const Icon = item.icon;
               const isBackfillButton = item.name === 'Backfill';
-              const needsHighlight = isBackfillButton && isBackfillComplete === false;
+              const needsHighlight = isBackfillButton && backfillMissingCount > 0;
               
               return (
                 <NavLink

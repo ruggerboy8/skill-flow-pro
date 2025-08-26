@@ -41,8 +41,11 @@ export default function StatsEvaluations() {
           .maybeSingle();
         if (!staff) { setLoading(false); return; }
 
-        // RPC preferred; fallback to client joins if needed
-        const { data } = await supabase.rpc('get_evaluations_summary', { p_staff_id: staff.id });
+        // RPC with p_only_submitted = true to get submitted evaluations only
+        const { data } = await supabase.rpc('get_evaluations_summary', { 
+          p_staff_id: staff.id,
+          p_only_submitted: true 
+        });
 
         // transform rows -> EvalRow[]
         const map = new Map<string, EvalRow>();
@@ -52,12 +55,17 @@ export default function StatsEvaluations() {
             if (r.quarter) labelBits.push(r.quarter);
             if (r.program_year) labelBits.push(String(r.program_year));
             const header = labelBits.length ? labelBits.join(' ') : r.type ?? 'Evaluation';
+            // Format submitted date
             const submitted = r.submitted_at ? new Date(r.submitted_at) : null;
-            const when = submitted ? submitted.toLocaleDateString() : 'Draft';
+            const when = submitted ? `Submitted ${submitted.toLocaleDateString('en-US', { 
+              month: 'short', 
+              day: 'numeric', 
+              year: 'numeric' 
+            })}` : '';
             map.set(r.eval_id, {
               eval_id: r.eval_id,
               label: `${header} • ${when}`,
-              status: (r.status === 'submitted' ? 'submitted' : 'draft'),
+              status: 'submitted', // Only submitted evaluations now
               domains: [],
               staff_id: staff.id
             });
@@ -69,7 +77,12 @@ export default function StatsEvaluations() {
             delta: r.delta
           });
         }
-        setEvals(Array.from(map.values()).sort((a,b) => a.status === 'submitted' ? -1 : 1));
+        // Sort by submitted_at desc
+        setEvals(Array.from(map.values()).sort((a,b) => {
+          const dateA = data?.find(d => d.eval_id === a.eval_id)?.submitted_at;
+          const dateB = data?.find(d => d.eval_id === b.eval_id)?.submitted_at;
+          return new Date(dateB || 0).getTime() - new Date(dateA || 0).getTime();
+        }));
       } finally {
         setLoading(false);
       }
@@ -90,14 +103,17 @@ export default function StatsEvaluations() {
       <Card>
         <CardContent className="py-12 text-center">
           <p className="text-muted-foreground">
-            No evaluations yet. Once we start one, you'll see it here.
+            No evaluations yet. Once one is submitted, you'll see it here.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  const latest = evals.find(e => e.status === 'submitted') ?? evals[0];
+  const latest = evals[0]; // First evaluation (most recent submitted)
+  
+  // Helper function for rounding
+  const r1 = (n: number | null) => n == null ? null : Math.round(n * 10) / 10;
 
   return (
     <div className="space-y-6">
@@ -113,12 +129,16 @@ export default function StatsEvaluations() {
                  style={{ backgroundColor: getDomainColor(d.domain_name) }}>
               <span className="text-sm font-medium text-slate-900 w-32">{d.domain_name}</span>
               <div className="flex items-center gap-4 text-sm">
-                <span><strong>Self:</strong> {d.avg_self ?? '—'}</span>
-                <span><strong>Observer:</strong> {d.avg_observer ?? '—'}</span>
-                {d.delta != null && (
-                  <Badge variant={d.delta >= 0.5 ? 'secondary' : d.delta <= -0.5 ? 'destructive' : 'default'}>
-                    {d.delta > 0 ? `Observer +${d.delta.toFixed(1)}` :
-                     d.delta < 0 ? `Observer ${d.delta.toFixed(1)}` : 'Aligned'}
+                <span><strong>Self:</strong> {r1(d.avg_self) ?? '—'}</span>
+                <span><strong>Observer:</strong> {r1(d.avg_observer) ?? '—'}</span>
+                {d.avg_self != null && d.avg_observer != null && (
+                  <Badge variant={
+                    Math.abs(d.avg_observer - d.avg_self) < 0.5 ? 'default' :
+                    d.avg_observer - d.avg_self >= 0.5 ? 'secondary' : 'destructive'
+                  }>
+                    {Math.abs(d.avg_observer - d.avg_self) < 0.5 ? 'Aligned' :
+                     d.avg_observer - d.avg_self >= 0.5 ? `Observer +${(d.avg_observer - d.avg_self).toFixed(1)}` :
+                     `Observer ${(d.avg_observer - d.avg_self).toFixed(1)}`}
                   </Badge>
                 )}
               </div>
@@ -127,9 +147,9 @@ export default function StatsEvaluations() {
           <div className="pt-2">
             <Button 
               className="w-full" 
-              onClick={() => navigate(`/coach/${latest.staff_id}/evaluation/${latest.eval_id}`)}
+              onClick={() => navigate(`/evaluation/${latest.eval_id}`)}
             >
-              Open Evaluation
+              View full evaluation
             </Button>
           </div>
         </CardContent>
@@ -153,7 +173,7 @@ export default function StatsEvaluations() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => navigate(`/coach/${e.staff_id}/evaluation/${e.eval_id}`)}
+                  onClick={() => navigate(`/evaluation/${e.eval_id}`)}
                 >
                   View
                 </Button>

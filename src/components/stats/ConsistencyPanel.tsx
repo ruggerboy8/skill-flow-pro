@@ -92,10 +92,12 @@ export default function ConsistencyPanel({ data, loading, tz = 'America/Chicago'
   };
 
   const getNarrative = () => {
-    const onTimeRate = data.on_time_count;
-    if (onTimeRate >= 4) {
+    const onTime = data.on_time_count;
+    if (onTime === 6) {
+      return "Perfect streak — on time for all 6 weeks.";
+    } else if (onTime >= 4) {
       return "Mostly on time in the last six weeks.";
-    } else if (onTimeRate === 3) {
+    } else if (onTime === 3) {
       return "Mixed on-time pattern recently.";
     } else {
       return "Often late or missing recently.";

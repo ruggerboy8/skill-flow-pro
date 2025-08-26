@@ -901,8 +901,10 @@ export type Database = {
         Returns: undefined
       }
       retime_backfill_cycle: {
-        Args: { p_cycle: number; p_role_id: number; p_staff_id: string }
-        Returns: undefined
+        Args:
+          | { p_cycle: number; p_role_id: number; p_staff_id: string }
+          | { p_cycle: number; p_role_id: number; p_staff_id: string }
+        Returns: string
       }
       rewrite_backfill_week: {
         Args: {

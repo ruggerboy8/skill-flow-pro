@@ -900,6 +900,19 @@ export type Database = {
         Args: { p_action_id: number; p_staff_id: string }
         Returns: undefined
       }
+      retime_backfill_cycle: {
+        Args: { p_cycle: number; p_role_id: number; p_staff_id: string }
+        Returns: undefined
+      }
+      rewrite_backfill_week: {
+        Args: {
+          p_cycle: number
+          p_role_id: number
+          p_staff_id: string
+          p_week: number
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       score_source: "live" | "backfill"

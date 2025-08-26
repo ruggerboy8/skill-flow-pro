@@ -789,7 +789,9 @@ export type Database = {
         }[]
       }
       get_evaluations_summary: {
-        Args: { p_staff_id: string }
+        Args:
+          | { p_only_submitted?: boolean; p_staff_id: string }
+          | { p_staff_id: string }
         Returns: {
           avg_observer: number
           avg_self: number

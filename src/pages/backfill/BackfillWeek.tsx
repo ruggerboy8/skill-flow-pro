@@ -157,26 +157,26 @@ export default function BackfillWeek() {
       return toast({ title: "Save failed", description: error.message, variant: "destructive" });
     }
 
-    // After successful upsert, run timestamp backfill for week 6
+     // After week 6 backfill, retime all backfilled scores for this staff/cycle
     try {
       if (weekNum >= 6 && staff?.id) {
         const ran = localStorage.getItem("bf_ts_fixed");
         if (!ran) {
-          const { data, error } = await supabase.rpc('backfill_historical_score_timestamps', {
+          const { error } = await supabase.rpc('retime_backfill_cycle', {
             p_staff_id: staff.id,
-            p_only_backfill: true,
-            p_jitter_minutes: 30
+            p_role_id: staff.role_id,
+            p_cycle: 1
           });
           if (error) {
-            console.error('Timestamp backfill RPC failed:', error);
+            console.error('retime_backfill_cycle RPC failed:', error);
           } else {
-            console.log('Timestamp backfill RPC ok:', data);
+            console.log('retime_backfill_cycle RPC succeeded');
             localStorage.setItem("bf_ts_fixed", "1");
           }
         }
       }
     } catch (e) {
-      console.error('Failed to run timestamp backfill RPC:', e);
+      console.error('Failed to run retime_backfill_cycle RPC:', e);
     }
 
     try {

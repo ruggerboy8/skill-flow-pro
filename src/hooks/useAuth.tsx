@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   needsPasswordSetup: boolean;
+  needsProfileSetup: boolean;
   isCoach: boolean;
   signInWithOtp: (email: string) => Promise<{ error: any }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error: any }>;
@@ -22,18 +23,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
+  const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [isCoach, setIsCoach] = useState(false);
 
   useEffect(() => {
-    const checkCoachStatus = async (userId: string) => {
+    const checkUserStatus = async (userId: string) => {
       const { data } = await supabase
         .from('staff')
-        .select('is_coach, is_super_admin')
+        .select('is_coach, is_super_admin, name, role_id, primary_location_id')
         .eq('user_id', userId)
         .single();
       
       if (data) {
         setIsCoach(data.is_coach || data.is_super_admin);
+        // Check if profile is complete
+        setNeedsProfileSetup(false);
+      } else {
+        // No staff record exists, user needs to complete profile
+        setNeedsProfileSetup(true);
+        setIsCoach(false);
       }
     };
 
@@ -49,13 +57,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!hasPasswordSet) {
             // User needs to set password
             setNeedsPasswordSetup(true);
+            setNeedsProfileSetup(false); // Don't show profile setup until password is set
           } else {
             setNeedsPasswordSetup(false);
+            // Check if user needs to complete profile
+            checkUserStatus(session.user.id);
           }
-          // Check coach status
-          checkCoachStatus(session.user.id);
         } else {
           setNeedsPasswordSetup(false);
+          setNeedsProfileSetup(false);
           setIsCoach(false);
         }
         
@@ -71,11 +81,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Check password setup for existing sessions too
       if (session?.user) {
         const hasPasswordSet = session.user.user_metadata?.password_set;
-        setNeedsPasswordSetup(!hasPasswordSet);
-        // Check coach status
-        checkCoachStatus(session.user.id);
+        if (!hasPasswordSet) {
+          setNeedsPasswordSetup(true);
+          setNeedsProfileSetup(false);
+        } else {
+          setNeedsPasswordSetup(false);
+          // Check if user needs to complete profile
+          checkUserStatus(session.user.id);
+        }
       } else {
         setNeedsPasswordSetup(false);
+        setNeedsProfileSetup(false);
         setIsCoach(false);
       }
       
@@ -141,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       loading,
       needsPasswordSetup,
+      needsProfileSetup,
       isCoach,
       signInWithOtp,
       signInWithPassword,

@@ -136,7 +136,7 @@ export default function Setup() {
         title: "Profile created",
         description: "Welcome to SkillCheck!"
       });
-      navigate('/');
+      navigate('/welcome');
     }
     setLoading(false);
   };

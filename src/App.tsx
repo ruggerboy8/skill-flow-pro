@@ -42,7 +42,7 @@ import BackfillReview from "./pages/backfill/BackfillReview";
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const { user, loading, needsPasswordSetup } = useAuth();
+  const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
 
   if (loading) {
     return (
@@ -59,6 +59,11 @@ function AppRoutes() {
   // If user needs to set up a password, show password setup page
   if (needsPasswordSetup) {
     return <SetupPassword />;
+  }
+
+  // If user needs to complete their profile, show profile setup page
+  if (needsProfileSetup) {
+    return <Setup />;
   }
 
   return (

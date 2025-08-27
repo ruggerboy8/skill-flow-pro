@@ -16,8 +16,8 @@ export function buildWeekBanner(args: {
 }): BannerCopy {
   const { status, location } = args;
   const { anchors, timezone } = location;
-  const confDue = fmt(anchors.confidence_deadline, timezone);
-  const perfDue = fmt(anchors.performance_deadline, timezone);
+  const confDue = fmt(anchors.checkin_due, timezone);
+  const perfDue = fmt(anchors.checkout_due, timezone);
 
   switch (status.state) {
     case 'can_checkin':

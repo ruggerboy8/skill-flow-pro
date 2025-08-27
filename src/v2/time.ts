@@ -4,9 +4,9 @@ import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 export interface V2Anchors {
   mondayZ: Date;
   checkin_open: Date;            // Mon 00:00 local tz
-  confidence_deadline: Date;     // Tue 12:00 local tz
+  checkin_due: Date;             // Tue 12:00 local tz
   checkout_open: Date;           // Thu 00:01 local tz
-  performance_deadline: Date;    // Fri 17:00 local tz
+  checkout_due: Date;            // Fri 17:00 local tz
   week_end: Date;                // Sun 23:59:59 local tz
 }
 
@@ -31,9 +31,9 @@ export function getWeekAnchors(now: Date, tz: string): V2Anchors {
   return {
     mondayZ,
     checkin_open: z(mondayZ, '00:00:00', tz),
-    confidence_deadline: z(addDays(mondayZ, 1), '12:00:00', tz), // Tue 12:00
+    checkin_due: z(addDays(mondayZ, 1), '12:00:00', tz),         // Tue 12:00
     checkout_open: z(addDays(mondayZ, 3), '00:01:00', tz),       // Thu 00:01
-    performance_deadline: z(addDays(mondayZ, 4), '17:00:00', tz),// Fri 17:00
+    checkout_due: z(addDays(mondayZ, 4), '17:00:00', tz),        // Fri 17:00
     week_end: z(addDays(mondayZ, 6), '23:59:59', tz),            // Sun 23:59:59
   };
 }

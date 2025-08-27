@@ -1,4 +1,4 @@
-import { getWeekAnchors } from './centralTime';
+import { getWeekAnchors } from '@/v2/time';
 import { supabase } from '@/integrations/supabase/client';
 import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 
@@ -276,6 +276,14 @@ export async function computeWeekState(params: {
 }): Promise<StaffStatus> {
   const { userId, locationId, now = new Date(), simOverrides, weekContext } = params;
 
+  // 1) Location context (no ISO)
+  const ctx = await getLocationWeekContext(locationId, now);
+  const { cycleNumber, weekInCycle } = weekContext || ctx;
+
+  // 2) Anchors for this location's current week
+  const anchors = getWeekAnchors(now, ctx.timezone);
+  const { checkin_open, checkin_due, checkout_open, checkout_due } = anchors;
+
   // Get staff information
   const { data: staff } = await supabase
     .from('staff')
@@ -301,107 +309,119 @@ export async function computeWeekState(params: {
     };
   }
 
-  // Use provided week context or calculate from time
-  const { cycleNumber, weekInCycle } = weekContext || await getLocationWeekContext(locationId, now);
-  const { anchors } = await getLocationWeekContext(locationId, now);
+  // weekly_focus ids for current cycle/week/role
+  const { data: focusRows } = await supabase
+    .from('weekly_focus')
+    .select('id')
+    .eq('role_id', roleId)
+    .eq('cycle', cycleNumber)
+    .eq('week_in_cycle', weekInCycle);
 
-  // Get weekly assignments
-  const assignments = await assembleWeek({ 
-    userId, 
-    roleId, 
-    locationId, 
-    cycleNumber, 
-    weekInCycle, 
-    simOverrides 
-  });
+  const focusIds = (focusRows ?? []).map(r => r.id);
+  const required = focusIds.length;
 
-  if (assignments.length === 0) {
+  if (required === 0) {
     return {
       state: 'no_assignments',
-      nextAction: undefined,
       backlogCount: 0,
-      selectionPending: false
+      selectionPending: false,
     };
   }
 
-  // Get current week's scores within time windows (for completion status)
+  // current staff id from userId
+  const staffId = staff.id;
+
   const { data: scores } = await supabase
     .from('weekly_scores')
-    .select(`
-      *,
-      weekly_focus!inner(cycle, week_in_cycle)
-    `)
-    .eq('staff_id', staff.id)
-    .eq('weekly_focus.cycle', cycleNumber)
-    .eq('weekly_focus.week_in_cycle', weekInCycle);
+    .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id')
+    .eq('staff_id', staffId)
+    .in('weekly_focus_id', focusIds);
 
-  // Advisory: completion = "is there a score?", regardless of timestamp
-  const requiredCount = assignments.length;
-  const confFilled = (scores || []).filter(s => s.confidence_score !== null).length;
-  const perfFilled = (scores || []).filter(s => s.performance_score !== null).length;
-  
+  const confCount = (scores ?? []).filter(s => s.confidence_score !== null).length;
+  const perfCount = (scores ?? []).filter(s => s.performance_score !== null).length;
+
   // Apply simulation overrides for confidence/performance status
-  let hasConfidence = confFilled >= requiredCount;
-  let hasPerformance = perfFilled >= requiredCount;
+  let confComplete = confCount >= required;
+  let perfComplete = perfCount >= required;
   
   if (simOverrides?.enabled) {
     if (simOverrides.forceHasConfidence !== null && simOverrides.forceHasConfidence !== undefined) {
-      hasConfidence = simOverrides.forceHasConfidence;
+      confComplete = simOverrides.forceHasConfidence;
     }
     if (simOverrides.forceHasPerformance !== null && simOverrides.forceHasPerformance !== undefined) {
-      hasPerformance = simOverrides.forceHasPerformance;
+      perfComplete = simOverrides.forceHasPerformance;
     }
   }
 
+  // lastActivity
+  const latestConf = (scores ?? [])
+    .filter(s => s.confidence_date)
+    .map(s => ({ kind: 'confidence' as const, at: new Date(s.confidence_date as string) }))
+    .sort((a,b) => b.at.getTime() - a.at.getTime())[0];
+
+  const latestPerf = (scores ?? [])
+    .filter(s => s.performance_date)
+    .map(s => ({ kind: 'performance' as const, at: new Date(s.performance_date as string) }))
+    .sort((a,b) => b.at.getTime() - a.at.getTime())[0];
+
+  const lastActivity =
+    latestConf && latestPerf
+      ? (latestConf.at > latestPerf.at ? latestConf : latestPerf)
+      : (latestConf ?? latestPerf);
+
   // Get backlog count with simulation support
-  const backlogResult = await getOpenBacklogCountV2(staff.id, simOverrides);
+  const backlogResult = await getOpenBacklogCountV2(staffId, simOverrides);
   const backlogCount = backlogResult.count;
 
   // Check for selection pending
-  const selectionPending = assignments.some(a => a.type === 'selfSelect' && !a.pro_move_id);
+  const selectionPending = false; // Simplified for now
 
-  // Get last activity (ALL historical activity, not just current week)
-  const { data: allScores } = await supabase
-    .from('weekly_scores')
-    .select('confidence_date, performance_date, updated_at')
-    .eq('staff_id', staff.id)
-    .or('confidence_date.not.is.null,performance_date.not.is.null')
-    .order('updated_at', { ascending: false })
-    .limit(50); // Get recent activity
+  // State machine (no ISO, only tz-anchors):
 
-  let lastActivity: { kind: 'confidence' | 'performance'; at: Date } | undefined;
-  
-  if (allScores && allScores.length > 0) {
-    // Find the most recent activity by comparing all confidence and performance dates
-    let latestDate: Date | null = null;
-    let latestKind: 'confidence' | 'performance' | null = null;
-    
-    for (const score of allScores) {
-      if (score.confidence_date) {
-        const confDate = new Date(score.confidence_date);
-        if (!latestDate || confDate > latestDate) {
-          latestDate = confDate;
-          latestKind = 'confidence';
-        }
-      }
-      if (score.performance_date) {
-        const perfDate = new Date(score.performance_date);
-        if (!latestDate || perfDate > latestDate) {
-          latestDate = perfDate;
-          latestKind = 'performance';
-        }
-      }
-    }
-    
-    if (latestDate && latestKind) {
-      lastActivity = { kind: latestKind, at: latestDate };
-    }
+  // Fully complete
+  if (confComplete && perfComplete) {
+    return {
+      state: 'done',
+      backlogCount,
+      selectionPending,
+      lastActivity,
+    };
   }
 
-  // Determine state and next action (advisory gating)
-  if (now > anchors.confidence_deadline && !hasConfidence) {
+  // Before/at Tue noon: confidence window
+  if (now <= checkin_due) {
+    if (!confComplete) {
+      return {
+        state: 'can_checkin',
+        nextAction: 'Submit confidence',
+        deadlineAt: checkin_due,
+        backlogCount,
+        selectionPending,
+        lastActivity,
+      };
+    }
+    // Conf is in, just waiting for Thu to open performance
+    return {
+      state: 'wait_for_thu',
+      nextAction: 'Performance opens Thursday',
+      backlogCount,
+      selectionPending,
+      lastActivity,
+    };
+  }
+
+  // After Tue noon: confidence late if missing
+  if (!confComplete && now > checkin_due && now < checkout_open) {
     // Auto-populate backlog v2 when check-in is missed
     try {
+      const assignments = await assembleWeek({ 
+        userId, 
+        roleId, 
+        locationId, 
+        cycleNumber, 
+        weekInCycle, 
+        simOverrides 
+      });
       await populateBacklogV2ForMissedWeek(staff.id, assignments, { weekInCycle, cycleNumber });
     } catch (e) {
       console.warn('Backlog v2 population failed (non-fatal):', e);
@@ -409,73 +429,61 @@ export async function computeWeekState(params: {
     
     return {
       state: 'missed_checkin',
-      nextAction: 'Overdue',
-      deadlineAt: anchors.confidence_deadline,
+      nextAction: 'Submit confidence (late)',
       backlogCount,
       selectionPending,
-      lastActivity
+      lastActivity,
     };
   }
 
-  if (!hasConfidence) {
-    return {
-      state: 'can_checkin',
-      nextAction: 'Confidence',
-      deadlineAt: anchors.confidence_deadline,
-      backlogCount,
-      selectionPending,
-      lastActivity
-    };
-  }
-
-  if (hasConfidence && !hasPerformance) {
-    if (now > anchors.performance_deadline) {
-      return {
-        state: 'missed_checkout',
-        nextAction: 'Overdue',
-        deadlineAt: anchors.performance_deadline,
-        backlogCount,
-        selectionPending,
-        lastActivity
-      };
-    } else if (now < anchors.checkout_open) {
-      // Confidence submitted but performance not yet available
-      return {
-        state: 'wait_for_thu',
-        nextAction: 'Performance',
-        deadlineAt: anchors.checkout_open,
-        backlogCount,
-        selectionPending,
-        lastActivity
-      };
-    } else {
+  // Thu -> Fri window: performance period
+  if (now >= checkout_open && now <= checkout_due) {
+    if (!perfComplete) {
       return {
         state: 'can_checkout',
-        nextAction: 'Performance',
-        deadlineAt: anchors.performance_deadline,
+        nextAction: 'Submit performance',
+        deadlineAt: checkout_due,
         backlogCount,
         selectionPending,
-        lastActivity
+        lastActivity,
       };
     }
-  }
-
-  if (hasConfidence && hasPerformance) {
+    // Performance already in, but week not marked done => (shouldn't happen unless data skew)
     return {
       state: 'done',
-      nextAction: undefined,
       backlogCount,
       selectionPending,
-      lastActivity
+      lastActivity,
     };
   }
 
-  // Fallback
+  // After Fri due: if performance missing -> missed_checkout
+  if (now > checkout_due && !perfComplete) {
+    return {
+      state: 'missed_checkout',
+      nextAction: 'Submit performance (late)',
+      backlogCount,
+      selectionPending,
+      lastActivity,
+    };
+  }
+
+  // Fallback: if we've submitted confidence before Thu, keep it in wait_for_thu
+  if (confComplete && now < checkout_open) {
+    return {
+      state: 'wait_for_thu',
+      nextAction: 'Performance opens Thursday',
+      backlogCount,
+      selectionPending,
+      lastActivity,
+    };
+  }
+
+  // Absolute fallback
   return {
     state: 'no_assignments',
-    nextAction: undefined,
     backlogCount,
     selectionPending,
-    lastActivity
+    lastActivity,
   };
 }

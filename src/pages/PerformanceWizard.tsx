@@ -184,8 +184,8 @@ export default function PerformanceWizard() {
     }
 
     // Check if late submission using location timezone
-    const { performance_deadline } = getWeekAnchors(effectiveNow, timezone);
-    const isLate = effectiveNow > performance_deadline;
+    const { checkout_due } = getWeekAnchors(effectiveNow, timezone);
+    const isLate = effectiveNow > checkout_due;
 
     const updates = existingScores.map(score => ({
       id: score.id,

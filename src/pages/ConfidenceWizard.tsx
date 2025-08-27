@@ -222,8 +222,8 @@ export default function ConfidenceWizard() {
     }
 
     // Check if late submission using location timezone
-    const { confidence_deadline } = getWeekAnchors(effectiveNow, timezone);
-    const isLate = effectiveNow > confidence_deadline;
+    const { checkin_due } = getWeekAnchors(effectiveNow, timezone);
+    const isLate = effectiveNow > checkin_due;
 
     const scoreInserts = weeklyFocus.map(focus => {
       const base: any = {

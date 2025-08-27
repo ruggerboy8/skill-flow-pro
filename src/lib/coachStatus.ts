@@ -87,7 +87,10 @@ export async function computeStaffStatusNew(
 
     // Debug logging for Johno Oberly
     if (staffData.id === "0df48cba-1e22-4588-8685-72da2566f2e5") {
-      console.log("Week state returned:", weekState);
+      console.log("Week state returned - state:", weekState.state);
+      console.log("Week state returned - nextAction:", weekState.nextAction);
+      console.log("Week state returned - backlogCount:", weekState.backlogCount);
+      console.log("Week state returned - lastActivity:", weekState.lastActivity);
     }
 
     // Map week state to coach status format
@@ -183,14 +186,13 @@ export async function computeStaffStatusNew(
 
     // Debug logging for Johno Oberly - final result
     if (staffData.id === "0df48cba-1e22-4588-8685-72da2566f2e5") {
-      console.log("Final mapped status:", {
-        state: weekState.state,
-        label,
-        severity,
-        detail,
-        color,
-        reason
-      });
+      console.log("Final mapped status - state:", weekState.state);
+      console.log("Final mapped status - label:", label);
+      console.log("Final mapped status - severity:", severity);
+      console.log("Final mapped status - detail:", detail);
+      console.log("Final mapped status - color:", color);
+      console.log("Final mapped status - reason:", reason);
+      console.log("Final mapped status - lastActivityText:", lastActivityText);
     }
 
     return {

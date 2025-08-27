@@ -120,6 +120,8 @@ export default function BackfillReview() {
     if (!staff) return;
     
     try {
+      console.log('Starting backfill completion for staff:', staff.id);
+      
       // Backfill historical timestamps for realistic dates
       const { data: updatedCount, error } = await supabase.rpc('backfill_historical_score_timestamps', {
         p_staff_id: staff.id,
@@ -127,24 +129,38 @@ export default function BackfillReview() {
         p_jitter_minutes: 30
       });
 
+      console.log('Backfill RPC response:', { updatedCount, error });
+
       if (error) {
         console.error('Error backfilling timestamps:', error);
         toast({ 
           title: "Error", 
-          description: "There was an issue setting historical dates. Your scores are saved but may show recent timestamps.",
+          description: `There was an issue setting historical dates: ${error.message}. Your scores are saved but may show recent timestamps.`,
           variant: "destructive"
         });
       } else {
-        console.log(`Backfilled timestamps for ${updatedCount} score entries`);
+        console.log(`Successfully backfilled timestamps for ${updatedCount} score entries`);
+        toast({ 
+          title: "Timestamps Updated", 
+          description: `Updated ${updatedCount} score timestamps to historical dates.`
+        });
       }
 
+      // Mark backfill as complete regardless of timestamp success
       localStorage.setItem("backfillDone", "true");
       const raw = localStorage.getItem("backfillProgress");
       const progress = raw ? JSON.parse(raw) : {};
       for (let w=1; w<=6; w++) if (!progress[w]) progress[w] = true;
       localStorage.setItem("backfillProgress", JSON.stringify(progress));
+      
+      console.log('Backfill completion localStorage updated');
     } catch (err) {
       console.error('Backfill completion error:', err);
+      toast({ 
+        title: "Error", 
+        description: "There was an unexpected error during backfill completion.",
+        variant: "destructive"
+      });
     }
     
     toast({ title: "Backfill complete", description: "Thanks! Your stats are ready." });

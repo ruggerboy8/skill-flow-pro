@@ -34,14 +34,24 @@ export default function Layout() {
         if (staffData) {
           setIsSuperAdmin(!!staffData.is_super_admin);
           
-          // Check backfill status using server-side RPC
-          if (isV2 && staffData.id && staffData.role_id) {
+          // Always check backfill status for all users with valid staff data
+          if (staffData.id && staffData.role_id) {
+            console.log('Checking backfill status for staff:', staffData.id, 'role:', staffData.role_id);
             const { data: backfillResult, error } = await supabase.rpc('needs_backfill', {
               p_staff_id: staffData.id,
               p_role_id: staffData.role_id
             });
+            
+            console.log('Backfill RPC result:', backfillResult, 'error:', error);
+            
             if (!error && backfillResult && typeof backfillResult === 'object') {
-              setBackfillMissingCount((backfillResult as any).missingCount || 0);
+              const missingCount = (backfillResult as any).missingCount || 0;
+              console.log('Setting backfill missing count to:', missingCount);
+              setBackfillMissingCount(missingCount);
+            } else if (error) {
+              console.error('Error checking backfill status:', error);
+              // For new users, assume they need backfill if there's an error
+              setBackfillMissingCount(6);
             }
           }
         }
@@ -53,7 +63,7 @@ export default function Layout() {
     }
 
     loadStaffData();
-  }, [user]);
+  }, [user, location.pathname]); // Re-check when user navigates
   
   const navigation = [
     { name: 'Home', href: '/', icon: Home },

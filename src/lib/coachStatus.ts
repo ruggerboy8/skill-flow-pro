@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { computeWeekState as computeLocationWeekState, StaffStatus, getLocationWeekContext } from '@/lib/locationState';
-import { getCoachDeadlines } from '@/utils/coachDeadlines';
+import { computeWeekState, getLocationWeekContext } from '@/lib/locationState';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
@@ -71,182 +70,123 @@ export async function computeStaffStatusNew(
       };
     }
 
-    // Get location context for timezone and week calculation
-    const locationContext = await getLocationWeekContext(staffData.primary_location_id, currentTime);
-    const timezone = locationContext.timezone;
-    
-    // Calculate deadlines in the staff's timezone
-    const deadlines = getCoachDeadlines(currentTime, timezone);
-    const localNow = toZonedTime(currentTime, timezone);
-    
-    // Check if staff is still onboarding
-    if (staffData.hire_date) {
-      const hireDate = new Date(staffData.hire_date);
-      const participationStart = new Date(hireDate.getTime() + (staffData.onboarding_weeks * 7 * 24 * 60 * 60 * 1000));
-      if (currentTime < participationStart) {
-        const weeksLeft = Math.ceil((participationStart.getTime() - currentTime.getTime()) / (7 * 24 * 60 * 60 * 1000));
-        return {
-          color: 'grey',
-          reason: `Onboarding (${weeksLeft} wks left)`,
-          state: 'onboarding',
-          blocked: false,
-          confCount: 0,
-          perfCount: 0,
-          backlogCount: 0,
-          selectionPending: false,
-          onboardingWeeksLeft: weeksLeft,
-          label: 'No actions',
-          severity: 'grey',
-          detail: 'Not participating yet',
-          lastActivityText: 'Onboarding in progress'
-        };
-      }
-    }
+    // Use the corrected computeWeekState function
+    const weekState = await computeWeekState({
+      userId,
+      locationId: staffData.primary_location_id,
+      roleId: staffData.role_id,
+      now: currentTime
+    });
 
-    // Get current week's weekly_focus items for this role
-    const { data: weeklyFocus } = await supabase
-      .from('weekly_focus')
-      .select('id')
-      .eq('role_id', staffData.role_id)
-      .eq('cycle', locationContext.cycleNumber)
-      .eq('week_in_cycle', locationContext.weekInCycle);
-
-    const required = weeklyFocus?.length || 0;
-    
-    if (required === 0) {
-      return {
-        color: 'green',
-        reason: 'No assignments',
-        state: 'no_assignments',
-        blocked: false,
-        confCount: 0,
-        perfCount: 0,
-        backlogCount: 0,
-        selectionPending: false,
-        label: 'No actions',
-        severity: 'green',
-        detail: 'No pro-moves this week',
-        lastActivityText: 'No check-in yet'
-      };
-    }
-
-    // Get scores for current week
-    const { data: scores } = await supabase
-      .from('weekly_scores')
-      .select('confidence_score, performance_score, confidence_date, performance_date, confidence_late, performance_late')
-      .eq('staff_id', staffData.id)
-      .in('weekly_focus_id', weeklyFocus.map(wf => wf.id));
-
-    const confComplete = (scores || []).filter(s => s.confidence_score !== null).length >= required;
-    const perfComplete = (scores || []).filter(s => s.performance_score !== null).length >= required;
-
-    // Find most recent activity for lastActivityText
-    let lastActivityText = 'No check-in yet';
-    if (scores && scores.length > 0) {
-      let latestActivity: { kind: 'confidence' | 'performance'; at: Date; late: boolean } | null = null;
-      
-      for (const score of scores) {
-        if (score.confidence_date) {
-          const confDate = new Date(score.confidence_date);
-          if (!latestActivity || confDate > latestActivity.at) {
-            latestActivity = { kind: 'confidence', at: confDate, late: score.confidence_late || false };
-          }
-        }
-        if (score.performance_date) {
-          const perfDate = new Date(score.performance_date);
-          if (!latestActivity || perfDate > latestActivity.at) {
-            latestActivity = { kind: 'performance', at: perfDate, late: score.performance_late || false };
-          }
-        }
-      }
-      
-      if (latestActivity) {
-        const formattedLocal = format(toZonedTime(latestActivity.at, timezone), 'EEE h:mma');
-        const lateText = latestActivity.late ? ' (late)' : '';
-        const kindText = latestActivity.kind === 'confidence' ? 'Confidence' : 'Performance';
-        lastActivityText = `${kindText} submitted${lateText} ${formattedLocal}`;
-      }
-    }
-
-    // Decision logic
+    // Map week state to coach status format
     let label: string;
     let severity: CoachSeverity;
     let detail: string;
     let color: StatusColor;
     let reason: string;
-    let state: WeekState;
 
-    if (localNow <= deadlines.confDue) {
-      if (confComplete) {
-        label = 'All set';
+    switch (weekState.state) {
+      case 'onboarding':
+        label = 'No actions';
+        severity = 'grey';
+        detail = 'Not participating yet';
+        color = 'grey';
+        reason = `Onboarding (${weekState.onboardingWeeksLeft} wks left)`;
+        break;
+      
+      case 'no_assignments':
+        label = 'No actions';
         severity = 'green';
-        detail = 'Confidence complete';
+        detail = 'No pro-moves this week';
         color = 'green';
-        reason = 'Complete';
-        state = 'wait_for_thu';
-      } else {
+        reason = 'No assignments';
+        break;
+        
+      case 'can_checkin':
         label = 'Due today';
         severity = 'yellow';
         detail = 'Confidence due today';
         color = 'yellow';
         reason = 'Can check in';
-        state = 'can_checkin';
-      }
-    } else if (localNow <= deadlines.perfDue) {
-      if (!confComplete) {
+        break;
+        
+      case 'missed_checkin':
         label = 'Action needed';
         severity = 'red';
         detail = 'Confidence overdue';
         color = 'red';
         reason = 'Missed check-in';
-        state = 'missed_checkin';
-      } else if (perfComplete) {
+        break;
+        
+      case 'wait_for_thu':
         label = 'All set';
         severity = 'green';
-        detail = 'Performance complete';
+        detail = 'Confidence complete';
         color = 'green';
         reason = 'Complete';
-        state = 'done';
-      } else {
+        break;
+        
+      case 'can_checkout':
         label = 'Due Thu';
         severity = 'yellow';
         detail = 'Performance due Thu';
         color = 'yellow';
         reason = 'Can check out';
-        state = 'can_checkout';
-      }
-    } else {
-      if (perfComplete) {
-        label = 'All set';
-        severity = 'green';
-        detail = 'Week complete';
-        color = 'green';
-        reason = 'Complete';
-        state = 'done';
-      } else {
+        break;
+        
+      case 'missed_checkout':
         label = 'Action needed';
         severity = 'red';
         detail = 'Performance overdue';
         color = 'red';
         reason = 'Missed check-out';
-        state = 'missed_checkout';
-      }
+        break;
+        
+      case 'done':
+        label = 'All set';
+        severity = 'green';
+        detail = 'Week complete';
+        color = 'green';
+        reason = 'Complete';
+        break;
+        
+      default:
+        label = 'No actions';
+        severity = 'grey';
+        detail = 'Unknown state';
+        color = 'grey';
+        reason = 'Unknown';
+    }
+
+    // Build lastActivityText from weekState.lastActivity
+    let lastActivityText = 'No check-in yet';
+    if (weekState.lastActivity) {
+      const { kind, at } = weekState.lastActivity;
+      // Get timezone for formatting
+      const locationContext = await getLocationWeekContext(staffData.primary_location_id, currentTime);
+      const formattedLocal = format(toZonedTime(at, locationContext.timezone), 'EEE h:mma');
+      const kindText = kind === 'confidence' ? 'Confidence' : 'Performance';
+      lastActivityText = `${kindText} submitted ${formattedLocal}`;
     }
 
     return {
       color,
       reason,
-      state,
-      blocked: state === 'missed_checkout',
+      state: weekState.state,
+      blocked: weekState.state === 'missed_checkout',
       confCount: 0,
       perfCount: 0,
-      backlogCount: 0,
-      selectionPending: false,
+      backlogCount: weekState.backlogCount,
+      selectionPending: weekState.selectionPending,
       label,
       severity,
       detail,
       lastActivityText,
-      tooltip: detail
+      tooltip: detail,
+      onboardingWeeksLeft: weekState.onboardingWeeksLeft,
+      lastActivity: weekState.lastActivity,
+      nextAction: weekState.nextAction,
+      deadlineAt: weekState.deadlineAt
     };
   } catch (error) {
     console.error('Error computing staff status:', error);

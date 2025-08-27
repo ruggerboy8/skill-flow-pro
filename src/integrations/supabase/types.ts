@@ -919,7 +919,7 @@ export type Database = {
       }
     }
     Enums: {
-      score_source: "live" | "backfill"
+      score_source: "live" | "backfill" | "backfill_historical"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1047,7 +1047,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      score_source: ["live", "backfill"],
+      score_source: ["live", "backfill", "backfill_historical"],
     },
   },
 } as const

@@ -177,89 +177,114 @@ export default function EvaluationViewer() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="observation" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="observation">Observation</TabsTrigger>
-          <TabsTrigger value="self">Self-Assessment</TabsTrigger>
-        </TabsList>
+      {/* Domain Sections */}
+      <div className="space-y-6">
+        {sortedDomains.map(domainName => {
+          const domainItems = groupedByDomain[domainName];
+          
+          // Calculate domain averages
+          const avgObserver = avg(domainItems.map(item => item.observer_score));
+          const avgSelf = avg(domainItems.map(item => item.self_score));
+          
+          // Collect notes for this domain
+          const notes: RolledNote[] = domainItems.flatMap(item => {
+            const out: RolledNote[] = [];
+            if (item.observer_note) {
+              out.push({ 
+                source: 'Observer', 
+                competency: item.competency_name_snapshot, 
+                text: item.observer_note 
+              });
+            }
+            if (item.self_note) {
+              out.push({ 
+                source: 'Self', 
+                competency: item.competency_name_snapshot, 
+                text: item.self_note 
+              });
+            }
+            return out;
+          });
 
-        <TabsContent value="observation" className="space-y-6">
-          {sortedDomains.map(domainName => (
-            <Card key={domainName}>
+          return (
+            <Card key={domainName} className="mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Badge 
-                    variant="outline"
-                    style={{ backgroundColor: getDomainColor(domainName) }}
-                    className="text-slate-900"
+                  <span
+                    className="px-2 py-0.5 rounded text-xs"
+                    style={{ backgroundColor: getDomainColor(domainName), color: '#000' }}
                   >
                     {domainName}
-                  </Badge>
+                  </span>
+                  <span>{domainName}</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {groupedByDomain[domainName].map(item => (
-                  <div key={item.competency_id} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">{item.competency_name_snapshot}</h4>
-                      <ReadOnlyScore value={item.observer_score} />
-                    </div>
-                    {item.competency_description_snapshot && (
-                      <p className="text-sm text-muted-foreground italic">
-                        {item.competency_description_snapshot}
-                      </p>
-                    )}
-                    {item.observer_note && (
-                      <div className="p-3 bg-muted/50 rounded text-sm">
-                        <strong>Observer Note:</strong> {item.observer_note}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
-        </TabsContent>
 
-        <TabsContent value="self" className="space-y-6">
-          {sortedDomains.map(domainName => (
-            <Card key={domainName}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Badge 
-                    variant="outline"
-                    style={{ backgroundColor: getDomainColor(domainName) }}
-                    className="text-slate-900"
-                  >
-                    {domainName}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {groupedByDomain[domainName].map(item => (
-                  <div key={item.competency_id} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">{item.competency_name_snapshot}</h4>
-                      <ReadOnlyScore value={item.self_score} />
-                    </div>
-                    {item.competency_description_snapshot && (
-                      <p className="text-sm text-muted-foreground italic">
-                        {item.competency_description_snapshot}
-                      </p>
-                    )}
-                    {item.self_note && (
-                      <div className="p-3 bg-muted/50 rounded text-sm">
-                        <strong>Self Note:</strong> {item.self_note}
+              <CardContent className="space-y-3">
+                {/* Header row */}
+                <div className="grid grid-cols-12 text-xs text-muted-foreground">
+                  <div className="col-span-7">Competency</div>
+                  <div className="col-span-2 text-center">Observer</div>
+                  <div className="col-span-3 text-center">Self</div>
+                </div>
+
+                {/* Competency rows */}
+                <div className="space-y-2">
+                  {domainItems.map(item => (
+                    <div key={item.competency_id} className="grid grid-cols-12 items-center py-2 border-b last:border-0">
+                      <div className="col-span-7">
+                        <div className="text-sm font-medium">{item.competency_name_snapshot}</div>
+                        {item.competency_description_snapshot && (
+                          <div className="text-xs text-muted-foreground italic">{item.competency_description_snapshot}</div>
+                        )}
                       </div>
-                    )}
+                      <div className="col-span-2 flex justify-center">
+                        <ReadOnlyScore value={item.observer_score} />
+                      </div>
+                      <div className="col-span-3 flex justify-center">
+                        <ReadOnlyScore value={item.self_score} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Averages row */}
+                <div className="grid grid-cols-12 items-center pt-2 border-t">
+                  <div className="col-span-7 text-sm font-medium">Averages</div>
+                  <div className="col-span-2 text-center text-sm">{avgObserver ?? '—'}</div>
+                  <div className="col-span-3 text-center text-sm">{avgSelf ?? '—'}</div>
+                </div>
+
+                {/* Notes accordion */}
+                {notes.length > 0 && (
+                  <div className="pt-2">
+                    <Accordion type="single" collapsible>
+                      <AccordionItem value="notes">
+                        <AccordionTrigger className="text-sm">Notes ({notes.length})</AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-3">
+                            {notes.map((note, idx) => (
+                              <div key={idx} className="text-sm">
+                                <span className={`inline-block px-2 py-0.5 mr-2 rounded text-xs ${
+                                  note.source === 'Observer' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'
+                                }`}>
+                                  {note.source}
+                                </span>
+                                <span className="font-medium">{note.competency}: </span>
+                                <span className="text-muted-foreground">{note.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </div>
-                ))}
+                )}
               </CardContent>
             </Card>
-          ))}
-        </TabsContent>
-      </Tabs>
+          );
+        })}
+      </div>
     </div>
   );
 }

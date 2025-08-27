@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { assembleWeek as locationAssembleWeek } from './locationState';
+import { assembleWeek as locationAssembleWeek, getLocationWeekContext } from './locationState';
 import { getOpenBacklogCountV2, areSelectionsLocked, saveUserSelection } from './backlog';
 import { nowUtc, getAnchors } from "./centralTime";
 
@@ -17,15 +17,30 @@ export interface WeekAssignment {
 }
 
 /**
- * Finds a user's active week based on their scoring progress.
+ * Finds a user's active week based on their scoring progress or simulation time.
  */
 async function findUserActiveWeek(
   userId: string,
   staffId: string,
   roleId: number,
   locationId: string,
-  simOverrides?: any
+  simOverrides?: any,
+  now?: Date
 ): Promise<{ cycleNumber: number; weekInCycle: number }> {
+  
+  // If simulation is active with a specific time, use time-based calculation
+  if (simOverrides?.enabled && now) {
+    console.log('Using time-based week calculation for simulation');
+    const context = await getLocationWeekContext(locationId, now);
+    
+    return {
+      cycleNumber: context.cycleNumber,
+      weekInCycle: context.weekInCycle
+    };
+  }
+
+  // Otherwise, use progress-based calculation (original logic)
+  console.log('Using progress-based week calculation');
   
   const { data: locationData } = await supabase
     .from('locations')
@@ -78,6 +93,11 @@ export async function assembleCurrentWeek(
     console.log('=== ASSEMBLING CURRENT WEEK (PROGRESS-BASED) ===');
     console.log('Input params:', { userId, simOverrides });
     
+    // Calculate effective time for simulation
+    const effectiveNow = simOverrides?.enabled && simOverrides?.nowISO 
+      ? new Date(simOverrides.nowISO)
+      : new Date();
+    
     // Get staff info including location
     const { data: staffData } = await supabase
       .from('staff')
@@ -94,14 +114,16 @@ export async function assembleCurrentWeek(
     }
 
     console.log('Staff data:', staffData);
+    console.log('Effective now:', effectiveNow);
 
-    // Determine user's active week based on their progress
+    // Determine user's active week based on their progress or simulation time
     const { cycleNumber, weekInCycle } = await findUserActiveWeek(
       userId,
       staffData.id,
       staffData.role_id,
       staffData.primary_location_id,
-      simOverrides
+      simOverrides,
+      effectiveNow
     );
     
     console.log('User-specific active week:', { cycleNumber, weekInCycle });

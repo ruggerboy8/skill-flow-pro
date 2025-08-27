@@ -331,18 +331,30 @@ export async function computeWeekState(params: {
   // current staff id from userId
   const staffId = staff.id;
 
+  // Get weekly_scores for those focus IDs (this week only!)
   const { data: scores } = await supabase
     .from('weekly_scores')
     .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id')
     .eq('staff_id', staffId)
     .in('weekly_focus_id', focusIds);
 
+  // Debug logging for score filtering
+  console.log('=== DEBUG SCORES FILTERING ===');
+  console.log('Focus IDs for current week:', focusIds);
+  console.log('All scores found:', scores);
+  
   const confCount = (scores ?? []).filter(s => s.confidence_score !== null).length;
   const perfCount = (scores ?? []).filter(s => s.performance_score !== null).length;
+  
+  console.log('Confidence count:', confCount, '/ required:', required);
+  console.log('Performance count:', perfCount, '/ required:', required);
 
   // Apply simulation overrides for confidence/performance status
   let confComplete = confCount >= required;
   let perfComplete = perfCount >= required;
+  
+  console.log('Confidence complete:', confComplete);
+  console.log('Performance complete:', perfComplete);
   
   if (simOverrides?.enabled) {
     if (simOverrides.forceHasConfidence !== null && simOverrides.forceHasConfidence !== undefined) {
@@ -412,20 +424,8 @@ export async function computeWeekState(params: {
 
   // After Tue noon: confidence late if missing
   if (!confComplete && now > checkin_due && now < checkout_open) {
-    // Auto-populate backlog v2 when check-in is missed
-    try {
-      const assignments = await assembleWeek({ 
-        userId, 
-        roleId, 
-        locationId, 
-        cycleNumber, 
-        weekInCycle, 
-        simOverrides 
-      });
-      await populateBacklogV2ForMissedWeek(staff.id, assignments, { weekInCycle, cycleNumber });
-    } catch (e) {
-      console.warn('Backlog v2 population failed (non-fatal):', e);
-    }
+    // Don't populate backlog until Sunday night (week officially over)
+    // Backlog v2 should only be populated at the END of the week, not mid-week
     
     return {
       state: 'missed_checkin',

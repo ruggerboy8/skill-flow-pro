@@ -53,13 +53,6 @@ export async function computeStaffStatusNew(
   try {
     const currentTime = now || new Date();
     
-    // Debug logging for Johno Oberly
-    if (staffData.id === "0df48cba-1e22-4588-8685-72da2566f2e5") {
-      console.log("=== DEBUG: Computing status for Johno Oberly ===");
-      console.log("Staff data:", staffData);
-      console.log("Current time:", currentTime);
-    }
-    
     if (!staffData.primary_location_id) {
       return {
         color: 'grey' as StatusColor,
@@ -84,14 +77,6 @@ export async function computeStaffStatusNew(
       roleId: staffData.role_id,
       now: currentTime
     });
-
-    // Debug logging for Johno Oberly
-    if (staffData.id === "0df48cba-1e22-4588-8685-72da2566f2e5") {
-      console.log("Week state returned - state:", weekState.state);
-      console.log("Week state returned - nextAction:", weekState.nextAction);
-      console.log("Week state returned - backlogCount:", weekState.backlogCount);
-      console.log("Week state returned - lastActivity:", weekState.lastActivity);
-    }
 
     // Map week state to coach status format
     let label: string;
@@ -182,17 +167,6 @@ export async function computeStaffStatusNew(
       const formattedLocal = format(toZonedTime(at, locationContext.timezone), 'EEE h:mma');
       const kindText = kind === 'confidence' ? 'Confidence' : 'Performance';
       lastActivityText = `${kindText} submitted ${formattedLocal}`;
-    }
-
-    // Debug logging for Johno Oberly - final result
-    if (staffData.id === "0df48cba-1e22-4588-8685-72da2566f2e5") {
-      console.log("Final mapped status - state:", weekState.state);
-      console.log("Final mapped status - label:", label);
-      console.log("Final mapped status - severity:", severity);
-      console.log("Final mapped status - detail:", detail);
-      console.log("Final mapped status - color:", color);
-      console.log("Final mapped status - reason:", reason);
-      console.log("Final mapped status - lastActivityText:", lastActivityText);
     }
 
     return {

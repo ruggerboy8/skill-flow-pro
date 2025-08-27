@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,17 +14,25 @@ import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvaluationWithItems } from '@/lib/evaluations';
 
 const SCORE_PILLS = [
-  { value: 1, label: '1', className: 'bg-red-100 text-red-800 border-red-200' },
-  { value: 2, label: '2', className: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { value: 3, label: '3', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { value: 4, label: '4', className: 'bg-green-100 text-green-800 border-green-200' },
+  { v: 1, cls: 'bg-red-100 text-red-800 border-red-200' },
+  { v: 2, cls: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { v: 3, cls: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { v: 4, cls: 'bg-green-100 text-green-800 border-green-200' },
 ];
 
 function ReadOnlyScore({ value }: { value: number | null }) {
   if (value == null) return <span className="text-xs text-muted-foreground">—</span>;
-  const pill = SCORE_PILLS.find(p => p.value === value);
-  return <span className={`px-3 py-1 text-sm rounded border ${pill?.className}`}>{pill?.label}</span>;
+  const pill = SCORE_PILLS.find(p => p.v === value);
+  return <span className={`px-2.5 py-1 rounded border text-sm ${pill?.cls}`}>{value}</span>;
 }
+
+type RolledNote = { source: 'Observer' | 'Self'; competency: string; text: string };
+
+const r1 = (n: number | null) => n == null ? null : Math.round(n * 10) / 10;
+const avg = (arr: Array<number | null>) => {
+  const vals = arr.filter((v): v is number => v != null);
+  return vals.length ? r1(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+};
 
 type GroupedItem = {
   competency_id: number;

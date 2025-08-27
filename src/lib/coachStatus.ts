@@ -53,6 +53,13 @@ export async function computeStaffStatusNew(
   try {
     const currentTime = now || new Date();
     
+    // Debug logging for Johno Oberly
+    if (staffData.id === "0df48cba-1e22-4588-8685-72da2566f2e5") {
+      console.log("=== DEBUG: Computing status for Johno Oberly ===");
+      console.log("Staff data:", staffData);
+      console.log("Current time:", currentTime);
+    }
+    
     if (!staffData.primary_location_id) {
       return {
         color: 'grey' as StatusColor,
@@ -77,6 +84,11 @@ export async function computeStaffStatusNew(
       roleId: staffData.role_id,
       now: currentTime
     });
+
+    // Debug logging for Johno Oberly
+    if (staffData.id === "0df48cba-1e22-4588-8685-72da2566f2e5") {
+      console.log("Week state returned:", weekState);
+    }
 
     // Map week state to coach status format
     let label: string;
@@ -167,6 +179,18 @@ export async function computeStaffStatusNew(
       const formattedLocal = format(toZonedTime(at, locationContext.timezone), 'EEE h:mma');
       const kindText = kind === 'confidence' ? 'Confidence' : 'Performance';
       lastActivityText = `${kindText} submitted ${formattedLocal}`;
+    }
+
+    // Debug logging for Johno Oberly - final result
+    if (staffData.id === "0df48cba-1e22-4588-8685-72da2566f2e5") {
+      console.log("Final mapped status:", {
+        state: weekState.state,
+        label,
+        severity,
+        detail,
+        color,
+        reason
+      });
     }
 
     return {

@@ -182,16 +182,15 @@ const handleResetPassword = async (user: User) => {
       body: { action: 'reset_link', user_id: user.user_id },
     });
     if (error) throw error;
-
     toast({
-      title: "Password reset sent",
-      description: `We emailed a reset code to ${user.email}.`,
+      title: "Email sent",
+      description: `A reset email was sent to ${user.email}.`,
     });
   } catch (error) {
-    console.error("Error generating reset link:", error);
+    console.error("Error generating reset email:", error);
     toast({
       title: "Error",
-      description: "Failed to send password reset email",
+      description: "Failed to send reset email",
       variant: "destructive",
     });
   }

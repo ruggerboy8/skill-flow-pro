@@ -1,159 +1,115 @@
-// src/pages/ResetPassword.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
-type Step = "request" | "verify" | "set";
-
 export default function ResetPassword() {
-  const nav = useNavigate();
-  const { search } = useLocation();
+  const [params] = useSearchParams();
   const { toast } = useToast();
+  const nav = useNavigate();
 
-  const qs = useMemo(() => new URLSearchParams(search), [search]);
-  const emailFromQuery = qs.get("email") || "";
-
-  const [step, setStep] = useState<Step>(emailFromQuery ? "verify" : "request");
-  const [email, setEmail] = useState(emailFromQuery);
-  const [sending, setSending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [updating, setUpdating] = useState(false);
+  const [email, setEmail] = useState(params.get("email") ?? "");
   const [code, setCode] = useState("");
+  const [stage, setStage] = useState<"enter-code" | "set-password">("enter-code");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [working, setWorking] = useState(false);
 
-  // Optional: allow re-send from this page
-  const sendCode = async () => {
-    if (!email) {
-      toast({ title: "Email required", variant: "destructive" });
-      return;
-    }
-    try {
-      setSending(true);
-      const redirectTo = `${window.location.origin}/reset-password?email=${encodeURIComponent(email)}`;
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-      if (error) throw error;
-      toast({ title: "Code sent", description: `We emailed a reset code to ${email}.` });
-      setStep("verify");
-    } catch (e:any) {
-      toast({ title: "Error", description: e.message || "Failed to send code", variant: "destructive" });
-    } finally {
-      setSending(false);
-    }
-  };
+  const canVerify = useMemo(() => email && code.length >= 6, [email, code]);
+  const canSave = useMemo(() => password.length >= 8 && password === confirm, [password, confirm]);
 
-  const verifyCode = async () => {
-    if (!email || !code) {
-      toast({ title: "Email and code required", variant: "destructive" });
-      return;
-    }
+  async function handleVerifyCode() {
     try {
-      setVerifying(true);
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
+      setWorking(true);
+      const { data, error } = await supabase.auth.verifyOtp({
         type: "recovery",
+        email,
+        token: code.trim(),
       });
       if (error) throw error;
-      // If success, we're authenticated in a recovery session. Now set password.
-      setStep("set");
-      toast({ title: "Code verified", description: "Please set your new password." });
-    } catch (e:any) {
-      toast({ title: "Invalid or expired code", description: e.message, variant: "destructive" });
-    } finally {
-      setVerifying(false);
-    }
-  };
 
-  const setNewPassword = async () => {
-    if (!password || password !== confirm) {
-      toast({ title: "Passwords don't match", variant: "destructive" });
-      return;
+      // If successful, Supabase sets a session; now move to choose new password.
+      setStage("set-password");
+      toast({ title: "Code verified", description: "Please choose a new password." });
+    } catch (e: any) {
+      toast({
+        title: "Invalid or expired code",
+        description: e?.message ?? "Please request a new reset email.",
+        variant: "destructive",
+      });
+    } finally {
+      setWorking(false);
     }
+  }
+
+  async function handleSetPassword() {
     try {
-      setUpdating(true);
+      setWorking(true);
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      toast({ title: "Password updated", description: "You can now sign in." });
-      nav("/", { replace: true });
-    } catch (e:any) {
-      toast({ title: "Error", description: e.message || "Failed to update password", variant: "destructive" });
+
+      toast({ title: "Password updated", description: "You're all set." });
+      nav("/", { replace: true }); // or nav("/login", { replace: true })
+    } catch (e: any) {
+      toast({
+        title: "Couldn't update password",
+        description: e?.message ?? "Please try again.",
+        variant: "destructive",
+      });
     } finally {
-      setUpdating(false);
+      setWorking(false);
     }
-  };
+  }
 
   return (
     <main className="min-h-screen grid place-items-center p-6">
       <Card className="w-full max-w-md">
-        <CardContent className="p-6 space-y-4">
-          {step === "request" && (
+        <CardHeader>
+          <CardTitle>Reset your password</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {stage === "enter-code" && (
             <>
-              <h1 className="text-xl font-semibold">Reset your password</h1>
-              <p className="text-sm text-muted-foreground">Enter your email and we’ll send you a 6-digit code.</p>
+              <label className="text-sm">Email</label>
               <Input
                 type="email"
-                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
               />
-              <Button onClick={sendCode} disabled={sending}>
-                {sending ? "Sending…" : "Send code"}
+              <label className="text-sm">6-digit code</label>
+              <Input
+                inputMode="numeric"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="123456"
+              />
+              <Button disabled={!canVerify || working} onClick={handleVerifyCode} className="w-full">
+                Verify code
               </Button>
             </>
           )}
 
-          {step === "verify" && (
+          {stage === "set-password" && (
             <>
-              <h1 className="text-xl font-semibold">Enter your code</h1>
-              {!emailFromQuery && (
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              )}
-              <Input
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                placeholder="6-digit code"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-              />
-              <div className="flex gap-2">
-                <Button onClick={verifyCode} disabled={verifying}>
-                  {verifying ? "Verifying…" : "Verify code"}
-                </Button>
-                <Button variant="outline" onClick={sendCode} disabled={sending}>
-                  {sending ? "Resending…" : "Resend code"}
-                </Button>
-              </div>
-            </>
-          )}
-
-          {step === "set" && (
-            <>
-              <h1 className="text-xl font-semibold">Set a new password</h1>
+              <label className="text-sm">New password (min 8 chars)</label>
               <Input
                 type="password"
-                placeholder="New password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              <label className="text-sm">Confirm password</label>
               <Input
                 type="password"
-                placeholder="Confirm new password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
               />
-              <Button onClick={setNewPassword} disabled={updating}>
-                {updating ? "Saving…" : "Save password"}
+              <Button disabled={!canSave || working} onClick={handleSetPassword} className="w-full">
+                Set new password
               </Button>
             </>
           )}

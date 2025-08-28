@@ -175,27 +175,22 @@ serve(async (req: Request) => {
       }
 
       case "reset_link": {
-        // Accept user_id OR email. If only user_id is provided, look up the email first.
-        const { user_id: userId, email: emailIn } = payload ?? {};
+        const { user_id, email: emailIn } = payload ?? {};
         let email = emailIn?.trim();
 
         if (!email) {
-          if (!userId) return json({ error: "user_id or email required" }, 400);
-          const { data: ures, error: getErr } = await admin.auth.admin.getUserById(userId);
+          if (!user_id) return json({ error: "user_id or email required" }, 400);
+          const { data: ures, error: getErr } = await admin.auth.admin.getUserById(user_id);
           if (getErr) throw getErr;
           email = ures.user?.email ?? "";
         }
-
         if (!email) return json({ error: "User has no email" }, 400);
 
-        const redirectTo = `${SITE_URL}/auth/callback?next=/reset-password`;
-        
-        // Create a public Supabase client to send the reset email (admin client doesn't have resetPasswordForEmail)
+        // IMPORTANT: redirect to the code-entry page (no magic link handling needed)
+        const redirectTo = `${SITE_URL}/reset-password`;
+
         const publicClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
-        const { error: resetErr } = await publicClient.auth.resetPasswordForEmail(email, {
-          redirectTo
-        });
-        
+        const { error: resetErr } = await publicClient.auth.resetPasswordForEmail(email, { redirectTo });
         if (resetErr) throw resetErr;
 
         return json({ ok: true, message: "Password reset email sent" });

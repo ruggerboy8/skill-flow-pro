@@ -60,6 +60,11 @@ function HashShim() {
 
 function AppRoutes() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
+  const { pathname } = useLocation();
+
+  // Public, unauthenticated routes for auth flows:
+  if (pathname.startsWith("/auth/callback")) return <AuthCallback />;
+  if (pathname.startsWith("/reset-password")) return <ResetPassword />;
 
   if (loading) {
     return (
@@ -69,32 +74,14 @@ function AppRoutes() {
     );
   }
 
-  return (
-    <>
-      <HashShim />
-      <Routes>
-        {/* PUBLIC: no session required */}
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/login" element={<Login />} />
+  if (!user) return <Login />;
 
-        {/* USER-SPECIFIC: requires a session */}
-        <Route
-          path="*"
-          element={
-            user ? (
-              needsPasswordSetup ? (
-                <SetupPassword />
-              ) : needsProfileSetup ? (
-                <Setup />
-              ) : (
-                <Layout />
-              )
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        >
+  if (needsPasswordSetup) return <SetupPassword />;
+  if (needsProfileSetup) return <Setup />;
+
+  return (
+    <Routes>
+      <Route path="/" element={<Layout />}>
           {user && !needsPasswordSetup && !needsProfileSetup && (
             <>
               <Route index element={<Index />} />
@@ -139,7 +126,6 @@ function AppRoutes() {
           )}
         </Route>
       </Routes>
-    </>
   );
 }
 
@@ -147,6 +133,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+        <HashShim />
         <AppRoutes />
         <Toaster />
       </Router>

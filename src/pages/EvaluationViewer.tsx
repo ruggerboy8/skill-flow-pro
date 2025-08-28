@@ -26,7 +26,7 @@ function ReadOnlyScore({ value }: { value: number | null }) {
   return <span className={`px-2.5 py-1 rounded border text-sm ${pill?.cls}`}>{value}</span>;
 }
 
-type RolledNote = { source: 'Observer' | 'Self'; competency: string; text: string };
+type RolledNote = { source: 'Observer' | 'Self'; competency: string; text: string; competency_id: number };
 
 const r1 = (n: number | null) => n == null ? null : Math.round(n * 10) / 10;
 const avg = (arr: Array<number | null>) => {
@@ -193,6 +193,7 @@ export default function EvaluationViewer() {
               out.push({ 
                 source: 'Observer', 
                 competency: item.competency_name_snapshot, 
+                competency_id: item.competency_id,
                 text: item.observer_note 
               });
             }
@@ -200,10 +201,21 @@ export default function EvaluationViewer() {
               out.push({ 
                 source: 'Self', 
                 competency: item.competency_name_snapshot, 
+                competency_id: item.competency_id,
                 text: item.self_note 
               });
             }
             return out;
+          });
+
+          // Sort notes: Observer notes first (by competency_id), then Self notes (by competency_id)
+          notes.sort((a, b) => {
+            // First sort by source (Observer before Self)
+            if (a.source !== b.source) {
+              return a.source === 'Observer' ? -1 : 1;
+            }
+            // Then sort by competency_id within the same source
+            return a.competency_id - b.competency_id;
           });
 
           return (

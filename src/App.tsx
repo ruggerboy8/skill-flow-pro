@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { NowProvider } from "@/providers/NowProvider";
 import Login from "./pages/Login";
@@ -46,6 +46,12 @@ const queryClient = new QueryClient();
 
 function AppRoutes() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
+  const { pathname } = useLocation();
+
+  // Always allow /auth/callback route to render (before authentication checks)
+  if (pathname === "/auth/callback") {
+    return <AuthCallback />;
+  }
 
   if (loading) {
     return (

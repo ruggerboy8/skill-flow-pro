@@ -19,8 +19,9 @@ export default function AuthCallback() {
         console.log("Hash:", window.location.hash);
         console.log("Search:", window.location.search);
 
-        // Hash-based tokens (recovery/invite/magic): #access_token=...&refresh_token=...&type=recovery
+        // Method 1: Hash-based tokens (#access_token=...&refresh_token=...&type=recovery)
         if (window.location.hash && window.location.hash.includes("access_token")) {
+          console.log("Processing hash-based tokens");
           const params = new URLSearchParams(window.location.hash.substring(1));
           const access_token = params.get("access_token") || "";
           const refresh_token = params.get("refresh_token") || "";
@@ -45,33 +46,23 @@ export default function AuthCallback() {
           }
         }
 
-        // PKCE/OAuth code flow: ?code=...
+        // Method 2: PKCE/OAuth code flow (?code=...)
         if (!routed && window.location.search.includes("code=")) {
+          console.log("Processing PKCE code flow");
           await supabase.auth.exchangeCodeForSession(window.location.href);
           window.history.replaceState({}, "", window.location.pathname);
-          navigate("/", { replace: true });
+          
+          // Check for next parameter
+          const urlParams = new URLSearchParams(window.location.search);
+          const next = urlParams.get("next");
+          navigate(next || "/", { replace: true });
           routed = true;
         }
 
-        // Handle direct password reset callback (when URL has next=/reset-password but no tokens)
-        if (!routed && window.location.search.includes("next=/reset-password")) {
-          // Try to exchange the full URL for a session
-          try {
-            await supabase.auth.exchangeCodeForSession(window.location.href);
-            navigate("/reset-password", { replace: true });
-            routed = true;
-          } catch (exchangeError) {
-            console.log("Exchange failed, checking for existing session:", exchangeError);
-            // If exchange fails, check if user already has a session
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-              navigate("/reset-password", { replace: true });
-              routed = true;
-            }
-          }
+        if (!routed) {
+          console.log("No valid auth tokens found, showing error");
+          setStatus("error");
         }
-
-        if (!routed) setStatus("error");
       } catch (e) {
         console.error("Auth callback error:", e);
         setStatus("error");

@@ -99,7 +99,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
       const locationData = {
         name: formData.name,
         slug: slug,
-        organization_id: formData.organization_id || null,
+        organization_id: formData.organization_id === "none" ? null : (formData.organization_id || null),
         timezone: formData.timezone,
         program_start_date: formData.program_start_date.toISOString().split('T')[0],
         cycle_length_weeks: formData.cycle_length_weeks,
@@ -171,7 +171,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
                 <SelectValue placeholder="Select an organization" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No organization</SelectItem>
+                <SelectItem value="none">No organization</SelectItem>
                 {organizations.map((org) => (
                   <SelectItem key={org.id} value={org.id}>
                     {org.name}

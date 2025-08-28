@@ -70,8 +70,8 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         method: 'PATCH',
         body: JSON.stringify({
           name: formData.name,
-          role_id: formData.role_id ? parseInt(formData.role_id) : null,
-          primary_location_id: formData.primary_location_id || null,
+          role_id: formData.role_id === "none" ? null : (formData.role_id ? parseInt(formData.role_id) : null),
+          primary_location_id: formData.primary_location_id === "none" ? null : (formData.primary_location_id || null),
           is_super_admin: formData.is_super_admin,
         }),
       });
@@ -127,7 +127,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No role</SelectItem>
+                <SelectItem value="none">No role</SelectItem>
                 {roles.map((role) => (
                   <SelectItem key={role.role_id} value={role.role_id.toString()}>
                     {role.role_name}
@@ -144,7 +144,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 <SelectValue placeholder="Select a location" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No location</SelectItem>
+                <SelectItem value="none">No location</SelectItem>
                 {locations.map((location) => (
                   <SelectItem key={location.id} value={location.id}>
                     {location.name}

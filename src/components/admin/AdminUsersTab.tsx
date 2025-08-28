@@ -46,9 +46,9 @@ export function AdminUsersTab() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState<string>("");
-  const [locationFilter, setLocationFilter] = useState<string>("");
-  const [superAdminFilter, setSuperAdminFilter] = useState<string>("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [superAdminFilter, setSuperAdminFilter] = useState<string>("all");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -192,9 +192,9 @@ export function AdminUsersTab() {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesRole = !roleFilter || user.role_id?.toString() === roleFilter;
-    const matchesLocation = !locationFilter || user.primary_location_id === locationFilter;
-    const matchesSuperAdmin = !superAdminFilter || 
+    const matchesRole = roleFilter === "all" || !roleFilter || user.role_id?.toString() === roleFilter;
+    const matchesLocation = locationFilter === "all" || !locationFilter || user.primary_location_id === locationFilter;
+    const matchesSuperAdmin = superAdminFilter === "all" || !superAdminFilter || 
       (superAdminFilter === "true" && user.is_super_admin) ||
       (superAdminFilter === "false" && !user.is_super_admin);
     
@@ -274,7 +274,7 @@ export function AdminUsersTab() {
                 <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All roles</SelectItem>
+                <SelectItem value="all">All roles</SelectItem>
                 {roles.map((role) => (
                   <SelectItem key={role.role_id} value={role.role_id.toString()}>
                     {role.role_name}
@@ -287,7 +287,7 @@ export function AdminUsersTab() {
                 <SelectValue placeholder="Filter by location" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All locations</SelectItem>
+                <SelectItem value="all">All locations</SelectItem>
                 {locations.map((location) => (
                   <SelectItem key={location.id} value={location.id}>
                     {location.name}
@@ -300,7 +300,7 @@ export function AdminUsersTab() {
                 <SelectValue placeholder="Filter admin" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All users</SelectItem>
+                <SelectItem value="all">All users</SelectItem>
                 <SelectItem value="true">Super admins</SelectItem>
                 <SelectItem value="false">Regular users</SelectItem>
               </SelectContent>

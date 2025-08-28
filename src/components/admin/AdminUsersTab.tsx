@@ -175,23 +175,19 @@ export function AdminUsersTab() {
     }
   };
 
-  const handleResetPassword = async (user: User) => {
+const handleResetPassword = async (user: User) => {
   try {
-    const { error } = await supabase.functions.invoke('admin-users', {
-      body: { 
-        action: 'reset_link',
-        user_id: user.user_id,
-        email: user.email // passing it saves a lookup
-      },
+    const { error } = await supabase.functions.invoke("admin-users", {
+      body: { action: "reset_link", user_id: user.user_id },
     });
     if (error) throw error;
 
     toast({
-      title: "Password reset email sent",
-      description: `We emailed ${user.email} a reset link.`,
+      title: "Reset email sent",
+      description: `We emailed a reset link to ${user.email}.`,
     });
   } catch (err) {
-    console.error("Error sending reset email:", err);
+    console.error("Error generating reset link:", err);
     toast({
       title: "Error",
       description: "Failed to send reset email",

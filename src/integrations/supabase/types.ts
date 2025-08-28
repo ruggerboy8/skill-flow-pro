@@ -199,6 +199,7 @@ export type Database = {
       }
       locations: {
         Row: {
+          active: boolean | null
           created_at: string
           cycle_length_weeks: number
           id: string
@@ -209,6 +210,7 @@ export type Database = {
           timezone: string
         }
         Insert: {
+          active?: boolean | null
           created_at?: string
           cycle_length_weeks?: number
           id?: string
@@ -219,6 +221,7 @@ export type Database = {
           timezone?: string
         }
         Update: {
+          active?: boolean | null
           created_at?: string
           cycle_length_weeks?: number
           id?: string
@@ -230,6 +233,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "locations_org_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "locations_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -240,18 +250,21 @@ export type Database = {
       }
       organizations: {
         Row: {
+          active: boolean | null
           created_at: string
           id: string
           name: string
           slug: string
         }
         Insert: {
+          active?: boolean | null
           created_at?: string
           id?: string
           name: string
           slug: string
         }
         Update: {
+          active?: boolean | null
           created_at?: string
           id?: string
           name?: string
@@ -899,6 +912,10 @@ export type Database = {
       }
       is_super_admin: {
         Args: { _user_id: string }
+        Returns: boolean
+      }
+      is_superadmin: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       needs_backfill: {

@@ -189,14 +189,16 @@ serve(async (req: Request) => {
 
         const origin = req.headers.get("origin") || APP_URL;
         const redirectTo = `${origin}/auth/callback?next=/reset-password`;
-        const { data: link, error: rlErr } = await admin.auth.admin.generateLink({
-          type: "recovery",
-          email,
-          options: { redirectTo }
+        
+        // Create a regular Supabase client to send the reset email (admin client doesn't have resetPasswordForEmail)
+        const publicClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
+        const { error: resetErr } = await publicClient.auth.resetPasswordForEmail(email, {
+          redirectTo
         });
-        if (rlErr) throw rlErr;
+        
+        if (resetErr) throw resetErr;
 
-        return json({ ok: true, link: link.properties.action_link });
+        return json({ ok: true, message: "Password reset email sent" });
       }
 
       case "delete_user": {

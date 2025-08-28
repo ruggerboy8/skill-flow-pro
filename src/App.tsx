@@ -116,6 +116,7 @@ function AppRoutes() {
         <Route path="admin/locations" element={<Navigate to="/admin?tab=locations" replace />} />
         <Route path="admin/builder" element={<Navigate to="/builder" replace />} />
         <Route path="*" element={<NotFound />} />
+        <Route path="reset-password" element={<ResetPassword />} />
       </Route>
     </Routes>
   );

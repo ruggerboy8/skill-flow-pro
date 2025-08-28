@@ -102,8 +102,8 @@ function AppRoutes() {
         <Route path="builder/:roleId" element={<CycleList />} />
         <Route path="builder/:roleId/:cycle" element={<WeekList />} />
         <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />
-        <Route path="admin/organizations" element={<OrganizationList />} />
-        <Route path="admin/locations" element={<LocationList />} />
+        <Route path="admin/organizations" element={<Navigate to="/admin?tab=organizations" replace />} />
+        <Route path="admin/locations" element={<Navigate to="/admin?tab=locations" replace />} />
         <Route path="admin/builder" element={<Navigate to="/builder" replace />} />
         <Route path="*" element={<NotFound />} />
       </Route>

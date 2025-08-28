@@ -75,10 +75,13 @@ serve(async (req: Request) => {
 
         // Pull emails only for the users on this page (faster than listUsers 1000)
         const userIds = Array.from(new Set((data ?? []).map((d: any) => d.user_id).filter(Boolean)));
+        console.log("Fetching auth data for user IDs:", userIds);
+        
         const authMap = new Map<
           string,
           { email: string|null; email_confirmed_at?: string|null; last_sign_in_at?: string|null; created_at?: string }
         >();
+        
         await Promise.all(
           userIds.map(async (uid) => {
             const { data: u, error: guErr } = await admin.auth.admin.getUserById(uid);
@@ -86,19 +89,21 @@ serve(async (req: Request) => {
               console.warn("getUserById failed", uid, guErr.message);
               authMap.set(uid, { email: null });
             } else {
-              authMap.set(uid, {
+              const authData = {
                 email: u.user?.email ?? null,
                 email_confirmed_at: u.user?.email_confirmed_at ?? null,
                 last_sign_in_at: (u.user?.last_sign_in_at as string) ?? null,
                 created_at: u.user?.created_at,
-              });
+              };
+              console.log(`Auth data for ${uid}:`, authData);
+              authMap.set(uid, authData);
             }
           })
         );
 
         const rows = (data ?? []).map((s: any) => {
           const a = s.user_id ? authMap.get(s.user_id) : undefined;
-          return {
+          const row = {
             staff_id: s.id,
             user_id: s.user_id,
             email: a?.email ?? null,
@@ -112,6 +117,8 @@ serve(async (req: Request) => {
             location_name: s.locations?.name ?? null,
             is_super_admin: s.is_super_admin ?? false,
           };
+          console.log("Final row data:", row);
+          return row;
         });
 
         return json({ rows, total: count ?? rows.length });

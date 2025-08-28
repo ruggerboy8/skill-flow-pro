@@ -62,14 +62,15 @@ export function AdminUsersTab() {
     try {
       setLoading(true);
       
-      // Call the admin-users edge function
-      const { data, error } = await supabase.functions.invoke('admin-users', {
+      // Call the admin-users edge function with query parameters
+      const searchParams = new URLSearchParams({
+        search,
+        page: page.toString(),
+        limit: usersPerPage.toString(),
+      });
+      
+      const { data, error } = await supabase.functions.invoke(`admin-users?${searchParams.toString()}`, {
         method: 'GET',
-        body: new URLSearchParams({
-          search,
-          page: page.toString(),
-          limit: usersPerPage.toString(),
-        }).toString(),
       });
 
       if (error) throw error;
@@ -140,9 +141,8 @@ export function AdminUsersTab() {
     if (!userToDelete) return;
 
     try {
-      const { error } = await supabase.functions.invoke('admin-users', {
+      const { error } = await supabase.functions.invoke(`admin-users/users/${userToDelete.user_id}`, {
         method: 'DELETE',
-        body: JSON.stringify({}),
       });
 
       if (error) throw error;
@@ -167,9 +167,9 @@ export function AdminUsersTab() {
 
   const handleResetPassword = async (user: User) => {
     try {
-      const { data, error } = await supabase.functions.invoke('admin-users', {
+      const { data, error } = await supabase.functions.invoke('admin-users/reset-link', {
         method: 'POST',
-        body: JSON.stringify({ user_id: user.user_id }),
+        body: { user_id: user.user_id },
       });
 
       if (error) throw error;

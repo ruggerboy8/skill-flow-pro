@@ -44,7 +44,7 @@ export function AdminLocationsTab() {
         .from("locations")
         .select(`
           *,
-          organizations:organization_id (
+          organizations!locations_organization_id_fkey (
             id,
             name
           )

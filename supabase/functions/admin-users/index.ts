@@ -102,8 +102,8 @@ serve(async (req) => {
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
 
-    // GET /users - List users with pagination
-    if (req.method === 'GET' && pathParts[0] === 'users') {
+    // GET / - List users with pagination (root path)
+    if (req.method === 'GET' && pathParts.length === 0) {
       const searchParams = new URLSearchParams(url.search);
       const search = searchParams.get('search') || '';
       const page = parseInt(searchParams.get('page') || '1');

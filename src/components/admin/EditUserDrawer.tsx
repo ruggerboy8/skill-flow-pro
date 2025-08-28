@@ -66,14 +66,14 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     setLoading(true);
 
     try {
-      const { error } = await supabase.functions.invoke('admin-users', {
+      const { error } = await supabase.functions.invoke(`admin-users/users/${user.user_id}`, {
         method: 'PATCH',
-        body: JSON.stringify({
+        body: {
           name: formData.name,
           role_id: formData.role_id === "none" ? null : (formData.role_id ? parseInt(formData.role_id) : null),
           primary_location_id: formData.primary_location_id === "none" ? null : (formData.primary_location_id || null),
           is_super_admin: formData.is_super_admin,
-        }),
+        },
       });
 
       if (error) throw error;

@@ -46,15 +46,15 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations }:
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-users', {
+      const { data, error } = await supabase.functions.invoke('admin-users/invite', {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           email: formData.email,
           name: formData.name,
           role_id: formData.role_id === "none" ? null : (formData.role_id ? parseInt(formData.role_id) : null),
           location_id: formData.location_id === "none" ? null : (formData.location_id || null),
           is_super_admin: formData.is_super_admin,
-        }),
+        },
       });
 
       if (error) throw error;

@@ -179,7 +179,7 @@ export function AdminUsersTab() {
   try {
     const { error } = await supabase.functions.invoke('admin-users', {
       body: { 
-        action: 'reset_password_email',
+        action: 'reset_link',
         user_id: user.user_id,
         email: user.email // passing it saves a lookup
       },

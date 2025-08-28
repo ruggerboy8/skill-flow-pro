@@ -31,6 +31,7 @@ import AdminPage from "./pages/AdminPage";
 import EvaluationViewer from "./pages/EvaluationViewer";
 import AdminBuilder from "./pages/AdminBuilder";
 import AuthCallback from "./pages/AuthCallback";
+import ResetPassword from "./pages/ResetPassword";
 import CycleList from "./pages/admin/CycleList";
 import WeekList from "./pages/admin/WeekList";
 import WeekEditor from "./pages/admin/WeekEditor";
@@ -71,6 +72,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="welcome" element={<Welcome />} />

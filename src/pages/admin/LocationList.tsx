@@ -65,21 +65,25 @@ export default function LocationList() {
       if (error) throw error;
 
       // Calculate current week/cycle for each location
-      const locationsWithWeekInfo = await Promise.all(
-        (data || []).map(async (location) => {
-          try {
-            const context = await getLocationWeekContext(location.id);
-            return {
-              ...location,
-              currentWeek: context.weekInCycle,
-              currentCycle: context.cycleNumber
-            } as Location;
-          } catch (error) {
-            console.error(`Error getting context for location ${location.id}:`, error);
-            return location as Location;
-          }
-        })
-      );
+        const locationsWithWeekInfo = await Promise.all(
+          (data || []).map(async (location: any) => {
+            try {
+              const context = await getLocationWeekContext(location.id);
+              return {
+                ...location,
+                currentWeek: context.weekInCycle,
+                currentCycle: context.cycleNumber,
+                organization: location.organization || { name: "No organization" }
+              } as Location;
+            } catch (error) {
+              console.error(`Error getting context for location ${location.id}:`, error);
+              return {
+                ...location,
+                organization: location.organization || { name: "No organization" }
+              } as Location;
+            }
+          })
+        );
 
       setLocations(locationsWithWeekInfo);
     } catch (error) {

@@ -27,6 +27,7 @@ import Profile from "./pages/Profile";
 import CoachDashboard from "./pages/coach/CoachDashboard";
 import CoachDetail from "./pages/coach/CoachDetail";
 import { EvaluationHub } from "./pages/coach/EvaluationHub";
+import AdminPage from "./pages/AdminPage";
 import EvaluationViewer from "./pages/EvaluationViewer";
 import AdminBuilder from "./pages/AdminBuilder";
 import CycleList from "./pages/admin/CycleList";
@@ -95,6 +96,7 @@ function AppRoutes() {
         <Route path="coach" element={<CoachDashboard />} />
         <Route path="coach/:staffId" element={<CoachDetail />} />
         <Route path="coach/:staffId/eval/:evalId" element={<EvaluationHub />} />
+        <Route path="admin" element={<AdminPage />} />
         <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
         <Route path="builder" element={<AdminBuilder />} />
         <Route path="builder/:roleId" element={<CycleList />} />

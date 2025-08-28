@@ -1,0 +1,255 @@
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Plus, MoreHorizontal, Edit, Archive } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { LocationFormDrawer } from "./LocationFormDrawer";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface Location {
+  id: string;
+  name: string;
+  organization_id: string | null;
+  timezone: string;
+  program_start_date: string;
+  cycle_length_weeks: number;
+  active: boolean;
+  organization?: {
+    name: string;
+  };
+}
+
+interface Organization {
+  id: string;
+  name: string;
+}
+
+export function AdminLocationsTab() {
+  const { toast } = useToast();
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+
+  const loadLocations = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("locations")
+        .select(`
+          *,
+          organizations:organization_id (
+            id,
+            name
+          )
+        `)
+        .order("name");
+
+      if (error) throw error;
+
+      setLocations(data || []);
+    } catch (error) {
+      console.error("Error loading locations:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load locations",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadOrganizations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("id, name")
+        .eq("active", true)
+        .order("name");
+
+      if (error) throw error;
+
+      setOrganizations(data || []);
+    } catch (error) {
+      console.error("Error loading organizations:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadLocations();
+    loadOrganizations();
+  }, []);
+
+  const handleNewLocation = () => {
+    setSelectedLocation(null);
+    setDrawerOpen(true);
+  };
+
+  const handleEditLocation = (location: Location) => {
+    setSelectedLocation(location);
+    setDrawerOpen(true);
+  };
+
+  const handleFormSuccess = () => {
+    setDrawerOpen(false);
+    setSelectedLocation(null);
+    loadLocations();
+  };
+
+  const toggleLocationActive = async (location: Location) => {
+    try {
+      const { error } = await supabase
+        .from("locations")
+        .update({ active: !location.active })
+        .eq("id", location.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Location ${location.active ? "archived" : "activated"} successfully`,
+      });
+
+      loadLocations();
+    } catch (error) {
+      console.error("Error updating location:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update location",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Program Locations</CardTitle>
+              <CardDescription>Manage program locations and settings</CardDescription>
+            </div>
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Program Locations</CardTitle>
+              <CardDescription>Manage program locations and settings</CardDescription>
+            </div>
+            <Button onClick={handleNewLocation}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Location
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Organization</TableHead>
+                  <TableHead>Timezone</TableHead>
+                  <TableHead>Program Start</TableHead>
+                  <TableHead>Cycle Length</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[50px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {locations.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No locations found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  locations.map((location) => (
+                    <TableRow key={location.id}>
+                      <TableCell className="font-medium">{location.name}</TableCell>
+                      <TableCell>
+                        {location.organization?.name || "No organization"}
+                      </TableCell>
+                      <TableCell>{location.timezone}</TableCell>
+                      <TableCell>{formatDate(location.program_start_date)}</TableCell>
+                      <TableCell>{location.cycle_length_weeks} weeks</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={location.active}
+                            onCheckedChange={() => toggleLocationActive(location)}
+                          />
+                          <Badge variant={location.active ? "default" : "secondary"}>
+                            {location.active ? "Active" : "Archived"}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditLocation(location)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toggleLocationActive(location)}>
+                              <Archive className="h-4 w-4 mr-2" />
+                              {location.active ? "Archive" : "Unarchive"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <LocationFormDrawer
+        open={drawerOpen}
+        onClose={() => {
+          setDrawerOpen(false);
+          setSelectedLocation(null);
+        }}
+        onSuccess={handleFormSuccess}
+        location={selectedLocation}
+        organizations={organizations}
+      />
+    </>
+  );
+}

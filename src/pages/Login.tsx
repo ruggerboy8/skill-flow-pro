@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,8 +14,15 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [showResetOption, setShowResetOption] = useState(false);
-  const { signInWithOtp, signInWithPassword, resetPassword } = useAuth();
+  const { user, signInWithOtp, signInWithPassword, resetPassword } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +42,7 @@ export default function Login() {
         title: "Welcome back!",
         description: "You've been signed in successfully"
       });
+      // The useEffect will handle the redirect
     }
     setLoading(false);
   };
@@ -44,12 +53,9 @@ export default function Login() {
 
     setLoading(true);
     
-    // Use signUp instead of signInWithOtp for new users
-    // This will create an account and send a confirmation email
     const { error } = await signInWithOtp(email);
     
     if (error) {
-      // Check if the error suggests the user already exists
       if (error.message?.toLowerCase().includes('already') || 
           error.message?.toLowerCase().includes('exist')) {
         setShowResetOption(true);

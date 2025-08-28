@@ -60,16 +60,6 @@ function HashShim() {
 
 function AppRoutes() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
-  const { pathname } = useLocation();
-
-  // Always allow public routes to be reachable without session
-  if (pathname === "/auth/callback") {
-    return <AuthCallback />;
-  }
-  
-  if (pathname === "/reset-password") {
-    return <ResetPassword />;
-  }
 
   if (loading) {
     return (
@@ -83,24 +73,30 @@ function AppRoutes() {
     <>
       <HashShim />
       <Routes>
-        {/* PUBLIC routes (must be reachable without a session) */}
+        {/* PUBLIC: no session required */}
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/login" element={<Login />} />
 
-        {/* PROTECTED area */}
-        {user ? (
-          needsPasswordSetup ? (
+        {/* USER-SPECIFIC: requires a session */}
+        <Route
+          path="*"
+          element={
+            user ? (
+              needsPasswordSetup ? (
+                <SetupPassword />
+              ) : needsProfileSetup ? (
+                <Setup />
+              ) : (
+                <Layout />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        >
+          {user && !needsPasswordSetup && !needsProfileSetup && (
             <>
-              <Route path="/" element={<SetupPassword />} />
-              <Route path="*" element={<SetupPassword />} />
-            </>
-          ) : needsProfileSetup ? (
-            <>
-              <Route path="/" element={<Setup />} />
-              <Route path="*" element={<Setup />} />
-            </>
-          ) : (
-            <Route path="/" element={<Layout />}>
               <Route index element={<Index />} />
               <Route path="welcome" element={<Welcome />} />
               <Route path="setup" element={<Setup />} />
@@ -139,15 +135,9 @@ function AppRoutes() {
               <Route path="admin/locations" element={<Navigate to="/admin?tab=locations" replace />} />
               <Route path="admin/builder" element={<Navigate to="/builder" replace />} />
               <Route path="*" element={<NotFound />} />
-            </Route>
-          )
-        ) : (
-          // No session: send everything else to Login
-          <>
-            <Route path="/login" element={<Login />} />
-            <Route path="*" element={<Login />} />
-          </>
-        )}
+            </>
+          )}
+        </Route>
       </Routes>
     </>
   );

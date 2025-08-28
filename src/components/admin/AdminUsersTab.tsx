@@ -176,32 +176,29 @@ export function AdminUsersTab() {
   };
 
   const handleResetPassword = async (user: User) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-users', {
-        body: { 
-          action: 'reset_link',
-          user_id: user.user_id 
-        },
-      });
+  try {
+    const { error } = await supabase.functions.invoke('admin-users', {
+      body: { 
+        action: 'reset_password_email',
+        user_id: user.user_id,
+        email: user.email // passing it saves a lookup
+      },
+    });
+    if (error) throw error;
 
-      if (error) throw error;
-
-      // Copy to clipboard
-      await navigator.clipboard.writeText(data.link);
-      
-      toast({
-        title: "Success",
-        description: "Password reset link copied to clipboard",
-      });
-    } catch (error) {
-      console.error("Error generating reset link:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate reset link",
-        variant: "destructive",
-      });
-    }
-  };
+    toast({
+      title: "Password reset email sent",
+      description: `We emailed ${user.email} a reset link.`,
+    });
+  } catch (err) {
+    console.error("Error sending reset email:", err);
+    toast({
+      title: "Error",
+      description: "Failed to send reset email",
+      variant: "destructive",
+    });
+  }
+};
 
   const filteredUsers = users.filter(user => {
     const matchesRole = roleFilter === "all" || !roleFilter || user.role_id?.toString() === roleFilter;

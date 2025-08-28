@@ -43,11 +43,8 @@ export function AdminLocationsTab() {
       const { data, error } = await supabase
         .from("locations")
         .select(`
-          *,
-          organizations!locations_organization_id_fkey (
-            id,
-            name
-          )
+          id, name, organization_id, timezone, program_start_date, cycle_length_weeks, active,
+          organization:organizations!locations_organization_id_fkey ( id, name )
         `)
         .order("name");
 
@@ -105,6 +102,25 @@ export function AdminLocationsTab() {
 
   const toggleLocationActive = async (location: Location) => {
     try {
+      if (location.active) {
+        // about to archive; block if staff still assigned
+        const { count, error: cntErr } = await supabase
+          .from("staff")
+          .select("*", { count: "exact", head: true })
+          .eq("primary_location_id", location.id);
+
+        if (cntErr) throw cntErr;
+
+        if ((count ?? 0) > 0) {
+          toast({
+            title: "Cannot archive",
+            description: "This location still has staff assigned. Reassign their primary location first.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from("locations")
         .update({ active: !location.active })
@@ -128,8 +144,10 @@ export function AdminLocationsTab() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "—";
+    const d = new Date(dateString);
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
   };
 
   if (loading) {

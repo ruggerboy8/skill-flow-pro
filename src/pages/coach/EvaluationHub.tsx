@@ -57,6 +57,8 @@ export function EvaluationHub() {
   const [showObserverNotes, setShowObserverNotes] = useState<Record<number, boolean>>({});
   const [showSelfNote, setShowSelfNote] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [pendingObserverNotes, setPendingObserverNotes] = useState<Record<number, string>>({});
+  const [pendingSelfNotes, setPendingSelfNotes] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (evalId) {
@@ -238,6 +240,9 @@ export function EvaluationHub() {
     
     try {
       setIsSubmitting(true);
+      // Make sure all locally drafted notes are persisted first
+      await flushAllPendingNotes();
+
       await submitEvaluation(evalId);
       
       toast({
@@ -285,6 +290,58 @@ export function EvaluationHub() {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const draftObserverNote = (competencyId: number, text: string) => {
+    setPendingObserverNotes(prev => ({ ...prev, [competencyId]: text }));
+  };
+
+  const draftSelfNote = (competencyId: number, text: string) => {
+    setPendingSelfNotes(prev => ({ ...prev, [competencyId]: text }));
+  };
+
+  // Save a single observer note (used onBlur)
+  const saveOneObserverNote = async (competencyId: number) => {
+    if (!evalId) return;
+    const text = pendingObserverNotes[competencyId];
+    if (text === undefined) return;
+    await setObserverNote(evalId, competencyId, text.trim());
+    setEvaluation(prev => prev ? ({
+      ...prev,
+      items: prev.items.map(it => it.competency_id === competencyId ? { ...it, observer_note: text.trim() } : it)
+    }) : prev);
+  };
+
+  // Save a single self note (used onBlur)
+  const saveOneSelfNote = async (competencyId: number) => {
+    if (!evalId) return;
+    const text = pendingSelfNotes[competencyId];
+    if (text === undefined) return;
+    await setSelfNote(evalId, competencyId, text.trim());
+    setEvaluation(prev => prev ? ({
+      ...prev,
+      items: prev.items.map(it => it.competency_id === competencyId ? { ...it, self_note: text.trim() } : it)
+    }) : prev);
+  };
+
+  // Flush *all* pending notes (call this right before submit)
+  const flushAllPendingNotes = async () => {
+    if (!evalId) return;
+
+    // Observer
+    for (const [k, v] of Object.entries(pendingObserverNotes)) {
+      const id = Number(k);
+      await setObserverNote(evalId, id, (v ?? '').trim());
+    }
+    // Self
+    for (const [k, v] of Object.entries(pendingSelfNotes)) {
+      const id = Number(k);
+      await setSelfNote(evalId, id, (v ?? '').trim());
+    }
+
+    // Clear pending caches
+    setPendingObserverNotes({});
+    setPendingSelfNotes({});
   };
 
   if (loading) {
@@ -511,8 +568,9 @@ export function EvaluationHub() {
                   {showObserverNotes[item.competency_id] ? (
                     <Textarea
                       placeholder="Add your notes..."
-                      value={item.observer_note || ''}
-                      onChange={(e) => !isReadOnly && handleObserverNoteChange(item.competency_id, e.target.value)}
+                      value={pendingObserverNotes[item.competency_id] ?? item.observer_note ?? ''}
+                      onChange={(e) => draftObserverNote(item.competency_id, e.target.value)}
+                      onBlur={() => saveOneObserverNote(item.competency_id)}
                       disabled={isReadOnly}
                       className="min-h-[80px]"
                     />
@@ -621,8 +679,9 @@ export function EvaluationHub() {
                     <label className="text-sm font-medium">Self-Assessment Notes</label>
                     <Textarea
                       placeholder="Please share your thoughts and examples..."
-                      value={currentItem.self_note || ''}
-                      onChange={(e) => !isReadOnly && handleSelfNoteChange(currentItem.competency_id, e.target.value)}
+                      value={pendingSelfNotes[currentItem.competency_id] ?? currentItem.self_note ?? ''}
+                      onChange={(e) => draftSelfNote(currentItem.competency_id, e.target.value)}
+                      onBlur={() => saveOneSelfNote(currentItem.competency_id)}
                       disabled={isReadOnly}
                       className="min-h-[120px]"
                     />

@@ -1,3 +1,4 @@
+// src/pages/AuthCallback.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +14,7 @@ export default function AuthCallback() {
       try {
         let routed = false;
 
-        // A) Hash-based tokens (recovery / magic link / invite)
+        // Hash-based tokens (recovery/invite/magic): #access_token=...&refresh_token=...&type=recovery
         if (window.location.hash && window.location.hash.includes("access_token")) {
           const params = new URLSearchParams(window.location.hash.substring(1));
           const access_token = params.get("access_token") || "";
@@ -24,10 +25,8 @@ export default function AuthCallback() {
             const { error } = await supabase.auth.setSession({ access_token, refresh_token });
             if (error) throw error;
 
-            // remove hash from URL
             window.history.replaceState({}, "", window.location.pathname);
 
-            // Route based on link type
             if (type === "recovery") {
               navigate("/reset-password", { replace: true });
             } else {
@@ -37,11 +36,9 @@ export default function AuthCallback() {
           }
         }
 
-        // B) PKCE/OAuth code flow (?code=)
+        // PKCE/OAuth code flow: ?code=...
         if (!routed && window.location.search.includes("code=")) {
-          // Pass full URL — the client will parse the code for us
           await supabase.auth.exchangeCodeForSession(window.location.href);
-          // Clean query
           window.history.replaceState({}, "", window.location.pathname);
           navigate("/", { replace: true });
           routed = true;

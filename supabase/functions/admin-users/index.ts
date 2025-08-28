@@ -101,9 +101,13 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
+    
+    console.log('Request method:', req.method);
+    console.log('Path parts:', pathParts);
+    console.log('Search params:', url.search);
 
-    // GET / - List users with pagination (root path)
-    if (req.method === 'GET' && pathParts.length === 0) {
+    // GET / - List users with pagination (root path or just function name)
+    if (req.method === 'GET' && (pathParts.length === 0 || pathParts[pathParts.length - 1] === 'admin-users')) {
       const searchParams = new URLSearchParams(url.search);
       const search = searchParams.get('search') || '';
       const page = parseInt(searchParams.get('page') || '1');

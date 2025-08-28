@@ -206,12 +206,6 @@ export function AdminUsersTab() {
     return matchesRole && matchesLocation && matchesSuperAdmin;
   });
 
-  const getStatusBadge = (user: User) => {
-    if (!user.email_confirmed_at) {
-      return <Badge variant="secondary">Invited</Badge>;
-    }
-    return <Badge variant="default">Active</Badge>;
-  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Never";
@@ -322,7 +316,6 @@ export function AdminUsersTab() {
                   <TableHead>Role</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Admin</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Last Sign In</TableHead>
                   <TableHead className="w-[50px]">Actions</TableHead>
                 </TableRow>
@@ -330,7 +323,7 @@ export function AdminUsersTab() {
               <TableBody>
                 {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -348,7 +341,6 @@ export function AdminUsersTab() {
                           <Badge variant="destructive">Super Admin</Badge>
                         )}
                       </TableCell>
-                      <TableCell>{getStatusBadge(user)}</TableCell>
                       <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
                       <TableCell>
                         <DropdownMenu>

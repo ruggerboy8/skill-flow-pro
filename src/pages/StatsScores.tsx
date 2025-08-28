@@ -193,9 +193,6 @@ export default function StatsScores() {
             >
               <div className="flex items-center gap-3">
                 <h3 className="text-lg font-semibold">Cycle {cycle.cycle}</h3>
-                {!cycle.hasAnyConfidence && (
-                  <span className="text-sm text-muted-foreground">Complete Week 1 confidence to unlock</span>
-                )}
               </div>
             </AccordionTrigger>
             

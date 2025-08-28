@@ -36,6 +36,9 @@ serve(async (req: Request) => {
 
   const payload = await safeJson(req);
   const action = payload?.action as string;
+  
+  console.log('POST request received with action:', action);
+  console.log('Payload:', payload);
 
   try {
     switch (action) {

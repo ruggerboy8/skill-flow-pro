@@ -141,8 +141,9 @@ export function AdminUsersTab() {
     if (!userToDelete) return;
 
     try {
-      const { error } = await supabase.functions.invoke(`admin-users/users/${userToDelete.user_id}`, {
+      const { error } = await supabase.functions.invoke('admin-users', {
         method: 'DELETE',
+        body: { path: `users/${userToDelete.user_id}` },
       });
 
       if (error) throw error;
@@ -167,9 +168,9 @@ export function AdminUsersTab() {
 
   const handleResetPassword = async (user: User) => {
     try {
-      const { data, error } = await supabase.functions.invoke('admin-users/reset-link', {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
         method: 'POST',
-        body: { user_id: user.user_id },
+        body: { path: 'reset-link', user_id: user.user_id },
       });
 
       if (error) throw error;

@@ -176,9 +176,12 @@ serve(async (req) => {
       });
     }
 
+    // Handle dynamic paths based on body
+    const body = req.method !== 'GET' ? await req.json() : {};
+    const requestPath = body.path;
+
     // POST /invite - Invite new user
-    if (req.method === 'POST' && pathParts[0] === 'invite') {
-      const body = await req.json();
+    if (req.method === 'POST' && (pathParts[0] === 'invite' || requestPath === 'invite')) {
       const { email, name, role_id, location_id, is_super_admin } = body;
 
       if (!email || !name) {
@@ -270,7 +273,6 @@ serve(async (req) => {
     // PATCH /users/:user_id - Update user
     if (req.method === 'PATCH' && pathParts[0] === 'users' && pathParts[1]) {
       const userId = pathParts[1];
-      const body = await req.json();
       const { name, role_id, primary_location_id, is_super_admin } = body;
 
       const { data: staff, error: updateError } = await supabaseAdmin
@@ -299,8 +301,7 @@ serve(async (req) => {
     }
 
     // POST /reset-link - Generate password reset link
-    if (req.method === 'POST' && pathParts[0] === 'reset-link') {
-      const body = await req.json();
+    if (req.method === 'POST' && (pathParts[0] === 'reset-link' || requestPath === 'reset-link')) {
       const { user_id } = body;
 
       if (!user_id) {
@@ -341,8 +342,8 @@ serve(async (req) => {
     }
 
     // DELETE /users/:user_id - Delete user
-    if (req.method === 'DELETE' && pathParts[0] === 'users' && pathParts[1]) {
-      const userId = pathParts[1];
+    if (req.method === 'DELETE' && ((pathParts[0] === 'users' && pathParts[1]) || requestPath?.startsWith('users/'))) {
+      const userId = pathParts[1] || requestPath?.split('/')[1];
 
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 

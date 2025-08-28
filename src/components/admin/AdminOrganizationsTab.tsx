@@ -69,12 +69,13 @@ export function AdminOrganizationsTab() {
   };
 
   const toggleOrganizationActive = async (organization: Organization) => {
-    // Check if organization has locations before archiving
+    // Check if organization has active locations before archiving
     if (organization.active) {
       const { count } = await supabase
         .from("locations")
         .select("*", { count: "exact", head: true })
-        .eq("organization_id", organization.id);
+        .eq("organization_id", organization.id)
+        .eq("active", true);
 
       if (count && count > 0) {
         toast({

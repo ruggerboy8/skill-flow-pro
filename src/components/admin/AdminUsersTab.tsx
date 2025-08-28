@@ -69,7 +69,8 @@ export function AdminUsersTab() {
           page,
           limit: usersPerPage,
           role_id: roleFilter === "all" ? undefined : parseInt(roleFilter),
-          location_id: locationFilter === "all" ? undefined : locationFilter
+          location_id: locationFilter === "all" ? undefined : locationFilter,
+          super_admin: superAdminFilter === "all" ? undefined : superAdminFilter === "true"
         }
       });
 
@@ -111,6 +112,12 @@ export function AdminUsersTab() {
     loadUsers();
     loadRolesAndLocations();
   }, []);
+
+  // Re-fetch when filters change
+  useEffect(() => {
+    loadUsers(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleFilter, locationFilter, superAdminFilter]);
 
   const handleSearch = () => {
     loadUsers(1, searchTerm);
@@ -206,10 +213,18 @@ export function AdminUsersTab() {
     return matchesRole && matchesLocation && matchesSuperAdmin;
   });
 
+  const getStatusBadge = (user: User) => {
+    if (!user.email_confirmed_at) {
+      return <Badge variant="secondary">Invited</Badge>;
+    }
+    return <Badge variant="default">Active</Badge>;
+  };
+
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Never";
-    return new Date(dateString).toLocaleDateString();
+    const d = new Date(dateString);
+    return Number.isNaN(d.getTime()) ? "Never" : d.toLocaleDateString();
   };
 
   if (loading) {
@@ -316,6 +331,7 @@ export function AdminUsersTab() {
                   <TableHead>Role</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Admin</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Last Sign In</TableHead>
                   <TableHead className="w-[50px]">Actions</TableHead>
                 </TableRow>
@@ -323,7 +339,7 @@ export function AdminUsersTab() {
               <TableBody>
                 {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -333,7 +349,7 @@ export function AdminUsersTab() {
                       <TableCell className="font-medium">
                         {user.name || "No name"}
                       </TableCell>
-                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.email || "—"}</TableCell>
                       <TableCell>{user.role_name || "No role"}</TableCell>
                       <TableCell>{user.location_name || "No location"}</TableCell>
                       <TableCell>
@@ -341,6 +357,7 @@ export function AdminUsersTab() {
                           <Badge variant="destructive">Super Admin</Badge>
                         )}
                       </TableCell>
+                      <TableCell>{getStatusBadge(user)}</TableCell>
                       <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -433,7 +450,7 @@ export function AdminUsersTab() {
               Are you sure you want to delete {userToDelete?.name}? This action cannot be undone and will:
               <ul className="list-disc ml-6 mt-2 space-y-1">
                 <li>Remove their user account permanently</li>
-                <li>Delete all their associated data (scores, evaluations, etc.)</li>
+                <li>Remove associated records that are configured for deletion</li>
                 <li>Revoke access to the system immediately</li>
               </ul>
             </AlertDialogDescription>

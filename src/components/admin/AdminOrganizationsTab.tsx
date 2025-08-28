@@ -111,8 +111,10 @@ export function AdminOrganizationsTab() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "—";
+    const d = new Date(dateString);
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
   };
 
   if (loading) {

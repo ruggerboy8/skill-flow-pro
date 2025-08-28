@@ -54,7 +54,7 @@ serve(async (req: Request) => {
   try {
     switch (action) {
       case "list_users": {
-        const { page = 1, limit = 20, search = "", location_id, role_id } = payload ?? {};
+        const { page = 1, limit = 20, search = "", location_id, role_id, super_admin } = payload ?? {};
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
@@ -68,36 +68,51 @@ serve(async (req: Request) => {
         if (search) q = q.ilike("name", `%${search}%`);
         if (location_id) q = q.eq("primary_location_id", location_id);
         if (role_id) q = q.eq("role_id", role_id);
+        if (super_admin !== undefined) q = q.eq("is_super_admin", super_admin);
 
         const { data, count, error } = await q.range(from, to);
         if (error) throw error;
 
         // Pull emails only for the users on this page (faster than listUsers 1000)
         const userIds = Array.from(new Set((data ?? []).map((d: any) => d.user_id).filter(Boolean)));
-        const authMap = new Map<string, string | null>();
+        const authMap = new Map<
+          string,
+          { email: string|null; email_confirmed_at?: string|null; last_sign_in_at?: string|null; created_at?: string }
+        >();
         await Promise.all(
           userIds.map(async (uid) => {
             const { data: u, error: guErr } = await admin.auth.admin.getUserById(uid);
             if (guErr) {
               console.warn("getUserById failed", uid, guErr.message);
-              authMap.set(uid, null);
+              authMap.set(uid, { email: null });
             } else {
-              authMap.set(uid, u.user?.email ?? null);
+              authMap.set(uid, {
+                email: u.user?.email ?? null,
+                email_confirmed_at: u.user?.email_confirmed_at ?? null,
+                last_sign_in_at: (u.user?.last_sign_in_at as string) ?? null,
+                created_at: u.user?.created_at,
+              });
             }
           })
         );
 
-        const rows = (data ?? []).map((s: any) => ({
-          staff_id: s.id,
-          user_id: s.user_id,
-          email: s.user_id ? authMap.get(s.user_id) ?? null : null,
-          name: s.name,
-          role_id: s.role_id,
-          role_name: s.roles?.role_name ?? null,
-          location_id: s.primary_location_id,
-          location_name: s.locations?.name ?? null,
-          is_super_admin: s.is_super_admin ?? false,
-        }));
+        const rows = (data ?? []).map((s: any) => {
+          const a = s.user_id ? authMap.get(s.user_id) : undefined;
+          return {
+            staff_id: s.id,
+            user_id: s.user_id,
+            email: a?.email ?? null,
+            email_confirmed_at: a?.email_confirmed_at ?? null,
+            last_sign_in_at: a?.last_sign_in_at ?? null,
+            created_at: a?.created_at ?? null,
+            name: s.name,
+            role_id: s.role_id,
+            role_name: s.roles?.role_name ?? null,
+            location_id: s.primary_location_id,
+            location_name: s.locations?.name ?? null,
+            is_super_admin: s.is_super_admin ?? false,
+          };
+        });
 
         return json({ rows, total: count ?? rows.length });
       }

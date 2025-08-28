@@ -1,20 +1,25 @@
 // supabase/functions/admin-users/index.ts
 // Deno deploy target
-
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.3";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+
+// Fail fast if environment isn't wired
+if (!SUPABASE_URL || !SERVICE_ROLE || !SUPABASE_ANON_KEY) {
+  console.error("Missing required env: SUPABASE_URL / SERVICE_ROLE / ANON_KEY");
+}
 
 serve(async (req: Request) => {
-  // CORS
+  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "authorization, content-type",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
       },
     });
   }
@@ -22,23 +27,29 @@ serve(async (req: Request) => {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  // Auth: verify caller is superadmin
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
-  const anon = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, { 
-    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } 
+  // Admin client (bypasses RLS for admin ops)
+  const admin = createClient(SUPABASE_URL!, SERVICE_ROLE!, { auth: { persistSession: false } });
+
+  // Auth-aware client (uses caller's JWT for the superadmin check via RLS)
+  const caller = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
   });
 
-  const { data: authUser } = await anon.auth.getUser();
-  if (!authUser?.user) return json({ error: "Unauthorized" }, 401);
+  // Verify caller
+  const { data: authUser, error: authErr } = await caller.auth.getUser();
+  if (authErr || !authUser?.user) return json({ error: "Unauthorized" }, 401);
 
-  const { data: me, error: meErr } = await anon.from("staff").select("is_super_admin").eq("user_id", authUser.user.id).maybeSingle();
+  const { data: me, error: meErr } = await caller
+    .from("staff")
+    .select("is_super_admin")
+    .eq("user_id", authUser.user.id)
+    .maybeSingle();
+
   if (meErr || !me?.is_super_admin) return json({ error: "Forbidden: Super admin required" }, 403);
 
   const payload = await safeJson(req);
-  const action = payload?.action as string;
-  
-  console.log('POST request received with action:', action);
-  console.log('Payload:', payload);
+  const action = payload?.action as string | undefined;
+  console.log("admin-users action:", action);
 
   try {
     switch (action) {
@@ -47,9 +58,11 @@ serve(async (req: Request) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
-        let q = supabase
+        let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,roles(role_name),locations(name)", { count: "exact" })
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,roles(role_name),locations(name)", {
+            count: "exact",
+          })
           .order("name", { ascending: true });
 
         if (search) q = q.ilike("name", `%${search}%`);
@@ -59,19 +72,25 @@ serve(async (req: Request) => {
         const { data, count, error } = await q.range(from, to);
         if (error) throw error;
 
-        // join auth.users
-        const userIds = (data ?? []).map(d => d.user_id).filter(Boolean);
-        const authMap = new Map<string, any>();
-        if (userIds.length) {
-          const { data: authRes, error: authErr } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-          if (authErr) throw authErr;
-          for (const u of authRes.users) authMap.set(u.id, u);
-        }
+        // Pull emails only for the users on this page (faster than listUsers 1000)
+        const userIds = Array.from(new Set((data ?? []).map((d: any) => d.user_id).filter(Boolean)));
+        const authMap = new Map<string, string | null>();
+        await Promise.all(
+          userIds.map(async (uid) => {
+            const { data: u, error: guErr } = await admin.auth.admin.getUserById(uid);
+            if (guErr) {
+              console.warn("getUserById failed", uid, guErr.message);
+              authMap.set(uid, null);
+            } else {
+              authMap.set(uid, u.user?.email ?? null);
+            }
+          })
+        );
 
         const rows = (data ?? []).map((s: any) => ({
           staff_id: s.id,
           user_id: s.user_id,
-          email: authMap.get(s.user_id)?.email ?? null,
+          email: s.user_id ? authMap.get(s.user_id) ?? null : null,
           name: s.name,
           role_id: s.role_id,
           role_name: s.roles?.role_name ?? null,
@@ -87,26 +106,28 @@ serve(async (req: Request) => {
         const { email, name, role_id, location_id, is_super_admin = false } = payload ?? {};
         if (!email || !name || !role_id) return json({ error: "Missing required fields" }, 400);
 
-        // Create staff row first (user_id null until the invite accepts)
-        const { data: staff, error: staffErr } = await supabase
+        // 1) Create staff row (no 'email' column on staff)
+        const { data: staff, error: staffErr } = await admin
           .from("staff")
-          .insert({ name, email, role_id, primary_location_id: location_id, is_super_admin })
+          .insert({ name, role_id, primary_location_id: location_id, is_super_admin })
           .select("id")
           .single();
         if (staffErr) throw staffErr;
 
-        const redirectTo = `${req.headers.get("origin") || "http://localhost:3000"}/auth/callback`;
-        const { data: invite, error: invErr } = await supabase.auth.admin.inviteUserByEmail(email, { 
-          data: { staff_id: staff.id }, 
-          redirectTo 
+        // 2) Send invite
+        const redirectTo = req.headers.get("origin")
+          ? `${req.headers.get("origin")}/auth/callback`
+          : undefined; // optional; ensure this is whitelisted in Auth settings
+        const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
+          data: { staff_id: staff.id },
+          ...(redirectTo ? { redirectTo } : {}),
         });
         if (invErr) throw invErr;
 
-        // Optionally back-fill staff.user_id when invite creates auth user (available in response)
+        // 3) Backfill staff.user_id if invite created a user now
         if (invite?.user?.id) {
-          await supabase.from("staff").update({ user_id: invite.user.id }).eq("id", staff.id);
+          await admin.from("staff").update({ user_id: invite.user.id }).eq("id", staff.id);
         }
-
         return json({ ok: true, staff_id: staff.id, user_id: invite?.user?.id ?? null });
       }
 
@@ -114,13 +135,13 @@ serve(async (req: Request) => {
         const { user_id, name, role_id, location_id, is_super_admin } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
 
-        const updateData: any = {};
+        const updateData: Record<string, any> = {};
         if (name !== undefined) updateData.name = name;
         if (role_id !== undefined) updateData.role_id = role_id;
         if (location_id !== undefined) updateData.primary_location_id = location_id;
         if (is_super_admin !== undefined) updateData.is_super_admin = is_super_admin;
 
-        const { data: staff, error: stErr } = await supabase
+        const { data: staff, error: stErr } = await admin
           .from("staff")
           .update(updateData)
           .eq("user_id", user_id)
@@ -134,12 +155,14 @@ serve(async (req: Request) => {
       case "reset_link": {
         const { user_id } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
-        const { data: link, error: rlErr } = await supabase.auth.admin.generateLink({
+
+        const { data: link, error: rlErr } = await admin.auth.admin.generateLink({
           type: "recovery",
           user_id,
           options: {},
         });
         if (rlErr) throw rlErr;
+
         return json({ ok: true, link: link.properties.action_link });
       }
 
@@ -147,11 +170,12 @@ serve(async (req: Request) => {
         const { user_id } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
 
-        // 1) delete staff row (FK cleanup happens via CASCADEs already in schema)
-        await supabase.from("staff").delete().eq("user_id", user_id);
-        // 2) delete auth user
-        const { error: delErr } = await supabase.auth.admin.deleteUser(user_id);
+        // Delete staff first; FK CASCADEs handle dependents if set up
+        await admin.from("staff").delete().eq("user_id", user_id);
+
+        const { error: delErr } = await admin.auth.admin.deleteUser(user_id);
         if (delErr) throw delErr;
+
         return json({ ok: true });
       }
 

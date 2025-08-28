@@ -27,10 +27,14 @@ export default function AuthCallback() {
 
             window.history.replaceState({}, "", window.location.pathname);
 
+            // Check for next parameter in the URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const next = urlParams.get("next");
+
             if (type === "recovery") {
-              navigate("/reset-password", { replace: true });
+              navigate(next || "/reset-password", { replace: true });
             } else {
-              navigate("/", { replace: true });
+              navigate(next || "/", { replace: true });
             }
             routed = true;
           }

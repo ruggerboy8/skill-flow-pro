@@ -187,7 +187,8 @@ serve(async (req: Request) => {
 
         if (!email) return json({ error: "User has no email" }, 400);
 
-        const redirectTo = `${APP_URL}/auth/callback`;
+        const origin = req.headers.get("origin") || APP_URL;
+        const redirectTo = `${origin}/auth/callback?next=/reset-password`;
         const { data: link, error: rlErr } = await admin.auth.admin.generateLink({
           type: "recovery",
           email,

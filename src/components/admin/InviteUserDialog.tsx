@@ -46,9 +46,9 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations }:
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-users/invite', {
-        method: 'POST',
+      const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
+          action: 'invite_user',
           email: formData.email,
           name: formData.name,
           role_id: formData.role_id === "none" ? null : (formData.role_id ? parseInt(formData.role_id) : null),

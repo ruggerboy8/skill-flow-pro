@@ -62,20 +62,20 @@ export function AdminUsersTab() {
     try {
       setLoading(true);
       
-      // Call the admin-users edge function with query parameters
-      const searchParams = new URLSearchParams({
-        search,
-        page: page.toString(),
-        limit: usersPerPage.toString(),
-      });
-      
-      const { data, error } = await supabase.functions.invoke(`admin-users?${searchParams.toString()}`, {
-        method: 'GET',
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { 
+          action: 'list_users',
+          search,
+          page,
+          limit: usersPerPage,
+          role_id: roleFilter === "all" ? undefined : parseInt(roleFilter),
+          location_id: locationFilter === "all" ? undefined : locationFilter
+        }
       });
 
       if (error) throw error;
 
-      setUsers(data.users || []);
+      setUsers(data.rows || []);
       setTotalUsers(data.total || 0);
       setCurrentPage(page);
     } catch (error) {

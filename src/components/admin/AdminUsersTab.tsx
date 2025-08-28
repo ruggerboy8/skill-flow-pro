@@ -15,16 +15,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface User {
-  user_id: string;
-  email: string;
-  created_at: string;
+  staff_id: string;
+  user_id?: string;
+  email?: string;
+  created_at?: string;
   last_sign_in_at?: string;
   email_confirmed_at?: string;
-  staff_id?: string;
-  name?: string;
+  name: string;
   role_id?: number;
   role_name?: string;
-  primary_location_id?: string;
+  location_id?: string;
   location_name?: string;
   is_super_admin: boolean;
 }
@@ -205,7 +205,7 @@ export function AdminUsersTab() {
 
   const filteredUsers = users.filter(user => {
     const matchesRole = roleFilter === "all" || !roleFilter || user.role_id?.toString() === roleFilter;
-    const matchesLocation = locationFilter === "all" || !locationFilter || user.primary_location_id === locationFilter;
+    const matchesLocation = locationFilter === "all" || !locationFilter || user.location_id === locationFilter;
     const matchesSuperAdmin = superAdminFilter === "all" || !superAdminFilter || 
       (superAdminFilter === "true" && user.is_super_admin) ||
       (superAdminFilter === "false" && !user.is_super_admin);
@@ -222,9 +222,9 @@ export function AdminUsersTab() {
 
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return "Never";
+    if (!dateString) return "—";
     const d = new Date(dateString);
-    return Number.isNaN(d.getTime()) ? "Never" : d.toLocaleDateString();
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
   };
 
   if (loading) {
@@ -345,7 +345,7 @@ export function AdminUsersTab() {
                   </TableRow>
                 ) : (
                   filteredUsers.map((user) => (
-                    <TableRow key={user.user_id}>
+                    <TableRow key={user.staff_id}>
                       <TableCell className="font-medium">
                         {user.name || "No name"}
                       </TableCell>
@@ -371,10 +371,12 @@ export function AdminUsersTab() {
                               <Edit className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleResetPassword(user)}>
-                              <Key className="h-4 w-4 mr-2" />
-                              Reset password
-                            </DropdownMenuItem>
+                            {user.user_id && (
+                              <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                                <Key className="h-4 w-4 mr-2" />
+                                Reset password
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem 
                               onClick={() => handleDeleteUser(user)}
                               className="text-destructive"

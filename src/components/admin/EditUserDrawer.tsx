@@ -20,12 +20,12 @@ interface Location {
 }
 
 interface User {
-  user_id: string;
-  email: string;
-  staff_id?: string;
-  name?: string;
+  staff_id: string;
+  user_id?: string;
+  email?: string;
+  name: string;
   role_id?: number;
-  primary_location_id?: string;
+  location_id?: string;
   is_super_admin: boolean;
 }
 
@@ -53,7 +53,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
       setFormData({
         name: user.name || "",
         role_id: user.role_id?.toString() || "",
-        primary_location_id: user.primary_location_id || "",
+        primary_location_id: user.location_id || "",
         is_super_admin: user.is_super_admin,
       });
     }
@@ -61,7 +61,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !formData.name) return;
+    if (!user || !formData.name || !user.user_id) return;
 
     setLoading(true);
 
@@ -105,7 +105,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         <SheetHeader>
           <SheetTitle>Edit User</SheetTitle>
           <SheetDescription>
-            Update user information and permissions for {user.email}
+            Update user information and permissions for {user.email || user.name}
           </SheetDescription>
         </SheetHeader>
         

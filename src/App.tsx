@@ -1,6 +1,7 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { useAuth, AuthProvider } from "@/hooks/useAuth";
+import { useEffect } from "react";
 
 // Page imports
 import Login from "@/pages/Login";
@@ -39,6 +40,24 @@ import AtAGlance from "@/pages/stats/AtAGlance";
 import StatsScores from "@/pages/StatsScores";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 
+function HashShim() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    // If the URL is like https://app/#/reset-password?email=...
+    if (location.hash.startsWith("#/")) {
+      const newPath = location.hash.slice(1); // "/reset-password?email=..."
+      // Replace the URL without reloading, then let Router match it
+      navigate(newPath, { replace: true });
+    }
+  // run only on first load for hash normalization
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  
+  return null;
+}
+
 function AppRoutes() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
   const { pathname } = useLocation();
@@ -62,6 +81,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <HashShim />
       {/* PUBLIC routes (must be reachable without a session) */}
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/reset-password" element={<ResetPassword />} />

@@ -1,5 +1,52 @@
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Toaster } from "@/components/ui/toaster";
+import { useAuth } from "@/hooks/useAuth";
+
+// Page imports
+import Login from "@/pages/Login";
+import AuthCallback from "@/pages/AuthCallback";
+import ResetPassword from "@/pages/ResetPassword";
+import SetupPassword from "@/pages/SetupPassword";
+import Setup from "@/pages/Setup";
+import Layout from "@/components/Layout";
+import Index from "@/pages/Index";
+import Welcome from "@/pages/Welcome";
+import Profile from "@/pages/Profile";
+import Week from "@/pages/Week";
+import WeekInfo from "@/pages/WeekInfo";
+import Confidence from "@/pages/Confidence";
+import ConfidenceWizard from "@/pages/ConfidenceWizard";
+import Performance from "@/pages/Performance";
+import PerformanceWizard from "@/pages/PerformanceWizard";
+import Review from "@/pages/Review";
+import BackfillIntro from "@/pages/backfill/BackfillIntro";
+import BackfillWeek from "@/pages/backfill/BackfillWeek";
+import BackfillReview from "@/pages/backfill/BackfillReview";
+import CoachDashboard from "@/pages/coach/CoachDashboard";
+import CoachDetail from "@/pages/coach/CoachDetail";
+import { EvaluationHub } from "@/pages/coach/EvaluationHub";
+import AdminPage from "@/pages/AdminPage";
+import EvaluationViewer from "@/pages/EvaluationViewer";
+import AdminBuilder from "@/pages/AdminBuilder";
+import CycleList from "@/pages/admin/CycleList";
+import WeekList from "@/pages/admin/WeekList";
+import WeekEditor from "@/pages/admin/WeekEditor";
+import NotFound from "@/pages/NotFound";
+
+// Stats pages
+import StatsLayout from "@/pages/StatsLayout";
+import AtAGlance from "@/pages/stats/AtAGlance";
+import StatsScores from "@/pages/StatsScores";
+import StatsEvaluations from "@/pages/stats/StatsEvaluations";
+
 function AppRoutes() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
+  const { pathname } = useLocation();
+
+  // Always allow auth callback route to be reachable
+  if (pathname === "/auth/callback") {
+    return <AuthCallback />;
+  }
 
   if (loading) {
     return (
@@ -79,3 +126,14 @@ function AppRoutes() {
     </Routes>
   );
 }
+
+function App() {
+  return (
+    <Router>
+      <AppRoutes />
+      <Toaster />
+    </Router>
+  );
+}
+
+export default App;

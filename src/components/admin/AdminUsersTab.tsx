@@ -142,8 +142,10 @@ export function AdminUsersTab() {
 
     try {
       const { error } = await supabase.functions.invoke('admin-users', {
-        method: 'DELETE',
-        body: { path: `users/${userToDelete.user_id}` },
+        body: { 
+          action: 'delete_user',
+          user_id: userToDelete.user_id 
+        },
       });
 
       if (error) throw error;
@@ -169,14 +171,16 @@ export function AdminUsersTab() {
   const handleResetPassword = async (user: User) => {
     try {
       const { data, error } = await supabase.functions.invoke('admin-users', {
-        method: 'POST',
-        body: { path: 'reset-link', user_id: user.user_id },
+        body: { 
+          action: 'reset_link',
+          user_id: user.user_id 
+        },
       });
 
       if (error) throw error;
 
       // Copy to clipboard
-      await navigator.clipboard.writeText(data.reset_link);
+      await navigator.clipboard.writeText(data.link);
       
       toast({
         title: "Success",

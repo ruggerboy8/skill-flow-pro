@@ -176,12 +176,12 @@ serve(async (req: Request) => {
 
       case "reset_link": {
         // Accept user_id OR email. If only user_id is provided, look up the email first.
-        const { user_id, email: emailIn } = payload ?? {};
+        const { user_id: userId, email: emailIn } = payload ?? {};
         let email = emailIn?.trim();
 
         if (!email) {
-          if (!user_id) return json({ error: "user_id or email required" }, 400);
-          const { data: ures, error: getErr } = await admin.auth.admin.getUserById(user_id);
+          if (!userId) return json({ error: "user_id or email required" }, 400);
+          const { data: ures, error: getErr } = await admin.auth.admin.getUserById(userId);
           if (getErr) throw getErr;
           email = ures.user?.email ?? "";
         }

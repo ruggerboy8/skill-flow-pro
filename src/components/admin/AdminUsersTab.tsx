@@ -175,22 +175,23 @@ export function AdminUsersTab() {
     }
   };
 
+// src/components/admin/AdminUsersTab.tsx
 const handleResetPassword = async (user: User) => {
   try {
-    const { error } = await supabase.functions.invoke("admin-users", {
-      body: { action: "reset_link", user_id: user.user_id },
+    const { error } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'reset_link', user_id: user.user_id },
     });
     if (error) throw error;
 
     toast({
-      title: "Reset email sent",
-      description: `We emailed a reset link to ${user.email}.`,
+      title: "Password reset sent",
+      description: `We emailed a reset code to ${user.email}.`,
     });
-  } catch (err) {
-    console.error("Error generating reset link:", err);
+  } catch (error) {
+    console.error("Error generating reset link:", error);
     toast({
       title: "Error",
-      description: "Failed to send reset email",
+      description: "Failed to send password reset email",
       variant: "destructive",
     });
   }

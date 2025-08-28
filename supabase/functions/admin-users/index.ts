@@ -7,6 +7,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 const APP_URL = Deno.env.get("APP_URL") || "http://localhost:3000";
+const SITE_URL = Deno.env.get("SITE_URL") || "https://alcanskills.lovable.app";
 
 // Fail fast if environment isn't wired
 if (!SUPABASE_URL || !SERVICE_ROLE || !SUPABASE_ANON_KEY) {
@@ -138,7 +139,7 @@ serve(async (req: Request) => {
         if (staffErr) throw staffErr;
 
         // 2) Send invite with redirect back to app
-        const redirectTo = `${APP_URL}/auth/callback`;
+        const redirectTo = `${SITE_URL}/auth/callback`;
         const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
           data: { staff_id: staff.id },
           redirectTo
@@ -187,18 +188,15 @@ serve(async (req: Request) => {
 
         if (!email) return json({ error: "User has no email" }, 400);
 
-        const origin = req.headers.get("origin") || APP_URL;
-        const redirectTo = `${origin}/auth/callback?next=/reset-password`;
-        
-        // Create a regular Supabase client to send the reset email (admin client doesn't have resetPasswordForEmail)
-        const publicClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
-        const { error: resetErr } = await publicClient.auth.resetPasswordForEmail(email, {
-          redirectTo
+        const redirectTo = `${SITE_URL}/auth/callback?next=/reset-password`;
+        const { data: link, error: rlErr } = await admin.auth.admin.generateLink({
+          type: "recovery",
+          email,
+          options: { redirectTo }
         });
-        
-        if (resetErr) throw resetErr;
+        if (rlErr) throw rlErr;
 
-        return json({ ok: true, message: "Password reset email sent" });
+        return json({ ok: true, link: link.properties.action_link });
       }
 
       case "delete_user": {

@@ -43,9 +43,13 @@ function AppRoutes() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
   const { pathname } = useLocation();
 
-  // Always allow auth callback route to be reachable
+  // Always allow public routes to be reachable without session
   if (pathname === "/auth/callback") {
     return <AuthCallback />;
+  }
+  
+  if (pathname === "/reset-password") {
+    return <ResetPassword />;
   }
 
   if (loading) {

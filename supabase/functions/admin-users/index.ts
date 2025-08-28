@@ -6,6 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.3";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+const APP_URL = Deno.env.get("APP_URL") || "http://localhost:3000";
 
 // Fail fast if environment isn't wired
 if (!SUPABASE_URL || !SERVICE_ROLE || !SUPABASE_ANON_KEY) {
@@ -19,7 +20,7 @@ serve(async (req: Request) => {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
       },
     });
   }
@@ -128,7 +129,7 @@ serve(async (req: Request) => {
         const { email, name, role_id, location_id, is_super_admin = false } = payload ?? {};
         if (!email || !name || !role_id) return json({ error: "Missing required fields" }, 400);
 
-        // 1) Create staff row (no 'email' column on staff)
+        // 1) Create staff row
         const { data: staff, error: staffErr } = await admin
           .from("staff")
           .insert({ name, role_id, primary_location_id: location_id, is_super_admin })
@@ -136,13 +137,11 @@ serve(async (req: Request) => {
           .single();
         if (staffErr) throw staffErr;
 
-        // 2) Send invite
-        const redirectTo = req.headers.get("origin")
-          ? `${req.headers.get("origin")}/auth/callback`
-          : undefined; // optional; ensure this is whitelisted in Auth settings
+        // 2) Send invite with redirect back to app
+        const redirectTo = `${APP_URL}/auth/callback`;
         const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
           data: { staff_id: staff.id },
-          ...(redirectTo ? { redirectTo } : {}),
+          redirectTo
         });
         if (invErr) throw invErr;
 
@@ -175,13 +174,24 @@ serve(async (req: Request) => {
       }
 
       case "reset_link": {
-        const { user_id } = payload ?? {};
-        if (!user_id) return json({ error: "user_id required" }, 400);
+        // Accept user_id OR email. If only user_id is provided, look up the email first.
+        const { user_id, email: emailIn } = payload ?? {};
+        let email = emailIn?.trim();
 
+        if (!email) {
+          if (!user_id) return json({ error: "user_id or email required" }, 400);
+          const { data: ures, error: getErr } = await admin.auth.admin.getUserById(user_id);
+          if (getErr) throw getErr;
+          email = ures.user?.email ?? "";
+        }
+
+        if (!email) return json({ error: "User has no email" }, 400);
+
+        const redirectTo = `${APP_URL}/auth/callback`;
         const { data: link, error: rlErr } = await admin.auth.admin.generateLink({
           type: "recovery",
-          user_id,
-          options: {},
+          email,
+          options: { redirectTo }
         });
         if (rlErr) throw rlErr;
 

@@ -79,6 +79,7 @@ export default function Setup() {
     const { data, error } = await supabase
       .from('organizations')
       .select('*')
+      .eq('active', true)
       .order('name');
     
     if (error) {
@@ -96,6 +97,7 @@ export default function Setup() {
     const { data, error } = await supabase
       .from('locations')
       .select('*')
+      .eq('active', true)
       .order('name');
     
     if (error) {

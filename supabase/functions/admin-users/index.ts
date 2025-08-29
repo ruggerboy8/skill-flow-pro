@@ -39,15 +39,34 @@ serve(async (req: Request) => {
 
   // Verify caller
   const { data: authUser, error: authErr } = await caller.auth.getUser();
-  if (authErr || !authUser?.user) return json({ error: "Unauthorized" }, 401);
+  console.log("Auth check - user:", authUser?.user?.id, "error:", authErr?.message);
+  if (authErr || !authUser?.user) {
+    console.log("Authentication failed:", authErr?.message || "No user");
+    return json({ error: "Unauthorized" }, 401);
+  }
 
   const { data: me, error: meErr } = await caller
     .from("staff")
-    .select("is_super_admin")
+    .select("is_super_admin, user_id, name")
     .eq("user_id", authUser.user.id)
     .maybeSingle();
 
-  if (meErr || !me?.is_super_admin) return json({ error: "Forbidden: Super admin required" }, 403);
+  console.log("Staff check - user_id:", authUser.user.id, "staff data:", me, "error:", meErr?.message);
+  
+  if (meErr) {
+    console.log("Database error checking staff:", meErr.message);
+    return json({ error: `Database error: ${meErr.message}` }, 500);
+  }
+  
+  if (!me) {
+    console.log("No staff record found for user:", authUser.user.id);
+    return json({ error: "No staff record found for this user" }, 403);
+  }
+  
+  if (!me.is_super_admin) {
+    console.log("User is not super admin:", me);
+    return json({ error: "Forbidden: Super admin required" }, 403);
+  }
 
   const payload = await safeJson(req);
   const action = payload?.action as string | undefined;

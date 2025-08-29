@@ -1,9 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+// src/App.tsx
+import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
-import { useAuth, AuthProvider } from "@/hooks/useAuth";
-import { useEffect } from "react";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
-// Page imports
+// Pages (same imports you already have)
 import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import ResetPassword from "@/pages/ResetPassword";
@@ -33,38 +33,14 @@ import CycleList from "@/pages/admin/CycleList";
 import WeekList from "@/pages/admin/WeekList";
 import WeekEditor from "@/pages/admin/WeekEditor";
 import NotFound from "@/pages/NotFound";
-
-// Stats pages
 import StatsLayout from "@/pages/StatsLayout";
 import AtAGlance from "@/pages/stats/AtAGlance";
 import StatsScores from "@/pages/StatsScores";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 
-function HashShim() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  
-  useEffect(() => {
-    // If the URL is like https://app/#/reset-password?email=...
-    if (location.hash.startsWith("#/")) {
-      const newPath = location.hash.slice(1); // "/reset-password?email=..."
-      // Replace the URL without reloading, then let Router match it
-      navigate(newPath, { replace: true });
-    }
-  // run only on first load for hash normalization
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  
-  return null;
-}
-
-function AppRoutes() {
+// Simple auth gate that only wraps private routes
+function RequireAuth() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
-  const { pathname } = useLocation();
-
-  // Public, unauthenticated routes for auth flows:
-  if (pathname.startsWith("/auth/callback")) return <AuthCallback />;
-  if (pathname.startsWith("/reset-password")) return <ResetPassword />;
 
   if (loading) {
     return (
@@ -75,15 +51,24 @@ function AppRoutes() {
   }
 
   if (!user) return <Login />;
-
   if (needsPasswordSetup) return <SetupPassword />;
   if (needsProfileSetup) return <Setup />;
 
+  return <Outlet />; // render nested private routes
+}
+
+export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-          {user && !needsPasswordSetup && !needsProfileSetup && (
-            <>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* PUBLIC routes: never behind auth */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* PRIVATE app */}
+          <Route element={<RequireAuth />}>
+            <Route path="/" element={<Layout />}>
               <Route index element={<Index />} />
               <Route path="welcome" element={<Welcome />} />
               <Route path="setup" element={<Setup />} />
@@ -109,36 +94,32 @@ function AppRoutes() {
               <Route path="backfill" element={<BackfillIntro />} />
               <Route path="backfill/:week" element={<BackfillWeek />} />
               <Route path="backfill/review" element={<BackfillReview />} />
+
               <Route path="coach" element={<CoachDashboard />} />
               <Route path="coach/:staffId" element={<CoachDetail />} />
               <Route path="coach/:staffId/eval/:evalId" element={<EvaluationHub />} />
+
               <Route path="admin" element={<AdminPage />} />
               <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
               <Route path="builder" element={<AdminBuilder />} />
               <Route path="builder/:roleId" element={<CycleList />} />
               <Route path="builder/:roleId/:cycle" element={<WeekList />} />
               <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />
+
+              {/* legacy redirects */}
               <Route path="admin/organizations" element={<Navigate to="/admin?tab=organizations" replace />} />
               <Route path="admin/locations" element={<Navigate to="/admin?tab=locations" replace />} />
               <Route path="admin/builder" element={<Navigate to="/builder" replace />} />
-              <Route path="*" element={<NotFound />} />
-            </>
-          )}
-        </Route>
-      </Routes>
-  );
-}
 
-function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <HashShim />
-        <AppRoutes />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Route>
+
+          {/* final catch-all for anything not caught above */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
         <Toaster />
-      </Router>
+      </BrowserRouter>
     </AuthProvider>
   );
 }
-
-export default App;

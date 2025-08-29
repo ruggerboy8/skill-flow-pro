@@ -43,9 +43,16 @@ function AppRoutes() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
   const { pathname } = useLocation();
 
+  // Debug logging
+  console.log("AppRoutes - Current pathname:", pathname);
+  console.log("AppRoutes - Checking reset-password:", pathname.startsWith("/reset-password"));
+
   // Public routes for auth flows (must run BEFORE auth gating)
   if (pathname.startsWith("/auth/callback")) return <AuthCallback />;
-  if (pathname.startsWith("/reset-password")) return <ResetPassword />;
+  if (pathname.startsWith("/reset-password")) {
+    console.log("AppRoutes - Returning ResetPassword component");
+    return <ResetPassword />;
+  }
 
   if (loading) {
     return (

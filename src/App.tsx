@@ -83,6 +83,7 @@ function AppRoutes() {
         </Route>
 
         <Route path="profile" element={<Profile />} />
+        <Route path="reset-password" element={<ResetPassword />} />
         <Route path="week" element={<Week />} />
         <Route path="week/:weekId" element={<Week />} />
         <Route path="week-info/:cycle/:week" element={<WeekInfo />} />

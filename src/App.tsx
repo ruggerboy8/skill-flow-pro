@@ -1,5 +1,5 @@
 // src/App.tsx
-import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
@@ -38,9 +38,14 @@ import AtAGlance from "@/pages/stats/AtAGlance";
 import StatsScores from "@/pages/StatsScores";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 
-// Simple auth gate that only wraps private routes
-function RequireAuth() {
+// App routes with pre-routing checks for public pages
+function AppRoutes() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
+  const { pathname } = useLocation();
+
+  // Public routes for auth flows (must run BEFORE auth gating)
+  if (pathname.startsWith("/auth/callback")) return <AuthCallback />;
+  if (pathname.startsWith("/reset-password")) return <ResetPassword />;
 
   if (loading) {
     return (
@@ -54,70 +59,62 @@ function RequireAuth() {
   if (needsPasswordSetup) return <SetupPassword />;
   if (needsProfileSetup) return <Setup />;
 
-  return <Outlet />; // render nested private routes
+  return (
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Index />} />
+        <Route path="welcome" element={<Welcome />} />
+        <Route path="setup" element={<Setup />} />
+        <Route path="create-password" element={<SetupPassword />} />
+        <Route path="setup-password" element={<SetupPassword />} />
+
+        <Route path="stats" element={<StatsLayout />}>
+          <Route index element={<AtAGlance />} />
+          <Route path="glance" element={<AtAGlance />} />
+          <Route path="scores" element={<StatsScores />} />
+          <Route path="evaluations" element={<StatsEvaluations />} />
+        </Route>
+
+        <Route path="profile" element={<Profile />} />
+        <Route path="week" element={<Week />} />
+        <Route path="week/:weekId" element={<Week />} />
+        <Route path="week-info/:cycle/:week" element={<WeekInfo />} />
+        <Route path="confidence/:week" element={<Confidence />} />
+        <Route path="confidence/:week/step/:n" element={<ConfidenceWizard />} />
+        <Route path="performance/:week" element={<Performance />} />
+        <Route path="performance/:week/step/:n" element={<PerformanceWizard />} />
+        <Route path="review/:cycle/:week" element={<Review />} />
+        <Route path="backfill" element={<BackfillIntro />} />
+        <Route path="backfill/:week" element={<BackfillWeek />} />
+        <Route path="backfill/review" element={<BackfillReview />} />
+
+        <Route path="coach" element={<CoachDashboard />} />
+        <Route path="coach/:staffId" element={<CoachDetail />} />
+        <Route path="coach/:staffId/eval/:evalId" element={<EvaluationHub />} />
+
+        <Route path="admin" element={<AdminPage />} />
+        <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
+        <Route path="builder" element={<AdminBuilder />} />
+        <Route path="builder/:roleId" element={<CycleList />} />
+        <Route path="builder/:roleId/:cycle" element={<WeekList />} />
+        <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />
+
+        {/* legacy redirects */}
+        <Route path="admin/organizations" element={<Navigate to="/admin?tab=organizations" replace />} />
+        <Route path="admin/locations" element={<Navigate to="/admin?tab=locations" replace />} />
+        <Route path="admin/builder" element={<Navigate to="/builder" replace />} />
+
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
+  );
 }
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          {/* PUBLIC routes: never behind auth */}
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-
-          {/* PRIVATE app */}
-          <Route element={<RequireAuth />}>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Index />} />
-              <Route path="welcome" element={<Welcome />} />
-              <Route path="setup" element={<Setup />} />
-              <Route path="create-password" element={<SetupPassword />} />
-              <Route path="setup-password" element={<SetupPassword />} />
-
-              <Route path="stats" element={<StatsLayout />}>
-                <Route index element={<AtAGlance />} />
-                <Route path="glance" element={<AtAGlance />} />
-                <Route path="scores" element={<StatsScores />} />
-                <Route path="evaluations" element={<StatsEvaluations />} />
-              </Route>
-
-              <Route path="profile" element={<Profile />} />
-              <Route path="week" element={<Week />} />
-              <Route path="week/:weekId" element={<Week />} />
-              <Route path="week-info/:cycle/:week" element={<WeekInfo />} />
-              <Route path="confidence/:week" element={<Confidence />} />
-              <Route path="confidence/:week/step/:n" element={<ConfidenceWizard />} />
-              <Route path="performance/:week" element={<Performance />} />
-              <Route path="performance/:week/step/:n" element={<PerformanceWizard />} />
-              <Route path="review/:cycle/:week" element={<Review />} />
-              <Route path="backfill" element={<BackfillIntro />} />
-              <Route path="backfill/:week" element={<BackfillWeek />} />
-              <Route path="backfill/review" element={<BackfillReview />} />
-
-              <Route path="coach" element={<CoachDashboard />} />
-              <Route path="coach/:staffId" element={<CoachDetail />} />
-              <Route path="coach/:staffId/eval/:evalId" element={<EvaluationHub />} />
-
-              <Route path="admin" element={<AdminPage />} />
-              <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
-              <Route path="builder" element={<AdminBuilder />} />
-              <Route path="builder/:roleId" element={<CycleList />} />
-              <Route path="builder/:roleId/:cycle" element={<WeekList />} />
-              <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />
-
-              {/* legacy redirects */}
-              <Route path="admin/organizations" element={<Navigate to="/admin?tab=organizations" replace />} />
-              <Route path="admin/locations" element={<Navigate to="/admin?tab=locations" replace />} />
-              <Route path="admin/builder" element={<Navigate to="/builder" replace />} />
-
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Route>
-
-          {/* final catch-all for anything not caught above */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppRoutes />
         <Toaster />
       </BrowserRouter>
     </AuthProvider>

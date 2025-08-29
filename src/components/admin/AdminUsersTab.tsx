@@ -367,7 +367,7 @@ const handleResetPassword = async (user: User) => {
                             {user.user_id && (
                               <DropdownMenuItem onClick={() => handleResetPassword(user)}>
                                 <Key className="h-4 w-4 mr-2" />
-                                Reset password
+                                Send reset email
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem 

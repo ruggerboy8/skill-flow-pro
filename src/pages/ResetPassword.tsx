@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ResetPassword() {
+  console.log("ResetPassword component rendering");
   const [params] = useSearchParams();
   const { toast } = useToast();
   const nav = useNavigate();

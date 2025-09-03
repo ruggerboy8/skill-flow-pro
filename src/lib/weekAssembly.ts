@@ -39,6 +39,23 @@ async function findUserActiveWeek(
     };
   }
 
+  // Check if user is new (has participation_start_at set)
+  const { data: staffData } = await supabase
+    .from('staff')
+    .select('participation_start_at')
+    .eq('id', staffId)
+    .single();
+
+  if (staffData?.participation_start_at) {
+    console.log('New user detected - using location current week');
+    const context = await getLocationWeekContext(locationId, now || new Date());
+    
+    return {
+      cycleNumber: context.cycleNumber,
+      weekInCycle: context.weekInCycle
+    };
+  }
+
   // Otherwise, use progress-based calculation (original logic)
   console.log('Using progress-based week calculation');
   

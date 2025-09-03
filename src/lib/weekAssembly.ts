@@ -1,11 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
-import { assembleWeek as locationAssembleWeek, getLocationWeekContext } from './locationState';
-import { getOpenBacklogCountV2, areSelectionsLocked, saveUserSelection } from './backlog';
-import { nowUtc, getAnchors } from "./centralTime";
+import { assembleWeek as locationAssembleWeek, getLocationWeekContext } from "./locationState";
+import { areSelectionsLocked, saveUserSelection } from "./backlog"; // (getOpenBacklogCountV2 not used here)
+ // NOTE: nowUtc/getAnchors imports removed: not used in site-centric assembly
 
 export interface WeekAssignment {
   weekly_focus_id: string;
-  type: 'site' | 'backlog' | 'selfSelect';
+  type: "site" | "backlog" | "selfSelect";
   pro_move_id?: number;
   action_statement: string;
   domain_name: string;
@@ -17,7 +17,9 @@ export interface WeekAssignment {
 }
 
 /**
- * Finds a user's active week based on their scoring progress or simulation time.
+ * Site-centric: derive (cycleNumber, weekInCycle) from the location's calendar.
+ * Progress-based is only used if explicitly requested via simOverrides.mode === 'progress'
+ * (kept for legacy/simulation needs).
  */
 async function findUserActiveWeek(
   userId: string,
@@ -27,76 +29,48 @@ async function findUserActiveWeek(
   simOverrides?: any,
   now?: Date
 ): Promise<{ cycleNumber: number; weekInCycle: number }> {
-  
-  // If simulation is active with a specific time, use time-based calculation
-  if (simOverrides?.enabled && now) {
-    console.log('Using time-based week calculation for simulation');
-    const context = await getLocationWeekContext(locationId, now);
-    
-    return {
-      cycleNumber: context.cycleNumber,
-      weekInCycle: context.weekInCycle
-    };
-  }
+  // Explicit opt-in to progress mode (legacy / special sims)
+  if (simOverrides?.mode === "progress") {
+    console.log("[week-assembly] Using PROGRESS-based week calculation (explicit opt-in)");
+    const { data: locationData } = await supabase
+      .from("locations")
+      .select("cycle_length_weeks")
+      .eq("id", locationId)
+      .single();
 
-  // Check if user is new (has participation_start_at set)
-  const { data: staffData } = await supabase
-    .from('staff')
-    .select('participation_start_at')
-    .eq('id', staffId)
-    .single();
-
-  if (staffData?.participation_start_at) {
-    console.log('New user detected - using location current week');
-    const context = await getLocationWeekContext(locationId, now || new Date());
-    
-    return {
-      cycleNumber: context.cycleNumber,
-      weekInCycle: context.weekInCycle
-    };
-  }
-
-  // Otherwise, use progress-based calculation (original logic)
-  console.log('Using progress-based week calculation');
-  
-  const { data: locationData } = await supabase
-    .from('locations')
-    .select('cycle_length_weeks')
-    .eq('id', locationId)
-    .single();
-
-  if (!locationData) {
-    throw new Error(`Location not found for locationId: ${locationId}`);
-  }
-  const cycleLength = locationData.cycle_length_weeks;
-
-  // Use the new RPC to get last progress week
-  const { data, error } = await supabase.rpc('get_last_progress_week', { 
-    p_staff_id: staffId 
-  });
-  
-  if (error) {
-    throw error;
-  }
-
-  let cycleNumber = data?.[0]?.last_cycle ?? 1;
-  let weekInCycle = data?.[0]?.last_week ?? 1;
-  const isComplete = !!data?.[0]?.is_complete;
-
-  if (isComplete) {
-    // Week is complete, advance to next week
-    weekInCycle += 1;
-    if (weekInCycle > cycleLength) {
-      weekInCycle = 1;
-      cycleNumber += 1;
+    if (!locationData) {
+      throw new Error(`Location not found for locationId: ${locationId}`);
     }
+    const cycleLength = locationData.cycle_length_weeks;
+
+    const { data, error } = await supabase.rpc("get_last_progress_week", {
+      p_staff_id: staffId,
+    });
+    if (error) throw error;
+
+    let cycleNumber = data?.[0]?.last_cycle ?? 1;
+    let weekInCycle = data?.[0]?.last_week ?? 1;
+    const isComplete = !!data?.[0]?.is_complete;
+
+    if (isComplete) {
+      weekInCycle += 1;
+      if (weekInCycle > cycleLength) {
+        weekInCycle = 1;
+        cycleNumber += 1;
+      }
+    }
+    return { cycleNumber, weekInCycle };
   }
 
-  return { cycleNumber, weekInCycle };
+  // Default: SITE-CENTRIC (location calendar)
+  console.log("[week-assembly] Using SITE-centric (time/location) week calculation");
+  const context = await getLocationWeekContext(locationId, now ?? new Date());
+  return { cycleNumber: context.cycleNumber, weekInCycle: context.weekInCycle };
 }
 
 /**
- * Assemble a user's current week assignments based on their progress.
+ * Assemble a user's current week assignments based on the location’s current week.
+ * Backfill gating happens in routing; by the time we run this, the user is allowed to see current week.
  */
 export async function assembleCurrentWeek(
   userId: string,
@@ -107,33 +81,29 @@ export async function assembleCurrentWeek(
   weekInCycle: number;
 }> {
   try {
-    console.log('=== ASSEMBLING CURRENT WEEK (PROGRESS-BASED) ===');
-    console.log('Input params:', { userId, simOverrides });
-    
-    // Calculate effective time for simulation
-    const effectiveNow = simOverrides?.enabled && simOverrides?.nowISO 
-      ? new Date(simOverrides.nowISO)
-      : new Date();
-    
-    // Get staff info including location
+    console.log("=== ASSEMBLING CURRENT WEEK (SITE-CENTRIC) ===");
+    console.log("Input params:", { userId, simOverrides });
+
+    const effectiveNow =
+      simOverrides?.enabled && simOverrides?.nowISO
+        ? new Date(simOverrides.nowISO)
+        : new Date();
+
+    // Staff + location
     const { data: staffData } = await supabase
-      .from('staff')
-      .select('id, role_id, primary_location_id')
-      .eq('user_id', userId)
+      .from("staff")
+      .select("id, role_id, primary_location_id")
+      .eq("user_id", userId)
       .single();
 
-    if (!staffData) {
-      throw new Error('Staff record not found');
-    }
+    if (!staffData) throw new Error("Staff record not found");
+    if (!staffData.primary_location_id)
+      throw new Error("Staff member has no assigned location");
 
-    if (!staffData.primary_location_id) {
-      throw new Error('Staff member has no assigned location');
-    }
+    console.log("Staff data:", staffData);
+    console.log("Effective now:", effectiveNow);
 
-    console.log('Staff data:', staffData);
-    console.log('Effective now:', effectiveNow);
-
-    // Determine user's active week based on their progress or simulation time
+    // Derive active week (site-centric by default)
     const { cycleNumber, weekInCycle } = await findUserActiveWeek(
       userId,
       staffData.id,
@@ -142,32 +112,31 @@ export async function assembleCurrentWeek(
       simOverrides,
       effectiveNow
     );
-    
-    console.log('User-specific active week:', { cycleNumber, weekInCycle });
 
-    // Use location-based assembly logic with the progress-based week
+    console.log("Active week (site-centric):", { cycleNumber, weekInCycle });
+
+    // Build assignments
     const assignments = await locationAssembleWeek({
       userId,
       roleId: staffData.role_id,
       locationId: staffData.primary_location_id,
-      cycleNumber: cycleNumber,
-      weekInCycle: weekInCycle,
-      simOverrides
+      cycleNumber,
+      weekInCycle,
+      simOverrides,
     });
 
-    console.log('Progress-based assignments:', assignments);
-    
+    console.log("Assignments:", assignments);
+
     return {
       assignments: assignments.sort((a, b) => a.display_order - b.display_order),
       cycleNumber,
-      weekInCycle
+      weekInCycle,
     };
-
   } catch (error) {
-    console.error('Error assembling current week:', error);
+    console.error("Error assembling current week:", error);
     return { assignments: [], cycleNumber: 1, weekInCycle: 1 };
   }
 }
 
-// Re-export functions from backlog.ts for compatibility
-export { saveUserSelection, areSelectionsLocked } from './backlog';
+// Re-export (unchanged)
+export { saveUserSelection, areSelectionsLocked } from "./backlog";

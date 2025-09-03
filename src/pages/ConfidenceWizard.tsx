@@ -320,13 +320,8 @@ export default function ConfidenceWizard() {
       description: "Great! Come back later to rate your performance."
     });
     
-    // Navigate to the correct week review page with current cycle/week
-    const focusItem = weeklyFocus[0];
-    if (focusItem) {
-      navigate(`/review/${focusItem.cycle}/${focusItem.week_in_cycle}`);
-    } else {
-      navigate('/');
-    }
+    // Navigate back to home after successful submission
+    navigate('/');
 
     setSubmitting(false);
   };

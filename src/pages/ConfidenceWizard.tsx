@@ -61,6 +61,8 @@ export default function ConfidenceWizard() {
   const repairCycle = qs.get("cycle");
   const repairWeek = qs.get("wk");
   const returnTo = qs.get("returnTo");
+  
+  console.log('Repair mode debug:', { isRepair, repairCycle, repairWeek, url: location.search });
 
   // Use simulated time if available for time gating
   const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
@@ -111,10 +113,17 @@ export default function ConfidenceWizard() {
       
       // Validate parsed values
       if (isNaN(targetCycle) || isNaN(targetWeek)) {
-        console.error('Invalid repair parameters:', { repairCycle, repairWeek });
+        console.error('Invalid repair parameters:', { repairCycle, repairWeek, targetCycle, targetWeek });
+        toast({
+          title: 'Error',
+          description: 'Invalid repair parameters. Please try again.',
+          variant: 'destructive'
+        });
         setLoading(false);
         return;
       }
+      
+      console.log('Loading repair data for:', { targetCycle, targetWeek });
       
       const { data: focusData } = await supabase
         .from('weekly_focus')

@@ -440,13 +440,18 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
 
     if (!showConf && !showPerf) return null;
 
+    console.log('Generating repair links for:', { cycle, week, total, confCount, perfCount, showConf, showPerf });
+
     return (
       <div className="flex gap-2 text-xs">
         {showConf && (
           <Link
             to={`/confidence/current?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}`}
             className="text-blue-600 underline opacity-70 hover:opacity-100"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('Repair link clicked:', { cycle, week, url: `/confidence/current?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}` });
+            }}
           >
             Backfill Confidence
           </Link>

@@ -114,6 +114,13 @@ export default function PerformanceWizard() {
       const targetCycle = parseInt(repairCycle, 10);
       const targetWeek = parseInt(repairWeek, 10);
       
+      // Validate parsed values
+      if (isNaN(targetCycle) || isNaN(targetWeek)) {
+        console.error('Invalid repair parameters:', { repairCycle, repairWeek });
+        setLoading(false);
+        return;
+      }
+      
       const { data: focusData } = await supabase
         .from('weekly_focus')
         .select(`

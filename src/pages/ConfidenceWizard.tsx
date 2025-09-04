@@ -305,9 +305,15 @@ export default function ConfidenceWizard() {
     setLoading(false);
   };
 
+  // Helper function to preserve URL parameters during navigation
+  const preserveSearchParams = (newPath: string) => {
+    const currentSearch = location.search;
+    return `${newPath}${currentSearch}`;
+  };
+
   const handleNext = () => {
     if (currentIndex < weeklyFocus.length - 1) {
-      navigate(`/confidence/current/step/${currentIndex + 2}`);
+      navigate(preserveSearchParams(`/confidence/current/step/${currentIndex + 2}`));
     } else {
       handleSubmit();
     }
@@ -315,7 +321,7 @@ export default function ConfidenceWizard() {
 
   const handleBack = () => {
     if (currentIndex > 0) {
-      navigate(`/confidence/current/step/${currentIndex}`);
+      navigate(preserveSearchParams(`/confidence/current/step/${currentIndex}`));
     }
   };
 

@@ -29,6 +29,7 @@ interface StaffMember {
   role_id: number;
   role_name: string;
   location: string | null;
+  organization: string | null;
   user_id: string;
   hire_date?: string | null;
   onboarding_weeks: number;
@@ -46,8 +47,10 @@ export default function CoachDashboard() {
     status: Awaited<ReturnType<typeof computeStaffStatusNew>>;
   }[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
+  const [organizations, setOrganizations] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('all');
+  const [selectedOrganization, setSelectedOrganization] = useState('all');
   const [selectedRole, setSelectedRole] = useState('all');
   const [search, setSearch] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -81,7 +84,7 @@ export default function CoachDashboard() {
 
   useEffect(() => {
     applyFilters();
-  }, [staff, selectedLocation, selectedRole, search]);
+  }, [staff, selectedLocation, selectedOrganization, selectedRole, search]);
 
   const loadStaffData = async () => {
     try {
@@ -99,7 +102,7 @@ export default function CoachDashboard() {
           hire_date,
           onboarding_weeks,
           roles!inner(role_name),
-          locations(name)
+          locations(name, organizations(name))
         `);
 
       if (error) throw error;
@@ -111,6 +114,7 @@ export default function CoachDashboard() {
         role_id: member.role_id,
         role_name: (member.roles as any).role_name,
         location: member.locations?.name ?? null,
+        organization: member.locations?.organizations?.name ?? null,
         user_id: member.user_id,
         hire_date: member.hire_date,
         onboarding_weeks: member.onboarding_weeks || 6,
@@ -120,15 +124,19 @@ export default function CoachDashboard() {
 
       setStaff(processedStaff);
 
-      // Extract unique locations and roles for filters
+      // Extract unique locations, organizations, and roles for filters
       const uniqueLocations = [
         ...new Set(processedStaff.map((s) => s.location).filter(Boolean)),
+      ] as string[];
+      const uniqueOrganizations = [
+        ...new Set(processedStaff.map((s) => s.organization).filter(Boolean)),
       ] as string[];
       const uniqueRoles = [
         ...new Set(processedStaff.map((s) => s.role_name)),
       ] as string[];
 
       setLocations(uniqueLocations);
+      setOrganizations(uniqueOrganizations);
       setRoles(uniqueRoles);
     } catch (error) {
       console.error('Error loading staff data:', error);
@@ -142,6 +150,10 @@ export default function CoachDashboard() {
 
     if (selectedLocation !== 'all') {
       filtered = filtered.filter((s) => s.location === selectedLocation);
+    }
+
+    if (selectedOrganization !== 'all') {
+      filtered = filtered.filter((s) => s.organization === selectedOrganization);
     }
 
     if (selectedRole !== 'all') {
@@ -210,6 +222,20 @@ export default function CoachDashboard() {
       {/* Filters Bar */}
       <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4 mb-6">
         <div className="flex gap-4 flex-wrap items-center">
+          <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Organizations" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Organizations</SelectItem>
+              {organizations.map((organization) => (
+                <SelectItem key={organization} value={organization}>
+                  {organization}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={selectedLocation} onValueChange={setSelectedLocation}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All Locations" />

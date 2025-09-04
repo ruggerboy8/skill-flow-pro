@@ -102,7 +102,7 @@ export default function CoachDashboard() {
           hire_date,
           onboarding_weeks,
           roles!inner(role_name),
-          locations(name, organizations(name))
+          locations(name, organizations!locations_organization_id_fkey(name))
         `);
 
       if (error) throw error;

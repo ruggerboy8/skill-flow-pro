@@ -4,12 +4,17 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { Trash2 } from 'lucide-react';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useNow } from '@/providers/NowProvider';
+import { getWeekAnchors } from '@/v2/time';
 
 interface WeekData {
   domain_name: string;
@@ -29,7 +34,10 @@ export default function StatsScores() {
   const [cycles, setCycles] = useState<CycleData[]>([]);
   const [loading, setLoading] = useState(true);
   const [staffData, setStaffData] = useState<{ id: string; role_id: number } | null>(null);
+  const [showRepairTools, setShowRepairTools] = useState(false);
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
@@ -42,6 +50,24 @@ export default function StatsScores() {
       loadCycleData();
     }
   }, [staffData]);
+
+  // Handle return from repair with auto-scroll
+  useEffect(() => {
+    if (location.state?.repairJustSubmitted && location.hash) {
+      const id = location.hash.slice(1);
+      setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+          // Clear the state
+          navigate(location.pathname + location.search + location.hash, { 
+            replace: true, 
+            state: undefined 
+          });
+        }
+      }, 100);
+    }
+  }, [location.state, location.hash, location.pathname, location.search, navigate]);
 
   const loadStaffData = async () => {
     if (!user) return;
@@ -174,10 +200,22 @@ export default function StatsScores() {
   return (
     <div className="space-y-4">
       {/* Status Legend */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
-        <span>✓ all done</span>
-        <span>● in progress / late</span>
-        <span>— not started</span>
+      <div className="flex items-center justify-between bg-muted/30 p-3 rounded-lg">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span>✓ all done</span>
+          <span>● in progress / late</span>
+          <span>— not started</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="repair-toggle" className="text-xs text-muted-foreground">
+            Need to fix a past week?
+          </Label>
+          <Switch 
+            id="repair-toggle"
+            checked={showRepairTools}
+            onCheckedChange={setShowRepairTools}
+          />
+        </div>
       </div>
       
       <Accordion type="multiple" className="space-y-4">
@@ -209,6 +247,8 @@ export default function StatsScores() {
                       weekData={cycle.weeks.get(week) || []}
                       weekStatus={cycle.weekStatuses.get(week) || { total: 0, confCount: 0, perfCount: 0 }}
                       onWeekDeleted={() => loadCycleData()}
+                      showRepairTools={showRepairTools}
+                      location={location}
                     />
                   ))}
                 </Accordion>
@@ -229,16 +269,20 @@ interface WeekAccordionProps {
   weekData: WeekData[];
   weekStatus: { total: number; confCount: number; perfCount: number };
   onWeekDeleted: () => void;
+  showRepairTools: boolean;
+  location: any;
 }
 
-function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus, onWeekDeleted }: WeekAccordionProps) {
+function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus, onWeekDeleted, showRepairTools, location }: WeekAccordionProps) {
   const [hasConfidence, setHasConfidence] = useState<boolean | null>(null);
   const [hasPerformance, setHasPerformance] = useState<boolean | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [locationData, setLocationData] = useState<{ timezone: string } | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const now = useNow();
 
   useEffect(() => {
     checkConfidence();
@@ -249,6 +293,37 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
       checkSuperAdminStatus();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (staffData) {
+      loadLocationData();
+    }
+  }, [staffData]);
+
+  async function loadLocationData() {
+    if (!staffData) return;
+    try {
+      const { data: staff } = await supabase
+        .from('staff')
+        .select('primary_location_id')
+        .eq('id', staffData.id)
+        .single();
+      
+      if (staff?.primary_location_id) {
+        const { data: loc } = await supabase
+          .from('locations')
+          .select('timezone')
+          .eq('id', staff.primary_location_id)
+          .single();
+        
+        if (loc) {
+          setLocationData(loc);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading location data:', error);
+    }
+  }
 
   async function checkSuperAdminStatus() {
     if (!user) return;
@@ -349,9 +424,58 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
     return null; // Grey for partial confidence
   };
 
+  // Check if this is a past week for repair functionality
+  const isPastWeek = () => {
+    if (!locationData || !now) return false;
+    try {
+      const timezone = locationData.timezone || 'America/Chicago';
+      const { checkout_due } = getWeekAnchors(now, timezone);
+      return now > checkout_due;
+    } catch {
+      return false;
+    }
+  };
+
+  // Generate repair links
+  const generateRepairLinks = () => {
+    if (!showRepairTools || !isPastWeek() || !hasConfidence) return null;
+    
+    const anchorId = `wk-${cycle}-${week}`;
+    const returnTo = encodeURIComponent(`${location.pathname}${location.search}#${anchorId}`);
+    
+    const { total, confCount, perfCount } = weekStatus;
+    const shouldShowRepairConfidence = confCount < total;
+    const shouldShowRepairPerformance = confCount === total && perfCount < total;
+
+    if (!shouldShowRepairConfidence && !shouldShowRepairPerformance) return null;
+
+    return (
+      <div className="flex gap-2 text-xs">
+        {shouldShowRepairConfidence && (
+          <Link
+            to={`/confidence/current?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}`}
+            className="text-blue-600 underline opacity-70 hover:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Backfill Confidence
+          </Link>
+        )}
+        {shouldShowRepairPerformance && (
+          <Link
+            to={`/performance/current?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}`}
+            className="text-blue-600 underline opacity-70 hover:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Backfill Performance
+          </Link>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
-      <AccordionItem value={`week-${cycle}-${week}`} className="border rounded">
+      <AccordionItem value={`week-${cycle}-${week}`} className="border rounded" id={`wk-${cycle}-${week}`}>
         <AccordionTrigger 
           className={`px-3 py-2 text-sm ${!hasConfidence ? 'opacity-50 cursor-not-allowed' : ''}`}
           disabled={!hasConfidence}
@@ -363,6 +487,7 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
               {!hasConfidence && (
                 <span className="text-xs text-muted-foreground">Submit confidence to unlock week</span>
               )}
+              {generateRepairLinks()}
             </div>
             <div className="flex items-center gap-2">
               {getStatusBadge()}

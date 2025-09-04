@@ -1,6 +1,6 @@
 // Updated Performance Wizard to use progress-based approach instead of ISO week
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,9 +63,17 @@ export default function PerformanceWizard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const now = useNow();
   const { overrides } = useSim();
   const { submitWithRetry, pendingCount } = useReliableSubmission();
+
+  // Parse repair mode parameters
+  const qs = new URLSearchParams(location.search);
+  const isRepair = qs.get("mode") === "repair";
+  const repairCycle = qs.get("cycle");
+  const repairWeek = qs.get("wk");
+  const returnTo = qs.get("returnTo");
 
   // Use simulated time if available for time gating
   const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
@@ -98,8 +106,51 @@ export default function PerformanceWizard() {
 
     setStaff(staffData);
 
-    // Use the unified site-based approach to get current week assignments
-    const { assignments: weekAssignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);
+    // Use the unified site-based approach to get assignments
+    let weekAssignments, cycleNumber, weekInCycle;
+    
+    if (isRepair && repairCycle && repairWeek) {
+      // For repair mode, load specific cycle/week assignments
+      const targetCycle = parseInt(repairCycle, 10);
+      const targetWeek = parseInt(repairWeek, 10);
+      
+      const { data: focusData } = await supabase
+        .from('weekly_focus')
+        .select(`
+          id,
+          display_order,
+          competency_id,
+          self_select,
+          cycle,
+          week_in_cycle,
+          pro_moves!weekly_focus_action_id_fkey(action_statement),
+          competencies(name),
+          domains!weekly_focus_competency_id_fkey(domain_name)
+        `)
+        .eq('role_id', staffData.role_id)
+        .eq('cycle', targetCycle)
+        .eq('week_in_cycle', targetWeek)
+        .order('display_order');
+
+      weekAssignments = (focusData || []).map((item: any) => ({
+        weekly_focus_id: item.id,
+        type: item.self_select ? 'self_select' : 'site',
+        display_order: item.display_order,
+        action_statement: item.pro_moves?.action_statement || '',
+        domain_name: item.domains?.domain_name || 'Unknown',
+        required: true,
+        locked: false
+      }));
+
+      cycleNumber = targetCycle;
+      weekInCycle = targetWeek;
+    } else {
+      // Normal current week logic
+      const result = await assembleCurrentWeek(user.id, overrides);
+      weekAssignments = result.assignments;
+      cycleNumber = result.cycleNumber;
+      weekInCycle = result.weekInCycle;
+    }
 
     if (!weekAssignments || weekAssignments.length === 0) {
       toast({
@@ -122,13 +173,13 @@ export default function PerformanceWizard() {
       .in('weekly_focus_id', focusIds)
       .not('confidence_score', 'is', null);
 
-    if (scoresError || !scoresData || scoresData.length !== weekAssignments.length) {
+    if (scoresError || !scoresData || (scoresData.length !== weekAssignments.length && !isRepair)) {
       toast({
         title: "Error",
-        description: "Please complete confidence ratings first",
+        description: isRepair ? "No confidence scores found for this week" : "Please complete confidence ratings first",
         variant: "destructive"
       });
-      navigate('/');
+      navigate(isRepair && returnTo ? decodeURIComponent(returnTo) : '/');
       return;
     }
 
@@ -195,7 +246,7 @@ export default function PerformanceWizard() {
       staff_id: staff.id,
       weekly_focus_id: score.weekly_focus_id,
       performance_score: performanceScores[score.weekly_focus_id] || 1,
-      performance_source: 'live' as const,
+      performance_source: isRepair ? 'repair' as const : 'live' as const,
       performance_late: isLate, // Set late flag
     }));
 
@@ -232,13 +283,20 @@ export default function PerformanceWizard() {
     
     if (success) {
       toast({
-        title: "Great week!",
-        description: "Enjoy your weekend!"
+        title: isRepair ? "Performance backfilled" : "Great week!",
+        description: isRepair ? "Scores updated for past week." : "Enjoy your weekend!"
       });
     }
     
-    // Always navigate home - retry system handles failures in background
-    navigate('/');
+    // Navigate based on mode
+    if (isRepair && returnTo) {
+      const dest = decodeURIComponent(returnTo);
+      setTimeout(() => {
+        navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
+      }, 150);
+    } else {
+      navigate('/');
+    }
     setSubmitting(false);
   };
 
@@ -296,7 +354,9 @@ export default function PerformanceWizard() {
                 Cycle {currentFocus.cycle}, Week {currentFocus.week_in_cycle}
               </Badge>
             </div>
-            <CardTitle className="text-center text-gray-900">Rate Your Performance</CardTitle>
+            <CardTitle className="text-center text-gray-900">
+              {isRepair ? `Backfill Performance - Cycle ${currentFocus.cycle}, Week ${currentFocus.week_in_cycle}` : 'Rate Your Performance'}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 p-3 sm:p-6">
             <div className="p-3 sm:p-4 bg-white/80 rounded-lg">
@@ -346,7 +406,7 @@ export default function PerformanceWizard() {
                 disabled={!hasScore || submitting}
                 className="flex-1"
               >
-                {submitting ? 'Saving...' : isLastItem ? 'Submit' : 'Next'}
+                {submitting ? 'Saving...' : isLastItem ? (isRepair ? 'Backfill' : 'Submit') : 'Next'}
               </Button>
             </div>
           </CardContent>

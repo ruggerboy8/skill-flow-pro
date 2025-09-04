@@ -548,7 +548,7 @@ export default function ConfidenceWizard() {
               {isRepair && isLastItem && returnTo && (
                 <div className="col-span-2 text-center mt-2">
                   <Link
-                    to={`/performance/current?mode=repair&cycle=${repairCycle}&wk=${repairWeek}&returnTo=${returnTo}`}
+                    to={`/performance/current/step/1?mode=repair&cycle=${repairCycle}&wk=${repairWeek}&returnTo=${returnTo}`}
                     className="text-xs text-blue-600 underline hover:no-underline"
                   >
                     Fix performance next →

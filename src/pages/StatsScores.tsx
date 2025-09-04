@@ -446,11 +446,11 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
       <div className="flex gap-2 text-xs">
         {showConf && (
           <Link
-            to={`/confidence/current?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}`}
+            to={`/confidence/current/step/1?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}`}
             className="text-blue-600 underline opacity-70 hover:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
-              console.log('Repair link clicked:', { cycle, week, url: `/confidence/current?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}` });
+              console.log('Repair link clicked:', { cycle, week, url: `/confidence/current/step/1?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}` });
             }}
           >
             Backfill Confidence
@@ -458,7 +458,7 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
         )}
         {showPerf && (
           <Link
-            to={`/performance/current?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}`}
+            to={`/performance/current/step/1?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}`}
             className="text-blue-600 underline opacity-70 hover:opacity-100"
             onClick={(e) => e.stopPropagation()}
           >

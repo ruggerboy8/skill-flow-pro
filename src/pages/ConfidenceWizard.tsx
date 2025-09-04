@@ -62,7 +62,32 @@ export default function ConfidenceWizard() {
   const repairWeek = qs.get("wk");
   const returnTo = qs.get("returnTo");
   
-  console.log('Repair mode debug:', { isRepair, repairCycle, repairWeek, url: location.search });
+  // Immediate debug logging
+  console.log('ConfidenceWizard - Raw URL params:', { 
+    isRepair, 
+    repairCycle: `"${repairCycle}"`, 
+    repairWeek: `"${repairWeek}"`, 
+    fullSearch: location.search 
+  });
+  
+  // Parse and validate repair parameters early
+  let targetCycle: number | null = null;
+  let targetWeek: number | null = null;
+  
+  if (isRepair) {
+    if (!repairCycle || !repairWeek) {
+      console.error('Missing repair parameters:', { repairCycle, repairWeek });
+    } else {
+      targetCycle = parseInt(repairCycle, 10);
+      targetWeek = parseInt(repairWeek, 10);
+      console.log('ConfidenceWizard - Parsed repair params:', { 
+        targetCycle, 
+        targetWeek, 
+        targetCycleIsNaN: isNaN(targetCycle), 
+        targetWeekIsNaN: isNaN(targetWeek) 
+      });
+    }
+  }
 
   // Use simulated time if available for time gating
   const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
@@ -106,24 +131,9 @@ export default function ConfidenceWizard() {
     // Use the unified site-based approach to get assignments
     let assignments, cycleNumber, weekInCycle;
     
-    if (isRepair && repairCycle && repairWeek) {
+    if (isRepair && targetCycle !== null && targetWeek !== null && !isNaN(targetCycle) && !isNaN(targetWeek)) {
       // For repair mode, load specific cycle/week assignments
-      const targetCycle = parseInt(repairCycle, 10);
-      const targetWeek = parseInt(repairWeek, 10);
-      
-      // Validate parsed values
-      if (isNaN(targetCycle) || isNaN(targetWeek)) {
-        console.error('Invalid repair parameters:', { repairCycle, repairWeek, targetCycle, targetWeek });
-        toast({
-          title: 'Error',
-          description: 'Invalid repair parameters. Please try again.',
-          variant: 'destructive'
-        });
-        setLoading(false);
-        return;
-      }
-      
-      console.log('Loading repair data for:', { targetCycle, targetWeek });
+      console.log('Loading repair data for cycle/week:', { targetCycle, targetWeek });
       
       const { data: focusData } = await supabase
         .from('weekly_focus')
@@ -156,6 +166,16 @@ export default function ConfidenceWizard() {
       cycleNumber = targetCycle;
       weekInCycle = targetWeek;
       console.log('repair mode assignments', assignments);
+    } else if (isRepair) {
+      // If repair mode but invalid params, show error and exit
+      console.error('Repair mode enabled but invalid parameters:', { targetCycle, targetWeek });
+      toast({
+        title: 'Error',
+        description: 'Invalid repair parameters. Please try again from the Stats page.',
+        variant: 'destructive'
+      });
+      setLoading(false);
+      return;
     } else {
       // Normal current week logic
       const result = await assembleCurrentWeek(user.id, overrides);

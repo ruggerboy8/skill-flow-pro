@@ -165,6 +165,13 @@ export default function ConfidenceWizard() {
         required: true,
         locked: false
       }));
+      
+      // Debug domain data
+      console.log('Domain data in repair mode:', focusData?.map(f => ({
+        id: f.id,
+        domain: f.competencies?.domains?.domain_name,
+        raw: f.competencies
+      })));
 
       cycleNumber = targetCycle;
       weekInCycle = targetWeek;
@@ -325,7 +332,7 @@ export default function ConfidenceWizard() {
         staff_id: staff.id,
         weekly_focus_id: focus.id,
         confidence_score: scores[focus.id] || 1,
-        confidence_source: isRepair ? 'repair' as const : 'live' as const,
+        confidence_source: isRepair ? 'backfill' as const : 'live' as const, // Fixed: 'repair' -> 'backfill'
         confidence_late: isLate, // Set late flag
       };
       
@@ -386,23 +393,43 @@ export default function ConfidenceWizard() {
       selfSelectInserts
     };
 
+    console.log('Submitting data:', { 
+      submissionData, 
+      finalScoreInserts, 
+      selfSelectInserts,
+      isRepair,
+      targetCycle,
+      targetWeek 
+    });
+
     const success = await submitWithRetry('confidence', submissionData);
+    
+    console.log('Submission result:', success);
+    console.log('Navigation params:', { isRepair, returnTo });
     
     if (success) {
       toast({
         title: isRepair ? "Confidence backfilled" : "Confidence saved",
         description: isRepair ? "Scores updated for past week." : "Great! Come back later to rate your performance."
       });
-    }
-    
-    // Navigate based on mode
-    if (isRepair && returnTo) {
-      const dest = decodeURIComponent(returnTo);
-      setTimeout(() => {
-        navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
-      }, 150);
+      
+      // Navigate based on mode
+      if (isRepair && returnTo) {
+        const dest = decodeURIComponent(returnTo);
+        console.log('Navigating back to:', dest);
+        setTimeout(() => {
+          navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
+        }, 150);
+      } else {
+        navigate('/');
+      }
     } else {
-      navigate('/');
+      console.error('Submission failed');
+      toast({
+        title: 'Error',
+        description: 'Failed to save confidence scores. Please try again.',
+        variant: 'destructive'
+      });
     }
     setSubmitting(false);
   };

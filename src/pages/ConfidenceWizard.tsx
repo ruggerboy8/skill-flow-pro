@@ -135,7 +135,7 @@ export default function ConfidenceWizard() {
       // For repair mode, load specific cycle/week assignments
       console.log('Loading repair data for cycle/week:', { targetCycle, targetWeek });
       
-      // Use the same query pattern as Week.tsx that we know works
+      // Use a better query that gets domain info through pro_moves
       const { data: focusData, error: focusError } = await supabase
         .from('weekly_focus')
         .select(`
@@ -146,8 +146,17 @@ export default function ConfidenceWizard() {
           cycle,
           week_in_cycle,
           action_id,
-          pro_moves!weekly_focus_action_id_fkey ( action_statement ),
-          competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
+          pro_moves!weekly_focus_action_id_fkey ( 
+            action_statement,
+            competencies ( 
+              name,
+              domains!competencies_domain_id_fkey ( domain_name )
+            )
+          ),
+          competencies ( 
+            name,
+            domains!competencies_domain_id_fkey ( domain_name )
+          )
         `)
         .eq('role_id', staffData.role_id)
         .eq('cycle', targetCycle)
@@ -156,15 +165,25 @@ export default function ConfidenceWizard() {
 
       console.log('Repair query result:', { focusData, focusError });
 
-      assignments = (focusData || []).map((item: any) => ({
-        weekly_focus_id: item.id,
-        type: item.self_select ? 'self_select' : 'site',
-        display_order: item.display_order,
-        action_statement: item.pro_moves?.action_statement || '',
-        domain_name: item.competencies?.domains?.domain_name || 'Unknown',
-        required: true,
-        locked: false
-      }));
+      assignments = (focusData || []).map((item: any) => {
+        // Get domain from pro_moves or competencies
+        let domainName = 'Unknown';
+        if (item.pro_moves?.competencies?.domains?.domain_name) {
+          domainName = item.pro_moves.competencies.domains.domain_name;
+        } else if (item.competencies?.domains?.domain_name) {
+          domainName = item.competencies.domains.domain_name;
+        }
+
+        return {
+          weekly_focus_id: item.id,
+          type: item.self_select ? 'self_select' : 'site',
+          display_order: item.display_order,
+          action_statement: item.pro_moves?.action_statement || '',
+          domain_name: domainName,
+          required: true,
+          locked: false
+        };
+      });
       
       // Debug domain data
       console.log('Domain data in repair mode:', focusData?.map(f => ({
@@ -303,6 +322,18 @@ export default function ConfidenceWizard() {
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
 
+    // Check if all scores are filled
+    const missingScores = weeklyFocus.filter(focus => !scores[focus.id]);
+    if (missingScores.length > 0) {
+      console.error('Missing scores for focuses:', missingScores.map(f => f.id));
+      toast({
+        title: 'Error',
+        description: 'Please provide confidence scores for all items before submitting.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     // Debug logging to track self-select state
@@ -328,13 +359,23 @@ export default function ConfidenceWizard() {
     const isLate = effectiveNow > checkin_due;
 
     const scoreInserts = weeklyFocus.map(focus => {
+      const scoreValue = scores[focus.id];
+      console.log(`Processing focus ${focus.id}: score = ${scoreValue}, scores object:`, scores);
+      
+      if (!scoreValue) {
+        console.error(`No score found for focus ${focus.id}`);
+      }
+      
       const base: any = {
         staff_id: staff.id,
         weekly_focus_id: focus.id,
-        confidence_score: scores[focus.id] || 1,
-        confidence_source: isRepair ? 'backfill' as const : 'live' as const, // Fixed: 'repair' -> 'backfill'
-        confidence_late: isLate, // Set late flag
+        confidence_score: scoreValue || 1, // Ensure we have a score value
+        confidence_date: new Date().toISOString(), // Set the current timestamp
+        confidence_source: isRepair ? 'backfill' as const : 'live' as const,
+        confidence_late: isLate,
       };
+      
+      console.log(`Created base object for focus ${focus.id}:`, base);
       
       // For self-select slots: set selected_action_id
       if (selfSelectById[focus.id] && selectedActions[focus.id] && selectedActions[focus.id] !== "") {

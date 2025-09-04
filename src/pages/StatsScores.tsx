@@ -226,16 +226,14 @@ export default function StatsScores() {
             className="border rounded-lg"
           >
             <AccordionTrigger 
-              className={`px-4 sticky top-0 bg-white z-10 ${!cycle.hasAnyConfidence ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={!cycle.hasAnyConfidence}
+              className="px-4 sticky top-0 bg-white z-10"
             >
               <div className="flex items-center gap-3">
                 <h3 className="text-lg font-semibold">Cycle {cycle.cycle}</h3>
               </div>
             </AccordionTrigger>
             
-            {cycle.hasAnyConfidence && (
-              <AccordionContent className="px-4 pb-4">
+            <AccordionContent className="px-4 pb-4">
                 <Accordion type="multiple" className="space-y-2">
                   {Array.from(cycle.weekStatuses.keys()).map(week => (
                     <WeekAccordion
@@ -253,7 +251,6 @@ export default function StatsScores() {
                   ))}
                 </Accordion>
               </AccordionContent>
-            )}
           </AccordionItem>
         ))}
       </Accordion>
@@ -406,7 +403,7 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
   };
 
   const handleExpand = () => {
-    if (hasConfidence && weekData.length === 0) {
+    if (weekData.length === 0) {
       onExpand();
     }
   };
@@ -477,22 +474,18 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
     <>
       <AccordionItem value={`week-${cycle}-${week}`} className="border rounded" id={`wk-${cycle}-${week}`}>
         <AccordionTrigger 
-          className={`px-3 py-2 text-sm ${!hasConfidence ? 'opacity-50 cursor-not-allowed' : ''}`}
-          disabled={!hasConfidence}
+          className="px-3 py-2 text-sm"
           onClick={handleExpand}
         >
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3">
               <span className="font-medium">Week {week}</span>
-              {!hasConfidence && (
-                <span className="text-xs text-muted-foreground">Submit confidence to unlock week</span>
-              )}
               {generateRepairLinks()}
             </div>
             <div className="flex items-center gap-2">
               {getStatusBadge()}
               {/* Super Admin Delete Button */}
-              {isSuperAdmin && hasConfidence && (
+              {isSuperAdmin && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -510,8 +503,7 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
           </div>
         </AccordionTrigger>
         
-        {hasConfidence && (
-          <AccordionContent className="px-3 pb-3">
+        <AccordionContent className="px-3 pb-3">
             <div className="space-y-2">
               {weekData.map((item, index) => (
                 <div
@@ -532,7 +524,6 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
               ))}
             </div>
           </AccordionContent>
-        )}
       </AccordionItem>
 
       {/* Delete Confirmation Dialog */}

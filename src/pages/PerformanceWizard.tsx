@@ -241,9 +241,15 @@ export default function PerformanceWizard() {
     setLoading(false);
   };
 
+  // Helper function to preserve URL parameters during navigation
+  const preserveSearchParams = (newPath: string) => {
+    const currentSearch = location.search;
+    return `${newPath}${currentSearch}`;
+  };
+
   const handleNext = () => {
     if (currentIndex < weeklyFocus.length - 1) {
-      navigate(`/performance/current/step/${currentIndex + 2}`);
+      navigate(preserveSearchParams(`/performance/current/step/${currentIndex + 2}`));
     } else {
       handleSubmit();
     }
@@ -251,7 +257,7 @@ export default function PerformanceWizard() {
 
   const handleBack = () => {
     if (currentIndex > 0) {
-      navigate(`/performance/current/step/${currentIndex}`);
+      navigate(preserveSearchParams(`/performance/current/step/${currentIndex}`));
     }
   };
 

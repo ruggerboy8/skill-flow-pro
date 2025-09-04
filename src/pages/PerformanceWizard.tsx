@@ -140,6 +140,7 @@ export default function PerformanceWizard() {
       // For repair mode, load specific cycle/week assignments
       console.log('Loading repair data for cycle/week:', { targetCycle, targetWeek });
       
+      // Use a better query that gets domain info through pro_moves
       const { data: focusData } = await supabase
         .from('weekly_focus')
         .select(`
@@ -149,24 +150,56 @@ export default function PerformanceWizard() {
           self_select,
           cycle,
           week_in_cycle,
-          pro_moves!weekly_focus_action_id_fkey(action_statement),
-          competencies(name),
-          domains!weekly_focus_competency_id_fkey(domain_name)
+          action_id,
+          pro_moves!weekly_focus_action_id_fkey ( 
+            action_statement,
+            competencies ( 
+              name,
+              domains!competencies_domain_id_fkey ( domain_name )
+            )
+          ),
+          competencies ( 
+            name,
+            domains!competencies_domain_id_fkey ( domain_name )
+          )
         `)
         .eq('role_id', staffData.role_id)
         .eq('cycle', targetCycle)
         .eq('week_in_cycle', targetWeek)
         .order('display_order');
 
-      weekAssignments = (focusData || []).map((item: any) => ({
-        weekly_focus_id: item.id,
-        type: item.self_select ? 'self_select' : 'site',
-        display_order: item.display_order,
-        action_statement: item.pro_moves?.action_statement || '',
-        domain_name: item.domains?.domain_name || 'Unknown',
-        required: true,
-        locked: false
-      }));
+      console.log('Repair query result:', { focusData, focusError: null });
+
+      weekAssignments = (focusData || []).map((item: any) => {
+        // Get domain from pro_moves or competencies
+        let domainName = 'Unknown';
+        if (item.pro_moves?.competencies?.domains?.domain_name) {
+          domainName = item.pro_moves.competencies.domains.domain_name;
+        } else if (item.competencies?.domains?.domain_name) {
+          domainName = item.competencies.domains.domain_name;
+        }
+
+        return {
+          weekly_focus_id: item.id,
+          type: item.self_select ? 'self_select' : 'site',
+          display_order: item.display_order,
+          action_statement: item.pro_moves?.action_statement || '',
+          domain_name: domainName,
+          required: true,
+          locked: false
+        };
+      });
+      
+      // Debug domain data
+      console.log('Domain data in repair mode:', focusData?.map(f => ({
+        id: f.id,
+        action_statement: f.pro_moves?.action_statement,
+        domain_from_pro_moves: f.pro_moves?.competencies?.domains?.domain_name,
+        domain_from_competencies: f.competencies?.domains?.domain_name
+      })));
+      
+      console.log('repair mode assignments', weekAssignments);
+      console.log('cycle info:', { cycleNumber: targetCycle, weekInCycle: targetWeek });
 
       cycleNumber = targetCycle;
       weekInCycle = targetWeek;
@@ -288,7 +321,8 @@ export default function PerformanceWizard() {
       staff_id: staff.id,
       weekly_focus_id: score.weekly_focus_id,
       performance_score: performanceScores[score.weekly_focus_id] || 1,
-      performance_source: isRepair ? 'repair' as const : 'live' as const,
+      performance_date: new Date().toISOString(), // Set the current timestamp
+      performance_source: isRepair ? 'backfill' as const : 'live' as const, // Fixed: 'repair' -> 'backfill'
       performance_late: isLate, // Set late flag
     }));
 

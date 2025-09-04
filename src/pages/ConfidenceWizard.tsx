@@ -135,7 +135,8 @@ export default function ConfidenceWizard() {
       // For repair mode, load specific cycle/week assignments
       console.log('Loading repair data for cycle/week:', { targetCycle, targetWeek });
       
-      const { data: focusData } = await supabase
+      // Use the same query pattern as Week.tsx that we know works
+      const { data: focusData, error: focusError } = await supabase
         .from('weekly_focus')
         .select(`
           id,
@@ -144,21 +145,23 @@ export default function ConfidenceWizard() {
           self_select,
           cycle,
           week_in_cycle,
-          pro_moves!weekly_focus_action_id_fkey(action_statement),
-          competencies(name),
-          domains!weekly_focus_competency_id_fkey(domain_name)
+          action_id,
+          pro_moves!weekly_focus_action_id_fkey ( action_statement ),
+          competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
         `)
         .eq('role_id', staffData.role_id)
         .eq('cycle', targetCycle)
         .eq('week_in_cycle', targetWeek)
         .order('display_order');
 
+      console.log('Repair query result:', { focusData, focusError });
+
       assignments = (focusData || []).map((item: any) => ({
         weekly_focus_id: item.id,
         type: item.self_select ? 'self_select' : 'site',
         display_order: item.display_order,
         action_statement: item.pro_moves?.action_statement || '',
-        domain_name: item.domains?.domain_name || 'Unknown',
+        domain_name: item.competencies?.domains?.domain_name || 'Unknown',
         required: true,
         locked: false
       }));

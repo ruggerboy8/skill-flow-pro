@@ -4,8 +4,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,8 +11,7 @@ import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { Trash2 } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { useNow } from '@/providers/NowProvider';
-import { getWeekAnchors } from '@/v2/time';
+import { getLocationWeekContext } from '@/lib/locationState';
 
 interface WeekData {
   domain_name: string;
@@ -34,7 +31,8 @@ export default function StatsScores() {
   const [cycles, setCycles] = useState<CycleData[]>([]);
   const [loading, setLoading] = useState(true);
   const [staffData, setStaffData] = useState<{ id: string; role_id: number } | null>(null);
-  const [showRepairTools, setShowRepairTools] = useState(false);
+  const [currentCycle, setCurrentCycle] = useState<number | null>(null);
+  const [currentWeek, setCurrentWeek] = useState<number | null>(null);
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -72,14 +70,20 @@ export default function StatsScores() {
   const loadStaffData = async () => {
     if (!user) return;
 
-    const { data } = await supabase
+    const { data: staffRow } = await supabase
       .from('staff')
-      .select('id, role_id')
+      .select('id, role_id, primary_location_id')
       .eq('user_id', user.id)
       .single();
 
-    if (data) {
-      setStaffData(data);
+    if (staffRow) {
+      setStaffData({ id: staffRow.id, role_id: staffRow.role_id });
+
+      if (staffRow.primary_location_id) {
+        const ctx = await getLocationWeekContext(staffRow.primary_location_id, new Date());
+        setCurrentCycle(ctx.cycleNumber);
+        setCurrentWeek(ctx.weekInCycle);
+      }
     }
   };
 
@@ -137,14 +141,91 @@ export default function StatsScores() {
     if (!staffData) return [];
 
     try {
-      const { data } = await supabase.rpc('get_weekly_review', {
+      // Try RPC first (if it returns rows for blank weeks, great)
+      const { data: rpcRows } = await supabase.rpc('get_weekly_review', {
         p_cycle: cycle,
         p_week: week,
         p_role_id: staffData.role_id,
         p_staff_id: staffData.id
       });
 
-      return data || [];
+      if (rpcRows && rpcRows.length) {
+        return rpcRows as WeekData[];
+      }
+
+      // Fallback: compose from weekly_focus + optional scores
+      // 1) Pull focus rows for this role/cycle/week
+      const { data: focus } = await supabase
+        .from('weekly_focus')
+        .select(`
+          id,
+          display_order,
+          pro_moves(action_statement, competency_id)
+        `)
+        .eq('cycle', cycle)
+        .eq('week_in_cycle', week)
+        .eq('role_id', staffData.role_id)
+        .order('display_order');
+
+      const focusIds = (focus ?? []).map((f: any) => f.id);
+
+      // 2) Map competency -> domain name (optional, so badges look right)
+      const compIds = Array.from(
+        new Set((focus ?? []).map((f: any) => f.pro_moves?.competency_id).filter(Boolean))
+      ) as number[];
+      let domainMap: Record<number, string> = {};
+      if (compIds.length) {
+        const { data: comps } = await supabase
+          .from('competencies')
+          .select('competency_id, domain_id')
+          .in('competency_id', compIds);
+
+        const domainIds = Array.from(new Set((comps ?? []).map(c => c.domain_id).filter(Boolean)));
+        if (domainIds.length) {
+          const { data: domains } = await supabase
+            .from('domains')
+            .select('domain_id, domain_name')
+            .in('domain_id', domainIds);
+          const idName: Record<number, string> = {};
+          (domains ?? []).forEach(d => { idName[d.domain_id] = d.domain_name; });
+          (comps ?? []).forEach(c => {
+            if (c.domain_id && idName[c.domain_id]) {
+              domainMap[c.competency_id] = idName[c.domain_id];
+            }
+          });
+        }
+      }
+
+      // 3) Overlay any existing scores (if any)
+      let scoreMap: Record<string, { confidence_score: number|null, performance_score: number|null }> = {};
+      if (focusIds.length) {
+        const { data: scores } = await supabase
+          .from('weekly_scores')
+          .select('weekly_focus_id, confidence_score, performance_score')
+          .eq('staff_id', staffData.id)
+          .in('weekly_focus_id', focusIds);
+        (scores ?? []).forEach((s: any) => {
+          scoreMap[s.weekly_focus_id] = {
+            confidence_score: s.confidence_score,
+            performance_score: s.performance_score
+          };
+        });
+      }
+
+      // 4) Build view rows even if all scores are null
+      const rows: WeekData[] = (focus ?? []).map((f: any) => {
+        const compId = f.pro_moves?.competency_id as number | null;
+        const domain_name = compId ? (domainMap[compId] || 'General') : 'General';
+        const sc = scoreMap[f.id] || { confidence_score: null, performance_score: null };
+        return {
+          domain_name,
+          action_statement: f.pro_moves?.action_statement || 'Pro Move',
+          confidence_score: sc.confidence_score,
+          performance_score: sc.performance_score
+        };
+      });
+
+      return rows;
     } catch (error) {
       console.error('Error loading week data:', error);
       return [];
@@ -200,21 +281,11 @@ export default function StatsScores() {
   return (
     <div className="space-y-4">
       {/* Status Legend */}
-      <div className="flex items-center justify-between bg-muted/30 p-3 rounded-lg">
+      <div className="flex items-center justify-center bg-muted/30 p-3 rounded-lg">
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span>✓ all done</span>
           <span>● in progress / late</span>
           <span>— not started</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor="repair-toggle" className="text-xs text-muted-foreground">
-            Need to fix a past week?
-          </Label>
-          <Switch 
-            id="repair-toggle"
-            checked={showRepairTools}
-            onCheckedChange={setShowRepairTools}
-          />
         </div>
       </div>
       
@@ -236,18 +307,19 @@ export default function StatsScores() {
             <AccordionContent className="px-4 pb-4">
                 <Accordion type="multiple" className="space-y-2">
                   {Array.from(cycle.weekStatuses.keys()).map(week => (
-                    <WeekAccordion
-                      key={week}
-                      cycle={cycle.cycle}
-                      week={week}
-                      staffData={staffData}
-                      onExpand={() => onWeekExpand(cycleIndex, week)}
-                      weekData={cycle.weeks.get(week) || []}
-                      weekStatus={cycle.weekStatuses.get(week) || { total: 0, confCount: 0, perfCount: 0 }}
-                      onWeekDeleted={() => loadCycleData()}
-                      showRepairTools={showRepairTools}
-                      location={location}
-                    />
+                     <WeekAccordion
+                       key={week}
+                       cycle={cycle.cycle}
+                       week={week}
+                       staffData={staffData}
+                       onExpand={() => onWeekExpand(cycleIndex, week)}
+                       weekData={cycle.weeks.get(week) || []}
+                       weekStatus={cycle.weekStatuses.get(week) || { total: 0, confCount: 0, perfCount: 0 }}
+                       onWeekDeleted={() => loadCycleData()}
+                       currentCycle={currentCycle}
+                       currentWeek={currentWeek}
+                       location={location}
+                     />
                   ))}
                 </Accordion>
               </AccordionContent>
@@ -266,24 +338,17 @@ interface WeekAccordionProps {
   weekData: WeekData[];
   weekStatus: { total: number; confCount: number; perfCount: number };
   onWeekDeleted: () => void;
-  showRepairTools: boolean;
+  currentCycle: number | null;
+  currentWeek: number | null;
   location: any;
 }
 
-function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus, onWeekDeleted, showRepairTools, location }: WeekAccordionProps) {
-  const [hasConfidence, setHasConfidence] = useState<boolean | null>(null);
-  const [hasPerformance, setHasPerformance] = useState<boolean | null>(null);
+function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus, onWeekDeleted, currentCycle, currentWeek, location }: WeekAccordionProps) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [locationData, setLocationData] = useState<{ timezone: string } | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-  const now = useNow();
-
-  useEffect(() => {
-    checkConfidence();
-  }, [cycle, week, staffData]);
 
   useEffect(() => {
     if (user) {
@@ -291,36 +356,6 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
     }
   }, [user]);
 
-  useEffect(() => {
-    if (staffData) {
-      loadLocationData();
-    }
-  }, [staffData]);
-
-  async function loadLocationData() {
-    if (!staffData) return;
-    try {
-      const { data: staff } = await supabase
-        .from('staff')
-        .select('primary_location_id')
-        .eq('id', staffData.id)
-        .single();
-      
-      if (staff?.primary_location_id) {
-        const { data: loc } = await supabase
-          .from('locations')
-          .select('timezone')
-          .eq('id', staff.primary_location_id)
-          .single();
-        
-        if (loc) {
-          setLocationData(loc);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading location data:', error);
-    }
-  }
 
   async function checkSuperAdminStatus() {
     if (!user) return;
@@ -366,51 +401,12 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
     }
   }
 
-  const checkConfidence = async () => {
-    if (!staffData) return;
-
-    const { data, error } = await supabase
-      .from('weekly_scores')
-      .select('confidence_score, performance_score, weekly_focus!inner(cycle, week_in_cycle)')
-      .eq('staff_id', staffData.id)
-      .eq('weekly_focus.cycle', cycle)
-      .eq('weekly_focus.week_in_cycle', week);
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    if (!data || data.length === 0) {
-      setHasConfidence(false);
-      setHasPerformance(false);
-      return;
-    }
-
-    // Check if ALL items have confidence scores
-    const allHaveConfidence = data.every(r => r.confidence_score !== null);
-    // Check if ALL items have performance scores  
-    const allHavePerformance = data.every(r => r.performance_score !== null);
-    // Check if ANY items have confidence scores
-    const someHaveConfidence = data.some(r => r.confidence_score !== null);
-    // Check if ANY items have performance scores
-    const someHavePerformance = data.some(r => r.performance_score !== null);
-
-    // hasConfidence = true if at least some confidence scores exist (to show the week)
-    setHasConfidence(someHaveConfidence);
-    // hasPerformance = true only if ALL items are completely done (confidence + performance)
-    setHasPerformance(allHaveConfidence && allHavePerformance);
-  };
 
   const handleExpand = () => {
     if (weekData.length === 0) {
       onExpand();
     }
   };
-
-  if (hasConfidence === null) {
-    return <div className="h-12 bg-gray-100 animate-pulse rounded" />;
-  }
 
   const getStatusBadge = () => {
     const { total, confCount, perfCount } = weekStatus;
@@ -423,32 +419,30 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
 
   // Check if this is a past week for repair functionality
   const isPastWeek = () => {
-    if (!locationData || !now) return false;
-    try {
-      const timezone = locationData.timezone || 'America/Chicago';
-      const { checkout_due } = getWeekAnchors(now, timezone);
-      return now > checkout_due;
-    } catch {
-      return false;
-    }
+    if (currentCycle == null || currentWeek == null) return false;
+    return cycle < currentCycle || (cycle === currentCycle && week < currentWeek);
   };
 
   // Generate repair links
   const generateRepairLinks = () => {
-    if (!showRepairTools || !isPastWeek() || !hasConfidence) return null;
-    
+    if (!isPastWeek()) return null;
+
     const anchorId = `wk-${cycle}-${week}`;
     const returnTo = encodeURIComponent(`${location.pathname}${location.search}#${anchorId}`);
-    
-    const { total, confCount, perfCount } = weekStatus;
-    const shouldShowRepairConfidence = confCount < total;
-    const shouldShowRepairPerformance = confCount === total && perfCount < total;
 
-    if (!shouldShowRepairConfidence && !shouldShowRepairPerformance) return null;
+    const { total, confCount, perfCount } = weekStatus;
+
+    // Conditions:
+    // - If any confidence is missing → show Backfill Confidence
+    // - If all confidence is present but some performance missing → show Backfill Performance
+    const showConf = total > 0 && confCount < total;
+    const showPerf = total > 0 && confCount === total && perfCount < total;
+
+    if (!showConf && !showPerf) return null;
 
     return (
       <div className="flex gap-2 text-xs">
-        {shouldShowRepairConfidence && (
+        {showConf && (
           <Link
             to={`/confidence/current?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}`}
             className="text-blue-600 underline opacity-70 hover:opacity-100"
@@ -457,7 +451,7 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
             Backfill Confidence
           </Link>
         )}
-        {shouldShowRepairPerformance && (
+        {showPerf && (
           <Link
             to={`/performance/current?mode=repair&cycle=${cycle}&wk=${week}&returnTo=${returnTo}`}
             className="text-blue-600 underline opacity-70 hover:opacity-100"

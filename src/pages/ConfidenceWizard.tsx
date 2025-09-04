@@ -16,6 +16,8 @@ import { useSim } from '@/devtools/SimProvider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
+import { useReliableSubmission } from '@/hooks/useReliableSubmission';
+import { AlertCircle, Loader2 } from 'lucide-react';
 
 interface Staff {
   id: string;
@@ -50,6 +52,7 @@ export default function ConfidenceWizard() {
   const navigate = useNavigate();
   const now = useNow();
   const { overrides } = useSim();
+  const { submitWithRetry, pendingCount } = useReliableSubmission();
 
   // Use simulated time if available for time gating
   const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
@@ -274,24 +277,7 @@ export default function ConfidenceWizard() {
       return insert;
     });
 
-    // Save weekly scores
-    const { error: scoresError } = await supabase
-      .from('weekly_scores')
-      .upsert(finalScoreInserts, {
-        onConflict: 'staff_id,weekly_focus_id'
-      });
-
-    if (scoresError) {
-      toast({
-        title: "Error",
-        description: scoresError.message,
-        variant: "destructive"
-      });
-      setSubmitting(false);
-      return;
-    }
-
-    // Save self-select choices to weekly_self_select table
+    // Prepare self-select data
     const selfSelectInserts = weeklyFocus
       .filter(focus => selfSelectById[focus.id] && selectedActions[focus.id] && selectedActions[focus.id] !== "")
       .map(focus => ({
@@ -302,27 +288,23 @@ export default function ConfidenceWizard() {
         source: 'manual'
       }));
 
-    if (selfSelectInserts.length > 0) {
-      const { error: selectError } = await supabase
-        .from('weekly_self_select')
-        .upsert(selfSelectInserts, {
-          onConflict: 'user_id,weekly_focus_id,slot_index'
-        });
+    // Use reliable submission system
+    const submissionData = {
+      updates: finalScoreInserts,
+      selfSelectInserts
+    };
 
-      if (selectError) {
-        console.error('Error saving self-selections:', selectError);
-        // Don't fail the entire submission for this
-      }
+    const success = await submitWithRetry('confidence', submissionData);
+    
+    if (success) {
+      toast({
+        title: "Confidence saved",
+        description: "Great! Come back later to rate your performance."
+      });
     }
     
-    toast({
-      title: "Confidence saved",
-      description: "Great! Come back later to rate your performance."
-    });
-    
-    // Navigate back to home after successful submission
+    // Always navigate home - retry system handles failures in background
     navigate('/');
-
     setSubmitting(false);
   };
 
@@ -359,6 +341,15 @@ export default function ConfidenceWizard() {
     <div className="min-h-screen p-2 sm:p-4 bg-background">
       <div className="max-w-md mx-auto space-y-4">
         <Card style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}>
+          {/* Submission Status Indicator */}
+          {pendingCount > 0 && (
+            <div className="absolute top-2 right-2 z-10">
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Saving...
+              </Badge>
+            </div>
+          )}
           <CardHeader>
             <div className="flex items-center justify-center">
               <Badge variant="outline" className="bg-white/80 text-gray-900">

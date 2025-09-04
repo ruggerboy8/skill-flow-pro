@@ -14,6 +14,8 @@ import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
+import { useReliableSubmission } from '@/hooks/useReliableSubmission';
+import { AlertCircle, Loader2 } from 'lucide-react';
 
 interface Assignment {
   weekly_focus_id: string;
@@ -63,6 +65,7 @@ export default function PerformanceWizard() {
   const navigate = useNavigate();
   const now = useNow();
   const { overrides } = useSim();
+  const { submitWithRetry, pendingCount } = useReliableSubmission();
 
   // Use simulated time if available for time gating
   const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
@@ -196,60 +199,46 @@ export default function PerformanceWizard() {
       performance_late: isLate, // Set late flag
     }));
 
-    const { error } = await supabase
-      .from('weekly_scores')
-      .upsert(updates);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
-    } else {
-      // Resolve any open backlog items that match this week's actions
-      try {
-        const actedOnIds = new Set<number>();
-        
-        // Collect action_ids from both selected and site actions
-        for (const update of updates) {
-          const score = existingScores.find(s => s.id === update.id);
-          if (score?.selected_action_id) {
-            actedOnIds.add(score.selected_action_id);
-          }
-          // For site moves, we need to get the action_id from the weekly_focus
-          const focusItem = weeklyFocus.find(wf => wf.id === score?.weekly_focus_id);
-          if (focusItem) {
-            // Get the action_id from the assignment data (site moves)
-            const { data: focusData } = await supabase
-              .from('weekly_focus')
-              .select('action_id')
-              .eq('id', focusItem.id)
-              .maybeSingle();
-            if (focusData?.action_id) {
-              actedOnIds.add(focusData.action_id);
-            }
-          }
-        }
-
-        // Resolve backlog items for these action_ids
-        for (const actionId of actedOnIds) {
-          await supabase.rpc('resolve_backlog_item', {
-            p_staff_id: staff.id,
-            p_action_id: actionId
-          });
-        }
-      } catch (backlogError) {
-        console.error('Error resolving backlog items:', backlogError);
+    // Collect action_ids for backlog resolution
+    const actedOnIds = new Set<number>();
+    
+    for (const update of updates) {
+      const score = existingScores.find(s => s.id === update.id);
+      if (score?.selected_action_id) {
+        actedOnIds.add(score.selected_action_id);
       }
+      // For site moves, get the action_id from weekly_focus
+      const focusItem = weeklyFocus.find(wf => wf.id === score?.weekly_focus_id);
+      if (focusItem) {
+        const { data: focusData } = await supabase
+          .from('weekly_focus')
+          .select('action_id')
+          .eq('id', focusItem.id)
+          .maybeSingle();
+        if (focusData?.action_id) {
+          actedOnIds.add(focusData.action_id);
+        }
+      }
+    }
 
+    // Use reliable submission system
+    const submissionData = {
+      updates,
+      staffId: staff.id,
+      resolveBacklogItems: Array.from(actedOnIds)
+    };
+
+    const success = await submitWithRetry('performance', submissionData);
+    
+    if (success) {
       toast({
         title: "Great week!",
         description: "Enjoy your weekend!"
       });
-      navigate('/');
     }
-
+    
+    // Always navigate home - retry system handles failures in background
+    navigate('/');
     setSubmitting(false);
   };
 
@@ -289,6 +278,15 @@ export default function PerformanceWizard() {
     <div className="min-h-screen p-2 sm:p-4 bg-background">
       <div className="max-w-md mx-auto space-y-4">
         <Card style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}>
+          {/* Submission Status Indicator */}
+          {pendingCount > 0 && (
+            <div className="absolute top-2 right-2 z-10">
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Saving...
+              </Badge>
+            </div>
+          )}
           <CardHeader>
             <div className="flex items-center justify-between">
               <Badge variant="outline" className="bg-white/80 text-gray-900">

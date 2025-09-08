@@ -1,0 +1,1 @@
+DELETE FROM weekly_scores WHERE id IN ('d689ee72-fba2-4a83-8f20-a3fdec3d5e39', '04911ff9-6519-450c-9001-126c2fa6e7b9', '7b3c0ad7-2f4f-4ba4-b7bc-0ef09eac6c18');

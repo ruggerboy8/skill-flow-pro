@@ -317,20 +317,19 @@ export default function PerformanceWizard() {
     const isLate = effectiveNow > checkout_due;
 
     const updates = existingScores.map(score => ({
-      id: score.id,
       staff_id: staff.id,
       weekly_focus_id: score.weekly_focus_id,
       performance_score: performanceScores[score.weekly_focus_id] || 1,
-      performance_date: new Date().toISOString(), // Set the current timestamp
-      performance_source: isRepair ? 'backfill' as const : 'live' as const, // Fixed: 'repair' -> 'backfill'
-      performance_late: isLate, // Set late flag
+      performance_date: new Date().toISOString(),
+      performance_source: isRepair ? 'backfill' as const : 'live' as const,
+      performance_late: isLate,
     }));
 
     // Collect action_ids for backlog resolution
     const actedOnIds = new Set<number>();
     
     for (const update of updates) {
-      const score = existingScores.find(s => s.id === update.id);
+      const score = existingScores.find(s => s.weekly_focus_id === update.weekly_focus_id);
       if (score?.selected_action_id) {
         actedOnIds.add(score.selected_action_id);
       }

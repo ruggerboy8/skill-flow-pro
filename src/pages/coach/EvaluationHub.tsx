@@ -66,6 +66,32 @@ export function EvaluationHub() {
     }
   }, [evalId]);
 
+  // Initialize note visibility for read-only mode when evaluation loads
+  useEffect(() => {
+    if (evaluation) {
+      const mode = searchParams.get('mode');
+      const isReadOnlyMode = evaluation.status === 'submitted' && mode === 'view';
+      
+      if (isReadOnlyMode) {
+        // Show observer notes that have content
+        const observerNotesToShow: Record<number, boolean> = {};
+        evaluation.items.forEach(item => {
+          if (item.observer_note && item.observer_note.trim()) {
+            observerNotesToShow[item.competency_id] = true;
+          }
+        });
+        setShowObserverNotes(observerNotesToShow);
+
+        // Show self note if it has content (check current index)
+        const sortedItems = evaluation.items.sort((a, b) => a.competency_id - b.competency_id);
+        const currentItem = sortedItems[currentSelfIndex];
+        if (currentItem && currentItem.self_note && currentItem.self_note.trim()) {
+          setShowSelfNote(true);
+        }
+      }
+    }
+  }, [evaluation, searchParams, currentSelfIndex]);
+
   const loadEvaluation = async () => {
     if (!evalId) return;
     
@@ -401,25 +427,6 @@ export function EvaluationHub() {
     );
   
   const currentItem = sortedItems[currentSelfIndex];
-
-  // Initialize note visibility for read-only mode
-  useEffect(() => {
-    if (evaluation && isReadOnly) {
-      // Show observer notes that have content
-      const observerNotesToShow: Record<number, boolean> = {};
-      evaluation.items.forEach(item => {
-        if (item.observer_note && item.observer_note.trim()) {
-          observerNotesToShow[item.competency_id] = true;
-        }
-      });
-      setShowObserverNotes(observerNotesToShow);
-
-      // Show self note if current item has content
-      if (currentItem && currentItem.self_note && currentItem.self_note.trim()) {
-        setShowSelfNote(true);
-      }
-    }
-  }, [evaluation, isReadOnly, currentItem]);
   
   // Calculate observation completion count
   const observerScoresCount = evaluation.items.filter(item => item.observer_score !== null).length;

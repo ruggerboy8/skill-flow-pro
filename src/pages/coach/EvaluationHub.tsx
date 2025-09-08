@@ -401,6 +401,25 @@ export function EvaluationHub() {
     );
   
   const currentItem = sortedItems[currentSelfIndex];
+
+  // Initialize note visibility for read-only mode
+  useEffect(() => {
+    if (evaluation && isReadOnly) {
+      // Show observer notes that have content
+      const observerNotesToShow: Record<number, boolean> = {};
+      evaluation.items.forEach(item => {
+        if (item.observer_note && item.observer_note.trim()) {
+          observerNotesToShow[item.competency_id] = true;
+        }
+      });
+      setShowObserverNotes(observerNotesToShow);
+
+      // Show self note if current item has content
+      if (currentItem && currentItem.self_note && currentItem.self_note.trim()) {
+        setShowSelfNote(true);
+      }
+    }
+  }, [evaluation, isReadOnly, currentItem]);
   
   // Calculate observation completion count
   const observerScoresCount = evaluation.items.filter(item => item.observer_score !== null).length;
@@ -565,28 +584,28 @@ export function EvaluationHub() {
                     ))}
                   </div>
 
-                  {/* Conditional Notes */}
-                  {showObserverNotes[item.competency_id] ? (
-                    <Textarea
-                      placeholder="Add your notes..."
-                      value={pendingObserverNotes[item.competency_id] ?? item.observer_note ?? ''}
-                      onChange={(e) => draftObserverNote(item.competency_id, e.target.value)}
-                      onBlur={() => saveOneObserverNote(item.competency_id)}
-                      disabled={isReadOnly}
-                      className="min-h-[80px]"
-                    />
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowObserverNotes(prev => ({ ...prev, [item.competency_id]: true }))}
-                      disabled={isReadOnly}
-                      className="flex items-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Note
-                    </Button>
-                  )}
+                   {/* Conditional Notes */}
+                   {showObserverNotes[item.competency_id] || (isReadOnly && item.observer_note && item.observer_note.trim()) ? (
+                     <Textarea
+                       placeholder="Add your notes..."
+                       value={pendingObserverNotes[item.competency_id] ?? item.observer_note ?? ''}
+                       onChange={(e) => draftObserverNote(item.competency_id, e.target.value)}
+                       onBlur={() => saveOneObserverNote(item.competency_id)}
+                       disabled={isReadOnly}
+                       className="min-h-[80px]"
+                     />
+                   ) : (
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setShowObserverNotes(prev => ({ ...prev, [item.competency_id]: true }))}
+                       disabled={isReadOnly}
+                       className="flex items-center gap-2"
+                     >
+                       <Plus className="w-4 h-4" />
+                       Add Note
+                     </Button>
+                   )}
                 </div>
               ))}
             </CardContent>
@@ -674,31 +693,31 @@ export function EvaluationHub() {
                   </div>
                 </div>
 
-                {/* Conditional Notes */}
-                {showSelfNote ? (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Self-Assessment Notes</label>
-                    <Textarea
-                      placeholder="Please share your thoughts and examples..."
-                      value={pendingSelfNotes[currentItem.competency_id] ?? currentItem.self_note ?? ''}
-                      onChange={(e) => draftSelfNote(currentItem.competency_id, e.target.value)}
-                      onBlur={() => saveOneSelfNote(currentItem.competency_id)}
-                      disabled={isReadOnly}
-                      className="min-h-[120px]"
-                    />
-                  </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowSelfNote(true)}
-                    disabled={isReadOnly}
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Note
-                  </Button>
-                )}
+                 {/* Conditional Notes */}
+                 {showSelfNote || (isReadOnly && currentItem.self_note && currentItem.self_note.trim()) ? (
+                   <div className="space-y-2">
+                     <label className="text-sm font-medium">Self-Assessment Notes</label>
+                     <Textarea
+                       placeholder="Please share your thoughts and examples..."
+                       value={pendingSelfNotes[currentItem.competency_id] ?? currentItem.self_note ?? ''}
+                       onChange={(e) => draftSelfNote(currentItem.competency_id, e.target.value)}
+                       onBlur={() => saveOneSelfNote(currentItem.competency_id)}
+                       disabled={isReadOnly}
+                       className="min-h-[120px]"
+                     />
+                   </div>
+                 ) : (
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setShowSelfNote(true)}
+                     disabled={isReadOnly}
+                     className="flex items-center gap-2"
+                   >
+                     <Plus className="w-4 h-4" />
+                     Add Note
+                   </Button>
+                 )}
               </CardContent>
             </Card>
           )}

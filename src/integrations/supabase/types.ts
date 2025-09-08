@@ -393,7 +393,6 @@ export type Database = {
           onboarding_weeks: number
           organization: string | null
           participation_start_at: string | null
-          primary_location: string | null
           primary_location_id: string | null
           role_id: number | null
           updated_at: string | null
@@ -411,7 +410,6 @@ export type Database = {
           onboarding_weeks?: number
           organization?: string | null
           participation_start_at?: string | null
-          primary_location?: string | null
           primary_location_id?: string | null
           role_id?: number | null
           updated_at?: string | null
@@ -429,7 +427,6 @@ export type Database = {
           onboarding_weeks?: number
           organization?: string | null
           participation_start_at?: string | null
-          primary_location?: string | null
           primary_location_id?: string | null
           role_id?: number | null
           updated_at?: string | null

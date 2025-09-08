@@ -13,7 +13,7 @@ interface ProfileData {
   name: string;
   email: string;
   organization: string | null;
-  primary_location: string | null;
+  location: string | null;
   created_at: string;
   role_name: string | null;
 }
@@ -43,7 +43,7 @@ export default function Profile() {
           name,
           email,
           organization,
-          primary_location,
+          location,
           created_at,
           roles(role_name)
         `)
@@ -80,7 +80,7 @@ export default function Profile() {
         .update({
           name: profile.name,
           organization: profile.organization,
-          primary_location: profile.primary_location
+          location: profile.location
         })
         .eq('user_id', user.id);
 
@@ -204,8 +204,8 @@ export default function Profile() {
               <MapPin className="w-4 h-4 text-muted-foreground" />
               <Input
                 id="location"
-                value={profile.primary_location || ''}
-                onChange={(e) => setProfile({ ...profile, primary_location: e.target.value })}
+                value={profile.location || ''}
+                onChange={(e) => setProfile({ ...profile, location: e.target.value })}
                 disabled={!editMode}
                 placeholder="Your primary location"
               />

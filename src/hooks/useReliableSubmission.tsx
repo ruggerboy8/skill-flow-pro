@@ -93,13 +93,29 @@ export function useReliableSubmission() {
   // Core writers
   const writeWeeklyScores = async (updates: ScoreUpdate[]) => {
     if (!updates?.length) return;
+    
+    // Validate updates before sending
+    const validatedUpdates = updates.map(update => {
+      // Log when we're about to upsert a record with null scores
+      if (update.confidence_score === null && update.performance_score === null) {
+        console.warn('[Submission] Attempting to upsert record with both scores null:', update);
+      }
+      
+      return update;
+    });
+
+    console.log(`[Submission] Writing ${validatedUpdates.length} score updates`);
     const { error } = await supabase
       .from('weekly_scores')
-      .upsert(updates, {
+      .upsert(validatedUpdates, {
         onConflict: 'staff_id,weekly_focus_id',
         ignoreDuplicates: false,
       });
-    if (error) throw error;
+    
+    if (error) {
+      console.error('[Submission] Error writing weekly scores:', error);
+      throw error;
+    }
   };
 
   const resolveBacklog = async (staffId: string, actionIds: number[]) => {
@@ -146,18 +162,23 @@ export function useReliableSubmission() {
 
   const attempt = useCallback(async (item: SubmissionItem) => {
     try {
+      console.log(`[Submission] Attempting ${item.data.kind} submission for item ${item.id}`);
+      
       if (item.data.kind === 'confidence') {
         await writeWeeklyScores(item.data.updates);
       } else {
         await writeWeeklyScores(item.data.updates);
         if (item.data.staffId && item.data.resolveBacklogActionIds?.length) {
+          console.log(`[Submission] Resolving backlog for ${item.data.resolveBacklogActionIds.length} actions`);
           await resolveBacklog(item.data.staffId, item.data.resolveBacklogActionIds);
         }
       }
+      
+      console.log(`[Submission] Successfully completed ${item.data.kind} submission for item ${item.id}`);
       removeSubmission(item.id);
       return true;
     } catch (e) {
-      console.error('attempt failed', e);
+      console.error(`[Submission] Attempt failed for item ${item.id}:`, e);
       return false;
     }
   }, [removeSubmission]);

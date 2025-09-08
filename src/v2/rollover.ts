@@ -51,7 +51,7 @@ export async function enforceWeeklyRolloverNow(args: {
   // Check completion: do we have performance for ALL of them?
   const { data: prevScores } = await supabase
     .from('weekly_scores')
-    .select('id, weekly_focus_id, confidence_score, confidence_date, performance_score')
+    .select('id, weekly_focus_id, confidence_score, confidence_date, performance_score, performance_date')
     .eq('staff_id', staffId)
     .in('weekly_focus_id', focusIds);
 
@@ -77,13 +77,22 @@ export async function enforceWeeklyRolloverNow(args: {
   const toClear = (prevScores || [])
     .filter(r => r.performance_score === null); // only where perf is missing
   if (toClear.length) {
+    console.log(`[Rollover] Clearing confidence for ${toClear.length} incomplete items for staff ${staffId}, cycle ${prevCycle}, week ${prevWeek}`);
+    
     const updates = toClear.map(r => ({
       id: r.id,
       staff_id: staffId,
       weekly_focus_id: r.weekly_focus_id,
       confidence_score: null,
       confidence_date: null,
+      performance_score: r.performance_score, // preserve existing performance score
+      performance_date: r.performance_date, // preserve existing performance date
     }));
-    await supabase.from('weekly_scores').upsert(updates);
+    
+    const { error } = await supabase.from('weekly_scores').upsert(updates);
+    if (error) {
+      console.error('[Rollover] Error clearing confidence scores:', error);
+      throw new Error(`Failed to clear confidence scores: ${error.message}`);
+    }
   }
 }

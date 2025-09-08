@@ -371,7 +371,8 @@ export function EvaluationHub() {
   }
 
   const completionStatus = isEvaluationComplete(evaluation);
-  const isReadOnly = evaluation.status === 'submitted';
+  const mode = searchParams.get('mode');
+  const isReadOnly = evaluation.status === 'submitted' && mode === 'view';
   
   // Group and sort items by domain and competency ID
   const domainOrder = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];

@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download } from 'lucide-react';
 import { downloadCSV, formatValueForCSV } from '@/lib/csvExport';
-import { EvalFilters } from '../../../pages/admin/EvalResults';
+import type { EvalFilters } from '@/types/analytics';
 
 interface StrengthsTabProps {
   filters: EvalFilters;
@@ -19,6 +19,8 @@ interface StrengthsData {
   name: string;
   n_items: number;
   avg_observer: number;
+  domain_id: number;
+  domain_name: string;
 }
 
 export function StrengthsTab({ filters }: StrengthsTabProps) {
@@ -27,23 +29,18 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
     queryFn: async () => {
       if (!filters.organizationId) return [];
 
-      console.log('Calling get_strengths_weaknesses with params:', {
+      const params = {
         p_org_id: filters.organizationId,
-        p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : null,
-        p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
-        p_types: filters.evaluationTypes.length > 0 ? filters.evaluationTypes : null,
-        p_start: filters.dateRange.start.toISOString(),
-        p_end: filters.dateRange.end.toISOString()
-      });
+        p_start: filters.dateRange.start?.toISOString(),
+        p_end: filters.dateRange.end?.toISOString(),
+        ...(filters.locationIds?.length ? { p_location_ids: filters.locationIds } : {}),
+        ...(filters.roleIds?.length ? { p_role_ids: filters.roleIds } : {}),
+        ...(filters.evaluationTypes?.length ? { p_types: filters.evaluationTypes } : {}),
+      };
 
-      const { data, error } = await supabase.rpc('get_strengths_weaknesses', {
-        p_org_id: filters.organizationId,
-        p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : null,
-        p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
-        p_types: filters.evaluationTypes.length > 0 ? filters.evaluationTypes : null,
-        p_start: filters.dateRange.start.toISOString(),
-        p_end: filters.dateRange.end.toISOString()
-      });
+      console.log('Calling get_strengths_weaknesses with params:', params);
+
+      const { data, error } = await supabase.rpc('get_strengths_weaknesses', params);
 
       console.log('get_strengths_weaknesses result:', { data, error });
       if (error) throw error;
@@ -53,29 +50,18 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
   });
 
   // Group data by domain
-  const groupedData = data?.reduce((acc, item) => {
-    if (item.level === 'domain') {
-      if (!acc[item.id]) {
-        acc[item.id] = {
-          domain: item,
-          competencies: []
-        };
-      }
-    } else if (item.level === 'competency') {
-      // Find the domain for this competency
-      const domainData = data.find(d => d.level === 'domain');
-      if (domainData) {
-        if (!acc[domainData.id]) {
-          acc[domainData.id] = {
-            domain: domainData,
-            competencies: []
-          };
-        }
-        acc[domainData.id].competencies.push(item);
-      }
-    }
+  const domainItems = data?.filter(d => d.level === 'domain') || [];
+  const competencyItems = data?.filter(d => d.level === 'competency') || [];
+
+  const groupedData = domainItems.reduce((acc, domain) => {
+    acc[domain.id] = {
+      domain,
+      competencies: competencyItems.filter(comp => comp.domain_id === domain.id)
+    };
     return acc;
-  }, {} as Record<number, { domain: StrengthsData; competencies: StrengthsData[] }>) || {};
+  }, {} as Record<number, { domain: StrengthsData; competencies: StrengthsData[] }>);
+
+  const sortedDomains = Object.values(groupedData).sort((a, b) => b.domain.avg_observer - a.domain.avg_observer);
 
   function exportToCSV() {
     if (!data) return;
@@ -138,8 +124,6 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
     );
   }
 
-  const domains = Object.values(groupedData).sort((a, b) => b.domain.avg_observer - a.domain.avg_observer);
-
   return (
     <Card>
       <CardHeader>
@@ -153,7 +137,7 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
       </CardHeader>
       <CardContent>
         <Accordion type="multiple" className="space-y-4">
-          {domains.map(({ domain, competencies }) => (
+          {sortedDomains.map(({ domain, competencies }) => (
             <AccordionItem key={domain.id} value={domain.id.toString()}>
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex justify-between items-center w-full mr-4">

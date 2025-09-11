@@ -1112,6 +1112,8 @@ export type Database = {
         }
         Returns: {
           avg_observer: number
+          domain_id: number
+          domain_name: string
           id: number
           level: string
           n_items: number

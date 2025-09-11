@@ -9,9 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, X, Loader2 } from 'lucide-react';
+import { CalendarIcon, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { EvalFilters } from '../../../pages/admin/EvalResults';
+import type { EvalFilters } from '@/types/analytics';
 
 interface FilterBarProps {
   filters: EvalFilters;
@@ -46,7 +46,6 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Load organizations on mount
   useEffect(() => {
@@ -54,7 +53,7 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
     loadRoles();
   }, []);
 
-  // Load locations when organization changes
+  // Load locations when organization changes and clear filters
   useEffect(() => {
     if (filters.organizationId) {
       loadLocations();
@@ -62,7 +61,8 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
       setLocations([]);
       onFiltersChange({
         ...filters,
-        locationIds: []
+        locationIds: [],
+        roleIds: []
       });
     }
   }, [filters.organizationId]);
@@ -144,8 +144,6 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
       roleIds: newRoleIds
     });
   }
-
-  const canApply = filters.organizationId.length > 0;
 
   return (
     <Card>
@@ -318,14 +316,6 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
             />
           </div>
 
-          {/* Apply Button */}
-          <Button
-            disabled={!canApply || isLoading}
-            onClick={() => setIsLoading(false)} // Parent components will handle the actual data fetching
-          >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Apply Filters
-          </Button>
         </div>
       </CardContent>
     </Card>

@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download } from 'lucide-react';
 import { downloadCSV, formatValueForCSV } from '@/lib/csvExport';
-import { EvalFilters } from '../../../pages/admin/EvalResults';
+import type { EvalFilters } from '@/types/analytics';
 
 interface ProMovesComparisonTabProps {
   filters: EvalFilters;
@@ -33,25 +33,19 @@ export function ProMovesComparisonTab({ filters }: ProMovesComparisonTabProps) {
     queryFn: async () => {
       if (!filters.organizationId) return [];
 
-      console.log('Calling compare_conf_perf_to_eval with params:', {
+      const params = {
         p_org_id: filters.organizationId,
         p_window_days: filters.windowDays,
-        p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : null,
-        p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
-        p_types: filters.evaluationTypes.length > 0 ? filters.evaluationTypes : null,
-        p_start: filters.dateRange.start.toISOString(),
-        p_end: filters.dateRange.end.toISOString()
-      });
+        p_start: filters.dateRange.start?.toISOString(),
+        p_end: filters.dateRange.end?.toISOString(),
+        ...(filters.locationIds?.length ? { p_location_ids: filters.locationIds } : {}),
+        ...(filters.roleIds?.length ? { p_role_ids: filters.roleIds } : {}),
+        ...(filters.evaluationTypes?.length ? { p_types: filters.evaluationTypes } : {}),
+      };
 
-      const { data, error } = await supabase.rpc('compare_conf_perf_to_eval', {
-        p_org_id: filters.organizationId,
-        p_window_days: filters.windowDays,
-        p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : null,
-        p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
-        p_types: filters.evaluationTypes.length > 0 ? filters.evaluationTypes : null,
-        p_start: filters.dateRange.start.toISOString(),
-        p_end: filters.dateRange.end.toISOString()
-      });
+      console.log('Calling compare_conf_perf_to_eval with params:', params);
+
+      const { data, error } = await supabase.rpc('compare_conf_perf_to_eval', params);
 
       console.log('compare_conf_perf_to_eval result:', { data, error });
       if (error) throw error;

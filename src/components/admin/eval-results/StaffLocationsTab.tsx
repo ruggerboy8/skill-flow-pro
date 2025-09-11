@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download, ArrowUpDown } from 'lucide-react';
 import { downloadCSV, formatValueForCSV } from '@/lib/csvExport';
-import { EvalFilters } from '../../../pages/admin/EvalResults';
+import type { EvalFilters } from '@/types/analytics';
 
 interface StaffLocationsTabProps {
   filters: EvalFilters;
@@ -37,15 +37,17 @@ export function StaffLocationsTab({ filters }: StaffLocationsTabProps) {
     queryFn: async () => {
       if (!filters.organizationId) return [];
 
-      const { data, error } = await supabase.rpc('get_location_domain_staff_averages', {
+      const params = {
         p_org_id: filters.organizationId,
-        p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : null,
-        p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
-        p_types: filters.evaluationTypes.length > 0 ? filters.evaluationTypes : null,
-        p_start: filters.dateRange.start.toISOString(),
-        p_end: filters.dateRange.end.toISOString(),
-        p_include_no_eval: filters.includeNoEvals
-      });
+        p_start: filters.dateRange.start?.toISOString(),
+        p_end: filters.dateRange.end?.toISOString(),
+        p_include_no_eval: filters.includeNoEvals,
+        ...(filters.locationIds?.length ? { p_location_ids: filters.locationIds } : {}),
+        ...(filters.roleIds?.length ? { p_role_ids: filters.roleIds } : {}),
+        ...(filters.evaluationTypes?.length ? { p_types: filters.evaluationTypes } : {}),
+      };
+
+      const { data, error } = await supabase.rpc('get_location_domain_staff_averages', params);
 
       if (error) throw error;
       return data as StaffLocationData[];

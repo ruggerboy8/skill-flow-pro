@@ -8,19 +8,8 @@ import { FilterBar } from '@/components/admin/eval-results/FilterBar';
 import { StrengthsTab } from '@/components/admin/eval-results/StrengthsTab';
 import { ProMovesComparisonTab } from '@/components/admin/eval-results/ProMovesComparisonTab';
 import { StaffLocationsTab } from '@/components/admin/eval-results/StaffLocationsTab';
+import type { EvalFilters } from '@/types/analytics';
 
-export interface EvalFilters {
-  organizationId: string;
-  evaluationTypes: string[];
-  dateRange: {
-    start: Date;
-    end: Date;
-  };
-  locationIds: string[];
-  roleIds: number[];
-  includeNoEvals: boolean;
-  windowDays: number;
-}
 
 export default function EvalResults() {
   const { user } = useAuth();

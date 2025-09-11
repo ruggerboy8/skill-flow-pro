@@ -985,6 +985,7 @@ export type Database = {
         }
         Returns: {
           competency_id: number
+          competency_name: string
           conf_avg: number
           domain_id: number
           domain_name: string

@@ -18,6 +18,7 @@ interface ComparisonData {
   staff_id: string;
   primary_location_id: string;
   competency_id: number;
+  competency_name: string;
   domain_id: number;
   domain_name: string;
   eval_observer_avg: number;
@@ -75,7 +76,7 @@ export function ProMovesComparisonTab({ filters }: ProMovesComparisonTabProps) {
 
     const csvData = data.map(item => ({
       'Domain': item.domain_name,
-      'Competency ID': item.competency_id,
+      'Competency': item.competency_name || `Competency ${item.competency_id}`,
       'Eval Avg (Observer)': formatValueForCSV(item.eval_observer_avg),
       'Eval Avg (Self)': formatValueForCSV(item.eval_self_avg),
       'Confidence Avg': formatValueForCSV(item.conf_avg),
@@ -190,9 +191,12 @@ export function ProMovesComparisonTab({ filters }: ProMovesComparisonTabProps) {
                         const deltaPerfEval = calculateDelta(avgPerf, avgEvalObserver);
                         const deltaConfEval = calculateDelta(avgConf, avgEvalObserver);
 
+                        // Get competency name from first item
+                        const competencyName = items[0]?.competency_name || `Competency ${competencyId}`;
+
                         return (
                           <TableRow key={competencyId}>
-                            <TableCell className="font-medium">Competency {competencyId}</TableCell>
+                            <TableCell className="font-medium">{competencyName}</TableCell>
                             <TableCell className="text-right">
                               {isNaN(avgEvalObserver) ? '—' : avgEvalObserver.toFixed(2)}
                             </TableCell>

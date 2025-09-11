@@ -15,8 +15,8 @@ export default function EvalResults() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState('strengths');
-  
+  const [activeTab, setActiveTab] = useState('overview');
+   
   const [filters, setFilters] = useState<EvalFilters>({
     organizationId: '',
     evaluationTypes: [],
@@ -92,12 +92,12 @@ export default function EvalResults() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="strengths">Strengths & Weaknesses</TabsTrigger>
-          <TabsTrigger value="promoves">Pro Moves vs Evaluation</TabsTrigger>
-          <TabsTrigger value="staff">Staff by Location</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="promoves">Pro-Moves vs Eval</TabsTrigger>
+          <TabsTrigger value="individual">Individual Results</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="strengths" className="mt-6">
+        <TabsContent value="overview" className="mt-6">
           <StrengthsTab filters={filters} />
         </TabsContent>
 
@@ -105,7 +105,7 @@ export default function EvalResults() {
           <ProMovesComparisonTab filters={filters} />
         </TabsContent>
 
-        <TabsContent value="staff" className="mt-6">
+        <TabsContent value="individual" className="mt-6">
           <StaffLocationsTab filters={filters} />
         </TabsContent>
       </Tabs>

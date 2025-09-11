@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Download } from 'lucide-react';
 import { downloadCSV, formatValueForCSV } from '@/lib/csvExport';
+import { getDomainColor } from '@/lib/domainColors';
 import type { EvalFilters } from '@/types/analytics';
 
 interface StrengthsTabProps {
@@ -21,6 +23,7 @@ interface StrengthsData {
   avg_observer: number;
   domain_id: number;
   domain_name: string;
+  framework: string | null;
 }
 
 export function StrengthsTab({ filters }: StrengthsTabProps) {
@@ -69,6 +72,7 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
     const csvData = data.map(item => ({
       'Level': item.level,
       'Name': item.name,
+      'Framework': item.framework || '',
       'Average Observer Score': formatValueForCSV(item.avg_observer),
       'Number of Items': item.n_items
     }));
@@ -91,7 +95,7 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Strengths & Weaknesses</CardTitle>
+            <CardTitle>Overview</CardTitle>
             <Skeleton className="h-10 w-32" />
           </div>
         </CardHeader>
@@ -128,7 +132,7 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle>Strengths & Weaknesses</CardTitle>
+          <CardTitle>Overview</CardTitle>
           <Button onClick={exportToCSV} variant="outline" size="sm">
             <Download className="mr-2 h-4 w-4" />
             Export CSV
@@ -141,7 +145,12 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
             <AccordionItem key={domain.id} value={domain.id.toString()}>
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex justify-between items-center w-full mr-4">
-                  <span className="font-medium">{domain.name}</span>
+                  <span
+                    className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
+                    style={{ backgroundColor: getDomainColor(domain.domain_name), color: "#000" }}
+                  >
+                    {domain.name}
+                  </span>
                   <div className="flex gap-4 text-sm text-muted-foreground">
                     <span>Avg: {domain.avg_observer?.toFixed(2) || '—'}</span>
                     <span>Items: {domain.n_items}</span>
@@ -163,7 +172,21 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
                         .sort((a, b) => (b.avg_observer || 0) - (a.avg_observer || 0))
                         .map((competency) => (
                         <TableRow key={competency.id}>
-                          <TableCell className="font-medium">{competency.name}</TableCell>
+                          <TableCell>
+                            <div
+                              className="border-l-4 pl-3 py-2 rounded"
+                              style={{ borderColor: getDomainColor(competency.domain_name) }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{competency.name}</span>
+                                {competency.framework && (
+                                  <Badge variant="outline" className="text-[10px] leading-4">
+                                    {competency.framework.toUpperCase()}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-right">
                             {competency.avg_observer?.toFixed(2) || '—'}
                           </TableCell>

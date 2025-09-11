@@ -992,6 +992,7 @@ export type Database = {
           eval_observer_avg: number
           eval_self_avg: number
           evaluation_id: string
+          framework: string
           perf_avg: number
           primary_location_id: string
           staff_id: string

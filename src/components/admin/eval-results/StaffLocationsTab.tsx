@@ -121,7 +121,7 @@ export function StaffLocationsTab({ filters }: StaffLocationsTabProps) {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Staff by Location</CardTitle>
+            <CardTitle>Individual Results</CardTitle>
             <Skeleton className="h-10 w-32" />
           </div>
         </CardHeader>
@@ -158,7 +158,7 @@ export function StaffLocationsTab({ filters }: StaffLocationsTabProps) {
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle>Staff by Location</CardTitle>
+          <CardTitle>Individual Results</CardTitle>
           <Button onClick={exportToCSV} variant="outline" size="sm">
             <Download className="mr-2 h-4 w-4" />
             Export CSV

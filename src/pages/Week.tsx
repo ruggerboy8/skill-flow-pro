@@ -521,7 +521,7 @@ export default function Week() {
       <div className="max-w-md mx-auto space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-center">SkillCheck</CardTitle>
+            <CardTitle className="text-center">ProMoves</CardTitle>
             <CardDescription className="text-center">
               Cycle {cycle}, Week {weekInCycle}
             </CardDescription>

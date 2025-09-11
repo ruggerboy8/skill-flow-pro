@@ -113,7 +113,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">SkillCheck</CardTitle>
+          <CardTitle className="text-2xl font-bold">ProMoves</CardTitle>
           <CardDescription>
             Sign in to your account or register as a new user
           </CardDescription>

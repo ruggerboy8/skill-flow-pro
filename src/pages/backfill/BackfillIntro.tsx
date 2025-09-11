@@ -8,7 +8,7 @@ export default function BackfillIntro() {
   useEffect(() => {
     document.title = "Backfill Wizard – Weeks 1–6";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Enter Weeks 1–6 binder scores to kickstart your SkillCheck stats.");
+    if (meta) meta.setAttribute("content", "Enter Weeks 1–6 binder scores to kickstart your ProMoves stats.");
   }, []);
 
   const getFirstIncompleteWeek = () => {

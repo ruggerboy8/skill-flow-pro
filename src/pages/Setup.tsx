@@ -165,7 +165,7 @@ export default function Setup() {
 
     toast({
       title: "Profile created",
-      description: "Welcome to SkillCheck!"
+      description: "Welcome to ProMoves!"
     });
 
     // Route based on choice
@@ -184,7 +184,7 @@ export default function Setup() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Complete Your Profile</CardTitle>
           <CardDescription>
-            Let's set up your SkillCheck profile
+            Let's set up your ProMoves profile
           </CardDescription>
         </CardHeader>
         <CardContent>

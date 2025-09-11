@@ -95,7 +95,7 @@ export default function Layout() {
             <div className="flex items-center space-x-8">
               <div className="flex items-center space-x-2">
                 <img src="/brand/alcan-logo.svg" alt="Alcan" className="h-6" />
-                <span className="font-bold text-xl tracking-wide">SkillCheck</span>
+                <span className="font-bold text-xl tracking-wide">ProMoves</span>
               </div>
               
               <div className="hidden md:flex space-x-1">

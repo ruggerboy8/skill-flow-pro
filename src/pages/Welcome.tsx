@@ -10,7 +10,7 @@ export default function Welcome() {
       <Card className="w-full max-w-md text-center">
         <CardHeader className="pb-4">
           <CardTitle className="text-3xl font-bold text-primary mb-2">
-            Welcome to SkillCheck! 🎉
+            Welcome to ProMoves! 🎉
           </CardTitle>
           <p className="text-muted-foreground text-lg">
             Your professional development journey starts here.

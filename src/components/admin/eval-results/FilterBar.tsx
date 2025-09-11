@@ -34,12 +34,9 @@ interface Role {
 }
 
 const EVALUATION_TYPES = [
-  'baseline',
-  'midpoint', 
-  'Q1',
-  'Q2',
-  'Q3',
-  'Q4'
+  'Baseline',
+  'Midpoint', 
+  'Quarterly'
 ];
 
 export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {

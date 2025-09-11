@@ -1114,6 +1114,7 @@ export type Database = {
           avg_observer: number
           domain_id: number
           domain_name: string
+          framework: string
           id: number
           level: string
           n_items: number

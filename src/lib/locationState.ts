@@ -438,6 +438,17 @@ export async function computeWeekState(params: {
 
   // Thu -> Fri window: performance period
   if (now >= checkout_open && now <= checkout_due) {
+    // During performance window, confidence must be complete first
+    if (!confComplete) {
+      return {
+        state: 'missed_checkin',
+        nextAction: 'Submit confidence (late)',
+        deadlineAt: checkout_due,
+        backlogCount,
+        selectionPending,
+        lastActivity,
+      };
+    }
     if (!perfComplete) {
       return {
         state: 'can_checkout',

@@ -33,6 +33,16 @@ export function ProMovesComparisonTab({ filters }: ProMovesComparisonTabProps) {
     queryFn: async () => {
       if (!filters.organizationId) return [];
 
+      console.log('Calling compare_conf_perf_to_eval with params:', {
+        p_org_id: filters.organizationId,
+        p_window_days: filters.windowDays,
+        p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : null,
+        p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
+        p_types: filters.evaluationTypes.length > 0 ? filters.evaluationTypes : null,
+        p_start: filters.dateRange.start.toISOString(),
+        p_end: filters.dateRange.end.toISOString()
+      });
+
       const { data, error } = await supabase.rpc('compare_conf_perf_to_eval', {
         p_org_id: filters.organizationId,
         p_window_days: filters.windowDays,
@@ -43,6 +53,7 @@ export function ProMovesComparisonTab({ filters }: ProMovesComparisonTabProps) {
         p_end: filters.dateRange.end.toISOString()
       });
 
+      console.log('compare_conf_perf_to_eval result:', { data, error });
       if (error) throw error;
       return data as ComparisonData[];
     },

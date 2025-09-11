@@ -27,6 +27,15 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
     queryFn: async () => {
       if (!filters.organizationId) return [];
 
+      console.log('Calling get_strengths_weaknesses with params:', {
+        p_org_id: filters.organizationId,
+        p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : null,
+        p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
+        p_types: filters.evaluationTypes.length > 0 ? filters.evaluationTypes : null,
+        p_start: filters.dateRange.start.toISOString(),
+        p_end: filters.dateRange.end.toISOString()
+      });
+
       const { data, error } = await supabase.rpc('get_strengths_weaknesses', {
         p_org_id: filters.organizationId,
         p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : null,
@@ -36,6 +45,7 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
         p_end: filters.dateRange.end.toISOString()
       });
 
+      console.log('get_strengths_weaknesses result:', { data, error });
       if (error) throw error;
       return data as StrengthsData[];
     },

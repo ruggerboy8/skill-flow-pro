@@ -460,12 +460,19 @@ export default function ConfidenceWizard() {
         description: isRepair ? "Scores updated for past week." : "Great! Come back later to rate your performance."
       });
       
-      // Navigate based on mode
+      // Navigate based on mode and return path
       if (isRepair && returnTo) {
         const dest = decodeURIComponent(returnTo);
         console.log('Navigating back to:', dest);
         setTimeout(() => {
           navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
+        }, 150);
+      } else if (returnTo && !isRepair) {
+        // If we have a return path (e.g., came from performance wizard), go back there
+        const dest = decodeURIComponent(returnTo);
+        console.log('Returning to performance wizard:', dest);
+        setTimeout(() => {
+          navigate(dest, { replace: true });
         }, 150);
       } else {
         navigate('/');

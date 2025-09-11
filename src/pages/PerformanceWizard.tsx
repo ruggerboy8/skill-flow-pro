@@ -243,12 +243,33 @@ export default function PerformanceWizard() {
       .not('confidence_score', 'is', null);
 
     if (scoresError || !scoresData || (scoresData.length !== weekAssignments.length && !isRepair)) {
-      toast({
-        title: "Error",
-        description: isRepair ? "No confidence scores found for this week" : "Please complete confidence ratings first",
-        variant: "destructive"
-      });
-      navigate(isRepair && returnTo ? decodeURIComponent(returnTo) : '/');
+      if (isRepair) {
+        toast({
+          title: "Error",
+          description: "No confidence scores found for this week",
+          variant: "destructive"
+        });
+        navigate(returnTo ? decodeURIComponent(returnTo) : '/');
+      } else {
+        // Redirect to confidence wizard to complete missing ratings
+        const missingCount = weekAssignments.length - (scoresData?.length || 0);
+        toast({
+          title: "Complete Confidence First",
+          description: `You need to rate confidence for ${missingCount} items before rating performance.`,
+          variant: "default"
+        });
+        
+        // Find the first incomplete confidence item
+        const completedIds = new Set((scoresData || []).map(s => s.weekly_focus_id));
+        const firstIncompleteIndex = weekAssignments.findIndex(
+          assignment => !completedIds.has(assignment.weekly_focus_id)
+        );
+        const stepIndex = Math.max(0, firstIncompleteIndex) + 1;
+        
+        // Navigate to confidence wizard, preserving current path for return
+        const currentPath = location.pathname + location.search;
+        navigate(`/confidence/current/step/${stepIndex}?returnTo=${encodeURIComponent(currentPath)}`);
+      }
       return;
     }
 

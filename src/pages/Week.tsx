@@ -42,7 +42,7 @@ export default function Week() {
   const [competencyNameById, setCompetencyNameById] = useState<Record<string, string>>({});
   const [carryoverPending, setCarryoverPending] = useState<{ cycle: number; week_in_cycle: number } | null>(null);
 
-  // loading flags (separate “page loading” vs “banner decision ready”)
+  // loading flags (separate "page loading" vs "banner decision ready")
   const [pageLoading, setPageLoading] = useState(true);
   const [bannerReady, setBannerReady] = useState(false);
 
@@ -248,7 +248,7 @@ export default function Week() {
     if (transformedFocus.length === 0) {
       setWeeklyFocus([]);
       setPageLoading(false);
-      setBannerReady(true); // ready to render the “no pro moves” card
+      setBannerReady(true); // ready to render the "no pro moves" card
       return;
     }
 
@@ -320,7 +320,7 @@ export default function Week() {
       (getScoreForFocus(f.id)?.performance_score ?? null) === null
   );
 
-  // Central-Time gating (memoize so anchors don’t bounce during renders)
+  // Central-Time gating (memoize so anchors don't bounce during renders)
   const { now, monCheckInZ, tueDueZ, thuStartZ, beforeCheckIn, afterTueNoon, beforeThursday } = useMemo(() => {
     const n = nowUtc();
     const anchors = getAnchors(n);
@@ -344,7 +344,7 @@ export default function Week() {
 
   type CtaConfig = { label: string; onClick: () => void; disabled?: boolean } | null;
 
-  // Build banner content only when we’re fully ready (prevents flash)
+  // Build banner content only when we're fully ready (prevents flash)
   const { bannerMessage, bannerCta } = useMemo((): { bannerMessage: string; bannerCta: CtaConfig } => {
     if (!bannerReady) return { bannerMessage: '', bannerCta: null };
 
@@ -402,12 +402,28 @@ export default function Week() {
       };
     }
 
-    // 4) Confidence window closed after Tue 12:00 CT (and not all confidence entered)
+    // 4) Confidence window closed after Tue 12:00 CT but allow late completion during performance window
     if (afterTueNoon && !allConfidence) {
-      return {
-        bannerMessage: `Confidence window closed. You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`,
-        bannerCta: null,
-      };
+      // If it's during performance window (Thursday+), allow late confidence submission
+      if (!beforeThursday) {
+        const label = partialConfidence ? 'Complete Late Confidence' : 'Submit Late Confidence';
+        const idx = firstIncompleteConfIndex === -1 ? 0 : firstIncompleteConfIndex;
+        return {
+          bannerMessage: partialConfidence
+            ? `Complete your confidence ratings to unlock performance (${confCount}/${total}). These will be marked as late.`
+            : `Complete confidence ratings first to rate performance. These will be marked as late.`,
+          bannerCta: {
+            label,
+            onClick: () => navigate(`/confidence/${weekInCycle}/step/${idx + 1}`),
+          },
+        };
+      } else {
+        // Before Thursday, show the regular closed message
+        return {
+          bannerMessage: `Confidence window closed. You'll get a fresh start on Mon, ${nextMondayStr(now)}.`,
+          bannerCta: null,
+        };
+      }
     }
 
     // 5) Confidence window open (Mon 9:00 → Tue 11:59) and not all confidence done
@@ -417,7 +433,7 @@ export default function Week() {
       return {
         bannerMessage: partialConfidence
           ? `You're midway through Monday check-in. Finish your confidence ratings (${confCount}/${total}).`
-          : `Welcome back! Time to rate your confidence for this week’s Pro Moves.`,
+          : `Welcome back! Time to rate your confidence for this week's Pro Moves.`,
         bannerCta: {
           label,
           onClick: () => navigate(`/confidence/${weekInCycle}/step/${idx + 1}`),
@@ -439,7 +455,7 @@ export default function Week() {
       return {
         bannerMessage:
           perfCount === 0
-            ? 'Time to reflect. Rate your performance for this week’s Pro Moves.'
+            ? 'Time to reflect. Rate your performance for this week\'s Pro Moves.'
             : `Pick up where you left off (${perfCount}/${total} complete).`,
         bannerCta: {
           label: 'Rate Performance',
@@ -586,13 +602,13 @@ export default function Week() {
                   <div className="font-medium text-sm text-foreground text-center">
                     {bannerMessage}
                   </div>
-                  {/** Show CTA only when actionable (no disabled “Thursday” button) */}
+                  {/** Show CTA only when actionable (no disabled "Thursday" button) */}
                   {bannerCta && !bannerCta.disabled && (
                     <Button className="w-full h-12 mt-2" onClick={bannerCta.onClick}>
                       {bannerCta.label}
                     </Button>
                   )}
-                  {/** Tiny progress hint if we’re mid-confidence window */}
+                  {/** Tiny progress hint if we're mid-confidence window */}
                   {!carryoverConflict && !afterTueNoon && confCount > 0 && confCount < total && (
                     <div className="text-xs text-muted-foreground text-center mt-1">
                       {confCount}/{total} complete

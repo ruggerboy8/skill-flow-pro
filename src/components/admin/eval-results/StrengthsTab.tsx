@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,8 @@ interface StrengthsData {
 }
 
 export function StrengthsTab({ filters }: StrengthsTabProps) {
+  const [openAccordions, setOpenAccordions] = useState<string[]>([]);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['strengths-weaknesses', filters],
     queryFn: async () => {
@@ -140,7 +143,12 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <Accordion type="multiple" className="space-y-4">
+        <Accordion 
+          type="multiple" 
+          className="space-y-4"
+          value={openAccordions}
+          onValueChange={setOpenAccordions}
+        >
           {sortedDomains.map(({ domain, competencies }) => (
             <AccordionItem key={domain.id} value={domain.id.toString()}>
               <AccordionTrigger className="hover:no-underline">
@@ -169,7 +177,7 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
                     </TableHeader>
                     <TableBody>
                       {competencies
-                        .sort((a, b) => (b.avg_observer || 0) - (a.avg_observer || 0))
+                        .sort((a, b) => a.id - b.id)
                         .map((competency) => (
                         <TableRow key={competency.id}>
                           <TableCell>

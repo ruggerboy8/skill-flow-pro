@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/AppSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Home, BarChart3, User, Settings, Users, ClipboardList, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -87,6 +89,38 @@ export default function Layout() {
     return location.pathname.startsWith(href);
   };
 
+  // Use sidebar for coaches and super admins
+  const useSidebar = isCoach || isSuperAdmin;
+
+  if (useSidebar) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SidebarProvider>
+          <div className="flex min-h-screen w-full">
+            <AppSidebar navigation={navigation} backfillMissingCount={backfillMissingCount} />
+            
+            <div className="flex-1 flex flex-col">
+              <header className="h-16 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+                <SidebarTrigger />
+                
+                <NavLink to="/profile">
+                  <Button variant="outline" size="icon">
+                    <User className="w-4 h-4" />
+                  </Button>
+                </NavLink>
+              </header>
+              
+              <main className="flex-1 p-6">
+                <Outlet />
+              </main>
+            </div>
+          </div>
+        </SidebarProvider>
+      </div>
+    );
+  }
+
+  // Original layout for non-coaches/non-super-admins
   return (
     <div className="min-h-screen bg-background">
       {/* Top Navigation */}

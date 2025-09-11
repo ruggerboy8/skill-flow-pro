@@ -164,7 +164,8 @@ export function ProMovesComparisonTab({ filters }: ProMovesComparisonTabProps) {
       <CardContent>
         <Accordion type="multiple" className="space-y-4">
           {domains.map(([domainId, domainData]) => {
-            const competencyEntries = Object.entries(domainData.competencies);
+            const competencyEntries = Object.entries(domainData.competencies)
+              .sort(([aId], [bId]) => parseInt(aId) - parseInt(bId));
             
             return (
               <AccordionItem key={domainId} value={domainId}>

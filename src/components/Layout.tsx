@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { Home, BarChart3, User, Settings, Users, ClipboardList } from 'lucide-react';
+import { Home, BarChart3, User, Settings, Users, ClipboardList, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { isV2 } from '@/lib/featureFlags';
 // Server-side backfill detection via RPC
@@ -73,7 +73,8 @@ export default function Layout() {
     ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
     ...(isSuperAdmin ? [
       { name: 'Builder', href: '/builder', icon: Settings },
-      { name: 'Admin', href: '/admin', icon: Settings }
+      { name: 'Admin', href: '/admin', icon: Settings },
+      { name: 'Eval Results', href: '/admin/eval-results', icon: TrendingUp }
     ] : [])
   ];
 

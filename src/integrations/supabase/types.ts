@@ -142,6 +142,13 @@ export type Database = {
             referencedRelation: "evaluations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "evaluation_items_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["evaluation_id"]
+          },
         ]
       }
       evaluations: {
@@ -194,6 +201,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "staff"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluations_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
           },
         ]
       }
@@ -485,6 +499,13 @@ export type Database = {
             referencedRelation: "staff"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "staff_audit_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
         ]
       }
       staging_prompts: {
@@ -577,6 +598,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "staff"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_backlog_v2_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
           },
         ]
       }
@@ -719,6 +747,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "weekly_scores_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
             foreignKeyName: "weekly_scores_weekly_focus_id_fkey"
             columns: ["weekly_focus_id"]
             isOneToOne: false
@@ -762,7 +797,159 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      view_evaluation_items_enriched: {
+        Row: {
+          competency_id: number | null
+          domain_id: number | null
+          domain_name: string | null
+          evaluation_at: string | null
+          evaluation_id: string | null
+          evaluation_type: string | null
+          location_name: string | null
+          observer_score: number | null
+          organization_id: string | null
+          primary_location_id: string | null
+          program_year: number | null
+          quarter: string | null
+          role_id: number | null
+          self_score: number | null
+          staff_id: string | null
+          staff_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competencies_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
+          {
+            foreignKeyName: "fk_competencies_domain_id"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
+          {
+            foreignKeyName: "locations_org_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_primary_location_id_fkey"
+            columns: ["primary_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+        ]
+      }
+      view_weekly_scores_with_competency: {
+        Row: {
+          action_id: number | null
+          competency_id: number | null
+          confidence_score: number | null
+          created_at: string | null
+          domain_id: number | null
+          domain_name: string | null
+          organization_id: string | null
+          performance_score: number | null
+          primary_location_id: string | null
+          role_id: number | null
+          staff_id: string | null
+          weekly_focus_id: string | null
+          weekly_score_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competencies_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
+          {
+            foreignKeyName: "fk_competencies_domain_id"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
+          {
+            foreignKeyName: "fk_pro_moves_competency_id"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "competencies"
+            referencedColumns: ["competency_id"]
+          },
+          {
+            foreignKeyName: "locations_org_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_primary_location_id_fkey"
+            columns: ["primary_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_weekly_focus_id_fkey"
+            columns: ["weekly_focus_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_focus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_backlog_if_missing: {
@@ -785,6 +972,29 @@ export type Database = {
       bulk_upsert_pro_moves: {
         Args: { pro_moves_data: Json }
         Returns: Json
+      }
+      compare_conf_perf_to_eval: {
+        Args: {
+          p_end?: string
+          p_location_ids?: string[]
+          p_org_id: string
+          p_role_ids?: number[]
+          p_start?: string
+          p_types?: string[]
+          p_window_days?: number
+        }
+        Returns: {
+          competency_id: number
+          conf_avg: number
+          domain_id: number
+          domain_name: string
+          eval_observer_avg: number
+          eval_self_avg: number
+          evaluation_id: string
+          perf_avg: number
+          primary_location_id: string
+          staff_id: string
+        }[]
       }
       delete_latest_week_data: {
         Args: { p_user_id: string }
@@ -851,6 +1061,28 @@ export type Database = {
           last_week: number
         }[]
       }
+      get_location_domain_staff_averages: {
+        Args: {
+          p_end?: string
+          p_include_no_eval?: boolean
+          p_location_ids?: string[]
+          p_org_id: string
+          p_role_ids?: number[]
+          p_start?: string
+          p_types?: string[]
+        }
+        Returns: {
+          avg_observer: number
+          domain_id: number
+          domain_name: string
+          has_eval: boolean
+          location_id: string
+          location_name: string
+          n_items: number
+          staff_id: string
+          staff_name: string
+        }[]
+      }
       get_performance_trend: {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json
@@ -866,6 +1098,23 @@ export type Database = {
           organization: string
           role_id: number
           staff_id: string
+        }[]
+      }
+      get_strengths_weaknesses: {
+        Args: {
+          p_end?: string
+          p_location_ids?: string[]
+          p_org_id: string
+          p_role_ids?: number[]
+          p_start?: string
+          p_types?: string[]
+        }
+        Returns: {
+          avg_observer: number
+          id: number
+          level: string
+          n_items: number
+          name: string
         }[]
       }
       get_user_admin_status: {

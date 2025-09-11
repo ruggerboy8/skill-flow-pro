@@ -347,9 +347,23 @@ export default function Week() {
   // Build banner content only when we're fully ready (prevents flash)
   const { bannerMessage, bannerCta } = useMemo((): { bannerMessage: string; bannerCta: CtaConfig } => {
     if (!bannerReady) return { bannerMessage: '', bannerCta: null };
+    
+    // Debug logging to understand banner logic
+    console.log('=== BANNER DEBUG ===', {
+      afterTueNoon,
+      allConfidence,
+      beforeThursday,
+      confCount,
+      total,
+      partialConfidence,
+      perfPending,
+      perfCount,
+      carryoverConflict
+    });
 
     // 1) Must finish last week's performance first
     if (carryoverConflict && carryoverPending) {
+      console.log('Banner: Carryover conflict detected');
       return {
         bannerMessage: 'You still need to submit performance for last week before starting a new one.',
         bannerCta: {
@@ -388,6 +402,7 @@ export default function Week() {
 
     // 2) All done for the week
     if (allDone) {
+      console.log('Banner: All done for the week');
       return {
         bannerMessage: 'Nice work! That\'s it for now, see you next week!',
         bannerCta: null,
@@ -396,6 +411,7 @@ export default function Week() {
 
     // 3) Before Monday 9 AM CT
     if (beforeCheckIn) {
+      console.log('Banner: Before check-in time');
       return {
         bannerMessage: 'Confidence opens at 9:00 a.m. CT.',
         bannerCta: null,
@@ -404,8 +420,10 @@ export default function Week() {
 
     // 4) Confidence window closed after Tue 12:00 CT but allow late completion during performance window
     if (afterTueNoon && !allConfidence) {
+      console.log('Banner: Confidence window closed, checking if performance window');
       // If it's during performance window (Thursday+), allow late confidence submission
       if (!beforeThursday) {
+        console.log('Banner: Performance window - allowing late confidence');
         const label = partialConfidence ? 'Complete Late Confidence' : 'Submit Late Confidence';
         const idx = firstIncompleteConfIndex === -1 ? 0 : firstIncompleteConfIndex;
         return {
@@ -418,6 +436,7 @@ export default function Week() {
           },
         };
       } else {
+        console.log('Banner: Before Thursday - confidence window closed');
         // Before Thursday, show the regular closed message
         return {
           bannerMessage: `Confidence window closed. You'll get a fresh start on Mon, ${nextMondayStr(now)}.`,
@@ -428,6 +447,7 @@ export default function Week() {
 
     // 5) Confidence window open (Mon 9:00 → Tue 11:59) and not all confidence done
     if (!afterTueNoon && !allConfidence) {
+      console.log('Banner: Confidence window open');
       const label = partialConfidence ? 'Finish Confidence' : 'Rate Confidence';
       const idx = firstIncompleteConfIndex === -1 ? 0 : firstIncompleteConfIndex;
       return {
@@ -443,6 +463,7 @@ export default function Week() {
 
     // 6) All confidence done; performance locked until Thursday (unless carryover)
     if (allConfidence && beforeThursday) {
+      console.log('Banner: All confidence done, waiting for Thursday');
       return {
         bannerMessage: 'Great! Come back Thursday to submit performance.',
         bannerCta: null, // no disabled buttons; simpler UX
@@ -451,6 +472,7 @@ export default function Week() {
 
     // 7) Performance open (Thu+) and still pending
     if (allConfidence && !beforeThursday && perfPending) {
+      console.log('Banner: Performance open - all confidence done');
       const idx = firstIncompletePerfIndex === -1 ? 0 : firstIncompletePerfIndex;
       return {
         bannerMessage:
@@ -465,6 +487,7 @@ export default function Week() {
     }
 
     // Fallback
+    console.log('Banner: Using fallback message');
     return { bannerMessage: 'Review your Pro Moves below.', bannerCta: null };
   }, [
     bannerReady,

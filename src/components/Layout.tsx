@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Home, BarChart3, User, Settings, Users, ClipboardList, TrendingUp } from 'lucide-react';
+import { Home, BarChart3, User, Settings, Users, ClipboardList, TrendingUp, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { isV2 } from '@/lib/featureFlags';
 // Server-side backfill detection via RPC
@@ -75,7 +75,7 @@ export default function Layout() {
     ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
     ...(isSuperAdmin ? [
       { name: 'Builder', href: '/builder', icon: Settings },
-      { name: 'Admin', href: '/admin', icon: Settings },
+      { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Eval Results', href: '/admin/eval-results', icon: TrendingUp }
     ] : [])
   ];
@@ -85,6 +85,10 @@ export default function Layout() {
   const isActive = (href: string) => {
     if (href === '/') {
       return location.pathname === '/';
+    }
+    // Special handling for admin routes - both /admin and /admin/eval-results should highlight admin
+    if (href === '/admin') {
+      return location.pathname === '/admin' || location.pathname.startsWith('/admin/');
     }
     return location.pathname.startsWith(href);
   };

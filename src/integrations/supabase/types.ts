@@ -1089,6 +1089,52 @@ export type Database = {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json
       }
+      get_staff_domain_avgs: {
+        Args: {
+          p_end: string
+          p_eval_types?: string[]
+          p_include_no_eval?: boolean
+          p_location_ids?: string[]
+          p_org_id: string
+          p_role_ids?: number[]
+          p_start: string
+        }
+        Returns: {
+          domain_id: number
+          domain_name: string
+          has_eval: boolean
+          last_eval_at: string
+          location_id: string
+          location_name: string
+          n_items: number
+          observer_avg: number
+          role_id: number
+          self_avg: number
+          staff_id: string
+          staff_name: string
+        }[]
+      }
+      get_staff_domain_competencies: {
+        Args: {
+          p_domain_id: number
+          p_end: string
+          p_eval_types?: string[]
+          p_location_ids?: string[]
+          p_org_id: string
+          p_role_ids?: number[]
+          p_staff_id: string
+          p_start: string
+        }
+        Returns: {
+          competency_id: number
+          competency_name: string
+          framework: string
+          last_eval_at: string
+          n_items: number
+          observer_avg: number
+          self_avg: number
+        }[]
+      }
       get_staff_summary: {
         Args: Record<PropertyKey, never>
         Returns: {

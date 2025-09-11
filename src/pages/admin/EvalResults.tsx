@@ -8,6 +8,7 @@ import { FilterBar } from '@/components/admin/eval-results/FilterBar';
 import { StrengthsTab } from '@/components/admin/eval-results/StrengthsTab';
 import { ProMovesComparisonTab } from '@/components/admin/eval-results/ProMovesComparisonTab';
 import { StaffLocationsTab } from '@/components/admin/eval-results/StaffLocationsTab';
+import { IndividualResultsTab } from '@/components/admin/eval-results/IndividualResultsTab';
 import type { EvalFilters } from '@/types/analytics';
 
 
@@ -106,7 +107,7 @@ export default function EvalResults() {
         </TabsContent>
 
         <TabsContent value="individual" className="mt-6">
-          <StaffLocationsTab filters={filters} />
+          <IndividualResultsTab filters={filters} />
         </TabsContent>
       </Tabs>
     </div>

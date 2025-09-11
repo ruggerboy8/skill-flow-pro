@@ -1,4 +1,4 @@
-import { Home, BarChart3, User, Settings, Users, ClipboardList, TrendingUp } from 'lucide-react';
+import { Home, BarChart3, User, Settings, Users, ClipboardList, TrendingUp, Shield } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   Sidebar,
@@ -30,6 +30,10 @@ export function AppSidebar({ navigation, backfillMissingCount }: AppSidebarProps
   const isActive = (href: string) => {
     if (href === '/') {
       return currentPath === '/';
+    }
+    // Special handling for admin routes - both /admin and /admin/eval-results should highlight admin
+    if (href === '/admin') {
+      return currentPath === '/admin' || currentPath.startsWith('/admin/');
     }
     return currentPath.startsWith(href);
   };

@@ -13,13 +13,11 @@ export default function Layout() {
   const { user, signOut, isCoach } = useAuth();
   const location = useLocation();
   
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [backfillMissingCount, setBackfillMissingCount] = useState(0);
   const [isLoadingBackfill, setIsLoadingBackfill] = useState(true);
 
   useEffect(() => {
     if (!user) { 
-      setIsSuperAdmin(false);
       setBackfillMissingCount(0);
       setIsLoadingBackfill(false);
       return; 
@@ -34,8 +32,6 @@ export default function Layout() {
           .maybeSingle();
 
         if (staffData) {
-          setIsSuperAdmin(!!staffData.is_super_admin);
-          
           // Always check backfill status for all users with valid staff data
           if (staffData.id && staffData.role_id) {
             console.log('Checking backfill status for staff:', staffData.id, 'role:', staffData.role_id);
@@ -72,8 +68,8 @@ export default function Layout() {
     { name: 'Stats', href: '/stats', icon: BarChart3 },
     // Show backfill button when server indicates missing completion data
     ...(isV2 && !isLoadingBackfill && backfillMissingCount > 0 ? [{ name: 'Backfill', href: '/backfill', icon: ClipboardList }] : []),
-    ...(isCoach ? [{ name: 'Coach', href: '/coach', icon: Users }] : []),
-    ...(isSuperAdmin ? [
+    ...(isCoach ? [
+      { name: 'Coach', href: '/coach', icon: Users },
       { name: 'Builder', href: '/builder', icon: Settings },
       { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Eval Results', href: '/admin/eval-results', icon: TrendingUp }
@@ -93,8 +89,8 @@ export default function Layout() {
     return location.pathname.startsWith(href);
   };
 
-  // Use sidebar for coaches and super admins
-  const useSidebar = isCoach || isSuperAdmin;
+  // Use sidebar for coaches (which includes super admins per useAuth logic)
+  const useSidebar = isCoach;
 
   if (useSidebar) {
     return (

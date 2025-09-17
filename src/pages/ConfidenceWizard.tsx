@@ -328,10 +328,14 @@ export default function ConfidenceWizard() {
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
 
-    // Check if all scores are filled
-    const missingScores = weeklyFocus.filter(focus => !scores[focus.id]);
+    // Check if all scores are filled with valid values (1-4)
+    const missingScores = weeklyFocus.filter(focus => {
+      const score = scores[focus.id];
+      return !score || score < 1 || score > 4;
+    });
+    
     if (missingScores.length > 0) {
-      console.error('Missing scores for focuses:', missingScores.map(f => f.id));
+      console.error('Missing or invalid scores for focuses:', missingScores.map(f => ({ id: f.id, score: scores[f.id] })));
       toast({
         title: 'Error',
         description: 'Please provide confidence scores for all items before submitting.',
@@ -375,8 +379,8 @@ export default function ConfidenceWizard() {
       const base: any = {
         staff_id: staff.id,
         weekly_focus_id: focus.id,
-        confidence_score: scoreValue || 1, // Ensure we have a score value
-        confidence_date: new Date().toISOString(), // Set the current timestamp
+        confidence_score: scoreValue, // Remove fallback - validation ensures this exists
+        confidence_date: new Date().toISOString(),
         confidence_source: isRepair ? 'backfill' as const : 'live' as const,
         confidence_late: isLate,
       };

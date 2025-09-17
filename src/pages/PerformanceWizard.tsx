@@ -318,6 +318,25 @@ export default function PerformanceWizard() {
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
 
+    // Check if all performance scores are filled with valid values (1-4)
+    const missingScores = existingScores.filter(score => {
+      const perfScore = performanceScores[score.weekly_focus_id];
+      return !perfScore || perfScore < 1 || perfScore > 4;
+    });
+    
+    if (missingScores.length > 0) {
+      console.error('Missing or invalid performance scores:', missingScores.map(s => ({ 
+        focus_id: s.weekly_focus_id, 
+        score: performanceScores[s.weekly_focus_id] 
+      })));
+      toast({
+        title: 'Error',
+        description: 'Please provide performance scores for all items before submitting.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     // Get location timezone for proper deadline calculation
@@ -340,7 +359,7 @@ export default function PerformanceWizard() {
     const updates = existingScores.map(score => ({
       staff_id: staff.id,
       weekly_focus_id: score.weekly_focus_id,
-      performance_score: performanceScores[score.weekly_focus_id] || 1,
+      performance_score: performanceScores[score.weekly_focus_id], // Remove fallback - validation ensures this exists
       performance_date: new Date().toISOString(),
       performance_source: isRepair ? 'backfill' as const : 'live' as const,
       performance_late: isLate,

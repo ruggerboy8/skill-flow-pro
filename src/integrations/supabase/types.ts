@@ -1239,7 +1239,7 @@ export type Database = {
         Args:
           | { p_cycle: number; p_role_id: number; p_staff_id: string }
           | { p_cycle: number; p_role_id: number; p_staff_id: string }
-        Returns: string
+        Returns: undefined
       }
       rewrite_backfill_week: {
         Args: {

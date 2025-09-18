@@ -114,10 +114,24 @@ export default function CoachDetail() {
 
         setCycles(cyclesWithWeeks);
         if (uniqueCycles.length > 0) {
-          const latestCycle = Math.max(...uniqueCycles);
-          setSelectedCycle(latestCycle);
-          // Load all week data for the latest cycle immediately
-          loadAllWeeksForCycle(latestCycle, staff.role_id, staff.id);
+          // Use smart default: staff's last progress cycle, fallback to latest available
+          let defaultCycle = Math.max(...uniqueCycles);
+          
+          try {
+            const { data: progressData } = await supabase.rpc('get_last_progress_week', {
+              p_staff_id: staff.id
+            });
+            
+            if (progressData?.[0]?.last_cycle) {
+              defaultCycle = progressData[0].last_cycle;
+            }
+          } catch (error) {
+            console.log('Could not get progress data, using latest cycle:', error); 
+          }
+          
+          setSelectedCycle(defaultCycle);
+          // Load all week data for the selected cycle immediately
+          loadAllWeeksForCycle(defaultCycle, staff.role_id, staff.id);
         }
       }
     } catch (error) {

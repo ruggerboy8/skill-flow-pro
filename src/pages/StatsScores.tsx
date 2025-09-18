@@ -130,6 +130,28 @@ export default function StatsScores() {
       }));
 
       setCycles(result);
+      
+      // Auto-expand the cycle where user has latest progress
+      if (result.length > 0) {
+        try {
+          const { data: progressData } = await supabase.rpc('get_last_progress_week', {
+            p_staff_id: staffData.id
+          });
+          
+          if (progressData?.[0]?.last_cycle) {
+            const progressCycle = progressData[0].last_cycle;
+            // Auto-expand this cycle by triggering its accordion
+            setTimeout(() => {
+              const accordionTrigger = document.querySelector(`[data-state][value="cycle-${progressCycle}"]`);
+              if (accordionTrigger && !accordionTrigger.getAttribute('data-state')?.includes('open')) {
+                (accordionTrigger as HTMLElement).click();
+              }
+            }, 100);
+          }
+        } catch (error) {
+          console.log('Could not get progress data for auto-expand:', error);
+        }
+      }
     } catch (error) {
       console.error('Error loading cycle data:', error);
     } finally {

@@ -118,17 +118,24 @@ export default function CoachDetail() {
           let defaultCycle = Math.max(...uniqueCycles);
           
           try {
+            console.log('Attempting to get last progress week for staff:', staff.id);
             const { data: progressData } = await supabase.rpc('get_last_progress_week', {
               p_staff_id: staff.id
             });
             
+            console.log('Progress data received:', progressData);
+            
             if (progressData?.[0]?.last_cycle) {
               defaultCycle = progressData[0].last_cycle;
+              console.log('Using progress cycle as default:', defaultCycle);
+            } else {
+              console.log('No progress data, using latest cycle:', defaultCycle);
             }
           } catch (error) {
             console.log('Could not get progress data, using latest cycle:', error); 
           }
           
+          console.log('Setting selected cycle to:', defaultCycle);
           setSelectedCycle(defaultCycle);
           // Load all week data for the selected cycle immediately
           loadAllWeeksForCycle(defaultCycle, staff.role_id, staff.id);

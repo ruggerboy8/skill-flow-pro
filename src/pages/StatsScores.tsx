@@ -301,7 +301,7 @@ export default function StatsScores() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-full overflow-x-hidden">
       {/* Status Legend */}
       <div className="flex items-center justify-center bg-muted/30 p-3 rounded-lg">
         <div className="flex items-center gap-4 text-xs text-muted-foreground">

@@ -201,7 +201,7 @@ export default function Layout() {
       </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-2 py-4 md:px-4 md:py-6">
         <Outlet />
       </main>
     </div>

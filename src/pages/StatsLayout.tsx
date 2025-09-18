@@ -14,8 +14,8 @@ export default function StatsLayout() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Your Stats</h1>
+    <div className="space-y-4 md:space-y-6">
+      <h1 className="text-2xl md:text-3xl font-bold">Your Stats</h1>
       
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-3">

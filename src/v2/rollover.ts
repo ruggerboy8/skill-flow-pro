@@ -7,7 +7,6 @@ import { addToBacklogV2 } from '@/lib/backlog';
 /**
  * Enforce weekly rollover at local Monday 12:01am.
  * - If the previous week is not fully "performed", push SITE moves to backlog (FIFO).
- * - Clear confidence for prior-week rows that still lack performance.
  * Safe to call repeatedly; it's idempotent.
  */
 export async function enforceWeeklyRolloverNow(args: {
@@ -56,15 +55,12 @@ export async function enforceWeeklyRolloverNow(args: {
     .in('weekly_focus_id', focusIds);
 
   const required = focusIds.length;
-  const confCount = (prevScores || []).filter(s => s.confidence_score !== null).length;
   const perfCount = (prevScores || []).filter(s => s.performance_score !== null).length;
   const fullyPerformed = perfCount >= required;
-  const hadAnyConfidence = confCount > 0;
 
   if (fullyPerformed) return; // nothing to rollover
-  if (!hadAnyConfidence) return; // don't backlog a week that had no check-in
 
-  // 1) Add SITE moves from that week to backlog (dedup handled by RPC)
+  // Add SITE moves from incomplete weeks to backlog (dedup handled by RPC)
   const siteActionIds = (focusRows || [])
     .filter(f => !f.self_select && f.action_id)     // site slots only
     .map(f => f.action_id as number);
@@ -73,26 +69,5 @@ export async function enforceWeeklyRolloverNow(args: {
     await addToBacklogV2(staffId, actionId, prevCycle, prevWeek); // RPC dedups
   }
 
-  // 2) Clear confidence for items that still lack performance
-  const toClear = (prevScores || [])
-    .filter(r => r.performance_score === null); // only where perf is missing
-  if (toClear.length) {
-    console.log(`[Rollover] Clearing confidence for ${toClear.length} incomplete items for staff ${staffId}, cycle ${prevCycle}, week ${prevWeek}`);
-    
-    const updates = toClear.map(r => ({
-      id: r.id,
-      staff_id: staffId,
-      weekly_focus_id: r.weekly_focus_id,
-      confidence_score: null,
-      confidence_date: null,
-      performance_score: r.performance_score, // preserve existing performance score
-      performance_date: r.performance_date, // preserve existing performance date
-    }));
-    
-    const { error } = await supabase.from('weekly_scores').upsert(updates);
-    if (error) {
-      console.error('[Rollover] Error clearing confidence scores:', error);
-      throw new Error(`Failed to clear confidence scores: ${error.message}`);
-    }
-  }
+  console.log(`[Rollover] Added ${siteActionIds.length} incomplete site moves to backlog for staff ${staffId}, cycle ${prevCycle}, week ${prevWeek}`);
 }

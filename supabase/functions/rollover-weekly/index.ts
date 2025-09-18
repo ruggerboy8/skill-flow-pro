@@ -78,7 +78,7 @@ async function enforceWeeklyRolloverNow(args: {
     return;
   }
 
-  // 5) Score status with hadAnyConfidence guard
+  // 5) Check performance completion status
   const { data: prevScores } = await supabase
     .from('weekly_scores')
     .select('id, weekly_focus_id, confidence_score, performance_score')
@@ -86,21 +86,15 @@ async function enforceWeeklyRolloverNow(args: {
     .in('weekly_focus_id', focusIds);
 
   const required = focusIds.length;
-  const confCount = (prevScores || []).filter(s => s.confidence_score !== null).length;
   const perfCount = (prevScores || []).filter(s => s.performance_score !== null).length;
   const fullyPerformed = perfCount >= required;
-  const hadAnyConfidence = confCount > 0;
 
   if (fullyPerformed) {
     console.log('Week fully performed — nothing to do');
     return;
   }
-  if (!hadAnyConfidence) {
-    console.log('No confidence was submitted — skipping backlog');
-    return;
-  }
 
-  // 6) Backlog site moves (RPC dedups)
+  // 6) Add incomplete site moves to backlog (RPC dedups)
   const siteActionIds = (focusRows || [])
     .filter(f => !f.self_select && f.action_id)
     .map(f => f.action_id as number);
@@ -114,19 +108,7 @@ async function enforceWeeklyRolloverNow(args: {
     });
   }
 
-  // 7) Clear confidence if performance missing
-  const toClear = (prevScores || []).filter(r => r.performance_score === null);
-  if (toClear.length) {
-    const updates = toClear.map(r => ({
-      id: r.id,
-      staff_id: staffId,
-      weekly_focus_id: r.weekly_focus_id,
-      confidence_score: null,
-      confidence_date: null,
-    }));
-    await supabase.from('weekly_scores').upsert(updates);
-    console.log(`Cleared confidence for ${updates.length} rows`);
-  }
+  console.log(`Added ${siteActionIds.length} incomplete site moves to backlog for staff ${staffId}`);
 
   console.log(`Rollover complete for staff ${staffId}`);
 }

@@ -41,7 +41,11 @@ export default function Setup() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Debug logging
+  console.log("Setup component rendering", { user, roles, organizations, locations });
+
   useEffect(() => {
+    console.log("Setup useEffect running, loading data");
     loadRoles();
     loadOrganizations();
     loadLocations();
@@ -59,18 +63,21 @@ export default function Setup() {
   }, [selectedOrganizationId, locations]);
 
   const loadRoles = async () => {
+    console.log("Loading roles...");
     const { data, error } = await supabase
       .from('roles')
       .select('role_id, role_name')
       .order('role_name');
     
     if (error) {
+      console.error("Error loading roles:", error);
       toast({
         title: "Error",
         description: "Failed to load roles",
         variant: "destructive"
       });
     } else {
+      console.log("Roles loaded:", data);
       setRoles(data || []);
     }
   };
@@ -149,6 +156,8 @@ export default function Setup() {
     setLoading(false);
   };
 
+  console.log("About to render Setup form");
+  
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-md">

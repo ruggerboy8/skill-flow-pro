@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { LocationFormDrawer } from "./LocationFormDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getLocationWeekContext } from "@/lib/locationState";
 
 interface Location {
   id: string;
@@ -22,6 +23,8 @@ interface Location {
   organization?: {
     name: string;
   };
+  currentWeek?: number;
+  currentCycle?: number;
 }
 
 interface Organization {
@@ -50,7 +53,26 @@ export function AdminLocationsTab() {
 
       if (error) throw error;
 
-      setLocations(data || []);
+      // Calculate current week/cycle for each location
+      const locationsWithWeekInfo = await Promise.all(
+        (data || []).map(async (location: any) => {
+          try {
+            const context = await getLocationWeekContext(location.id);
+            return {
+              ...location,
+              currentWeek: context.weekInCycle,
+              currentCycle: context.cycleNumber,
+            } as Location;
+          } catch (error) {
+            console.error(`Error getting context for location ${location.id}:`, error);
+            return {
+              ...location,
+            } as Location;
+          }
+        })
+      );
+
+      setLocations(locationsWithWeekInfo);
     } catch (error) {
       console.error("Error loading locations:", error);
       toast({
@@ -197,7 +219,7 @@ export function AdminLocationsTab() {
                   <TableHead>Organization</TableHead>
                   <TableHead>Timezone</TableHead>
                   <TableHead>Program Start</TableHead>
-                  <TableHead>Cycle Length</TableHead>
+                  <TableHead>Current Week</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[50px]">Actions</TableHead>
                 </TableRow>
@@ -218,7 +240,15 @@ export function AdminLocationsTab() {
                       </TableCell>
                       <TableCell>{location.timezone}</TableCell>
                       <TableCell>{formatDate(location.program_start_date)}</TableCell>
-                      <TableCell>{location.cycle_length_weeks} weeks</TableCell>
+                      <TableCell>
+                        {location.currentWeek && location.currentCycle ? (
+                          <Badge variant="outline" className="text-xs">
+                            Cycle {location.currentCycle} · Week {location.currentWeek}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Switch

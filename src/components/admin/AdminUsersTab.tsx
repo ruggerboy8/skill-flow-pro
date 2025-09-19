@@ -29,6 +29,7 @@ interface User {
   location_id?: string;
   location_name?: string;
   is_super_admin: boolean;
+  is_coach: boolean;
 }
 
 interface Role {
@@ -321,53 +322,52 @@ const handleResetPassword = async (user: User) => {
           {/* Users Table */}
           <div className="rounded-md border">
             <Table>
-               <TableHeader>
-                 <TableRow>
-                   <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                     Name
-                   </SortableTableHead>
-                   <SortableTableHead sortKey="email" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                     Email
-                   </SortableTableHead>
-                   <SortableTableHead sortKey="role_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                     Role
-                   </SortableTableHead>
-                   <SortableTableHead sortKey="location_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                     Location
-                   </SortableTableHead>
-                   <SortableTableHead sortKey="is_super_admin" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                     Admin
-                   </SortableTableHead>
-                   <SortableTableHead sortKey="email_confirmed_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                     Status
-                   </SortableTableHead>
-                   <SortableTableHead sortKey="last_sign_in_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                     Last Sign In
-                   </SortableTableHead>
-                   <TableHead className="w-[50px]">Actions</TableHead>
-                 </TableRow>
-               </TableHeader>
-               <TableBody>
-                 {sortedData.length === 0 ? (
+              <TableHeader>
+                <TableRow>
+                  <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Name
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="email" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Email
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="role_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Role
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="location_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Location
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="email_confirmed_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Status
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="last_sign_in_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Last Sign In
+                  </SortableTableHead>
+                  <TableHead className="w-[50px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
-                 ) : (
-                   sortedData.map((user) => (
+                ) : (
+                  sortedData.map((user) => (
                     <TableRow key={user.staff_id}>
                       <TableCell className="font-medium">
-                        {user.name || "No name"}
+                        <div className="flex items-center gap-2">
+                          <span>{user.name || "No name"}</span>
+                          {user.is_super_admin ? (
+                            <Badge variant="destructive" className="text-xs">Super</Badge>
+                          ) : user.is_coach ? (
+                            <Badge variant="secondary" className="text-xs">Coach</Badge>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell>{user.email || "—"}</TableCell>
                       <TableCell>{user.role_name || "No role"}</TableCell>
                       <TableCell>{user.location_name || "No location"}</TableCell>
-                      <TableCell>
-                        {user.is_super_admin && (
-                          <Badge variant="destructive">Super Admin</Badge>
-                        )}
-                      </TableCell>
                       <TableCell>{getStatusBadge(user)}</TableCell>
                       <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
                       <TableCell>

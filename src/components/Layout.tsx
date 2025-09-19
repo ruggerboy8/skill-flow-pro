@@ -64,7 +64,7 @@ export default function Layout() {
                 </NavLink>
               </header>
               
-              <main className="flex-1 p-6 overflow-auto">
+              <main className="flex-1 p-6 overflow-auto w-full min-w-0">
                 <Outlet />
               </main>
             </div>
@@ -145,7 +145,7 @@ export default function Layout() {
       </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-2 py-4 md:px-4 md:py-6">
+      <main className="container mx-auto px-2 py-4 md:px-4 md:py-6 w-full min-w-0 overflow-auto">
         <Outlet />
       </main>
     </div>

@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useTableSort } from "@/hooks/useTableSort";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -206,6 +208,8 @@ const handleResetPassword = async (user: User) => {
     return matchesRole && matchesLocation && matchesSuperAdmin;
   });
 
+  const { sortedData, sortConfig, handleSort } = useTableSort(filteredUsers);
+
   const getStatusBadge = (user: User) => {
     if (!user.email_confirmed_at) {
       return <Badge variant="secondary">Invited</Badge>;
@@ -317,27 +321,41 @@ const handleResetPassword = async (user: User) => {
           {/* Users Table */}
           <div className="rounded-md border">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Admin</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Sign In</TableHead>
-                  <TableHead className="w-[50px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.length === 0 ? (
+               <TableHeader>
+                 <TableRow>
+                   <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Name
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="email" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Email
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="role_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Role
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="location_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Location
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="is_super_admin" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Admin
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="email_confirmed_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Status
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="last_sign_in_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Last Sign In
+                   </SortableTableHead>
+                   <TableHead className="w-[50px]">Actions</TableHead>
+                 </TableRow>
+               </TableHeader>
+               <TableBody>
+                 {sortedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filteredUsers.map((user) => (
+                 ) : (
+                   sortedData.map((user) => (
                     <TableRow key={user.staff_id}>
                       <TableCell className="font-medium">
                         {user.name || "No name"}

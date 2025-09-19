@@ -8,6 +8,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { OrganizationDialog } from '@/components/admin/OrganizationDialog';
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 
 interface Organization {
   id: string;
@@ -73,6 +75,8 @@ export default function OrganizationList() {
     }
   }
 
+  const { sortedData, sortConfig, handleSort } = useTableSort(organizations);
+
   function handleCreate() {
     setEditingOrg(null);
     setDialogOpen(true);
@@ -133,15 +137,23 @@ export default function OrganizationList() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Organization</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead>Locations</TableHead>
-                  <TableHead>Created</TableHead>
+                  <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Organization
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="slug" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Slug
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="location_count" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Locations
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="created_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Created
+                  </SortableTableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {organizations.map((org) => (
+                {sortedData.map((org) => (
                   <TableRow key={org.id}>
                     <TableCell className="font-medium">{org.name}</TableCell>
                     <TableCell className="text-muted-foreground">{org.slug}</TableCell>

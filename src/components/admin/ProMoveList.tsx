@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Edit, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -164,6 +166,8 @@ export function ProMoveList({
     }
   };
 
+  const { sortedData, sortConfig, handleSort } = useTableSort(proMoves);
+
   const toggleActive = async (proMove: ProMove) => {
     try {
       const { error } = await supabase
@@ -232,7 +236,7 @@ export function ProMoveList({
     return <div className="text-center py-8">Loading pro-moves...</div>;
   }
 
-  if (proMoves.length === 0) {
+  if (sortedData.length === 0) {
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">No pro-moves found matching your criteria.</p>
@@ -245,16 +249,26 @@ export function ProMoveList({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Pro-Move</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Domain</TableHead>
-            <TableHead>Competency</TableHead>
-            <TableHead>Updated</TableHead>
+            <SortableTableHead sortKey="action_statement" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+              Pro-Move
+            </SortableTableHead>
+            <SortableTableHead sortKey="role_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+              Role
+            </SortableTableHead>
+            <SortableTableHead sortKey="domain_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+              Domain
+            </SortableTableHead>
+            <SortableTableHead sortKey="competency_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+              Competency
+            </SortableTableHead>
+            <SortableTableHead sortKey="updated_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+              Updated
+            </SortableTableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {proMoves.map((proMove) => (
+          {sortedData.map((proMove) => (
             <TableRow key={proMove.action_id}>
               <TableCell className="max-w-md">
                 <div className="font-medium">{proMove.action_statement}</div>

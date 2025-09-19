@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useTableSort } from "@/hooks/useTableSort";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -84,6 +86,8 @@ export function AdminLocationsTab() {
       setLoading(false);
     }
   };
+
+  const { sortedData, sortConfig, handleSort } = useTableSort(locations);
 
   const loadOrganizations = async () => {
     try {
@@ -231,27 +235,39 @@ export function AdminLocationsTab() {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Organization</TableHead>
-                  <TableHead>Timezone</TableHead>
-                  <TableHead>Program Start</TableHead>
-                  <TableHead>Current Week</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[50px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {locations.length === 0 ? (
+             <Table>
+               <TableHeader>
+                 <TableRow>
+                   <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Name
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="organization.name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Organization
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="timezone" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Timezone
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="program_start_date" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Program Start
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="currentWeek" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Current Week
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="active" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Status
+                   </SortableTableHead>
+                   <TableHead className="w-[50px]">Actions</TableHead>
+                 </TableRow>
+               </TableHeader>
+               <TableBody>
+                 {sortedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No locations found
                     </TableCell>
                   </TableRow>
-                ) : (
-                  locations.map((location) => (
+                 ) : (
+                   sortedData.map((location) => (
                     <TableRow key={location.id}>
                       <TableCell className="font-medium">{location.name}</TableCell>
                       <TableCell>

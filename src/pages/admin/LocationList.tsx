@@ -10,6 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { LocationDialog } from '@/components/admin/LocationDialog';
 import { getLocationWeekContext } from '@/lib/locationState';
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 
 interface Location {
   id: string;
@@ -98,6 +100,8 @@ export default function LocationList() {
     }
   }
 
+  const { sortedData, sortConfig, handleSort } = useTableSort(locations);
+
   function handleCreate() {
     setEditingLocation(null);
     setDialogOpen(true);
@@ -158,16 +162,26 @@ export default function LocationList() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Organization</TableHead>
-                  <TableHead>Program Start</TableHead>
-                  <TableHead>Current Week</TableHead>
-                  <TableHead>Timezone</TableHead>
+                  <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Location
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="organization.name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Organization
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="program_start_date" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Program Start
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="currentWeek" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Current Week
+                  </SortableTableHead>
+                  <SortableTableHead sortKey="timezone" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                    Timezone
+                  </SortableTableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {locations.map((location) => (
+                {sortedData.map((location) => (
                   <TableRow key={location.id}>
                     <TableCell>
                       <div>

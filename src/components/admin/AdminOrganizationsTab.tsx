@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useTableSort } from "@/hooks/useTableSort";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +49,8 @@ export function AdminOrganizationsTab() {
       setLoading(false);
     }
   };
+
+  const { sortedData, sortConfig, handleSort } = useTableSort(organizations);
 
   useEffect(() => {
     loadOrganizations();
@@ -157,24 +161,30 @@ export function AdminOrganizationsTab() {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[50px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {organizations.length === 0 ? (
+             <Table>
+               <TableHeader>
+                 <TableRow>
+                   <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Name
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="created_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Created
+                   </SortableTableHead>
+                   <SortableTableHead sortKey="active" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                     Status
+                   </SortableTableHead>
+                   <TableHead className="w-[50px]">Actions</TableHead>
+                 </TableRow>
+               </TableHeader>
+               <TableBody>
+                 {sortedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                       No organizations found
                     </TableCell>
                   </TableRow>
-                ) : (
-                  organizations.map((organization) => (
+                 ) : (
+                   sortedData.map((organization) => (
                     <TableRow key={organization.id}>
                       <TableCell className="font-medium">{organization.name}</TableCell>
                       <TableCell>{formatDate(organization.created_at)}</TableCell>

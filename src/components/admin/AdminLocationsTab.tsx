@@ -243,7 +243,7 @@ export function AdminLocationsTab() {
                       <TableCell>
                         {location.currentWeek && location.currentCycle ? (
                           <Badge variant="outline" className="text-xs">
-                            Cycle {location.currentCycle} · Week {location.currentWeek}
+                            C:{location.currentCycle} W:{location.currentWeek}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground">—</span>

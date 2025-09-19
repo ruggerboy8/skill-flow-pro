@@ -355,19 +355,19 @@ const handleResetPassword = async (user: User) => {
                 ) : (
                   sortedData.map((user) => (
                     <TableRow key={user.staff_id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <span>{user.name || "No name"}</span>
-                          {user.is_super_admin ? (
-                            <Badge variant="destructive" className="text-xs">Super</Badge>
-                          ) : user.is_coach ? (
-                            <Badge variant="secondary" className="text-xs">Coach</Badge>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>{user.email || "—"}</TableCell>
-                      <TableCell>{user.role_name || "No role"}</TableCell>
-                      <TableCell>{user.location_name || "No location"}</TableCell>
+                       <TableCell className="font-medium w-1/4">
+                         <div className="flex items-center gap-2 min-w-0">
+                           <span className="truncate">{user.name || "No name"}</span>
+                           {user.is_super_admin ? (
+                             <Badge variant="destructive" className="text-xs shrink-0">Super</Badge>
+                           ) : user.is_coach ? (
+                             <Badge variant="secondary" className="text-xs shrink-0">Coach</Badge>
+                           ) : null}
+                         </div>
+                       </TableCell>
+                       <TableCell className="w-1/4 truncate">{user.email || "—"}</TableCell>
+                       <TableCell className="w-1/6 truncate">{user.role_name || "No role"}</TableCell>
+                       <TableCell className="w-1/6 truncate">{user.location_name || "No location"}</TableCell>
                       <TableCell>{getStatusBadge(user)}</TableCell>
                       <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
                       <TableCell>

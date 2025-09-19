@@ -81,7 +81,7 @@ serve(async (req: Request) => {
 
         let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,roles(role_name),locations(name)", {
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_coach,roles(role_name),locations(name)", {
             count: "exact",
           })
           .order("name", { ascending: true });
@@ -137,6 +137,7 @@ serve(async (req: Request) => {
             location_id: s.primary_location_id,
             location_name: s.locations?.name ?? null,
             is_super_admin: s.is_super_admin ?? false,
+            is_coach: s.is_coach ?? false,
           };
           console.log("Final row data:", row);
           return row;
@@ -173,7 +174,7 @@ serve(async (req: Request) => {
       }
 
       case "update_user": {
-        const { user_id, name, role_id, location_id, is_super_admin } = payload ?? {};
+        const { user_id, name, role_id, location_id, is_super_admin, is_coach } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
 
         const updateData: Record<string, any> = {};
@@ -181,6 +182,7 @@ serve(async (req: Request) => {
         if (role_id !== undefined) updateData.role_id = role_id;
         if (location_id !== undefined) updateData.primary_location_id = location_id;
         if (is_super_admin !== undefined) updateData.is_super_admin = is_super_admin;
+        if (is_coach !== undefined) updateData.is_coach = is_coach;
 
         const { data: staff, error: stErr } = await admin
           .from("staff")

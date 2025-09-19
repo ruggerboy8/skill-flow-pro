@@ -47,7 +47,7 @@ export function AppSidebar({ navigation, backfillMissingCount = 0 }: AppSidebarP
 
   return (
     <Sidebar
-      className={isCollapsed ? "w-14" : "w-60"}
+      className="border-r"
       collapsible="icon"
     >
       <SidebarContent>

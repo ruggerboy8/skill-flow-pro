@@ -342,7 +342,7 @@ const handleResetPassword = async (user: User) => {
                   <SortableTableHead sortKey="last_sign_in_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
                     Last Sign In
                   </SortableTableHead>
-                  <TableHead className="w-[50px]">Actions</TableHead>
+                  <TableHead className="w-20">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

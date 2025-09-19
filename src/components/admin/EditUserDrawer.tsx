@@ -27,6 +27,7 @@ interface User {
   role_id?: number;
   location_id?: string;
   is_super_admin: boolean;
+  is_coach: boolean;
 }
 
 interface EditUserDrawerProps {
@@ -46,6 +47,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     role_id: "",
     primary_location_id: "",
     is_super_admin: false,
+    is_coach: false,
   });
 
   useEffect(() => {
@@ -55,6 +57,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         role_id: user.role_id?.toString() || "",
         primary_location_id: user.location_id || "",
         is_super_admin: user.is_super_admin,
+        is_coach: user.is_coach,
       });
     }
   }, [user, open]);
@@ -74,6 +77,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
           role_id: formData.role_id === "none" ? null : (formData.role_id ? parseInt(formData.role_id) : null),
           location_id: formData.primary_location_id === "none" ? null : (formData.primary_location_id || null),
           is_super_admin: formData.is_super_admin,
+          is_coach: formData.is_coach,
         },
       });
 
@@ -162,6 +166,15 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
               onCheckedChange={(checked) => setFormData({ ...formData, is_super_admin: checked })}
             />
             <Label htmlFor="edit-super-admin">Super administrator</Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="edit-coach"
+              checked={formData.is_coach}
+              onCheckedChange={(checked) => setFormData({ ...formData, is_coach: checked })}
+            />
+            <Label htmlFor="edit-coach">Coach</Label>
           </div>
 
           <SheetFooter className="mt-6">

@@ -150,8 +150,8 @@ export default function Setup() {
       description: "Welcome to ProMoves!"
     });
 
-    // Navigate to home page
-    navigate('/', { replace: true });
+    // Navigate to welcome page
+    navigate('/welcome', { replace: true });
     
     setLoading(false);
   };

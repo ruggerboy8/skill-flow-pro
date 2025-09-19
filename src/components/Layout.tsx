@@ -10,7 +10,7 @@ import { isV2 } from '@/lib/featureFlags';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
-  const { user, signOut, isCoach } = useAuth();
+  const { user, signOut, isCoach, isSuperAdmin, roleLoading } = useAuth();
   const location = useLocation();
   
   const [backfillMissingCount, setBackfillMissingCount] = useState(0);
@@ -89,8 +89,17 @@ export default function Layout() {
     return location.pathname.startsWith(href);
   };
 
-  // Use sidebar for coaches (which includes super admins per useAuth logic)
-  const useSidebar = isCoach;
+  // Use sidebar for coaches and super admins
+  const useSidebar = isCoach || isSuperAdmin;
+
+  // Don't render until we know the user's role to prevent flashing
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   if (useSidebar) {
     return (

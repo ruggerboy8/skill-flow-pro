@@ -6,9 +6,11 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  roleLoading: boolean;
   needsPasswordSetup: boolean;
   needsProfileSetup: boolean;
   isCoach: boolean;
+  isSuperAdmin: boolean;
   signInWithOtp: (email: string) => Promise<{ error: any }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error: any }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error: any }>;
@@ -22,26 +24,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(false);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [isCoach, setIsCoach] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     const checkUserStatus = async (userId: string) => {
-      const { data } = await supabase
-        .from('staff')
-        .select('is_coach, is_super_admin, name, role_id, primary_location_id')
-        .eq('user_id', userId)
-        .single();
-      
-      if (data) {
-        setIsCoach(data.is_coach || data.is_super_admin);
-        // Check if profile is complete
-        setNeedsProfileSetup(false);
-      } else {
-        // No staff record exists, user needs to complete profile
-        setNeedsProfileSetup(true);
-        setIsCoach(false);
+      setRoleLoading(true);
+      try {
+        const { data } = await supabase
+          .from('staff')
+          .select('is_coach, is_super_admin, name, role_id, primary_location_id')
+          .eq('user_id', userId)
+          .single();
+        
+        if (data) {
+          setIsCoach(data.is_coach || data.is_super_admin);
+          setIsSuperAdmin(data.is_super_admin);
+          // Check if profile is complete
+          setNeedsProfileSetup(false);
+        } else {
+          // No staff record exists, user needs to complete profile
+          setNeedsProfileSetup(true);
+          setIsCoach(false);
+          setIsSuperAdmin(false);
+        }
+      } finally {
+        setRoleLoading(false);
       }
     };
 
@@ -67,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setNeedsPasswordSetup(false);
           setNeedsProfileSetup(false);
           setIsCoach(false);
+          setIsSuperAdmin(false);
         }
         
         setLoading(false);
@@ -93,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setNeedsPasswordSetup(false);
         setNeedsProfileSetup(false);
         setIsCoach(false);
+        setIsSuperAdmin(false);
       }
       
       setLoading(false);
@@ -151,14 +164,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  return (
+    return (
     <AuthContext.Provider value={{
       user,
       session,
       loading,
+      roleLoading,
       needsPasswordSetup,
       needsProfileSetup,
       isCoach,
+      isSuperAdmin,
       signInWithOtp,
       signInWithPassword,
       signUpWithPassword,

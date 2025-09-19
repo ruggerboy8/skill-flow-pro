@@ -172,6 +172,25 @@ export function AdminLocationsTab() {
     return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
   };
 
+  const formatTimezone = (timezone: string) => {
+    const timezoneMap: { [key: string]: string } = {
+      'America/New_York': 'Eastern',
+      'America/Chicago': 'Central',
+      'America/Denver': 'Mountain',
+      'America/Phoenix': 'Mountain (no DST)',
+      'America/Los_Angeles': 'Pacific',
+      'America/Anchorage': 'Alaska',
+      'Pacific/Honolulu': 'Hawaii',
+      'America/Halifax': 'Atlantic',
+      'America/St_Johns': 'Newfoundland',
+      'America/Toronto': 'Eastern',
+      'America/Edmonton': 'Mountain',
+      'America/Vancouver': 'Pacific',
+    };
+    
+    return timezoneMap[timezone] || timezone;
+  };
+
   if (loading) {
     return (
       <Card>
@@ -238,7 +257,7 @@ export function AdminLocationsTab() {
                       <TableCell>
                         {location.organization?.name || "No organization"}
                       </TableCell>
-                      <TableCell>{location.timezone}</TableCell>
+                      <TableCell>{formatTimezone(location.timezone)}</TableCell>
                       <TableCell>{formatDate(location.program_start_date)}</TableCell>
                       <TableCell>
                         {(() => {

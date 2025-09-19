@@ -41,6 +41,8 @@ export default function Setup() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  console.log('Setup component rendering, user:', user);
+
   useEffect(() => {
     loadRoles();
     loadOrganizations();
@@ -59,54 +61,69 @@ export default function Setup() {
   }, [selectedOrganizationId, locations]);
 
   const loadRoles = async () => {
+    console.log('Loading roles...');
     const { data, error } = await supabase
       .from('roles')
       .select('role_id, role_name')
       .order('role_name');
     
+    console.log('Roles query result:', { data, error });
+    
     if (error) {
+      console.error('Role loading error:', error);
       toast({
         title: "Error",
         description: "Failed to load roles",
         variant: "destructive"
       });
     } else {
+      console.log('Setting roles:', data);
       setRoles(data || []);
     }
   };
 
   const loadOrganizations = async () => {
+    console.log('Loading organizations...');
     const { data, error } = await supabase
       .from('organizations')
       .select('*')
       .eq('active', true)
       .order('name');
     
+    console.log('Organizations query result:', { data, error });
+    
     if (error) {
+      console.error('Organizations loading error:', error);
       toast({
-        title: "Error",
+        title: "Error", 
         description: "Failed to load organizations",
         variant: "destructive"
       });
     } else {
+      console.log('Setting organizations:', data);
       setOrganizations(data || []);
     }
   };
 
   const loadLocations = async () => {
+    console.log('Loading locations...');
     const { data, error } = await supabase
       .from('locations')
       .select('*')
       .eq('active', true)
       .order('name');
     
+    console.log('Locations query result:', { data, error });
+    
     if (error) {
+      console.error('Locations loading error:', error);
       toast({
         title: "Error",
-        description: "Failed to load locations",
+        description: "Failed to load locations", 
         variant: "destructive"
       });
     } else {
+      console.log('Setting locations:', data);
       setLocations(data || []);
     }
   };

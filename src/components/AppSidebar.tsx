@@ -18,10 +18,10 @@ interface AppSidebarProps {
     href: string;
     icon: any;
   }>;
-  backfillMissingCount: number;
+  backfillMissingCount?: number; // Made optional since backfill nav is removed
 }
 
-export function AppSidebar({ navigation, backfillMissingCount }: AppSidebarProps) {
+export function AppSidebar({ navigation, backfillMissingCount = 0 }: AppSidebarProps) {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;

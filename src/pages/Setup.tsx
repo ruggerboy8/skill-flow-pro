@@ -32,11 +32,10 @@ export default function Setup() {
   const [roleId, setRoleId] = useState<string>('');
   const [selectedOrganizationId, setSelectedOrganizationId] = useState('');
   const [selectedLocationId, setSelectedLocationId] = useState('');
-  const [participationChoice, setParticipationChoice] = useState<"experienced"|"new"|"">("");
   const [roles, setRoles] = useState<Role[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<Location[]>();
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -114,7 +113,7 @@ export default function Setup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !roleId || !selectedOrganizationId || !selectedLocationId || !participationChoice || !user) return;
+    if (!name || !roleId || !selectedOrganizationId || !selectedLocationId || !user) return;
 
     setLoading(true);
     
@@ -139,41 +138,13 @@ export default function Setup() {
       return;
     }
 
-    // Update participation decision
-    const isNew = participationChoice === "new";
-    const { error: updateError } = await supabase
-      .from('staff')
-      .update({
-        participation_start_at: isNew ? new Date().toISOString() : null,
-      })
-      .eq('user_id', user.id);
-
-    if (updateError) {
-      toast({
-        title: "Error",
-        description: updateError.message,
-        variant: "destructive"
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Clear any stale backfill local state
-    localStorage.removeItem("backfillDone");
-    localStorage.removeItem("backfillProgress");
-    localStorage.removeItem("bf_ts_fixed");
-
     toast({
       title: "Profile created",
       description: "Welcome to ProMoves!"
     });
 
-    // Route based on choice
-    if (isNew) {
-      navigate('/', { replace: true });
-    } else {
-      navigate('/backfill', { replace: true });
-    }
+    // Navigate to home page
+    navigate('/', { replace: true });
     
     setLoading(false);
   };
@@ -245,28 +216,11 @@ export default function Setup() {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="participation">How are you joining?</Label>
-              <Select value={participationChoice} onValueChange={(v) => setParticipationChoice(v as any)} required>
-                <SelectTrigger className="h-12">
-                  <SelectValue placeholder="Select one..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="experienced">
-                    I have been participating in ProMoves meetings for the past 6 weeks
-                  </SelectItem>
-                  <SelectItem value="new">
-                    I'm new! This is my first time doing any of this
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             
             <Button 
               type="submit" 
               className="w-full h-12" 
-              disabled={loading || !name || !roleId || !selectedOrganizationId || !selectedLocationId || !participationChoice}
+              disabled={loading || !name || !roleId || !selectedOrganizationId || !selectedLocationId}
             >
               {loading ? "Creating Profile..." : "Complete Setup"}
             </Button>

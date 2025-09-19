@@ -241,13 +241,28 @@ export function AdminLocationsTab() {
                       <TableCell>{location.timezone}</TableCell>
                       <TableCell>{formatDate(location.program_start_date)}</TableCell>
                       <TableCell>
-                        {location.currentWeek && location.currentCycle ? (
-                          <Badge variant="outline" className="text-xs">
-                            C:{location.currentCycle} W:{location.currentWeek}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        {(() => {
+                          const today = new Date();
+                          const startDate = new Date(location.program_start_date);
+                          
+                          if (startDate > today) {
+                            return (
+                              <Badge variant="secondary" className="text-xs">
+                                Not Started
+                              </Badge>
+                            );
+                          }
+                          
+                          if (location.currentWeek && location.currentCycle) {
+                            return (
+                              <Badge variant="outline" className="text-xs">
+                                C:{location.currentCycle} W:{location.currentWeek}
+                              </Badge>
+                            );
+                          }
+                          
+                          return <span className="text-muted-foreground">—</span>;
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">

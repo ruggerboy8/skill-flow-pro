@@ -162,16 +162,21 @@ export default function StatsScores() {
     if (!staffData) return [];
 
     try {
-      // Try RPC first (if it returns rows for blank weeks, great)
-      const { data: rpcRows } = await supabase.rpc('get_weekly_review', {
-        p_cycle: cycle,
-        p_week: week,
-        p_role_id: staffData.role_id,
-        p_staff_id: staffData.id
-      });
+      // Skip RPC for current week (shows "no pro moves" issue), use fallback directly
+      const isCurrentWeek = cycle === currentCycle && week === currentWeek;
+      
+      if (!isCurrentWeek) {
+        // Try RPC first for historical weeks (works fine when scores exist)
+        const { data: rpcRows } = await supabase.rpc('get_weekly_review', {
+          p_cycle: cycle,
+          p_week: week,
+          p_role_id: staffData.role_id,
+          p_staff_id: staffData.id
+        });
 
-      if (rpcRows && rpcRows.length) {
-        return rpcRows as WeekData[];
+        if (rpcRows && rpcRows.length) {
+          return rpcRows as WeekData[];
+        }
       }
 
       // Fallback: compose from weekly_focus + optional scores

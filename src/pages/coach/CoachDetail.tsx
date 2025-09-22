@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { QuarterlyEvalsTab } from '@/components/coach/QuarterlyEvalsTab';
+import { getLocationWeekContext } from '@/lib/locationState';
 
 interface StaffInfo {
   id: string;
@@ -48,6 +49,8 @@ export default function CoachDetail() {
   const [cycles, setCycles] = useState<CycleData[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<number>(1);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+  const [currentCycle, setCurrentCycle] = useState<number | null>(null);
+  const [currentWeek, setCurrentWeek] = useState<number | null>(null);
 
   // Redirect if not coach
   useEffect(() => {
@@ -92,6 +95,13 @@ export default function CoachDetail() {
       };
 
       setStaffInfo(staff);
+
+      // Get current cycle/week context for this staff
+      if (staff.location_id) {
+        const ctx = await getLocationWeekContext(staff.location_id, new Date());
+        setCurrentCycle(ctx.cycleNumber);
+        setCurrentWeek(ctx.weekInCycle);
+      }
 
       // Get available cycles
       const { data: cycleData } = await supabase
@@ -277,7 +287,7 @@ export default function CoachDetail() {
     );
   }
 
-  const currentCycle = cycles.find(c => c.cycle === selectedCycle);
+  const selectedCycleData = cycles.find(c => c.cycle === selectedCycle);
 
   return (
     <div className="space-y-6">
@@ -318,10 +328,10 @@ export default function CoachDetail() {
           </Select>
 
           {/* Week Accordion */}
-          {currentCycle && (
+          {selectedCycleData && (
             <Accordion type="multiple" value={Array.from(expandedWeeks)}>
               {[1, 2, 3, 4, 5, 6].map(week => {
-                const weekData = currentCycle.weeks.get(week);
+                const weekData = selectedCycleData.weeks.get(week);
                 const cycleWeekKey = `${selectedCycle}-${week}`;
 
                 return (
@@ -330,11 +340,21 @@ export default function CoachDetail() {
                       onClick={() => handleWeekExpand(cycleWeekKey)}
                       className="hover:no-underline"
                     >
-                      <div className="flex items-center gap-3 w-full">
-                        <span>Week {week}</span>
-                        {weekData && weekData.loaded && 
-                          getStatusBadge(weekData.data)
-                        }
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-3">
+                          <span>Week {week}</span>
+                          {/* Current Week Pill */}
+                          {selectedCycle === currentCycle && week === currentWeek && (
+                            <Badge variant="outline" className="text-xs">
+                              Current Week
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {weekData && weekData.loaded && 
+                            getStatusBadge(weekData.data)
+                          }
+                        </div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>

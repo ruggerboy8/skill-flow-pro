@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +30,7 @@ interface CycleData {
 
 export default function StatsScores() {
   const [cycles, setCycles] = useState<CycleData[]>([]);
+  const [selectedCycle, setSelectedCycle] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [staffData, setStaffData] = useState<{ id: string; role_id: number } | null>(null);
   const [currentCycle, setCurrentCycle] = useState<number | null>(null);
@@ -131,25 +133,22 @@ export default function StatsScores() {
 
       setCycles(result);
       
-      // Auto-expand the cycle where user has latest progress
+      // Set default selected cycle and auto-expand
       if (result.length > 0) {
         try {
           const { data: progressData } = await supabase.rpc('get_last_progress_week', {
             p_staff_id: staffData.id
           });
           
+          let defaultCycle = currentCycle || Math.max(...cyclesUnique);
           if (progressData?.[0]?.last_cycle) {
-            const progressCycle = progressData[0].last_cycle;
-            // Auto-expand this cycle by triggering its accordion
-            setTimeout(() => {
-              const accordionTrigger = document.querySelector(`[data-state][value="cycle-${progressCycle}"]`);
-              if (accordionTrigger && !accordionTrigger.getAttribute('data-state')?.includes('open')) {
-                (accordionTrigger as HTMLElement).click();
-              }
-            }, 100);
+            defaultCycle = progressData[0].last_cycle;
           }
+          
+          setSelectedCycle(defaultCycle);
         } catch (error) {
-          console.log('Could not get progress data for auto-expand:', error);
+          console.log('Could not get progress data:', error);
+          setSelectedCycle(currentCycle || Math.max(...cyclesUnique));
         }
       }
     } catch (error) {
@@ -182,6 +181,8 @@ export default function StatsScores() {
         .select(`
           id,
           display_order,
+          self_select,
+          competency_id,
           pro_moves(action_statement, competency_id)
         `)
         .eq('cycle', cycle)
@@ -191,16 +192,36 @@ export default function StatsScores() {
 
       const focusIds = (focus ?? []).map((f: any) => f.id);
 
-      // 2) Map competency -> domain name (optional, so badges look right)
-      const compIds = Array.from(
-        new Set((focus ?? []).map((f: any) => f.pro_moves?.competency_id).filter(Boolean))
+      // 2) Get user selections for self-select items
+      const { data: userSelections } = await supabase
+        .from('weekly_self_select')
+        .select(`
+          weekly_focus_id,
+          selected_pro_move_id,
+          pro_moves(action_statement, competency_id)
+        `)
+        .eq('user_id', user?.id)
+        .in('weekly_focus_id', (focus ?? []).map((f: any) => f.id));
+
+      const selectionsMap: Record<string, any> = {};
+      (userSelections ?? []).forEach((sel: any) => {
+        selectionsMap[sel.weekly_focus_id] = sel;
+      });
+
+      // 3) Map competency -> domain name (for both pro_moves and self-select)
+      const allCompIds = Array.from(
+        new Set([
+          ...(focus ?? []).map((f: any) => f.pro_moves?.competency_id).filter(Boolean),
+          ...(focus ?? []).map((f: any) => f.competency_id).filter(Boolean),
+          ...(userSelections ?? []).map((sel: any) => sel.pro_moves?.competency_id).filter(Boolean)
+        ])
       ) as number[];
       let domainMap: Record<number, string> = {};
-      if (compIds.length) {
+      if (allCompIds.length) {
         const { data: comps } = await supabase
           .from('competencies')
           .select('competency_id, domain_id')
-          .in('competency_id', compIds);
+          .in('competency_id', allCompIds);
 
         const domainIds = Array.from(new Set((comps ?? []).map(c => c.domain_id).filter(Boolean)));
         if (domainIds.length) {
@@ -218,7 +239,7 @@ export default function StatsScores() {
         }
       }
 
-      // 3) Overlay any existing scores (if any)
+      // 4) Overlay any existing scores (if any)
       let scoreMap: Record<string, { confidence_score: number|null, performance_score: number|null }> = {};
       if (focusIds.length) {
         const { data: scores } = await supabase
@@ -234,14 +255,33 @@ export default function StatsScores() {
         });
       }
 
-      // 4) Build view rows even if all scores are null
+      // 5) Build view rows even if all scores are null
       const rows: WeekData[] = (focus ?? []).map((f: any) => {
-        const compId = f.pro_moves?.competency_id as number | null;
+        let action_statement = 'Pro Move';
+        let compId: number | null = null;
+        
+        if (f.self_select) {
+          // Self-select item
+          const selection = selectionsMap[f.id];
+          if (selection?.pro_moves) {
+            action_statement = selection.pro_moves.action_statement;
+            compId = selection.pro_moves.competency_id;
+          } else {
+            action_statement = 'Self-Select';
+            compId = f.competency_id; // Use focus competency_id for domain
+          }
+        } else {
+          // Regular pro move
+          action_statement = f.pro_moves?.action_statement || 'Pro Move';
+          compId = f.pro_moves?.competency_id;
+        }
+        
         const domain_name = compId ? (domainMap[compId] || 'General') : 'General';
         const sc = scoreMap[f.id] || { confidence_score: null, performance_score: null };
+        
         return {
           domain_name,
-          action_statement: f.pro_moves?.action_statement || 'Pro Move',
+          action_statement,
           confidence_score: sc.confidence_score,
           performance_score: sc.performance_score
         };
@@ -300,6 +340,9 @@ export default function StatsScores() {
     );
   }
 
+  // Filter cycles to show only selected cycle
+  const filteredCycles = selectedCycle ? cycles.filter(cycle => cycle.cycle === selectedCycle) : cycles;
+
   return (
     <div className="space-y-4 max-w-full overflow-x-hidden">
       {/* Status Legend */}
@@ -311,8 +354,24 @@ export default function StatsScores() {
         </div>
       </div>
       
+      {/* Cycle Selector */}
+      {cycles.length > 1 && (
+        <Select value={selectedCycle?.toString() || ""} onValueChange={(value) => setSelectedCycle(parseInt(value))}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Select cycle" />
+          </SelectTrigger>
+          <SelectContent>
+            {cycles.map(cycle => (
+              <SelectItem key={cycle.cycle} value={cycle.cycle.toString()}>
+                Cycle {cycle.cycle}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      
       <Accordion type="multiple" className="space-y-4">
-        {cycles.map((cycle, cycleIndex) => (
+        {filteredCycles.map((cycle, cycleIndex) => (
           <AccordionItem
             key={cycle.cycle}
             value={`cycle-${cycle.cycle}`}
@@ -334,7 +393,7 @@ export default function StatsScores() {
                        cycle={cycle.cycle}
                        week={week}
                        staffData={staffData}
-                       onExpand={() => onWeekExpand(cycleIndex, week)}
+                       onExpand={() => onWeekExpand(cycles.findIndex(c => c.cycle === cycle.cycle), week)}
                        weekData={cycle.weeks.get(week) || []}
                        weekStatus={cycle.weekStatuses.get(week) || { total: 0, confCount: 0, perfCount: 0 }}
                        onWeekDeleted={() => loadCycleData()}
@@ -501,6 +560,12 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3">
               <span className="font-medium">Week {week}</span>
+              {/* Current Week Pill */}
+              {cycle === currentCycle && week === currentWeek && (
+                <Badge variant="outline" className="text-xs">
+                  Current Week
+                </Badge>
+              )}
               {generateRepairLinks()}
             </div>
             <div className="flex items-center gap-2">
@@ -525,6 +590,7 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
         </AccordionTrigger>
         
         <AccordionContent className="px-3 pb-3">
+          {weekData.length > 0 ? (
             <div className="space-y-2">
               {weekData.map((item, index) => (
                 <div
@@ -544,7 +610,10 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
                 </div>
               ))}
             </div>
-          </AccordionContent>
+          ) : (
+            <p className="text-muted-foreground py-4">No Pro-Moves scheduled for this week.</p>
+          )}
+        </AccordionContent>
       </AccordionItem>
 
       {/* Delete Confirmation Dialog */}

@@ -162,25 +162,161 @@ export default function CoachDetail() {
     // Load all 6 weeks for the cycle
     for (let week = 1; week <= 6; week++) {
       try {
-        const { data: weekData, error } = await supabase.rpc('get_weekly_review', {
-          p_cycle: cycle,
-          p_week: week,
-          p_role_id: roleId,
-          p_staff_id: staffId
+        // Skip RPC for current week, use fallback directly
+        const isCurrentWeek = cycle === currentCycle && week === currentWeek;
+        
+        if (!isCurrentWeek) {
+          // Try RPC first for historical weeks
+          const { data: weekData, error } = await supabase.rpc('get_weekly_review', {
+            p_cycle: cycle,
+            p_week: week,
+            p_role_id: roleId,
+            p_staff_id: staffId
+          });
+
+          if (!error && weekData && weekData.length) {
+            // Calculate missing scores
+            const confMissing = weekData.filter((item: WeekData) => item.confidence_score === null).length;
+            const perfMissing = weekData.filter((item: WeekData) => item.performance_score === null).length;
+
+            setCycles(prev => prev.map(c => {
+              if (c.cycle === cycle) {
+                const newWeeks = new Map(c.weeks);
+                newWeeks.set(week, {
+                  loaded: true,
+                  data: weekData,
+                  confMissing,
+                  perfMissing
+                });
+                return { ...c, weeks: newWeeks };
+              }
+              return c;
+            }));
+            continue; // Skip fallback for this week
+          }
+        }
+
+        // Fallback logic (same as loadWeekData)
+        const { data: focus } = await supabase
+          .from('weekly_focus')
+          .select(`
+            id,
+            display_order,
+            self_select,
+            competency_id,
+            pro_moves(action_statement, competency_id)
+          `)
+          .eq('cycle', cycle)
+          .eq('week_in_cycle', week)
+          .eq('role_id', roleId)
+          .order('display_order');
+
+        const focusIds = (focus ?? []).map((f: any) => f.id);
+
+        // Get user selections
+        const { data: userSelections } = await supabase
+          .from('weekly_self_select')
+          .select(`
+            weekly_focus_id,
+            selected_pro_move_id,
+            pro_moves(action_statement, competency_id)
+          `)
+          .eq('user_id', staffId)
+          .in('weekly_focus_id', focusIds);
+
+        const selectionsMap: Record<string, any> = {};
+        (userSelections ?? []).forEach((sel: any) => {
+          selectionsMap[sel.weekly_focus_id] = sel;
         });
 
-        if (error) throw error;
+        // Map competency -> domain
+        const allCompIds = Array.from(
+          new Set([
+            ...(focus ?? []).map((f: any) => f.pro_moves?.competency_id).filter(Boolean),
+            ...(focus ?? []).map((f: any) => f.competency_id).filter(Boolean),
+            ...(userSelections ?? []).map((sel: any) => sel.pro_moves?.competency_id).filter(Boolean)
+          ])
+        ) as number[];
+        
+        let domainMap: Record<number, string> = {};
+        if (allCompIds.length) {
+          const { data: comps } = await supabase
+            .from('competencies')
+            .select('competency_id, domain_id')
+            .in('competency_id', allCompIds);
+
+          const domainIds = Array.from(new Set((comps ?? []).map(c => c.domain_id).filter(Boolean)));
+          if (domainIds.length) {
+            const { data: domains } = await supabase
+              .from('domains')
+              .select('domain_id, domain_name')
+              .in('domain_id', domainIds);
+            const idName: Record<number, string> = {};
+            (domains ?? []).forEach(d => { idName[d.domain_id] = d.domain_name; });
+            (comps ?? []).forEach(c => {
+              if (c.domain_id && idName[c.domain_id]) {
+                domainMap[c.competency_id] = idName[c.domain_id];
+              }
+            });
+          }
+        }
+
+        // Get existing scores
+        let scoreMap: Record<string, { confidence_score: number|null, performance_score: number|null }> = {};
+        if (focusIds.length) {
+          const { data: scores } = await supabase
+            .from('weekly_scores')
+            .select('weekly_focus_id, confidence_score, performance_score')
+            .eq('staff_id', staffId)
+            .in('weekly_focus_id', focusIds);
+          (scores ?? []).forEach((s: any) => {
+            scoreMap[s.weekly_focus_id] = {
+              confidence_score: s.confidence_score,
+              performance_score: s.performance_score
+            };
+          });
+        }
+
+        // Build view rows
+        const rows: WeekData[] = (focus ?? []).map((f: any) => {
+          let action_statement = 'Pro Move';
+          let compId: number | null = null;
+          
+          if (f.self_select) {
+            const selection = selectionsMap[f.id];
+            if (selection?.pro_moves) {
+              action_statement = selection.pro_moves.action_statement;
+              compId = selection.pro_moves.competency_id;
+            } else {
+              action_statement = 'Self-Select';
+              compId = f.competency_id;
+            }
+          } else {
+            action_statement = f.pro_moves?.action_statement || 'Pro Move';
+            compId = f.pro_moves?.competency_id;
+          }
+          
+          const domain_name = compId ? (domainMap[compId] || 'General') : 'General';
+          const sc = scoreMap[f.id] || { confidence_score: null, performance_score: null };
+          
+          return {
+            domain_name,
+            action_statement,
+            confidence_score: sc.confidence_score,
+            performance_score: sc.performance_score
+          };
+        });
 
         // Calculate missing scores
-        const confMissing = (weekData || []).filter((item: WeekData) => item.confidence_score === null).length;
-        const perfMissing = (weekData || []).filter((item: WeekData) => item.performance_score === null).length;
+        const confMissing = rows.filter((item: WeekData) => item.confidence_score === null).length;
+        const perfMissing = rows.filter((item: WeekData) => item.performance_score === null).length;
 
         setCycles(prev => prev.map(c => {
           if (c.cycle === cycle) {
             const newWeeks = new Map(c.weeks);
             newWeeks.set(week, {
               loaded: true,
-              data: weekData || [],
+              data: rows,
               confMissing,
               perfMissing
             });
@@ -188,6 +324,7 @@ export default function CoachDetail() {
           }
           return c;
         }));
+
       } catch (error) {
         console.error(`Error loading week ${week} data:`, error);
       }
@@ -198,25 +335,161 @@ export default function CoachDetail() {
     if (!staffInfo) return;
 
     try {
-      const { data: weekData, error } = await supabase.rpc('get_weekly_review', {
-        p_cycle: cycle,
-        p_week: week,
-        p_role_id: staffInfo.role_id,
-        p_staff_id: staffInfo.id
+      // Skip RPC for current week (shows "no pro moves" issue), use fallback directly
+      const isCurrentWeek = cycle === currentCycle && week === currentWeek;
+      
+      if (!isCurrentWeek) {
+        // Try RPC first for historical weeks (works fine when scores exist)
+        const { data: weekData, error } = await supabase.rpc('get_weekly_review', {
+          p_cycle: cycle,
+          p_week: week,
+          p_role_id: staffInfo.role_id,
+          p_staff_id: staffInfo.id
+        });
+
+        if (!error && weekData && weekData.length) {
+          // Calculate missing scores
+          const confMissing = weekData.filter((item: WeekData) => item.confidence_score === null).length;
+          const perfMissing = weekData.filter((item: WeekData) => item.performance_score === null).length;
+
+          setCycles(prev => prev.map(c => {
+            if (c.cycle === cycle) {
+              const newWeeks = new Map(c.weeks);
+              newWeeks.set(week, {
+                loaded: true,
+                data: weekData,
+                confMissing,
+                perfMissing
+              });
+              return { ...c, weeks: newWeeks };
+            }
+            return c;
+          }));
+          return;
+        }
+      }
+
+      // Fallback: compose from weekly_focus + optional scores (same logic as StatsScores)
+      const { data: focus } = await supabase
+        .from('weekly_focus')
+        .select(`
+          id,
+          display_order,
+          self_select,
+          competency_id,
+          pro_moves(action_statement, competency_id)
+        `)
+        .eq('cycle', cycle)
+        .eq('week_in_cycle', week)
+        .eq('role_id', staffInfo.role_id)
+        .order('display_order');
+
+      const focusIds = (focus ?? []).map((f: any) => f.id);
+
+      // Get user selections for self-select items
+      const { data: userSelections } = await supabase
+        .from('weekly_self_select')
+        .select(`
+          weekly_focus_id,
+          selected_pro_move_id,
+          pro_moves(action_statement, competency_id)
+        `)
+        .eq('user_id', staffInfo.id) // Use staff ID for coach view
+        .in('weekly_focus_id', (focus ?? []).map((f: any) => f.id));
+
+      const selectionsMap: Record<string, any> = {};
+      (userSelections ?? []).forEach((sel: any) => {
+        selectionsMap[sel.weekly_focus_id] = sel;
       });
 
-      if (error) throw error;
+      // Map competency -> domain name
+      const allCompIds = Array.from(
+        new Set([
+          ...(focus ?? []).map((f: any) => f.pro_moves?.competency_id).filter(Boolean),
+          ...(focus ?? []).map((f: any) => f.competency_id).filter(Boolean),
+          ...(userSelections ?? []).map((sel: any) => sel.pro_moves?.competency_id).filter(Boolean)
+        ])
+      ) as number[];
+      
+      let domainMap: Record<number, string> = {};
+      if (allCompIds.length) {
+        const { data: comps } = await supabase
+          .from('competencies')
+          .select('competency_id, domain_id')
+          .in('competency_id', allCompIds);
+
+        const domainIds = Array.from(new Set((comps ?? []).map(c => c.domain_id).filter(Boolean)));
+        if (domainIds.length) {
+          const { data: domains } = await supabase
+            .from('domains')
+            .select('domain_id, domain_name')
+            .in('domain_id', domainIds);
+          const idName: Record<number, string> = {};
+          (domains ?? []).forEach(d => { idName[d.domain_id] = d.domain_name; });
+          (comps ?? []).forEach(c => {
+            if (c.domain_id && idName[c.domain_id]) {
+              domainMap[c.competency_id] = idName[c.domain_id];
+            }
+          });
+        }
+      }
+
+      // Overlay any existing scores
+      let scoreMap: Record<string, { confidence_score: number|null, performance_score: number|null }> = {};
+      if (focusIds.length) {
+        const { data: scores } = await supabase
+          .from('weekly_scores')
+          .select('weekly_focus_id, confidence_score, performance_score')
+          .eq('staff_id', staffInfo.id)
+          .in('weekly_focus_id', focusIds);
+        (scores ?? []).forEach((s: any) => {
+          scoreMap[s.weekly_focus_id] = {
+            confidence_score: s.confidence_score,
+            performance_score: s.performance_score
+          };
+        });
+      }
+
+      // Build view rows
+      const rows: WeekData[] = (focus ?? []).map((f: any) => {
+        let action_statement = 'Pro Move';
+        let compId: number | null = null;
+        
+        if (f.self_select) {
+          const selection = selectionsMap[f.id];
+          if (selection?.pro_moves) {
+            action_statement = selection.pro_moves.action_statement;
+            compId = selection.pro_moves.competency_id;
+          } else {
+            action_statement = 'Self-Select';
+            compId = f.competency_id;
+          }
+        } else {
+          action_statement = f.pro_moves?.action_statement || 'Pro Move';
+          compId = f.pro_moves?.competency_id;
+        }
+        
+        const domain_name = compId ? (domainMap[compId] || 'General') : 'General';
+        const sc = scoreMap[f.id] || { confidence_score: null, performance_score: null };
+        
+        return {
+          domain_name,
+          action_statement,
+          confidence_score: sc.confidence_score,
+          performance_score: sc.performance_score
+        };
+      });
 
       // Calculate missing scores
-      const confMissing = (weekData || []).filter((item: WeekData) => item.confidence_score === null).length;
-      const perfMissing = (weekData || []).filter((item: WeekData) => item.performance_score === null).length;
+      const confMissing = rows.filter((item: WeekData) => item.confidence_score === null).length;
+      const perfMissing = rows.filter((item: WeekData) => item.performance_score === null).length;
 
       setCycles(prev => prev.map(c => {
         if (c.cycle === cycle) {
           const newWeeks = new Map(c.weeks);
           newWeeks.set(week, {
             loaded: true,
-            data: weekData || [],
+            data: rows,
             confMissing,
             perfMissing
           });
@@ -224,6 +497,7 @@ export default function CoachDetail() {
         }
         return c;
       }));
+
     } catch (error) {
       console.error('Error loading week data:', error);
     }
@@ -381,7 +655,7 @@ export default function CoachDetail() {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-muted-foreground py-4">No Pro-Moves scheduled for this week.</p>
+                          <p className="text-muted-foreground py-4">Loading...</p>
                         )
                       ) : (
                         <div className="space-y-3">

@@ -165,6 +165,8 @@ export default function StatsScores() {
       // Skip RPC for current week (shows "no pro moves" issue), use fallback directly
       const isCurrentWeek = cycle === currentCycle && week === currentWeek;
       
+      console.log(`Loading week data for C${cycle}W${week}, isCurrentWeek: ${isCurrentWeek}, currentCycle: ${currentCycle}, currentWeek: ${currentWeek}`);
+      
       if (!isCurrentWeek) {
         // Try RPC first for historical weeks (works fine when scores exist)
         const { data: rpcRows } = await supabase.rpc('get_weekly_review', {
@@ -175,6 +177,7 @@ export default function StatsScores() {
         });
 
         if (rpcRows && rpcRows.length) {
+          console.log(`RPC returned ${rpcRows.length} rows for C${cycle}W${week}`);
           return rpcRows as WeekData[];
         }
       }
@@ -292,6 +295,7 @@ export default function StatsScores() {
         };
       });
 
+      console.log(`Fallback logic returned ${rows.length} rows for C${cycle}W${week}:`, rows);
       return rows;
     } catch (error) {
       console.error('Error loading week data:', error);
@@ -317,6 +321,8 @@ export default function StatsScores() {
   const onWeekExpand = async (cycleIndex: number, week: number) => {
     const cycle = cycles[cycleIndex];
     if (!cycle) return;
+
+    console.log(`Expanding accordion for C${cycle.cycle}W${week}, existing data length:`, cycle.weeks.get(week)?.length || 0);
 
     const weekData = await loadWeekData(cycle.cycle, week);
     
@@ -489,9 +495,9 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
 
 
   const handleExpand = () => {
-    if (weekData.length === 0) {
-      onExpand();
-    }
+    console.log(`Handle expand called for C${cycle}W${week}, current weekData length:`, weekData.length);
+    // Always call onExpand to ensure data is loaded, especially for current week
+    onExpand();
   };
 
   const getStatusBadge = () => {

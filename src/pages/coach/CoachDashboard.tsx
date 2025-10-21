@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import StaffRow from '@/components/coach/StaffRow';
@@ -97,6 +98,15 @@ export default function CoachDashboard() {
     
     setSearchParams(params, { replace: true });
   }, [selectedOrganization, selectedLocation, selectedRole, search, setSearchParams]);
+
+  const clearFilters = () => {
+    setSelectedOrganization('all');
+    setSelectedLocation('all');
+    setSelectedRole('all');
+    setSearch('');
+  };
+
+  const hasActiveFilters = selectedOrganization !== 'all' || selectedLocation !== 'all' || selectedRole !== 'all' || search.trim() !== '';
 
   const loadStaffData = async () => {
     try {
@@ -283,6 +293,18 @@ export default function CoachDashboard() {
             className="w-64"
             aria-label="Search staff by name"
           />
+          
+          {hasActiveFilters && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={clearFilters}
+              className="gap-2"
+            >
+              <X className="h-4 w-4" />
+              Clear Filters
+            </Button>
+          )}
         </div>
       </div>
 

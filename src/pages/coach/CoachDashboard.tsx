@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -39,6 +39,7 @@ interface StaffMember {
 
 export default function CoachDashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isCoach } = useAuth();
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -49,10 +50,10 @@ export default function CoachDashboard() {
   const [locations, setLocations] = useState<string[]>([]);
   const [organizations, setOrganizations] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState('all');
-  const [selectedOrganization, setSelectedOrganization] = useState('all');
-  const [selectedRole, setSelectedRole] = useState('all');
-  const [search, setSearch] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState(searchParams.get('loc') || 'all');
+  const [selectedOrganization, setSelectedOrganization] = useState(searchParams.get('org') || 'all');
+  const [selectedRole, setSelectedRole] = useState(searchParams.get('role') || 'all');
+  const [search, setSearch] = useState(searchParams.get('q') || '');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Redirect if not coach
@@ -85,6 +86,17 @@ export default function CoachDashboard() {
   useEffect(() => {
     applyFilters();
   }, [staff, selectedLocation, selectedOrganization, selectedRole, search]);
+
+  // Sync URL params with filter state
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedOrganization !== 'all') params.set('org', selectedOrganization);
+    if (selectedLocation !== 'all') params.set('loc', selectedLocation);
+    if (selectedRole !== 'all') params.set('role', selectedRole);
+    if (search.trim()) params.set('q', search.trim());
+    
+    setSearchParams(params, { replace: true });
+  }, [selectedOrganization, selectedLocation, selectedRole, search, setSearchParams]);
 
   const loadStaffData = async () => {
     try {

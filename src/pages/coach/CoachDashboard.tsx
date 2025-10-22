@@ -123,26 +123,30 @@ export default function CoachDashboard() {
           role_id,
           hire_date,
           onboarding_weeks,
+          is_participant,
           roles!inner(role_name),
           locations(name, organizations!locations_organization_id_fkey(name))
-        `);
+        `)
+        .eq('is_participant', true);
 
       if (error) throw error;
 
       // Normalize staff data to our shape
-      const processedStaff: StaffMember[] = (staffData as any[]).map((member: any) => ({
-        id: member.id,
-        name: member.name,
-        role_id: member.role_id,
-        role_name: (member.roles as any).role_name,
-        location: member.locations?.name ?? null,
-        organization: member.locations?.organizations?.name ?? null,
-        user_id: member.user_id,
-        hire_date: member.hire_date,
-        onboarding_weeks: member.onboarding_weeks || 6,
-        primary_location_id: member.primary_location_id,
-        weekly_scores: []
-      }));
+      const processedStaff: StaffMember[] = (staffData as any[])
+        .filter((member: any) => member.user_id !== user?.id) // Exclude self
+        .map((member: any) => ({
+          id: member.id,
+          name: member.name,
+          role_id: member.role_id,
+          role_name: (member.roles as any).role_name,
+          location: member.locations?.name ?? null,
+          organization: member.locations?.organizations?.name ?? null,
+          user_id: member.user_id,
+          hire_date: member.hire_date,
+          onboarding_weeks: member.onboarding_weeks || 6,
+          primary_location_id: member.primary_location_id,
+          weekly_scores: []
+        }));
 
       setStaff(processedStaff);
 

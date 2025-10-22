@@ -171,7 +171,8 @@ Deno.serve(async (req) => {
       const { data: staff } = await supabase
         .from('staff')
         .select('id, user_id, role_id, primary_location_id')
-        .eq('primary_location_id', locationId);
+        .eq('primary_location_id', locationId)
+        .eq('is_participant', true);
 
       for (const staffMember of staff || []) {
         if (staffMember.role_id && staffMember.primary_location_id) {

@@ -438,7 +438,7 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                     <Button 
                       size="sm" 
                       variant="outline"
-                      onClick={() => navigate(`/coach/${staffId}/eval/${evaluation.id}?mode=view`)}
+                      onClick={() => navigate(`/evaluation/${evaluation.id}`)}
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       View

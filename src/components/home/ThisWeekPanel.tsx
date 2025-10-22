@@ -28,7 +28,7 @@ interface WeeklyScore {
 }
 
 export default function ThisWeekPanel() {
-  const { user } = useAuth();
+  const { user, isParticipant } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const now = useNow();
@@ -190,6 +190,28 @@ export default function ThisWeekPanel() {
         </CardHeader>
         <CardContent>
           <div className="h-24 rounded-md bg-muted animate-pulse" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show Coach/Admin CTA for non-participants
+  if (!isParticipant) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>You&apos;re set up as a Coach/Admin</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Participant tasks aren&apos;t assigned to your account.
+          </p>
+          <Button 
+            className="w-full" 
+            onClick={() => navigate('/coach')}
+          >
+            Go to Coach Dashboard
+          </Button>
         </CardContent>
       </Card>
     );

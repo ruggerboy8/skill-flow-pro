@@ -37,15 +37,6 @@ export default function Layout() {
   // Use sidebar for coaches and super admins
   const useSidebar = isCoach || isSuperAdmin;
 
-  // Don't render until we know the user's role to prevent flashing
-  if (roleLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   if (useSidebar) {
     return (
       <div className="min-h-screen bg-background">
@@ -65,7 +56,13 @@ export default function Layout() {
               </header>
               
               <main className="flex-1 p-6 overflow-auto w-full min-w-0">
-                <Outlet />
+                {roleLoading ? (
+                  <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <Outlet />
+                )}
               </main>
             </div>
           </div>
@@ -146,7 +143,13 @@ export default function Layout() {
 
       {/* Main Content */}
       <main className="container mx-auto px-2 py-4 md:px-4 md:py-6 w-full min-w-0 overflow-auto">
-        <Outlet />
+        {roleLoading ? (
+          <div className="flex items-center justify-center min-h-[50vh]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   );

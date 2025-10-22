@@ -53,6 +53,7 @@ export default function EvaluationViewer() {
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
   const [staffName, setStaffName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [backUrl, setBackUrl] = useState('/stats/evaluations');
 
   useEffect(() => {
     if (!user || !evalId) return;
@@ -102,6 +103,11 @@ export default function EvaluationViewer() {
           setStaffName(staffData.name);
         }
 
+        // Set back URL: if coach viewing another staff's evaluation, go to that staff's page
+        if ((isCoach || isSuperAdmin) && evalData.staff_id !== staff.id) {
+          setBackUrl(`/coach/${evalData.staff_id}`);
+        }
+
         setEvaluation(evalData);
       } catch (err) {
         console.error('Error loading evaluation:', err);
@@ -129,7 +135,7 @@ export default function EvaluationViewer() {
           <Button 
             variant="outline" 
             className="mt-4"
-            onClick={() => navigate('/stats/evaluations')}
+            onClick={() => navigate(backUrl)}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Evaluations
@@ -177,7 +183,7 @@ export default function EvaluationViewer() {
         <Button 
           variant="outline" 
           size="sm"
-          onClick={() => navigate('/stats/evaluations')}
+          onClick={() => navigate(backUrl)}
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back

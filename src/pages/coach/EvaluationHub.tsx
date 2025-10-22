@@ -65,6 +65,7 @@ export function EvaluationHub() {
   const [pendingObserverNotes, setPendingObserverNotes] = useState<Record<number, string>>({});
   const [pendingSelfNotes, setPendingSelfNotes] = useState<Record<number, string>>({});
   const [editType, setEditType] = useState<string>('');
+  const [editQuarter, setEditQuarter] = useState<string | null>(null);
   const [editDate, setEditDate] = useState<Date | undefined>();
 
   useEffect(() => {
@@ -129,6 +130,7 @@ export function EvaluationHub() {
 
       // Initialize edit fields
       setEditType(data.type);
+      setEditQuarter(data.quarter);
       setEditDate(data.observed_at ? new Date(data.observed_at) : undefined);
     } catch (error) {
       console.error('Failed to load evaluation:', error);
@@ -334,9 +336,21 @@ export function EvaluationHub() {
     
     try {
       setEditType(newType);
-      await updateEvaluationMetadata(evalId, { type: newType });
       
-      setEvaluation(prev => prev ? { ...prev, type: newType } : prev);
+      // If changing to non-Quarterly, clear quarter
+      const updateData: { type: string; quarter?: null } = { type: newType };
+      if (newType !== 'Quarterly') {
+        updateData.quarter = null;
+        setEditQuarter(null);
+      }
+      
+      await updateEvaluationMetadata(evalId, updateData);
+      
+      setEvaluation(prev => prev ? { 
+        ...prev, 
+        type: newType,
+        quarter: newType !== 'Quarterly' ? null : prev.quarter
+      } : prev);
       
       toast({
         title: "Saved",
@@ -348,6 +362,30 @@ export function EvaluationHub() {
       toast({
         title: "Error",
         description: "Failed to update type",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleQuarterChange = async (newQuarter: string) => {
+    if (!evalId) return;
+    
+    try {
+      setEditQuarter(newQuarter);
+      await updateEvaluationMetadata(evalId, { quarter: newQuarter });
+      
+      setEvaluation(prev => prev ? { ...prev, quarter: newQuarter } : prev);
+      
+      toast({
+        title: "Saved",
+        description: "Quarter updated",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Failed to update quarter:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update quarter",
         variant: "destructive"
       });
     }
@@ -521,8 +559,21 @@ export function EvaluationHub() {
                     <SelectItem value="Quarterly">Quarterly</SelectItem>
                   </SelectContent>
                 </Select>
+                {editType === 'Quarterly' && (
+                  <Select value={editQuarter || ''} onValueChange={handleQuarterChange}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Quarter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Q1">Q1</SelectItem>
+                      <SelectItem value="Q2">Q2</SelectItem>
+                      <SelectItem value="Q3">Q3</SelectItem>
+                      <SelectItem value="Q4">Q4</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
                 <span className="text-xl font-bold">
-                  {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
+                  {evaluation.program_year} Evaluation
                 </span>
               </div>
             ) : (

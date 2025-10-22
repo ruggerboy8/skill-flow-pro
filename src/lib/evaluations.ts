@@ -325,11 +325,11 @@ export async function setSelfNote(
 }
 
 /**
- * Update evaluation metadata (type and observed date)
+ * Update evaluation metadata (type, quarter, and observed date)
  */
 export async function updateEvaluationMetadata(
   evalId: string,
-  data: { type?: string; observed_at?: string }
+  data: { type?: string; quarter?: string | null; observed_at?: string }
 ) {
   const { error } = await supabase
     .from('evaluations')

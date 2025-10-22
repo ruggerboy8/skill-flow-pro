@@ -6,6 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
@@ -31,6 +35,7 @@ import {
   submitEvaluation,
   deleteEvaluation,
   isEvaluationComplete,
+  updateEvaluationMetadata,
   type EvaluationWithItems
 } from '@/lib/evaluations';
 
@@ -59,6 +64,8 @@ export function EvaluationHub() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [pendingObserverNotes, setPendingObserverNotes] = useState<Record<number, string>>({});
   const [pendingSelfNotes, setPendingSelfNotes] = useState<Record<number, string>>({});
+  const [editType, setEditType] = useState<string>('');
+  const [editDate, setEditDate] = useState<Date | undefined>();
 
   useEffect(() => {
     if (evalId) {
@@ -119,6 +126,10 @@ export function EvaluationHub() {
       if (staffData) {
         setStaffName(staffData.name);
       }
+
+      // Initialize edit fields
+      setEditType(data.type);
+      setEditDate(data.observed_at ? new Date(data.observed_at) : undefined);
     } catch (error) {
       console.error('Failed to load evaluation:', error);
       toast({
@@ -318,6 +329,59 @@ export function EvaluationHub() {
     }
   };
 
+  const handleTypeChange = async (newType: string) => {
+    if (!evalId) return;
+    
+    try {
+      setEditType(newType);
+      await updateEvaluationMetadata(evalId, { type: newType });
+      
+      setEvaluation(prev => prev ? { ...prev, type: newType } : prev);
+      
+      toast({
+        title: "Saved",
+        description: "Evaluation type updated",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Failed to update evaluation type:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update type",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDateChange = async (newDate: Date | undefined) => {
+    if (!evalId) return;
+    
+    try {
+      setEditDate(newDate);
+      await updateEvaluationMetadata(evalId, { 
+        observed_at: newDate?.toISOString() 
+      });
+      
+      setEvaluation(prev => prev ? { 
+        ...prev, 
+        observed_at: newDate?.toISOString() || null 
+      } : prev);
+      
+      toast({
+        title: "Saved",
+        description: "Observation date updated",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Failed to update observation date:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update date",
+        variant: "destructive"
+      });
+    }
+  };
+
   const draftObserverNote = (competencyId: number, text: string) => {
     setPendingObserverNotes(prev => ({ ...prev, [competencyId]: text }));
   };
@@ -444,13 +508,54 @@ export function EvaluationHub() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">
-              {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
-            </h1>
-            <p className="text-muted-foreground">
-              {staffName || 'Staff Member'} • {evaluation.status === 'draft' ? 'Draft' : 'Submitted'}
-            </p>
+          <div className="space-y-2">
+            {mode === 'edit' ? (
+              <div className="flex items-center gap-2">
+                <Select value={editType} onValueChange={handleTypeChange}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Baseline">Baseline</SelectItem>
+                    <SelectItem value="Midpoint">Midpoint</SelectItem>
+                    <SelectItem value="Quarterly">Quarterly</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-xl font-bold">
+                  {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
+                </span>
+              </div>
+            ) : (
+              <h1 className="text-2xl font-bold">
+                {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
+              </h1>
+            )}
+            <div className="flex items-center gap-2">
+              <p className="text-muted-foreground">
+                {staffName || 'Staff Member'} • {evaluation.status === 'draft' ? 'Draft' : 'Submitted'}
+              </p>
+              {mode === 'edit' && (
+                <>
+                  <span className="text-muted-foreground">•</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 text-xs">
+                        <CalendarIcon className="w-3 h-3 mr-1" />
+                        {editDate ? format(editDate, 'MMM d, yyyy') : 'Set date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={editDate}
+                        onSelect={handleDateChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center space-x-2">

@@ -325,6 +325,23 @@ export async function setSelfNote(
 }
 
 /**
+ * Update evaluation metadata (type and observed date)
+ */
+export async function updateEvaluationMetadata(
+  evalId: string,
+  data: { type?: string; observed_at?: string }
+) {
+  const { error } = await supabase
+    .from('evaluations')
+    .update(data)
+    .eq('id', evalId);
+
+  if (error) {
+    throw new Error(`Failed to update evaluation metadata: ${error.message}`);
+  }
+}
+
+/**
  * Submit an evaluation (mark as completed)
  */
 export async function submitEvaluation(evalId: string) {

@@ -401,6 +401,7 @@ export type Database = {
           hire_date: string | null
           id: string
           is_coach: boolean
+          is_participant: boolean
           is_super_admin: boolean
           location: string | null
           name: string
@@ -418,6 +419,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           is_coach?: boolean
+          is_participant?: boolean
           is_super_admin?: boolean
           location?: string | null
           name: string
@@ -435,6 +437,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           is_coach?: boolean
+          is_participant?: boolean
           is_super_admin?: boolean
           location?: string | null
           name?: string
@@ -969,10 +972,7 @@ export type Database = {
         }
         Returns: number
       }
-      bulk_upsert_pro_moves: {
-        Args: { pro_moves_data: Json }
-        Returns: Json
-      }
+      bulk_upsert_pro_moves: { Args: { pro_moves_data: Json }; Returns: Json }
       compare_conf_perf_to_eval: {
         Args: {
           p_end?: string
@@ -998,10 +998,7 @@ export type Database = {
           staff_id: string
         }[]
       }
-      delete_latest_week_data: {
-        Args: { p_user_id: string }
-        Returns: Json
-      }
+      delete_latest_week_data: { Args: { p_user_id: string }; Returns: Json }
       delete_week_data: {
         Args: {
           p_cycle: number
@@ -1029,23 +1026,37 @@ export type Database = {
           week_in_cycle: number
         }[]
       }
-      get_evaluations_summary: {
-        Args:
-          | { p_only_submitted?: boolean; p_staff_id: string }
-          | { p_staff_id: string }
-        Returns: {
-          avg_observer: number
-          avg_self: number
-          delta: number
-          domain_name: string
-          eval_id: string
-          program_year: number
-          quarter: string
-          status: string
-          submitted_at: string
-          type: string
-        }[]
-      }
+      get_evaluations_summary:
+        | {
+            Args: { p_staff_id: string }
+            Returns: {
+              avg_observer: number
+              avg_self: number
+              delta: number
+              domain_name: string
+              eval_id: string
+              program_year: number
+              quarter: string
+              status: string
+              submitted_at: string
+              type: string
+            }[]
+          }
+        | {
+            Args: { p_only_submitted?: boolean; p_staff_id: string }
+            Returns: {
+              avg_observer: number
+              avg_self: number
+              delta: number
+              domain_name: string
+              eval_id: string
+              program_year: number
+              quarter: string
+              status: string
+              submitted_at: string
+              type: string
+            }[]
+          }
       get_focus_cycle_week: {
         Args: { p_cycle: number; p_role_id: number; p_week: number }
         Returns: {
@@ -1136,7 +1147,7 @@ export type Database = {
         }[]
       }
       get_staff_summary: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           email: string
           is_coach: boolean
@@ -1169,7 +1180,7 @@ export type Database = {
         }[]
       }
       get_user_admin_status: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           coach: boolean
           super_admin: boolean
@@ -1198,10 +1209,7 @@ export type Database = {
           performance_score: number
         }[]
       }
-      is_coach_or_admin: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
+      is_coach_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_eligible_for_pro_moves: {
         Args: {
           check_date?: string
@@ -1210,14 +1218,8 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_super_admin: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
-      is_superadmin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_superadmin: { Args: never; Returns: boolean }
       needs_backfill: {
         Args: { p_role_id: number; p_staff_id: string }
         Returns: Json
@@ -1235,12 +1237,15 @@ export type Database = {
         Args: { p_action_id: number; p_staff_id: string }
         Returns: undefined
       }
-      retime_backfill_cycle: {
-        Args:
-          | { p_cycle: number; p_role_id: number; p_staff_id: string }
-          | { p_cycle: number; p_role_id: number; p_staff_id: string }
-        Returns: undefined
-      }
+      retime_backfill_cycle:
+        | {
+            Args: { p_cycle: number; p_role_id: number; p_staff_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: { p_cycle: number; p_role_id: number; p_staff_id: string }
+            Returns: string
+          }
       rewrite_backfill_week: {
         Args: {
           p_cycle: number

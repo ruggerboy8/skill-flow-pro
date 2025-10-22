@@ -17,6 +17,8 @@ export default function Layout() {
     // Backfill nav removed - keeping function for individual score backfill only
     ...(isCoach || isSuperAdmin ? [
       { name: 'Coach', href: '/coach', icon: Users },
+    ] : []),
+    ...(isSuperAdmin ? [
       { name: 'Builder', href: '/builder', icon: Settings },
       { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Eval Results', href: '/admin/eval-results', icon: TrendingUp }

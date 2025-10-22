@@ -18,6 +18,7 @@ interface AuthContextType {
   signUpWithPassword: (email: string, password: string) => Promise<{ error: any }>;
   resetPassword: (email: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  refreshRoles: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -176,6 +177,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const refreshRoles = async () => {
+    if (!user) return;
+    
+    setRoleLoading(true);
+    try {
+      const { data } = await supabase
+        .from('staff')
+        .select('is_coach, is_super_admin, is_participant, is_lead, name, role_id, primary_location_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (data) {
+        setIsCoach(data.is_coach || data.is_super_admin);
+        setIsSuperAdmin(data.is_super_admin);
+        setIsParticipant(data.is_participant);
+        setIsLead(data.is_lead || false);
+        setNeedsProfileSetup(false);
+      } else {
+        setNeedsProfileSetup(true);
+        setIsCoach(false);
+        setIsSuperAdmin(false);
+        setIsParticipant(true);
+        setIsLead(false);
+      }
+    } catch (error) {
+      console.error('Error refreshing roles:', error);
+    } finally {
+      setRoleLoading(false);
+    }
+  };
+
     return (
     <AuthContext.Provider value={{
       user,
@@ -192,7 +224,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithPassword,
       signUpWithPassword,
       resetPassword,
-      signOut
+      signOut,
+      refreshRoles
     }}>
       {children}
     </AuthContext.Provider>

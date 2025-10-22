@@ -4,12 +4,28 @@ import { Button } from '@/components/ui/button';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { useAuth } from '@/hooks/useAuth';
+import { useRoleRefresh } from '@/hooks/useRoleRefresh';
+import { useToast } from '@/hooks/use-toast';
 import { Home, BarChart3, User, Settings, Users, TrendingUp, Shield } from 'lucide-react';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
-  const { user, signOut, isCoach, isSuperAdmin, isLead, roleLoading } = useAuth();
+  const { user, signOut, isCoach, isSuperAdmin, isLead, roleLoading, refreshRoles } = useAuth();
   const location = useLocation();
+  const { toast } = useToast();
+
+  // Monitor for role changes and refresh automatically
+  useRoleRefresh(user?.id || null, {
+    enabled: !!user,
+    pollInterval: 60000, // Check every 60 seconds
+    onRoleChange: async () => {
+      await refreshRoles();
+      toast({
+        title: "Permissions Updated",
+        description: "Your role or permissions have been updated.",
+      });
+    }
+  });
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },

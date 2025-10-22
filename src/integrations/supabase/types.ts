@@ -493,6 +493,7 @@ export type Database = {
           participation_start_at: string | null
           primary_location_id: string | null
           role_id: number | null
+          roles_updated_at: string | null
           updated_at: string | null
           user_id: string
         }
@@ -515,6 +516,7 @@ export type Database = {
           participation_start_at?: string | null
           primary_location_id?: string | null
           role_id?: number | null
+          roles_updated_at?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -537,6 +539,7 @@ export type Database = {
           participation_start_at?: string | null
           primary_location_id?: string | null
           role_id?: number | null
+          roles_updated_at?: string | null
           updated_at?: string | null
           user_id?: string
         }

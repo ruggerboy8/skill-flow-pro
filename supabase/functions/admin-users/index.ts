@@ -176,7 +176,7 @@ serve(async (req: Request) => {
       }
 
       case "update_user": {
-        const { user_id, name, role_id, location_id, is_super_admin, is_coach, is_lead } = payload ?? {};
+        const { user_id, name, role_id, location_id, is_super_admin, is_coach, is_lead, coach_scope_type, coach_scope_id } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
 
         // Get current state for audit
@@ -193,6 +193,8 @@ serve(async (req: Request) => {
         if (is_super_admin !== undefined) updateData.is_super_admin = is_super_admin;
         if (is_coach !== undefined) updateData.is_coach = is_coach;
         if (is_lead !== undefined) updateData.is_lead = is_lead;
+        if (coach_scope_type !== undefined) updateData.coach_scope_type = coach_scope_type;
+        if (coach_scope_id !== undefined) updateData.coach_scope_id = coach_scope_id;
 
         const { data: staff, error: stErr } = await admin
           .from("staff")
@@ -223,6 +225,8 @@ serve(async (req: Request) => {
                   is_super_admin: currentStaff.is_super_admin,
                   is_coach: currentStaff.is_coach,
                   is_lead: currentStaff.is_lead,
+                  coach_scope_type: currentStaff.coach_scope_type,
+                  coach_scope_id: currentStaff.coach_scope_id,
                 },
                 new_values: updateData,
               });
@@ -236,7 +240,7 @@ serve(async (req: Request) => {
       }
 
       case "role_preset": {
-        const { user_id, preset, scope_organization_id, scope_location_id } = payload ?? {};
+        const { user_id, preset, coach_scope_type, coach_scope_id, scope_location_id } = payload ?? {};
         
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
@@ -260,18 +264,24 @@ serve(async (req: Request) => {
             is_coach: false,
             is_super_admin: false,
             primary_location_id: currentStaff.primary_location_id, // Keep current location
+            coach_scope_type: null,
+            coach_scope_id: null,
           },
           lead_rda: {
             is_participant: true,
             is_lead: true,
             is_coach: false,
             is_super_admin: false,
+            coach_scope_type: coach_scope_type || null,
+            coach_scope_id: coach_scope_id || null,
           },
           coach: {
             is_participant: false,
             is_lead: false,
             is_coach: true,
             is_super_admin: false,
+            coach_scope_type: coach_scope_type || null,
+            coach_scope_id: coach_scope_id || null,
           },
           super_admin: {
             is_participant: false,
@@ -279,18 +289,22 @@ serve(async (req: Request) => {
             is_coach: false,
             is_super_admin: true,
             primary_location_id: null, // Clear scope
+            coach_scope_type: null,
+            coach_scope_id: null,
           },
         };
         
         const config = presets[preset];
         if (!config) return json({ error: "Invalid preset" }, 400);
         
-        // Validate scope requirements
-        if ((preset === "lead_rda" || preset === "coach") && !scope_location_id) {
-          return json({ error: `${preset === "lead_rda" ? "Lead RDA" : "Coach"} requires location scope` }, 400);
+        // Validate scope requirements for Lead RDA and Coach
+        if (preset === "lead_rda" || preset === "coach") {
+          if (!coach_scope_type || !coach_scope_id) {
+            return json({ error: `${preset === "lead_rda" ? "Lead RDA" : "Coach"} requires scope type and scope ID` }, 400);
+          }
         }
         
-        // Apply location scope if provided
+        // Apply location to primary_location_id if scope is location-based
         if (scope_location_id) {
           config.primary_location_id = scope_location_id;
         }
@@ -342,6 +356,8 @@ serve(async (req: Request) => {
                 is_coach: currentStaff.is_coach,
                 is_super_admin: currentStaff.is_super_admin,
                 primary_location_id: currentStaff.primary_location_id,
+                coach_scope_type: currentStaff.coach_scope_type,
+                coach_scope_id: currentStaff.coach_scope_id,
               },
               new_values: config,
               scope_location_id,

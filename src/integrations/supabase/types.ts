@@ -475,6 +475,8 @@ export type Database = {
       }
       staff: {
         Row: {
+          coach_scope_id: string | null
+          coach_scope_type: string | null
           created_at: string | null
           email: string
           hire_date: string | null
@@ -494,6 +496,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          coach_scope_id?: string | null
+          coach_scope_type?: string | null
           created_at?: string | null
           email: string
           hire_date?: string | null
@@ -513,6 +517,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          coach_scope_id?: string | null
+          coach_scope_type?: string | null
           created_at?: string | null
           email?: string
           hire_date?: string | null

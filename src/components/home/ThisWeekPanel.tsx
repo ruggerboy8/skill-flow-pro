@@ -76,8 +76,13 @@ export default function ThisWeekPanel() {
 
   // Load current week data and compute state
   useEffect(() => {
+    // Early return for non-participants to avoid heavy computation
+    if (!isParticipant) {
+      setLoading(false);
+      return;
+    }
     if (staff) void loadCurrentWeek();
-  }, [staff, overrides]); // Re-run when simulation overrides change
+  }, [staff, overrides, isParticipant]); // Re-run when simulation overrides change
 
   async function loadCurrentWeek() {
     if (!staff || !user) return;

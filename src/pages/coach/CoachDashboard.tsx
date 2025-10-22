@@ -120,7 +120,7 @@ export default function CoachDashboard() {
           .select(`
             id,
             primary_location_id,
-            locations!staff_primary_location_id_fkey(organization_id)
+            locations!primary_location_id(organization_id)
           `)
           .eq('user_id', user?.id)
           .maybeSingle();

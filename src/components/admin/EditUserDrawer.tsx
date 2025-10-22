@@ -46,7 +46,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [scopeLocId, setScopeLocId] = useState<string>("");
-  const [scopeType, setScopeType] = useState<'org' | 'location' | ''>('');
+  const [scopeType, setScopeType] = useState<'org' | 'location' | 'none'>('none');
   const [scopeOrgId, setScopeOrgId] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
@@ -70,8 +70,8 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
       setScopeLocId(user.location_id || "");
       // Initialize scope from user data if available
       // Note: We'd need to add coach_scope_type and coach_scope_id to the User interface
-      // For now, default to empty until user picks a preset
-      setScopeType('');
+      // For now, default to none until user picks a preset
+      setScopeType('none');
       setScopeOrgId("");
     }
   }, [user, open]);
@@ -81,7 +81,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     
     // Validate scope requirements for Lead RDA and Coach
     if (preset === 'lead_rda' || preset === 'coach') {
-      if (!scopeType) {
+      if (!scopeType || scopeType === 'none') {
         toast({
           title: "Scope required",
           description: `${preset === 'lead_rda' ? 'Lead RDA' : 'Coach'} requires scope type (Organization or Location)`,
@@ -110,7 +110,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
           action: 'role_preset',
           user_id: user.user_id,
           preset,
-          coach_scope_type: scopeType || null,
+          coach_scope_type: scopeType === 'none' ? null : scopeType,
           coach_scope_id: scopeId,
           scope_location_id: scopeType === 'location' ? scopeLocId : null, // For primary_location_id
         },
@@ -201,12 +201,12 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             {/* Scope Type Selector */}
             <div className="space-y-2">
               <Label htmlFor="scope-type" className="text-xs">Scope Type (For Lead RDA / Coach)</Label>
-              <Select value={scopeType} onValueChange={(value) => setScopeType(value as 'org' | 'location' | '')}>
+              <Select value={scopeType} onValueChange={(value) => setScopeType(value as 'org' | 'location' | 'none')}>
                 <SelectTrigger id="scope-type" className="h-8 text-xs">
                   <SelectValue placeholder="Select scope type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   <SelectItem value="org">Organization</SelectItem>
                   <SelectItem value="location">Location</SelectItem>
                 </SelectContent>
@@ -222,7 +222,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                     <SelectValue placeholder="Select organization" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {organizations.map((org) => (
                       <SelectItem key={org.id} value={org.id}>
                         {org.name}
@@ -242,7 +242,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {locations.map((location) => (
                       <SelectItem key={location.id} value={location.id}>
                         {location.name}
@@ -270,9 +270,9 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 variant="outline"
                 size="sm"
                 onClick={() => handlePresetClick('lead_rda')}
-                disabled={loading || !scopeType || (scopeType === 'org' ? !scopeOrgId : !scopeLocId)}
+                disabled={loading || !scopeType || scopeType === 'none' || (scopeType === 'org' ? !scopeOrgId : !scopeLocId)}
                 className="text-xs"
-                title={!scopeType ? "Requires scope type and selection" : ""}
+                title={!scopeType || scopeType === 'none' ? "Requires scope type and selection" : ""}
               >
                 Make Lead RDA
               </Button>
@@ -281,9 +281,9 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 variant="outline"
                 size="sm"
                 onClick={() => handlePresetClick('coach')}
-                disabled={loading || !scopeType || (scopeType === 'org' ? !scopeOrgId : !scopeLocId)}
+                disabled={loading || !scopeType || scopeType === 'none' || (scopeType === 'org' ? !scopeOrgId : !scopeLocId)}
                 className="text-xs"
-                title={!scopeType ? "Requires scope type and selection" : ""}
+                title={!scopeType || scopeType === 'none' ? "Requires scope type and selection" : ""}
               >
                 Make Coach
               </Button>

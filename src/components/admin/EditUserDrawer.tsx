@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
@@ -30,6 +30,9 @@ interface User {
   is_super_admin: boolean;
   is_coach: boolean;
   is_lead: boolean;
+  is_participant: boolean;
+  coach_scope_type?: 'org' | 'location' | null;
+  coach_scope_id?: string | null;
 }
 
 interface EditUserDrawerProps {
@@ -45,124 +48,81 @@ interface EditUserDrawerProps {
 export function EditUserDrawer({ open, onClose, onSuccess, user, roles, locations, organizations }: EditUserDrawerProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [scopeLocId, setScopeLocId] = useState<string>("");
-  const [scopeType, setScopeType] = useState<'org' | 'location' | 'none'>('none');
-  const [scopeOrgId, setScopeOrgId] = useState<string>("");
-  const [formData, setFormData] = useState({
-    name: "",
-    role_id: "",
-    primary_location_id: "",
-    is_super_admin: false,
-    is_coach: false,
-    is_lead: false,
-  });
+  const [selectedAction, setSelectedAction] = useState<'participant' | 'lead' | 'coach' | 'super_admin'>('participant');
+  const [scopeType, setScopeType] = useState<'org' | 'location'>('org');
+  const [scopeId, setScopeId] = useState<string>("");
 
   useEffect(() => {
     if (user && open) {
-      setFormData({
-        name: user.name || "",
-        role_id: user.role_id?.toString() || "",
-        primary_location_id: user.location_id || "",
-        is_super_admin: user.is_super_admin,
-        is_coach: user.is_coach,
-        is_lead: user.is_lead || false,
-      });
-      setScopeLocId(user.location_id || "");
-      // Initialize scope from user data if available
-      // Note: We'd need to add coach_scope_type and coach_scope_id to the User interface
-      // For now, default to none until user picks a preset
-      setScopeType('none');
-      setScopeOrgId("");
+      // Determine current action from flags
+      if (user.is_super_admin) {
+        setSelectedAction('super_admin');
+      } else if (user.is_coach && !user.is_participant) {
+        setSelectedAction('coach');
+      } else if (user.is_lead && user.is_participant) {
+        setSelectedAction('lead');
+      } else {
+        setSelectedAction('participant');
+      }
+      
+      // Prefill scope from user data
+      if (user.coach_scope_type && user.coach_scope_id) {
+        setScopeType(user.coach_scope_type);
+        setScopeId(user.coach_scope_id);
+      } else if (user.organization_id) {
+        setScopeType('org');
+        setScopeId(user.organization_id);
+      } else if (user.location_id) {
+        setScopeType('location');
+        setScopeId(user.location_id);
+      } else {
+        setScopeType('org');
+        setScopeId("");
+      }
     }
   }, [user, open]);
 
-  const handlePresetClick = async (preset: string) => {
-    if (!user?.user_id) return;
-    
-    // Validate scope requirements for Lead RDA and Coach
-    if (preset === 'lead_rda' || preset === 'coach') {
-      if (!scopeType || scopeType === 'none') {
-        toast({
-          title: "Scope required",
-          description: `${preset === 'lead_rda' ? 'Lead RDA' : 'Coach'} requires scope type (Organization or Location)`,
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const scopeId = scopeType === 'org' ? scopeOrgId : scopeLocId;
-      if (!scopeId) {
-        toast({
-          title: "Scope required",
-          description: `Please select a ${scopeType === 'org' ? 'organization' : 'location'}`,
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-    
-    setLoading(true);
-    try {
-      const scopeId = scopeType === 'org' ? scopeOrgId : (scopeType === 'location' ? scopeLocId : null);
-      
-      const { error } = await supabase.functions.invoke('admin-users', {
-        body: {
-          action: 'role_preset',
-          user_id: user.user_id,
-          preset,
-          coach_scope_type: scopeType === 'none' ? null : scopeType,
-          coach_scope_id: scopeId,
-          scope_location_id: scopeType === 'location' ? scopeLocId : null, // For primary_location_id
-        },
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: `User role updated to ${preset.replace('_', ' ')}`,
-      });
-      
-      onSuccess();
-    } catch (error: any) {
-      console.error("Error applying preset:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update role",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !formData.name || !user.user_id) return;
+    if (!user?.user_id) return;
+    
+    // Validate scope for Lead/Coach
+    if ((selectedAction === 'lead' || selectedAction === 'coach') && !scopeId) {
+      toast({
+        title: "Scope required",
+        description: "Scope type and scope are required for this action.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
-
     try {
-      const { error } = await supabase.functions.invoke('admin-users', {
-        body: {
-          action: 'update_user',
-          user_id: user.user_id,
-          name: formData.name,
-          role_id: formData.role_id === "none" ? null : (formData.role_id ? parseInt(formData.role_id) : null),
-          location_id: formData.primary_location_id === "none" ? null : (formData.primary_location_id || null),
-          is_super_admin: formData.is_super_admin,
-          is_coach: formData.is_coach,
-          is_lead: formData.is_lead,
-        },
-      });
-
+      const payload: any = {
+        action: 'role_preset',
+        user_id: user.user_id,
+        preset: selectedAction,
+      };
+      
+      if (selectedAction === 'lead' || selectedAction === 'coach') {
+        payload.coach_scope_type = scopeType;
+        payload.coach_scope_id = scopeId;
+      }
+      
+      const { data, error } = await supabase.functions.invoke('admin-users', { body: payload });
+      
       if (error) throw error;
-
+      
+      const sideEffects = data?.side_effects;
+      const message = sideEffects?.cleared_weekly_tasks 
+        ? `User updated. Cleared ${sideEffects.deleted_scores} incomplete scores and ${sideEffects.deleted_selections} selections.`
+        : "User updated successfully";
+      
       toast({
         title: "Success",
-        description: "User updated successfully",
+        description: message,
       });
-
+      
       onSuccess();
     } catch (error: any) {
       console.error("Error updating user:", error);
@@ -178,216 +138,153 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
 
   if (!user) return null;
 
+  // Determine current status badge
+  const getCurrentStatusBadge = () => {
+    if (user.is_super_admin) return <Badge variant="destructive">Super Admin</Badge>;
+    if (user.is_coach && !user.is_participant) return <Badge variant="secondary">Coach</Badge>;
+    if (user.is_lead && user.is_participant) return <Badge variant="outline">Lead RDA</Badge>;
+    return <Badge>Participant</Badge>;
+  };
+
+  // Determine scope text
+  const getScopeText = () => {
+    if (!user.coach_scope_type || !user.coach_scope_id) return null;
+    const scopeName = user.coach_scope_type === 'org' 
+      ? organizations.find(o => o.id === user.coach_scope_id)?.name
+      : locations.find(l => l.id === user.coach_scope_id)?.name;
+    return scopeName ? `Scoped to: ${scopeName}` : null;
+  };
+
+  // Generate live summary
+  const getLiveSummary = () => {
+    const scopeName = scopeType === 'org'
+      ? organizations.find(o => o.id === scopeId)?.name || "selected scope"
+      : locations.find(l => l.id === scopeId)?.name || "selected scope";
+    
+    switch (selectedAction) {
+      case 'participant':
+        return `This will set ${user.name} to Participant.`;
+      case 'lead':
+        return scopeId
+          ? `This will promote ${user.name} to Lead RDA scoped to ${scopeName} and maintain their participant tasks.`
+          : `This will promote ${user.name} to Lead RDA (requires scope selection).`;
+      case 'coach':
+        return scopeId
+          ? `This will promote ${user.name} to Coach scoped to ${scopeName} and remove participant tasks.`
+          : `This will promote ${user.name} to Coach (requires scope selection).`;
+      case 'super_admin':
+        return `This will promote ${user.name} to Super Admin and remove participant tasks.`;
+    }
+  };
+
+  const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach') && !scopeId);
+
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent>
+      <SheetContent className="w-[500px] sm:max-w-[500px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Edit User</SheetTitle>
           <SheetDescription>
-            Update user information and permissions for {user.email || user.name}
+            Change role and permissions for this user
           </SheetDescription>
         </SheetHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4 mt-6">
-          {/* Role & Scope Presets */}
-          <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Quick Role Presets</Label>
-              <p className="text-xs text-muted-foreground">
-                Apply standardized role configurations with proper scoping
-              </p>
+        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+          {/* Header with Status */}
+          <div className="space-y-2 pb-4 border-b">
+            <div className="flex items-center gap-2">
+              {getCurrentStatusBadge()}
             </div>
-            
-            {/* Scope Type Selector */}
-            <div className="space-y-2">
-              <Label htmlFor="scope-type" className="text-xs">Scope Type (For Lead RDA / Coach)</Label>
-              <Select value={scopeType} onValueChange={(value) => setScopeType(value as 'org' | 'location' | 'none')}>
-                <SelectTrigger id="scope-type" className="h-8 text-xs">
-                  <SelectValue placeholder="Select scope type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="org">Organization</SelectItem>
-                  <SelectItem value="location">Location</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="text-sm space-y-1">
+              <p className="text-muted-foreground">{user.email || "No email"}</p>
+              {getScopeText() && (
+                <p className="text-xs text-muted-foreground">{getScopeText()}</p>
+              )}
             </div>
-            
-            {/* Organization Scope Selector (shown if scope type is org) */}
-            {scopeType === 'org' && (
+          </div>
+
+          {/* Action Selection */}
+          <div className="space-y-3">
+            <Label className="text-base font-semibold">Choose new status</Label>
+            <RadioGroup value={selectedAction} onValueChange={(value) => setSelectedAction(value as any)}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="participant" id="action-participant" />
+                <Label htmlFor="action-participant" className="font-normal cursor-pointer">Make Participant</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="lead" id="action-lead" />
+                <Label htmlFor="action-lead" className="font-normal cursor-pointer">Promote to Lead RDA</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="coach" id="action-coach" />
+                <Label htmlFor="action-coach" className="font-normal cursor-pointer">Promote to Coach</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="super_admin" id="action-super-admin" />
+                <Label htmlFor="action-super-admin" className="font-normal cursor-pointer">Promote to Super Admin</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {/* Scope (Conditional) */}
+          {(selectedAction === 'lead' || selectedAction === 'coach') && (
+            <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               <div className="space-y-2">
-                <Label htmlFor="scope-org" className="text-xs">Organization</Label>
-                <Select value={scopeOrgId} onValueChange={setScopeOrgId}>
-                  <SelectTrigger id="scope-org" className="h-8 text-xs">
-                    <SelectValue placeholder="Select organization" />
+                <Label htmlFor="scope-type" className="text-sm font-semibold">Scope Type</Label>
+                <Select value={scopeType} onValueChange={(value) => {
+                  setScopeType(value as 'org' | 'location');
+                  setScopeId(""); // Reset scope ID when type changes
+                }}>
+                  <SelectTrigger id="scope-type">
+                    <SelectValue placeholder="Select scope type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {organizations.map((org) => (
-                      <SelectItem key={org.id} value={org.id}>
-                        {org.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="org">Organization</SelectItem>
+                    <SelectItem value="location">Location</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
-            
-            {/* Location Scope Selector (shown if scope type is location) */}
-            {scopeType === 'location' && (
+              
               <div className="space-y-2">
-                <Label htmlFor="scope-loc" className="text-xs">Location</Label>
-                <Select value={scopeLocId} onValueChange={setScopeLocId}>
-                  <SelectTrigger id="scope-loc" className="h-8 text-xs">
-                    <SelectValue placeholder="Select location" />
+                <Label htmlFor="scope-value" className="text-sm font-semibold">
+                  {scopeType === 'org' ? 'Organization' : 'Location'}
+                </Label>
+                <Select value={scopeId} onValueChange={setScopeId}>
+                  <SelectTrigger id="scope-value">
+                    <SelectValue placeholder={`Select ${scopeType === 'org' ? 'organization' : 'location'}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {location.name}
-                      </SelectItem>
-                    ))}
+                    {scopeType === 'org' 
+                      ? organizations.map((org) => (
+                          <SelectItem key={org.id} value={org.id}>
+                            {org.name}
+                          </SelectItem>
+                        ))
+                      : locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name}
+                          </SelectItem>
+                        ))
+                    }
                   </SelectContent>
                 </Select>
               </div>
-            )}
-            
-            {/* Preset Buttons */}
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handlePresetClick('participant')}
-                disabled={loading}
-                className="text-xs"
-              >
-                Make Participant
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handlePresetClick('lead_rda')}
-                disabled={loading || !scopeType || scopeType === 'none' || (scopeType === 'org' ? !scopeOrgId : !scopeLocId)}
-                className="text-xs"
-                title={!scopeType || scopeType === 'none' ? "Requires scope type and selection" : ""}
-              >
-                Make Lead RDA
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handlePresetClick('coach')}
-                disabled={loading || !scopeType || scopeType === 'none' || (scopeType === 'org' ? !scopeOrgId : !scopeLocId)}
-                className="text-xs"
-                title={!scopeType || scopeType === 'none' ? "Requires scope type and selection" : ""}
-              >
-                Make Coach
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handlePresetClick('super_admin')}
-                disabled={loading}
-                className="text-xs"
-              >
-                Make Super Admin
-              </Button>
             </div>
-          </div>
-          
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or edit manually</span>
-            </div>
-          </div>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="edit-name">Full name *</Label>
-            <Input
-              id="edit-name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Full name"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-role">Role</Label>
-            <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No role</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                    {role.role_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-location">Location</Label>
-            <Select value={formData.primary_location_id} onValueChange={(value) => setFormData({ ...formData, primary_location_id: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No location</SelectItem>
-                {locations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="edit-super-admin"
-              checked={formData.is_super_admin}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_super_admin: checked })}
-            />
-            <Label htmlFor="edit-super-admin">Super administrator</Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="edit-coach"
-              checked={formData.is_coach}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_coach: checked })}
-            />
-            <Label htmlFor="edit-coach">Coach</Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="edit-lead"
-              checked={formData.is_lead}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_lead: checked })}
-            />
-            <Label htmlFor="edit-lead">Lead RDA</Label>
+          {/* Live Summary */}
+          <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+            <p className="text-sm font-medium mb-1">This change will:</p>
+            <p className="text-sm text-muted-foreground">{getLiveSummary()}</p>
           </div>
 
           <SheetFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !formData.name}>
+            <Button type="submit" disabled={isSaveDisabled}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
+              Apply Changes
             </Button>
           </SheetFooter>
         </form>

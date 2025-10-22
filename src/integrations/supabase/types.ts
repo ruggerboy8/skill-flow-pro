@@ -480,6 +480,7 @@ export type Database = {
           created_at: string | null
           email: string
           hire_date: string | null
+          home_route: string | null
           id: string
           is_coach: boolean
           is_lead: boolean
@@ -501,6 +502,7 @@ export type Database = {
           created_at?: string | null
           email: string
           hire_date?: string | null
+          home_route?: string | null
           id?: string
           is_coach?: boolean
           is_lead?: boolean
@@ -522,6 +524,7 @@ export type Database = {
           created_at?: string | null
           email?: string
           hire_date?: string | null
+          home_route?: string | null
           id?: string
           is_coach?: boolean
           is_lead?: boolean

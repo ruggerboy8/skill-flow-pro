@@ -81,7 +81,7 @@ serve(async (req: Request) => {
 
         let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_coach,is_lead,roles(role_name),locations(name,organization_id)", {
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_coach,is_lead,is_participant,coach_scope_type,coach_scope_id,roles(role_name),locations(name,organization_id)", {
             count: "exact",
           })
           .order("name", { ascending: true });
@@ -140,6 +140,9 @@ serve(async (req: Request) => {
             is_super_admin: s.is_super_admin ?? false,
             is_coach: s.is_coach ?? false,
             is_lead: s.is_lead ?? false,
+            is_participant: s.is_participant ?? true,
+            coach_scope_type: s.coach_scope_type ?? null,
+            coach_scope_id: s.coach_scope_id ?? null,
           };
           console.log("Final row data:", row);
           return row;
@@ -176,8 +179,14 @@ serve(async (req: Request) => {
       }
 
       case "update_user": {
-        const { user_id, name, role_id, location_id, is_super_admin, is_coach, is_lead, coach_scope_type, coach_scope_id } = payload ?? {};
+        const { user_id, name, role_id, location_id, is_super_admin, is_coach, is_lead, is_participant, coach_scope_type, coach_scope_id } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
+        
+        // Block role changes - must use role_preset instead
+        if (is_super_admin !== undefined || is_coach !== undefined || is_lead !== undefined || 
+            is_participant !== undefined || coach_scope_type !== undefined || coach_scope_id !== undefined) {
+          return json({ error: "Use action=role_preset for role changes." }, 400);
+        }
 
         // Get current state for audit
         const { data: currentStaff } = await admin
@@ -190,11 +199,6 @@ serve(async (req: Request) => {
         if (name !== undefined) updateData.name = name;
         if (role_id !== undefined) updateData.role_id = role_id;
         if (location_id !== undefined) updateData.primary_location_id = location_id;
-        if (is_super_admin !== undefined) updateData.is_super_admin = is_super_admin;
-        if (is_coach !== undefined) updateData.is_coach = is_coach;
-        if (is_lead !== undefined) updateData.is_lead = is_lead;
-        if (coach_scope_type !== undefined) updateData.coach_scope_type = coach_scope_type;
-        if (coach_scope_id !== undefined) updateData.coach_scope_id = coach_scope_id;
 
         const { data: staff, error: stErr } = await admin
           .from("staff")
@@ -240,7 +244,7 @@ serve(async (req: Request) => {
       }
 
       case "role_preset": {
-        const { user_id, preset, coach_scope_type, coach_scope_id, scope_location_id } = payload ?? {};
+        const { user_id, preset, coach_scope_type, coach_scope_id } = payload ?? {};
         
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
@@ -256,6 +260,25 @@ serve(async (req: Request) => {
         if (fetchErr) throw fetchErr;
         if (!currentStaff) return json({ error: "Staff not found" }, 404);
         
+        // Validate scope requirements for lead and coach
+        if ((preset === "lead" || preset === "coach") && (!coach_scope_type || !coach_scope_id)) {
+          return json({ error: "Scope type and scope are required for this action." }, 422);
+        }
+        
+        // Validate scope ID exists
+        if (coach_scope_type && coach_scope_id) {
+          const scopeTable = coach_scope_type === 'org' ? 'organizations' : 'locations';
+          const { data: scopeData, error: scopeErr } = await admin
+            .from(scopeTable)
+            .select("id")
+            .eq("id", coach_scope_id)
+            .maybeSingle();
+          
+          if (scopeErr || !scopeData) {
+            return json({ error: `Invalid ${coach_scope_type === 'org' ? 'organization' : 'location'} ID` }, 422);
+          }
+        }
+        
         // Define preset configurations
         const presets: Record<string, any> = {
           participant: {
@@ -263,68 +286,67 @@ serve(async (req: Request) => {
             is_lead: false,
             is_coach: false,
             is_super_admin: false,
-            primary_location_id: currentStaff.primary_location_id, // Keep current location
             coach_scope_type: null,
             coach_scope_id: null,
+            home_route: '/',
           },
-          lead_rda: {
+          lead: {
             is_participant: true,
             is_lead: true,
             is_coach: false,
             is_super_admin: false,
-            coach_scope_type: coach_scope_type || null,
-            coach_scope_id: coach_scope_id || null,
+            coach_scope_type: coach_scope_type,
+            coach_scope_id: coach_scope_id,
+            home_route: '/',
           },
           coach: {
             is_participant: false,
             is_lead: false,
             is_coach: true,
             is_super_admin: false,
-            coach_scope_type: coach_scope_type || null,
-            coach_scope_id: coach_scope_id || null,
+            coach_scope_type: coach_scope_type,
+            coach_scope_id: coach_scope_id,
+            home_route: '/coach',
           },
           super_admin: {
             is_participant: false,
             is_lead: false,
             is_coach: false,
             is_super_admin: true,
-            primary_location_id: null, // Clear scope
             coach_scope_type: null,
             coach_scope_id: null,
+            home_route: '/coach',
           },
         };
         
         const config = presets[preset];
         if (!config) return json({ error: "Invalid preset" }, 400);
         
-        // Validate scope requirements for Lead RDA and Coach
-        if (preset === "lead_rda" || preset === "coach") {
-          if (!coach_scope_type || !coach_scope_id) {
-            return json({ error: `${preset === "lead_rda" ? "Lead RDA" : "Coach"} requires scope type and scope ID` }, 400);
-          }
-        }
+        // Side-effects: Clear weekly tasks if becoming non-participant
+        let deletedScores = 0;
+        let deletedSelections = 0;
         
-        // Apply location to primary_location_id if scope is location-based
-        if (scope_location_id) {
-          config.primary_location_id = scope_location_id;
-        }
-        
-        // Side-effect: Clear weekly tasks if becoming non-participant
         if (!config.is_participant && currentStaff.is_participant) {
           console.log(`Clearing weekly tasks for staff ${currentStaff.id} (becoming non-participant)`);
           
           // Delete incomplete weekly_scores
-          await admin
+          const { error: scoreErr, count: scoreCount } = await admin
             .from("weekly_scores")
-            .delete()
+            .delete({ count: 'exact' })
             .eq("staff_id", currentStaff.id)
             .or("confidence_score.is.null,performance_score.is.null");
           
-          // Delete weekly_self_select entries
-          await admin
+          if (scoreErr) console.warn("Error deleting scores:", scoreErr);
+          deletedScores = scoreCount ?? 0;
+          
+          // Delete all weekly_self_select entries
+          const { error: selectErr, count: selectCount } = await admin
             .from("weekly_self_select")
-            .delete()
+            .delete({ count: 'exact' })
             .eq("user_id", user_id);
+          
+          if (selectErr) console.warn("Error deleting selections:", selectErr);
+          deletedSelections = selectCount ?? 0;
         }
         
         // Update staff record
@@ -337,7 +359,7 @@ serve(async (req: Request) => {
         
         if (updateErr) throw updateErr;
         
-        // Write audit log
+        // Enhanced audit log
         try {
           const { data: changerStaff } = await admin
             .from("staff")
@@ -349,18 +371,21 @@ serve(async (req: Request) => {
             await admin.from("admin_audit").insert({
               staff_id: currentStaff.id,
               changed_by: changerStaff.id,
-              action: `role_preset:${preset}`,
+              action: `role_preset`,
               old_values: {
+                preset: preset,
                 is_participant: currentStaff.is_participant,
                 is_lead: currentStaff.is_lead,
                 is_coach: currentStaff.is_coach,
                 is_super_admin: currentStaff.is_super_admin,
-                primary_location_id: currentStaff.primary_location_id,
                 coach_scope_type: currentStaff.coach_scope_type,
                 coach_scope_id: currentStaff.coach_scope_id,
+                home_route: currentStaff.home_route,
               },
-              new_values: config,
-              scope_location_id,
+              new_values: {
+                preset: preset,
+                ...config
+              },
             });
           }
         } catch (auditErr) {
@@ -370,8 +395,11 @@ serve(async (req: Request) => {
         return json({ 
           ok: true, 
           staff_id: updatedStaff?.id ?? null,
+          applied_preset: preset,
           side_effects: {
-            cleared_weekly_tasks: !config.is_participant && currentStaff.is_participant
+            cleared_weekly_tasks: !config.is_participant && currentStaff.is_participant,
+            deleted_scores: deletedScores,
+            deleted_selections: deletedSelections,
           }
         });
       }

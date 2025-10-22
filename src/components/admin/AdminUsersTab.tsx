@@ -32,6 +32,9 @@ interface User {
   is_super_admin: boolean;
   is_coach: boolean;
   is_lead: boolean;
+  is_participant: boolean;
+  coach_scope_type?: 'org' | 'location' | null;
+  coach_scope_id?: string | null;
 }
 
 interface Role {

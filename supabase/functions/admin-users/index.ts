@@ -81,7 +81,7 @@ serve(async (req: Request) => {
 
         let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_coach,roles(role_name),locations(name)", {
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_coach,is_lead,roles(role_name),locations(name,organization_id)", {
             count: "exact",
           })
           .order("name", { ascending: true });
@@ -136,8 +136,10 @@ serve(async (req: Request) => {
             role_name: s.roles?.role_name ?? null,
             location_id: s.primary_location_id,
             location_name: s.locations?.name ?? null,
+            organization_id: s.locations?.organization_id ?? null,
             is_super_admin: s.is_super_admin ?? false,
             is_coach: s.is_coach ?? false,
+            is_lead: s.is_lead ?? false,
           };
           console.log("Final row data:", row);
           return row;
@@ -174,8 +176,15 @@ serve(async (req: Request) => {
       }
 
       case "update_user": {
-        const { user_id, name, role_id, location_id, is_super_admin, is_coach } = payload ?? {};
+        const { user_id, name, role_id, location_id, is_super_admin, is_coach, is_lead } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
+
+        // Get current state for audit
+        const { data: currentStaff } = await admin
+          .from("staff")
+          .select("*")
+          .eq("user_id", user_id)
+          .maybeSingle();
 
         const updateData: Record<string, any> = {};
         if (name !== undefined) updateData.name = name;
@@ -183,6 +192,7 @@ serve(async (req: Request) => {
         if (location_id !== undefined) updateData.primary_location_id = location_id;
         if (is_super_admin !== undefined) updateData.is_super_admin = is_super_admin;
         if (is_coach !== undefined) updateData.is_coach = is_coach;
+        if (is_lead !== undefined) updateData.is_lead = is_lead;
 
         const { data: staff, error: stErr } = await admin
           .from("staff")
@@ -192,7 +202,162 @@ serve(async (req: Request) => {
           .maybeSingle();
         if (stErr) throw stErr;
 
+        // Write audit log
+        if (currentStaff) {
+          try {
+            const { data: changerStaff } = await admin
+              .from("staff")
+              .select("id")
+              .eq("user_id", authUser.user.id)
+              .maybeSingle();
+            
+            if (changerStaff) {
+              await admin.from("admin_audit").insert({
+                staff_id: currentStaff.id,
+                changed_by: changerStaff.id,
+                action: "update_user",
+                old_values: {
+                  name: currentStaff.name,
+                  role_id: currentStaff.role_id,
+                  primary_location_id: currentStaff.primary_location_id,
+                  is_super_admin: currentStaff.is_super_admin,
+                  is_coach: currentStaff.is_coach,
+                  is_lead: currentStaff.is_lead,
+                },
+                new_values: updateData,
+              });
+            }
+          } catch (auditErr) {
+            console.warn("Failed to write audit log:", auditErr);
+          }
+        }
+
         return json({ ok: true, staff_id: staff?.id ?? null });
+      }
+
+      case "role_preset": {
+        const { user_id, preset, scope_organization_id, scope_location_id } = payload ?? {};
+        
+        if (!user_id || !preset) {
+          return json({ error: "user_id and preset required" }, 400);
+        }
+        
+        // Get current staff record
+        const { data: currentStaff, error: fetchErr } = await admin
+          .from("staff")
+          .select("*")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        
+        if (fetchErr) throw fetchErr;
+        if (!currentStaff) return json({ error: "Staff not found" }, 404);
+        
+        // Define preset configurations
+        const presets: Record<string, any> = {
+          participant: {
+            is_participant: true,
+            is_lead: false,
+            is_coach: false,
+            is_super_admin: false,
+            primary_location_id: currentStaff.primary_location_id, // Keep current location
+          },
+          lead_rda: {
+            is_participant: true,
+            is_lead: true,
+            is_coach: false,
+            is_super_admin: false,
+          },
+          coach: {
+            is_participant: false,
+            is_lead: false,
+            is_coach: true,
+            is_super_admin: false,
+          },
+          super_admin: {
+            is_participant: false,
+            is_lead: false,
+            is_coach: false,
+            is_super_admin: true,
+            primary_location_id: null, // Clear scope
+          },
+        };
+        
+        const config = presets[preset];
+        if (!config) return json({ error: "Invalid preset" }, 400);
+        
+        // Validate scope requirements
+        if ((preset === "lead_rda" || preset === "coach") && !scope_location_id) {
+          return json({ error: `${preset === "lead_rda" ? "Lead RDA" : "Coach"} requires location scope` }, 400);
+        }
+        
+        // Apply location scope if provided
+        if (scope_location_id) {
+          config.primary_location_id = scope_location_id;
+        }
+        
+        // Side-effect: Clear weekly tasks if becoming non-participant
+        if (!config.is_participant && currentStaff.is_participant) {
+          console.log(`Clearing weekly tasks for staff ${currentStaff.id} (becoming non-participant)`);
+          
+          // Delete incomplete weekly_scores
+          await admin
+            .from("weekly_scores")
+            .delete()
+            .eq("staff_id", currentStaff.id)
+            .or("confidence_score.is.null,performance_score.is.null");
+          
+          // Delete weekly_self_select entries
+          await admin
+            .from("weekly_self_select")
+            .delete()
+            .eq("user_id", user_id);
+        }
+        
+        // Update staff record
+        const { data: updatedStaff, error: updateErr } = await admin
+          .from("staff")
+          .update(config)
+          .eq("user_id", user_id)
+          .select("id")
+          .maybeSingle();
+        
+        if (updateErr) throw updateErr;
+        
+        // Write audit log
+        try {
+          const { data: changerStaff } = await admin
+            .from("staff")
+            .select("id")
+            .eq("user_id", authUser.user.id)
+            .maybeSingle();
+          
+          if (changerStaff) {
+            await admin.from("admin_audit").insert({
+              staff_id: currentStaff.id,
+              changed_by: changerStaff.id,
+              action: `role_preset:${preset}`,
+              old_values: {
+                is_participant: currentStaff.is_participant,
+                is_lead: currentStaff.is_lead,
+                is_coach: currentStaff.is_coach,
+                is_super_admin: currentStaff.is_super_admin,
+                primary_location_id: currentStaff.primary_location_id,
+              },
+              new_values: config,
+              scope_location_id,
+            });
+          }
+        } catch (auditErr) {
+          console.warn("Failed to write audit log:", auditErr);
+        }
+        
+        return json({ 
+          ok: true, 
+          staff_id: updatedStaff?.id ?? null,
+          side_effects: {
+            cleared_weekly_tasks: !config.is_participant && currentStaff.is_participant
+          }
+        });
       }
 
       case "reset_link": {

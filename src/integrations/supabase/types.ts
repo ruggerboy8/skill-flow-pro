@@ -14,6 +14,85 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit: {
+        Row: {
+          action: string
+          changed_by: string
+          created_at: string
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          scope_location_id: string | null
+          scope_organization_id: string | null
+          staff_id: string
+        }
+        Insert: {
+          action: string
+          changed_by: string
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          scope_location_id?: string | null
+          scope_organization_id?: string | null
+          staff_id: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          scope_location_id?: string | null
+          scope_organization_id?: string | null
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_audit_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_audit_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "admin_audit_scope_location_id_fkey"
+            columns: ["scope_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_audit_scope_organization_id_fkey"
+            columns: ["scope_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_audit_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_audit_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       competencies: {
         Row: {
           code: string | null
@@ -401,6 +480,7 @@ export type Database = {
           hire_date: string | null
           id: string
           is_coach: boolean
+          is_lead: boolean
           is_participant: boolean
           is_super_admin: boolean
           location: string | null
@@ -419,6 +499,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           is_coach?: boolean
+          is_lead?: boolean
           is_participant?: boolean
           is_super_admin?: boolean
           location?: string | null
@@ -437,6 +518,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           is_coach?: boolean
+          is_lead?: boolean
           is_participant?: boolean
           is_super_admin?: boolean
           location?: string | null

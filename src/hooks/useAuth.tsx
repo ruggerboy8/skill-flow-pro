@@ -12,6 +12,7 @@ interface AuthContextType {
   isCoach: boolean;
   isSuperAdmin: boolean;
   isParticipant: boolean;
+  isLead: boolean;
   signInWithOtp: (email: string) => Promise<{ error: any }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error: any }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error: any }>;
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isCoach, setIsCoach] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isParticipant, setIsParticipant] = useState(true);
+  const [isLead, setIsLead] = useState(false);
 
   useEffect(() => {
     const checkUserStatus = async (userId: string) => {
@@ -38,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data } = await supabase
           .from('staff')
-          .select('is_coach, is_super_admin, is_participant, name, role_id, primary_location_id')
+          .select('is_coach, is_super_admin, is_participant, is_lead, name, role_id, primary_location_id')
           .eq('user_id', userId)
           .single();
         
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsCoach(data.is_coach || data.is_super_admin);
           setIsSuperAdmin(data.is_super_admin);
           setIsParticipant(data.is_participant);
+          setIsLead(data.is_lead || false);
           // Check if profile is complete
           setNeedsProfileSetup(false);
         } else {
@@ -54,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsCoach(false);
           setIsSuperAdmin(false);
           setIsParticipant(true);
+          setIsLead(false);
         }
       } finally {
         setRoleLoading(false);
@@ -84,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsCoach(false);
           setIsSuperAdmin(false);
           setIsParticipant(true);
+          setIsLead(false);
         }
         
         setLoading(false);
@@ -112,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsCoach(false);
         setIsSuperAdmin(false);
         setIsParticipant(true);
+        setIsLead(false);
       }
       
       setLoading(false);
@@ -181,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isCoach,
       isSuperAdmin,
       isParticipant,
+      isLead,
       signInWithOtp,
       signInWithPassword,
       signUpWithPassword,

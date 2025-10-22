@@ -28,8 +28,10 @@ interface User {
   role_name?: string;
   location_id?: string;
   location_name?: string;
+  organization_id?: string;
   is_super_admin: boolean;
   is_coach: boolean;
+  is_lead: boolean;
 }
 
 interface Role {
@@ -47,6 +49,7 @@ export function AdminUsersTab() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [organizations, setOrganizations] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -96,18 +99,21 @@ export function AdminUsersTab() {
 
   const loadRolesAndLocations = async () => {
     try {
-      const [rolesResult, locationsResult] = await Promise.all([
+      const [rolesResult, locationsResult, orgsResult] = await Promise.all([
         supabase.from("roles").select("role_id, role_name").order("role_name"),
         supabase.from("locations").select("id, name").eq("active", true).order("name"),
+        supabase.from("organizations").select("id, name").eq("active", true).order("name"),
       ]);
 
       if (rolesResult.error) throw rolesResult.error;
       if (locationsResult.error) throw locationsResult.error;
+      if (orgsResult.error) throw orgsResult.error;
 
       setRoles(rolesResult.data || []);
       setLocations(locationsResult.data || []);
+      setOrganizations(orgsResult.data || []);
     } catch (error) {
-      console.error("Error loading roles and locations:", error);
+      console.error("Error loading roles/locations/orgs:", error);
     }
   };
 
@@ -216,6 +222,19 @@ const handleResetPassword = async (user: User) => {
       return <Badge variant="secondary">Invited</Badge>;
     }
     return <Badge variant="default">Active</Badge>;
+  };
+
+  const getRoleBadge = (user: User) => {
+    if (user.is_super_admin) {
+      return <Badge variant="destructive" className="text-xs shrink-0">Super</Badge>;
+    }
+    if (user.is_coach) {
+      return <Badge variant="secondary" className="text-xs shrink-0">Coach</Badge>;
+    }
+    if (user.is_lead) {
+      return <Badge variant="outline" className="text-xs shrink-0">Lead RDA</Badge>;
+    }
+    return null;
   };
 
 
@@ -354,15 +373,11 @@ const handleResetPassword = async (user: User) => {
                   </TableRow>
                 ) : (
                   sortedData.map((user) => (
-                    <TableRow key={user.staff_id}>
+                     <TableRow key={user.staff_id}>
                        <TableCell className="font-medium w-1/4">
                          <div className="flex items-center gap-2 min-w-0">
                            <span className="truncate">{user.name || "No name"}</span>
-                           {user.is_super_admin ? (
-                             <Badge variant="destructive" className="text-xs shrink-0">Super</Badge>
-                           ) : user.is_coach ? (
-                             <Badge variant="secondary" className="text-xs shrink-0">Coach</Badge>
-                           ) : null}
+                           {getRoleBadge(user)}
                          </div>
                        </TableCell>
                        <TableCell className="w-1/4 truncate">{user.email || "—"}</TableCell>
@@ -453,6 +468,7 @@ const handleResetPassword = async (user: User) => {
         user={selectedUser}
         roles={roles}
         locations={locations}
+        organizations={organizations}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

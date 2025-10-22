@@ -41,7 +41,7 @@ interface StaffMember {
 export default function CoachDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, isCoach } = useAuth();
+  const { user, isCoach, isLead } = useAuth();
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [rows, setRows] = useState<{
@@ -57,12 +57,12 @@ export default function CoachDashboard() {
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Redirect if not coach
+  // Redirect if not coach, super admin, or lead RDA
   useEffect(() => {
-    if (!loading && !(isCoach || isSuperAdmin)) {
+    if (!loading && !(isCoach || isSuperAdmin || isLead)) {
       navigate('/');
     }
-  }, [isCoach, isSuperAdmin, loading, navigate]);
+  }, [isCoach, isSuperAdmin, isLead, loading, navigate]);
 
   useEffect(() => {
     loadStaffData();
@@ -112,6 +112,22 @@ export default function CoachDashboard() {
     try {
       const now = new Date();
       
+      // Get current user's organization for Lead RDA scoping
+      let myOrgId: string | null = null;
+      if (isLead && !isCoach && !isSuperAdmin) {
+        const { data: myStaff } = await supabase
+          .from('staff')
+          .select(`
+            id,
+            primary_location_id,
+            locations!staff_primary_location_id_fkey(organization_id)
+          `)
+          .eq('user_id', user?.id)
+          .maybeSingle();
+        
+        myOrgId = myStaff?.locations?.organization_id ?? null;
+      }
+      
       // Get staff roster with additional fields needed for new system
       const { data: staffData, error } = await supabase
         .from('staff')
@@ -125,7 +141,7 @@ export default function CoachDashboard() {
           onboarding_weeks,
           is_participant,
           roles!inner(role_name),
-          locations(name, organizations!locations_organization_id_fkey(name))
+          locations(name, organization_id, organizations!locations_organization_id_fkey(name))
         `)
         .eq('is_participant', true);
 
@@ -134,6 +150,13 @@ export default function CoachDashboard() {
       // Normalize staff data to our shape
       const processedStaff: StaffMember[] = (staffData as any[])
         .filter((member: any) => member.user_id !== user?.id) // Exclude self
+        .filter((member: any) => {
+          // Lead RDAs only see their organization
+          if (isLead && !isCoach && !isSuperAdmin) {
+            return member.locations?.organization_id === myOrgId;
+          }
+          return true;
+        })
         .map((member: any) => ({
           id: member.id,
           name: member.name,
@@ -248,19 +271,22 @@ export default function CoachDashboard() {
       {/* Filters Bar */}
       <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4 mb-6">
         <div className="flex gap-4 flex-wrap items-center">
-          <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Organizations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Organizations</SelectItem>
-              {organizations.map((organization) => (
-                <SelectItem key={organization} value={organization}>
-                  {organization}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Only show org filter for Coaches and Super Admins */}
+          {(isCoach || isSuperAdmin) && (
+            <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Organizations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Organizations</SelectItem>
+                {organizations.map((organization) => (
+                  <SelectItem key={organization} value={organization}>
+                    {organization}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           <Select value={selectedLocation} onValueChange={setSelectedLocation}>
             <SelectTrigger className="w-48">

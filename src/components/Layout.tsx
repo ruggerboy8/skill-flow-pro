@@ -8,14 +8,14 @@ import { Home, BarChart3, User, Settings, Users, TrendingUp, Shield } from 'luci
 // Server-side backfill detection via RPC
 
 export default function Layout() {
-  const { user, signOut, isCoach, isSuperAdmin, roleLoading } = useAuth();
+  const { user, signOut, isCoach, isSuperAdmin, isLead, roleLoading } = useAuth();
   const location = useLocation();
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Stats', href: '/stats', icon: BarChart3 },
     // Backfill nav removed - keeping function for individual score backfill only
-    ...(isCoach || isSuperAdmin ? [
+    ...(isCoach || isSuperAdmin || isLead ? [
       { name: 'Coach', href: '/coach', icon: Users },
     ] : []),
     ...(isSuperAdmin ? [
@@ -36,8 +36,8 @@ export default function Layout() {
     return location.pathname.startsWith(href);
   };
 
-  // Use sidebar for coaches and super admins
-  const useSidebar = isCoach || isSuperAdmin;
+  // Use sidebar for coaches, super admins, and lead RDAs
+  const useSidebar = isCoach || isSuperAdmin || isLead;
 
   if (useSidebar) {
     return (

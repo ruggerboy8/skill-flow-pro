@@ -48,7 +48,7 @@ type GroupedItem = {
 export default function EvaluationViewer() {
   const { evalId } = useParams<{ evalId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isCoach, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,8 +78,14 @@ export default function EvaluationViewer() {
           return;
         }
 
-        // Check access: must be this user's evaluation and must be submitted
-        if (evalData.staff_id !== staff.id || evalData.status !== 'submitted') {
+        // Check access: must be submitted, and either this user's evaluation OR user is coach/admin
+        if (evalData.status !== 'submitted') {
+          setError("You don't have access to this evaluation.");
+          return;
+        }
+
+        // Allow access if: own evaluation OR is coach/admin
+        if (evalData.staff_id !== staff.id && !isCoach && !isSuperAdmin) {
           setError("You don't have access to this evaluation.");
           return;
         }

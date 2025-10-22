@@ -571,7 +571,7 @@ export default function CoachDetail() {
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/coach')}
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Staff List

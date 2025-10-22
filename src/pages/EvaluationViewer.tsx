@@ -51,6 +51,7 @@ export default function EvaluationViewer() {
   const { user, isCoach, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
+  const [staffName, setStaffName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -88,6 +89,17 @@ export default function EvaluationViewer() {
         if (evalData.staff_id !== staff.id && !isCoach && !isSuperAdmin) {
           setError("You don't have access to this evaluation.");
           return;
+        }
+
+        // Fetch staff name
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select('name')
+          .eq('id', evalData.staff_id)
+          .single();
+
+        if (staffData) {
+          setStaffName(staffData.name);
         }
 
         setEvaluation(evalData);
@@ -172,7 +184,7 @@ export default function EvaluationViewer() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">
-            {evaluation.type} {evaluation.quarter} {evaluation.program_year} Evaluation
+            {staffName && `${staffName} - `}{evaluation.type} {evaluation.quarter} {evaluation.program_year} Evaluation
           </h1>
           <p className="text-muted-foreground">
             Submitted {submittedDate}

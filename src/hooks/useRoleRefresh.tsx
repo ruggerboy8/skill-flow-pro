@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface RoleRefreshOptions {
@@ -17,7 +17,7 @@ export function useRoleRefresh(
     onRoleChange
   } = options;
 
-  const [lastKnownTimestamp, setLastKnownTimestamp] = useState<string | null>(null);
+  const lastKnownTimestampRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isVisibleRef = useRef(true);
 
@@ -29,7 +29,7 @@ export function useRoleRefresh(
         .from('staff')
         .select('roles_updated_at')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error checking role updates:', error);
@@ -41,15 +41,15 @@ export function useRoleRefresh(
       const dbTimestamp = data.roles_updated_at;
 
       // Initialize on first check
-      if (lastKnownTimestamp === null) {
-        setLastKnownTimestamp(dbTimestamp);
+      if (lastKnownTimestampRef.current === null) {
+        lastKnownTimestampRef.current = dbTimestamp;
         return;
       }
 
       // Check if roles have been updated
-      if (dbTimestamp && dbTimestamp !== lastKnownTimestamp) {
+      if (dbTimestamp && dbTimestamp !== lastKnownTimestampRef.current) {
         console.log('Role change detected, refreshing...');
-        setLastKnownTimestamp(dbTimestamp);
+        lastKnownTimestampRef.current = dbTimestamp;
         onRoleChange?.();
       }
     } catch (err) {
@@ -70,7 +70,7 @@ export function useRoleRefresh(
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [userId, enabled, lastKnownTimestamp]);
+  }, [userId, enabled]);
 
   // Set up polling
   useEffect(() => {
@@ -94,7 +94,7 @@ export function useRoleRefresh(
         pollIntervalRef.current = null;
       }
     };
-  }, [userId, enabled, pollInterval, lastKnownTimestamp]);
+  }, [userId, enabled, pollInterval]);
 
   return { checkRoleChanges };
 }

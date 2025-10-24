@@ -253,11 +253,6 @@ export default function PerformanceWizard() {
       } else {
         // Redirect to confidence wizard to complete missing ratings
         const missingCount = weekAssignments.length - (scoresData?.length || 0);
-        toast({
-          title: "Complete Confidence First",
-          description: `You need to rate confidence for ${missingCount} items before rating performance.`,
-          variant: "default"
-        });
         
         // Find the first incomplete confidence item
         const completedIds = new Set((scoresData || []).map(s => s.weekly_focus_id));
@@ -266,9 +261,18 @@ export default function PerformanceWizard() {
         );
         const stepIndex = Math.max(0, firstIncompleteIndex) + 1;
         
-        // Navigate to confidence wizard, preserving current path for return
+        // Navigate to confidence wizard with clearer messaging for late submissions
         const currentPath = location.pathname + location.search;
-        navigate(`/confidence/current/step/${stepIndex}?returnTo=${encodeURIComponent(currentPath)}`);
+        const returnPath = `?returnTo=${encodeURIComponent(currentPath)}`;
+        
+        // Show a friendly message that explains the flow
+        toast({
+          title: "Rate Confidence First",
+          description: `Complete your confidence ratings (${missingCount} remaining), then you can rate your performance.`,
+          variant: "default"
+        });
+        
+        navigate(`/confidence/current/step/${stepIndex}${returnPath}`);
       }
       return;
     }

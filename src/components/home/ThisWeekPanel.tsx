@@ -185,8 +185,8 @@ export default function ThisWeekPanel() {
     });
   }, [weekContext, locationWeekContext, now]);
 
-  // Show loading state
-  if (loading || !weekContext || !staff) {
+  // Show loading state (but allow non-participants through even without weekContext)
+  if (loading || !staff || (!weekContext && isParticipant)) {
     return (
       <Card className="overflow-hidden">
         <CardHeader>

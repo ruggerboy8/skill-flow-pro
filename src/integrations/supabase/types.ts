@@ -232,6 +232,7 @@ export type Database = {
       }
       evaluations: {
         Row: {
+          audio_recording_path: string | null
           created_at: string
           evaluator_id: string
           id: string
@@ -246,6 +247,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          audio_recording_path?: string | null
           created_at?: string
           evaluator_id: string
           id?: string
@@ -260,6 +262,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          audio_recording_path?: string | null
           created_at?: string
           evaluator_id?: string
           id?: string

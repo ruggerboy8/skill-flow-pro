@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Eye, FileEdit, Trash2 } from 'lucide-react';
+import { CalendarIcon, Plus, Eye, FileEdit, Trash2, Mic } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -327,9 +327,17 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h5 className="font-medium">
-                      {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
-                    </h5>
+                    <div className="flex items-center gap-2">
+                      <h5 className="font-medium">
+                        {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
+                      </h5>
+                      {evaluation.audio_recording_path && (
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <Mic className="w-3 h-3" />
+                          Recording
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {formatEvaluationSubtitle(evaluation)}
                     </p>
@@ -396,9 +404,17 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h5 className="font-medium">
-                      {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
-                    </h5>
+                    <div className="flex items-center gap-2">
+                      <h5 className="font-medium">
+                        {evaluation.type} {evaluation.quarter ? `${evaluation.quarter} ` : ''}{evaluation.program_year} Evaluation
+                      </h5>
+                      {evaluation.audio_recording_path && (
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <Mic className="w-3 h-3" />
+                          Recording
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {formatEvaluationSubtitle(evaluation)}
                     </p>

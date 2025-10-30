@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
@@ -67,6 +67,14 @@ export function EvaluationHub() {
   const [editType, setEditType] = useState<string>('');
   const [editQuarter, setEditQuarter] = useState<string | null>(null);
   const [editDate, setEditDate] = useState<Date | undefined>();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [currentRecording, setCurrentRecording] = useState<{
+    path: string;
+    name: string;
+    size: number;
+    uploaded_at: string;
+  } | null>(null);
 
   useEffect(() => {
     if (evalId) {
@@ -132,6 +140,11 @@ export function EvaluationHub() {
       setEditType(data.type);
       setEditQuarter(data.quarter);
       setEditDate(data.observed_at ? new Date(data.observed_at) : undefined);
+
+      // Load audio recording if exists
+      if (data.audio_recording_path) {
+        await loadCurrentRecording(data.audio_recording_path);
+      }
     } catch (error) {
       console.error('Failed to load evaluation:', error);
       toast({
@@ -472,6 +485,146 @@ export function EvaluationHub() {
     setPendingSelfNotes({});
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const loadCurrentRecording = async (path: string) => {
+    if (!evalId) return;
+    try {
+      const folder = evalId;
+      const { data, error } = await supabase.storage
+        .from('evaluation-recordings')
+        .list(folder);
+      
+      if (error) throw error;
+      
+      const file = data?.find(f => path.includes(f.name));
+      if (file) {
+        setCurrentRecording({
+          path,
+          name: file.name,
+          size: file.metadata?.size || 0,
+          uploaded_at: file.created_at
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load recording metadata:', error);
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile || !evalId) return;
+    
+    try {
+      setIsUploading(true);
+      
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${evalId}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('evaluation-recordings')
+        .upload(fileName, selectedFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      const { error: updateError } = await supabase
+        .from('evaluations')
+        .update({ audio_recording_path: fileName })
+        .eq('id', evalId);
+      
+      if (updateError) throw updateError;
+      
+      setEvaluation(prev => prev ? {
+        ...prev,
+        audio_recording_path: fileName
+      } : prev);
+      
+      await loadCurrentRecording(fileName);
+      
+      toast({
+        title: "Success",
+        description: "Audio recording uploaded successfully"
+      });
+      
+      setSelectedFile(null);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload recording",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteRecording = async () => {
+    if (!evaluation?.audio_recording_path || !evalId) return;
+    
+    try {
+      const { error: storageError } = await supabase.storage
+        .from('evaluation-recordings')
+        .remove([evaluation.audio_recording_path]);
+      
+      if (storageError) throw storageError;
+      
+      const { error: updateError } = await supabase
+        .from('evaluations')
+        .update({ audio_recording_path: null })
+        .eq('id', evalId);
+      
+      if (updateError) throw updateError;
+      
+      setEvaluation(prev => prev ? {
+        ...prev,
+        audio_recording_path: null
+      } : prev);
+      setCurrentRecording(null);
+      
+      toast({
+        title: "Success",
+        description: "Recording deleted successfully"
+      });
+    } catch (error) {
+      console.error('Delete failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete recording",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDownloadRecording = async () => {
+    if (!evaluation?.audio_recording_path) return;
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('evaluation-recordings')
+        .createSignedUrl(evaluation.audio_recording_path, 3600);
+      
+      if (error) throw error;
+      
+      window.open(data.signedUrl, '_blank');
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download recording",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto p-6">
@@ -644,6 +797,136 @@ export function EvaluationHub() {
           {isReadOnly && <Badge variant="default">Submitted</Badge>}
         </div>
       </div>
+
+      {/* Audio Recording Section */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Mic className="w-5 h-5" />
+            Self-Evaluation Interview Recording
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {currentRecording ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-3">
+                  <FileAudio className="w-8 h-8 text-primary" />
+                  <div>
+                    <p className="font-medium">{currentRecording.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatFileSize(currentRecording.size)} • 
+                      Uploaded {format(new Date(currentRecording.uploaded_at), 'MMM d, yyyy')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleDownloadRecording}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Download
+                  </Button>
+                  {!isReadOnly && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="destructive">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Recording</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure? This will permanently delete the audio recording.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleDeleteRecording}>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {!selectedFile ? (
+                <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                  <input
+                    type="file"
+                    accept=".mp3,.wav,.m4a,.ogg,.webm,audio/*"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    disabled={isReadOnly}
+                    className="hidden"
+                    id="audio-upload"
+                  />
+                  <label
+                    htmlFor="audio-upload"
+                    className={cn(
+                      "cursor-pointer flex flex-col items-center gap-2",
+                      isReadOnly && "cursor-not-allowed opacity-60"
+                    )}
+                  >
+                    <Upload className="w-8 h-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Click to upload audio recording
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      MP3, WAV, M4A, OGG, or WebM (max 100MB)
+                    </p>
+                  </label>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileAudio className="w-6 h-6" />
+                      <div>
+                        <p className="font-medium">{selectedFile.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatFileSize(selectedFile.size)}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSelectedFile(null)}
+                      disabled={isUploading}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={handleFileUpload}
+                    disabled={isUploading || isReadOnly}
+                    className="w-full"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Upload Recording
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Progress & Submit Bar */}
       {!isReadOnly && (

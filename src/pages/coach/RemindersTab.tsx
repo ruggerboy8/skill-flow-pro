@@ -424,6 +424,14 @@ export default function RemindersTab() {
               <Button onClick={addRecipient} variant="outline" size="icon">
                 <Mail className="h-4 w-4" />
               </Button>
+              <Button 
+                onClick={() => setRecipients([])} 
+                variant="outline" 
+                size="icon"
+                title="Clear all recipients (testing)"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
 
             {/* Recipient pills */}

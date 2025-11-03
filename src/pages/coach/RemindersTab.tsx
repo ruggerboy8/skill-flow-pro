@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Mail, CheckCircle2 } from 'lucide-react';
+import { Mail, CheckCircle2, X, Send, Edit2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { computeStaffStatusNew } from '@/lib/coachStatus';
@@ -19,6 +22,9 @@ interface StaffMember {
   primary_location_id?: string | null;
 }
 
+type TemplateKey = 'confidence' | 'performance';
+type Templates = Record<TemplateKey, { subject: string; body: string }>;
+
 export default function RemindersTab() {
   const { user, isCoach, isLead } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -27,8 +33,30 @@ export default function RemindersTab() {
   const [performanceList, setPerformanceList] = useState<StaffMember[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
+  // Templates + modal state
+  const [templates, setTemplates] = useState<Templates>({
+    confidence: {
+      subject: 'Quick reminder: confidence check-in',
+      body:
+        'Hi {{first_name}},\n\nYour confidence check-in for {{week_label}} is still outstanding. Please complete when you\'re next on shift.\n\nThanks,\n{{coach_name}}',
+    },
+    performance: {
+      subject: 'Quick reminder: performance check-out',
+      body:
+        'Hi {{first_name}},\n\nYour performance check-out for {{week_label}} is still outstanding. Please complete when you\'re next on shift.\n\nThanks,\n{{coach_name}}',
+    },
+  });
+  const [editingTemplates, setEditingTemplates] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<TemplateKey>('confidence');
+  const [recipients, setRecipients] = useState<StaffMember[]>([]);
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+
   useEffect(() => {
     loadStaffData();
+    loadTemplates();
   }, []);
 
   useEffect(() => {
@@ -46,6 +74,37 @@ export default function RemindersTab() {
       }
     })();
   }, [user]);
+
+  async function loadTemplates() {
+    const { data, error } = await supabase
+      .from('reminder_templates')
+      .select('key,subject,body');
+    if (error) return; // ignore silently for MVP
+    if (data && data.length) {
+      const next = { ...templates };
+      for (const row of data as any[]) {
+        if (row.key === 'confidence' || row.key === 'performance') {
+          next[row.key] = { subject: row.subject, body: row.body };
+        }
+      }
+      setTemplates(next);
+    }
+  }
+
+  async function saveTemplates() {
+    if (!isSuperAdmin) return;
+    const rows = [
+      { key: 'confidence', subject: templates.confidence.subject, body: templates.confidence.body },
+      { key: 'performance', subject: templates.performance.subject, body: templates.performance.body },
+    ];
+    const { error } = await supabase.from('reminder_templates').upsert(rows);
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to save templates', variant: 'destructive' });
+    } else {
+      toast({ title: 'Saved', description: 'Templates updated' });
+      setEditingTemplates(false);
+    }
+  }
 
   const loadStaffData = async () => {
     try {
@@ -162,22 +221,41 @@ export default function RemindersTab() {
     setPerformanceList(needPerformance);
   };
 
-  const copyEmails = (list: StaffMember[], type: 'confidence' | 'performance') => {
-    const emails = list.map(s => s.email).join(', ');
-    
-    navigator.clipboard.writeText(emails).then(() => {
+  function openPreview(type: TemplateKey) {
+    const list = type === 'confidence' ? confidenceList : performanceList;
+    setModalType(type);
+    setRecipients(list);
+    setSubject(templates[type].subject);
+    setBody(templates[type].body);
+    setModalOpen(true);
+  }
+
+  function removeRecipient(userId: string) {
+    setRecipients(prev => prev.filter(r => r.user_id !== userId));
+  }
+
+  async function sendReminders() {
+    try {
+      setSending(true);
+      const payload = {
+        template_key: modalType,
+        subject,
+        body,
+        recipients: recipients.map(r => ({ user_id: r.user_id, email: r.email, name: r.name })),
+      };
+      const { error } = await supabase.functions.invoke('coach-remind', { body: payload });
+      if (error) throw error;
       toast({
-        title: "Copied!",
-        description: `${list.length} email address${list.length !== 1 ? 'es' : ''} copied to clipboard`,
+        title: 'Sent',
+        description: `Sent ${recipients.length} reminder${recipients.length !== 1 ? 's' : ''}`,
       });
-    }).catch(() => {
-      toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
-        variant: "destructive"
-      });
-    });
-  };
+      setModalOpen(false);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message ?? 'Failed to send reminders', variant: 'destructive' });
+    } finally {
+      setSending(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -190,6 +268,47 @@ export default function RemindersTab() {
 
   return (
     <div className="space-y-6">
+      {/* Templates editor (Super Admin only) */}
+      {isSuperAdmin && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Edit2 className="h-5 w-5" />
+                Reminder Templates
+              </CardTitle>
+              <CardDescription>Define the Tuesday (confidence) and Friday (performance) emails.</CardDescription>
+            </div>
+            <Button variant={editingTemplates ? 'secondary' : 'default'} onClick={() => setEditingTemplates(v => !v)}>
+              {editingTemplates ? 'Cancel' : 'Edit'}
+            </Button>
+          </CardHeader>
+          {editingTemplates && (
+            <CardContent className="grid gap-6 md:grid-cols-2">
+              {(['confidence','performance'] as TemplateKey[]).map(k => (
+                <div key={k} className="space-y-3">
+                  <div className="text-sm font-medium capitalize">{k}</div>
+                  <Input
+                    value={templates[k].subject}
+                    onChange={e => setTemplates(t => ({ ...t, [k]: { ...t[k], subject: e.target.value } }))}
+                    placeholder="Subject"
+                  />
+                  <Textarea
+                    rows={8}
+                    value={templates[k].body}
+                    onChange={e => setTemplates(t => ({ ...t, [k]: { ...t[k], body: e.target.value } }))}
+                    placeholder="Body (use {{first_name}}, {{coach_name}}, {{week_label}})"
+                  />
+                </div>
+              ))}
+              <div className="md:col-span-2">
+                <Button onClick={saveTemplates}>Save Templates</Button>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -211,13 +330,9 @@ export default function RemindersTab() {
               <p className="text-sm text-muted-foreground">
                 {confidenceList.length} staff member{confidenceList.length !== 1 ? 's need' : ' needs'} to submit confidence scores
               </p>
-              <Button 
-                onClick={() => copyEmails(confidenceList, 'confidence')}
-                className="w-full sm:w-auto"
-                variant="default"
-              >
+              <Button onClick={() => openPreview('confidence')} className="w-full sm:w-auto">
                 <Mail className="h-4 w-4 mr-2" />
-                Copy Emails - Missing Confidence ({confidenceList.length})
+                Preview & Send ({confidenceList.length})
               </Button>
             </>
           )}
@@ -245,18 +360,67 @@ export default function RemindersTab() {
               <p className="text-sm text-muted-foreground">
                 {performanceList.length} staff member{performanceList.length !== 1 ? 's need' : ' needs'} to submit performance scores
               </p>
-              <Button 
-                onClick={() => copyEmails(performanceList, 'performance')}
-                className="w-full sm:w-auto"
-                variant="default"
-              >
+              <Button onClick={() => openPreview('performance')} className="w-full sm:w-auto">
                 <Mail className="h-4 w-4 mr-2" />
-                Copy Emails - Missing Performance ({performanceList.length})
+                Preview & Send ({performanceList.length})
               </Button>
             </>
           )}
         </CardContent>
       </Card>
+
+      {/* Preview & Send modal */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Send {modalType === 'confidence' ? 'Confidence' : 'Performance'} Reminders</DialogTitle>
+          </DialogHeader>
+          {/* Recipients */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Recipients</div>
+            <div className="flex flex-wrap gap-2">
+              {recipients.map(r => (
+                <span key={r.user_id} className="inline-flex items-center rounded-full border px-3 py-1 text-sm">
+                  {r.name} <span className="mx-1 text-muted-foreground">·</span> {r.email}
+                  <button
+                    className="ml-2 hover:text-red-600"
+                    onClick={() => removeRecipient(r.user_id)}
+                    aria-label={`Remove ${r.name}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </span>
+              ))}
+              {recipients.length === 0 && (
+                <div className="text-sm text-muted-foreground">No recipients selected.</div>
+              )}
+            </div>
+          </div>
+          {/* Subject/Body */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Subject</div>
+            <Input value={subject} onChange={e => setSubject(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Body</div>
+            <Textarea
+              rows={10}
+              value={body}
+              onChange={e => setBody(e.target.value)}
+            />
+            <div className="text-xs text-muted-foreground">
+              Available tags: <code>{'{{first_name}}'}</code>, <code>{'{{coach_name}}'}</code>, <code>{'{{week_label}}'}</code>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button onClick={sendReminders} disabled={sending || recipients.length === 0}>
+              <Send className="h-4 w-4 mr-2" />
+              {sending ? 'Sending…' : `Send ${recipients.length}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

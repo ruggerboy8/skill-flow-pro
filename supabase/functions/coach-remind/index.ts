@@ -26,8 +26,9 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client
+    // Initialize Supabase clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const authHeader = req.headers.get('Authorization');
     
@@ -39,12 +40,13 @@ serve(async (req) => {
       );
     }
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    // Client for user authentication
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
     // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
       console.error('Auth error:', authError);
       return new Response(
@@ -54,6 +56,9 @@ serve(async (req) => {
     }
 
     console.log('Authenticated user:', user.id);
+
+    // Admin client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get coach/sender info
     const { data: senderStaff, error: staffError } = await supabase

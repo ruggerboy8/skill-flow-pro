@@ -41,12 +41,11 @@ serve(async (req) => {
     }
     
     // Client for user authentication
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    // Verify authentication - extract token and pass it explicitly
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     if (authError || !user) {
       console.error('Auth error:', authError);
       return new Response(

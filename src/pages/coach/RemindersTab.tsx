@@ -53,6 +53,8 @@ export default function RemindersTab() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newName, setNewName] = useState('');
 
   useEffect(() => {
     loadStaffData();
@@ -234,6 +236,29 @@ export default function RemindersTab() {
     setRecipients(prev => prev.filter(r => r.user_id !== userId));
   }
 
+  function addRecipient() {
+    if (!newEmail.trim()) return;
+    
+    // Check if email already exists
+    if (recipients.some(r => r.email.toLowerCase() === newEmail.toLowerCase())) {
+      toast({ title: 'Already added', description: 'This email is already in the recipient list' });
+      return;
+    }
+
+    const recipient: StaffMember = {
+      id: `manual-${Date.now()}`,
+      user_id: `manual-${Date.now()}`,
+      name: newName.trim() || newEmail.split('@')[0],
+      email: newEmail.trim(),
+      role_id: 0,
+      onboarding_weeks: 0,
+    };
+
+    setRecipients(prev => [...prev, recipient]);
+    setNewEmail('');
+    setNewName('');
+  }
+
   async function sendReminders() {
     try {
       setSending(true);
@@ -376,8 +401,32 @@ export default function RemindersTab() {
             <DialogTitle>Send {modalType === 'confidence' ? 'Confidence' : 'Performance'} Reminders</DialogTitle>
           </DialogHeader>
           {/* Recipients */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="text-sm font-medium">Recipients</div>
+            
+            {/* Add recipient input */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Name (optional)"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                className="flex-1"
+                onKeyDown={e => e.key === 'Enter' && addRecipient()}
+              />
+              <Input
+                placeholder="email@example.com"
+                type="email"
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+                className="flex-[2]"
+                onKeyDown={e => e.key === 'Enter' && addRecipient()}
+              />
+              <Button onClick={addRecipient} variant="outline" size="icon">
+                <Mail className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Recipient pills */}
             <div className="flex flex-wrap gap-2">
               {recipients.map(r => (
                 <span key={r.user_id} className="inline-flex items-center rounded-full border px-3 py-1 text-sm">
@@ -392,7 +441,7 @@ export default function RemindersTab() {
                 </span>
               ))}
               {recipients.length === 0 && (
-                <div className="text-sm text-muted-foreground">No recipients selected.</div>
+                <div className="text-sm text-muted-foreground">No recipients selected. Add emails above.</div>
               )}
             </div>
           </div>

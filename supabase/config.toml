@@ -1,1 +1,4 @@
 project_id = "yeypngaufuualdfzcjpk"
+
+[functions.coach-remind]
+verify_jwt = true

@@ -431,6 +431,60 @@ export type Database = {
           },
         ]
       }
+      reminder_log: {
+        Row: {
+          body: string
+          id: string
+          sender_user_id: string
+          sent_at: string
+          subject: string
+          target_user_id: string
+          type: string
+        }
+        Insert: {
+          body: string
+          id?: string
+          sender_user_id: string
+          sent_at?: string
+          subject: string
+          target_user_id: string
+          type: string
+        }
+        Update: {
+          body?: string
+          id?: string
+          sender_user_id?: string
+          sent_at?: string
+          subject?: string
+          target_user_id?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      reminder_templates: {
+        Row: {
+          body: string
+          key: string
+          subject: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          body: string
+          key: string
+          subject: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          body?: string
+          key?: string
+          subject?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       roles: {
         Row: {
           role_id: number

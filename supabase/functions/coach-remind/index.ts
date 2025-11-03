@@ -29,7 +29,15 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const authHeader = req.headers.get('Authorization')!;
+    const authHeader = req.headers.get('Authorization');
+    
+    if (!authHeader) {
+      console.error('No Authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
@@ -38,11 +46,14 @@ serve(async (req) => {
     // Verify authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
+      console.error('Auth error:', authError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Unauthorized', details: authError?.message }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('Authenticated user:', user.id);
 
     // Get coach/sender info
     const { data: senderStaff, error: staffError } = await supabase
@@ -69,13 +80,33 @@ serve(async (req) => {
       );
     }
 
-    // Calculate current week label (Monday of current week)
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const daysToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + daysToMonday);
-    const weekLabel = `Week of ${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    // Helper function to calculate week label for a specific timezone
+    function getWeekLabelForTimezone(timezone: string): string {
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        weekday: 'short'
+      });
+      
+      const parts = formatter.formatToParts(now);
+      const month = parseInt(parts.find(p => p.type === 'month')?.value || '1');
+      const day = parseInt(parts.find(p => p.type === 'day')?.value || '1');
+      const year = parseInt(parts.find(p => p.type === 'year')?.value || '2025');
+      const weekday = parts.find(p => p.type === 'weekday')?.value || 'Mon';
+      
+      // Calculate days to Monday (0=Sun, 1=Mon, etc.)
+      const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+      const currentDay = dayMap[weekday] || 1;
+      const daysToMonday = currentDay === 1 ? 0 : (currentDay === 0 ? -6 : 1 - currentDay);
+      
+      const localDate = new Date(year, month - 1, day);
+      localDate.setDate(localDate.getDate() + daysToMonday);
+      
+      return `Week of ${localDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    }
 
     // Get Resend config
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
@@ -96,6 +127,23 @@ serve(async (req) => {
 
     for (const recipient of recipients) {
       try {
+        // Get recipient's location timezone (if they're a staff member)
+        let recipientTimezone = 'America/Chicago'; // default
+        let weekLabelForRecipient = getWeekLabelForTimezone(recipientTimezone);
+        
+        if (!recipient.user_id.startsWith('manual-')) {
+          const { data: staffData } = await supabase
+            .from('staff')
+            .select('primary_location_id, locations(timezone)')
+            .eq('user_id', recipient.user_id)
+            .single();
+          
+          if (staffData?.locations?.timezone) {
+            recipientTimezone = staffData.locations.timezone;
+            weekLabelForRecipient = getWeekLabelForTimezone(recipientTimezone);
+          }
+        }
+        
         // Extract first name
         const firstName = recipient.name.split(' ')[0];
 
@@ -103,12 +151,12 @@ serve(async (req) => {
         const personalizedSubject = subject
           .replace(/\{\{first_name\}\}/g, firstName)
           .replace(/\{\{coach_name\}\}/g, senderStaff.name)
-          .replace(/\{\{week_label\}\}/g, weekLabel);
+          .replace(/\{\{week_label\}\}/g, weekLabelForRecipient);
 
         const personalizedBody = body
           .replace(/\{\{first_name\}\}/g, firstName)
           .replace(/\{\{coach_name\}\}/g, senderStaff.name)
-          .replace(/\{\{week_label\}\}/g, weekLabel);
+          .replace(/\{\{week_label\}\}/g, weekLabelForRecipient);
 
         // Send via Resend
         const resendResponse = await fetch('https://api.resend.com/emails', {

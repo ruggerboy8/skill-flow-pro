@@ -40,6 +40,8 @@ export interface OrgInputs {
   lastSelected: LastSelected[];
   domainCoverage8w: DomainCoverage[];
   managerPriorities?: Map<number, number>;
+  timezone: string;
+  effectiveDate: string;
 }
 
 export interface EngineConfig {

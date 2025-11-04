@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 import { corsHeaders } from '../_shared/cors.ts';
-import { computeNextAndPreview } from '../_shared/sequencer-engine.ts';
+import { computeTwoWeeks } from '../_shared/sequencer-engine.ts';
 import { defaultEngineConfig } from '../_shared/sequencer-config.ts';
 import type { OrgInputs, RoleId } from '../_shared/sequencer-types.ts';
 
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
       });
 
     // 2. Run engine to compute thisWeek + nextWeek
-    const result = computeNextAndPreview(inputs, defaultEngineConfig);
+    const result = computeTwoWeeks(inputs, defaultEngineConfig);
 
     // 3. Build ranked list (exclude thisWeek picks)
     const thisWeekIds = new Set(result.next.picks.map(p => p.proMoveId));

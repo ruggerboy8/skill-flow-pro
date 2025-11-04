@@ -128,6 +128,29 @@ export function advanceInputsForPreview(inputs: OrgInputs, next: WeekPlan): OrgI
   return clone;
 }
 
+export function computeTwoWeeks(inputs: OrgInputs, config: EngineConfig) {
+  const logs: string[] = [];
+  
+  // Compute next week
+  const nextMondayDate = new Date(inputs.effectiveDate);
+  nextMondayDate.setDate(nextMondayDate.getDate() + ((1 + 7 - nextMondayDate.getDay()) % 7));
+  const nextWeekStart = nextMondayDate.toISOString().split('T')[0];
+  
+  const next = computeWeek(inputs, config, nextWeekStart);
+  logs.push(...next.logs);
+  
+  // Advance state and compute preview
+  const previewInputs = advanceInputsForPreview(inputs, next);
+  const previewMondayDate = new Date(nextMondayDate);
+  previewMondayDate.setDate(previewMondayDate.getDate() + 7);
+  const previewWeekStart = previewMondayDate.toISOString().split('T')[0];
+  
+  const preview = computeWeek(previewInputs, config, previewWeekStart);
+  logs.push(...preview.logs);
+  
+  return { next, preview, logs };
+}
+
 function weeksBetween(start: string, end: string): number {
   const d1 = new Date(start);
   const d2 = new Date(end);

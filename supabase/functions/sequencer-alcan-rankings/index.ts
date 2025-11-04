@@ -70,12 +70,17 @@ Deno.serve(async (req) => {
       // Production behavior
       const timezone = 'America/Chicago';
       const now = new Date();
+      const effectiveDate = now.toISOString().split('T')[0];
 
-      const inputs = await fetchAlcanInputsForRole({
-        role: roleId,
-        effectiveDate: now,
+      const inputs = {
+        ...(await fetchAlcanInputsForRole({
+          role: roleId,
+          effectiveDate: now,
+          timezone,
+        })),
         timezone,
-      });
+        effectiveDate,
+      };
 
       const result = computeTwoWeeks(inputs, defaultEngineConfig);
 

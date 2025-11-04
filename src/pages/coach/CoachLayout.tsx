@@ -8,7 +8,7 @@ export default function CoachLayout() {
   // Extract the tab from the pathname
   const getTabFromPath = () => {
     if (location.pathname === '/coach/reminders') return 'reminders';
-    if (location.pathname === '/coach/priorities') return 'priorities';
+    if (location.pathname === '/coach/weekly-pro-moves') return 'weekly-pro-moves';
     return 'dashboard';
   };
   
@@ -29,7 +29,7 @@ export default function CoachLayout() {
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="priorities">Priorities</TabsTrigger>
+          <TabsTrigger value="weekly-pro-moves">Weekly Pro Moves</TabsTrigger>
           <TabsTrigger value="reminders">Reminders</TabsTrigger>
         </TabsList>
         

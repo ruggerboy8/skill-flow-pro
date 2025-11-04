@@ -29,7 +29,7 @@ import CoachDetail from "@/pages/coach/CoachDetail";
 import { EvaluationHub } from "@/pages/coach/EvaluationHub";
 import CoachLayout from "@/pages/coach/CoachLayout";
 import RemindersTab from "@/pages/coach/RemindersTab";
-import ManagerPrioritiesPage from "@/pages/coach/ManagerPrioritiesPage";
+import WeeklyProMovesPage from "@/pages/coach/WeeklyProMovesPage";
 import AdminPage from "@/pages/AdminPage";
 import EvalResults from "@/pages/admin/EvalResults";
 import EvaluationViewer from "@/pages/EvaluationViewer";
@@ -103,7 +103,7 @@ function AppRoutes() {
 
         <Route path="coach" element={<CoachLayout />}>
           <Route index element={<CoachDashboard />} />
-          <Route path="priorities" element={<ManagerPrioritiesPage />} />
+          <Route path="weekly-pro-moves" element={<WeeklyProMovesPage />} />
           <Route path="reminders" element={<RemindersTab />} />
         </Route>
         <Route path="coach/:staffId" element={<CoachDetail />} />

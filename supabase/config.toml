@@ -17,3 +17,9 @@ verify_jwt = true
 
 [functions.rollover-weekly]
 verify_jwt = false
+
+[functions.sequencer-alcan-rankings]
+verify_jwt = true
+
+[functions.manager-priorities-save]
+verify_jwt = true

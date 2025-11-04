@@ -82,7 +82,7 @@ serve(async (req: Request) => {
         // Check if caller is Lead RDA (for scope filtering)
         const { data: callerStaff } = await admin
           .from("staff")
-          .select("is_lead, is_coach, is_super_admin, coach_scope_type, coach_scope_id")
+          .select("id, is_lead, is_coach, is_super_admin")
           .eq("user_id", authUser.user.id)
           .maybeSingle();
         
@@ -97,12 +97,22 @@ serve(async (req: Request) => {
           })
           .order("name", { ascending: true });
 
-        // Apply Lead RDA scope filtering
-        if (callerIsLead && !callerIsCoach && !callerIsSuperAdmin) {
-          if (callerStaff.coach_scope_type === 'org') {
-            q = q.eq('locations.organization_id', callerStaff.coach_scope_id);
-          } else if (callerStaff.coach_scope_type === 'location') {
-            q = q.eq('primary_location_id', callerStaff.coach_scope_id);
+        // Apply Lead RDA scope filtering using junction table
+        if (callerIsLead && !callerIsCoach && !callerIsSuperAdmin && callerStaff) {
+          const { data: callerScopes } = await admin
+            .from("coach_scopes")
+            .select("scope_type, scope_id")
+            .eq("staff_id", callerStaff.id);
+          
+          if (callerScopes && callerScopes.length > 0) {
+            const orgScopes = callerScopes.filter((s: any) => s.scope_type === 'org').map((s: any) => s.scope_id);
+            const locationScopes = callerScopes.filter((s: any) => s.scope_type === 'location').map((s: any) => s.scope_id);
+            
+            if (orgScopes.length > 0) {
+              q = q.in('locations.organization_id', orgScopes);
+            } else if (locationScopes.length > 0) {
+              q = q.in('primary_location_id', locationScopes);
+            }
           }
         }
 
@@ -142,8 +152,27 @@ serve(async (req: Request) => {
           })
         );
 
+        // Fetch coach_scopes for all staff
+        const staffIds = (data ?? []).map((s: any) => s.id);
+        const { data: allScopes } = await admin
+          .from("coach_scopes")
+          .select("staff_id, scope_type, scope_id")
+          .in("staff_id", staffIds);
+        
+        // Build scope map
+        const scopeMap = new Map<string, { scope_type: string, scope_ids: string[] }>();
+        if (allScopes) {
+          for (const scope of allScopes) {
+            if (!scopeMap.has(scope.staff_id)) {
+              scopeMap.set(scope.staff_id, { scope_type: scope.scope_type, scope_ids: [] });
+            }
+            scopeMap.get(scope.staff_id)!.scope_ids.push(scope.scope_id);
+          }
+        }
+        
         const rows = (data ?? []).map((s: any) => {
           const a = s.user_id ? authMap.get(s.user_id) : undefined;
+          const scopes = scopeMap.get(s.id);
           const row = {
             staff_id: s.id,
             user_id: s.user_id,
@@ -161,8 +190,7 @@ serve(async (req: Request) => {
             is_coach: s.is_coach ?? false,
             is_lead: s.is_lead ?? false,
             is_participant: s.is_participant ?? true,
-            coach_scope_type: s.coach_scope_type ?? null,
-            coach_scope_id: s.coach_scope_id ?? null,
+            coach_scopes: scopes || null,
           };
           console.log("Final row data:", row);
           return row;
@@ -264,7 +292,7 @@ serve(async (req: Request) => {
       }
 
       case "role_preset": {
-        const { user_id, preset, coach_scope_type, coach_scope_id } = payload ?? {};
+        const { user_id, preset, coach_scope_type, coach_scope_ids } = payload ?? {};
         
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
@@ -281,21 +309,20 @@ serve(async (req: Request) => {
         if (!currentStaff) return json({ error: "Staff not found" }, 404);
         
         // Validate scope requirements for lead, coach, and coach_participant
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant") && (!coach_scope_type || !coach_scope_id)) {
-          return json({ error: "Scope type and scope are required for this action." }, 422);
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant") && (!coach_scope_type || !coach_scope_ids || !Array.isArray(coach_scope_ids) || coach_scope_ids.length === 0)) {
+          return json({ error: "Scope type and at least one scope ID are required for this action." }, 422);
         }
         
-        // Validate scope ID exists
-        if (coach_scope_type && coach_scope_id) {
+        // Validate scope IDs exist
+        if (coach_scope_type && coach_scope_ids && Array.isArray(coach_scope_ids) && coach_scope_ids.length > 0) {
           const scopeTable = coach_scope_type === 'org' ? 'organizations' : 'locations';
           const { data: scopeData, error: scopeErr } = await admin
             .from(scopeTable)
             .select("id")
-            .eq("id", coach_scope_id)
-            .maybeSingle();
+            .in("id", coach_scope_ids);
           
-          if (scopeErr || !scopeData) {
-            return json({ error: `Invalid ${coach_scope_type === 'org' ? 'organization' : 'location'} ID` }, 422);
+          if (scopeErr || !scopeData || scopeData.length !== coach_scope_ids.length) {
+            return json({ error: `Invalid ${coach_scope_type === 'org' ? 'organization' : 'location'} IDs` }, 422);
           }
         }
         
@@ -315,8 +342,8 @@ serve(async (req: Request) => {
             is_lead: true,
             is_coach: false,
             is_super_admin: false,
-            coach_scope_type: coach_scope_type,
-            coach_scope_id: coach_scope_id,
+            coach_scope_type: null,
+            coach_scope_id: null,
             home_route: '/',
           },
           coach: {
@@ -324,8 +351,8 @@ serve(async (req: Request) => {
             is_lead: false,
             is_coach: true,
             is_super_admin: false,
-            coach_scope_type: coach_scope_type,
-            coach_scope_id: coach_scope_id,
+            coach_scope_type: null,
+            coach_scope_id: null,
             home_route: '/coach',
           },
           coach_participant: {
@@ -333,8 +360,8 @@ serve(async (req: Request) => {
             is_lead: false,
             is_coach: true,
             is_super_admin: false,
-            coach_scope_type: coach_scope_type,
-            coach_scope_id: coach_scope_id,
+            coach_scope_type: null,
+            coach_scope_id: null,
             home_route: '/coach',
           },
           super_admin: {
@@ -387,6 +414,43 @@ serve(async (req: Request) => {
           .maybeSingle();
         
         if (updateErr) throw updateErr;
+        
+        // Handle coach_scopes junction table
+        if (preset === "lead" || preset === "coach" || preset === "coach_participant") {
+          // Delete existing scopes
+          const { error: deleteErr } = await admin
+            .from("coach_scopes")
+            .delete()
+            .eq("staff_id", currentStaff.id);
+          
+          if (deleteErr) console.warn("Error deleting old scopes:", deleteErr);
+          
+          // Insert new scopes
+          if (coach_scope_ids && Array.isArray(coach_scope_ids) && coach_scope_ids.length > 0) {
+            const scopeInserts = coach_scope_ids.map((scope_id: string) => ({
+              staff_id: currentStaff.id,
+              scope_type: coach_scope_type,
+              scope_id: scope_id,
+            }));
+            
+            const { error: insertErr } = await admin
+              .from("coach_scopes")
+              .insert(scopeInserts);
+            
+            if (insertErr) {
+              console.error("Error inserting scopes:", insertErr);
+              throw new Error("Failed to update coach scopes");
+            }
+            
+            console.log(`✅ Inserted ${coach_scope_ids.length} scopes for staff ${currentStaff.id}`);
+          }
+        } else {
+          // For participant/super_admin, clear any existing scopes
+          await admin
+            .from("coach_scopes")
+            .delete()
+            .eq("staff_id", currentStaff.id);
+        }
         
         // Enhanced audit log
         try {

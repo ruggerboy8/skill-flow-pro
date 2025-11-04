@@ -93,6 +93,45 @@ export type Database = {
           },
         ]
       }
+      coach_scopes: {
+        Row: {
+          created_at: string
+          id: string
+          scope_id: string
+          scope_type: string
+          staff_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          scope_id: string
+          scope_type: string
+          staff_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          scope_id?: string
+          scope_type?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_scopes_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_scopes_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       competencies: {
         Row: {
           code: string | null

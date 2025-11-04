@@ -112,20 +112,28 @@ export default function CoachDashboard() {
     try {
       const now = new Date();
       
-      // Get current user's organization for Lead RDA scoping
-      let myOrgId: string | null = null;
+      // Get current user's scopes for Lead RDA filtering using junction table
+      let myScopeOrgIds: string[] = [];
+      let myScopeLocationIds: string[] = [];
+      
       if (isLead && !isCoach && !isSuperAdmin) {
         const { data: myStaff } = await supabase
           .from('staff')
-          .select(`
-            id,
-            primary_location_id,
-            locations!primary_location_id(organization_id)
-          `)
+          .select('id')
           .eq('user_id', user?.id)
           .maybeSingle();
         
-        myOrgId = myStaff?.locations?.organization_id ?? null;
+        if (myStaff) {
+          const { data: myScopes } = await supabase
+            .from('coach_scopes')
+            .select('scope_type, scope_id')
+            .eq('staff_id', myStaff.id);
+          
+          if (myScopes) {
+            myScopeOrgIds = myScopes.filter(s => s.scope_type === 'org').map(s => s.scope_id);
+            myScopeLocationIds = myScopes.filter(s => s.scope_type === 'location').map(s => s.scope_id);
+          }
+        }
       }
       
       // Get staff roster with additional fields needed for new system
@@ -151,9 +159,14 @@ export default function CoachDashboard() {
       const processedStaff: StaffMember[] = (staffData as any[])
         .filter((member: any) => member.user_id !== user?.id) // Exclude self
         .filter((member: any) => {
-          // Lead RDAs only see their organization
+          // Lead RDAs only see their scopes (OR logic)
           if (isLead && !isCoach && !isSuperAdmin) {
-            return member.locations?.organization_id === myOrgId;
+            if (myScopeOrgIds.length > 0) {
+              return myScopeOrgIds.includes(member.locations?.organization_id);
+            } else if (myScopeLocationIds.length > 0) {
+              return myScopeLocationIds.includes(member.primary_location_id);
+            }
+            return false;
           }
           return true;
         })

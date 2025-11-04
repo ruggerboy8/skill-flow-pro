@@ -50,7 +50,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const [loading, setLoading] = useState(false);
   const [selectedAction, setSelectedAction] = useState<'participant' | 'lead' | 'coach' | 'coach_participant' | 'super_admin'>('participant');
   const [scopeType, setScopeType] = useState<'org' | 'location'>('org');
-  const [scopeId, setScopeId] = useState<string>("");
+  const [scopeIds, setScopeIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (user && open) {
@@ -67,19 +67,14 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         setSelectedAction('participant');
       }
       
-      // Prefill scope from user data
-      if (user.coach_scope_type && user.coach_scope_id) {
-        setScopeType(user.coach_scope_type);
-        setScopeId(user.coach_scope_id);
-      } else if (user.organization_id) {
-        setScopeType('org');
-        setScopeId(user.organization_id);
-      } else if (user.location_id) {
-        setScopeType('location');
-        setScopeId(user.location_id);
+      // Prefill scopes from user data (coach_scopes junction table)
+      const scopes = (user as any).coach_scopes;
+      if (scopes && scopes.scope_ids && scopes.scope_ids.length > 0) {
+        setScopeType(scopes.scope_type);
+        setScopeIds(scopes.scope_ids);
       } else {
         setScopeType('org');
-        setScopeId("");
+        setScopeIds([]);
       }
     }
   }, [user, open]);
@@ -89,10 +84,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     if (!user?.user_id) return;
     
     // Validate scope for Lead/Coach/Coach+Participant
-    if ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') && !scopeId) {
+    if ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') && scopeIds.length === 0) {
       toast({
         title: "Scope required",
-        description: "Scope type and scope are required for this action.",
+        description: "Please select at least one scope.",
         variant: "destructive",
       });
       return;
@@ -108,7 +103,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
       
       if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') {
         payload.coach_scope_type = scopeType;
-        payload.coach_scope_id = scopeId;
+        payload.coach_scope_ids = scopeIds;
       }
       
       const { data, error } = await supabase.functions.invoke('admin-users', { body: payload });
@@ -151,40 +146,47 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
 
   // Determine scope text
   const getScopeText = () => {
-    if (!user.coach_scope_type || !user.coach_scope_id) return null;
-    const scopeName = user.coach_scope_type === 'org' 
-      ? organizations.find(o => o.id === user.coach_scope_id)?.name
-      : locations.find(l => l.id === user.coach_scope_id)?.name;
-    return scopeName ? `Scoped to: ${scopeName}` : null;
+    const scopes = (user as any).coach_scopes;
+    if (!scopes || !scopes.scope_ids || scopes.scope_ids.length === 0) return null;
+    
+    const scopeNames = scopes.scope_type === 'org'
+      ? scopes.scope_ids.map((id: string) => organizations.find(o => o.id === id)?.name).filter(Boolean)
+      : scopes.scope_ids.map((id: string) => locations.find(l => l.id === id)?.name).filter(Boolean);
+    
+    return scopeNames.length > 0 ? `Scoped to: ${scopeNames.join(', ')}` : null;
   };
 
   // Generate live summary
   const getLiveSummary = () => {
-    const scopeName = scopeType === 'org'
-      ? organizations.find(o => o.id === scopeId)?.name || "selected scope"
-      : locations.find(l => l.id === scopeId)?.name || "selected scope";
+    const scopeCount = scopeIds.length;
+    const scopeNames = scopeType === 'org'
+      ? scopeIds.map(id => organizations.find(o => o.id === id)?.name).filter(Boolean).join(', ')
+      : scopeIds.map(id => locations.find(l => l.id === id)?.name).filter(Boolean).join(', ');
+    
+    const scopeText = scopeCount > 0 ? scopeNames : '[select scopes]';
+    const scopeLabel = scopeType === 'org' ? 'organization(s)' : 'location(s)';
     
     switch (selectedAction) {
       case 'participant':
         return `This will set ${user.name} to Participant.`;
       case 'lead':
-        return scopeId
-          ? `This will promote ${user.name} to Lead RDA scoped to ${scopeName} and maintain their participant tasks.`
+        return scopeCount > 0
+          ? `This will promote ${user.name} to Lead RDA scoped to ${scopeCount} ${scopeLabel}: ${scopeText} and maintain their participant tasks.`
           : `This will promote ${user.name} to Lead RDA (requires scope selection).`;
       case 'coach':
-        return scopeId
-          ? `This will promote ${user.name} to Coach scoped to ${scopeName} and remove participant tasks.`
+        return scopeCount > 0
+          ? `This will promote ${user.name} to Coach scoped to ${scopeCount} ${scopeLabel}: ${scopeText} and remove participant tasks.`
           : `This will promote ${user.name} to Coach (requires scope selection).`;
       case 'coach_participant':
-        return scopeId
-          ? `This will promote ${user.name} to Coach + Participant scoped to ${scopeName} and maintain their participant tasks.`
+        return scopeCount > 0
+          ? `This will promote ${user.name} to Coach + Participant scoped to ${scopeCount} ${scopeLabel}: ${scopeText} and maintain their participant tasks.`
           : `This will promote ${user.name} to Coach + Participant (requires scope selection).`;
       case 'super_admin':
         return `This will promote ${user.name} to Super Admin and remove participant tasks.`;
     }
   };
 
-  const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') && !scopeId);
+  const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') && scopeIds.length === 0);
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
@@ -244,41 +246,63 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 <Label htmlFor="scope-type" className="text-sm font-semibold">Scope Type</Label>
                 <Select value={scopeType} onValueChange={(value) => {
                   setScopeType(value as 'org' | 'location');
-                  setScopeId(""); // Reset scope ID when type changes
+                  setScopeIds([]); // Reset scope IDs when type changes
                 }}>
                   <SelectTrigger id="scope-type">
                     <SelectValue placeholder="Select scope type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="org">Organization</SelectItem>
-                    <SelectItem value="location">Location</SelectItem>
+                    <SelectItem value="org">Organizations (includes all locations in each org)</SelectItem>
+                    <SelectItem value="location">Specific Locations</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="scope-value" className="text-sm font-semibold">
-                  {scopeType === 'org' ? 'Organization' : 'Location'}
+                <Label className="text-sm font-semibold">
+                  {scopeType === 'org' ? 'Select Organizations' : 'Select Locations'} (multiple)
                 </Label>
-                <Select value={scopeId} onValueChange={setScopeId}>
-                  <SelectTrigger id="scope-value">
-                    <SelectValue placeholder={`Select ${scopeType === 'org' ? 'organization' : 'location'}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {scopeType === 'org' 
-                      ? organizations.map((org) => (
-                          <SelectItem key={org.id} value={org.id}>
-                            {org.name}
-                          </SelectItem>
-                        ))
-                      : locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.name}
-                          </SelectItem>
-                        ))
-                    }
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2 max-h-48 overflow-y-auto p-2 border rounded-md">
+                  {scopeType === 'org' 
+                    ? organizations.map((org) => (
+                        <label key={org.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={scopeIds.includes(org.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setScopeIds([...scopeIds, org.id]);
+                              } else {
+                                setScopeIds(scopeIds.filter(id => id !== org.id));
+                              }
+                            }}
+                            className="rounded border-input"
+                          />
+                          <span className="text-sm">{org.name}</span>
+                        </label>
+                      ))
+                    : locations.map((location) => (
+                        <label key={location.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={scopeIds.includes(location.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setScopeIds([...scopeIds, location.id]);
+                              } else {
+                                setScopeIds(scopeIds.filter(id => id !== location.id));
+                              }
+                            }}
+                            className="rounded border-input"
+                          />
+                          <span className="text-sm">{location.name}</span>
+                        </label>
+                      ))
+                  }
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {scopeIds.length} selected
+                </p>
               </div>
             </div>
           )}

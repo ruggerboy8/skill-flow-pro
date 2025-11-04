@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +11,8 @@ import { defaultEngineConfig } from '@/lib/sequencer/config';
 import { computeNextAndPreview } from '@/lib/sequencer/engine';
 import { fetchAlcanInputsForRole } from '@/lib/sequencer/data';
 import type { RoleId, TwoWeekResult } from '@/lib/sequencer/types';
-import { Loader2, PlayCircle, Download } from 'lucide-react';
+import { Loader2, PlayCircle, Download, Upload } from 'lucide-react';
+import type { OrgInputs } from '@/lib/sequencer/types';
 import { DRIVER_LABELS } from '@/lib/constants/domains';
 import { formatMmDdYyyy } from '@/v2/time';
 
@@ -22,8 +23,10 @@ export function OrgSequencerPanel() {
   const [effectiveDate, setEffectiveDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [timezone] = useState<string>('America/Chicago');
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<TwoWeekResult | null>(null);
   const [domainMap, setDomainMap] = useState<Map<number, Domain>>(new Map());
+  const lastInputsRef = useRef<OrgInputs | null>(null);
 
   useEffect(() => {
     void loadDomains();
@@ -55,6 +58,8 @@ export function OrgSequencerPanel() {
         timezone,
       });
 
+      lastInputsRef.current = inputs; // Store for simulation publish
+
       const res = await computeNextAndPreview(inputs, defaultEngineConfig);
       setResult(res);
       toast({ title: 'Dry-run complete', description: 'Sequencer computed Alcan-wide next week + preview.' });
@@ -62,6 +67,25 @@ export function OrgSequencerPanel() {
       toast({ title: 'Run failed', description: e?.message || 'Unknown error', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onSaveAsSimulation() {
+    if (!lastInputsRef.current) {
+      toast({ title: 'Run Dry-Run first', description: 'No inputs to publish', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke('sequencer-sim-upsert', {
+        body: { roleId: role, inputs: lastInputsRef.current }
+      });
+      if (error) throw error;
+      toast({ title: 'Simulation Published', description: 'Coach Simulation Mode now reflects this dry-run.' });
+    } catch (e: any) {
+      toast({ title: 'Publish failed', description: e?.message || 'Unable to save simulation', variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -110,6 +134,19 @@ export function OrgSequencerPanel() {
                 <>
                   <PlayCircle className="mr-2 h-4 w-4" />
                   Run Dry-Run
+                </>
+              )}
+            </Button>
+            <Button variant="secondary" onClick={onSaveAsSimulation} disabled={!result || saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Publishing…
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Save as Simulation
                 </>
               )}
             </Button>

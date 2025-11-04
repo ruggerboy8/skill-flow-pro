@@ -5,24 +5,23 @@ import { Navigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
+import { OrgSequencerStub } from '@/components/admin/OrgSequencerStub';
 
 export default function AdminBuilder() {
-  console.log('=== NEW ADMINBUILDER LOADING ===');
   const { user } = useAuth();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     checkAdminStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const checkAdminStatus = async () => {
-    console.log('=== CHECKING ADMIN STATUS ===', user?.email);
     if (!user) {
       setLoading(false);
       return;
     }
-
     try {
       const { data } = await supabase
         .from('staff')
@@ -30,9 +29,8 @@ export default function AdminBuilder() {
         .eq('user_id', user.id)
         .single();
 
-      setIsSuperAdmin(data?.is_super_admin || false);
-      console.log('=== ADMIN STATUS RESULT ===', data?.is_super_admin);
-    } catch (error) {
+      setIsSuperAdmin(Boolean(data?.is_super_admin));
+    } catch {
       setIsSuperAdmin(false);
     } finally {
       setLoading(false);
@@ -40,42 +38,68 @@ export default function AdminBuilder() {
   };
 
   if (loading) {
-    console.log('=== ADMINBUILDER LOADING ===');
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center">Loading...</div>
+        <div className="text-center text-sm text-muted-foreground">Loading…</div>
       </div>
     );
   }
 
   if (!user || !isSuperAdmin) {
-    console.log('=== ACCESS DENIED ===', { user: !!user, isSuperAdmin });
     return <Navigate to="/" replace />;
   }
-
-  console.log('=== RENDERING NEW TABBED INTERFACE ===');
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <h1 className="text-3xl font-bold">Admin Builder</h1>
-      
-      <Tabs defaultValue="dfi" className="w-full">
+
+      {/* Top-level tabs: Static Cycles / Pro-Move Library / Org Sequencer */}
+      <Tabs defaultValue="static" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="dfi">DFI Focus Builder</TabsTrigger>
-          <TabsTrigger value="rda">RDA Focus Builder</TabsTrigger>
-          <TabsTrigger value="promoves">Pro-Move Library</TabsTrigger>
+          <TabsTrigger value="static">Static Cycles</TabsTrigger>
+          <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
+          <TabsTrigger value="sequencer">Org Sequencer</TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="dfi" className="space-y-6">
-          <SimpleFocusBuilder roleFilter={1} />
+
+        {/* Static Cycles: nested role tabs */}
+        <TabsContent value="static" className="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold">Static Cycles</h2>
+            <p className="text-sm text-muted-foreground">
+              Manage the initial static cycles for each role. (No changes to behavior—just moved here.)
+            </p>
+          </div>
+
+          <Tabs defaultValue="dfi" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="dfi">DFI</TabsTrigger>
+              <TabsTrigger value="rda">RDA</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dfi" className="space-y-6">
+              <SimpleFocusBuilder roleFilter={1} />
+            </TabsContent>
+
+            <TabsContent value="rda" className="space-y-6">
+              <SimpleFocusBuilder roleFilter={2} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        <TabsContent value="rda" className="space-y-6">
-          <SimpleFocusBuilder roleFilter={2} />
-        </TabsContent>
-        
-        <TabsContent value="promoves" className="space-y-6">
+        {/* Pro-Move Library (unchanged) */}
+        <TabsContent value="library" className="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold">Pro-Move Library</h2>
+            <p className="text-sm text-muted-foreground">
+              Browse and maintain the library of Pro Moves.
+            </p>
+          </div>
           <ProMoveLibrary />
+        </TabsContent>
+
+        {/* Org Sequencer (stub) */}
+        <TabsContent value="sequencer" className="space-y-6">
+          <OrgSequencerStub />
         </TabsContent>
       </Tabs>
     </div>

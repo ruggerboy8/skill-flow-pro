@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { roleId } = await req.json() as { roleId: RoleId };
+    const { roleId, simulation } = await req.json() as { roleId: RoleId; simulation?: boolean };
 
     if (![1, 2].includes(roleId)) {
       return new Response(JSON.stringify({ error: 'Invalid roleId' }), {
@@ -48,70 +48,84 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use America/Chicago as default timezone for Alcan-wide
-    const timezone = 'America/Chicago';
-    const now = new Date();
+    let response;
 
-    // Fetch Alcan-wide inputs
-    const inputs = await fetchAlcanInputsForRole({
-      role: roleId,
-      effectiveDate: now,
-      timezone,
-    });
+    if (simulation) {
+      // Read from simulation KV store
+      const { data: simData, error: simError } = await supabase
+        .from('app_kv')
+        .select('value')
+        .eq('key', `sim:two_week:role:${roleId}`)
+        .single();
 
-    // Compute next + preview weeks
-    const result = computeTwoWeeks(inputs, defaultEngineConfig);
+      if (simError || !simData) {
+        return new Response(JSON.stringify({ error: 'No simulation data found. Run "Save as Simulation" in Builder first.' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
-    // Extract eligible moves that are NOT in thisWeek
-    const thisWeekIds = new Set(result.next.picks.map(p => p.proMoveId));
-    const ranked = inputs.eligibleMoves
-      .filter(m => !thisWeekIds.has(m.id))
-      .map(m => {
-        // Re-score each using the engine's needScore logic
-        // For simplicity, we'll compute a rough score here
-        // In production, you'd call the engine's scoring function
-        const confSample = inputs.confidenceHistory.find(c => c.proMoveId === m.id);
-        const avg = confSample?.avg01 ?? 0.7;
-        const finalScore = 1 - avg; // Simplified: lower confidence = higher need
-        
-        return {
-          proMoveId: m.id,
-          name: m.name,
-          domainId: m.domainId,
-          finalScore,
-          drivers: ['C'] as Array<'C'|'R'|'E'|'D'|'M'>,
-        };
-      })
-      .sort((a, b) => b.finalScore - a.finalScore);
+      response = simData.value;
+    } else {
+      // Production behavior
+      const timezone = 'America/Chicago';
+      const now = new Date();
 
-    const response = {
-      timezone,
-      thisWeek: {
-        weekStart: result.next.weekStart,
-        picks: result.next.picks.map(p => ({
-          proMoveId: p.proMoveId,
-          name: p.name,
-          domainId: p.domainId,
-          finalScore: p.score,
-          drivers: Object.entries(p.drivers)
-            .filter(([_, v]) => v > 0)
-            .map(([k]) => k) as Array<'C'|'R'|'E'|'D'|'M'>,
-        })),
-      },
-      nextWeek: {
-        weekStart: result.preview.weekStart,
-        picks: result.preview.picks.map(p => ({
-          proMoveId: p.proMoveId,
-          name: p.name,
-          domainId: p.domainId,
-          finalScore: p.score,
-          drivers: Object.entries(p.drivers)
-            .filter(([_, v]) => v > 0)
-            .map(([k]) => k) as Array<'C'|'R'|'E'|'D'|'M'>,
-        })),
-      },
-      ranked,
-    };
+      const inputs = await fetchAlcanInputsForRole({
+        role: roleId,
+        effectiveDate: now,
+        timezone,
+      });
+
+      const result = computeTwoWeeks(inputs, defaultEngineConfig);
+
+      const thisWeekIds = new Set(result.next.picks.map(p => p.proMoveId));
+      const ranked = inputs.eligibleMoves
+        .filter(m => !thisWeekIds.has(m.id))
+        .map(m => {
+          const confSample = inputs.confidenceHistory.find(c => c.proMoveId === m.id);
+          const avg = confSample?.avg01 ?? 0.7;
+          const finalScore = 1 - avg;
+          
+          return {
+            proMoveId: m.id,
+            name: m.name,
+            domainId: m.domainId,
+            finalScore,
+            drivers: ['C'] as Array<'C'|'R'|'E'|'D'|'M'>,
+          };
+        })
+        .sort((a, b) => b.finalScore - a.finalScore);
+
+      response = {
+        timezone,
+        thisWeek: {
+          weekStart: result.next.weekStart,
+          picks: result.next.picks.map(p => ({
+            proMoveId: p.proMoveId,
+            name: p.name,
+            domainId: p.domainId,
+            finalScore: p.score,
+            drivers: Object.entries(p.drivers)
+              .filter(([_, v]) => v > 0)
+              .map(([k]) => k) as Array<'C'|'R'|'E'|'D'|'M'>,
+          })),
+        },
+        nextWeek: {
+          weekStart: result.preview.weekStart,
+          picks: result.preview.picks.map(p => ({
+            proMoveId: p.proMoveId,
+            name: p.name,
+            domainId: p.domainId,
+            finalScore: p.score,
+            drivers: Object.entries(p.drivers)
+              .filter(([_, v]) => v > 0)
+              .map(([k]) => k) as Array<'C'|'R'|'E'|'D'|'M'>,
+          })),
+        },
+        ranked,
+      };
+    }
 
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

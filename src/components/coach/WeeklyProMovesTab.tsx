@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, RotateCcw, RefreshCw } from 'lucide-react';
@@ -84,6 +85,7 @@ function SortableRow({ item, index, isPriorityZone }: { item: RankItem; index: n
 
 export function WeeklyProMovesTab() {
   const [role, setRole] = useState<RoleId>(2); // default RDA
+  const [sim, setSim] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [data, setData] = useState<RankingsResponse | null>(null);
@@ -98,7 +100,7 @@ export function WeeklyProMovesTab() {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('sequencer-alcan-rankings', {
-        body: { roleId: role }
+        body: { roleId: role, simulation: sim }
       });
       if (error) throw error;
       const resp = data as RankingsResponse;
@@ -112,7 +114,7 @@ export function WeeklyProMovesTab() {
     }
   }
 
-  useEffect(() => { void load(); }, [role]);
+  useEffect(() => { void load(); }, [role, sim]);
 
   function onDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -132,10 +134,10 @@ export function WeeklyProMovesTab() {
       setSaving(true);
       const actionIds = ordered.map(i => i.proMoveId);
       const { error } = await supabase.functions.invoke('manager-priorities-save', {
-        body: { roleId: role, actionIds }
+        body: { roleId: role, actionIds, simulation: sim }
       });
       if (error) throw error;
-      toast({ title: 'Saved', description: 'Priorities updated. Refreshing preview…' });
+      toast({ title: 'Saved', description: `Priorities ${sim ? '(simulation)' : ''} updated. Refreshing preview…` });
 
       await load();
     } catch (e: any) {
@@ -164,20 +166,34 @@ export function WeeklyProMovesTab() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div className="space-y-1.5">
-          <h2 className="text-2xl font-semibold">Weekly Pro Moves</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-semibold">Weekly Pro Moves</h2>
+            {sim && <Badge variant="destructive" className="text-xs">SIM</Badge>}
+          </div>
           <p className="text-sm text-muted-foreground">
             This Week is locked. Your Top&nbsp;5 priorities influence <strong>Next Week</strong> only.
           </p>
+          {sim && (
+            <div className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1 inline-block">
+              Simulation Mode — sandboxed inputs &amp; priorities
+            </div>
+          )}
         </div>
-        <div className="w-full sm:w-56">
-          <Label>Role</Label>
-          <Select value={String(role)} onValueChange={(v) => setRole(Number(v) as RoleId)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">DFI</SelectItem>
-              <SelectItem value="2">RDA</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 justify-end">
+            <Label className="text-xs">Simulation Mode</Label>
+            <Switch checked={sim} onCheckedChange={setSim} />
+          </div>
+          <div className="w-full sm:w-56">
+            <Label>Role</Label>
+            <Select value={String(role)} onValueChange={(v) => setRole(Number(v) as RoleId)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">DFI</SelectItem>
+                <SelectItem value="2">RDA</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 

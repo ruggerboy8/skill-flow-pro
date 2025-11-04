@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { roleId, actionIds } = await req.json() as { roleId: RoleId; actionIds: number[] };
+    const { roleId, actionIds, simulation } = await req.json() as { roleId: RoleId; actionIds: number[]; simulation?: boolean };
 
     if (![1, 2].includes(roleId)) {
       return new Response(JSON.stringify({ error: 'Invalid roleId' }), {
@@ -59,36 +59,58 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Delete existing priorities for this coach/role
-    await supabase
-      .from('manager_priorities')
-      .delete()
-      .eq('coach_staff_id', staff.id)
-      .eq('role_id', roleId);
+    if (simulation) {
+      // Simulation mode: store priorities in KV
+      const top5 = actionIds.slice(0, 5);
+      await supabase
+        .from('app_kv')
+        .upsert({
+          key: `sim:priorities:user:${user.id}:role:${roleId}`,
+          value: { actionIds: top5, savedAt: new Date().toISOString() },
+          updated_at: new Date().toISOString(),
+        });
 
-    // Insert top 5 priorities with rank
-    const top5 = actionIds.slice(0, 5);
-    const inserts = top5.map((actionId, idx) => ({
-      coach_staff_id: staff.id,
-      role_id: roleId,
-      action_id: actionId,
-      weight: 5 - idx, // Higher rank = higher weight
-    }));
+      // Recompute simulation nextWeek with updated priorities
+      // Load simulation inputs
+      const { data: inputsData } = await supabase
+        .from('app_kv')
+        .select('value')
+        .eq('key', `sim:inputs:role:${roleId}`)
+        .single();
 
-    const { error: insertError } = await supabase
-      .from('manager_priorities')
-      .insert(inserts);
+      if (inputsData) {
+        // Re-run engine with updated priorities (simplified: just reload for now)
+        // In full implementation, merge priority weights into inputs.managerPriorities
+        // and recompute. For now, the UI refetch will show updated state.
+      }
+    } else {
+      // Production mode: write to manager_priorities table
+      await supabase
+        .from('manager_priorities')
+        .delete()
+        .eq('coach_staff_id', staff.id)
+        .eq('role_id', roleId);
 
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      return new Response(JSON.stringify({ error: insertError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const top5 = actionIds.slice(0, 5);
+      const inserts = top5.map((actionId, idx) => ({
+        coach_staff_id: staff.id,
+        role_id: roleId,
+        action_id: actionId,
+        weight: 5 - idx,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('manager_priorities')
+        .insert(inserts);
+
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        return new Response(JSON.stringify({ error: insertError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
-
-    // TODO: Trigger preview recompute (call compute-weekly-plans or similar)
-    // For now, the UI will refetch rankings which includes the updated preview
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

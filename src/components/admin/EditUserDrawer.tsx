@@ -17,6 +17,7 @@ interface Role {
 interface Location {
   id: string;
   name: string;
+  organization?: { name: string };
 }
 
 interface User {
@@ -295,7 +296,12 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                             }}
                             className="rounded border-input"
                           />
-                          <span className="text-sm">{location.name}</span>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{location.name}</span>
+                            {location.organization && (
+                              <span className="text-xs text-muted-foreground">{location.organization.name}</span>
+                            )}
+                          </div>
                         </label>
                       ))
                   }

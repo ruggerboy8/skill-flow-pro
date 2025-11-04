@@ -45,6 +45,7 @@ interface Role {
 interface Location {
   id: string;
   name: string;
+  organization?: { name: string };
 }
 
 export function AdminUsersTab() {
@@ -104,7 +105,7 @@ export function AdminUsersTab() {
     try {
       const [rolesResult, locationsResult, orgsResult] = await Promise.all([
         supabase.from("roles").select("role_id, role_name").order("role_name"),
-        supabase.from("locations").select("id, name").eq("active", true).order("name"),
+        supabase.from("locations").select("id, name, organization:organizations!organization_id(name)").eq("active", true).order("name"),
         supabase.from("organizations").select("id, name").eq("active", true).order("name"),
       ]);
 

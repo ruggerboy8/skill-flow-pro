@@ -79,12 +79,32 @@ serve(async (req: Request) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
+        // Check if caller is Lead RDA (for scope filtering)
+        const { data: callerStaff } = await admin
+          .from("staff")
+          .select("is_lead, is_coach, is_super_admin, coach_scope_type, coach_scope_id")
+          .eq("user_id", authUser.user.id)
+          .maybeSingle();
+        
+        const callerIsLead = callerStaff?.is_lead ?? false;
+        const callerIsCoach = callerStaff?.is_coach ?? false;
+        const callerIsSuperAdmin = callerStaff?.is_super_admin ?? false;
+
         let q = admin
           .from("staff")
           .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_coach,is_lead,is_participant,coach_scope_type,coach_scope_id,roles(role_name),locations(name,organization_id)", {
             count: "exact",
           })
           .order("name", { ascending: true });
+
+        // Apply Lead RDA scope filtering
+        if (callerIsLead && !callerIsCoach && !callerIsSuperAdmin) {
+          if (callerStaff.coach_scope_type === 'org') {
+            q = q.eq('locations.organization_id', callerStaff.coach_scope_id);
+          } else if (callerStaff.coach_scope_type === 'location') {
+            q = q.eq('primary_location_id', callerStaff.coach_scope_id);
+          }
+        }
 
         if (search) q = q.ilike("name", `%${search}%`);
         if (location_id) q = q.eq("primary_location_id", location_id);
@@ -260,8 +280,8 @@ serve(async (req: Request) => {
         if (fetchErr) throw fetchErr;
         if (!currentStaff) return json({ error: "Staff not found" }, 404);
         
-        // Validate scope requirements for lead and coach
-        if ((preset === "lead" || preset === "coach") && (!coach_scope_type || !coach_scope_id)) {
+        // Validate scope requirements for lead, coach, and coach_participant
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant") && (!coach_scope_type || !coach_scope_id)) {
           return json({ error: "Scope type and scope are required for this action." }, 422);
         }
         
@@ -301,6 +321,15 @@ serve(async (req: Request) => {
           },
           coach: {
             is_participant: false,
+            is_lead: false,
+            is_coach: true,
+            is_super_admin: false,
+            coach_scope_type: coach_scope_type,
+            coach_scope_id: coach_scope_id,
+            home_route: '/coach',
+          },
+          coach_participant: {
+            is_participant: true,
             is_lead: false,
             is_coach: true,
             is_super_admin: false,

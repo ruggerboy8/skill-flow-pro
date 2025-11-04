@@ -48,7 +48,7 @@ interface EditUserDrawerProps {
 export function EditUserDrawer({ open, onClose, onSuccess, user, roles, locations, organizations }: EditUserDrawerProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<'participant' | 'lead' | 'coach' | 'super_admin'>('participant');
+  const [selectedAction, setSelectedAction] = useState<'participant' | 'lead' | 'coach' | 'coach_participant' | 'super_admin'>('participant');
   const [scopeType, setScopeType] = useState<'org' | 'location'>('org');
   const [scopeId, setScopeId] = useState<string>("");
 
@@ -57,6 +57,8 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
       // Determine current action from flags
       if (user.is_super_admin) {
         setSelectedAction('super_admin');
+      } else if (user.is_coach && user.is_participant) {
+        setSelectedAction('coach_participant');
       } else if (user.is_coach && !user.is_participant) {
         setSelectedAction('coach');
       } else if (user.is_lead && user.is_participant) {
@@ -86,8 +88,8 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     e.preventDefault();
     if (!user?.user_id) return;
     
-    // Validate scope for Lead/Coach
-    if ((selectedAction === 'lead' || selectedAction === 'coach') && !scopeId) {
+    // Validate scope for Lead/Coach/Coach+Participant
+    if ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') && !scopeId) {
       toast({
         title: "Scope required",
         description: "Scope type and scope are required for this action.",
@@ -104,7 +106,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         preset: selectedAction,
       };
       
-      if (selectedAction === 'lead' || selectedAction === 'coach') {
+      if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') {
         payload.coach_scope_type = scopeType;
         payload.coach_scope_id = scopeId;
       }
@@ -141,6 +143,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   // Determine current status badge
   const getCurrentStatusBadge = () => {
     if (user.is_super_admin) return <Badge variant="destructive">Super Admin</Badge>;
+    if (user.is_coach && user.is_participant) return <Badge variant="secondary">Coach + Participant</Badge>;
     if (user.is_coach && !user.is_participant) return <Badge variant="secondary">Coach</Badge>;
     if (user.is_lead && user.is_participant) return <Badge variant="outline">Lead RDA</Badge>;
     return <Badge>Participant</Badge>;
@@ -172,12 +175,16 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         return scopeId
           ? `This will promote ${user.name} to Coach scoped to ${scopeName} and remove participant tasks.`
           : `This will promote ${user.name} to Coach (requires scope selection).`;
+      case 'coach_participant':
+        return scopeId
+          ? `This will promote ${user.name} to Coach + Participant scoped to ${scopeName} and maintain their participant tasks.`
+          : `This will promote ${user.name} to Coach + Participant (requires scope selection).`;
       case 'super_admin':
         return `This will promote ${user.name} to Super Admin and remove participant tasks.`;
     }
   };
 
-  const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach') && !scopeId);
+  const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') && !scopeId);
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
@@ -220,6 +227,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 <Label htmlFor="action-coach" className="font-normal cursor-pointer">Promote to Coach</Label>
               </div>
               <div className="flex items-center space-x-2">
+                <RadioGroupItem value="coach_participant" id="action-coach-participant" />
+                <Label htmlFor="action-coach-participant" className="font-normal cursor-pointer">Promote to Coach + Participant</Label>
+              </div>
+              <div className="flex items-center space-x-2">
                 <RadioGroupItem value="super_admin" id="action-super-admin" />
                 <Label htmlFor="action-super-admin" className="font-normal cursor-pointer">Promote to Super Admin</Label>
               </div>
@@ -227,7 +238,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
           </div>
 
           {/* Scope (Conditional) */}
-          {(selectedAction === 'lead' || selectedAction === 'coach') && (
+          {(selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') && (
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               <div className="space-y-2">
                 <Label htmlFor="scope-type" className="text-sm font-semibold">Scope Type</Label>

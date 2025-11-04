@@ -231,6 +231,9 @@ const handleResetPassword = async (user: User) => {
     if (user.is_super_admin) {
       return <Badge variant="destructive" className="text-xs shrink-0">Super</Badge>;
     }
+    if (user.is_coach && user.is_participant) {
+      return <Badge variant="secondary" className="text-xs shrink-0">Coach + Participant</Badge>;
+    }
     if (user.is_coach) {
       return <Badge variant="secondary" className="text-xs shrink-0">Coach</Badge>;
     }

@@ -20,10 +20,8 @@ export function startOfNextWeekMonday(effectiveDate: Date, tz: string): Date {
   const isoDow = Number(formatInTimeZone(effectiveDate, tz, 'i'));
   
   // Get midnight of the effective date in the timezone
-  const effectiveMidnight = fromZonedTime(
-    `${formatInTimeZone(effectiveDate, tz, 'yyyy-MM-dd')}T00:00:00`,
-    tz
-  );
+  const localYMD = formatInTimeZone(effectiveDate, tz, 'yyyy-MM-dd');
+  const localMidnightUtc = fromZonedTime(`${localYMD}T00:00:00`, tz);
   
   // Calculate days until next Monday
   // If we're on Saturday (6), we want +2 days to get to Monday
@@ -31,7 +29,7 @@ export function startOfNextWeekMonday(effectiveDate: Date, tz: string): Date {
   // If we're on Monday (1), we want +7 days to get to next Monday
   const daysUntilNextMonday = isoDow === 7 ? 1 : (8 - isoDow);
   
-  return addDays(effectiveMidnight, daysUntilNextMonday);
+  return addDays(localMidnightUtc, daysUntilNextMonday);
 }
 
 /**
@@ -43,15 +41,10 @@ export function startOfNextWeekMonday(effectiveDate: Date, tz: string): Date {
  * @returns New date offset by the specified weeks
  */
 export function addWeeks(date: Date, weeks: number, tz: string): Date {
-  // Format as local date, add days, then parse back to UTC
-  const localDate = formatInTimeZone(date, tz, 'yyyy-MM-dd');
-  const dateObj = new Date(localDate + 'T00:00:00');
-  const offsetDate = addDays(dateObj, weeks * 7);
-  
-  return fromZonedTime(
-    `${formatInTimeZone(offsetDate, 'UTC', 'yyyy-MM-dd')}T00:00:00`,
-    tz
-  );
+  // Stay aligned to local midnight when adding weeks
+  const localYMD = formatInTimeZone(date, tz, 'yyyy-MM-dd');
+  const localMidnightUtc = fromZonedTime(`${localYMD}T00:00:00`, tz);
+  return addDays(localMidnightUtc, weeks * 7);
 }
 
 /**
@@ -66,15 +59,16 @@ export function toISODate(date: Date, tz: string): string {
 }
 
 /**
- * Calculate weeks between two ISO date strings.
+ * Calculate weeks between two ISO date strings, respecting timezone.
  * 
  * @param isoA - Earlier date (YYYY-MM-DD)
  * @param isoB - Later date (YYYY-MM-DD)
+ * @param tz - Timezone for calculation
  * @returns Number of weeks between dates (rounded)
  */
-export function weeksBetween(isoA: string, isoB: string): number {
-  const a = new Date(isoA + 'T00:00:00Z');
-  const b = new Date(isoB + 'T00:00:00Z');
-  const diffMs = b.getTime() - a.getTime();
+export function weeksBetween(isoA: string, isoB: string, tz: string): number {
+  const aUtc = fromZonedTime(`${isoA}T00:00:00`, tz);
+  const bUtc = fromZonedTime(`${isoB}T00:00:00`, tz);
+  const diffMs = bUtc.getTime() - aUtc.getTime();
   return Math.max(0, Math.round(diffMs / (7 * 24 * 60 * 60 * 1000)));
 }

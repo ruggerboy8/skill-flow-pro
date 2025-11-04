@@ -56,7 +56,7 @@ function buildEligibilityMap(inputs: OrgInputs, weekStartIso: string): Map<numbe
       continue;
     }
     
-    const weeks = weeksBetween(lastEntry.weekStart, weekStartIso);
+    const weeks = weeksBetween(lastEntry.weekStart, weekStartIso, inputs.timezone);
     map.set(move.id, {
       weeksSinceSeen: weeks,
       lastSeenIso: lastEntry.weekStart,
@@ -130,20 +130,20 @@ function scoreAllCandidates(
 }
 
 /**
- * Deterministic tie-breaker: E > R > weeksSinceSeen > lower ID.
+ * Deterministic tie-breaker: weighted E (capped) > weighted R > weeksSinceSeen > lower ID.
  */
-function compareCandidates(a: ScoredCandidate, b: ScoredCandidate): number {
+function compareCandidates(a: ScoredCandidate, b: ScoredCandidate, cfg: EngineConfig): number {
   // Primary: higher score
   if (a.score !== b.score) return b.score - a.score;
   
-  // Tie-break 1: higher E contribution
-  const eA = a.parts.E;
-  const eB = b.parts.E;
+  // Tie-break 1: higher weighted & capped E contribution
+  const eA = Math.min(a.parts.E * cfg.weights.E, cfg.evalCap);
+  const eB = Math.min(b.parts.E * cfg.weights.E, cfg.evalCap);
   if (eA !== eB) return eB - eA;
   
-  // Tie-break 2: higher R contribution
-  const rA = a.parts.R;
-  const rB = b.parts.R;
+  // Tie-break 2: higher weighted R contribution
+  const rA = a.parts.R * cfg.weights.R;
+  const rB = b.parts.R * cfg.weights.R;
   if (rA !== rB) return rB - rA;
   
   // Tie-break 3: larger weeksSinceSeen (older)
@@ -172,15 +172,21 @@ function pickThree(
   
   if (pool.length < 3) {
     logs.push(
-      `⚠️ Relaxation: Only ${pool.length} moves passed cooldown filter (≥${cfg.cooldownWeeks}w). Using all candidates.`
+      `⚠️ Relaxation (cooldown): Only ${pool.length} moves passed cooldown filter (≥${cfg.cooldownWeeks}w). Using all candidates.`
     );
     pool = candidates;
   }
   
   // Sort with deterministic tie-breaking
-  pool.sort(compareCandidates);
+  pool.sort((a, b) => compareCandidates(a, b, cfg));
   
-  const addPick = (c: ScoredCandidate) => {
+  const addPick = (c: ScoredCandidate, pickNum?: number) => {
+    // Check for tie-break (next candidate has same score)
+    const idx = pool.indexOf(c);
+    if (idx > 0 && pool[idx - 1].score === c.score) {
+      logs.push(`ℹ️ Tie-break applied for pick ${pickNum || picks.length + 1}: weighted E→R→weeksSince→id`);
+    }
+    
     picks.push({
       proMoveId: c.move.id,
       name: c.move.name,
@@ -194,7 +200,7 @@ function pickThree(
   
   // Pick 1: Best overall
   if (pool.length > 0) {
-    addPick(pool[0]);
+    addPick(pool[0], 1);
   }
   
   // Pick 2: Prefer new domain for diversity
@@ -202,13 +208,13 @@ function pickThree(
   const second = pool.find(c => !usedIds.has(c.move.id) && (!needDiversity || !usedDomains.has(c.move.domainId)));
   
   if (second) {
-    addPick(second);
+    addPick(second, 2);
   } else {
     const fallback = pool.find(c => !usedIds.has(c.move.id));
     if (fallback) {
-      addPick(fallback);
+      addPick(fallback, 2);
       if (needDiversity) {
-        logs.push('⚠️ Relaxation: Could not satisfy diversity constraint for pick 2.');
+        logs.push('⚠️ Relaxation (diversity): Could not satisfy diversity constraint for pick 2.');
       }
     }
   }
@@ -218,13 +224,13 @@ function pickThree(
   const third = pool.find(c => !usedIds.has(c.move.id) && (!stillNeedDiversity || !usedDomains.has(c.move.domainId)));
   
   if (third) {
-    addPick(third);
+    addPick(third, 3);
   } else {
     const fallback = pool.find(c => !usedIds.has(c.move.id));
     if (fallback) {
-      addPick(fallback);
+      addPick(fallback, 3);
       if (stillNeedDiversity) {
-        logs.push('⚠️ Relaxation: Could not satisfy diversity constraint for pick 3.');
+        logs.push('⚠️ Relaxation (diversity): Could not satisfy diversity constraint for pick 3.');
       }
     }
   }

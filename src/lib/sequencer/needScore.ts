@@ -11,7 +11,7 @@ type SignalParts = { C: number; R: number; E: number; D: number };
 export type WhyTag = keyof SignalParts;
 
 /**
- * Compute recency score: 0 if within cooldown, linear 0→1 from cooldown to horizon.
+ * Compute recency score: 0 through cooldown, linear cooldown+1 → H, 1 at ≥H.
  */
 export function computeRecencyScore(
   weeksSince: number,
@@ -20,7 +20,7 @@ export function computeRecencyScore(
 ): number {
   if (weeksSince <= cooldown) return 0;
   
-  const start = cooldown;
+  const start = cooldown + 1;
   const end = Math.max(horizonH, start + 1);
   
   if (weeksSince >= end) return 1;
@@ -54,8 +54,8 @@ export function ebSmooth(mean: number, n: number, prior: number, k: number): num
 /**
  * Compute confidence need (1 - confidence).
  * 
- * Phase 2: Simplified binning - treats all samples equally.
- * Phase 3 TODO: Weight by recency (0-6w×3, 7-12w×2, 13-18w×1).
+ * Phase 2: Simplified binning - trimmed mean of weekly averages, EB-smoothed by total N.
+ * Phase 3 TODO: Weight by recency bins (0-6w×3, 7-12w×2, 13-18w×1).
  */
 export function computeConfidenceNeed(
   moveId: number,
@@ -69,20 +69,12 @@ export function computeConfidenceNeed(
     return 1 - cfg.ebPrior;
   }
   
-  // Collect all confidence values weighted by sample size
-  const allValues: number[] = [];
-  let totalN = 0;
+  // Phase 2: trimmed mean of weekly averages (unweighted by week)
+  const weeklyAverages = moveSamples.map(s => s.avg);
+  const rawMean = trimmedMean(weeklyAverages, cfg.trimPct);
   
-  for (const s of moveSamples) {
-    const weight = Math.max(1, Math.round(s.n));
-    for (let i = 0; i < weight; i++) {
-      allValues.push(s.avg);
-    }
-    totalN += weight;
-  }
-  
-  // Compute trimmed mean and EB smooth
-  const rawMean = trimmedMean(allValues, cfg.trimPct);
+  // EB smoothing uses total observations as 'n'
+  const totalN = moveSamples.reduce((acc, s) => acc + Math.max(0, s.n), 0);
   const smoothed = ebSmooth(rawMean, totalN, cfg.ebPrior, cfg.ebK);
   
   // Need = 1 - confidence
@@ -157,7 +149,7 @@ export function combineNeedScore(parts: SignalParts, cfg: EngineConfig): number 
 /**
  * Identify top 2 score drivers by weighted contribution.
  */
-export function topDrivers(parts: SignalParts, cfg: EngineConfig): WhyTag[] {
+export function topDrivers(parts: SignalParts, cfg: EngineConfig): ('C'|'R'|'E'|'D')[] {
   const entries: [WhyTag, number][] = [
     ['C', cfg.weights.C * parts.C],
     ['R', cfg.weights.R * parts.R],

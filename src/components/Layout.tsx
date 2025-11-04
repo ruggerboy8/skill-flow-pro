@@ -34,9 +34,11 @@ export default function Layout() {
     ...(isCoach || isSuperAdmin || isLead ? [
       { name: 'Coach', href: '/coach', icon: Users },
     ] : []),
+    ...(isCoach || isSuperAdmin ? [
+      { name: 'Admin', href: '/admin', icon: Shield },
+    ] : []),
     ...(isSuperAdmin ? [
       { name: 'Builder', href: '/builder', icon: Settings },
-      { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Eval Results', href: '/admin/eval-results', icon: TrendingUp }
     ] : [])
   ];

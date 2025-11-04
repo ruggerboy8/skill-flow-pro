@@ -1445,6 +1445,48 @@ export type Database = {
         }
         Returns: undefined
       }
+      seq_confidence_history_18w: {
+        Args: {
+          p_effective_date: string
+          p_org_id: string
+          p_role_id: number
+          p_tz: string
+        }
+        Returns: {
+          avg01: number
+          n: number
+          pro_move_id: number
+          week_start: string
+        }[]
+      }
+      seq_domain_coverage_8w: {
+        Args: {
+          p_effective_date: string
+          p_org_id: string
+          p_role_id: number
+          p_tz: string
+        }
+        Returns: {
+          appearances: number
+          domain_id: number
+          weeks_counted: number
+        }[]
+      }
+      seq_last_selected_by_move: {
+        Args: { p_org_id: string; p_role_id: number; p_tz: string }
+        Returns: {
+          pro_move_id: number
+          week_start: string
+        }[]
+      }
+      seq_latest_quarterly_evals: {
+        Args: { p_org_id: string; p_role_id: number }
+        Returns: {
+          competency_id: number
+          effective_date: string
+          score01: number
+        }[]
+      }
     }
     Enums: {
       score_source: "live" | "backfill" | "backfill_historical"

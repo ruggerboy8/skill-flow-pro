@@ -37,3 +37,10 @@ export function getWeekAnchors(now: Date, tz: string): V2Anchors {
     week_end: z(addDays(mondayZ, 6), '23:59:59', tz),            // Sun 23:59:59
   };
 }
+
+/**
+ * Format ISO date string (YYYY-MM-DD) as MM-DD-YYYY for display.
+ */
+export function formatMmDdYyyy(iso: string, tz: string): string {
+  return formatInTimeZone(new Date(iso + 'T00:00:00Z'), tz, 'MM-dd-yyyy');
+}

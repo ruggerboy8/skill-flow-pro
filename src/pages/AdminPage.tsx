@@ -4,11 +4,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, MapPin, Building, TrendingUp, Target, Library, CalendarDays } from "lucide-react";
+import { Shield, Users, MapPin, Building, Library, CalendarDays } from "lucide-react";
 import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
 import { AdminLocationsTab } from "@/components/admin/AdminLocationsTab";
 import { AdminOrganizationsTab } from "@/components/admin/AdminOrganizationsTab";
-import { ManagerPriorities } from "@/components/admin/ManagerPriorities";
 import { ProMoveLibrary } from "@/components/admin/ProMoveLibrary";
 import { WeeklyPlansView } from "@/components/admin/WeeklyPlansView";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -99,13 +98,13 @@ export default function AdminPage() {
           <p className="text-muted-foreground">
             {isSuperAdmin 
               ? "Manage users, locations, and organizational settings"
-              : "Manage priorities and view weekly plans"}
+              : "View weekly plans and pro-move library"}
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5 lg:w-auto">
           {isSuperAdmin && (
             <>
               <TabsTrigger value="users" className="flex items-center space-x-2">
@@ -122,10 +121,6 @@ export default function AdminPage() {
               </TabsTrigger>
             </>
           )}
-          <TabsTrigger value="priorities" className="flex items-center space-x-2">
-            <Target className="h-4 w-4" />
-            <span className="hidden sm:inline">Priorities</span>
-          </TabsTrigger>
           <TabsTrigger value="library" className="flex items-center space-x-2">
             <Library className="h-4 w-4" />
             <span className="hidden sm:inline">Pro-Moves</span>
@@ -151,10 +146,6 @@ export default function AdminPage() {
             </TabsContent>
           </>
         )}
-
-        <TabsContent value="priorities">
-          <ManagerPriorities />
-        </TabsContent>
 
         <TabsContent value="library">
           {isSuperAdmin ? (

@@ -99,7 +99,7 @@ interface FetchParams {
  * @returns Org-wide inputs for engine
  * @throws Error (Phase 2 stub)
  */
-export async function fetchOrgInputsForRole(params: FetchParams): Promise<OrgInputs> {
+export async function fetchAlcanInputsForRole(params: FetchParams): Promise<OrgInputs> {
   const { orgId, role, effectiveDate, timezone } = params;
   
   const { supabase } = await import('@/integrations/supabase/client');

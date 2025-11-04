@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 import { OrgSequencerPanel } from '@/components/admin/sequencer/OrgSequencerPanel';
+import { WeeklyPlansPanel } from '@/components/admin/WeeklyPlansPanel';
 
 export default function AdminBuilder() {
   const { user } = useAuth();
@@ -53,12 +54,13 @@ export default function AdminBuilder() {
     <div className="container mx-auto p-6 space-y-6">
       <h1 className="text-3xl font-bold">Admin Builder</h1>
 
-      {/* Top-level tabs: Static Cycles / Pro-Move Library / Org Sequencer */}
+      {/* Top-level tabs: Static Cycles / Pro-Move Library / Org Sequencer / Weekly Plans */}
       <Tabs defaultValue="static" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="static">Static Cycles</TabsTrigger>
           <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
           <TabsTrigger value="sequencer">Org Sequencer</TabsTrigger>
+          <TabsTrigger value="weekly-plans">Weekly Plans</TabsTrigger>
         </TabsList>
 
         {/* Static Cycles: nested role tabs */}
@@ -106,6 +108,17 @@ export default function AdminBuilder() {
             </p>
           </div>
           <OrgSequencerPanel />
+        </TabsContent>
+
+        {/* Weekly Plans */}
+        <TabsContent value="weekly-plans" className="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold">Weekly Plans</h2>
+            <p className="text-sm text-muted-foreground">
+              View computed weekly plans and override the preview week if needed.
+            </p>
+          </div>
+          <WeeklyPlansPanel />
         </TabsContent>
       </Tabs>
     </div>

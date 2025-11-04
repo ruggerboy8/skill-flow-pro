@@ -9,23 +9,13 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { defaultEngineConfig } from '@/lib/sequencer/config';
 import { computeNextAndPreview } from '@/lib/sequencer/engine';
-import { fetchOrgInputsForRole } from '@/lib/sequencer/data';
+import { fetchAlcanInputsForRole } from '@/lib/sequencer/data';
 import type { RoleId, TwoWeekResult } from '@/lib/sequencer/types';
 import { Loader2, PlayCircle, Download } from 'lucide-react';
+import { DRIVER_LABELS } from '@/lib/constants/domains';
+import { formatMmDdYyyy } from '@/v2/time';
 
 type Domain = { id: number; name: string; color_hex?: string | null };
-
-const DRIVER_LABELS = {
-  C: { label: 'Confidence', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  R: { label: 'Recency', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-  E: { label: 'Eval', color: 'bg-amber-100 text-amber-800 border-amber-200' },
-  D: { label: 'Domain', color: 'bg-green-100 text-green-800 border-green-200' },
-};
-
-const toMDY = (iso: string) => {
-  const [y, m, d] = iso.split('-');
-  return `${m}-${d}-${y}`;
-};
 
 export function OrgSequencerPanel() {
   const [role, setRole] = useState<RoleId>(1);
@@ -59,7 +49,7 @@ export function OrgSequencerPanel() {
     setLoading(true);
     setResult(null);
     try {
-      const inputs = await fetchOrgInputsForRole({
+      const inputs = await fetchAlcanInputsForRole({
         role,
         effectiveDate: new Date(`${effectiveDate}T12:00:00Z`),
         timezone,
@@ -67,7 +57,7 @@ export function OrgSequencerPanel() {
 
       const res = await computeNextAndPreview(inputs, defaultEngineConfig);
       setResult(res);
-      toast({ title: 'Dry-run complete', description: 'Sequencer computed next week + preview successfully.' });
+      toast({ title: 'Dry-run complete', description: 'Sequencer computed Alcan-wide next week + preview.' });
     } catch (e: any) {
       toast({ title: 'Run failed', description: e?.message || 'Unknown error', variant: 'destructive' });
     } finally {
@@ -87,10 +77,10 @@ export function OrgSequencerPanel() {
         <CardHeader>
           <CardTitle>Org Sequencer (Dry-Run)</CardTitle>
           <CardDescription>
-            Compute Next Week + Preview using NeedScore v1. No database writes.
+            Compute Next Week + Preview using NeedScore v1 across all Alcan organizations. No database writes.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
+        <CardContent className="grid gap-4 md:grid-cols-2">
           <div>
             <Label>Role</Label>
             <Select value={String(role)} onValueChange={(v) => setRole(Number(v) as RoleId)}>
@@ -109,12 +99,7 @@ export function OrgSequencerPanel() {
             <Input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
           </div>
 
-          <div>
-            <Label>Timezone</Label>
-            <Input value={timezone} readOnly className="bg-muted" />
-          </div>
-
-          <div className="md:col-span-3 flex gap-3">
+          <div className="md:col-span-2 flex gap-3">
             <Button onClick={onRun} disabled={loading}>
               {loading ? (
                 <>
@@ -176,7 +161,7 @@ export function OrgSequencerPanel() {
               <Card key={k}>
                 <CardHeader>
                   <CardTitle>{k === 'next' ? '📅 Next Week' : '🔮 Preview (N+1)'}</CardTitle>
-                  <CardDescription>Week of {toMDY(plan.weekStart)}</CardDescription>
+                  <CardDescription>Week of {formatMmDdYyyy(plan.weekStart, timezone)}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {plan.picks.map((p, idx) => {

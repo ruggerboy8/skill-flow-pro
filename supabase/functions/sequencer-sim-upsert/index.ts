@@ -47,17 +47,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Ensure inputs have required fields
+    const timezone = inputs.timezone || 'America/Chicago';
+    const effectiveDate = inputs.effectiveDate || new Date().toISOString().split('T')[0];
+    
+    const normalizedInputs: OrgInputs = {
+      ...inputs,
+      timezone,
+      effectiveDate,
+    };
+
     // 1. Store inputs snapshot
     await supabase
       .from('app_kv')
       .upsert({
         key: `sim:inputs:role:${roleId}`,
-        value: inputs,
+        value: normalizedInputs,
         updated_at: new Date().toISOString(),
       });
 
     // 2. Run engine to compute thisWeek + nextWeek
-    const result = computeTwoWeeks(inputs, defaultEngineConfig);
+    const result = computeTwoWeeks(normalizedInputs, defaultEngineConfig);
 
     // 3. Build ranked list (exclude thisWeek picks)
     const thisWeekIds = new Set(result.next.picks.map(p => p.proMoveId));

@@ -77,8 +77,13 @@ export function OrgSequencerPanel() {
     }
     setSaving(true);
     try {
+      const inputsWithMeta = {
+        ...lastInputsRef.current,
+        timezone,
+        effectiveDate: effectiveDate ? new Date(effectiveDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      };
       const { error } = await supabase.functions.invoke('sequencer-sim-upsert', {
-        body: { roleId: role, inputs: lastInputsRef.current }
+        body: { roleId: role, inputs: inputsWithMeta }
       });
       if (error) throw error;
       toast({ title: 'Simulation Published', description: 'Coach Simulation Mode now reflects this dry-run.' });

@@ -13,7 +13,7 @@ import { fetchOrgInputsForRole } from '@/lib/sequencer/data';
 import type { RoleId, TwoWeekResult } from '@/lib/sequencer/types';
 import { Loader2, PlayCircle, Download } from 'lucide-react';
 
-type Org = { id: string; name: string; timezone?: string | null };
+type Domain = { id: number; name: string; color_hex?: string | null };
 
 const DRIVER_LABELS = {
   C: { label: 'Confidence', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -22,46 +22,44 @@ const DRIVER_LABELS = {
   D: { label: 'Domain', color: 'bg-green-100 text-green-800 border-green-200' },
 };
 
+const toMDY = (iso: string) => {
+  const [y, m, d] = iso.split('-');
+  return `${m}-${d}-${y}`;
+};
+
 export function OrgSequencerPanel() {
-  const [orgs, setOrgs] = useState<Org[]>([]);
-  const [orgId, setOrgId] = useState<string | null>(null);
   const [role, setRole] = useState<RoleId>(1);
   const [effectiveDate, setEffectiveDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [timezone, setTimezone] = useState<string>('America/Chicago');
+  const [timezone] = useState<string>('America/Chicago');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TwoWeekResult | null>(null);
+  const [domainMap, setDomainMap] = useState<Map<number, Domain>>(new Map());
 
   useEffect(() => {
-    void loadOrgs();
+    void loadDomains();
   }, []);
 
-  async function loadOrgs() {
-    const { data, error } = await supabase.from('organizations').select('id, name');
+  async function loadDomains() {
+    const { data, error } = await supabase.from('domains').select('domain_id, domain_name, color_hex');
     if (error) {
-      toast({ title: 'Error', description: 'Failed to load organizations', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to load domains', variant: 'destructive' });
       return;
     }
-    setOrgs(data || []);
-    if (data?.length && !orgId) {
-      setOrgId(data[0].id);
-    }
+    setDomainMap(
+      new Map(
+        (data || []).map((d: any) => [
+          Number(d.domain_id),
+          { id: Number(d.domain_id), name: d.domain_name, color_hex: d.color_hex },
+        ])
+      )
+    );
   }
 
-  useEffect(() => {
-    const org = orgs.find(o => o.id === orgId);
-    if (org) setTimezone(org.timezone || 'America/Chicago');
-  }, [orgId, orgs]);
-
   async function onRun() {
-    if (!orgId) {
-      toast({ title: 'Select an organization', description: 'Choose an organization to run the sequencer.' });
-      return;
-    }
     setLoading(true);
     setResult(null);
     try {
       const inputs = await fetchOrgInputsForRole({
-        orgId,
         role,
         effectiveDate: new Date(`${effectiveDate}T12:00:00Z`),
         timezone,
@@ -92,23 +90,7 @@ export function OrgSequencerPanel() {
             Compute Next Week + Preview using NeedScore v1. No database writes.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-4">
-          <div>
-            <Label>Organization</Label>
-            <Select value={orgId ?? ''} onValueChange={(v) => setOrgId(v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select org" />
-              </SelectTrigger>
-              <SelectContent>
-                {orgs.map(o => (
-                  <SelectItem key={o.id} value={o.id}>
-                    {o.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+        <CardContent className="grid gap-4 md:grid-cols-3">
           <div>
             <Label>Role</Label>
             <Select value={String(role)} onValueChange={(v) => setRole(Number(v) as RoleId)}>
@@ -132,7 +114,7 @@ export function OrgSequencerPanel() {
             <Input value={timezone} readOnly className="bg-muted" />
           </div>
 
-          <div className="md:col-span-4 flex gap-3">
+          <div className="md:col-span-3 flex gap-3">
             <Button onClick={onRun} disabled={loading}>
               {loading ? (
                 <>
@@ -163,8 +145,8 @@ export function OrgSequencerPanel() {
             <CardContent className="space-y-3">
               <div className="text-sm space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Org:</span>
-                  <span className="font-medium">{orgs.find(o => o.id === orgId)?.name}</span>
+                  <span className="text-muted-foreground">Scope:</span>
+                  <span className="font-medium">Alcan-wide</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Role:</span>
@@ -194,40 +176,48 @@ export function OrgSequencerPanel() {
               <Card key={k}>
                 <CardHeader>
                   <CardTitle>{k === 'next' ? '📅 Next Week' : '🔮 Preview (N+1)'}</CardTitle>
-                  <CardDescription>Week of {plan.weekStart}</CardDescription>
+                  <CardDescription>Week of {toMDY(plan.weekStart)}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {plan.picks.map((p, idx) => (
-                    <div key={p.proMoveId} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">
-                            {idx + 1}. {p.name}
+                  {plan.picks.map((p, idx) => {
+                    const domain = domainMap.get(p.domainId);
+                    const domainLabel = domain?.name ?? `Domain ${p.domainId}`;
+                    const domainStyle = domain?.color_hex
+                      ? { backgroundColor: domain.color_hex, color: '#111', borderColor: domain.color_hex }
+                      : undefined;
+
+                    return (
+                      <div key={p.proMoveId} className="border rounded-lg p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">
+                              {idx + 1}. {p.name}
+                            </div>
                           </div>
+                          <Badge variant="secondary" className="shrink-0 font-mono text-xs">
+                            {p.finalScore.toFixed(2)}
+                          </Badge>
                         </div>
-                        <Badge variant="secondary" className="shrink-0 font-mono text-xs">
-                          {p.finalScore.toFixed(2)}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <Badge variant="outline" className="text-[10px] py-0" style={domainStyle}>
+                            {domainLabel}
+                          </Badge>
+                          {p.drivers.map((d) => {
+                            const driverInfo = DRIVER_LABELS[d];
+                            return (
+                              <Badge
+                                key={d}
+                                variant="outline"
+                                className={`text-[10px] py-0 ${driverInfo.color}`}
+                              >
+                                {driverInfo.label}
+                              </Badge>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-1.5 items-center">
-                        <Badge variant="outline" className="text-[10px] py-0">
-                          Domain {p.domainId}
-                        </Badge>
-                        {p.drivers.map((d) => {
-                          const driverInfo = DRIVER_LABELS[d];
-                          return (
-                            <Badge
-                              key={d}
-                              variant="outline"
-                              className={`text-[10px] py-0 ${driverInfo.color}`}
-                            >
-                              {driverInfo.label}
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </CardContent>
               </Card>
             );

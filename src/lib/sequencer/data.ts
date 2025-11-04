@@ -8,7 +8,7 @@
 import { OrgInputs, RoleId } from './types';
 
 interface FetchParams {
-  orgId: string;          // Organization UUID from organizations table
+  orgId?: string;         // Optional: Organization UUID. If omitted, fetch Alcan-wide.
   role: RoleId;           // 1=DFI, 2=RDA
   effectiveDate: Date;    // "As of" date (typically Saturday)
   timezone: string;       // e.g., "America/Chicago"
@@ -129,7 +129,7 @@ export async function fetchOrgInputsForRole(params: FetchParams): Promise<OrgInp
   
   // 2) confidenceHistory: last 18 weeks, org-wide per move
   const { data: conf, error: confErr } = await supabase.rpc('seq_confidence_history_18w', {
-    p_org_id: orgId,
+    p_org_id: orgId || null,
     p_role_id: role,
     p_tz: timezone,
     p_effective_date: effectiveDate.toISOString(),
@@ -146,7 +146,7 @@ export async function fetchOrgInputsForRole(params: FetchParams): Promise<OrgInp
   
   // 3) evals: latest quarterly evaluations by competency
   const { data: evals, error: evalsErr } = await supabase.rpc('seq_latest_quarterly_evals', {
-    p_org_id: orgId,
+    p_org_id: orgId || null,
     p_role_id: role,
   });
   
@@ -160,7 +160,7 @@ export async function fetchOrgInputsForRole(params: FetchParams): Promise<OrgInp
   
   // 4) lastSelected: org-wide last scheduled week per move
   const { data: lastSel, error: lastErr } = await supabase.rpc('seq_last_selected_by_move', {
-    p_org_id: orgId,
+    p_org_id: orgId || null,
     p_role_id: role,
     p_tz: timezone,
   });
@@ -174,7 +174,7 @@ export async function fetchOrgInputsForRole(params: FetchParams): Promise<OrgInp
   
   // 5) domainCoverage8w: last 8 weeks per domain
   const { data: dom8, error: domErr } = await supabase.rpc('seq_domain_coverage_8w', {
-    p_org_id: orgId,
+    p_org_id: orgId || null,
     p_role_id: role,
     p_tz: timezone,
     p_effective_date: effectiveDate.toISOString(),
@@ -189,7 +189,7 @@ export async function fetchOrgInputsForRole(params: FetchParams): Promise<OrgInp
   }));
   
   return {
-    orgId,
+    orgId: orgId || 'alcan-wide',
     role,
     timezone,
     eligibleMoves,

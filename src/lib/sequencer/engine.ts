@@ -244,6 +244,47 @@ function pickThree(
 }
 
 /**
+ * Advance inputs for preview computation by treating the next week's picks as already scheduled.
+ */
+export function advanceInputsForPreview(
+  inputs: OrgInputs,
+  next: WeekPlan
+): OrgInputs {
+  // Clone shallowly
+  const clone: OrgInputs = {
+    ...inputs,
+    lastSelected: [...inputs.lastSelected],
+    domainCoverage8w: [...inputs.domainCoverage8w],
+  };
+
+  // 1) Update lastSelected for the picked moves to next.weekStart
+  const lastMap = new Map(clone.lastSelected.map(ls => [ls.proMoveId, ls]));
+  for (const p of next.picks) {
+    lastMap.set(p.proMoveId, { proMoveId: p.proMoveId, weekStart: next.weekStart });
+  }
+  clone.lastSelected = Array.from(lastMap.values());
+
+  // 2) Update domain coverage: +1 appearance for each picked domain
+  const covMap = new Map(clone.domainCoverage8w.map(d => [d.domainId, { ...d }]));
+  const alreadyCounted = new Set<number>();
+  for (const p of next.picks) {
+    const d = covMap.get(p.domainId);
+    if (!d) continue;
+    if (!alreadyCounted.has(p.domainId)) {
+      d.appearances = Math.min(d.weeksCounted + 1, d.appearances + 1);
+      alreadyCounted.add(p.domainId);
+    }
+  }
+  // Increment weeksCounted (window rolls forward)
+  for (const d of covMap.values()) {
+    d.weeksCounted = Math.min(8, d.weeksCounted + 1);
+  }
+  clone.domainCoverage8w = Array.from(covMap.values());
+
+  return clone;
+}
+
+/**
  * Compute one week's plan.
  */
 export function computeWeek(
@@ -259,10 +300,7 @@ export function computeWeek(
 }
 
 /**
- * Main entry point: compute Next Week (N) and Preview (N+1).
- * 
- * Phase 2: Preview reuses same inputs (no state advancement).
- * Phase 3 TODO: Adapter will advance cooldowns/decays for preview.
+ * Main entry point: compute Next Week (N) and Preview (N+1) with state advancement.
  */
 export async function computeNextAndPreview(
   inputs: OrgInputs,
@@ -282,14 +320,15 @@ export async function computeNextAndPreview(
   // Compute Next Week
   const next = computeWeek(inputs, cfg, weekStartIso, logs);
   
-  // Compute Preview (N+1)
+  // Advance state for Preview (treat next week's picks as scheduled)
+  const previewInputs = advanceInputsForPreview(inputs, next);
   const previewMon = addWeeks(nextMon, 1, inputs.timezone);
   const previewStartIso = toISODate(previewMon, inputs.timezone);
   
   logs.push(`📍 Preview week starts: ${previewStartIso}`);
-  logs.push('ℹ️ Phase 2: Preview uses same inputs (no state advancement).');
+  logs.push('✅ State advanced: Next week picks treated as scheduled for preview.');
   
-  const preview = computeWeek(inputs, cfg, previewStartIso, logs);
+  const preview = computeWeek(previewInputs, cfg, previewStartIso, logs);
   
   return { next, preview, logs };
 }

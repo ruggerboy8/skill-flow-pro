@@ -60,7 +60,7 @@ export interface DomainCoverage {
  * Phase 3 TODO: Add manager boost data, better confidence binning.
  */
 export interface OrgInputs {
-  orgId: number;                          // organization ID
+  orgId: string;                          // organization UUID from organizations table
   role: RoleId;                           // 1=DFI, 2=RDA
   timezone: string;                       // e.g., "America/Chicago"
   eligibleMoves: ProMove[];               // active moves for this role

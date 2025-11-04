@@ -8,7 +8,7 @@
 import { OrgInputs, RoleId } from './types';
 
 interface FetchParams {
-  orgId: number;          // Organization ID from organizations table
+  orgId: string;          // Organization UUID from organizations table
   role: RoleId;           // 1=DFI, 2=RDA
   effectiveDate: Date;    // "As of" date (typically Saturday)
   timezone: string;       // e.g., "America/Chicago"
@@ -102,10 +102,101 @@ interface FetchParams {
 export async function fetchOrgInputsForRole(params: FetchParams): Promise<OrgInputs> {
   const { orgId, role, effectiveDate, timezone } = params;
   
-  // Phase 2: Stub implementation
-  throw new Error(
-    `fetchOrgInputsForRole not implemented (Phase 2 stub).\n` +
-    `Params: orgId=${orgId}, role=${role}, effectiveDate=${effectiveDate.toISOString()}, timezone=${timezone}\n` +
-    `Phase 3 TODO: Implement Supabase queries (see JSDoc comments).`
-  );
+  const { supabase } = await import('@/integrations/supabase/client');
+  
+  // 1) eligibleMoves: active pro-moves for this role with joined domain_id
+  const { data: moves, error: movesErr } = await supabase
+    .from('pro_moves')
+    .select(`
+      action_id,
+      action_statement,
+      competency_id,
+      active,
+      competencies:competency_id ( domain_id )
+    `)
+    .eq('role_id', role)
+    .eq('active', true);
+  
+  if (movesErr) throw new Error(`Failed to fetch eligible moves: ${movesErr.message}`);
+  
+  const eligibleMoves = (moves || []).map((m: any) => ({
+    id: m.action_id,
+    name: m.action_statement,
+    competencyId: m.competency_id,
+    domainId: m.competencies?.domain_id ?? 0,
+    isActive: m.active,
+  }));
+  
+  // 2) confidenceHistory: last 18 weeks, org-wide per move
+  const { data: conf, error: confErr } = await supabase.rpc('seq_confidence_history_18w', {
+    p_org_id: orgId,
+    p_role_id: role,
+    p_tz: timezone,
+    p_effective_date: effectiveDate.toISOString(),
+  });
+  
+  if (confErr) throw new Error(`Failed to fetch confidence history: ${confErr.message}`);
+  
+  const confidenceHistory = (conf || []).map((r: any) => ({
+    proMoveId: r.pro_move_id,
+    weekStart: r.week_start,
+    avg: Number(r.avg01),
+    n: Number(r.n),
+  }));
+  
+  // 3) evals: latest quarterly evaluations by competency
+  const { data: evals, error: evalsErr } = await supabase.rpc('seq_latest_quarterly_evals', {
+    p_org_id: orgId,
+    p_role_id: role,
+  });
+  
+  if (evalsErr) throw new Error(`Failed to fetch quarterly evals: ${evalsErr.message}`);
+  
+  const evalCompetencies = (evals || []).map((r: any) => ({
+    competencyId: r.competency_id,
+    score01: Number(r.score01),
+    effectiveDate: r.effective_date,
+  }));
+  
+  // 4) lastSelected: org-wide last scheduled week per move
+  const { data: lastSel, error: lastErr } = await supabase.rpc('seq_last_selected_by_move', {
+    p_org_id: orgId,
+    p_role_id: role,
+    p_tz: timezone,
+  });
+  
+  if (lastErr) throw new Error(`Failed to fetch last selected: ${lastErr.message}`);
+  
+  const lastSelected = (lastSel || []).map((r: any) => ({
+    proMoveId: r.pro_move_id,
+    weekStart: r.week_start,
+  }));
+  
+  // 5) domainCoverage8w: last 8 weeks per domain
+  const { data: dom8, error: domErr } = await supabase.rpc('seq_domain_coverage_8w', {
+    p_org_id: orgId,
+    p_role_id: role,
+    p_tz: timezone,
+    p_effective_date: effectiveDate.toISOString(),
+  });
+  
+  if (domErr) throw new Error(`Failed to fetch domain coverage: ${domErr.message}`);
+  
+  const domainCoverage8w = (dom8 || []).map((r: any) => ({
+    domainId: r.domain_id,
+    weeksCounted: Number(r.weeks_counted),
+    appearances: Number(r.appearances),
+  }));
+  
+  return {
+    orgId,
+    role,
+    timezone,
+    eligibleMoves,
+    confidenceHistory,
+    evals: evalCompetencies,
+    lastSelected,
+    domainCoverage8w,
+    now: effectiveDate,
+  };
 }

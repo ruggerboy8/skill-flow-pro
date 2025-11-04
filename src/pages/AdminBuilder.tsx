@@ -5,7 +5,7 @@ import { Navigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
-import { OrgSequencerStub } from '@/components/admin/OrgSequencerStub';
+import { OrgSequencerPanel } from '@/components/admin/sequencer/OrgSequencerPanel';
 
 export default function AdminBuilder() {
   const { user } = useAuth();
@@ -97,9 +97,15 @@ export default function AdminBuilder() {
           <ProMoveLibrary />
         </TabsContent>
 
-        {/* Org Sequencer (stub) */}
+        {/* Org Sequencer */}
         <TabsContent value="sequencer" className="space-y-6">
-          <OrgSequencerStub />
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold">Org Sequencer</h2>
+            <p className="text-sm text-muted-foreground">
+              Run dry-runs to preview next week and N+1 using NeedScore v1 algorithm. No database writes.
+            </p>
+          </div>
+          <OrgSequencerPanel />
         </TabsContent>
       </Tabs>
     </div>

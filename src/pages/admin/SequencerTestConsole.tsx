@@ -20,7 +20,7 @@ export function SequencerTestConsole() {
   const [orgData, setOrgData] = useState<any>(null);
   const [availableOrgs, setAvailableOrgs] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
-  const [userOrgInfo, setUserOrgInfo] = useState<{ orgId: string; orgName: string; locationName: string } | null>(null);
+  const [userOrgInfo, setUserOrgInfo] = useState<{ orgId: string; orgName: string; locationName: string; roleId: number; roleName: string } | null>(null);
 
   // Load user's org info
   useEffect(() => {
@@ -31,16 +31,19 @@ export function SequencerTestConsole() {
 
         const { data: staff } = await supabase
           .from('staff')
-          .select('primary_location_id, locations!inner(organization_id, name, organizations!inner(name))')
+          .select('role_id, primary_location_id, locations!inner(organization_id, name, organizations!inner(name)), roles!inner(role_name)')
           .eq('user_id', user.id)
           .maybeSingle();
 
         if (staff?.locations) {
           const loc = staff.locations as any;
+          const role = (staff as any).roles;
           setUserOrgInfo({
             orgId: loc.organization_id,
             orgName: loc.organizations?.name || 'Unknown',
-            locationName: loc.name
+            locationName: loc.name,
+            roleId: (staff as any).role_id,
+            roleName: role?.role_name || 'Unknown'
           });
         }
       } catch (error) {
@@ -81,6 +84,11 @@ export function SequencerTestConsole() {
       return;
     }
 
+    if (!userOrgInfo) {
+      toast({ title: 'Loading user info...', description: 'Please wait', variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
     try {
       // Get org timezone
@@ -99,11 +107,14 @@ export function SequencerTestConsole() {
       
       console.log('[TestConsole] Seeding for Monday:', mondayStr, 'in timezone:', tz);
 
+      // Use the user's actual role_id to ensure data matches their staff record
+      const actualRoleId = userOrgInfo.roleId;
+
       // Get 3 random active pro moves for this role
       const { data: proMoves } = await supabase
         .from('pro_moves')
         .select('action_id')
-        .eq('role_id', roleId)
+        .eq('role_id', actualRoleId)
         .eq('active', true)
         .limit(10);
 
@@ -121,7 +132,7 @@ export function SequencerTestConsole() {
         .from('weekly_plan')
         .delete()
         .eq('org_id', orgId)
-        .eq('role_id', roleId)
+        .eq('role_id', actualRoleId)
         .eq('week_start_date', mondayStr);
 
       if (deleteError) throw deleteError;
@@ -132,7 +143,7 @@ export function SequencerTestConsole() {
         .insert(
           selected.map((pm, idx) => ({
             org_id: orgId,
-            role_id: roleId,
+            role_id: actualRoleId,
             week_start_date: mondayStr,
             display_order: idx + 1,
             action_id: pm.action_id,
@@ -145,8 +156,8 @@ export function SequencerTestConsole() {
 
       if (error) throw error;
 
-      toast({ title: 'Seeded locked plan', description: `Created 3 locked rows for ${mondayStr} (org: ${orgId})` });
-      console.log('[TestConsole] ✅ Seeded 3 rows:', { mondayStr, orgId, roleId });
+      toast({ title: 'Seeded locked plan', description: `Created 3 locked rows for ${mondayStr} (org: ${orgId}, role: ${actualRoleId})` });
+      console.log('[TestConsole] ✅ Seeded 3 rows:', { mondayStr, orgId, roleId: actualRoleId });
       await checkCurrentWeekSource();
     } catch (error: any) {
       console.error('Seed error:', error);
@@ -322,9 +333,10 @@ export function SequencerTestConsole() {
                 <div className="space-y-1 text-sm mt-2">
                   <div>Organization: <strong>{userOrgInfo.orgName}</strong></div>
                   <div>Location: <strong>{userOrgInfo.locationName}</strong></div>
+                  <div>Role: <strong>{userOrgInfo.roleName}</strong> (ID: {userOrgInfo.roleId})</div>
                   <div className="text-xs text-muted-foreground">Org ID: {userOrgInfo.orgId}</div>
                   <div className="mt-2 text-yellow-600">
-                    ⚠️ Make sure to seed data for THIS organization to see it on your Week page!
+                    ⚠️ Data will be seeded for THIS organization and role!
                   </div>
                 </div>
               </AlertDescription>

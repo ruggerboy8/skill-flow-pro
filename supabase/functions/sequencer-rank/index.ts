@@ -110,6 +110,28 @@ serve(async (req) => {
 
     logs.push(`Found ${eligible.length} eligible moves`);
 
+    // Helper: classify confidence status
+    const classifyConfidence = (
+      confEB: number,
+      recent: { avg: number; n: number }[]
+    ): { status: 'critical'|'watch'|'ok'; severity?: number; n2w?: number; recentMeans?: number[] } => {
+      const lastTwo = recent.slice(-2);
+      const n2w = lastTwo.reduce((s,r)=>s+(r?.n||0), 0);
+      const recentMeans = lastTwo.map(r => r?.avg ?? 0);
+
+      const isCritical = confEB <= 0.20 && n2w >= 10;
+      if (isCritical) {
+        const severity = Math.max(0, Math.min(1, (0.25 - confEB) / 0.25));
+        return { status: 'critical', severity, n2w, recentMeans };
+      }
+
+      const anyVeryLow = lastTwo.some(r => (r?.avg ?? 1) <= 0.20 && (r?.n ?? 0) >= 5);
+      const isWatch = confEB <= 0.30 || anyVeryLow;
+      if (isWatch) return { status: 'watch', n2w, recentMeans };
+
+      return { status: 'ok', n2w, recentMeans };
+    };
+
     // 2. Fetch confidence history (last 18 weeks)
     const { data: confData, error: confError } = await supabase
       .from('weekly_scores')
@@ -394,10 +416,21 @@ serve(async (req) => {
       }
     }
 
-    // Format response
+    // Format response with CLC detection
     const formatRow = (pick: any, refDate: string) => {
       const ls = lastSelected.find(l => l.proMoveId === pick.id);
-      const confidenceN = confidenceHistory.filter(h => h.proMoveId === pick.id).reduce((sum, h) => sum + h.n, 0);
+      const moveConfData = confidenceHistory.filter(h => h.proMoveId === pick.id);
+      const confidenceN = moveConfData.reduce((sum, h) => sum + h.n, 0);
+      
+      // Get last 2 completed weeks before refDate for CLC detection
+      const refDateObj = new Date(refDate);
+      const recentWeeks = moveConfData
+        .filter(h => new Date(h.weekStart) < refDateObj)
+        .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime())
+        .slice(0, 2);
+      
+      const classification = classifyConfidence(1 - pick.C, recentWeeks);
+      
       return {
         proMoveId: pick.id,
         name: pick.name,
@@ -409,14 +442,29 @@ serve(async (req) => {
         lastSeen: ls ? new Date(ls.weekStart).toLocaleDateString('en-US') : undefined,
         weeksSinceSeen: pick.weeksSince,
         confidenceN,
+        status: classification.status,
+        severity: classification.severity,
+        n2w: classification.n2w,
+        recentMeans: classification.recentMeans,
       };
     };
 
     const next = nextPicks.map(p => formatRow(p, effectiveDate));
     const preview = previewPicks.map(p => {
       const ls = advancedLastSelected.find(l => l.proMoveId === p.id);
-      const confidenceN = confidenceHistory.filter(h => h.proMoveId === p.id).reduce((sum, h) => sum + h.n, 0);
+      const moveConfData = confidenceHistory.filter(h => h.proMoveId === p.id);
+      const confidenceN = moveConfData.reduce((sum, h) => sum + h.n, 0);
       const ws = ls ? Math.floor((new Date(previewDateStr).getTime() - new Date(ls.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000)) : 999;
+      
+      // Get last 2 completed weeks before preview date for CLC detection
+      const previewDateObj = new Date(previewDateStr);
+      const recentWeeks = moveConfData
+        .filter(h => new Date(h.weekStart) < previewDateObj)
+        .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime())
+        .slice(0, 2);
+      
+      const classification = classifyConfidence(1 - p.C, recentWeeks);
+      
       return {
         proMoveId: p.id,
         name: p.name,
@@ -428,10 +476,23 @@ serve(async (req) => {
         lastSeen: ls ? new Date(ls.weekStart).toLocaleDateString('en-US') : undefined,
         weeksSinceSeen: ws,
         confidenceN,
+        status: classification.status,
+        severity: classification.severity,
+        n2w: classification.n2w,
+        recentMeans: classification.recentMeans,
       };
     });
 
     const ranked = scored.map(p => formatRow(p, effectiveDate));
+    
+    // Log any critical detections
+    const criticalMoves = [...next, ...preview].filter(r => r.status === 'critical');
+    if (criticalMoves.length > 0) {
+      logs.push(`⚠️ ${criticalMoves.length} CRITICAL low-confidence moves detected`);
+      criticalMoves.forEach(m => {
+        logs.push(`  • ${m.name}: confEB=${(1-m.parts.C).toFixed(2)}, n2w=${m.n2w}, severity=${m.severity?.toFixed(2)}`);
+      });
+    }
 
     const response = {
       timezone,

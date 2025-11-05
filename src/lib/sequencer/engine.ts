@@ -178,6 +178,7 @@ export function computeNextAndPreview(
       lastSeen: lastSeenRecord ? formatMmDdYyyy(lastSeenRecord.weekStart) : undefined,
       weeksSinceSeen: lastSeenRecord ? formatWeeksSince(lastSeenRecord.weekStart, nextDate) : 999,
       confidenceN,
+      status: 'ok', // CLC detection happens in edge function
     };
   });
 
@@ -221,6 +222,7 @@ export function computeNextAndPreview(
       lastSeen: lastSeenRecord ? formatMmDdYyyy(lastSeenRecord.weekStart) : undefined,
       weeksSinceSeen: lastSeenRecord ? formatWeeksSince(lastSeenRecord.weekStart, previewDateStr) : 999,
       confidenceN,
+      status: 'ok', // CLC detection happens in edge function
     };
   });
 
@@ -267,6 +269,7 @@ export function buildRankedList(
       lastSeen: lastSeenRecord ? formatMmDdYyyy(lastSeenRecord.weekStart) : undefined,
       weeksSinceSeen: lastSeenRecord ? formatWeeksSince(lastSeenRecord.weekStart, inputs.effectiveDate) : 999,
       confidenceN,
+      status: 'ok', // CLC detection happens in edge function
     };
   });
 }

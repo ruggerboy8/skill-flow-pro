@@ -28,6 +28,11 @@ export interface RankedRow {
   lastSeen?: string; // "MM-DD-YYYY"
   weeksSinceSeen: number;
   confidenceN: number; // sum of 'n' used for EB smoothing
+  // CLC Detector fields
+  status: 'critical' | 'watch' | 'ok';
+  severity?: number; // 0..1 when status='critical'
+  n2w?: number; // sum of last-2-week Ns
+  recentMeans?: number[]; // up to 2 numbers (0..1)
 }
 
 export interface RankResponse {

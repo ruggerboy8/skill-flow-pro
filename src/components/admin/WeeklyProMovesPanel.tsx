@@ -113,6 +113,24 @@ export function WeeklyProMovesPanel() {
     return DRIVER_LABELS[driver]?.className || 'bg-muted';
   };
 
+  const getStatusBadge = (status: string, severity?: number) => {
+    if (status === 'critical') {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          🚨 CRITICAL {severity !== undefined && `(${Math.round(severity * 100)}%)`}
+        </Badge>
+      );
+    }
+    if (status === 'watch') {
+      return (
+        <Badge variant="outline" className="gap-1 border-yellow-500 text-yellow-700 dark:text-yellow-400">
+          ⚠️ Watch
+        </Badge>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -358,6 +376,7 @@ export function WeeklyProMovesPanel() {
                       <Badge className={getDomainChipClass(pick.domainId)}>
                         {pick.domainName}
                       </Badge>
+                      {getStatusBadge(pick.status, pick.severity)}
                       {pick.drivers.map(d => (
                         <Badge key={d} variant="outline" className={getDriverClass(d)}>
                           {getDriverLabel(d)}
@@ -386,6 +405,7 @@ export function WeeklyProMovesPanel() {
                       <Badge className={getDomainChipClass(pick.domainId)}>
                         {pick.domainName}
                       </Badge>
+                      {getStatusBadge(pick.status, pick.severity)}
                       {pick.drivers.map(d => (
                         <Badge key={d} variant="outline" className={getDriverClass(d)}>
                           {getDriverLabel(d)}
@@ -431,9 +451,12 @@ export function WeeklyProMovesPanel() {
                         <TableCell>{idx + 1}</TableCell>
                         <TableCell className="font-medium">{row.name}</TableCell>
                         <TableCell>
-                          <Badge className={getDomainChipClass(row.domainId)}>
-                            {row.domainName}
-                          </Badge>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge className={getDomainChipClass(row.domainId)}>
+                              {row.domainName}
+                            </Badge>
+                            {getStatusBadge(row.status, row.severity)}
+                          </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {row.finalScore.toFixed(3)}

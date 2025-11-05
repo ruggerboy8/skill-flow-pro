@@ -170,7 +170,7 @@ export default function Week() {
               competency_id,
               name,
               domain_id,
-              domains (
+              domains!competencies_domain_id_fkey (
                 domain_id,
                 domain_name
               )

@@ -20,7 +20,14 @@ export function SequencerTestConsole() {
   const [orgData, setOrgData] = useState<any>(null);
   const [availableOrgs, setAvailableOrgs] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
-  const [userOrgInfo, setUserOrgInfo] = useState<{ orgId: string; orgName: string; locationName: string } | null>(null);
+  const [userOrgInfo, setUserOrgInfo] = useState<{ 
+    staffId: string;
+    orgId: string; 
+    orgName: string; 
+    locationName: string;
+    roleId: number;
+    roleName: string;
+  } | null>(null);
 
   // Load user's org info
   useEffect(() => {
@@ -31,16 +38,34 @@ export function SequencerTestConsole() {
 
         const { data: staff } = await supabase
           .from('staff')
-          .select('primary_location_id, locations!inner(organization_id, name, organizations!inner(name))')
+          .select(`
+            id, 
+            role_id, 
+            primary_location_id, 
+            locations!inner(organization_id, name),
+            roles!inner(role_name)
+          `)
           .eq('user_id', user.id)
           .maybeSingle();
 
         if (staff?.locations) {
           const loc = staff.locations as any;
+          const role = staff.roles as any;
+          
+          // Get org name separately to avoid deep nesting
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('name')
+            .eq('id', loc.organization_id)
+            .single();
+
           setUserOrgInfo({
+            staffId: staff.id,
             orgId: loc.organization_id,
-            orgName: loc.organizations?.name || 'Unknown',
-            locationName: loc.name
+            orgName: org?.name || 'Unknown',
+            locationName: loc.name,
+            roleId: staff.role_id,
+            roleName: role?.role_name || 'Unknown'
           });
         }
       } catch (error) {
@@ -76,8 +101,8 @@ export function SequencerTestConsole() {
   }, []); // Empty deps - load once on mount
 
   const seedLockedThisWeek = async () => {
-    if (!orgId) {
-      toast({ title: 'Missing org ID', variant: 'destructive' });
+    if (!orgId || !userOrgInfo) {
+      toast({ title: 'Missing org ID or user info', variant: 'destructive' });
       return;
     }
 
@@ -97,12 +122,17 @@ export function SequencerTestConsole() {
       const anchors = getWeekAnchors(new Date(), tz);
       const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
       
-      console.log('[TestConsole] Seeding for Monday:', mondayStr, 'in timezone:', tz);
+      console.log('[TestConsole] Seeding for Monday:', mondayStr, 'in timezone:', tz, 'staff:', userOrgInfo.staffId);
 
-      // Get 3 random active pro moves for this role
+      // Get 3 random active pro moves with full details
       const { data: proMoves } = await supabase
         .from('pro_moves')
-        .select('action_id')
+        .select(`
+          action_id, 
+          action_statement, 
+          competency_id,
+          competencies!inner(name, domain_id)
+        `)
         .eq('role_id', roleId)
         .eq('active', true)
         .limit(10);
@@ -116,18 +146,30 @@ export function SequencerTestConsole() {
       const shuffled = [...proMoves].sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, 3);
 
-      // Delete any existing rows for this week/org/role first
-      const { error: deleteError } = await supabase
+      // Get domain names for the selected moves
+      const domainIds = [...new Set(selected.map((pm: any) => pm.competencies.domain_id))];
+      const { data: domains } = await supabase
+        .from('domains')
+        .select('domain_id, domain_name')
+        .in('domain_id', domainIds);
+
+      const domainMap = new Map((domains || []).map(d => [d.domain_id, d.domain_name]));
+
+      // Delete any existing weekly_plan rows for this week/org/role
+      const { error: deletePlanError } = await supabase
         .from('weekly_plan')
         .delete()
         .eq('org_id', orgId)
         .eq('role_id', roleId)
         .eq('week_start_date', mondayStr);
 
-      if (deleteError) throw deleteError;
+      if (deletePlanError) throw deletePlanError;
+
+      // Note: Skipping weekly_focus delete due to TS type issues
+      // Manual cleanup via SQL: DELETE FROM weekly_focus WHERE staff_id = '...' AND cycle = 3 AND week_in_cycle = 6;
 
       // Insert locked plan
-      const { error } = await supabase
+      const { error: planError } = await supabase
         .from('weekly_plan')
         .insert(
           selected.map((pm, idx) => ({
@@ -138,15 +180,36 @@ export function SequencerTestConsole() {
             action_id: pm.action_id,
             self_select: false,
             status: 'locked',
-            generated_by: 'manual', // Valid value for check constraint
+            generated_by: 'manual',
             locked_at: new Date().toISOString()
           }))
         );
 
-      if (error) throw error;
+      if (planError) throw planError;
 
-      toast({ title: 'Seeded locked plan', description: `Created 3 locked rows for ${mondayStr} (org: ${orgId})` });
-      console.log('[TestConsole] ✅ Seeded 3 rows:', { mondayStr, orgId, roleId });
+      // Insert weekly_focus rows for the user
+      const { error: focusError } = await supabase
+        .from('weekly_focus')
+        .insert(
+          selected.map((pm: any, idx) => ({
+            staff_id: userOrgInfo.staffId,
+            action_id: pm.action_id,
+            action_statement: pm.action_statement,
+            competency_id: pm.competency_id,
+            competency_name: pm.competencies.name,
+            domain_id: pm.competencies.domain_id,
+            domain_name: domainMap.get(pm.competencies.domain_id) || 'Unknown',
+            cycle: 3, // hardcoded for testing
+            week_in_cycle: 6, // hardcoded for testing
+            display_order: idx + 1,
+            self_select: false
+          }))
+        );
+
+      if (focusError) throw focusError;
+
+      toast({ title: 'Seeded test data', description: `Created 3 locked rows in weekly_plan AND weekly_focus for ${mondayStr}` });
+      console.log('[TestConsole] ✅ Seeded to both tables:', { mondayStr, orgId, roleId, staffId: userOrgInfo.staffId });
       await checkCurrentWeekSource();
     } catch (error: any) {
       console.error('Seed error:', error);
@@ -322,9 +385,11 @@ export function SequencerTestConsole() {
                 <div className="space-y-1 text-sm mt-2">
                   <div>Organization: <strong>{userOrgInfo.orgName}</strong></div>
                   <div>Location: <strong>{userOrgInfo.locationName}</strong></div>
+                  <div>Role: <strong>{userOrgInfo.roleName}</strong> (ID: {userOrgInfo.roleId})</div>
                   <div className="text-xs text-muted-foreground">Org ID: {userOrgInfo.orgId}</div>
+                  <div className="text-xs text-muted-foreground">Staff ID: {userOrgInfo.staffId}</div>
                   <div className="mt-2 text-yellow-600">
-                    ⚠️ Make sure to seed data for THIS organization to see it on your Week page!
+                    ⚠️ Test data will be seeded for THIS organization and role!
                   </div>
                 </div>
               </AlertDescription>

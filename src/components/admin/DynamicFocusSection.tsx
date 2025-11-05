@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { format, startOfWeek, addWeeks } from 'date-fns';
 import { EditNextWeekModal } from './EditNextWeekModal';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface WeekPlan {
   id: number;
@@ -17,7 +18,14 @@ interface WeekPlan {
   self_select: boolean;
   overridden: boolean;
   status: string;
-  pro_moves?: { action_statement: string };
+  pro_moves?: { 
+    action_statement: string;
+    competencies: {
+      domains: {
+        domain_name: string;
+      };
+    };
+  };
 }
 
 interface HealthStatus {
@@ -94,7 +102,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     // Load current week (locked)
     const { data: current } = await supabase
       .from('weekly_plan' as any)
-      .select('*, pro_moves(action_statement)')
+      .select('*, pro_moves(action_statement, competencies(domains(domain_name)))')
       .eq('org_id', testOrgId)
       .eq('role_id', roleId)
       .eq('week_start_date', currentMonday)
@@ -106,7 +114,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     // Load next week (proposed)
     const { data: next } = await supabase
       .from('weekly_plan' as any)
-      .select('*, pro_moves(action_statement)')
+      .select('*, pro_moves(action_statement, competencies(domains(domain_name)))')
       .eq('org_id', testOrgId)
       .eq('role_id', roleId)
       .eq('week_start_date', nextMonday)
@@ -272,13 +280,34 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
           {currentWeek.length === 0 ? (
             <p className="text-muted-foreground text-sm">No locked week yet</p>
           ) : (
-            <div className="space-y-2">
-              {currentWeek.map((item) => (
-                <div key={item.id} className="p-3 border rounded-lg bg-muted/30">
-                  <span className="font-semibold text-sm">{item.display_order}.</span>{' '}
-                  <span className="text-sm">{item.pro_moves?.action_statement || 'Self-Select'}</span>
-                </div>
-              ))}
+            <div className="space-y-3">
+              {currentWeek.map((item) => {
+                const domainName = item.pro_moves?.competencies?.domains?.domain_name;
+                const bgColor = domainName ? getDomainColor(domainName) : undefined;
+                
+                return (
+                  <div 
+                    key={item.id} 
+                    className="rounded-lg p-4 border-2"
+                    style={bgColor ? { backgroundColor: bgColor, borderColor: bgColor } : undefined}
+                  >
+                    {domainName && (
+                      <Badge 
+                        variant="secondary" 
+                        className="text-xs font-semibold mb-2 bg-white/80 text-gray-900"
+                      >
+                        {domainName}
+                      </Badge>
+                    )}
+                    <div className="flex items-start gap-2">
+                      <span className="font-bold text-sm">{item.display_order}.</span>
+                      <span className="text-sm font-medium">
+                        {item.pro_moves?.action_statement || 'Self-Select'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -298,13 +327,34 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
           {nextWeek.length === 0 ? (
             <p className="text-muted-foreground text-sm">No proposed week yet</p>
           ) : (
-            <div className="space-y-2">
-              {nextWeek.map((item) => (
-                <div key={item.id} className="p-3 border rounded-lg bg-muted/30">
-                  <span className="font-semibold text-sm">{item.display_order}.</span>{' '}
-                  <span className="text-sm">{item.pro_moves?.action_statement || 'Self-Select'}</span>
-                </div>
-              ))}
+            <div className="space-y-3">
+              {nextWeek.map((item) => {
+                const domainName = item.pro_moves?.competencies?.domains?.domain_name;
+                const bgColor = domainName ? getDomainColor(domainName) : undefined;
+                
+                return (
+                  <div 
+                    key={item.id} 
+                    className="rounded-lg p-4 border-2"
+                    style={bgColor ? { backgroundColor: bgColor, borderColor: bgColor } : undefined}
+                  >
+                    {domainName && (
+                      <Badge 
+                        variant="secondary" 
+                        className="text-xs font-semibold mb-2 bg-white/80 text-gray-900"
+                      >
+                        {domainName}
+                      </Badge>
+                    )}
+                    <div className="flex items-start gap-2">
+                      <span className="font-bold text-sm">{item.display_order}.</span>
+                      <span className="text-sm font-medium">
+                        {item.pro_moves?.action_statement || 'Self-Select'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
           <Button onClick={() => setEditModalOpen(true)} variant="outline">

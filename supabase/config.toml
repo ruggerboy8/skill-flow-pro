@@ -1,28 +1,4 @@
 project_id = "yeypngaufuualdfzcjpk"
 
-[functions.compute-weekly-plans]
-verify_jwt = false
-
-[functions.save-priorities]
-verify_jwt = true
-
-[functions.override-plan]
-verify_jwt = true
-
-[functions.admin-users]
-verify_jwt = true
-
 [functions.coach-remind]
-verify_jwt = true
-
-[functions.rollover-weekly]
-verify_jwt = false
-
-[functions.sequencer-alcan-rankings]
-verify_jwt = true
-
-[functions.manager-priorities-save]
-verify_jwt = true
-
-[functions.sequencer-sim-upsert]
 verify_jwt = true

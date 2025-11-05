@@ -96,10 +96,30 @@ export function useReliableSubmission() {
     
     // Validate updates before sending
     const validatedUpdates = updates.map(update => {
+      const focusId = update.weekly_focus_id;
+      
+      // Validate focus ID format
+      const isPlanId = /^plan:[0-9]+$/.test(focusId);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(focusId);
+      
+      if (!isPlanId && !isUuid) {
+        console.error('[Submission] Invalid focus ID format:', focusId);
+        throw new Error(`Invalid weekly_focus_id format: ${focusId}. Expected 'plan:<id>' or UUID.`);
+      }
+      
+      // Reject deprecated synthetic format (plan-{action}-{order})
+      if (focusId.startsWith('plan-') && focusId.includes('-')) {
+        console.error('[Submission] Detected deprecated synthetic ID format:', focusId);
+        throw new Error(`Deprecated ID format detected: ${focusId}. Please refresh the page to load the latest data.`);
+      }
+      
       // Log when we're about to upsert a record with null scores
       if (update.confidence_score === null && update.performance_score === null) {
         console.warn('[Submission] Attempting to upsert record with both scores null:', update);
       }
+      
+      console.info('[Submission] Writing score with focus_id=%s conf=%s perf=%s', 
+        focusId, update.confidence_score, update.performance_score);
       
       return update;
     });

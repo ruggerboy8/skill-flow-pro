@@ -63,14 +63,12 @@ export function SequencerTestConsole() {
 
       const tz = locations?.[0]?.timezone || 'America/Chicago';
 
-      // Calculate current Monday in org timezone
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const thisMonday = new Date(now);
-      thisMonday.setDate(now.getDate() + daysToMonday);
-      thisMonday.setHours(0, 0, 0, 0);
-      const mondayStr = format(thisMonday, 'yyyy-MM-dd');
+      // Use getWeekAnchors to calculate Monday (same as system does)
+      const { getWeekAnchors } = await import('@/v2/time');
+      const anchors = getWeekAnchors(new Date(), tz);
+      const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
+      
+      console.log('[TestConsole] Seeding for Monday:', mondayStr, 'in timezone:', tz);
 
       // Get 3 random active pro moves for this role
       const { data: proMoves } = await supabase
@@ -112,7 +110,7 @@ export function SequencerTestConsole() {
             self_select: false,
             status: 'locked',
             generated_by: 'manual', // Valid value for check constraint
-            locked_at: now.toISOString()
+            locked_at: new Date().toISOString()
           }))
         );
 
@@ -136,14 +134,21 @@ export function SequencerTestConsole() {
 
     setLoading(true);
     try {
-      // Calculate current Monday
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const thisMonday = new Date(now);
-      thisMonday.setDate(now.getDate() + daysToMonday);
-      thisMonday.setHours(0, 0, 0, 0);
-      const mondayStr = format(thisMonday, 'yyyy-MM-dd');
+      // Get org timezone
+      const { data: locations } = await supabase
+        .from('locations')
+        .select('timezone')
+        .eq('organization_id', orgId)
+        .limit(1);
+
+      const tz = locations?.[0]?.timezone || 'America/Chicago';
+
+      // Use getWeekAnchors to calculate Monday (same as system does)
+      const { getWeekAnchors } = await import('@/v2/time');
+      const anchors = getWeekAnchors(new Date(), tz);
+      const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
+      
+      console.log('[TestConsole] Checking for Monday:', mondayStr, 'in timezone:', tz);
 
       // Check weekly_plan
       const { data: planData } = await supabase
@@ -228,14 +233,21 @@ export function SequencerTestConsole() {
 
     setLoading(true);
     try {
-      // Calculate current Monday
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const thisMonday = new Date(now);
-      thisMonday.setDate(now.getDate() + daysToMonday);
-      thisMonday.setHours(0, 0, 0, 0);
-      const mondayStr = format(thisMonday, 'yyyy-MM-dd');
+      // Get org timezone
+      const { data: locations } = await supabase
+        .from('locations')
+        .select('timezone')
+        .eq('organization_id', orgId)
+        .limit(1);
+
+      const tz = locations?.[0]?.timezone || 'America/Chicago';
+
+      // Use getWeekAnchors to calculate Monday (same as system does)
+      const { getWeekAnchors } = await import('@/v2/time');
+      const anchors = getWeekAnchors(new Date(), tz);
+      const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
+      
+      console.log('[TestConsole] Clearing for Monday:', mondayStr);
 
       // Delete test plans created by test console
       const { error } = await supabase

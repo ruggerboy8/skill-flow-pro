@@ -3,15 +3,18 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 import { WeeklyProMovesPanel } from '@/components/admin/WeeklyProMovesPanel';
+import { DynamicFocusSection } from '@/components/admin/DynamicFocusSection';
 
 export default function AdminBuilder() {
   console.log('=== NEW ADMINBUILDER LOADING ===');
   const { user } = useAuth();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [orgId, setOrgId] = useState<string>('');
 
   useEffect(() => {
     checkAdminStatus();
@@ -25,14 +28,27 @@ export default function AdminBuilder() {
     }
 
     try {
-      const { data } = await supabase
+      const { data: staffData } = await supabase
         .from('staff')
-        .select('is_super_admin')
+        .select('is_super_admin, primary_location_id')
         .eq('user_id', user.id)
         .single();
 
-      setIsSuperAdmin(data?.is_super_admin || false);
-      console.log('=== ADMIN STATUS RESULT ===', data?.is_super_admin);
+      setIsSuperAdmin(staffData?.is_super_admin || false);
+      console.log('=== ADMIN STATUS RESULT ===', staffData?.is_super_admin);
+
+      // Get org_id from location
+      if (staffData?.primary_location_id) {
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('organization_id')
+          .eq('id', staffData.primary_location_id)
+          .single();
+        
+        if (locationData?.organization_id) {
+          setOrgId(locationData.organization_id);
+        }
+      }
     } catch (error) {
       setIsSuperAdmin(false);
     } finally {
@@ -69,11 +85,23 @@ export default function AdminBuilder() {
         </TabsList>
         
         <TabsContent value="dfi" className="space-y-6">
+          <h2 className="text-xl font-semibold">Onboarding (Cycles 1–3)</h2>
           <SimpleFocusBuilder roleFilter={1} />
+          
+          <Separator className="my-8" />
+          
+          <h2 className="text-xl font-semibold">Dynamic (Cycle 4+)</h2>
+          {orgId && <DynamicFocusSection roleId={1} orgId={orgId} />}
         </TabsContent>
 
         <TabsContent value="rda" className="space-y-6">
+          <h2 className="text-xl font-semibold">Onboarding (Cycles 1–3)</h2>
           <SimpleFocusBuilder roleFilter={2} />
+          
+          <Separator className="my-8" />
+          
+          <h2 className="text-xl font-semibold">Dynamic (Cycle 4+)</h2>
+          {orgId && <DynamicFocusSection roleId={2} orgId={orgId} />}
         </TabsContent>
         
         <TabsContent value="promoves" className="space-y-6">

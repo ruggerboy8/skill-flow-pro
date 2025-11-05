@@ -5,3 +5,9 @@ verify_jwt = true
 
 [functions.sequencer-rank]
 verify_jwt = true
+
+[functions.sequencer-rollover]
+verify_jwt = true
+
+[functions.sequencer-health]
+verify_jwt = false

@@ -84,9 +84,8 @@ Deno.serve(async (req) => {
     const mondayZ = toZonedStart(now, globalTz);
     const currentWeekStr = format(mondayZ, 'yyyy-MM-dd');
     const nextWeekStr = format(addWeeks(mondayZ, 1), 'yyyy-MM-dd');
-    const nplus1WeekStr = format(addWeeks(mondayZ, 2), 'yyyy-MM-dd');
 
-    logs.push(`[Global Rollover] Weeks: Current=${currentWeekStr}, Next=${nextWeekStr}, N+1=${nplus1WeekStr}`);
+    logs.push(`[Global Rollover] Weeks: Current=${currentWeekStr}, Next=${nextWeekStr}`);
 
     const results = [];
 
@@ -140,14 +139,6 @@ Deno.serve(async (req) => {
           roleLogs.push('[Generate Next] Skipped (dry run)');
         }
 
-        // Step 3: Generate/refresh N+1 week (unless overridden)
-        roleLogs.push(`[Generate N+1] Checking ${nplus1WeekStr}`);
-        if (!dryRun) {
-          await generateWeekPlan(supabase, null, roleId, nplus1WeekStr, globalTz, true, 'proposed', roleLogs);
-        } else {
-          roleLogs.push('[Generate N+1] Skipped (dry run)');
-        }
-
         // Log to sequencer_runs
         if (!dryRun) {
           await supabase.from('sequencer_runs').insert({
@@ -166,7 +157,6 @@ Deno.serve(async (req) => {
           status: 'success',
           currentWeek: currentWeekStr,
           nextWeek: nextWeekStr,
-          nplus1Week: nplus1WeekStr,
           logs: roleLogs
         });
 
@@ -192,7 +182,6 @@ Deno.serve(async (req) => {
           status: 'error',
           currentWeek: currentWeekStr,
           nextWeek: nextWeekStr,
-          nplus1Week: nplus1WeekStr,
           error: error.message,
           logs: roleLogs
         });

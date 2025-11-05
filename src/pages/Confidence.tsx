@@ -118,6 +118,7 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
       const { data: planData, error: planError } = await supabase
         .from('weekly_plan')
         .select(`
+          id,
           action_id,
           display_order,
           self_select,
@@ -145,7 +146,7 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
       if (planData && planData.length > 0) {
         console.log('📊 [Confidence] Using weekly_plan data source');
         focusData = planData.map((item: any) => ({
-          id: `plan-${item.action_id}-${item.display_order}`,
+          id: `plan:${item.id}`,
           action_id: item.action_id,
           display_order: item.display_order,
           self_select: item.self_select,

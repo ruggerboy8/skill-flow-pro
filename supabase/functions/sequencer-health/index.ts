@@ -19,8 +19,8 @@ serve(async (req) => {
   );
 
   try {
-    const url = new URL(req.url);
-    const orgId = url.searchParams.get('orgId');
+    const body = await req.json().catch(() => ({}));
+    const { orgId } = body;
 
     if (!orgId) {
       return new Response(JSON.stringify({ error: 'orgId required' }), {

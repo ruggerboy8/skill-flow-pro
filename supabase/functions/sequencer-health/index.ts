@@ -19,16 +19,6 @@ serve(async (req) => {
   );
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const { orgId } = body;
-
-    if (!orgId) {
-      return new Response(JSON.stringify({ error: 'orgId required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
     // Get settings
     const { data: enabledData } = await supabase
       .from('app_kv')
@@ -44,16 +34,16 @@ serve(async (req) => {
 
     const orgTz = tzData?.value?.timezone || 'America/Chicago';
 
-    // Check gate
+    // Check gate (global - checks all locations)
     const gateData = await supabase.rpc('check_sequencer_gate', {
-      p_org_id: orgId
+      p_org_id: null
     });
 
-    // Check if first week seeded
+    // Check if first week seeded (global)
     const { data: seededData } = await supabase
       .from('weekly_plan')
       .select('id')
-      .eq('org_id', orgId)
+      .is('org_id', null)
       .limit(1);
 
     // #10: Compute current dates in org timezone
@@ -64,11 +54,11 @@ serve(async (req) => {
     const currentMonday = format(currentMondayLocal, 'yyyy-MM-dd');
     const nextMonday = format(nextMondayLocal, 'yyyy-MM-dd');
 
-    // #10: Check has_current_locked per role
+    // #10: Check has_current_locked per role (global)
     const { data: dfiCurrent } = await supabase
       .from('weekly_plan')
       .select('id')
-      .eq('org_id', orgId)
+      .is('org_id', null)
       .eq('role_id', 1)
       .eq('week_start_date', currentMonday)
       .eq('status', 'locked')
@@ -77,17 +67,17 @@ serve(async (req) => {
     const { data: rdaCurrent } = await supabase
       .from('weekly_plan')
       .select('id')
-      .eq('org_id', orgId)
+      .is('org_id', null)
       .eq('role_id', 2)
       .eq('week_start_date', currentMonday)
       .eq('status', 'locked')
       .limit(1);
 
-    // #10: Check has_next_proposed per role
+    // #10: Check has_next_proposed per role (global)
     const { data: dfiNext } = await supabase
       .from('weekly_plan')
       .select('id')
-      .eq('org_id', orgId)
+      .is('org_id', null)
       .eq('role_id', 1)
       .eq('week_start_date', nextMonday)
       .eq('status', 'proposed')
@@ -96,7 +86,7 @@ serve(async (req) => {
     const { data: rdaNext } = await supabase
       .from('weekly_plan')
       .select('id')
-      .eq('org_id', orgId)
+      .is('org_id', null)
       .eq('role_id', 2)
       .eq('week_start_date', nextMonday)
       .eq('status', 'proposed')

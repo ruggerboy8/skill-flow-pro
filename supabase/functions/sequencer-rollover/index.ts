@@ -124,6 +124,8 @@ async function generateWeekPlan(supabase: any, orgId: string, roleId: number, we
 
   const nextPicks = rankData?.next || [];
   
+  console.log(`[generateWeekPlan] Rank response for ${weekStartDate}:`, JSON.stringify(nextPicks.slice(0, 3).map((p: any) => ({ id: p.proMoveId, name: p.name }))));
+  
   if (nextPicks.length === 0) {
     console.warn(`[generateWeekPlan] No moves ranked for ${weekStartDate}`);
     return;

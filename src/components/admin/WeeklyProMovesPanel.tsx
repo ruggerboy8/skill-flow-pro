@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Download, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { Play, Download, Loader2, ChevronDown, ChevronUp, Info, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -182,11 +182,24 @@ export function WeeklyProMovesPanel() {
         {/* Weights */}
         <Card>
           <CardHeader>
-            <CardTitle>NeedScore Weights</CardTitle>
-            <CardDescription>
-              Final = C·wC + R·wR + E·wE + D·wD (0–1). Higher = higher priority for selection.
-              {needsNormalization && ' Weights will auto-normalize to sum to 1.00 on run.'}
-            </CardDescription>
+            <div className="flex items-start justify-between">
+              <div className="space-y-1.5">
+                <CardTitle>NeedScore Weights</CardTitle>
+                <CardDescription>
+                  Final = C·wC + R·wR + E·wE + D·wD (0–1). Higher = higher priority for selection.
+                  {needsNormalization && ' Weights will auto-normalize to sum to 1.00 on run.'}
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWeights(DEFAULT_ENGINE_CONFIG.weights)}
+                className="gap-2"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset Defaults
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-sm space-y-2 p-3 bg-muted/50 rounded-lg mb-4">

@@ -191,10 +191,15 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
 
       toast({
         title: 'Monday Rollover Simulated',
-        description: `Tested with date: ${simulatedMonday}`
+        description: `After rollover: Current=11-10 (locked), Next=11-17 (proposed)`
       });
 
-      await loadWeeks();
+      // After simulating Monday 11-10, the rollover:
+      // 1. Locked 11-10 (was proposed, now locked)
+      // 2. Generated 11-17 as proposed (next week)
+      // 3. Generated 11-24 as proposed (n+1 week)
+      // So we need to load 11-10 as current and 11-17 as next
+      await loadWeeksForSimulation('2025-11-10', '2025-11-17');
       await loadHealthStatus();
     } catch (error: any) {
       toast({
@@ -205,6 +210,36 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     } finally {
       setRunningNow(false);
     }
+  };
+
+  const loadWeeksForSimulation = async (currentWeekStr: string, nextWeekStr: string) => {
+    console.log('[Sim] Loading simulated weeks:', { currentWeekStr, nextWeekStr });
+    
+    // Load current week (locked)
+    const { data: current, error: currentError } = await supabase
+      .from('weekly_plan' as any)
+      .select('*, pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))')
+      .eq('org_id', testOrgId)
+      .eq('role_id', roleId)
+      .eq('week_start_date', currentWeekStr)
+      .eq('status', 'locked')
+      .order('display_order');
+
+    console.log('[Sim] Current week result:', { current, currentError });
+    setCurrentWeek((current as any) || []);
+
+    // Load next week (proposed)
+    const { data: next, error: nextError } = await supabase
+      .from('weekly_plan' as any)
+      .select('*, pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))')
+      .eq('org_id', testOrgId)
+      .eq('role_id', roleId)
+      .eq('week_start_date', nextWeekStr)
+      .eq('status', 'proposed')
+      .order('display_order');
+
+    console.log('[Sim] Next week result:', { next, nextError });
+    setNextWeek((next as any) || []);
   };
 
   const getHealthMessage = () => {

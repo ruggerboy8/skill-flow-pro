@@ -63,6 +63,9 @@ serve(async (req) => {
 
     const logs: string[] = [];
     logs.push(`Starting ranking for role ${body.roleId} on ${effectiveDate}`);
+    if (weights.R === 0) {
+      logs.push('Recency disabled (wR=0) - cooldown and diversity still apply');
+    }
 
     // Calculate cutoff dates
     const effectiveDateObj = new Date(effectiveDate);

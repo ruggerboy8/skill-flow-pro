@@ -106,7 +106,7 @@ export interface ScoreBreakdown {
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
-  weights: { C: 0.65, R: 0.15, E: 0.15, D: 0.05 },
+  weights: { C: 0.80, R: 0.00, E: 0.15, D: 0.05 }, // R disabled temporarily
   cooldownWeeks: 2,
   diversityMinDomainsPerWeek: 2,
   recencyHorizonWeeks: 0, // 0 = auto

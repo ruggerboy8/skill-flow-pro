@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Download, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, Download, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import type { RankRequest, RankResponse } from '@/lib/sequencer/types';
 import { DEFAULT_ENGINE_CONFIG } from '@/lib/sequencer/types';
@@ -131,6 +133,11 @@ export function WeeklyProMovesPanel() {
     return null;
   };
 
+  // Filter drivers to exclude R when weight is 0
+  const getActiveDrivers = (drivers: string[]) => {
+    return drivers.filter(d => !(d === 'R' && weights.R === 0));
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -140,6 +147,17 @@ export function WeeklyProMovesPanel() {
           Compute ranked Pro Move lists using NeedScore v1. No writes to schedules.
         </p>
       </div>
+
+      {/* Recency Disabled Banner */}
+      {weights.R === 0 && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Recency is disabled in scoring.</strong> While locations are out of sync, we're temporarily excluding Recency (R) from calculations. 
+            Cooldown and diversity constraints still apply.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Controls */}
       <div className="space-y-4">
@@ -166,57 +184,109 @@ export function WeeklyProMovesPanel() {
           <CardHeader>
             <CardTitle>NeedScore Weights</CardTitle>
             <CardDescription>
-              Recommended defaults: C=0.65, R=0.15, E=0.15, D=0.05.
+              Final = C·wC + R·wR + E·wE + D·wD (0–1). Higher = higher priority for selection.
               {needsNormalization && ' Weights will auto-normalize to sum to 1.00 on run.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div>
-                <Label>C (Confidence): {weights.C.toFixed(2)}</Label>
-                <Slider
-                  value={[weights.C]}
-                  onValueChange={([v]) => setWeights({ ...weights, C: v })}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  className="mt-2"
-                />
-              </div>
-              <div>
-                <Label>R (Recency): {weights.R.toFixed(2)}</Label>
-                <Slider
-                  value={[weights.R]}
-                  onValueChange={([v]) => setWeights({ ...weights, R: v })}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  className="mt-2"
-                />
-              </div>
-              <div>
-                <Label>E (Eval): {weights.E.toFixed(2)}</Label>
-                <Slider
-                  value={[weights.E]}
-                  onValueChange={([v]) => setWeights({ ...weights, E: v })}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  className="mt-2"
-                />
-              </div>
-              <div>
-                <Label>D (Domain): {weights.D.toFixed(2)}</Label>
-                <Slider
-                  value={[weights.D]}
-                  onValueChange={([v]) => setWeights({ ...weights, D: v })}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  className="mt-2"
-                />
-              </div>
+            <div className="text-sm space-y-2 p-3 bg-muted/50 rounded-lg mb-4">
+              <p className="font-medium">What the score means:</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li><strong>Confidence (C)</strong> – How under-confident are we? (Primary driver)</li>
+                <li><strong>Recency (R)</strong> – Time since last scheduled (Currently disabled)</li>
+                <li><strong>Eval (E)</strong> – Quarterly evaluation gap indicator</li>
+                <li><strong>Domain (D)</strong> – Domain diversity nudge</li>
+              </ul>
             </div>
+            <TooltipProvider>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Label>C (Confidence): {weights.C.toFixed(2)}</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>How under-confident are we on this move? Derived from recent confidence ratings with outliers trimmed and EB-smoothed. Higher C = lower confidence → higher priority.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Slider
+                    value={[weights.C]}
+                    onValueChange={([v]) => setWeights({ ...weights, C: v })}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    className="mt-2"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Label>R (Recency): {weights.R.toFixed(2)} {weights.R === 0 && '(Disabled)'}</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Lift for moves not scheduled recently (between cooldown and horizon). Encourages rotation. Currently disabled while locations are out of sync.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Slider
+                    value={[weights.R]}
+                    onValueChange={([v]) => setWeights({ ...weights, R: v })}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    className="mt-2"
+                    disabled={true}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Label>E (Eval): {weights.E.toFixed(2)}</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>How much the last quarterly evaluation indicates a gap for this move's competency. Capped by Eval Cap so evals inform but don't dominate.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Slider
+                    value={[weights.E]}
+                    onValueChange={([v]) => setWeights({ ...weights, E: v })}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    className="mt-2"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Label>D (Domain): {weights.D.toFixed(2)}</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Nudge for domains that appeared less often in the last 8 weeks. Helps maintain variety across domains.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Slider
+                    value={[weights.D]}
+                    onValueChange={([v]) => setWeights({ ...weights, D: v })}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    className="mt-2"
+                  />
+                </div>
+              </div>
+            </TooltipProvider>
             <div className="text-sm text-muted-foreground">
               Sum: {weightsSum.toFixed(2)} {needsNormalization && '(will normalize)'}
             </div>
@@ -236,82 +306,154 @@ export function WeeklyProMovesPanel() {
             </CardHeader>
             <CollapsibleContent>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Cooldown Weeks (≥0)</Label>
-                    <Input
-                      type="number"
-                      value={advanced.cooldownWeeks}
-                      onChange={(e) => setAdvanced({ ...advanced, cooldownWeeks: Math.max(0, Number(e.target.value)) })}
-                      min={0}
-                    />
-                  </div>
-                  <div>
-                    <Label>Min Domains per Week (1-4)</Label>
-                    <Input
-                      type="number"
-                      value={advanced.diversityMinDomainsPerWeek}
-                      onChange={(e) => setAdvanced({ ...advanced, diversityMinDomainsPerWeek: Math.max(1, Math.min(4, Number(e.target.value))) })}
-                      min={1}
-                      max={4}
-                    />
-                  </div>
-                  <div>
-                    <Label>Recency Horizon Weeks (0=auto)</Label>
-                    <Input
-                      type="number"
-                      value={advanced.recencyHorizonWeeks}
-                      onChange={(e) => setAdvanced({ ...advanced, recencyHorizonWeeks: Math.max(0, Number(e.target.value)) })}
-                      min={0}
-                    />
-                  </div>
-                  <div>
-                    <Label>EB Prior (0.40-0.85)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={advanced.ebPrior}
-                      onChange={(e) => setAdvanced({ ...advanced, ebPrior: Math.max(0.4, Math.min(0.85, Number(e.target.value))) })}
-                      min={0.4}
-                      max={0.85}
-                    />
-                  </div>
-                  <div>
-                    <Label>EB K (1-100)</Label>
-                    <Input
-                      type="number"
-                      value={advanced.ebK}
-                      onChange={(e) => setAdvanced({ ...advanced, ebK: Math.max(1, Math.min(100, Number(e.target.value))) })}
-                      min={1}
-                      max={100}
-                    />
-                  </div>
-                  <div>
-                    <Label>Trim % (0-0.15)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={advanced.trimPct}
-                      onChange={(e) => setAdvanced({ ...advanced, trimPct: Math.max(0, Math.min(0.15, Number(e.target.value))) })}
-                      min={0}
-                      max={0.15}
-                    />
-                  </div>
-                  <div>
-                    <Label>Eval Cap (0-0.40)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={advanced.evalCap}
-                      onChange={(e) => setAdvanced({ ...advanced, evalCap: Math.max(0, Math.min(0.4, Number(e.target.value))) })}
-                      min={0}
-                      max={0.4}
-                    />
-                  </div>
+                <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded mb-3">
+                  <p>Advanced parameters control EB smoothing, cooldown, diversity constraints, and eval caps. Keep defaults unless testing.</p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Keep defaults unless testing. Preview assumes Next is consumed.
-                </p>
+                <TooltipProvider>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label>Cooldown Weeks (≥0)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Minimum number of weeks before the same move can be selected again. Higher = longer rest between repeats.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        type="number"
+                        value={advanced.cooldownWeeks}
+                        onChange={(e) => setAdvanced({ ...advanced, cooldownWeeks: Math.max(0, Number(e.target.value)) })}
+                        min={0}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label>Min Domains per Week (1-4)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Minimum count of distinct domains among the 3 weekly picks. We'll log a 'Relaxation' if it can't be met.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        type="number"
+                        value={advanced.diversityMinDomainsPerWeek}
+                        onChange={(e) => setAdvanced({ ...advanced, diversityMinDomainsPerWeek: Math.max(1, Math.min(4, Number(e.target.value))) })}
+                        min={1}
+                        max={4}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label>Recency Horizon Weeks (0=auto)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Upper bound for R to hit 1. Set 0 to auto-compute based on library size.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        type="number"
+                        value={advanced.recencyHorizonWeeks}
+                        onChange={(e) => setAdvanced({ ...advanced, recencyHorizonWeeks: Math.max(0, Number(e.target.value)) })}
+                        min={0}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label>EB Prior (0.40-0.85)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Assumed baseline confidence when data is sparse (e.g., 0.70 = 7/10). Higher prior makes trends more conservative.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={advanced.ebPrior}
+                        onChange={(e) => setAdvanced({ ...advanced, ebPrior: Math.max(0.4, Math.min(0.85, Number(e.target.value))) })}
+                        min={0.4}
+                        max={0.85}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label>EB K (strength) (1-100)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>How heavily the prior is weighted vs. observed data. Higher values reduce volatility from small sample sizes.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        type="number"
+                        value={advanced.ebK}
+                        onChange={(e) => setAdvanced({ ...advanced, ebK: Math.max(1, Math.min(100, Number(e.target.value))) })}
+                        min={1}
+                        max={100}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label>Trim % (0-0.15)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Removes extreme highs and lows before smoothing. Use higher trim if you see spiky data.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={advanced.trimPct}
+                        onChange={(e) => setAdvanced({ ...advanced, trimPct: Math.max(0, Math.min(0.15, Number(e.target.value))) })}
+                        min={0}
+                        max={0.15}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label>Eval Cap (0-0.40)</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Maximum share that Eval can contribute to the final. Prevents a single eval gap from outweighing ongoing confidence data.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={advanced.evalCap}
+                        onChange={(e) => setAdvanced({ ...advanced, evalCap: Math.max(0, Math.min(0.4, Number(e.target.value))) })}
+                        min={0}
+                        max={0.4}
+                      />
+                    </div>
+                  </div>
+                </TooltipProvider>
               </CardContent>
             </CollapsibleContent>
           </Card>
@@ -377,7 +519,7 @@ export function WeeklyProMovesPanel() {
                         {pick.domainName}
                       </Badge>
                       {getStatusBadge(pick.status, pick.severity)}
-                      {pick.drivers.map(d => (
+                      {getActiveDrivers(pick.drivers).map(d => (
                         <Badge key={d} variant="outline" className={getDriverClass(d)}>
                           {getDriverLabel(d)}
                         </Badge>
@@ -406,7 +548,7 @@ export function WeeklyProMovesPanel() {
                         {pick.domainName}
                       </Badge>
                       {getStatusBadge(pick.status, pick.severity)}
-                      {pick.drivers.map(d => (
+                      {getActiveDrivers(pick.drivers).map(d => (
                         <Badge key={d} variant="outline" className={getDriverClass(d)}>
                           {getDriverLabel(d)}
                         </Badge>
@@ -425,7 +567,11 @@ export function WeeklyProMovesPanel() {
           <Card>
             <CardHeader>
               <CardTitle>All Candidates (Ranked)</CardTitle>
-              <CardDescription>Top 100 shown</CardDescription>
+              <CardDescription>
+                Top 100 shown. Legend: <strong>Final</strong> = combined score (0–1) | <strong>C/R/E/D</strong> = component signals | 
+                <strong>Drivers</strong> = top 2 weighted contributors | <strong>Conf N</strong> = total sample count | 
+                <strong>Status</strong>: 🚨 Critical (≤0.20 EB-conf) | ⚠️ Watch (borderline)
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[600px]">

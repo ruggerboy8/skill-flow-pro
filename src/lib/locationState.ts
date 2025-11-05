@@ -426,8 +426,11 @@ export async function computeWeekState(params: {
       if (!planErr && planData && planData.length === 3) {
         focusIds = planData.map(p => `plan:${p.id}`);
         dataSource = 'weekly_plan';
-        console.info('[weekState] source=weekly_plan locked=true org=%s role=%d week=%s', 
-          orgId, roleId, mondayStr);
+        console.info('[weekState] source=weekly_plan locked=true org=%s role=%d week=%s count=%d', 
+          orgId, roleId, mondayStr, planData.length);
+        console.log('[weekState] ✅ Found weekly_plan data:', planData);
+      } else {
+        console.warn('[weekState] ⚠️ weekly_plan query returned:', { planErr, count: planData?.length || 0, expected: 3 });
       }
     }
 

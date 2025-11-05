@@ -20,6 +20,35 @@ export function SequencerTestConsole() {
   const [orgData, setOrgData] = useState<any>(null);
   const [availableOrgs, setAvailableOrgs] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
+  const [userOrgInfo, setUserOrgInfo] = useState<{ orgId: string; orgName: string; locationName: string } | null>(null);
+
+  // Load user's org info
+  useEffect(() => {
+    const loadUserOrg = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: staff } = await supabase
+          .from('staff')
+          .select('primary_location_id, locations!inner(organization_id, name, organizations!inner(name))')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (staff?.locations) {
+          const loc = staff.locations as any;
+          setUserOrgInfo({
+            orgId: loc.organization_id,
+            orgName: loc.organizations?.name || 'Unknown',
+            locationName: loc.name
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load user org:', error);
+      }
+    };
+    loadUserOrg();
+  }, []);
 
   // Load available orgs on mount
   useEffect(() => {
@@ -116,7 +145,8 @@ export function SequencerTestConsole() {
 
       if (error) throw error;
 
-      toast({ title: 'Seeded locked plan', description: `Created 3 locked rows for ${mondayStr}` });
+      toast({ title: 'Seeded locked plan', description: `Created 3 locked rows for ${mondayStr} (org: ${orgId})` });
+      console.log('[TestConsole] ✅ Seeded 3 rows:', { mondayStr, orgId, roleId });
       await checkCurrentWeekSource();
     } catch (error: any) {
       console.error('Seed error:', error);
@@ -284,6 +314,23 @@ export function SequencerTestConsole() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* User's Current Org Info */}
+          {userOrgInfo && (
+            <Alert>
+              <AlertTitle>Your Staff Record</AlertTitle>
+              <AlertDescription>
+                <div className="space-y-1 text-sm mt-2">
+                  <div>Organization: <strong>{userOrgInfo.orgName}</strong></div>
+                  <div>Location: <strong>{userOrgInfo.locationName}</strong></div>
+                  <div className="text-xs text-muted-foreground">Org ID: {userOrgInfo.orgId}</div>
+                  <div className="mt-2 text-yellow-600">
+                    ⚠️ Make sure to seed data for THIS organization to see it on your Week page!
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Configuration */}
           <div className="space-y-4">
             <div className="space-y-2">

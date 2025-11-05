@@ -1,6 +1,7 @@
 import { getWeekAnchors } from '@/v2/time';
 import { supabase } from '@/integrations/supabase/client';
 import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
+import { format } from 'date-fns';
 
 export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'done' | 'missed_checkout' | 'no_assignments';
 
@@ -284,10 +285,10 @@ export async function computeWeekState(params: {
   const anchors = getWeekAnchors(now, ctx.timezone);
   const { checkin_open, checkin_due, checkout_open, checkout_due } = anchors;
 
-  // Get staff information
+  // Get staff information with org and timezone
   const { data: staff } = await supabase
     .from('staff')
-    .select('*')
+    .select('*, locations!inner(organization_id, timezone)')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -296,6 +297,8 @@ export async function computeWeekState(params: {
   }
 
   const roleId = params.roleId || staff.role_id;
+  const orgId = (staff.locations as any)?.organization_id;
+  const orgTz = (staff.locations as any)?.timezone || 'America/Chicago';
 
   // Check eligibility (onboarding status)
   if (!isEligibleForProMoves(staff, now)) {
@@ -309,15 +312,67 @@ export async function computeWeekState(params: {
     };
   }
 
-  // weekly_focus ids for current cycle/week/role
-  const { data: focusRows } = await supabase
-    .from('weekly_focus')
-    .select('id')
-    .eq('role_id', roleId)
-    .eq('cycle', cycleNumber)
-    .eq('week_in_cycle', weekInCycle);
+  // Calculate Monday anchor in org timezone
+  const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
 
-  const focusIds = (focusRows ?? []).map(r => r.id);
+  // ----- HYBRID LOGIC: Try locked weekly_plan first -----
+  let focusIds: string[] = [];
+  let dataSource: 'weekly_plan' | 'weekly_focus' = 'weekly_focus';
+
+  // Simple per-render cache to avoid N× queries for same week
+  const cacheKey = `${orgId}:${roleId}:${mondayStr}`;
+  if (!globalThis.__weekStateCache) {
+    globalThis.__weekStateCache = new Map<string, { ids: string[], source: string }>();
+  }
+  const cache = globalThis.__weekStateCache as Map<string, { ids: string[], source: string }>;
+
+  if (cache.has(cacheKey)) {
+    const cached = cache.get(cacheKey)!;
+    focusIds = cached.ids;
+    dataSource = cached.source as 'weekly_plan' | 'weekly_focus';
+    console.info(`[weekState] cache hit for ${cacheKey} source=${dataSource}`);
+  } else {
+    // Try weekly_plan if we have org context
+    if (orgId) {
+      const { data: planData, error: planErr } = await supabase
+        .from('weekly_plan')
+        .select('id, display_order')
+        .eq('org_id', orgId)
+        .eq('role_id', roleId)
+        .eq('week_start_date', mondayStr)
+        .eq('status', 'locked')
+        .order('display_order');
+
+      // Only use plan if we have exactly 3 locked rows
+      if (!planErr && planData && planData.length === 3) {
+        focusIds = planData.map(p => `plan:${p.id}`);
+        dataSource = 'weekly_plan';
+        console.info('[weekState] source=weekly_plan locked=true org=%s role=%d week=%s', 
+          orgId, roleId, mondayStr);
+      }
+    }
+
+    // Fallback to weekly_focus
+    if (focusIds.length === 0) {
+      const { data: focusRows, error: focusErr } = await supabase
+        .from('weekly_focus')
+        .select('id')
+        .eq('role_id', roleId)
+        .eq('cycle', cycleNumber)
+        .eq('week_in_cycle', weekInCycle);
+
+      if (!focusErr && focusRows) {
+        focusIds = focusRows.map(r => r.id);
+        dataSource = 'weekly_focus';
+        console.info('[weekState] source=weekly_focus cycle=%d week=%d role=%d', 
+          cycleNumber, weekInCycle, roleId);
+      }
+    }
+
+    // Cache result
+    cache.set(cacheKey, { ids: focusIds, source: dataSource });
+  }
+
   const required = focusIds.length;
 
   if (required === 0) {

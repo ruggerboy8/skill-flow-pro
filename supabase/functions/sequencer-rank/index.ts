@@ -139,6 +139,7 @@ serve(async (req) => {
     };
 
     // 2. Fetch confidence history (last 18 weeks) - handle both weekly_focus and weekly_plan
+    // Note: We explicitly select columns to avoid PostgREST auto-join attempts
     const { data: confData, error: confError } = await supabase
       .from('weekly_scores')
       .select('confidence_score, confidence_date, weekly_focus_id')

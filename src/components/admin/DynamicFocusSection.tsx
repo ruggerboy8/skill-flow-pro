@@ -39,6 +39,10 @@ interface DynamicFocusSectionProps {
 
 export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps) {
   const { toast } = useToast();
+  
+  // TESTING: Override with sandbox org for testing
+  const testOrgId = '99999999-9999-9999-9999-999999999999';
+  
   const [autoEnabled, setAutoEnabled] = useState(false);
   const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
   const [currentWeek, setCurrentWeek] = useState<WeekPlan[]>([]);
@@ -49,7 +53,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
 
   useEffect(() => {
     loadAll();
-  }, [roleId, orgId]);
+  }, [roleId, testOrgId]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -73,7 +77,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
 
   const loadHealthStatus = async () => {
     const { data, error } = await supabase.functions.invoke('sequencer-health', {
-      body: { orgId }
+      body: { orgId: testOrgId }
     });
     
     console.log('[Step 2] Health check result:', data);
@@ -91,7 +95,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     const { data: current } = await supabase
       .from('weekly_plan' as any)
       .select('*, pro_moves(action_statement)')
-      .eq('org_id', orgId)
+      .eq('org_id', testOrgId)
       .eq('role_id', roleId)
       .eq('week_start_date', currentMonday)
       .eq('status', 'locked')
@@ -103,7 +107,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     const { data: next } = await supabase
       .from('weekly_plan' as any)
       .select('*, pro_moves(action_statement)')
-      .eq('org_id', orgId)
+      .eq('org_id', testOrgId)
       .eq('role_id', roleId)
       .eq('week_start_date', nextMonday)
       .eq('status', 'proposed')
@@ -134,7 +138,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     setRunningNow(true);
     try {
       const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
-        body: { roles: [roleId], orgId }
+        body: { roles: [roleId], orgId: testOrgId }
       });
 
       if (error) throw error;
@@ -313,7 +317,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
       <EditNextWeekModal
         open={editModalOpen}
         onClose={() => setEditModalOpen(false)}
-        orgId={orgId}
+        orgId={testOrgId}
         roleId={roleId}
         existingWeek={nextWeek}
         onSave={async () => {

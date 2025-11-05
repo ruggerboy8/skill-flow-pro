@@ -64,7 +64,7 @@ export default function Review() {
           action_id,
           self_select,
           pro_moves:action_id(action_statement),
-          competencies!inner(domains!inner(domain_name))
+          competencies!inner(domains!competencies_domain_id_fkey!inner(domain_name))
         `)
         .eq("role_id", staffRow.role_id)
         .eq("cycle", cycleNum)

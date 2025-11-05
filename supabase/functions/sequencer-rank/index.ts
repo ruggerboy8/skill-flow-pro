@@ -177,37 +177,36 @@ serve(async (req) => {
 
     logs.push(`Collected ${confidenceHistory.length} confidence data points`);
 
-    // 3. Fetch latest quarterly evals
-    const { data: evalData, error: evalError } = await supabase.rpc('get_latest_quarterly_evals');
+    // 3. Fetch latest quarterly evals (Alcan-wide per role)
+    const { data: evalData, error: evalError } = await supabase.rpc(
+      'seq_latest_quarterly_evals',
+      { role_id_arg: body.roleId }
+    );
     if (evalError) console.warn('Eval fetch failed:', evalError);
 
     const evals = evalData?.map((e: any) => ({
       competencyId: e.competency_id,
-      score: e.score,
+      score: e.score, // already 0..1
     })) || [];
 
     logs.push(`Found ${evals.length} eval scores`);
 
-    // 4. Fetch last selected (approximate using cycle/week)
+    // 4. Fetch last selected using real week_start_date
     const { data: lastSelectedData, error: lsError } = await supabase
       .from('weekly_focus')
-      .select('action_id, cycle, week_in_cycle')
+      .select('action_id, week_start_date')
       .eq('role_id', body.roleId)
       .not('action_id', 'is', null)
-      .order('cycle', { ascending: false })
-      .order('week_in_cycle', { ascending: false });
+      .not('week_start_date', 'is', null)
+      .order('week_start_date', { ascending: false });
 
     if (lsError) throw lsError;
 
-    // Approximate week start dates (assuming 6-week cycles starting from a base date)
-    const baseDate = new Date('2024-01-01'); // Adjust as needed
     const lastSelectedMap = new Map<number, string>();
     lastSelectedData?.forEach((row: any) => {
-      if (lastSelectedMap.has(row.action_id)) return;
-      const weekOffset = (row.cycle - 1) * 6 + (row.week_in_cycle - 1);
-      const weekStart = new Date(baseDate);
-      weekStart.setDate(weekStart.getDate() + weekOffset * 7);
-      lastSelectedMap.set(row.action_id, weekStart.toISOString().split('T')[0]);
+      if (!lastSelectedMap.has(row.action_id)) {
+        lastSelectedMap.set(row.action_id, row.week_start_date);
+      }
     });
 
     const lastSelected = Array.from(lastSelectedMap.entries()).map(([proMoveId, weekStart]) => ({
@@ -217,20 +216,23 @@ serve(async (req) => {
 
     logs.push(`Found ${lastSelected.length} last-selected records`);
 
-    // 5. Fetch domain coverage (last 8 weeks)
+    // 5. Fetch domain coverage (last 8 weeks) using real week_start_date
+    const { data: domainCoverageData, error: dcError } = await supabase
+      .from('weekly_focus')
+      .select('action_id, week_start_date')
+      .eq('role_id', body.roleId)
+      .not('action_id', 'is', null)
+      .not('week_start_date', 'is', null)
+      .gte('week_start_date', cutoff8w.toISOString().split('T')[0]);
+
+    if (dcError) throw dcError;
+
     const domainCoverageMap = new Map<number, Set<string>>();
-    lastSelectedData?.forEach((row: any) => {
+    domainCoverageData?.forEach((row: any) => {
       const move = eligible.find(m => m.id === row.action_id);
-      if (!move) return;
-
-      const weekOffset = (row.cycle - 1) * 6 + (row.week_in_cycle - 1);
-      const weekStart = new Date(baseDate);
-      weekStart.setDate(weekStart.getDate() + weekOffset * 7);
-
-      const weeksSince = Math.floor((effectiveDateObj.getTime() - weekStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
-      if (weeksSince <= 8 && weeksSince >= 0) {
+      if (move) {
         const weeks = domainCoverageMap.get(move.domainId) || new Set();
-        weeks.add(weekStart.toISOString().split('T')[0]);
+        weeks.add(row.week_start_date);
         domainCoverageMap.set(move.domainId, weeks);
       }
     });
@@ -241,6 +243,11 @@ serve(async (req) => {
     }));
 
     logs.push(`Domain coverage: ${domainCoverage.length} domains tracked`);
+
+    // Add sample move logging
+    if (eligible.length > 0) {
+      logs.push(`Sample move for introspection: ${eligible[0].name} (id=${eligible[0].id})`);
+    }
 
     // Import and run engine (inline for now since we can't import from src/)
     // We'll compute directly here
@@ -269,44 +276,69 @@ serve(async (req) => {
       }
       const C = 1 - smoothedConf;
 
-      // R (Recency)
+      // R (Recency) - Linear post-cooldown
       const lastSeenRecord = lastSelected.find(ls => ls.proMoveId === move.id);
       const weeksSince = lastSeenRecord
         ? Math.floor((new Date(referenceDate).getTime() - new Date(lastSeenRecord.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000))
         : 999;
       const horizon = config.recencyHorizonWeeks === 0 ? 12 : config.recencyHorizonWeeks;
-      const R = weeksSince >= horizon ? 1.0 : Math.exp(-weeksSince / horizon);
+      const cooldown = config.cooldownWeeks;
+      const R = weeksSince <= cooldown ? 0
+              : weeksSince >= horizon  ? 1
+              : (weeksSince - cooldown) / (horizon - cooldown);
 
-      // E (Eval)
+      // E (Eval) - Deficit with capped contribution
       const evalRecord = evals.find(e => e.competencyId === move.competencyId);
-      const evalScore = evalRecord ? evalRecord.score : 0;
-      const E = Math.min(evalScore, config.evalCap);
+      const evalScore01 = evalRecord?.score; // 0..1 (1=good, undefined=no data)
+      const E_raw = evalScore01 == null ? 0 : Math.max(0, 1 - evalScore01); // deficit
+      const eContrib = Math.min(E_raw * weights.E, config.evalCap); // cap contribution
 
       // D (Domain)
       const domainRecord = domainCoverage.find(dc => dc.domainId === move.domainId);
       const appearances = domainRecord ? domainRecord.appearances : 0;
       const D = 1 - Math.min(appearances / 8, 1);
 
-      const final = C * weights.C + R * weights.R + E * weights.E + D * weights.D;
+      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib;
 
       const components = [
         { key: 'C', value: C * weights.C },
         { key: 'R', value: R * weights.R },
-        { key: 'E', value: E * weights.E },
+        { key: 'E', value: eContrib }, // Use capped contribution for drivers
         { key: 'D', value: D * weights.D },
       ];
       components.sort((a, b) => b.value - a.value);
       const drivers = components.slice(0, 2).map(c => c.key);
 
-      return { C, R, E, D, final, drivers, weeksSince };
+      return { C, R, E: E_raw, D, eContrib, final, drivers, weeksSince };
     };
 
     // Compute Next
     const scored = eligible.map(move => ({ ...move, ...scoreCandidate(move, effectiveDate) }));
+    
+    // Enhanced deterministic tie-breaks
     scored.sort((a, b) => {
-      if (Math.abs(b.final - a.final) < 0.0001) return a.id - b.id;
-      return b.final - a.final;
+      // 1. Final score desc
+      if (Math.abs(b.final - a.final) >= 0.0001) return b.final - a.final;
+      // 2. Eval contribution desc (bigger gap wins)
+      if (Math.abs(b.eContrib - a.eContrib) >= 0.0001) return b.eContrib - a.eContrib;
+      // 3. Confidence component desc
+      const cA = a.C * weights.C;
+      const cB = b.C * weights.C;
+      if (Math.abs(cB - cA) >= 0.0001) return cB - cA;
+      // 4. Weeks since seen desc (longer = higher priority)
+      if (a.weeksSince !== b.weeksSince) return b.weeksSince - a.weeksSince;
+      // 5. ID asc (deterministic)
+      return a.id - b.id;
     });
+
+    // Log sample breakdown
+    if (scored.length > 0) {
+      const sample = scored[0];
+      logs.push(`Sample breakdown [${sample.name}]:`);
+      logs.push(`  Raw: C=${sample.C.toFixed(3)}, R=${sample.R.toFixed(3)}, E_raw=${sample.E.toFixed(3)}, D=${sample.D.toFixed(3)}`);
+      logs.push(`  Weighted: C*w=${(sample.C * weights.C).toFixed(3)}, R*w=${(sample.R * weights.R).toFixed(3)}, E_contrib=${sample.eContrib.toFixed(3)}, D*w=${(sample.D * weights.D).toFixed(3)}`);
+      logs.push(`  Final: ${sample.final.toFixed(3)}, Drivers: ${sample.drivers.join(', ')}`);
+    }
 
     // Apply cooldown and pick 3
     const eligibleNext = scored.filter(m => m.weeksSince >= config.cooldownWeeks);
@@ -366,33 +398,42 @@ serve(async (req) => {
       const C = 1 - smoothedConf;
 
       const horizon = config.recencyHorizonWeeks === 0 ? 12 : config.recencyHorizonWeeks;
-      const R = weeksSince >= horizon ? 1.0 : Math.exp(-weeksSince / horizon);
+      const cooldown = config.cooldownWeeks;
+      const R = weeksSince <= cooldown ? 0
+              : weeksSince >= horizon  ? 1
+              : (weeksSince - cooldown) / (horizon - cooldown);
 
       const evalRecord = evals.find(e => e.competencyId === move.competencyId);
-      const evalScore = evalRecord ? evalRecord.score : 0;
-      const E = Math.min(evalScore, config.evalCap);
+      const evalScore01 = evalRecord?.score;
+      const E_raw = evalScore01 == null ? 0 : Math.max(0, 1 - evalScore01);
+      const eContrib = Math.min(E_raw * weights.E, config.evalCap);
 
       const domainRecord = domainCoverage.find(dc => dc.domainId === move.domainId);
       const appearances = domainRecord ? domainRecord.appearances : 0;
       const D = 1 - Math.min(appearances / 8, 1);
 
-      const final = C * weights.C + R * weights.R + E * weights.E + D * weights.D;
+      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib;
 
       const components = [
         { key: 'C', value: C * weights.C },
         { key: 'R', value: R * weights.R },
-        { key: 'E', value: E * weights.E },
+        { key: 'E', value: eContrib },
         { key: 'D', value: D * weights.D },
       ];
       components.sort((a, b) => b.value - a.value);
       const drivers = components.slice(0, 2).map(c => c.key);
 
-      return { ...move, C, R, E, D, final, drivers, weeksSince };
+      return { ...move, C, R, E: E_raw, D, eContrib, final, drivers, weeksSince };
     });
 
     scoredPreview.sort((a, b) => {
-      if (Math.abs(b.final - a.final) < 0.0001) return a.id - b.id;
-      return b.final - a.final;
+      if (Math.abs(b.final - a.final) >= 0.0001) return b.final - a.final;
+      if (Math.abs(b.eContrib - a.eContrib) >= 0.0001) return b.eContrib - a.eContrib;
+      const cA = a.C * weights.C;
+      const cB = b.C * weights.C;
+      if (Math.abs(cB - cA) >= 0.0001) return cB - cA;
+      if (a.weeksSince !== b.weeksSince) return b.weeksSince - a.weeksSince;
+      return a.id - b.id;
     });
 
     const eligiblePreview = scoredPreview.filter(m => m.weeksSince >= config.cooldownWeeks);
@@ -442,7 +483,8 @@ serve(async (req) => {
         name: pick.name,
         domainId: pick.domainId,
         domainName: pick.domainName,
-        parts: { C: pick.C, R: pick.R, E: pick.E, D: pick.D },
+        parts: { C: pick.C, R: pick.R, E: pick.E, D: pick.D }, // E is E_raw for introspection
+        evalContrib: pick.eContrib, // Show capped contribution
         finalScore: pick.final,
         drivers: pick.drivers,
         lastSeen: ls ? new Date(ls.weekStart).toLocaleDateString('en-US') : undefined,

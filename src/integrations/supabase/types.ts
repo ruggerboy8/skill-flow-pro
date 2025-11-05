@@ -93,6 +93,75 @@ export type Database = {
           },
         ]
       }
+      alcan_weekly_plan: {
+        Row: {
+          action_ids: number[]
+          computed_at: string
+          computed_by: string | null
+          created_at: string
+          engine_config: Json | null
+          id: string
+          locked_until: string | null
+          logs: Json | null
+          published_at: string | null
+          published_by: string | null
+          role_id: number
+          status: Database["public"]["Enums"]["plan_status"]
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          action_ids: number[]
+          computed_at?: string
+          computed_by?: string | null
+          created_at?: string
+          engine_config?: Json | null
+          id?: string
+          locked_until?: string | null
+          logs?: Json | null
+          published_at?: string | null
+          published_by?: string | null
+          role_id: number
+          status?: Database["public"]["Enums"]["plan_status"]
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          action_ids?: number[]
+          computed_at?: string
+          computed_by?: string | null
+          created_at?: string
+          engine_config?: Json | null
+          id?: string
+          locked_until?: string | null
+          logs?: Json | null
+          published_at?: string | null
+          published_by?: string | null
+          role_id?: number
+          status?: Database["public"]["Enums"]["plan_status"]
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
+      app_kv: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       coach_scopes: {
         Row: {
           created_at: string
@@ -380,6 +449,58 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      manager_priorities: {
+        Row: {
+          action_id: number
+          coach_staff_id: string
+          created_at: string
+          id: number
+          role_id: number
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          action_id: number
+          coach_staff_id: string
+          created_at?: string
+          id?: number
+          role_id: number
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          action_id?: number
+          coach_staff_id?: string
+          created_at?: string
+          id?: number
+          role_id?: number
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manager_priorities_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "manager_priorities_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manager_priorities_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
           },
         ]
       }
@@ -813,6 +934,7 @@ export type Database = {
           self_select: boolean
           universal: boolean
           week_in_cycle: number
+          week_start_date: string | null
         }
         Insert: {
           action_id?: number | null
@@ -825,6 +947,7 @@ export type Database = {
           self_select?: boolean
           universal?: boolean
           week_in_cycle: number
+          week_start_date?: string | null
         }
         Update: {
           action_id?: number | null
@@ -837,6 +960,7 @@ export type Database = {
           self_select?: boolean
           universal?: boolean
           week_in_cycle?: number
+          week_start_date?: string | null
         }
         Relationships: [
           {
@@ -1206,6 +1330,7 @@ export type Database = {
         Args: { p_staff_id: string; p_tz?: string; p_weeks?: number }
         Returns: Json
       }
+      get_current_staff_id: { Args: never; Returns: string }
       get_cycle_week_status: {
         Args: { p_role_id: number; p_staff_id: string }
         Returns: {
@@ -1445,8 +1570,59 @@ export type Database = {
         }
         Returns: undefined
       }
+      seq_confidence_history_18w: {
+        Args: {
+          p_effective_date: string
+          p_org_id: string
+          p_role_id: number
+          p_tz: string
+        }
+        Returns: {
+          avg01: number
+          n: number
+          pro_move_id: number
+          week_start: string
+        }[]
+      }
+      seq_domain_coverage_8w: {
+        Args: {
+          p_effective_date: string
+          p_org_id: string
+          p_role_id: number
+          p_tz: string
+        }
+        Returns: {
+          appearances: number
+          domain_id: number
+          weeks_counted: number
+        }[]
+      }
+      seq_last_selected_by_move: {
+        Args: { p_org_id: string; p_role_id: number; p_tz: string }
+        Returns: {
+          pro_move_id: number
+          week_start: string
+        }[]
+      }
+      seq_latest_quarterly_evals:
+        | {
+            Args: { p_org_id: string; p_role_id: number }
+            Returns: {
+              competency_id: number
+              effective_date: string
+              score01: number
+            }[]
+          }
+        | {
+            Args: { role_id_arg: number }
+            Returns: {
+              competency_id: number
+              score: number
+            }[]
+          }
     }
     Enums: {
+      plan_status: "locked" | "draft"
       score_source: "live" | "backfill" | "backfill_historical"
     }
     CompositeTypes: {
@@ -1575,6 +1751,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      plan_status: ["locked", "draft"],
       score_source: ["live", "backfill", "backfill_historical"],
     },
   },

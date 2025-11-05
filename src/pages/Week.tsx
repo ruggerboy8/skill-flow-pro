@@ -13,6 +13,9 @@ import { getDomainColor } from '@/lib/domainColors';
 interface Staff {
   id: string;
   role_id: number;
+  locations?: {
+    organization_id: string;
+  };
 }
 
 interface WeeklyFocus {
@@ -75,7 +78,7 @@ export default function Week() {
   const loadStaffProfile = async () => {
     const { data, error } = await supabase
       .from('staff')
-      .select('id, role_id')
+      .select('id, role_id, locations(organization_id)')
       .eq('user_id', user!.id)
       .maybeSingle();
 
@@ -136,22 +139,93 @@ export default function Week() {
     console.log('=== WEEK.TSX DEBUG ===');
     console.log('Loading week data for:', { cycle, weekInCycle, staffRoleId: staff.role_id, userId: user!.id });
     
-    // Simpler query approach - get focus first, then get selections separately
-    const { data: focusData, error: focusError } = await supabase
-      .from('weekly_focus')
-      .select(`
-        id,
-        display_order,
-        self_select,
-        competency_id,
-        action_id,
-        pro_moves!weekly_focus_action_id_fkey ( action_statement ),
-        competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
-      `)
-      .eq('cycle', cycle)
-      .eq('week_in_cycle', weekInCycle)
-      .eq('role_id', staff.role_id)
-      .order('display_order');
+    // Try weekly_plan first (for orgs with sequencer)
+    const orgId = staff.locations?.organization_id;
+    let focusData: any[] | null = null;
+    let focusError: any = null;
+    
+    if (orgId) {
+      // Calculate current Monday
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const thisMonday = new Date(now);
+      thisMonday.setDate(now.getDate() + daysToMonday);
+      thisMonday.setHours(0, 0, 0, 0);
+      const mondayStr = thisMonday.toISOString().split('T')[0];
+
+      console.log('Attempting weekly_plan query:', { orgId, roleId: staff.role_id, mondayStr });
+      
+      const { data: planData, error: planError } = await supabase
+        .from('weekly_plan')
+        .select(`
+          action_id,
+          display_order,
+          self_select,
+          pro_moves (
+            action_id,
+            action_statement,
+            competency_id,
+            competencies (
+              competency_id,
+              name,
+              domain_id,
+              domains (
+                domain_id,
+                domain_name
+              )
+            )
+          )
+        `)
+        .eq('org_id', orgId)
+        .eq('role_id', staff.role_id)
+        .eq('week_start_date', mondayStr)
+        .eq('status', 'locked')
+        .order('display_order');
+
+      console.log('Weekly_plan result:', { planData, planError });
+
+      if (planData && planData.length > 0) {
+        console.log('📊 Using weekly_plan data source');
+        // Transform weekly_plan to weekly_focus structure
+        focusData = planData.map((item: any) => ({
+          id: `plan-${item.action_id}-${item.display_order}`,
+          action_id: item.action_id,
+          display_order: item.display_order,
+          self_select: item.self_select,
+          competency_id: item.pro_moves?.competency_id,
+          pro_moves: { action_statement: item.pro_moves?.action_statement },
+          competencies: {
+            domains: {
+              domain_name: item.pro_moves?.competencies?.domains?.domain_name
+            }
+          }
+        }));
+      }
+    }
+
+    // Fall back to weekly_focus if no weekly_plan data
+    if (!focusData) {
+      console.log('📚 Using weekly_focus data source (fallback)');
+      const result = await supabase
+        .from('weekly_focus')
+        .select(`
+          id,
+          display_order,
+          self_select,
+          competency_id,
+          action_id,
+          pro_moves!weekly_focus_action_id_fkey ( action_statement ),
+          competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
+        `)
+        .eq('cycle', cycle)
+        .eq('week_in_cycle', weekInCycle)
+        .eq('role_id', staff.role_id)
+        .order('display_order');
+      
+      focusData = result.data;
+      focusError = result.error;
+    }
 
     console.log('Focus data result:', { focusData, focusError });
 

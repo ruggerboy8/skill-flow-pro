@@ -138,26 +138,67 @@ serve(async (req) => {
       return { status: 'ok', n2w, recentMeans };
     };
 
-    // 2. Fetch confidence history (last 18 weeks)
+    // 2. Fetch confidence history (last 18 weeks) - handle both weekly_focus and weekly_plan
     const { data: confData, error: confError } = await supabase
       .from('weekly_scores')
-      .select(`
-        confidence_score,
-        confidence_date,
-        weekly_focus!inner(action_id, role_id)
-      `)
-      .eq('weekly_focus.role_id', body.roleId)
+      .select('confidence_score, confidence_date, weekly_focus_id')
       .not('confidence_score', 'is', null)
       .gte('confidence_date', cutoff18w.toISOString());
 
     if (confError) throw confError;
 
+    logs.push(`Fetched ${confData?.length || 0} confidence scores`);
+
+    // Parse weekly_focus_id to get action_id (handles both UUID and plan:XXX formats)
+    const focusIdToActionId = new Map<string, number>();
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    // Collect all unique focus IDs
+    const allFocusIds = [...new Set(confData?.map((r: any) => r.weekly_focus_id).filter(Boolean))];
+    
+    // Split into UUID and plan:XXX formats
+    const uuidIds = allFocusIds.filter(id => uuidPattern.test(id));
+    const planIds = allFocusIds
+      .filter(id => id.startsWith('plan:'))
+      .map(id => id.replace('plan:', ''));
+
+    // Batch fetch action_ids from weekly_focus (Cycles 1-3)
+    if (uuidIds.length > 0) {
+      const { data: focusRows } = await supabase
+        .from('weekly_focus')
+        .select('id, action_id')
+        .eq('role_id', body.roleId)
+        .in('id', uuidIds);
+      
+      focusRows?.forEach((row: any) => {
+        if (row.action_id) focusIdToActionId.set(row.id, row.action_id);
+      });
+      logs.push(`Mapped ${focusRows?.length || 0} weekly_focus IDs to action_ids`);
+    }
+
+    // Batch fetch action_ids from weekly_plan (Cycle 4+)
+    if (planIds.length > 0) {
+      const { data: planRows } = await supabase
+        .from('weekly_plan')
+        .select('id, action_id')
+        .eq('role_id', body.roleId)
+        .in('id', planIds);
+      
+      planRows?.forEach((row: any) => {
+        if (row.action_id) focusIdToActionId.set(`plan:${row.id}`, row.action_id);
+      });
+      logs.push(`Mapped ${planRows?.length || 0} weekly_plan IDs to action_ids`);
+    }
+
     // Group by pro_move and week
     const confidenceMap = new Map<string, { sum: number; count: number }>();
     confData?.forEach((row: any) => {
+      const actionId = focusIdToActionId.get(row.weekly_focus_id);
+      if (!actionId) return; // Skip if we couldn't map to action_id
+      
       const weekStart = new Date(row.confidence_date);
       weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
-      const key = `${row.weekly_focus.action_id}-${weekStart.toISOString().split('T')[0]}`;
+      const key = `${actionId}-${weekStart.toISOString().split('T')[0]}`;
       const existing = confidenceMap.get(key) || { sum: 0, count: 0 };
       confidenceMap.set(key, {
         sum: existing.sum + row.confidence_score / 10.0,
@@ -191,8 +232,9 @@ serve(async (req) => {
 
     logs.push(`Found ${evals.length} eval scores`);
 
-    // 4. Fetch last selected using real week_start_date
-    const { data: lastSelectedData, error: lsError } = await supabase
+    // 4. Fetch last selected - handle both weekly_focus and weekly_plan
+    // For weekly_focus: use week_start_date if available
+    const { data: lastSelectedFocus, error: lsFocusError } = await supabase
       .from('weekly_focus')
       .select('action_id, week_start_date')
       .eq('role_id', body.roleId)
@@ -200,11 +242,34 @@ serve(async (req) => {
       .not('week_start_date', 'is', null)
       .order('week_start_date', { ascending: false });
 
-    if (lsError) throw lsError;
+    if (lsFocusError) throw lsFocusError;
 
+    // For weekly_plan: use week_start_date (global plans)
+    const { data: lastSelectedPlan, error: lsPlanError } = await supabase
+      .from('weekly_plan')
+      .select('action_id, week_start_date')
+      .eq('role_id', body.roleId)
+      .is('org_id', null)
+      .not('action_id', 'is', null)
+      .not('week_start_date', 'is', null)
+      .order('week_start_date', { ascending: false });
+
+    if (lsPlanError) throw lsPlanError;
+
+    // Merge and deduplicate (keep most recent per action_id)
     const lastSelectedMap = new Map<number, string>();
-    lastSelectedData?.forEach((row: any) => {
+    
+    // Add from focus first
+    lastSelectedFocus?.forEach((row: any) => {
       if (!lastSelectedMap.has(row.action_id)) {
+        lastSelectedMap.set(row.action_id, row.week_start_date);
+      }
+    });
+
+    // Add from plan (may override if more recent)
+    lastSelectedPlan?.forEach((row: any) => {
+      const existing = lastSelectedMap.get(row.action_id);
+      if (!existing || row.week_start_date > existing) {
         lastSelectedMap.set(row.action_id, row.week_start_date);
       }
     });
@@ -214,10 +279,11 @@ serve(async (req) => {
       weekStart,
     }));
 
-    logs.push(`Found ${lastSelected.length} last-selected records`);
+    logs.push(`Found ${lastSelected.length} last-selected records (${lastSelectedFocus?.length || 0} focus + ${lastSelectedPlan?.length || 0} plan)`);
 
-    // 5. Fetch domain coverage (last 8 weeks) using real week_start_date
-    const { data: domainCoverageData, error: dcError } = await supabase
+    // 5. Fetch domain coverage (last 8 weeks) - handle both weekly_focus and weekly_plan
+    // From weekly_focus
+    const { data: domainCoverageFocus, error: dcFocusError } = await supabase
       .from('weekly_focus')
       .select('action_id, week_start_date')
       .eq('role_id', body.roleId)
@@ -225,10 +291,28 @@ serve(async (req) => {
       .not('week_start_date', 'is', null)
       .gte('week_start_date', cutoff8w.toISOString().split('T')[0]);
 
-    if (dcError) throw dcError;
+    if (dcFocusError) throw dcFocusError;
+
+    // From weekly_plan (global)
+    const { data: domainCoveragePlan, error: dcPlanError } = await supabase
+      .from('weekly_plan')
+      .select('action_id, week_start_date')
+      .eq('role_id', body.roleId)
+      .is('org_id', null)
+      .not('action_id', 'is', null)
+      .not('week_start_date', 'is', null)
+      .gte('week_start_date', cutoff8w.toISOString().split('T')[0]);
+
+    if (dcPlanError) throw dcPlanError;
+
+    // Merge both sources
+    const allCoverageData = [
+      ...(domainCoverageFocus || []),
+      ...(domainCoveragePlan || [])
+    ];
 
     const domainCoverageMap = new Map<number, Set<string>>();
-    domainCoverageData?.forEach((row: any) => {
+    allCoverageData.forEach((row: any) => {
       const move = eligible.find(m => m.id === row.action_id);
       if (move) {
         const weeks = domainCoverageMap.get(move.domainId) || new Set();
@@ -242,7 +326,7 @@ serve(async (req) => {
       appearances: weeks.size,
     }));
 
-    logs.push(`Domain coverage: ${domainCoverage.length} domains tracked`);
+    logs.push(`Domain coverage: ${domainCoverage.length} domains tracked (${domainCoverageFocus?.length || 0} focus + ${domainCoveragePlan?.length || 0} plan)`);
 
     // Add sample move logging
     if (eligible.length > 0) {

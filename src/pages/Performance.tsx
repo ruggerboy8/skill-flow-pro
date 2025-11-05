@@ -12,6 +12,9 @@ import { nowUtc, getAnchors } from '@/lib/centralTime';
 interface Staff {
   id: string;
   role_id: number;
+  locations?: {
+    organization_id: string;
+  };
 }
 
 interface WeeklyFocus {
@@ -68,7 +71,7 @@ export default function Performance() {
     // Load staff profile
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
-      .select('id, role_id')
+      .select('id, role_id, locations(organization_id)')
       .eq('user_id', user.id)
       .single();
 
@@ -79,24 +82,89 @@ export default function Performance() {
 
     setStaff(staffData);
 
-    // Load weekly focus using direct query with cycle/week_in_cycle
-    const { data: focusData, error: focusError } = await supabase
-      .from('weekly_focus')
-      .select(`
-        id,
-        display_order,
-        self_select,
-        pro_moves (
-          action_statement
-        ),
-        competencies (
-          domains ( domain_name )
-        )
-      `)
-      .eq('cycle', 1) // Use cycle 1 for now
-      .eq('week_in_cycle', weekNum)
-      .eq('role_id', staffData.role_id)
-      .order('display_order');
+    // Try weekly_plan first (for orgs with sequencer)
+    const orgId = staffData.locations?.organization_id;
+    let focusData: any[] | null = null;
+    let focusError: any = null;
+    
+    if (orgId) {
+      // Calculate current Monday
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const thisMonday = new Date(now);
+      thisMonday.setDate(now.getDate() + daysToMonday);
+      thisMonday.setHours(0, 0, 0, 0);
+      const mondayStr = thisMonday.toISOString().split('T')[0];
+
+      const { data: planData, error: planError } = await supabase
+        .from('weekly_plan')
+        .select(`
+          action_id,
+          display_order,
+          self_select,
+          pro_moves (
+            action_id,
+            action_statement,
+            competency_id,
+            competencies (
+              competency_id,
+              name,
+              domain_id,
+              domains!competencies_domain_id_fkey (
+                domain_id,
+                domain_name
+              )
+            )
+          )
+        `)
+        .eq('org_id', orgId)
+        .eq('role_id', staffData.role_id)
+        .eq('week_start_date', mondayStr)
+        .eq('status', 'locked')
+        .order('display_order');
+
+      if (planData && planData.length > 0) {
+        console.log('📊 [Performance] Using weekly_plan data source');
+        focusData = planData.map((item: any) => ({
+          id: `plan-${item.action_id}-${item.display_order}`,
+          action_id: item.action_id,
+          display_order: item.display_order,
+          self_select: item.self_select,
+          pro_moves: { action_statement: item.pro_moves?.action_statement },
+          competencies: {
+            domains: {
+              domain_name: item.pro_moves?.competencies?.domains?.domain_name
+            }
+          }
+        }));
+      }
+    }
+
+    // Fall back to weekly_focus if no weekly_plan data
+    if (!focusData) {
+      console.log('📚 [Performance] Using weekly_focus data source (fallback)');
+      const result = await supabase
+        .from('weekly_focus')
+        .select(`
+          id,
+          display_order,
+          self_select,
+          pro_moves (
+            action_statement
+          ),
+          competencies (
+            domains!competencies_domain_id_fkey ( domain_name )
+          )
+        `)
+        .eq('cycle', 1) // Use cycle 1 for now
+        .eq('week_in_cycle', weekNum)
+        .eq('role_id', staffData.role_id)
+        .order('display_order');
+      
+      focusData = result.data;
+      focusError = result.error;
+    }
 
     if (focusError || !focusData || focusData.length === 0) {
       toast({

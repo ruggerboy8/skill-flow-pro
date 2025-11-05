@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import ConfPerfDelta from "@/components/ConfPerfDelta";
 import { getDomainColor } from "@/lib/domainColors";
 
-type Staff = { id: string; role_id: number };
+type Staff = { 
+  id: string; 
+  role_id: number;
+  locations?: {
+    organization_id: string;
+  };
+};
 type FocusRow = {
   id: string;
   display_order: number;
@@ -49,27 +55,90 @@ export default function Review() {
       // staff info
       const { data: staffRow } = await supabase
         .from("staff")
-        .select("id, role_id")
+        .select("id, role_id, locations(organization_id)")
         .eq("user_id", user.id)
         .maybeSingle();
       if (!staffRow) return;
       setStaff(staffRow);
 
-      // weekly_focus for this cycle/week/role with domain information
-      const { data: wf } = await supabase
-        .from("weekly_focus")
-        .select(`
-          id,
-          display_order,
-          action_id,
-          self_select,
-          pro_moves:action_id(action_statement),
-          competencies!inner(domains!competencies_domain_id_fkey!inner(domain_name))
-        `)
-        .eq("role_id", staffRow.role_id)
-        .eq("cycle", cycleNum)
-        .eq("week_in_cycle", weekNum)
-        .order("display_order");
+      // Try weekly_plan first (for orgs with sequencer)
+      const orgId = staffRow.locations?.organization_id;
+      let wf: any[] | null = null;
+      
+      if (orgId) {
+        // Calculate current Monday
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const thisMonday = new Date(now);
+        thisMonday.setDate(now.getDate() + daysToMonday);
+        thisMonday.setHours(0, 0, 0, 0);
+        const mondayStr = thisMonday.toISOString().split('T')[0];
+
+        const { data: planData } = await supabase
+          .from('weekly_plan')
+          .select(`
+            action_id,
+            display_order,
+            self_select,
+            pro_moves (
+              action_id,
+              action_statement,
+              competency_id,
+              competencies (
+                competency_id,
+                name,
+                domain_id,
+                domains!competencies_domain_id_fkey (
+                  domain_id,
+                  domain_name
+                )
+              )
+            )
+          `)
+          .eq('org_id', orgId)
+          .eq('role_id', staffRow.role_id)
+          .eq('week_start_date', mondayStr)
+          .eq('status', 'locked')
+          .order('display_order');
+
+        if (planData && planData.length > 0) {
+          console.log('📊 [Review] Using weekly_plan data source');
+          wf = planData.map((item: any) => ({
+            id: `plan-${item.action_id}-${item.display_order}`,
+            action_id: item.action_id,
+            display_order: item.display_order,
+            self_select: item.self_select,
+            pro_moves: { action_statement: item.pro_moves?.action_statement },
+            competencies: {
+              domains: {
+                domain_name: item.pro_moves?.competencies?.domains?.domain_name
+              }
+            }
+          }));
+        }
+      }
+
+      // Fall back to weekly_focus if no weekly_plan data
+      if (!wf) {
+        console.log('📚 [Review] Using weekly_focus data source (fallback)');
+        const { data: focusData } = await supabase
+          .from("weekly_focus")
+          .select(`
+            id,
+            display_order,
+            action_id,
+            self_select,
+            pro_moves:action_id(action_statement),
+            competencies!inner(domains!competencies_domain_id_fkey!inner(domain_name))
+          `)
+          .eq("role_id", staffRow.role_id)
+          .eq("cycle", cycleNum)
+          .eq("week_in_cycle", weekNum)
+          .order("display_order");
+        
+        wf = focusData;
+      }
 
       const focus: FocusRow[] =
         (wf || []).map((w: any) => ({

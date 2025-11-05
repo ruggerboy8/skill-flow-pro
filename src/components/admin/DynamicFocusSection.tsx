@@ -72,9 +72,12 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
   };
 
   const loadHealthStatus = async () => {
-    const { data } = await supabase.functions.invoke('sequencer-health', {
+    const { data, error } = await supabase.functions.invoke('sequencer-health', {
       body: { orgId }
     });
+    
+    console.log('[Step 2] Health check result:', data);
+    console.log('[Step 2] Health check error:', error);
     
     if (data) setHealthStatus(data);
   };

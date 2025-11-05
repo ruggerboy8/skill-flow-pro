@@ -62,6 +62,24 @@ serve(async (req) => {
       });
     }
 
+    // GUARDRAIL: Check if org is in allowed list
+    const { data: allowedOrgsData } = await supabaseAdmin
+      .from('app_kv')
+      .select('value')
+      .eq('key', 'sequencer:allowed_org_ids')
+      .single();
+
+    const allowedOrgIds = allowedOrgsData?.value?.org_ids || [];
+    if (allowedOrgIds.length > 0 && !allowedOrgIds.includes(orgId)) {
+      return new Response(JSON.stringify({
+        status: 'forbidden',
+        message: `Organization ${orgId} is not in the allowed list for sequencing`
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Get org timezone
     const { data: tzData } = await supabaseAdmin
       .from('app_kv')

@@ -71,6 +71,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "admin_audit_scope_location_id_fkey"
+            columns: ["scope_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["location_id"]
+          },
+          {
             foreignKeyName: "admin_audit_scope_organization_id_fkey"
             columns: ["scope_organization_id"]
             isOneToOne: false
@@ -254,6 +261,13 @@ export type Database = {
             referencedRelation: "roles"
             referencedColumns: ["role_id"]
           },
+          {
+            foreignKeyName: "fk_competencies_role_id"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["role_id"]
+          },
         ]
       }
       domains: {
@@ -408,6 +422,7 @@ export type Database = {
           cycle_length_weeks: number
           id: string
           name: string
+          onboarding_active: boolean | null
           organization_id: string
           program_start_date: string
           slug: string
@@ -419,6 +434,7 @@ export type Database = {
           cycle_length_weeks?: number
           id?: string
           name: string
+          onboarding_active?: boolean | null
           organization_id: string
           program_start_date: string
           slug: string
@@ -430,6 +446,7 @@ export type Database = {
           cycle_length_weeks?: number
           id?: string
           name?: string
+          onboarding_active?: boolean | null
           organization_id?: string
           program_start_date?: string
           slug?: string
@@ -509,6 +526,7 @@ export type Database = {
           active: boolean | null
           created_at: string
           id: string
+          is_sandbox: boolean | null
           name: string
           slug: string
         }
@@ -516,6 +534,7 @@ export type Database = {
           active?: boolean | null
           created_at?: string
           id?: string
+          is_sandbox?: boolean | null
           name: string
           slug: string
         }
@@ -523,6 +542,7 @@ export type Database = {
           active?: boolean | null
           created_at?: string
           id?: string
+          is_sandbox?: boolean | null
           name?: string
           slug?: string
         }
@@ -587,6 +607,13 @@ export type Database = {
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "fk_pro_moves_role_id"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
             referencedColumns: ["role_id"]
           },
         ]
@@ -659,6 +686,59 @@ export type Database = {
           role_name?: string | null
         }
         Relationships: []
+      }
+      sequencer_runs: {
+        Row: {
+          config: Json | null
+          error_message: string | null
+          id: string
+          lock_at_local: string | null
+          logs: string[] | null
+          mode: string
+          org_id: string
+          role_id: number
+          run_at: string
+          success: boolean
+          target_week_start: string
+          weights: Json | null
+        }
+        Insert: {
+          config?: Json | null
+          error_message?: string | null
+          id?: string
+          lock_at_local?: string | null
+          logs?: string[] | null
+          mode: string
+          org_id: string
+          role_id: number
+          run_at?: string
+          success: boolean
+          target_week_start: string
+          weights?: Json | null
+        }
+        Update: {
+          config?: Json | null
+          error_message?: string | null
+          id?: string
+          lock_at_local?: string | null
+          logs?: string[] | null
+          mode?: string
+          org_id?: string
+          role_id?: number
+          run_at?: string
+          success?: boolean
+          target_week_start?: string
+          weights?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sequencer_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       site_cycle_state: {
         Row: {
@@ -769,10 +849,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "staff_primary_location_id_fkey"
+            columns: ["primary_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["location_id"]
+          },
+          {
             foreignKeyName: "staff_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "staff_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
             referencedColumns: ["role_id"]
           },
         ]
@@ -984,6 +1078,93 @@ export type Database = {
             referencedRelation: "roles"
             referencedColumns: ["role_id"]
           },
+          {
+            foreignKeyName: "weekly_focus_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["role_id"]
+          },
+        ]
+      }
+      weekly_plan: {
+        Row: {
+          action_id: number | null
+          created_at: string
+          display_order: number
+          generated_by: string
+          id: number
+          locked_at: string | null
+          org_id: string
+          overridden: boolean
+          overridden_at: string | null
+          role_id: number
+          self_select: boolean
+          status: string
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          action_id?: number | null
+          created_at?: string
+          display_order: number
+          generated_by?: string
+          id?: number
+          locked_at?: string | null
+          org_id: string
+          overridden?: boolean
+          overridden_at?: string | null
+          role_id: number
+          self_select?: boolean
+          status?: string
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          action_id?: number | null
+          created_at?: string
+          display_order?: number
+          generated_by?: string
+          id?: number
+          locked_at?: string | null
+          org_id?: string
+          overridden?: boolean
+          overridden_at?: string | null
+          role_id?: number
+          self_select?: boolean
+          status?: string
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_plan_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "weekly_plan_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_plan_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "weekly_plan_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["role_id"]
+          },
         ]
       }
       weekly_scores: {
@@ -1114,6 +1295,36 @@ export type Database = {
       }
     }
     Views: {
+      v_onboarding_progress: {
+        Row: {
+          current_cycle: number | null
+          current_week: number | null
+          cycle_length_weeks: number | null
+          location_id: string | null
+          location_name: string | null
+          onboarding_active: boolean | null
+          org_id: string | null
+          program_start_date: string | null
+          role_id: number | null
+          role_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_org_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_organization_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       view_evaluation_items_enriched: {
         Row: {
           competency_id: number | null
@@ -1170,10 +1381,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "staff_primary_location_id_fkey"
+            columns: ["primary_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["location_id"]
+          },
+          {
             foreignKeyName: "staff_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "staff_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
             referencedColumns: ["role_id"]
           },
         ]
@@ -1238,10 +1463,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "staff_primary_location_id_fkey"
+            columns: ["primary_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["location_id"]
+          },
+          {
             foreignKeyName: "staff_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "staff_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
             referencedColumns: ["role_id"]
           },
           {
@@ -1287,6 +1526,10 @@ export type Database = {
         Returns: number
       }
       bulk_upsert_pro_moves: { Args: { pro_moves_data: Json }; Returns: Json }
+      check_sequencer_gate: {
+        Args: { p_org_id: string; p_role_id?: number }
+        Returns: Json
+      }
       compare_conf_perf_to_eval: {
         Args: {
           p_end?: string
@@ -1531,6 +1774,10 @@ export type Database = {
           hire_date: string
           onboarding_weeks: number
         }
+        Returns: boolean
+      }
+      is_org_allowed_for_sequencing: {
+        Args: { p_org_id: string }
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }

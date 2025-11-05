@@ -78,7 +78,7 @@ serve(async (req) => {
         action_id,
         action_statement,
         competency_id,
-        competencies!inner(domain_id, domains!inner(domain_name))
+        competencies!inner(domain_id, domains!competencies_domain_id_fkey(domain_name))
       `)
       .eq('active', true)
       .eq('role_id', body.roleId);

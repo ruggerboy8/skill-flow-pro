@@ -122,7 +122,7 @@ async function generateWeekPlan(supabase: any, orgId: string, roleId: number, we
     throw new Error(`Failed to rank moves: ${rankError.message}`);
   }
 
-  const nextPicks = rankData?.result?.nextPicks || [];
+  const nextPicks = rankData?.next || [];
   
   if (nextPicks.length === 0) {
     console.warn(`[generateWeekPlan] No moves ranked for ${weekStartDate}`);
@@ -147,7 +147,7 @@ async function generateWeekPlan(supabase: any, orgId: string, roleId: number, we
     role_id: roleId,
     week_start_date: weekStartDate,
     display_order: index + 1,
-    action_id: pick.id,
+    action_id: pick.proMoveId,
     self_select: false,
     status: 'proposed',
     generated_by: 'auto',

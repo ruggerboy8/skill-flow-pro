@@ -23,6 +23,8 @@ export interface StaffStatus {
   selectionPending: boolean;
   lastActivity?: { kind: 'confidence' | 'performance'; at: Date };
   onboardingWeeksLeft?: number;
+  source?: 'weekly_plan' | 'weekly_focus';
+  weekLabel?: string;
 }
 
 /**
@@ -103,46 +105,41 @@ export async function assembleWeek(params: {
 }): Promise<any[]> {
   const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
-  // ----- HYBRID LOGIC: Try weekly_plan first -----
-  // Get location context to determine Monday date
-  const { data: location } = await supabase
-    .from('locations')
-    .select('organization_id, timezone, program_start_date')
-    .eq('id', locationId)
-    .maybeSingle();
+  // ----- GRADUATION CHECK: Cycle 4+ uses global weekly_plan -----
+  if (cycleNumber >= 4) {
+    const { data: location } = await supabase
+      .from('locations')
+      .select('timezone')
+      .eq('id', locationId)
+      .maybeSingle();
 
-  if (!location) return [];
+    if (!location) return [];
 
-  const orgId = location.organization_id;
-  const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
-    ? new Date(params.simOverrides.nowISO) 
-    : new Date();
-  
-  const ctx = await getLocationWeekContext(locationId, now);
-  const anchors = getWeekAnchors(now, location.timezone);
-  const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
+    const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
+      ? new Date(params.simOverrides.nowISO) 
+      : new Date();
+    
+    const anchors = getWeekAnchors(now, location.timezone);
+    const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
 
-  // Try weekly_plan if we have org context
-  if (orgId) {
+    // Query global weekly_plan (org_id IS NULL)
     const { data: planData, error: planErr } = await supabase
       .from('weekly_plan')
       .select('id, display_order, action_id, self_select')
-      .eq('org_id', orgId)
+      .is('org_id', null)
       .eq('role_id', roleId)
       .eq('week_start_date', mondayStr)
       .eq('status', 'locked')
       .order('display_order');
 
-    // Only use plan if we have exactly 3 locked rows
+    // Require exactly 3 locked rows
     if (!planErr && planData && planData.length === 3) {
-      console.info('[assembleWeek] Using weekly_plan source for org=%s role=%d week=%s', 
-        orgId, roleId, mondayStr);
+      console.info('[assembleWeek] Using global weekly_plan for Cycle 4+ role=%d week=%s', 
+        roleId, mondayStr);
       
-      // Build assignments from weekly_plan
       const result: any[] = [];
       for (const plan of planData) {
         if (plan.action_id && !plan.self_select) {
-          // Site move from weekly_plan
           const { data: pm } = await supabase
             .from('pro_moves')
             .select('action_id, action_statement, competencies!inner(name, domain_id)')
@@ -168,21 +165,27 @@ export async function assembleWeek(params: {
             domain_name: domainName,
             required: true,
             locked: true,
-            display_order: plan.display_order
+            display_order: plan.display_order,
+            source: 'plan',
+            weekLabel: `Week of ${mondayStr}`
           });
         }
       }
       
-      if (result.length > 0) {
-        return result.sort((a, b) => a.display_order - b.display_order);
+      if (result.length === 3) {
+        return result;
+      } else {
+        console.warn('[assembleWeek] Expected 3 locked global plan rows, got %d - falling back', result.length);
       }
+    } else {
+      console.warn('[assembleWeek] No global plan for Cycle 4+ (week %s) - falling back to focus', mondayStr);
     }
   }
 
-  console.info('[assembleWeek] Falling back to weekly_focus for cycle=%d week=%d role=%d', 
+  // ----- CYCLES 1-3: Use static weekly_focus -----
+  console.info('[assembleWeek] Using weekly_focus for Cycles 1-3: cycle=%d week=%d role=%d', 
     cycleNumber, weekInCycle, roleId);
 
-  // Fallback to weekly_focus
   const { data: weeklyFocus } = await supabase
     .from('weekly_focus')
     .select('id, display_order, self_select, action_id, competency_id')
@@ -394,47 +397,50 @@ export async function computeWeekState(params: {
   // Calculate Monday anchor in org timezone
   const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
 
-  // ----- HYBRID LOGIC: Try locked weekly_plan first -----
+  // ----- GRADUATION CHECK: Cycle 4+ uses global weekly_plan -----
   let focusIds: string[] = [];
   let dataSource: 'weekly_plan' | 'weekly_focus' = 'weekly_focus';
+  let weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
 
-  // Simple per-render cache to avoid N× queries for same week
-  const cacheKey = `${orgId}:${roleId}:${mondayStr}`;
+  // Simple per-render cache
+  type CacheEntry = { ids: string[]; source: string; label: string };
+  const cacheKey = `plan:${roleId}:${mondayStr}`;
   if (!globalThis.__weekStateCache) {
-    globalThis.__weekStateCache = new Map<string, { ids: string[], source: string }>();
+    globalThis.__weekStateCache = new Map<string, CacheEntry>();
   }
-  const cache = globalThis.__weekStateCache as Map<string, { ids: string[], source: string }>;
+  const cache = globalThis.__weekStateCache as Map<string, CacheEntry>;
 
   if (cache.has(cacheKey)) {
     const cached = cache.get(cacheKey)!;
     focusIds = cached.ids;
     dataSource = cached.source as 'weekly_plan' | 'weekly_focus';
+    weekLabel = cached.label;
     console.info(`[weekState] cache hit for ${cacheKey} source=${dataSource}`);
   } else {
-    // Try weekly_plan if we have org context
-    if (orgId) {
+    if (cycleNumber >= 4) {
+      // Try global weekly_plan (org_id IS NULL)
       const { data: planData, error: planErr } = await supabase
         .from('weekly_plan')
         .select('id, display_order')
-        .eq('org_id', orgId)
+        .is('org_id', null)
         .eq('role_id', roleId)
         .eq('week_start_date', mondayStr)
         .eq('status', 'locked')
         .order('display_order');
 
-      // Only use plan if we have exactly 3 locked rows
+      // Require exactly 3 locked rows
       if (!planErr && planData && planData.length === 3) {
         focusIds = planData.map(p => `plan:${p.id}`);
         dataSource = 'weekly_plan';
-        console.info('[weekState] source=weekly_plan locked=true org=%s role=%d week=%s count=%d', 
-          orgId, roleId, mondayStr, planData.length);
-        console.log('[weekState] ✅ Found weekly_plan data:', planData);
+        weekLabel = `Week of ${mondayStr}`;
+        console.info('[weekState] source=global_weekly_plan cycle=%d week=%s role=%d count=%d', 
+          cycleNumber, mondayStr, roleId, planData.length);
       } else {
-        console.warn('[weekState] ⚠️ weekly_plan query returned:', { planErr, count: planData?.length || 0, expected: 3 });
+        console.warn('[weekState] Expected 3 locked global plan rows for Cycle 4+, got %d - falling back', planData?.length || 0);
       }
     }
 
-    // Fallback to weekly_focus
+    // Fallback to weekly_focus (Cycles 1-3 or if plan missing)
     if (focusIds.length === 0) {
       const { data: focusRows, error: focusErr } = await supabase
         .from('weekly_focus')
@@ -446,13 +452,14 @@ export async function computeWeekState(params: {
       if (!focusErr && focusRows) {
         focusIds = focusRows.map(r => r.id);
         dataSource = 'weekly_focus';
+        weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
         console.info('[weekState] source=weekly_focus cycle=%d week=%d role=%d', 
           cycleNumber, weekInCycle, roleId);
       }
     }
 
     // Cache result
-    cache.set(cacheKey, { ids: focusIds, source: dataSource });
+    cache.set(cacheKey, { ids: focusIds, source: dataSource, label: weekLabel });
   }
 
   const required = focusIds.length;

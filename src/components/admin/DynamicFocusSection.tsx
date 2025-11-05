@@ -42,14 +42,11 @@ interface HealthStatus {
 
 interface DynamicFocusSectionProps {
   roleId: number;
-  orgId: string;
+  orgId?: string; // Optional now - global mode
 }
 
-export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps) {
+export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
   const { toast } = useToast();
-  
-  // TESTING: Override with sandbox org for testing
-  const testOrgId = '99999999-9999-9999-9999-999999999999';
   
   const [autoEnabled, setAutoEnabled] = useState(false);
   const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
@@ -61,7 +58,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
 
   useEffect(() => {
     loadAll();
-  }, [roleId, testOrgId]);
+  }, [roleId]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -85,11 +82,8 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
 
   const loadHealthStatus = async () => {
     const { data, error } = await supabase.functions.invoke('sequencer-health', {
-      body: { orgId: testOrgId }
+      body: {}
     });
-    
-    console.log('[Step 2] Health check result:', data);
-    console.log('[Step 2] Health check error:', error);
     
     if (data) setHealthStatus(data);
   };
@@ -99,32 +93,28 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     const currentMonday = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const nextMonday = format(addWeeks(startOfWeek(now, { weekStartsOn: 1 }), 1), 'yyyy-MM-dd');
 
-    console.log('[Step 7] Loading weeks for:', { testOrgId, roleId, currentMonday, nextMonday });
-
-    // Load current week (locked)
-    const { data: current, error: currentError } = await supabase
+    // Load current week (locked) - global plan (org_id IS NULL)
+    const { data: current } = await supabase
       .from('weekly_plan' as any)
       .select('*, pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))')
-      .eq('org_id', testOrgId)
+      .is('org_id', null)
       .eq('role_id', roleId)
       .eq('week_start_date', currentMonday)
       .eq('status', 'locked')
       .order('display_order');
 
-    console.log('[Step 7] Current week result:', { current, currentError });
     setCurrentWeek((current as any) || []);
 
-    // Load next week (proposed)
-    const { data: next, error: nextError } = await supabase
+    // Load next week (proposed) - global plan
+    const { data: next } = await supabase
       .from('weekly_plan' as any)
       .select('*, pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))')
-      .eq('org_id', testOrgId)
+      .is('org_id', null)
       .eq('role_id', roleId)
       .eq('week_start_date', nextMonday)
       .eq('status', 'proposed')
       .order('display_order');
 
-    console.log('[Step 7] Next week result:', { next, nextError });
     setNextWeek((next as any) || []);
   };
 
@@ -150,13 +140,13 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     setRunningNow(true);
     try {
       const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
-        body: { roles: [roleId], orgId: testOrgId }
+        body: { roles: [roleId], force: true }
       });
 
       if (error) throw error;
 
       toast({
-        title: 'Sequencer Run Complete',
+        title: 'Global Sequencer Run Complete',
         description: `Status: ${data.results[0]?.status || 'success'}`
       });
 
@@ -174,7 +164,6 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
   };
 
   const handleSimulateMonday = async () => {
-    // For testing: simulate running on Monday Nov 10, 2025
     const simulatedMonday = '2025-11-10';
     
     setRunningNow(true);
@@ -182,23 +171,18 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
       const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
         body: { 
           roles: [roleId], 
-          orgId: testOrgId,
-          testDate: simulatedMonday // Pass simulated date
+          asOf: simulatedMonday,
+          force: true
         }
       });
 
       if (error) throw error;
 
       toast({
-        title: 'Monday Rollover Simulated',
-        description: `After rollover: Current=11-10 (locked), Next=11-17 (proposed)`
+        title: 'Monday Rollover Simulated (Global)',
+        description: `Status: ${data.status || 'success'}`
       });
 
-      // After simulating Monday 11-10, the rollover:
-      // 1. Locked 11-10 (was proposed, now locked)
-      // 2. Generated 11-17 as proposed (next week)
-      // 3. Generated 11-24 as proposed (n+1 week)
-      // So we need to load 11-10 as current and 11-17 as next
       await loadWeeksForSimulation('2025-11-10', '2025-11-17');
       await loadHealthStatus();
     } catch (error: any) {
@@ -213,32 +197,28 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
   };
 
   const loadWeeksForSimulation = async (currentWeekStr: string, nextWeekStr: string) => {
-    console.log('[Sim] Loading simulated weeks:', { currentWeekStr, nextWeekStr });
-    
-    // Load current week (locked)
-    const { data: current, error: currentError } = await supabase
+    // Load current week (locked) - global plan
+    const { data: current } = await supabase
       .from('weekly_plan' as any)
       .select('*, pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))')
-      .eq('org_id', testOrgId)
+      .is('org_id', null)
       .eq('role_id', roleId)
       .eq('week_start_date', currentWeekStr)
       .eq('status', 'locked')
       .order('display_order');
 
-    console.log('[Sim] Current week result:', { current, currentError });
     setCurrentWeek((current as any) || []);
 
-    // Load next week (proposed)
-    const { data: next, error: nextError } = await supabase
+    // Load next week (proposed) - global plan
+    const { data: next } = await supabase
       .from('weekly_plan' as any)
       .select('*, pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))')
-      .eq('org_id', testOrgId)
+      .is('org_id', null)
       .eq('role_id', roleId)
       .eq('week_start_date', nextWeekStr)
       .eq('status', 'proposed')
       .order('display_order');
 
-    console.log('[Sim] Next week result:', { next, nextError });
     setNextWeek((next as any) || []);
   };
 
@@ -285,10 +265,10 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
 
   return (
     <div className="space-y-6">
-      {/* Automation Strip */}
+      {/* Global Sequencer Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Automation Settings</CardTitle>
+          <CardTitle>Global Sequencer</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
@@ -296,18 +276,18 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
               checked={autoEnabled} 
               onCheckedChange={handleToggleEnabled} 
             />
-            <Label>Auto-sequence Weekly Pro Moves</Label>
+            <Label>Auto-sequence Weekly Pro Moves (Global)</Label>
           </div>
           
           <div className="space-y-1">
-            <Label>Mode: Progress-gated</Label>
+            <Label>Mode</Label>
             <p className="text-sm text-muted-foreground">
-              Auto-starts when first location reaches Cycle 3, Week 6
+              Global • Progress-gated (auto-starts when any location reaches C3W6)
             </p>
           </div>
 
           <div className="space-y-1">
-            <Label>Org Timezone</Label>
+            <Label>Global Timezone</Label>
             <p className="text-sm text-muted-foreground">
               {healthStatus?.org_timezone || 'America/Chicago'}
             </p>
@@ -448,15 +428,15 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
       <EditNextWeekModal
         open={editModalOpen}
         onClose={() => setEditModalOpen(false)}
-        orgId={testOrgId}
+        orgId={null}
         roleId={roleId}
         existingWeek={nextWeek}
         onSave={async () => {
           await loadWeeks();
           setEditModalOpen(false);
           toast({
-            title: 'Next Week Updated',
-            description: 'Manual adjustments saved'
+            title: 'Next Week Updated (Global)',
+            description: 'Manual adjustments saved to global plan'
           });
         }}
       />

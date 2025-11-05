@@ -101,30 +101,12 @@ export function SequencerTestConsole() {
   }, []); // Empty deps - load once on mount
 
   const seedLockedThisWeek = async () => {
-    if (!orgId) {
-      toast({ title: 'Missing org ID', variant: 'destructive' });
-      return;
-    }
-
     setLoading(true);
     try {
-      // Get org timezone
-      const { data: locations } = await supabase
-        .from('locations')
-        .select('timezone')
-        .eq('organization_id', orgId)
-        .limit(1);
-
-      const tz = locations?.[0]?.timezone || 'America/Chicago';
-
-      // Use getWeekAnchors to calculate Monday (same as system does)
       const { getWeekAnchors } = await import('@/v2/time');
-      const anchors = getWeekAnchors(new Date(), tz);
+      const anchors = getWeekAnchors(new Date(), 'America/Chicago');
       const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
-      
-      console.log('[TestConsole] Seeding for Monday:', mondayStr, 'in timezone:', tz);
 
-      // Get 3 random active pro moves for this role
       const { data: proMoves } = await supabase
         .from('pro_moves')
         .select('action_id')
@@ -133,54 +115,30 @@ export function SequencerTestConsole() {
         .limit(10);
 
       if (!proMoves || proMoves.length < 3) {
-        toast({ title: 'Not enough pro moves for this role', variant: 'destructive' });
+        toast({ title: 'Not enough pro moves', variant: 'destructive' });
         return;
       }
 
-      // Pick 3 random ones
-      const shuffled = [...proMoves].sort(() => Math.random() - 0.5);
-      const selected = shuffled.slice(0, 3);
+      const selected = [...proMoves].sort(() => Math.random() - 0.5).slice(0, 3);
 
-      // Delete any existing rows for this week/org/role first
-      const { error: deleteError } = await supabase
-        .from('weekly_plan')
-        .delete()
-        .eq('org_id', orgId)
-        .eq('role_id', roleId)
-        .eq('week_start_date', mondayStr);
+      await supabase.from('weekly_plan').delete().is('org_id', null).eq('role_id', roleId).eq('week_start_date', mondayStr);
 
-      if (deleteError) throw deleteError;
+      await supabase.from('weekly_plan').insert(
+        selected.map((pm, idx) => ({
+          org_id: null,
+          role_id: roleId,
+          week_start_date: mondayStr,
+          display_order: idx + 1,
+          action_id: pm.action_id,
+          self_select: false,
+          status: 'locked',
+          generated_by: 'manual',
+          locked_at: new Date().toISOString()
+        }))
+      );
 
-      // Insert locked plan
-      const { error } = await supabase
-        .from('weekly_plan')
-        .insert(
-          selected.map((pm, idx) => ({
-            org_id: orgId,
-            role_id: roleId,
-            week_start_date: mondayStr,
-            display_order: idx + 1,
-            action_id: pm.action_id,
-            self_select: false,
-            status: 'locked',
-            generated_by: 'manual', // Valid value for check constraint
-            locked_at: new Date().toISOString()
-          }))
-        );
-
-      if (error) throw error;
-
-      // Clear the week state cache so new data is picked up
-      if (globalThis.__weekStateCache) {
-        globalThis.__weekStateCache.clear();
-        console.log('[TestConsole] 🗑️ Cleared week state cache');
-      }
-
-      toast({ title: 'Seeded locked plan', description: `Created 3 locked rows for ${mondayStr} (org: ${orgId})` });
-      console.log('[TestConsole] ✅ Seeded 3 rows:', { mondayStr, orgId, roleId });
-      await checkCurrentWeekSource();
+      toast({ title: 'Seeded global locked plan', description: `Created 3 locked rows for ${mondayStr}` });
     } catch (error: any) {
-      console.error('Seed error:', error);
       toast({ title: 'Seed failed', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -255,31 +213,23 @@ export function SequencerTestConsole() {
   };
 
   const runRolloverDryRun = async () => {
-    if (!orgId) {
-      toast({ title: 'Missing org ID', variant: 'destructive' });
-      return;
-    }
-
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
         body: {
-          orgId,
           roles: [roleId],
           dryRun: true,
-          forceRollover: true // Skip time/gate checks for testing
+          force: true
         }
       });
 
       if (error) throw error;
 
-      console.log('Rollover dry run result:', data);
       toast({ 
-        title: 'Dry run complete', 
-        description: `Check console for results. Success: ${data.success}` 
+        title: 'Global rollover dry run complete', 
+        description: `Status: ${data.status || 'success'}` 
       });
     } catch (error: any) {
-      console.error('Rollover error:', error);
       toast({ title: 'Rollover failed', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -372,37 +322,17 @@ export function SequencerTestConsole() {
 
           {/* Configuration */}
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="orgId">Organization</Label>
-              {loadingOrgs ? (
-                <div className="text-sm text-muted-foreground">Loading organizations...</div>
-              ) : availableOrgs.length > 0 ? (
-                <select
-                  id="orgId"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  value={orgId}
-                  onChange={e => setOrgId(e.target.value)}
-                >
-                  {availableOrgs.map(org => (
-                    <option key={org.id} value={org.id}>
-                      {org.name} ({org.id.substring(0, 8)}...)
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input 
-                  id="orgId"
-                  placeholder="Enter org UUID manually" 
-                  value={orgId} 
-                  onChange={e => setOrgId(e.target.value)} 
-                />
-              )}
-            </div>
+            <Alert>
+              <AlertTitle>Global Mode</AlertTitle>
+              <AlertDescription>
+                Testing global sequencer (no org selection needed)
+              </AlertDescription>
+            </Alert>
             <div className="space-y-2">
               <Label htmlFor="roleId">Role</Label>
               <select
                 id="roleId"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={roleId}
                 onChange={e => setRoleId(parseInt(e.target.value))}
               >
@@ -416,11 +346,11 @@ export function SequencerTestConsole() {
           <div className="grid grid-cols-2 gap-3">
             <Button 
               onClick={seedLockedThisWeek} 
-              disabled={loading || !orgId}
+              disabled={loading}
               className="w-full"
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Seed Locked This Week
+              Seed Global Locked Week
             </Button>
             <Button 
               onClick={checkCurrentWeekSource} 
@@ -434,11 +364,11 @@ export function SequencerTestConsole() {
             <Button 
               onClick={runRolloverDryRun} 
               variant="secondary"
-              disabled={loading || !orgId}
+              disabled={loading}
               className="w-full"
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-              Run Rollover (Dry Run)
+              Run Global Rollover (Dry)
             </Button>
             <Button 
               onClick={clearTestData} 

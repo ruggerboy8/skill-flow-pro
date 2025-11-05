@@ -26,15 +26,21 @@ export async function enforceWeeklyRolloverNow(args: {
     .maybeSingle();
   if (locErr || !loc) return;
 
-  // Is it >= Monday 12:01am local?
-  const currAnchors = getWeekAnchors(now, loc.timezone);
-  const rolloverThreshold = addMinutes(currAnchors.checkin_open, 1); // Mon 00:01 local
-  if (now < rolloverThreshold) return; // not time yet
-
   // Get previous week's cycle/week using our location context (time-shift by -7 days)
   const prevCtx = await getLocationWeekContext(locationId, subDays(now, 7));
   const prevCycle = prevCtx.cycleNumber;
   const prevWeek  = prevCtx.weekInCycle;
+
+  // Skip rollover for Cycle 4+ (global plan handles it)
+  if (prevCycle >= 4) {
+    console.log(`[Rollover] Skipping for Cycle ${prevCycle} (global plan active)`);
+    return;
+  }
+
+  // Is it >= Monday 12:01am local?
+  const currAnchors = getWeekAnchors(now, loc.timezone);
+  const rolloverThreshold = addMinutes(currAnchors.checkin_open, 1);
+  if (now < rolloverThreshold) return;
 
   // Find all weekly_focus rows for prev cycle/week/role
   const { data: focusRows } = await supabase

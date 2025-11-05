@@ -1095,7 +1095,7 @@ export type Database = {
           generated_by: string
           id: number
           locked_at: string | null
-          org_id: string
+          org_id: string | null
           overridden: boolean
           overridden_at: string | null
           role_id: number
@@ -1111,7 +1111,7 @@ export type Database = {
           generated_by?: string
           id?: number
           locked_at?: string | null
-          org_id: string
+          org_id?: string | null
           overridden?: boolean
           overridden_at?: string | null
           role_id: number
@@ -1127,7 +1127,7 @@ export type Database = {
           generated_by?: string
           id?: number
           locked_at?: string | null
-          org_id?: string
+          org_id?: string | null
           overridden?: boolean
           overridden_at?: string | null
           role_id?: number

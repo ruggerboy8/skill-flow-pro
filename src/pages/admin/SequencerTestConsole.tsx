@@ -1,0 +1,380 @@
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, Database, Play, CheckCircle2, XCircle } from 'lucide-react';
+import { format } from 'date-fns';
+
+export function SequencerTestConsole() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [orgId, setOrgId] = useState('');
+  const [roleId, setRoleId] = useState(1);
+  const [weekSource, setWeekSource] = useState<'plan' | 'focus' | 'unknown'>('unknown');
+  const [focusIds, setFocusIds] = useState<string[]>([]);
+  const [orgData, setOrgData] = useState<any>(null);
+
+  const seedLockedThisWeek = async () => {
+    if (!orgId) {
+      toast({ title: 'Missing org ID', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Get org timezone
+      const { data: locations } = await supabase
+        .from('locations')
+        .select('timezone')
+        .eq('organization_id', orgId)
+        .limit(1);
+
+      const tz = locations?.[0]?.timezone || 'America/Chicago';
+
+      // Calculate current Monday in org timezone
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const thisMonday = new Date(now);
+      thisMonday.setDate(now.getDate() + daysToMonday);
+      thisMonday.setHours(0, 0, 0, 0);
+      const mondayStr = format(thisMonday, 'yyyy-MM-dd');
+
+      // Get 3 random active pro moves for this role
+      const { data: proMoves } = await supabase
+        .from('pro_moves')
+        .select('action_id')
+        .eq('role_id', roleId)
+        .eq('active', true)
+        .limit(10);
+
+      if (!proMoves || proMoves.length < 3) {
+        toast({ title: 'Not enough pro moves for this role', variant: 'destructive' });
+        return;
+      }
+
+      // Pick 3 random ones
+      const shuffled = [...proMoves].sort(() => Math.random() - 0.5);
+      const selected = shuffled.slice(0, 3);
+
+      // Insert locked plan
+      const { error } = await supabase
+        .from('weekly_plan')
+        .insert(
+          selected.map((pm, idx) => ({
+            org_id: orgId,
+            role_id: roleId,
+            week_start_date: mondayStr,
+            display_order: idx + 1,
+            action_id: pm.action_id,
+            self_select: false,
+            status: 'locked',
+            generated_by: 'test',
+            locked_at: now.toISOString()
+          }))
+        );
+
+      if (error) throw error;
+
+      toast({ title: 'Seeded locked plan', description: `Created 3 locked rows for ${mondayStr}` });
+      await checkCurrentWeekSource();
+    } catch (error: any) {
+      console.error('Seed error:', error);
+      toast({ title: 'Seed failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkCurrentWeekSource = async () => {
+    if (!orgId) {
+      toast({ title: 'Missing org ID', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Calculate current Monday
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const thisMonday = new Date(now);
+      thisMonday.setDate(now.getDate() + daysToMonday);
+      thisMonday.setHours(0, 0, 0, 0);
+      const mondayStr = format(thisMonday, 'yyyy-MM-dd');
+
+      // Check weekly_plan
+      const { data: planData } = await supabase
+        .from('weekly_plan')
+        .select('id, action_id, display_order, status, pro_moves(action_statement)')
+        .eq('org_id', orgId)
+        .eq('role_id', roleId)
+        .eq('week_start_date', mondayStr)
+        .eq('status', 'locked')
+        .order('display_order');
+
+      if (planData && planData.length === 3) {
+        setWeekSource('plan');
+        setFocusIds(planData.map(p => `plan:${p.id}`));
+        setOrgData({
+          source: 'weekly_plan',
+          count: planData.length,
+          monday: mondayStr,
+          moves: planData.map((p: any) => ({
+            id: p.id,
+            action_id: p.action_id,
+            display_order: p.display_order,
+            statement: p.pro_moves?.action_statement || 'Unknown'
+          }))
+        });
+      } else {
+        // Fallback to weekly_focus (would need cycle/week calculation)
+        setWeekSource('focus');
+        setFocusIds([]);
+        setOrgData({
+          source: 'weekly_focus',
+          count: 0,
+          monday: mondayStr,
+          message: 'No locked weekly_plan found (would use weekly_focus in real app)'
+        });
+      }
+    } catch (error: any) {
+      console.error('Check error:', error);
+      toast({ title: 'Check failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runRolloverDryRun = async () => {
+    if (!orgId) {
+      toast({ title: 'Missing org ID', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
+        body: {
+          orgId,
+          roles: [roleId],
+          dryRun: true,
+          forceRollover: true // Skip time/gate checks for testing
+        }
+      });
+
+      if (error) throw error;
+
+      console.log('Rollover dry run result:', data);
+      toast({ 
+        title: 'Dry run complete', 
+        description: `Check console for results. Success: ${data.success}` 
+      });
+    } catch (error: any) {
+      console.error('Rollover error:', error);
+      toast({ title: 'Rollover failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearTestData = async () => {
+    if (!orgId) {
+      toast({ title: 'Missing org ID', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Calculate current Monday
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const thisMonday = new Date(now);
+      thisMonday.setDate(now.getDate() + daysToMonday);
+      thisMonday.setHours(0, 0, 0, 0);
+      const mondayStr = format(thisMonday, 'yyyy-MM-dd');
+
+      // Delete test plans
+      const { error } = await supabase
+        .from('weekly_plan')
+        .delete()
+        .eq('org_id', orgId)
+        .eq('week_start_date', mondayStr)
+        .eq('generated_by', 'test');
+
+      if (error) throw error;
+
+      toast({ title: 'Test data cleared' });
+      setWeekSource('unknown');
+      setFocusIds([]);
+      setOrgData(null);
+    } catch (error: any) {
+      console.error('Clear error:', error);
+      toast({ title: 'Clear failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            🧪 Sequencer Test Console
+          </CardTitle>
+          <CardDescription>
+            Test the hybrid weekly_plan/weekly_focus system without SQL
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Configuration */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="orgId">Organization ID</Label>
+              <Input 
+                id="orgId"
+                placeholder="uuid" 
+                value={orgId} 
+                onChange={e => setOrgId(e.target.value)} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="roleId">Role ID</Label>
+              <Input 
+                id="roleId"
+                type="number" 
+                placeholder="1 or 2" 
+                value={roleId} 
+                onChange={e => setRoleId(parseInt(e.target.value) || 1)} 
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="grid grid-cols-2 gap-3">
+            <Button 
+              onClick={seedLockedThisWeek} 
+              disabled={loading || !orgId}
+              className="w-full"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Seed Locked This Week
+            </Button>
+            <Button 
+              onClick={checkCurrentWeekSource} 
+              variant="outline"
+              disabled={loading || !orgId}
+              className="w-full"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Check Week Source
+            </Button>
+            <Button 
+              onClick={runRolloverDryRun} 
+              variant="secondary"
+              disabled={loading || !orgId}
+              className="w-full"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+              Run Rollover (Dry Run)
+            </Button>
+            <Button 
+              onClick={clearTestData} 
+              variant="destructive"
+              disabled={loading || !orgId}
+              className="w-full"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Clear Test Data
+            </Button>
+          </div>
+
+          {/* Results */}
+          {weekSource !== 'unknown' && orgData && (
+            <Alert>
+              <div className="flex items-start justify-between">
+                <div className="space-y-2 flex-1">
+                  <AlertTitle className="flex items-center gap-2">
+                    {weekSource === 'plan' ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-yellow-600" />
+                    )}
+                    Current Week Source: 
+                    <Badge variant={weekSource === 'plan' ? 'default' : 'secondary'}>
+                      {orgData.source}
+                    </Badge>
+                  </AlertTitle>
+                  <AlertDescription>
+                    <div className="space-y-2 mt-3">
+                      <div className="text-sm text-muted-foreground">
+                        Monday: {orgData.monday}
+                      </div>
+                      {orgData.moves && (
+                        <div className="font-mono text-xs space-y-1 bg-muted p-3 rounded">
+                          <div className="font-semibold mb-2">Focus IDs:</div>
+                          {focusIds.map((id, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <span className="text-muted-foreground">{i + 1}.</span>
+                              <span className="text-primary">{id}</span>
+                              {orgData.moves[i] && (
+                                <span className="text-muted-foreground text-xs">
+                                  ({orgData.moves[i].statement.substring(0, 40)}...)
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {orgData.message && (
+                        <div className="text-sm text-yellow-600">
+                          {orgData.message}
+                        </div>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </div>
+              </div>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Testing Instructions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <div>
+            <strong>1. Seed Test Data</strong>
+            <p className="text-muted-foreground">Click "Seed Locked This Week" to create 3 locked weekly_plan rows for the current Monday.</p>
+          </div>
+          <div>
+            <strong>2. Check Source</strong>
+            <p className="text-muted-foreground">Click "Check Week Source" to verify the system detects weekly_plan (should show "plan:&lt;id&gt;" format).</p>
+          </div>
+          <div>
+            <strong>3. Test Pages</strong>
+            <p className="text-muted-foreground">Navigate to Week, Confidence, or Performance pages. Open browser console and look for log lines showing which source is used.</p>
+          </div>
+          <div>
+            <strong>4. Submit Scores</strong>
+            <p className="text-muted-foreground">Submit a confidence or performance score. Check the console for validation logs showing "plan:&lt;id&gt;" format.</p>
+          </div>
+          <div>
+            <strong>5. Verify Database</strong>
+            <p className="text-muted-foreground">Check weekly_scores table - the weekly_focus_id column should contain "plan:123" (not UUID).</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

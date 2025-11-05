@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,33 @@ export function SequencerTestConsole() {
   const [weekSource, setWeekSource] = useState<'plan' | 'focus' | 'unknown'>('unknown');
   const [focusIds, setFocusIds] = useState<string[]>([]);
   const [orgData, setOrgData] = useState<any>(null);
+  const [availableOrgs, setAvailableOrgs] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
+
+  // Load available orgs on mount
+  useEffect(() => {
+    const loadOrgs = async () => {
+      setLoadingOrgs(true);
+      try {
+        const { data } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .eq('active', true)
+          .order('name');
+        
+        setAvailableOrgs(data || []);
+        // Auto-populate first org if available
+        if (data && data.length > 0 && !orgId) {
+          setOrgId(data[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to load orgs:', error);
+      } finally {
+        setLoadingOrgs(false);
+      }
+    };
+    loadOrgs();
+  }, []); // Empty deps - load once on mount
 
   const seedLockedThisWeek = async () => {
     if (!orgId) {
@@ -74,7 +101,7 @@ export function SequencerTestConsole() {
             action_id: pm.action_id,
             self_select: false,
             status: 'locked',
-            generated_by: 'test',
+            generated_by: 'manual', // Valid value for check constraint
             locked_at: now.toISOString()
           }))
         );
@@ -200,13 +227,13 @@ export function SequencerTestConsole() {
       thisMonday.setHours(0, 0, 0, 0);
       const mondayStr = format(thisMonday, 'yyyy-MM-dd');
 
-      // Delete test plans
+      // Delete test plans created by test console
       const { error } = await supabase
         .from('weekly_plan')
         .delete()
         .eq('org_id', orgId)
         .eq('week_start_date', mondayStr)
-        .eq('generated_by', 'test');
+        .eq('generated_by', 'manual');
 
       if (error) throw error;
 
@@ -236,25 +263,44 @@ export function SequencerTestConsole() {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Configuration */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="orgId">Organization ID</Label>
-              <Input 
-                id="orgId"
-                placeholder="uuid" 
-                value={orgId} 
-                onChange={e => setOrgId(e.target.value)} 
-              />
+              <Label htmlFor="orgId">Organization</Label>
+              {loadingOrgs ? (
+                <div className="text-sm text-muted-foreground">Loading organizations...</div>
+              ) : availableOrgs.length > 0 ? (
+                <select
+                  id="orgId"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={orgId}
+                  onChange={e => setOrgId(e.target.value)}
+                >
+                  {availableOrgs.map(org => (
+                    <option key={org.id} value={org.id}>
+                      {org.name} ({org.id.substring(0, 8)}...)
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input 
+                  id="orgId"
+                  placeholder="Enter org UUID manually" 
+                  value={orgId} 
+                  onChange={e => setOrgId(e.target.value)} 
+                />
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="roleId">Role ID</Label>
-              <Input 
+              <Label htmlFor="roleId">Role</Label>
+              <select
                 id="roleId"
-                type="number" 
-                placeholder="1 or 2" 
-                value={roleId} 
-                onChange={e => setRoleId(parseInt(e.target.value) || 1)} 
-              />
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={roleId}
+                onChange={e => setRoleId(parseInt(e.target.value))}
+              >
+                <option value={1}>1 - Coach</option>
+                <option value={2}>2 - Lead Coach</option>
+              </select>
             </div>
           </div>
 

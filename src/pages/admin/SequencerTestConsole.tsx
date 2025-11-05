@@ -89,6 +89,16 @@ export function SequencerTestConsole() {
       const shuffled = [...proMoves].sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, 3);
 
+      // Delete any existing rows for this week/org/role first
+      const { error: deleteError } = await supabase
+        .from('weekly_plan')
+        .delete()
+        .eq('org_id', orgId)
+        .eq('role_id', roleId)
+        .eq('week_start_date', mondayStr);
+
+      if (deleteError) throw deleteError;
+
       // Insert locked plan
       const { error } = await supabase
         .from('weekly_plan')

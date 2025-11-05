@@ -5,6 +5,7 @@ import { Navigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
+import { WeeklyProMovesPanel } from '@/components/admin/WeeklyProMovesPanel';
 
 export default function AdminBuilder() {
   console.log('=== NEW ADMINBUILDER LOADING ===');
@@ -60,10 +61,11 @@ export default function AdminBuilder() {
       <h1 className="text-3xl font-bold">Admin Builder</h1>
       
       <Tabs defaultValue="dfi" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="dfi">DFI Focus Builder</TabsTrigger>
           <TabsTrigger value="rda">RDA Focus Builder</TabsTrigger>
           <TabsTrigger value="promoves">Pro-Move Library</TabsTrigger>
+          <TabsTrigger value="weekly">Weekly Pro Moves</TabsTrigger>
         </TabsList>
         
         <TabsContent value="dfi" className="space-y-6">
@@ -76,6 +78,10 @@ export default function AdminBuilder() {
         
         <TabsContent value="promoves" className="space-y-6">
           <ProMoveLibrary />
+        </TabsContent>
+        
+        <TabsContent value="weekly" className="space-y-6">
+          <WeeklyProMovesPanel />
         </TabsContent>
       </Tabs>
     </div>

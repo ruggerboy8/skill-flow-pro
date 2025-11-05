@@ -2,3 +2,6 @@ project_id = "yeypngaufuualdfzcjpk"
 
 [functions.coach-remind]
 verify_jwt = true
+
+[functions.sequencer-rank]
+verify_jwt = true

@@ -1251,13 +1251,6 @@ export type Database = {
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
           },
-          {
-            foreignKeyName: "weekly_scores_weekly_focus_id_fkey"
-            columns: ["weekly_focus_id"]
-            isOneToOne: false
-            referencedRelation: "weekly_focus"
-            referencedColumns: ["id"]
-          },
         ]
       }
       weekly_self_select: {
@@ -1496,13 +1489,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
-          },
-          {
-            foreignKeyName: "weekly_scores_weekly_focus_id_fkey"
-            columns: ["weekly_focus_id"]
-            isOneToOne: false
-            referencedRelation: "weekly_focus"
-            referencedColumns: ["id"]
           },
         ]
       }

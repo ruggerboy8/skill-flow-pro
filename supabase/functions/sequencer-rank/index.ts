@@ -39,7 +39,8 @@ serve(async (req) => {
     const effectiveDate = body.effectiveDate || new Date().toISOString().split('T')[0];
     
     // Normalize weights
-    let weights = body.weights || { C: 0.65, R: 0.15, E: 0.15, D: 0.05 };
+    let weights = body.weights || { C: 0.80, R: 0.00, E: 0.15, D: 0.05 };
+    const receivedWeights = JSON.stringify(body.weights);
     const sum = weights.C + weights.R + weights.E + weights.D;
     if (Math.abs(sum - 1.0) > 0.001) {
       weights = {
@@ -63,6 +64,8 @@ serve(async (req) => {
 
     const logs: string[] = [];
     logs.push(`Starting ranking for role ${body.roleId} on ${effectiveDate}`);
+    logs.push(`Received weights: ${receivedWeights}`);
+    logs.push(`Normalized weights: C=${weights.C.toFixed(3)}, R=${weights.R.toFixed(3)}, E=${weights.E.toFixed(3)}, D=${weights.D.toFixed(3)}`);
     if (weights.R === 0) {
       logs.push('Recency disabled (wR=0) - cooldown and diversity still apply');
     }

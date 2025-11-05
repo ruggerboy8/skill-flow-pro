@@ -173,6 +173,40 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     }
   };
 
+  const handleSimulateMonday = async () => {
+    // For testing: simulate running on Monday Nov 10, 2025
+    const simulatedMonday = '2025-11-10';
+    
+    setRunningNow(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
+        body: { 
+          roles: [roleId], 
+          orgId: testOrgId,
+          testDate: simulatedMonday // Pass simulated date
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Monday Rollover Simulated',
+        description: `Tested with date: ${simulatedMonday}`
+      });
+
+      await loadWeeks();
+      await loadHealthStatus();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setRunningNow(false);
+    }
+  };
+
   const getHealthMessage = () => {
     if (!healthStatus) return 'Loading...';
     
@@ -244,7 +278,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <Button 
               onClick={handleRunNow} 
               disabled={runningNow}
@@ -258,6 +292,14 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
               ) : (
                 'Run Now'
               )}
+            </Button>
+            
+            <Button 
+              onClick={handleSimulateMonday} 
+              disabled={runningNow}
+              variant="secondary"
+            >
+              🧪 Test Monday Rollover
             </Button>
             
             <div className={`flex items-center gap-2 ${getHealthColor()}`}>

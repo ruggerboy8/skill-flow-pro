@@ -47,8 +47,29 @@ Deno.serve(async (req) => {
 
     for (const roleId of roles) {
       try {
-        console.log(`[Generate Next] Refreshing ${nextWeekStr} as PROPOSED`);
-        console.log(`[Prepare N+1] Refreshing ${nplus1WeekStr} as PROPOSED`);
+        // Step 1: Lock current week (if it's proposed and we're on/past Monday)
+        if (testDate || new Date().getDay() === 1) { // Monday or test mode
+          console.log(`[Lock Current] Locking ${currentWeekStr} for role ${roleId}`);
+          const { error: lockError } = await supabase
+            .from('weekly_plan')
+            .update({ status: 'locked', locked_at: new Date().toISOString() })
+            .eq('org_id', orgId)
+            .eq('role_id', roleId)
+            .eq('week_start_date', currentWeekStr)
+            .eq('status', 'proposed');
+
+          if (lockError) {
+            console.error(`[Lock Current] Error:`, lockError);
+          }
+        }
+
+        // Step 2: Generate/refresh next week (proposed)
+        console.log(`[Generate Next] Generating ${nextWeekStr} as PROPOSED`);
+        await generateWeekPlan(supabase, orgId, roleId, nextWeekStr);
+
+        // Step 3: Generate/refresh N+1 week (proposed)
+        console.log(`[Prepare N+1] Generating ${nplus1WeekStr} as PROPOSED`);
+        await generateWeekPlan(supabase, orgId, roleId, nplus1WeekStr);
 
         results.push({
           roleId,
@@ -63,6 +84,9 @@ Deno.serve(async (req) => {
         results.push({
           roleId,
           status: 'error',
+          currentWeek: currentWeekStr,
+          nextWeek: nextWeekStr,
+          nplus1Week: nplus1WeekStr,
           error: error.message
         });
       }
@@ -81,3 +105,63 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// Helper function to generate a week's plan
+async function generateWeekPlan(supabase: any, orgId: string, roleId: number, weekStartDate: string) {
+  // Call sequencer-rank to get the ranked moves
+  const { data: rankData, error: rankError } = await supabase.functions.invoke('sequencer-rank', {
+    body: {
+      roleId,
+      effectiveDate: weekStartDate,
+      timezone: 'America/Chicago'
+    }
+  });
+
+  if (rankError) {
+    console.error(`[generateWeekPlan] Rank error for ${weekStartDate}:`, rankError);
+    throw new Error(`Failed to rank moves: ${rankError.message}`);
+  }
+
+  const nextPicks = rankData?.result?.nextPicks || [];
+  
+  if (nextPicks.length === 0) {
+    console.warn(`[generateWeekPlan] No moves ranked for ${weekStartDate}`);
+    return;
+  }
+
+  // Delete existing plan for this week (if any)
+  const { error: deleteError } = await supabase
+    .from('weekly_plan')
+    .delete()
+    .eq('org_id', orgId)
+    .eq('role_id', roleId)
+    .eq('week_start_date', weekStartDate);
+
+  if (deleteError) {
+    console.error(`[generateWeekPlan] Delete error:`, deleteError);
+  }
+
+  // Insert new plan (UPSERT via unique constraint)
+  const planRows = nextPicks.slice(0, 3).map((pick: any, index: number) => ({
+    org_id: orgId,
+    role_id: roleId,
+    week_start_date: weekStartDate,
+    display_order: index + 1,
+    action_id: pick.id,
+    self_select: false,
+    status: 'proposed',
+    generated_by: 'auto',
+    overridden: false
+  }));
+
+  const { error: insertError } = await supabase
+    .from('weekly_plan')
+    .insert(planRows);
+
+  if (insertError) {
+    console.error(`[generateWeekPlan] Insert error for ${weekStartDate}:`, insertError);
+    throw new Error(`Failed to insert plan: ${insertError.message}`);
+  }
+
+  console.log(`[generateWeekPlan] Successfully generated ${planRows.length} moves for ${weekStartDate}`);
+}

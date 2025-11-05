@@ -101,8 +101,8 @@ export function SequencerTestConsole() {
   }, []); // Empty deps - load once on mount
 
   const seedLockedThisWeek = async () => {
-    if (!orgId || !userOrgInfo) {
-      toast({ title: 'Missing org ID or user info', variant: 'destructive' });
+    if (!orgId) {
+      toast({ title: 'Missing org ID', variant: 'destructive' });
       return;
     }
 
@@ -122,17 +122,12 @@ export function SequencerTestConsole() {
       const anchors = getWeekAnchors(new Date(), tz);
       const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
       
-      console.log('[TestConsole] Seeding for Monday:', mondayStr, 'in timezone:', tz, 'staff:', userOrgInfo.staffId);
+      console.log('[TestConsole] Seeding for Monday:', mondayStr, 'in timezone:', tz);
 
-      // Get 3 random active pro moves with full details
+      // Get 3 random active pro moves for this role
       const { data: proMoves } = await supabase
         .from('pro_moves')
-        .select(`
-          action_id, 
-          action_statement, 
-          competency_id,
-          competencies!inner(name, domain_id)
-        `)
+        .select('action_id')
         .eq('role_id', roleId)
         .eq('active', true)
         .limit(10);
@@ -146,30 +141,18 @@ export function SequencerTestConsole() {
       const shuffled = [...proMoves].sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, 3);
 
-      // Get domain names for the selected moves
-      const domainIds = [...new Set(selected.map((pm: any) => pm.competencies.domain_id))];
-      const { data: domains } = await supabase
-        .from('domains')
-        .select('domain_id, domain_name')
-        .in('domain_id', domainIds);
-
-      const domainMap = new Map((domains || []).map(d => [d.domain_id, d.domain_name]));
-
-      // Delete any existing weekly_plan rows for this week/org/role
-      const { error: deletePlanError } = await supabase
+      // Delete any existing rows for this week/org/role first
+      const { error: deleteError } = await supabase
         .from('weekly_plan')
         .delete()
         .eq('org_id', orgId)
         .eq('role_id', roleId)
         .eq('week_start_date', mondayStr);
 
-      if (deletePlanError) throw deletePlanError;
-
-      // Note: Skipping weekly_focus delete due to TS type issues
-      // Manual cleanup via SQL: DELETE FROM weekly_focus WHERE staff_id = '...' AND cycle = 3 AND week_in_cycle = 6;
+      if (deleteError) throw deleteError;
 
       // Insert locked plan
-      const { error: planError } = await supabase
+      const { error } = await supabase
         .from('weekly_plan')
         .insert(
           selected.map((pm, idx) => ({
@@ -180,36 +163,21 @@ export function SequencerTestConsole() {
             action_id: pm.action_id,
             self_select: false,
             status: 'locked',
-            generated_by: 'manual',
+            generated_by: 'manual', // Valid value for check constraint
             locked_at: new Date().toISOString()
           }))
         );
 
-      if (planError) throw planError;
+      if (error) throw error;
 
-      // Insert weekly_focus rows for the user
-      const { error: focusError } = await supabase
-        .from('weekly_focus')
-        .insert(
-          selected.map((pm: any, idx) => ({
-            staff_id: userOrgInfo.staffId,
-            action_id: pm.action_id,
-            action_statement: pm.action_statement,
-            competency_id: pm.competency_id,
-            competency_name: pm.competencies.name,
-            domain_id: pm.competencies.domain_id,
-            domain_name: domainMap.get(pm.competencies.domain_id) || 'Unknown',
-            cycle: 3, // hardcoded for testing
-            week_in_cycle: 6, // hardcoded for testing
-            display_order: idx + 1,
-            self_select: false
-          }))
-        );
+      // Clear the week state cache so new data is picked up
+      if (globalThis.__weekStateCache) {
+        globalThis.__weekStateCache.clear();
+        console.log('[TestConsole] 🗑️ Cleared week state cache');
+      }
 
-      if (focusError) throw focusError;
-
-      toast({ title: 'Seeded test data', description: `Created 3 locked rows in weekly_plan AND weekly_focus for ${mondayStr}` });
-      console.log('[TestConsole] ✅ Seeded to both tables:', { mondayStr, orgId, roleId, staffId: userOrgInfo.staffId });
+      toast({ title: 'Seeded locked plan', description: `Created 3 locked rows for ${mondayStr} (org: ${orgId})` });
+      console.log('[TestConsole] ✅ Seeded 3 rows:', { mondayStr, orgId, roleId });
       await checkCurrentWeekSource();
     } catch (error: any) {
       console.error('Seed error:', error);
@@ -351,6 +319,12 @@ export function SequencerTestConsole() {
         .eq('generated_by', 'manual');
 
       if (error) throw error;
+
+      // Clear the week state cache
+      if (globalThis.__weekStateCache) {
+        globalThis.__weekStateCache.clear();
+        console.log('[TestConsole] 🗑️ Cleared week state cache');
+      }
 
       toast({ title: 'Test data cleared' });
       setWeekSource('unknown');

@@ -99,8 +99,10 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
     const currentMonday = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const nextMonday = format(addWeeks(startOfWeek(now, { weekStartsOn: 1 }), 1), 'yyyy-MM-dd');
 
+    console.log('[Step 7] Loading weeks for:', { testOrgId, roleId, currentMonday, nextMonday });
+
     // Load current week (locked)
-    const { data: current } = await supabase
+    const { data: current, error: currentError } = await supabase
       .from('weekly_plan' as any)
       .select('*, pro_moves(action_statement, competencies(domains(domain_name)))')
       .eq('org_id', testOrgId)
@@ -109,10 +111,11 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
       .eq('status', 'locked')
       .order('display_order');
 
+    console.log('[Step 7] Current week result:', { current, currentError });
     setCurrentWeek((current as any) || []);
 
     // Load next week (proposed)
-    const { data: next } = await supabase
+    const { data: next, error: nextError } = await supabase
       .from('weekly_plan' as any)
       .select('*, pro_moves(action_statement, competencies(domains(domain_name)))')
       .eq('org_id', testOrgId)
@@ -121,6 +124,7 @@ export function DynamicFocusSection({ roleId, orgId }: DynamicFocusSectionProps)
       .eq('status', 'proposed')
       .order('display_order');
 
+    console.log('[Step 7] Next week result:', { next, nextError });
     setNextWeek((next as any) || []);
   };
 

@@ -42,10 +42,11 @@ export function EditNextWeekModal({
   onSave,
 }: EditNextWeekModalProps) {
   const { toast } = useToast();
-  const [slots, setSlots] = useState<Array<{ action_id: number | null; self_select: boolean; display_order: number }>>([]);
+  const [slots, setSlots] = useState<Array<{ action_id: number | null; self_select: boolean; display_order: number; action_statement?: string }>>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (open && existingWeek.length > 0) {
@@ -54,6 +55,7 @@ export function EditNextWeekModal({
           action_id: w.action_id,
           self_select: w.self_select,
           display_order: w.display_order,
+          action_statement: w.pro_moves?.action_statement,
         }))
       );
     } else if (open) {
@@ -73,11 +75,41 @@ export function EditNextWeekModal({
         action_id: proMove.action_id,
         self_select: false,
         display_order: editingSlot + 1,
+        action_statement: proMove.action_statement,
       };
       setSlots(newSlots);
     }
     setShowPicker(false);
     setEditingSlot(null);
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) return;
+
+    const newSlots = [...slots];
+    const draggedSlot = newSlots[draggedIndex];
+    
+    // Remove dragged item
+    newSlots.splice(draggedIndex, 1);
+    // Insert at new position
+    newSlots.splice(dropIndex, 0, draggedSlot);
+    
+    // Update display_order
+    newSlots.forEach((slot, idx) => {
+      slot.display_order = idx + 1;
+    });
+    
+    setSlots(newSlots);
+    setDraggedIndex(null);
   };
 
   const handleToggleSelfSelect = (index: number) => {
@@ -162,7 +194,11 @@ export function EditNextWeekModal({
             {slots.map((slot, index) => (
               <div
                 key={index}
-                className="flex items-center gap-3 p-4 border rounded-lg"
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                className="flex items-center gap-3 p-4 border rounded-lg cursor-move hover:bg-accent/50 transition-colors"
               >
                 <GripVertical className="h-4 w-4 text-muted-foreground" />
                 <span className="font-semibold text-sm">{index + 1}.</span>
@@ -171,7 +207,7 @@ export function EditNextWeekModal({
                   <Badge variant="outline">Self-Select</Badge>
                 ) : slot.action_id ? (
                   <span className="text-sm flex-1">
-                    {existingWeek.find((w) => w.action_id === slot.action_id)?.pro_moves?.action_statement || 'Pro Move'}
+                    {slot.action_statement || 'Pro Move'}
                   </span>
                 ) : (
                   <span className="text-sm text-muted-foreground flex-1">Empty slot</span>

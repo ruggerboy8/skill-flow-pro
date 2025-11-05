@@ -101,9 +101,88 @@ export async function assembleWeek(params: {
   weekInCycle: number;
   simOverrides?: any;
 }): Promise<any[]> {
-  const { userId, roleId, cycleNumber, weekInCycle } = params;
+  const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
-  // 1) Load weekly_focus for this role/week
+  // ----- HYBRID LOGIC: Try weekly_plan first -----
+  // Get location context to determine Monday date
+  const { data: location } = await supabase
+    .from('locations')
+    .select('organization_id, timezone, program_start_date')
+    .eq('id', locationId)
+    .maybeSingle();
+
+  if (!location) return [];
+
+  const orgId = location.organization_id;
+  const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
+    ? new Date(params.simOverrides.nowISO) 
+    : new Date();
+  
+  const ctx = await getLocationWeekContext(locationId, now);
+  const anchors = getWeekAnchors(now, location.timezone);
+  const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
+
+  // Try weekly_plan if we have org context
+  if (orgId) {
+    const { data: planData, error: planErr } = await supabase
+      .from('weekly_plan')
+      .select('id, display_order, action_id, self_select')
+      .eq('org_id', orgId)
+      .eq('role_id', roleId)
+      .eq('week_start_date', mondayStr)
+      .eq('status', 'locked')
+      .order('display_order');
+
+    // Only use plan if we have exactly 3 locked rows
+    if (!planErr && planData && planData.length === 3) {
+      console.info('[assembleWeek] Using weekly_plan source for org=%s role=%d week=%s', 
+        orgId, roleId, mondayStr);
+      
+      // Build assignments from weekly_plan
+      const result: any[] = [];
+      for (const plan of planData) {
+        if (plan.action_id && !plan.self_select) {
+          // Site move from weekly_plan
+          const { data: pm } = await supabase
+            .from('pro_moves')
+            .select('action_id, action_statement, competencies!inner(name, domain_id)')
+            .eq('action_id', plan.action_id)
+            .maybeSingle();
+
+          let domainName = 'General';
+          if (pm?.competencies?.domain_id) {
+            const { data: d } = await supabase
+              .from('domains')
+              .select('domain_name')
+              .eq('domain_id', pm.competencies.domain_id)
+              .maybeSingle();
+            domainName = d?.domain_name || 'General';
+          }
+
+          result.push({
+            weekly_focus_id: `plan:${plan.id}`,
+            type: 'site',
+            pro_move_id: pm?.action_id,
+            action_statement: pm?.action_statement || 'Pro Move',
+            competency_name: pm?.competencies?.name || 'General',
+            domain_name: domainName,
+            required: true,
+            locked: true,
+            display_order: plan.display_order
+          });
+        }
+      }
+      
+      if (result.length > 0) {
+        return result.sort((a, b) => a.display_order - b.display_order);
+      }
+    }
+  }
+
+  console.info('[assembleWeek] Falling back to weekly_focus for cycle=%d week=%d role=%d', 
+    cycleNumber, weekInCycle, roleId);
+
+  // Fallback to weekly_focus
   const { data: weeklyFocus } = await supabase
     .from('weekly_focus')
     .select('id, display_order, self_select, action_id, competency_id')

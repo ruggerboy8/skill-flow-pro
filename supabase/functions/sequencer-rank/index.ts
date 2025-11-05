@@ -71,27 +71,42 @@ serve(async (req) => {
     const cutoff8w = new Date(effectiveDateObj);
     cutoff8w.setDate(cutoff8w.getDate() - 8 * 7);
 
-    // 1. Fetch eligible moves
+    // 1. Fetch eligible moves with competencies
     const { data: eligibleMoves, error: movesError } = await supabase
       .from('pro_moves')
-      .select(`
-        action_id,
-        action_statement,
-        competency_id,
-        competencies!inner(domain_id, domains!competencies_domain_id_fkey(domain_name))
-      `)
+      .select('action_id, action_statement, competency_id')
       .eq('active', true)
       .eq('role_id', body.roleId);
 
     if (movesError) throw movesError;
 
-    const eligible = eligibleMoves?.map((m: any) => ({
-      id: m.action_id,
-      name: m.action_statement,
-      competencyId: m.competency_id,
-      domainId: m.competencies.domain_id,
-      domainName: m.competencies.domains.domain_name,
-    })) || [];
+    // 1b. Fetch competencies with domains separately
+    const competencyIds = eligibleMoves?.map((m: any) => m.competency_id) || [];
+    const { data: competencies, error: compError } = await supabase
+      .from('competencies')
+      .select('competency_id, domain_id, domains!competencies_domain_id_fkey(domain_name)')
+      .in('competency_id', competencyIds);
+
+    if (compError) throw compError;
+
+    // Build competency lookup map
+    const competencyMap = new Map(
+      competencies?.map((c: any) => [
+        c.competency_id,
+        { domainId: c.domain_id, domainName: c.domains.domain_name }
+      ]) || []
+    );
+
+    const eligible = eligibleMoves?.map((m: any) => {
+      const comp = competencyMap.get(m.competency_id);
+      return {
+        id: m.action_id,
+        name: m.action_statement,
+        competencyId: m.competency_id,
+        domainId: comp?.domainId || 0,
+        domainName: comp?.domainName || 'Unknown',
+      };
+    }) || [];
 
     logs.push(`Found ${eligible.length} eligible moves`);
 

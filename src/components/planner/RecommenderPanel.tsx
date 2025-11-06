@@ -7,12 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CalendarIcon, Play, Copy, ChevronDown, Zap, Clock, Target } from 'lucide-react';
 import { formatWeekOf, isMondayChicago, getChicagoMonday } from '@/lib/plannerUtils';
 import { cn } from '@/lib/utils';
 import { PlannerPreset } from '@/hooks/usePlannerParams';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface RecommenderPanelProps {
   roleId: number;
@@ -21,6 +23,7 @@ interface RecommenderPanelProps {
   preset: PlannerPreset;
   onWeekChange: (week: string) => void;
   onPresetChange: (preset: PlannerPreset) => void;
+  usedActionIds?: number[];
 }
 
 interface ProMoveRecommendation {
@@ -46,6 +49,7 @@ interface RecommenderResponse {
   rulesApplied: string[];
   relaxedConstraintNote: string | null;
   top6: ProMoveRecommendation[];
+  allRanked?: ProMoveRecommendation[];
 }
 
 const presetLabels: Record<PlannerPreset, string> = {
@@ -62,6 +66,7 @@ export function RecommenderPanel({
   preset,
   onWeekChange,
   onPresetChange,
+  usedActionIds = [],
 }: RecommenderPanelProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -86,10 +91,12 @@ export function RecommenderPanel({
 
       if (error) throw error;
 
-      setResults(data);
+      // Use allRanked if available, fallback to top6
+      const allMoves = data.allRanked || data.top6 || [];
+      setResults({ ...data, allRanked: allMoves });
       toast({
         title: 'Recommender Complete',
-        description: `Ranked ${data.top6?.length || 0} pro-moves from pool of ${data.poolSize || 0}`,
+        description: `Ranked ${allMoves.length} pro-moves from pool of ${data.poolSize || 0}`,
       });
     } catch (error: any) {
       toast({
@@ -201,32 +208,51 @@ export function RecommenderPanel({
               </div>
             )}
 
-            {/* Top 6 cards */}
-            <div className="grid grid-cols-2 gap-4">
-              {results.top6.map((move, idx) => (
-                <Card 
-                  key={move.proMoveId} 
-                  className="relative cursor-grab active:cursor-grabbing"
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('application/json', JSON.stringify({
-                      actionId: move.proMoveId,
-                      actionStatement: move.name,
-                      domainName: move.domain,
-                    }));
-                  }}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <Badge variant="secondary" className="text-xs">
-                        #{idx + 1}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {move.domain}
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-sm leading-tight">{move.name}</CardTitle>
-                  </CardHeader>
+            {/* All ranked cards - scrollable */}
+            <ScrollArea className="h-[600px]">
+              <div className="grid grid-cols-2 gap-4 pr-4">
+                {(results.allRanked || results.top6).map((move, idx) => {
+                  const isUsed = usedActionIds.includes(move.proMoveId);
+                  return (
+                    <Card 
+                      key={move.proMoveId} 
+                      className={cn(
+                        "relative cursor-grab active:cursor-grabbing transition-opacity",
+                        isUsed && "opacity-40 cursor-not-allowed"
+                      )}
+                      draggable={!isUsed}
+                      onDragStart={(e) => {
+                        if (isUsed) {
+                          e.preventDefault();
+                          return;
+                        }
+                        e.dataTransfer.setData('application/json', JSON.stringify({
+                          actionId: move.proMoveId,
+                          actionStatement: move.name,
+                          domainName: move.domain,
+                        }));
+                      }}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            #{idx + 1}
+                          </Badge>
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs"
+                            style={{ backgroundColor: `hsl(${getDomainColor(move.domain)})` }}
+                          >
+                            {move.domain}
+                          </Badge>
+                        </div>
+                        <CardTitle className="text-sm leading-tight">{move.name}</CardTitle>
+                        {isUsed && (
+                          <Badge variant="secondary" className="text-xs mt-1">
+                            Already Scheduled
+                          </Badge>
+                        )}
+                      </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold">Need Score</span>
@@ -289,12 +315,14 @@ export function RecommenderPanel({
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </ScrollArea>
 
-            {results.top6.length === 0 && (
+            {(results.allRanked || results.top6).length === 0 && (
               <div className="text-center p-8 text-muted-foreground">
                 No recommendations available under current constraints.
                 Try adjusting the preset or date.

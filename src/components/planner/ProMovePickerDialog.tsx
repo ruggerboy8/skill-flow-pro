@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { Search } from 'lucide-react';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface ProMove {
   action_id: number;
@@ -52,10 +53,10 @@ export function ProMovePickerDialog({ open, onClose, roleId, onSelect }: ProMove
         action_id,
         action_statement,
         competency_id,
-        competencies (
+        competencies!pro_moves_competency_id_fkey (
           name,
           domain_id,
-          domains (
+          domains!competencies_domain_id_fkey (
             domain_name
           )
         )
@@ -151,17 +152,21 @@ export function ProMovePickerDialog({ open, onClose, roleId, onSelect }: ProMove
                       onClose();
                     }}
                   >
-                    <div className="text-left space-y-1 w-full">
-                      <div className="font-medium">{pm.action_statement}</div>
-                      <div className="flex gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {(pm.competencies as any)?.domains?.domain_name}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {(pm.competencies as any)?.name}
-                        </span>
+                      <div className="text-left space-y-1 w-full">
+                        <div className="font-medium">{pm.action_statement}</div>
+                        <div className="flex gap-2">
+                          <Badge 
+                            variant="secondary" 
+                            className="text-xs"
+                            style={{ backgroundColor: `hsl(${getDomainColor((pm.competencies as any)?.domains?.domain_name)})` }}
+                          >
+                            {(pm.competencies as any)?.domains?.domain_name}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {(pm.competencies as any)?.name}
+                          </span>
+                        </div>
                       </div>
-                    </div>
                   </Button>
                 ))}
               </div>

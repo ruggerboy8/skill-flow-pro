@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X } from 'lucide-react';
 import { getChicagoMonday } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface WeekSlot {
   id?: number;
@@ -29,10 +30,10 @@ interface WeekData {
 interface WeekBuilderPanelProps {
   roleId: number;
   roleName: string;
-  onRefreshHistory?: () => void;
+  onUsedActionIdsChange?: (actionIds: number[]) => void;
 }
 
-export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBuilderPanelProps) {
+export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: WeekBuilderPanelProps) {
   const { toast } = useToast();
   const [weeks, setWeeks] = useState<WeekData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +64,15 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
 
     setWeeks(weeksData);
     setLoading(false);
+    
+    // Notify parent of used action IDs
+    if (onUsedActionIdsChange) {
+      const usedIds = weeksData
+        .flatMap(w => w.slots)
+        .filter(s => s.actionId)
+        .map(s => s.actionId as number);
+      onUsedActionIdsChange(usedIds);
+    }
   };
 
   const loadSlotsForWeek = async (weekStart: string): Promise<WeekSlot[]> => {
@@ -99,7 +109,14 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
           if (row.action_id) {
             const { data: pmData } = await supabase
               .from('pro_moves')
-              .select('action_statement, competencies(domains(domain_name))')
+              .select(`
+                action_statement,
+                competency_id,
+                competencies!pro_moves_competency_id_fkey(
+                  domain_id,
+                  domains!competencies_domain_id_fkey(domain_name)
+                )
+              `)
               .eq('action_id', row.action_id)
               .single();
 
@@ -198,7 +215,6 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
 
     toast({ title: 'Saved', description: 'Pro-move assigned successfully' });
     loadWeeks(baseMonday);
-    if (onRefreshHistory) onRefreshHistory();
     setPickerOpen(false);
   };
 
@@ -224,7 +240,6 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
 
     toast({ title: 'Cleared', description: 'Slot cleared successfully' });
     loadWeeks(baseMonday);
-    if (onRefreshHistory) onRefreshHistory();
   };
 
   const formatDate = (dateStr: string) => {
@@ -322,7 +337,11 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
                             {slot.actionStatement || 'Pro-Move'}
                           </div>
                           {slot.domainName && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge 
+                              variant="secondary" 
+                              className="text-xs"
+                              style={{ backgroundColor: `hsl(${getDomainColor(slot.domainName)})` }}
+                            >
                               {slot.domainName}
                             </Badge>
                           )}

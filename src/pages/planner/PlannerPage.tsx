@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { RecommenderPanel } from '@/components/planner/RecommenderPanel';
 import { HistoryPanel } from '@/components/planner/HistoryPanel';
 import { WeekBuilderPanel } from '@/components/planner/WeekBuilderPanel';
@@ -14,6 +15,7 @@ interface PlannerPageProps {
 export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
   const navigate = useNavigate();
   const { asOfWeek, preset, setAsOfWeek, setPreset } = usePlannerParams();
+  const [usedActionIds, setUsedActionIds] = useState<number[]>([]);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -33,7 +35,7 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
         <RecommenderPanel
           roleId={roleId}
           roleName={roleName}
@@ -41,11 +43,13 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
           preset={preset}
           onWeekChange={setAsOfWeek}
           onPresetChange={setPreset}
+          usedActionIds={usedActionIds}
         />
 
         <WeekBuilderPanel 
           roleId={roleId} 
           roleName={roleName}
+          onUsedActionIdsChange={setUsedActionIds}
         />
       </div>
 

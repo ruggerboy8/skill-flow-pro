@@ -707,6 +707,43 @@ serve(async (req) => {
       };
     });
 
+    // Format all ranked moves (for scrollable list)
+    const allRanked = scored.map((pick) => {
+      const formatted = formatRow(pick, effectiveDate);
+      
+      // Build competency tag
+      const competencies = competencyMap.get(pick.competencyId);
+      const competencyTag = `${formatted.domainName.split('.')[1] || 'UNK'}.${pick.competencyId}`;
+      
+      // Build reason summary
+      const reasons = [];
+      if (formatted.parts.C > 0.3) reasons.push(`Low avg confidence`);
+      if (formatted.weeksSinceSeen > 4) reasons.push(`not practiced in ${formatted.weeksSinceSeen} weeks`);
+      if (pick.eContrib > 0.05) reasons.push(`eval gap (${competencyTag})`);
+      if (formatted.parts.D > 0.1) reasons.push(`underrepresented domain`);
+      const reasonSummary = reasons.join('; ') || 'Balanced priority';
+      
+      return {
+        proMoveId: formatted.proMoveId,
+        name: formatted.name,
+        domain: formatted.domainName,
+        competencyTag,
+        score: formatted.finalScore,
+        breakdown: {
+          C: formatted.parts.C * weights.C,
+          R: formatted.parts.R * weights.R,
+          E: pick.eContrib,
+          D: formatted.parts.D * weights.D,
+        },
+        lastSeenWeeksAgo: formatted.weeksSinceSeen < 999 ? formatted.weeksSinceSeen : null,
+        cooldownOk: formatted.weeksSinceSeen >= config.cooldownWeeks,
+        cooldownReason: formatted.weeksSinceSeen < config.cooldownWeeks 
+          ? `Used ${config.cooldownWeeks - formatted.weeksSinceSeen}w ago` 
+          : null,
+        reasonSummary,
+      };
+    });
+
     // New planner response format
     const plannerResponse = {
       roleId: body.roleId,
@@ -718,6 +755,7 @@ serve(async (req) => {
       rulesApplied,
       relaxedConstraintNote,
       top6,
+      allRanked,
     };
 
     // Legacy response format (for backward compatibility)

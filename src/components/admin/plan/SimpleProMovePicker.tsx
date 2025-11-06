@@ -29,7 +29,7 @@ export function SimpleProMovePicker({ roleId, selectedId, onSelect }: SimpleProM
         .select(`
           action_id,
           action_statement,
-          competencies!inner(domains!inner(domain_name))
+          competencies(domains!competencies_domain_id_fkey(domain_name))
         `)
         .eq('role_id', roleId)
         .eq('active', true)

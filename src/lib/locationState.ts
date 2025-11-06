@@ -2,6 +2,7 @@ import { getWeekAnchors } from '@/v2/time';
 import { supabase } from '@/integrations/supabase/client';
 import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'done' | 'missed_checkout' | 'no_assignments';
 
@@ -120,7 +121,7 @@ export async function assembleWeek(params: {
       : new Date();
     
     const anchors = getWeekAnchors(now, location.timezone);
-    const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
+    const mondayStr = formatInTimeZone(anchors.mondayZ, location.timezone, 'yyyy-MM-dd');
 
     // Query global weekly_plan (org_id IS NULL)
     const { data: planData, error: planErr } = await supabase
@@ -134,8 +135,8 @@ export async function assembleWeek(params: {
 
     // Require exactly 3 locked rows
     if (!planErr && planData && planData.length === 3) {
-      console.info('[assembleWeek] Using global weekly_plan for Cycle 4+ role=%d week=%s', 
-        roleId, mondayStr);
+      console.info('[assembleWeek] ✅ Using global weekly_plan for Cycle 4+ role=%d week=%s (found %d locked rows)', 
+        roleId, mondayStr, planData.length);
       
       const result: any[] = [];
       for (const plan of planData) {
@@ -178,7 +179,8 @@ export async function assembleWeek(params: {
         console.warn('[assembleWeek] Expected 3 locked global plan rows, got %d - falling back', result.length);
       }
     } else {
-      console.warn('[assembleWeek] No global plan for Cycle 4+ (week %s) - falling back to focus', mondayStr);
+      console.warn('[assembleWeek] ❌ No global plan for Cycle 4+ (week %s, role %d) - found %d rows with error: %s - falling back to focus', 
+        mondayStr, roleId, planData?.length || 0, planErr?.message || 'none');
     }
   }
 

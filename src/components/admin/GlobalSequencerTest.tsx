@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { startOfWeek, addWeeks } from 'date-fns';
+import { addWeeks, addDays } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,8 +18,11 @@ interface GlobalSequencerTestProps {
 
 function mondayStrings(asOf?: string) {
   const now = asOf ? new Date(asOf) : new Date();
-  const localNow = fromZonedTime(formatInTimeZone(now, APP_TZ, 'yyyy-MM-dd\'T\'HH:mm:ss'), APP_TZ);
-  const localMonday = startOfWeek(localNow, { weekStartsOn: 1 });
+  // Get ISO day (1=Mon..7=Sun) in APP_TZ
+  const isoDow = Number(formatInTimeZone(now, APP_TZ, 'i'));
+  const todayStr = formatInTimeZone(now, APP_TZ, 'yyyy-MM-dd');
+  const todayMidnight = fromZonedTime(`${todayStr}T00:00:00`, APP_TZ);
+  const localMonday = addDays(todayMidnight, -(isoDow - 1));
   const nextLocalMonday = addWeeks(localMonday, 1);
   const thisMondayStr = formatInTimeZone(localMonday, APP_TZ, 'yyyy-MM-dd');
   const nextMondayStr = formatInTimeZone(nextLocalMonday, APP_TZ, 'yyyy-MM-dd');
@@ -170,7 +173,7 @@ export function GlobalSequencerTest({ roleId, roleName }: GlobalSequencerTestPro
     }
   };
 
-  // Clear test data
+  // Clear test data (weekly_plan)
   const handleClear = async () => {
     setLoading(true);
     try {
@@ -186,6 +189,27 @@ export function GlobalSequencerTest({ roleId, roleName }: GlobalSequencerTestPro
       if (error) throw error;
 
       toast({ title: 'Success', description: 'Test data cleared' });
+      setPreviewData(null);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete old Cycle 4 weekly_focus rows (cleanup legacy data)
+  const handleClearLegacyC4 = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('weekly_focus')
+        .delete()
+        .eq('role_id', roleId)
+        .eq('cycle', 4);
+
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Cleared Cycle 4 weekly_focus rows' });
       setPreviewData(null);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -263,6 +287,9 @@ export function GlobalSequencerTest({ roleId, roleName }: GlobalSequencerTestPro
           </Button>
           <Button onClick={handleClear} disabled={loading} size="sm" variant="destructive">
             Clear Test Data
+          </Button>
+          <Button onClick={handleClearLegacyC4} disabled={loading} size="sm" variant="outline">
+            Clear Legacy Cycle 4
           </Button>
           <Button onClick={handlePreview} disabled={loading} size="sm" variant="secondary">
             Preview As Me

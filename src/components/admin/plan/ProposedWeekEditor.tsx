@@ -104,8 +104,18 @@ export function ProposedWeekEditor({ roleId, weekStartDate, onRefresh }: Propose
 
   const handleSave = async () => {
     try {
+      // Fetch original rows to preserve rank provenance
+      const { data: originalRows, error: fetchError } = await supabase
+        .from('weekly_plan')
+        .select('id, rank_version, rank_snapshot')
+        .in('id', editedRows.map(r => r.id));
+
+      if (fetchError) throw fetchError;
+
       // Update rows in place, preserving rank_version and rank_snapshot
       for (const row of editedRows) {
+        const original = originalRows?.find(o => o.id === row.id);
+        
         const { error } = await supabase
           .from('weekly_plan')
           .update({
@@ -113,7 +123,9 @@ export function ProposedWeekEditor({ roleId, weekStartDate, onRefresh }: Propose
             generated_by: 'manual',
             overridden: true,
             overridden_at: new Date().toISOString(),
-            // rank_version and rank_snapshot preserved automatically
+            // CRITICAL: Preserve original rank provenance
+            rank_version: original?.rank_version || null,
+            rank_snapshot: original?.rank_snapshot || null,
           })
           .eq('id', row.id);
 
@@ -122,7 +134,7 @@ export function ProposedWeekEditor({ roleId, weekStartDate, onRefresh }: Propose
 
       toast({
         title: 'Success',
-        description: 'Proposed week updated and marked as overridden. Rank provenance preserved.'
+        description: 'Proposed week updated and marked as overridden. Original rank provenance preserved.'
       });
 
       setEditMode(false);

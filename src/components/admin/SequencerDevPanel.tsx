@@ -322,8 +322,13 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
           <Zap className="h-5 w-5 text-orange-500" />
           Sequencer Controls (Dev Only) - {roleName}
         </CardTitle>
-        <CardDescription>
-          Test sequencer-rank with custom weights. Current: {thisMondayStr}, Next: {nextMondayStr}
+        <CardDescription className="space-y-1">
+          <div>Test sequencer-rank with custom weights and provenance tracking</div>
+          <div className="font-mono text-xs">
+            <Badge variant="outline" className="mr-2">This Monday: {thisMondayStr}</Badge>
+            <Badge variant="outline" className="mr-2">Next Monday: {nextMondayStr}</Badge>
+            <Badge variant="outline">TZ: {APP_TZ}</Badge>
+          </div>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

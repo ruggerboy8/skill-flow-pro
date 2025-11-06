@@ -53,10 +53,10 @@ export function ProMovePickerDialog({ open, onClose, roleId, onSelect }: ProMove
         action_id,
         action_statement,
         competency_id,
-        competencies!inner (
+        competencies:fk_pro_moves_competency_id!inner (
           name,
           domain_id,
-          domains!inner (
+          domains:fk_competencies_domain_id!inner (
             domain_name
           )
         )

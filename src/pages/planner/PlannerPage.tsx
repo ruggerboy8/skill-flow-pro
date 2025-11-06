@@ -35,9 +35,9 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
-        {/* Left Column: Recommender (Sticky) */}
-        <div className="space-y-4">
+      <div className="grid grid-cols-[400px_1fr] gap-4 items-start">
+        {/* Left Column: Recommender (max height with internal scroll) */}
+        <div className="max-h-[calc(100vh-180px)] overflow-hidden">
           <RecommenderPanel
             roleId={roleId}
             roleName={roleName}
@@ -49,8 +49,8 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
           />
         </div>
 
-        {/* Right Column: Week Builder + History */}
-        <div className="space-y-6">
+        {/* Right Column: Week Builder + History (sticky) */}
+        <div className="space-y-6 sticky top-4">
           <WeekBuilderPanel 
             roleId={roleId} 
             roleName={roleName}

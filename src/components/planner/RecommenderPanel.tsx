@@ -5,11 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { normalizeToPlannerWeek } from '@/lib/plannerUtils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface RecommenderPanelProps {
   roleId: number;
@@ -46,9 +46,15 @@ export function RecommenderPanel({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [allRanked, setAllRanked] = useState<ProMoveRecommendation[]>([]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [expandedMove, setExpandedMove] = useState<number | null>(null);
+  
+  const ITEMS_PER_PAGE = 6;
 
   const loadRecommendations = async () => {
     setLoading(true);
+    setCurrentPage(0);
+    setExpandedMove(null);
     try {
       const { data, error } = await supabase.functions.invoke('sequencer-rank', {
         body: {
@@ -83,10 +89,13 @@ export function RecommenderPanel({
       setLoading(false);
     }
   };
+  
+  const startIdx = currentPage * ITEMS_PER_PAGE;
+  const visibleMoves = allRanked.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(allRanked.length / ITEMS_PER_PAGE);
 
   return (
-    <div className="sticky top-6">
-      <Card>
+    <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Pro-Move Recommender</CardTitle>
@@ -127,12 +136,42 @@ export function RecommenderPanel({
                   <SelectItem value="variety_first">Variety First</SelectItem>
                 </SelectContent>
               </Select>
+          </div>
+        </div>
+
+        {/* Pagination Controls */}
+        {allRanked.length > 0 && (
+          <div className="flex items-center justify-between py-2 border-t">
+            <div className="text-xs text-muted-foreground">
+              Showing {startIdx + 1}-{Math.min(startIdx + ITEMS_PER_PAGE, allRanked.length)} of {allRanked.length}
+            </div>
+            <div className="flex gap-1">
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs px-2 py-1 flex items-center">
+                {currentPage + 1} / {totalPages}
+              </span>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={currentPage === totalPages - 1}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
+        )}
 
-          <ScrollArea className="h-[calc(100vh-280px)]">
-            <div className="grid grid-cols-2 gap-3 pr-4">
-              {allRanked.map((move) => {
+        {/* Pro-Move Cards */}
+        <div className="space-y-3 max-h-[calc(100vh-440px)] overflow-y-auto pr-2">
+          {visibleMoves.map((move) => {
                 const isUsed = usedActionIds.includes(move.proMoveId);
                 const needScore = Math.round(move.score * 100);
                 const colorClass = needScore >= 75 ? 'text-red-600' : 
@@ -197,13 +236,58 @@ export function RecommenderPanel({
                         </Badge>
                       )}
                     </div>
+
+                    {/* Details Toggle */}
+                    <Collapsible open={expandedMove === move.proMoveId} onOpenChange={() => {
+                      setExpandedMove(expandedMove === move.proMoveId ? null : move.proMoveId);
+                    }}>
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-xs mt-1 h-6"
+                        >
+                          {expandedMove === move.proMoveId ? (
+                            <><ChevronUp className="h-3 w-3 mr-1" /> Hide Details</>
+                          ) : (
+                            <><ChevronDown className="h-3 w-3 mr-1" /> Show Details</>
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2">
+                        <div className="p-2 bg-muted rounded text-xs space-y-1">
+                          <div className="font-semibold">Score Breakdown:</div>
+                          <div className="grid grid-cols-2 gap-1">
+                            <div>Confidence: {Math.round(move.breakdown.C * 100)}</div>
+                            <div>Recency: {Math.round(move.breakdown.R * 100)}</div>
+                            <div>Eval: {Math.round(move.breakdown.E * 100)}</div>
+                            <div>Diversity: {Math.round(move.breakdown.D * 100)}</div>
+                          </div>
+                          {move.reasonSummary && (
+                            <>
+                              <div className="font-semibold mt-2">Why recommended:</div>
+                              <div className="text-muted-foreground">{move.reasonSummary}</div>
+                            </>
+                          )}
+                          {move.cooldownReason && (
+                            <>
+                              <div className="font-semibold mt-2">Cooldown info:</div>
+                              <div className="text-muted-foreground">{move.cooldownReason}</div>
+                            </>
+                          )}
+                          {move.lastSeenWeeksAgo !== null && (
+                            <div className="mt-2 text-muted-foreground">
+                              Last assigned: {move.lastSeenWeeksAgo} weeks ago
+                            </div>
+                          )}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
                 );
               })}
             </div>
-          </ScrollArea>
         </CardContent>
       </Card>
-    </div>
   );
 }

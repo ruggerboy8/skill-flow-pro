@@ -1309,6 +1309,19 @@ export type Database = {
       }
     }
     Views: {
+      action_usage_stats: {
+        Row: {
+          action_id: number | null
+          avg_confidence: number | null
+          first_assigned: string | null
+          last_assigned: string | null
+          role_id: number | null
+          total_attempts: number | null
+          unique_users: number | null
+          weeks_assigned: number | null
+        }
+        Relationships: []
+      }
       v_onboarding_progress: {
         Row: {
           current_cycle: number | null

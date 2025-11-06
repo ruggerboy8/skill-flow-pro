@@ -63,10 +63,10 @@ export function HistoryPanel({ roleId, roleName }: HistoryPanelProps) {
           action_id,
           generated_by,
           rank_version,
-          pro_moves!inner(
+          pro_moves:fk_weekly_plan_action_id!inner(
             action_statement, 
-            competencies!inner(
-              domains!inner(domain_name)
+            competencies:fk_pro_moves_competency_id!inner(
+              domains:fk_competencies_domain_id!inner(domain_name)
             )
           )
         `)

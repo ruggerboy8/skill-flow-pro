@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 import { WeeklyProMovesPanel } from '@/components/admin/WeeklyProMovesPanel';
+import { GlobalSequencerTest } from '@/components/admin/GlobalSequencerTest';
 
 export default function AdminBuilder() {
   console.log('=== NEW ADMINBUILDER LOADING ===');
@@ -70,11 +71,13 @@ export default function AdminBuilder() {
         
         <TabsContent value="static-dfi" className="space-y-6">
           <h2 className="text-xl font-semibold">Static Onboarding Builder - DFI (Cycles 1–3)</h2>
+          <GlobalSequencerTest roleId={1} roleName="DFI" />
           <SimpleFocusBuilder roleFilter={1} />
         </TabsContent>
 
         <TabsContent value="static-rda" className="space-y-6">
           <h2 className="text-xl font-semibold">Static Onboarding Builder - RDA (Cycles 1–3)</h2>
+          <GlobalSequencerTest roleId={2} roleName="RDA" />
           <SimpleFocusBuilder roleFilter={2} />
         </TabsContent>
         

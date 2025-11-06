@@ -73,13 +73,21 @@ export default function AdminBuilder() {
         </Button>
       </div>
       
-      <Tabs defaultValue="onboarding" className="w-full">
+      <Tabs defaultValue="dfi-planner" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="dfi-planner">DFI Planner</TabsTrigger>
           <TabsTrigger value="rda-planner">RDA Planner</TabsTrigger>
+          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="dfi-planner" className="space-y-6">
+          <PlannerTabContent roleId={1} roleName="DFI" />
+        </TabsContent>
+
+        <TabsContent value="rda-planner" className="space-y-6">
+          <PlannerTabContent roleId={2} roleName="RDA" />
+        </TabsContent>
         
         <TabsContent value="onboarding" className="space-y-6">
           <div className="space-y-8">
@@ -106,14 +114,6 @@ export default function AdminBuilder() {
             </Card>
           </div>
         </TabsContent>
-
-        <TabsContent value="dfi-planner" className="space-y-6">
-          <PlannerTabContent roleId={1} roleName="DFI" />
-        </TabsContent>
-
-        <TabsContent value="rda-planner" className="space-y-6">
-          <PlannerTabContent roleId={2} roleName="RDA" />
-        </TabsContent>
         
         <TabsContent value="library" className="space-y-6">
           <h2 className="text-xl font-semibold">Pro-Move Library</h2>
@@ -126,21 +126,35 @@ export default function AdminBuilder() {
 
 function PlannerTabContent({ roleId, roleName }: { roleId: number; roleName: string }) {
   const { asOfWeek, preset, setAsOfWeek, setPreset } = usePlannerParams();
+  const [usedActionIds, setUsedActionIds] = useState<number[]>([]);
 
   return (
-    <div className="space-y-6">
-      <RecommenderPanel
-        roleId={roleId}
-        roleName={roleName}
-        asOfWeek={asOfWeek}
-        preset={preset}
-        onWeekChange={setAsOfWeek}
-        onPresetChange={setPreset}
-      />
+    <div className="flex gap-4">
+      {/* Left: fixed sidebar */}
+      <div className="w-[400px] shrink-0">
+        <RecommenderPanel
+          roleId={roleId}
+          roleName={roleName}
+          asOfWeek={asOfWeek}
+          preset={preset}
+          onWeekChange={setAsOfWeek}
+          onPresetChange={setPreset}
+          usedActionIds={usedActionIds}
+        />
+      </div>
 
-      <WeekBuilderPanel roleId={roleId} roleName={roleName} />
-
-      <HistoryPanel roleId={roleId} roleName={roleName} />
+      {/* Right: grows */}
+      <div className="flex-1 min-w-0">
+        <div className="space-y-6">
+          <WeekBuilderPanel 
+            roleId={roleId} 
+            roleName={roleName}
+            onUsedActionIdsChange={setUsedActionIds}
+          />
+          
+          <HistoryPanel roleId={roleId} roleName={roleName} />
+        </div>
+      </div>
     </div>
   );
 }

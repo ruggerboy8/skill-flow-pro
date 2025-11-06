@@ -17,7 +17,7 @@ interface SaveWeekRequest {
   weekStartDate: string
   picks: Array<{
     displayOrder: 1 | 2 | 3
-    actionId: number
+    actionId: number | null
     generatedBy: 'manual' | 'auto'
   }>
   updaterUserId: string
@@ -72,8 +72,9 @@ Deno.serve(async (req) => {
 
     if (body.action === 'saveWeek') {
       const { roleId, weekStartDate, picks, updaterUserId } = body
-      const upserted: Array<{ id: number, displayOrder: number, actionId: number }> = []
-      const skippedLocked: Array<{ id: number, displayOrder: number, actionId: number }> = []
+      const upserted: Array<{ id: number, displayOrder: number, actionId: number | null }> = []
+      const skippedLocked: Array<{ id: number, displayOrder: number, actionId: number | null }> = []
+      const deleted: Array<{ id: number, displayOrder: number }> = []
 
       // Process each slot
       for (const pick of picks) {
@@ -99,34 +100,52 @@ Deno.serve(async (req) => {
             skippedLocked.push({
               id: existing.id,
               displayOrder: pick.displayOrder,
-              actionId: existing.action_id || 0,
+              actionId: existing.action_id || null,
             })
             continue
           }
 
-          // Update existing row
-          const { error: updateError } = await supabase
-            .from('weekly_plan')
-            .update({
-              action_id: pick.actionId,
-              generated_by: pick.generatedBy,
-              updated_by: updaterUserId,
-              updated_at: new Date().toISOString(),
+          // If actionId is null, delete the row
+          if (pick.actionId === null || pick.actionId === 0) {
+            const { error: deleteError } = await supabase
+              .from('weekly_plan')
+              .delete()
+              .eq('id', existing.id)
+
+            if (deleteError) {
+              console.error('Delete error:', deleteError)
+              continue
+            }
+
+            deleted.push({
+              id: existing.id,
+              displayOrder: pick.displayOrder,
             })
-            .eq('id', existing.id)
+          } else {
+            // Update existing row
+            const { error: updateError } = await supabase
+              .from('weekly_plan')
+              .update({
+                action_id: pick.actionId,
+                generated_by: pick.generatedBy,
+                updated_by: updaterUserId,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existing.id)
 
-          if (updateError) {
-            console.error('Update error:', updateError)
-            continue
+            if (updateError) {
+              console.error('Update error:', updateError)
+              continue
+            }
+
+            upserted.push({
+              id: existing.id,
+              displayOrder: pick.displayOrder,
+              actionId: pick.actionId,
+            })
           }
-
-          upserted.push({
-            id: existing.id,
-            displayOrder: pick.displayOrder,
-            actionId: pick.actionId,
-          })
-        } else {
-          // Insert new row
+        } else if (pick.actionId && pick.actionId !== 0) {
+          // Insert new row only if actionId is not null/0
           const { data: inserted, error: insertError } = await supabase
             .from('weekly_plan')
             .insert({
@@ -163,6 +182,7 @@ Deno.serve(async (req) => {
           ok: true,
           data: {
             upserted,
+            deleted,
             skippedLocked,
             updatedMeta: {
               updatedBy: updaterUserId,

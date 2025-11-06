@@ -287,15 +287,11 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
       let errorCount = 0;
 
       for (const week of editableWeeks) {
-        const picks = week.slots
-          .filter(s => s.actionId !== null)
-          .map(s => ({ 
-            displayOrder: s.displayOrder as 1 | 2 | 3, 
-            actionId: s.actionId!, 
-            generatedBy: 'manual' as const
-          }));
-
-        if (picks.length === 0) continue;
+        const picks = week.slots.map(s => ({ 
+          displayOrder: s.displayOrder as 1 | 2 | 3, 
+          actionId: s.actionId || null, 
+          generatedBy: 'manual' as const
+        }));
 
         const { data, error } = await supabase.functions.invoke('planner-upsert', {
           body: {

@@ -46,7 +46,7 @@ export function LockedWeekViewer({ roleId, weekStartDate }: LockedWeekViewerProp
           overridden,
           rank_version,
           locked_at,
-          pro_moves!inner(action_statement, competencies!inner(domains!inner(domain_name)))
+          pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))
         `)
         .is('org_id', null)
         .eq('role_id', roleId)

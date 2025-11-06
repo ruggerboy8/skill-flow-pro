@@ -89,9 +89,19 @@ export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
   };
 
   const loadWeeks = async () => {
-    const now = new Date();
-    const currentMonday = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-    const nextMonday = format(addWeeks(startOfWeek(now, { weekStartsOn: 1 }), 1), 'yyyy-MM-dd');
+    // Load the most recent locked week as "current" and most recent proposed as "next"
+    const { data: allWeeks } = await supabase
+      .from('weekly_plan' as any)
+      .select('week_start_date, status')
+      .is('org_id', null)
+      .eq('role_id', roleId)
+      .order('week_start_date', { ascending: false });
+
+    const latestLocked = (allWeeks as any)?.find((w: any) => w.status === 'locked');
+    const latestProposed = (allWeeks as any)?.find((w: any) => w.status === 'proposed');
+
+    const currentMonday = latestLocked?.week_start_date || format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const nextMonday = latestProposed?.week_start_date || format(addWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), 1), 'yyyy-MM-dd');
 
     // Load current week (locked) - global plan (org_id IS NULL)
     const { data: current } = await supabase
@@ -182,8 +192,8 @@ export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
         description: `Advanced to next week`
       });
 
-      // After rollover: 11/10 should be locked, 11/17 should be proposed
-      await loadWeeksForSimulation('2025-11-10', '2025-11-17');
+      // Reload all weeks to show the new current state
+      await loadWeeks();
       await loadHealthStatus();
     } catch (error: any) {
       toast({
@@ -196,31 +206,6 @@ export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
     }
   };
 
-  const loadWeeksForSimulation = async (currentWeekStr: string, nextWeekStr: string) => {
-    // Load current week (locked) - global plan
-    const { data: current } = await supabase
-      .from('weekly_plan' as any)
-      .select('*, pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))')
-      .is('org_id', null)
-      .eq('role_id', roleId)
-      .eq('week_start_date', currentWeekStr)
-      .eq('status', 'locked')
-      .order('display_order');
-
-    setCurrentWeek((current as any) || []);
-
-    // Load next week (proposed) - global plan
-    const { data: next } = await supabase
-      .from('weekly_plan' as any)
-      .select('*, pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))')
-      .is('org_id', null)
-      .eq('role_id', roleId)
-      .eq('week_start_date', nextWeekStr)
-      .eq('status', 'proposed')
-      .order('display_order');
-
-    setNextWeek((next as any) || []);
-  };
 
   const getHealthMessage = () => {
     if (!healthStatus) return 'Loading...';

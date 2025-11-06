@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2 } from 'lucide-react';
 import { normalizeToPlannerWeek } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
 import { fetchProMoveMetaByIds } from '@/lib/proMoves';
 import { getDomainColor } from '@/lib/domainColors';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface WeekSlot {
   displayOrder: 1 | 2 | 3;
@@ -40,6 +41,8 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
   const [savingChanges, setSavingChanges] = useState(false);
   const baseMonday = normalizeToPlannerWeek(new Date());
   const [displayedBaseMonday, setDisplayedBaseMonday] = useState(baseMonday);
+  const [deleteWeekDialogOpen, setDeleteWeekDialogOpen] = useState(false);
+  const [weekToDelete, setWeekToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadWeeks(displayedBaseMonday);
@@ -341,6 +344,36 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
     }
   };
 
+  const handleDeleteWeek = async (weekStart: string) => {
+    try {
+      // Delete all weekly_plan rows for this week
+      const { error } = await supabase
+        .from('weekly_plan')
+        .delete()
+        .eq('role_id', roleId)
+        .is('org_id', null)
+        .eq('week_start_date', weekStart);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Week cleared',
+        description: `All pro-moves removed from week of ${formatDate(weekStart)}`,
+      });
+
+      // Reload weeks
+      await loadWeeks(displayedBaseMonday);
+      setDeleteWeekDialogOpen(false);
+      setWeekToDelete(null);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -389,9 +422,22 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
             {weeks.map((week) => (
               <Card key={week.weekStart} className="border-primary/20">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-bold">
-                    Week of {formatDate(week.weekStart)}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-bold">
+                      Week of {formatDate(week.weekStart)}
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setWeekToDelete(week.weekStart);
+                        setDeleteWeekDialogOpen(true);
+                      }}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {week.slots.map((slot) => (
@@ -514,6 +560,26 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
           onSelect={handleSelectProMove}
         />
       )}
+
+      <AlertDialog open={deleteWeekDialogOpen} onOpenChange={setDeleteWeekDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete all pro-moves for this week?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all assigned pro-moves for the week of {weekToDelete && formatDate(weekToDelete)}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => weekToDelete && handleDeleteWeek(weekToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Week
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

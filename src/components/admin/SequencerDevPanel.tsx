@@ -288,6 +288,77 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
     }
   };
 
+  const handlePromoteProposedToCurrent = async () => {
+    if (!confirm('This will move next week\'s proposed plan to this week as locked. Continue?')) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const { thisMondayStr, nextMondayStr } = mondayStrings(asOfDate || undefined);
+
+      // Fetch proposed rows from next week
+      const { data: proposedRows, error: fetchError } = await supabase
+        .from('weekly_plan')
+        .select('*')
+        .is('org_id', null)
+        .eq('role_id', roleId)
+        .eq('week_start_date', nextMondayStr)
+        .eq('status', 'proposed');
+
+      if (fetchError) throw fetchError;
+
+      if (!proposedRows || proposedRows.length === 0) {
+        throw new Error('No proposed week found to promote');
+      }
+
+      // Delete old current week if exists
+      await supabase
+        .from('weekly_plan')
+        .delete()
+        .is('org_id', null)
+        .eq('role_id', roleId)
+        .eq('week_start_date', thisMondayStr);
+
+      // Insert proposed rows as locked at current week
+      const lockedRows = proposedRows.map(row => ({
+        org_id: null,
+        role_id: roleId,
+        week_start_date: thisMondayStr,
+        display_order: row.display_order,
+        action_id: row.action_id,
+        self_select: row.self_select,
+        status: 'locked',
+        generated_by: row.generated_by,
+        overridden: row.overridden,
+        rank_version: row.rank_version,
+        rank_snapshot: row.rank_snapshot,
+        locked_at: new Date().toISOString()
+      }));
+
+      const { error: insertError } = await supabase
+        .from('weekly_plan')
+        .insert(lockedRows);
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: 'Success',
+        description: `Promoted ${lockedRows.length} moves from next week to current week (locked)`
+      });
+
+      onRefresh?.();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const { thisMondayStr, nextMondayStr } = mondayStrings(asOfDate || undefined);
 
   return (
@@ -409,6 +480,9 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2 pt-2">
             <Badge variant="destructive" className="mb-2">Development Only</Badge>
+            <Button onClick={handlePromoteProposedToCurrent} disabled={loading} size="sm" variant="outline" className="w-full mb-2">
+              📅 Promote Proposed → Current (Locked)
+            </Button>
             <Button onClick={handleClearProposed} disabled={loading} size="sm" variant="destructive" className="w-full">
               <Trash2 className="h-4 w-4 mr-2" />
               Clear Proposed ({nextMondayStr})

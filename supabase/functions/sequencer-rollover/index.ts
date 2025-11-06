@@ -97,11 +97,10 @@ Deno.serve(async (req) => {
     for (const roleId of roles) {
       const roleLogs: string[] = [];
       try {
-        // Step 1: Lock current week OR lock proposed next week (first rollover)
+        // Step 1: Lock current week (skip if proposeOnly)
         if (!proposeOnly) {
-          roleLogs.push(`[Lock Week] Checking what to lock for role ${roleId}`);
+          roleLogs.push(`[Lock Current Week] Checking ${currentWeekStr}`);
           
-          // Check if current week exists
           const { data: existingCurrent, error: checkError } = await supabase
             .from('weekly_plan')
             .select('id, status')
@@ -109,44 +108,17 @@ Deno.serve(async (req) => {
             .eq('role_id', roleId)
             .eq('week_start_date', currentWeekStr);
 
-          console.log(`[Lock Week] Current week query result:`, { count: existingCurrent?.length, existingCurrent, checkError });
-
           if (!existingCurrent || existingCurrent.length === 0) {
-            // No current week - this is first rollover scenario
-            // Lock the "next week" (which becomes the first locked week)
-            roleLogs.push(`[Lock Week] First rollover scenario - locking proposed ${nextWeekStr}`);
-            
-            const { data: proposedNext, error: nextError } = await supabase
-              .from('weekly_plan')
-              .select('id, status')
-              .is('org_id', null)
-              .eq('role_id', roleId)
-              .eq('week_start_date', nextWeekStr)
-              .eq('status', 'proposed');
-
-            if (proposedNext && proposedNext.length > 0) {
-              if (!dryRun) {
-                const { error: lockError, count } = await supabase
-                  .from('weekly_plan')
-                  .update({ status: 'locked', locked_at: new Date().toISOString() })
-                  .is('org_id', null)
-                  .eq('role_id', roleId)
-                  .eq('week_start_date', nextWeekStr)
-                  .eq('status', 'proposed');
-
-                if (lockError) throw new Error(`Failed to lock next week: ${lockError.message}`);
-                roleLogs.push(`[Lock Week] Locked ${count} rows at ${nextWeekStr} (first rollover) ✓`);
-              }
-            } else {
-              roleLogs.push(`[Lock Week] No proposed week found at ${nextWeekStr} to lock`);
-            }
+            // FIRST ROLLOVER: No current week exists yet
+            // We should NOT lock anything yet - just keep proposed week as-is
+            // Wait until next rollover to lock it
+            roleLogs.push(`[Lock Current Week] First rollover - no current week exists, will wait to lock proposed`);
           } else if (existingCurrent.every(row => row.status === 'locked')) {
-            // Already locked - normal steady state
-            roleLogs.push(`[Lock Week] ${currentWeekStr} already locked (${existingCurrent.length} rows) ✓`);
+            roleLogs.push(`[Lock Current Week] Already locked (${existingCurrent.length} rows) ✓`);
           } else {
-            // Has proposed rows at current week - lock them
+            // Has proposed rows - lock them
             const proposedRows = existingCurrent.filter(row => row.status === 'proposed');
-            roleLogs.push(`[Lock Week] Found ${proposedRows.length} proposed rows at ${currentWeekStr} to lock`);
+            roleLogs.push(`[Lock Current Week] Locking ${proposedRows.length} proposed rows`);
             
             if (!dryRun) {
               const { error: lockError, count } = await supabase
@@ -158,29 +130,15 @@ Deno.serve(async (req) => {
                 .eq('status', 'proposed');
 
               if (lockError) throw new Error(`Failed to lock week: ${lockError.message}`);
-              roleLogs.push(`[Lock Week] Locked ${count} rows at ${currentWeekStr} ✓`);
+              roleLogs.push(`[Lock Current Week] Locked ${count} rows ✓`);
             }
           }
         } else {
-          roleLogs.push('[Lock Week] Skipped (proposeOnly mode)');
+          roleLogs.push('[Lock Current Week] Skipped (proposeOnly mode)');
         }
 
-        // Step 2: Generate new proposed week (always at nextWeek after locking)
-        // Calculate the week to generate (if we locked current, generate next; if we locked next, generate next+1)
-        const { data: lockedNext } = await supabase
-          .from('weekly_plan')
-          .select('status')
-          .is('org_id', null)
-          .eq('role_id', roleId)
-          .eq('week_start_date', nextWeekStr)
-          .eq('status', 'locked')
-          .limit(1);
-
-        const weekToGenerate = lockedNext && lockedNext.length > 0 
-          ? format(addWeeks(new Date(nextWeekStr), 1), 'yyyy-MM-dd') // locked next, so generate next+1
-          : nextWeekStr; // current locked, so generate next
-
-        roleLogs.push(`[Generate Proposed] Checking ${weekToGenerate}`);
+        // Step 2: Ensure next week has proposed plan
+        roleLogs.push(`[Ensure Next Week] Checking ${nextWeekStr}`);
         let rankSnapshot: any = null;
         let generatedPicks: number[] = [];
         let wroteCount = 0;
@@ -190,7 +148,7 @@ Deno.serve(async (req) => {
           const ensureResult = await ensureWeekPlan({
             supabase,
             roleId,
-            weekStartDate: weekToGenerate,
+            weekStartDate: nextWeekStr,
             timezone: globalTz,
             status: 'proposed',
             regenerate: regenerateNextWeek,
@@ -203,12 +161,12 @@ Deno.serve(async (req) => {
           preserved = ensureResult.preserved;
 
           if (preserved) {
-            roleLogs.push(`[Generate Proposed] ✅ Preserved existing complete week at ${weekToGenerate}`);
+            roleLogs.push(`[Ensure Next Week] ✅ Preserved complete week`);
           } else if (wroteCount > 0) {
-            roleLogs.push(`[Generate Proposed] ✅ Generated ${wroteCount} slots at ${weekToGenerate}`);
+            roleLogs.push(`[Ensure Next Week] ✅ Generated ${wroteCount} slots`);
           }
         } else {
-          roleLogs.push('[Generate Proposed] Skipped (dry run)');
+          roleLogs.push('[Ensure Next Week] Skipped (dry run)');
         }
 
         // Log to sequencer_runs with enhanced metadata (non-fatal)

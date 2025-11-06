@@ -47,25 +47,52 @@ export function ProMovePickerDialog({ open, onClose, roleId, onSelect }: ProMove
 
   const loadProMoves = async () => {
     setLoading(true);
-    const { data } = await supabase
+    
+    // Fetch pro_moves
+    const { data: movesData } = await supabase
       .from('pro_moves')
-      .select(`
-        action_id,
-        action_statement,
-        competency_id,
-        competencies:fk_pro_moves_competency_id!inner (
-          name,
-          domain_id,
-          domains:fk_competencies_domain_id!inner (
-            domain_name
-          )
-        )
-      `)
+      .select('action_id, action_statement, competency_id')
       .eq('role_id', roleId)
-      .eq('active', true)
-      .order('action_statement');
+      .eq('active', true);
 
-    setProMoves((data as any) || []);
+    // Fetch competencies with domains
+    const competencyIds = [...new Set(movesData?.map(m => m.competency_id) || [])];
+    const { data: competenciesData } = await supabase
+      .from('competencies')
+      .select('competency_id, name, domain_id, domains!fk_competencies_domain_id(domain_id, domain_name)')
+      .in('competency_id', competencyIds);
+
+    // Build lookup map
+    const compMap = new Map(
+      competenciesData?.map(c => [c.competency_id, {
+        name: c.name,
+        domain_id: c.domain_id,
+        domains: { domain_name: (c.domains as any).domain_name }
+      }]) || []
+    );
+
+    // Join data
+    const enriched = (movesData || []).map(m => ({
+      action_id: m.action_id,
+      action_statement: m.action_statement,
+      competency_id: m.competency_id,
+      competencies: compMap.get(m.competency_id)
+    }));
+
+    // Sort by domain, then competency, then action_id
+    enriched.sort((a, b) => {
+      const domainA = (a.competencies?.domains as any)?.domain_name || '';
+      const domainB = (b.competencies?.domains as any)?.domain_name || '';
+      if (domainA !== domainB) return domainA.localeCompare(domainB);
+      
+      const compA = a.competencies?.name || '';
+      const compB = b.competencies?.name || '';
+      if (compA !== compB) return compA.localeCompare(compB);
+      
+      return a.action_id - b.action_id;
+    });
+
+    setProMoves(enriched as any);
     setLoading(false);
   };
 
@@ -96,7 +123,7 @@ export function ProMovePickerDialog({ open, onClose, roleId, onSelect }: ProMove
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[80vh]">
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Choose Pro-Move from Library</DialogTitle>
         </DialogHeader>
@@ -135,13 +162,13 @@ export function ProMovePickerDialog({ open, onClose, roleId, onSelect }: ProMove
           </div>
 
           {/* Results */}
-          <ScrollArea className="h-[400px] border rounded-lg">
+          <ScrollArea className="flex-1 border rounded-lg">
             {loading ? (
               <div className="p-8 text-center text-muted-foreground">Loading...</div>
             ) : filteredMoves.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">No pro-moves found</div>
             ) : (
-              <div className="p-2 space-y-2">
+              <div className="p-3 space-y-2">
                 {filteredMoves.map((pm) => (
                   <Button
                     key={pm.action_id}

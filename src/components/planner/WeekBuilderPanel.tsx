@@ -321,7 +321,11 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
       for (const week of editableWeeks) {
         const picks = week.slots
           .filter(s => s.actionId !== null)
-          .map(s => ({ displayOrder: s.displayOrder, actionId: s.actionId!, generatedBy: 'manual' }));
+          .map(s => ({ 
+            displayOrder: s.displayOrder as 1 | 2 | 3, 
+            actionId: s.actionId!, 
+            generatedBy: 'manual' as const
+          }));
 
         if (picks.length === 0) continue;
 
@@ -339,6 +343,12 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
           errorCount++;
           console.error(`Failed to save week ${week.weekStart}:`, error || data?.message);
         } else {
+          if (data.data?.skippedLocked?.length > 0) {
+            toast({
+              title: 'Some slots locked',
+              description: `${data.data.skippedLocked.length} slot(s) in ${week.weekStart} have scores`,
+            });
+          }
           successCount++;
         }
       }

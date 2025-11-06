@@ -179,10 +179,6 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
   };
 
   const handleForceRollover = async () => {
-    if (!confirm('Force rollover will lock the current week and prepare the next. Continue?')) {
-      return;
-    }
-    
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('sequencer-rollover', {

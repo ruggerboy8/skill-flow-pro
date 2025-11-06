@@ -96,13 +96,16 @@ Deno.serve(async (req) => {
         roleLogs.push(`[Lock This Week] Locking ${currentWeekStr} for role ${roleId}`);
         
         // Check if current week exists and what status it has
-        const { data: existingCurrent } = await supabase
+        const { data: existingCurrent, error: checkError } = await supabase
           .from('weekly_plan')
           .select('id, status')
           .is('org_id', null)
           .eq('role_id', roleId)
           .eq('week_start_date', currentWeekStr)
           .limit(1);
+
+        console.log(`[Lock This Week] Query result:`, { existingCurrent, checkError });
+        roleLogs.push(`[Lock This Week] Found ${existingCurrent?.length || 0} existing rows`);
 
         if (!existingCurrent || existingCurrent.length === 0) {
           // First week after gate - generate it as locked
@@ -117,18 +120,30 @@ Deno.serve(async (req) => {
           // Update proposed → locked
           roleLogs.push(`[Lock This Week] Updating proposed week to locked`);
           if (!dryRun) {
-            const { error: lockError, count } = await supabase
+            console.log(`[Lock This Week] Attempting UPDATE with:`, {
+              org_id: null,
+              role_id: roleId,
+              week_start_date: currentWeekStr,
+              current_status: 'proposed',
+              new_status: 'locked'
+            });
+
+            const { data: updateData, error: lockError, count } = await supabase
               .from('weekly_plan')
               .update({ status: 'locked', locked_at: new Date().toISOString() })
               .is('org_id', null)
               .eq('role_id', roleId)
               .eq('week_start_date', currentWeekStr)
-              .eq('status', 'proposed');
+              .eq('status', 'proposed')
+              .select();
+
+            console.log(`[Lock This Week] UPDATE result:`, { updateData, lockError, count });
 
             if (lockError) {
-              roleLogs.push(`[Lock This Week] Error: ${lockError.message}`);
+              roleLogs.push(`[Lock This Week] RLS/UPDATE Error: ${lockError.message}`);
+              console.error(`[Lock This Week] Full error:`, lockError);
             } else {
-              roleLogs.push(`[Lock This Week] Locked successfully (${count} rows) ✓`);
+              roleLogs.push(`[Lock This Week] Locked successfully (${count} rows, data: ${JSON.stringify(updateData)}) ✓`);
             }
           } else {
             roleLogs.push('[Lock This Week] Skipped (dry run)');
@@ -145,15 +160,24 @@ Deno.serve(async (req) => {
 
         // Log to sequencer_runs
         if (!dryRun) {
-          await supabase.from('sequencer_runs').insert({
-            org_id: null,
-            role_id: roleId,
-            target_week_start: currentWeekStr,
-            mode: 'global_cron',
-            success: true,
-            logs: roleLogs,
-            run_at: new Date().toISOString()
-          });
+          console.log(`[sequencer_runs] Attempting INSERT with org_id=NULL`);
+          const { data: runData, error: runError } = await supabase
+            .from('sequencer_runs')
+            .insert({
+              org_id: null,
+              role_id: roleId,
+              target_week_start: currentWeekStr,
+              mode: 'global_cron',
+              success: true,
+              logs: roleLogs,
+              run_at: new Date().toISOString()
+            })
+            .select();
+          
+          console.log(`[sequencer_runs] INSERT result:`, { runData, runError });
+          if (runError) {
+            console.error(`[sequencer_runs] Failed to log run:`, runError);
+          }
         }
 
         results.push({
@@ -169,16 +193,22 @@ Deno.serve(async (req) => {
         roleLogs.push(`[ERROR] ${error.message}`);
         
         if (!dryRun) {
-          await supabase.from('sequencer_runs').insert({
-            org_id: null,
-            role_id: roleId,
-            target_week_start: currentWeekStr,
-            mode: 'global_cron',
-            success: false,
-            error_message: error.message,
-            logs: roleLogs,
-            run_at: new Date().toISOString()
-          });
+          console.log(`[sequencer_runs] Logging error run with org_id=NULL`);
+          const { data: runData, error: runError } = await supabase
+            .from('sequencer_runs')
+            .insert({
+              org_id: null,
+              role_id: roleId,
+              target_week_start: currentWeekStr,
+              mode: 'global_cron',
+              success: false,
+              error_message: error.message,
+              logs: roleLogs,
+              run_at: new Date().toISOString()
+            })
+            .select();
+          
+          console.log(`[sequencer_runs] Error run INSERT result:`, { runData, runError });
         }
 
         results.push({
@@ -323,12 +353,18 @@ async function generateWeekPlan(
     overridden: false
   }));
 
-  const { error: insertError } = await supabase
+  console.log(`[generateWeekPlan] Attempting INSERT with:`, planRows);
+
+  const { data: insertData, error: insertError } = await supabase
     .from('weekly_plan')
-    .insert(planRows);
+    .insert(planRows)
+    .select();
+
+  console.log(`[generateWeekPlan] INSERT result:`, { insertData, insertError });
 
   if (insertError) {
-    logs.push(`[generateWeekPlan] Insert error: ${insertError.message}`);
+    logs.push(`[generateWeekPlan] RLS/INSERT Error: ${insertError.message}`);
+    console.error(`[generateWeekPlan] Full insert error:`, insertError);
     throw new Error(`Failed to insert plan: ${insertError.message}`);
   }
 

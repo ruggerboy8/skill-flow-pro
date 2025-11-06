@@ -2,6 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { format, addWeeks, startOfWeek, addDays } from 'https://esm.sh/date-fns@3.6.0';
 import { formatInTimeZone, fromZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
 
+// Sequencer engine version (bump when algorithm changes)
+const RANK_VERSION = 'v3.2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -166,13 +169,18 @@ Deno.serve(async (req) => {
 
         // Step 2: Generate/refresh next week (unless overridden)
         roleLogs.push(`[Generate Next] Checking ${nextWeekStr}`);
+        let rankSnapshot: any = null;
+        let generatedPicks: number[] = [];
+        
         if (!dryRun) {
-          await generateWeekPlan(supabase, null, roleId, nextWeekStr, globalTz, true, 'proposed', roleLogs);
+          const genResult = await generateWeekPlan(supabase, null, roleId, nextWeekStr, globalTz, true, 'proposed', roleLogs);
+          rankSnapshot = genResult?.rankSnapshot || null;
+          generatedPicks = genResult?.picks || [];
         } else {
           roleLogs.push('[Generate Next] Skipped (dry run)');
         }
 
-        // Log to sequencer_runs (non-fatal)
+        // Log to sequencer_runs with enhanced metadata (non-fatal)
         if (!dryRun) {
           try {
             console.log(`[sequencer_runs] Attempting INSERT with org_id=NULL, mode=global_cron`);
@@ -184,6 +192,11 @@ Deno.serve(async (req) => {
                 target_week_start: currentWeekStr,
                 mode: 'global_cron',
                 success: true,
+                as_of: asOf || new Date().toISOString(),
+                picks: generatedPicks.length > 0 ? { top3: generatedPicks } : null,
+                weights: rankSnapshot?.weights || null,
+                rank_version: RANK_VERSION,
+                notes: `Locked ${currentWeekStr}, generated ${nextWeekStr}`,
                 logs: roleLogs.slice(0, 50), // Limit log size
                 run_at: new Date().toISOString()
               })
@@ -302,6 +315,7 @@ function toZonedStart(now: Date, tz: string): Date {
 }
 
 // Generate a week's plan (global: org_id = null)
+// Returns: { picks: number[], rankSnapshot: any }
 async function generateWeekPlan(
   supabase: any, 
   orgId: string | null,
@@ -311,7 +325,7 @@ async function generateWeekPlan(
   respectOverride: boolean = true,
   status: 'proposed' | 'locked' = 'proposed',
   logs: string[] = []
-) {
+): Promise<{ picks: number[]; rankSnapshot: any } | null> {
   // Check if week is overridden
   if (respectOverride) {
     const { data: existing } = await supabase
@@ -324,8 +338,20 @@ async function generateWeekPlan(
 
     if (existing && existing.length > 0 && existing[0].overridden) {
       logs.push(`[generateWeekPlan] Week ${weekStartDate} is overridden, skipping`);
-      return;
+      return null;
     }
+  }
+
+  // Check for incomplete weeks (1-2 rows that aren't overridden)
+  const { data: incompleteCheck, count: incompleteCount } = await supabase
+    .from('weekly_plan')
+    .select('*', { count: 'exact' })
+    .is('org_id', null)
+    .eq('role_id', roleId)
+    .eq('week_start_date', weekStartDate);
+
+  if (incompleteCount && incompleteCount > 0 && incompleteCount < 3) {
+    logs.push(`[generateWeekPlan] Found incomplete week (${incompleteCount} rows), will rebuild`);
   }
 
   // Call sequencer-rank to get ranked moves
@@ -343,12 +369,27 @@ async function generateWeekPlan(
   }
 
   const nextPicks = rankData?.next || [];
-  logs.push(`[generateWeekPlan] Ranked ${nextPicks.length} moves`);
+  logs.push(`[generateWeekPlan] Ranked ${nextPicks.length} moves from sequencer-rank`);
   
   if (nextPicks.length === 0) {
     logs.push(`[generateWeekPlan] No moves ranked for ${weekStartDate}`);
-    return;
+    return null;
   }
+
+  // Build rank snapshot with full provenance
+  const top3 = nextPicks.slice(0, 3);
+  const picks = top3.map((m: any) => m.proMoveId);
+  const top5 = nextPicks.slice(0, 5).map((m: any) => m.proMoveId);
+  
+  const rankSnapshot = {
+    top3: picks,
+    top5,
+    poolSize: rankData.ranked?.length || 0,
+    weights: top3[0]?.parts || null,
+    version: RANK_VERSION
+  };
+
+  logs.push(`[generateWeekPlan] Rank snapshot: top3=[${picks.join(',')}], pool=${rankSnapshot.poolSize}`);
 
   // Delete existing plan for this week (if not overridden)
   const { error: deleteError } = await supabase
@@ -363,8 +404,8 @@ async function generateWeekPlan(
     logs.push(`[generateWeekPlan] Delete error: ${deleteError.message}`);
   }
 
-  // Insert new plan (global: org_id = NULL)
-  const planRows = nextPicks.slice(0, 3).map((pick: any, index: number) => ({
+  // Insert new plan with full provenance (global: org_id = NULL)
+  const planRows = top3.map((pick: any, index: number) => ({
     org_id: null,
     role_id: roleId,
     week_start_date: weekStartDate,
@@ -373,10 +414,12 @@ async function generateWeekPlan(
     self_select: false,
     status,
     generated_by: 'auto',
-    overridden: false
+    overridden: false,
+    rank_version: RANK_VERSION,
+    rank_snapshot: rankSnapshot
   }));
 
-  console.log(`[generateWeekPlan] Attempting INSERT with:`, planRows);
+  console.log(`[generateWeekPlan] Attempting INSERT with provenance:`, planRows);
 
   const { data: insertData, error: insertError, count } = await supabase
     .from('weekly_plan')
@@ -398,4 +441,6 @@ async function generateWeekPlan(
   }
 
   logs.push(`[generateWeekPlan] Generated ${count} moves for ${weekStartDate} (status: ${status}) ✓`);
+  
+  return { picks, rankSnapshot };
 }

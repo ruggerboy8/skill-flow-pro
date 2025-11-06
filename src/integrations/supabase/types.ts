@@ -689,13 +689,17 @@ export type Database = {
       }
       sequencer_runs: {
         Row: {
+          as_of: string | null
           config: Json | null
           error_message: string | null
           id: string
           lock_at_local: string | null
           logs: string[] | null
           mode: string
+          notes: string | null
           org_id: string | null
+          picks: Json | null
+          rank_version: string | null
           role_id: number
           run_at: string
           success: boolean
@@ -703,13 +707,17 @@ export type Database = {
           weights: Json | null
         }
         Insert: {
+          as_of?: string | null
           config?: Json | null
           error_message?: string | null
           id?: string
           lock_at_local?: string | null
           logs?: string[] | null
           mode: string
+          notes?: string | null
           org_id?: string | null
+          picks?: Json | null
+          rank_version?: string | null
           role_id: number
           run_at?: string
           success: boolean
@@ -717,13 +725,17 @@ export type Database = {
           weights?: Json | null
         }
         Update: {
+          as_of?: string | null
           config?: Json | null
           error_message?: string | null
           id?: string
           lock_at_local?: string | null
           logs?: string[] | null
           mode?: string
+          notes?: string | null
           org_id?: string | null
+          picks?: Json | null
+          rank_version?: string | null
           role_id?: number
           run_at?: string
           success?: boolean
@@ -1098,6 +1110,8 @@ export type Database = {
           org_id: string | null
           overridden: boolean
           overridden_at: string | null
+          rank_snapshot: Json | null
+          rank_version: string | null
           role_id: number
           self_select: boolean
           status: string
@@ -1114,6 +1128,8 @@ export type Database = {
           org_id?: string | null
           overridden?: boolean
           overridden_at?: string | null
+          rank_snapshot?: Json | null
+          rank_version?: string | null
           role_id: number
           self_select?: boolean
           status?: string
@@ -1130,6 +1146,8 @@ export type Database = {
           org_id?: string | null
           overridden?: boolean
           overridden_at?: string | null
+          rank_snapshot?: Json | null
+          rank_version?: string | null
           role_id?: number
           self_select?: boolean
           status?: string

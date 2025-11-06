@@ -3,18 +3,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 import { WeeklyProMovesPanel } from '@/components/admin/WeeklyProMovesPanel';
-import { DynamicFocusSection } from '@/components/admin/DynamicFocusSection';
 
 export default function AdminBuilder() {
   console.log('=== NEW ADMINBUILDER LOADING ===');
   const { user } = useAuth();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [orgId, setOrgId] = useState<string>('');
 
   useEffect(() => {
     checkAdminStatus();
@@ -36,19 +33,6 @@ export default function AdminBuilder() {
 
       setIsSuperAdmin(staffData?.is_super_admin || false);
       console.log('=== ADMIN STATUS RESULT ===', staffData?.is_super_admin);
-
-      // Get org_id from location
-      if (staffData?.primary_location_id) {
-        const { data: locationData } = await supabase
-          .from('locations')
-          .select('organization_id')
-          .eq('id', staffData.primary_location_id)
-          .single();
-        
-        if (locationData?.organization_id) {
-          setOrgId(locationData.organization_id);
-        }
-      }
     } catch (error) {
       setIsSuperAdmin(false);
     } finally {
@@ -76,40 +60,35 @@ export default function AdminBuilder() {
     <div className="container mx-auto p-6 space-y-6">
       <h1 className="text-3xl font-bold">Admin Builder</h1>
       
-      <Tabs defaultValue="dfi" className="w-full">
+      <Tabs defaultValue="static-dfi" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="dfi">DFI Focus Builder</TabsTrigger>
-          <TabsTrigger value="rda">RDA Focus Builder</TabsTrigger>
-          <TabsTrigger value="promoves">Pro-Move Library</TabsTrigger>
-          <TabsTrigger value="weekly">Weekly Pro Moves</TabsTrigger>
+          <TabsTrigger value="static-dfi">DFI Onboarding (C1-3)</TabsTrigger>
+          <TabsTrigger value="static-rda">RDA Onboarding (C1-3)</TabsTrigger>
+          <TabsTrigger value="sequencer">Sequencer (Read-Only)</TabsTrigger>
+          <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="dfi" className="space-y-6">
-          <h2 className="text-xl font-semibold">Onboarding (Cycles 1–3)</h2>
+        <TabsContent value="static-dfi" className="space-y-6">
+          <h2 className="text-xl font-semibold">Static Onboarding Builder - DFI (Cycles 1–3)</h2>
           <SimpleFocusBuilder roleFilter={1} />
-          
-          <Separator className="my-8" />
-          
-          <h2 className="text-xl font-semibold">Dynamic (Cycle 4+)</h2>
-          {orgId && <DynamicFocusSection roleId={1} orgId={orgId} />}
         </TabsContent>
 
-        <TabsContent value="rda" className="space-y-6">
-          <h2 className="text-xl font-semibold">Onboarding (Cycles 1–3)</h2>
+        <TabsContent value="static-rda" className="space-y-6">
+          <h2 className="text-xl font-semibold">Static Onboarding Builder - RDA (Cycles 1–3)</h2>
           <SimpleFocusBuilder roleFilter={2} />
-          
-          <Separator className="my-8" />
-          
-          <h2 className="text-xl font-semibold">Dynamic (Cycle 4+)</h2>
-          {orgId && <DynamicFocusSection roleId={2} orgId={orgId} />}
         </TabsContent>
         
-        <TabsContent value="promoves" className="space-y-6">
-          <ProMoveLibrary />
-        </TabsContent>
-        
-        <TabsContent value="weekly" className="space-y-6">
+        <TabsContent value="sequencer" className="space-y-6">
+          <h2 className="text-xl font-semibold">Global Sequencer (Read-Only Preview)</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            View ranked pro moves for Cycle 4+. The global sequencer automatically generates weekly plans on Mondays at 12:01 AM.
+          </p>
           <WeeklyProMovesPanel />
+        </TabsContent>
+        
+        <TabsContent value="library" className="space-y-6">
+          <h2 className="text-xl font-semibold">Pro-Move Library</h2>
+          <ProMoveLibrary />
         </TabsContent>
       </Tabs>
     </div>

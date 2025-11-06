@@ -176,11 +176,20 @@ Deno.serve(async (req) => {
         roleLogs.push(`[Generate Next] Checking ${nextWeekStr}`);
         let rankSnapshot: any = null;
         let generatedPicks: number[] = [];
+        let wroteCount = 0;
         
         if (!dryRun) {
-          const genResult = await generateWeekPlan(supabase, null, roleId, nextWeekStr, globalTz, true, 'proposed', roleLogs);
+          const genResult = await generateWeekPlan(supabase, null, roleId, nextWeekStr, globalTz, !proposeOnly, 'proposed', roleLogs);
           rankSnapshot = genResult?.rankSnapshot || null;
           generatedPicks = genResult?.picks || [];
+          wroteCount = genResult?.wroteCount || 0;
+          
+          // Assert we wrote exactly 3 rows
+          if (wroteCount !== 3) {
+            roleLogs.push(`[Generate Next] ⚠️ WARNING: Expected 3 rows, wrote ${wroteCount}`);
+          } else {
+            roleLogs.push(`[Generate Next] ✅ Wrote ${wroteCount} rows for ${nextWeekStr}`);
+          }
         } else {
           roleLogs.push('[Generate Next] Skipped (dry run)');
         }
@@ -226,6 +235,9 @@ Deno.serve(async (req) => {
           status: 'success',
           currentWeek: currentWeekStr,
           nextWeek: nextWeekStr,
+          wroteCount,
+          picks: generatedPicks,
+          mode: proposeOnly ? 'proposeOnly' : 'rollover',
           logs: roleLogs
         });
 
@@ -320,7 +332,7 @@ function toZonedStart(now: Date, tz: string): Date {
 }
 
 // Generate a week's plan (global: org_id = null)
-// Returns: { picks: number[], rankSnapshot: any }
+// Returns: { picks: number[], rankSnapshot: any, wroteCount: number }
 async function generateWeekPlan(
   supabase: any, 
   orgId: string | null,
@@ -330,7 +342,7 @@ async function generateWeekPlan(
   respectOverride: boolean = true,
   status: 'proposed' | 'locked' = 'proposed',
   logs: string[] = []
-): Promise<{ picks: number[]; rankSnapshot: any } | null> {
+): Promise<{ picks: number[]; rankSnapshot: any; wroteCount: number } | null> {
   // Check if week is overridden
   if (respectOverride) {
     const { data: existing } = await supabase
@@ -439,13 +451,18 @@ async function generateWeekPlan(
     throw new Error(`Failed to insert plan: ${insertError.message}`);
   }
 
+  // Use insertData length as fallback if count is null
+  const actualCount = count !== null ? count : (insertData?.length || 0);
+
   // Verify we inserted exactly 3 rows
-  if (count !== 3) {
-    logs.push(`[generateWeekPlan] ⚠️ PARTIAL WEEK: Expected 3 rows, got ${count}`);
-    console.warn(`[generateWeekPlan] Row count mismatch`, { expected: 3, actual: count });
+  if (actualCount !== 3) {
+    logs.push(`[generateWeekPlan] ⚠️ PARTIAL WEEK: Expected 3 rows, got ${actualCount}`);
+    console.warn(`[generateWeekPlan] Row count mismatch`, { expected: 3, actual: actualCount, countWasNull: count === null });
+  } else {
+    logs.push(`[generateWeekPlan] ✅ Wrote ${actualCount} rows successfully`);
   }
 
-  logs.push(`[generateWeekPlan] Generated ${count} moves for ${weekStartDate} (status: ${status}) ✓`);
+  logs.push(`[generateWeekPlan] Generated ${actualCount} moves for ${weekStartDate} (status: ${status}) ✓`);
   
-  return { picks, rankSnapshot };
+  return { picks, rankSnapshot, wroteCount: actualCount };
 }

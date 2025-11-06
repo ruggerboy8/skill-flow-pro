@@ -147,13 +147,25 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
         throw new Error(result.error || 'Failed to propose week');
       }
 
-      toast({
-        title: 'Success',
-        description: `Proposed next week with sequencer picks`,
-      });
+      // Verify we wrote 3 rows
+      if (result?.wroteCount !== 3) {
+        console.warn('[Propose Next Week] Unexpected row count:', result);
+        toast({
+          title: 'Partial Success',
+          description: `Wrote ${result?.wroteCount || 0} rows for ${result?.nextWeek}. Expected 3.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: `Proposed ${result.nextWeek} with 3 sequencer picks (${result.picks?.join(', ')})`,
+        });
+      }
 
+      console.log('[Propose Next Week] Result:', result);
       onRefresh?.();
     } catch (error: any) {
+      console.error('[Propose Next Week] Error:', error);
       toast({
         title: 'Error',
         description: error.message,

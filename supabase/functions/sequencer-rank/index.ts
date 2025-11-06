@@ -8,6 +8,16 @@ const corsHeaders = {
 
 interface RankRequest {
   roleId: 1 | 2;
+  // New planner contract
+  asOfWeek?: string;
+  lookbackWeeks?: number;
+  preset?: 'balanced' | 'confidence_recovery' | 'eval_focus' | 'variety_first';
+  constraints?: {
+    minDistinctDomains?: number;
+    cooldownWeeks?: number;
+    excludeMoveIds?: number[];
+  };
+  // Legacy fields (backward compatible)
   effectiveDate?: string;
   timezone?: string;
   weights?: { C: number; R: number; E: number; D: number };
@@ -34,13 +44,23 @@ serve(async (req) => {
 
     const body: RankRequest = await req.json();
 
-    // Default values
+    // Support both new planner contract and legacy contract
     const timezone = body.timezone || 'America/Chicago';
-    const effectiveDate = body.effectiveDate || new Date().toISOString().split('T')[0];
+    const effectiveDate = body.asOfWeek || body.effectiveDate || new Date().toISOString().split('T')[0];
+    const lookbackWeeks = body.lookbackWeeks ?? 9;
+    const preset = body.preset || 'balanced';
     
-    // Normalize weights
-    let weights = body.weights || { C: 0.80, R: 0.00, E: 0.15, D: 0.05 };
-    const receivedWeights = JSON.stringify(body.weights);
+    // Map presets to weights
+    const presetWeights: Record<string, { C: number; R: number; E: number; D: number }> = {
+      balanced: { C: 0.50, R: 0.30, E: 0.15, D: 0.05 },
+      confidence_recovery: { C: 0.70, R: 0.15, E: 0.10, D: 0.05 },
+      eval_focus: { C: 0.35, R: 0.20, E: 0.40, D: 0.05 },
+      variety_first: { C: 0.40, R: 0.20, E: 0.10, D: 0.30 },
+    };
+    
+    // Use preset weights if no custom weights provided
+    let weights = body.weights || presetWeights[preset] || presetWeights.balanced;
+    const receivedWeights = JSON.stringify(body.weights || preset);
     const sum = weights.C + weights.R + weights.E + weights.D;
     if (Math.abs(sum - 1.0) > 0.001) {
       weights = {
@@ -53,18 +73,26 @@ serve(async (req) => {
 
     const config = {
       weights,
-      cooldownWeeks: body.cooldownWeeks ?? 2,
-      diversityMinDomainsPerWeek: body.diversityMinDomainsPerWeek ?? 2,
+      cooldownWeeks: body.constraints?.cooldownWeeks ?? body.cooldownWeeks ?? 4,
+      diversityMinDomainsPerWeek: body.constraints?.minDistinctDomains ?? body.diversityMinDomainsPerWeek ?? 2,
       recencyHorizonWeeks: body.recencyHorizonWeeks ?? 0,
       ebPrior: body.ebPrior ?? 0.70,
       ebK: body.ebK ?? 20,
       trimPct: body.trimPct ?? 0.05,
       evalCap: body.evalCap ?? 0.25,
+      excludeMoveIds: body.constraints?.excludeMoveIds ?? [],
     };
 
     const logs: string[] = [];
-    logs.push(`Starting ranking for role ${body.roleId} on ${effectiveDate}`);
-    logs.push(`Received weights: ${receivedWeights}`);
+    const rankVersion = 'v3.3';
+    const rulesApplied: string[] = [
+      `cooldown=${config.cooldownWeeks}w`,
+      `minDistinctDomains=${config.diversityMinDomainsPerWeek}`,
+      `lookback=${lookbackWeeks}w`,
+    ];
+    
+    logs.push(`Starting ranking for role ${body.roleId} on ${effectiveDate} (${preset})`);
+    logs.push(`Received: ${receivedWeights}`);
     logs.push(`Normalized weights: C=${weights.C.toFixed(3)}, R=${weights.R.toFixed(3)}, E=${weights.E.toFixed(3)}, D=${weights.D.toFixed(3)}`);
     if (weights.R === 0) {
       logs.push('Recency disabled (wR=0) - cooldown and diversity still apply');
@@ -72,8 +100,8 @@ serve(async (req) => {
 
     // Calculate cutoff dates
     const effectiveDateObj = new Date(effectiveDate);
-    const cutoff18w = new Date(effectiveDateObj);
-    cutoff18w.setDate(cutoff18w.getDate() - 18 * 7);
+    const cutoffLookback = new Date(effectiveDateObj);
+    cutoffLookback.setDate(cutoffLookback.getDate() - lookbackWeeks * 7);
     const cutoff8w = new Date(effectiveDateObj);
     cutoff8w.setDate(cutoff8w.getDate() - 8 * 7);
 
@@ -103,7 +131,7 @@ serve(async (req) => {
       ]) || []
     );
 
-    const eligible = eligibleMoves?.map((m: any) => {
+    let eligible = eligibleMoves?.map((m: any) => {
       const comp = competencyMap.get(m.competency_id);
       return {
         id: m.action_id,
@@ -113,6 +141,12 @@ serve(async (req) => {
         domainName: comp?.domainName || 'Unknown',
       };
     }) || [];
+
+    // Apply exclusions
+    if (config.excludeMoveIds.length > 0) {
+      eligible = eligible.filter(m => !config.excludeMoveIds.includes(m.id));
+      logs.push(`Excluded ${config.excludeMoveIds.length} moves, ${eligible.length} remaining`);
+    }
 
     logs.push(`Found ${eligible.length} eligible moves`);
 
@@ -138,13 +172,13 @@ serve(async (req) => {
       return { status: 'ok', n2w, recentMeans };
     };
 
-    // 2. Fetch confidence history (last 18 weeks) - handle both weekly_focus and weekly_plan
+    // 2. Fetch confidence history (lookback weeks) - handle both weekly_focus and weekly_plan
     // Note: We explicitly select columns to avoid PostgREST auto-join attempts
     const { data: confData, error: confError } = await supabase
       .from('weekly_scores')
       .select('confidence_score, confidence_date, weekly_focus_id')
       .not('confidence_score', 'is', null)
-      .gte('confidence_date', cutoff18w.toISOString());
+      .gte('confidence_date', cutoffLookback.toISOString());
 
     if (confError) throw confError;
 
@@ -425,17 +459,19 @@ serve(async (req) => {
       logs.push(`  Final: ${sample.final.toFixed(3)}, Drivers: ${sample.drivers.join(', ')}`);
     }
 
-    // Apply cooldown and pick 3
+    // Apply cooldown and pick top 6 for planner
     const eligibleNext = scored.filter(m => m.weeksSince >= config.cooldownWeeks);
     const nextPicks = [];
     const usedDomains = new Set<number>();
+    let relaxedConstraintNote: string | null = null;
 
     if (eligibleNext.length > 0) {
       nextPicks.push(eligibleNext[0]);
       usedDomains.add(eligibleNext[0].domainId);
     }
 
-    for (let i = 1; i < eligibleNext.length && nextPicks.length < 3; i++) {
+    // Pick up to 6 with diversity preference
+    for (let i = 1; i < eligibleNext.length && nextPicks.length < 6; i++) {
       const candidate = eligibleNext[i];
       if (usedDomains.size < config.diversityMinDomainsPerWeek && usedDomains.has(candidate.domainId)) {
         continue;
@@ -444,13 +480,20 @@ serve(async (req) => {
       usedDomains.add(candidate.domainId);
     }
 
-    if (nextPicks.length < 3) {
-      logs.push('Relaxing diversity constraint for Next');
-      for (let i = 1; i < eligibleNext.length && nextPicks.length < 3; i++) {
+    // Relax diversity if needed to reach 6
+    if (nextPicks.length < 6) {
+      logs.push('Relaxing diversity constraint to complete Top 6');
+      relaxedConstraintNote = 'Not enough candidates under current constraints; diversity requirements were relaxed to complete Top 6.';
+      for (let i = 1; i < eligibleNext.length && nextPicks.length < 6; i++) {
         if (!nextPicks.find(p => p.id === eligibleNext[i].id)) {
           nextPicks.push(eligibleNext[i]);
         }
       }
+    }
+    
+    // If still under 6, note it
+    if (nextPicks.length < 6) {
+      relaxedConstraintNote = `Only ${nextPicks.length} candidates available after applying cooldown. Consider reducing cooldown weeks or expanding the pro-move library.`;
     }
 
     // Compute Preview (advance state)
@@ -627,7 +670,58 @@ serve(async (req) => {
       });
     }
 
-    const response = {
+    // Format top 6 for planner UI
+    const top6 = nextPicks.map((pick, idx) => {
+      const formatted = formatRow(pick, effectiveDate);
+      
+      // Build competency tag
+      const competencies = competencyMap.get(pick.competencyId);
+      const competencyTag = `${formatted.domainName.split('.')[1] || 'UNK'}.${pick.competencyId}`;
+      
+      // Build reason summary
+      const reasons = [];
+      if (formatted.parts.C > 0.3) reasons.push(`Low avg confidence`);
+      if (formatted.weeksSinceSeen > 4) reasons.push(`not practiced in ${formatted.weeksSinceSeen} weeks`);
+      if (pick.eContrib > 0.05) reasons.push(`eval gap (${competencyTag})`);
+      if (formatted.parts.D > 0.1) reasons.push(`underrepresented domain`);
+      const reasonSummary = reasons.join('; ') || 'Balanced priority';
+      
+      return {
+        proMoveId: formatted.proMoveId,
+        name: formatted.name,
+        domain: formatted.domainName,
+        competencyTag,
+        score: formatted.finalScore,
+        breakdown: {
+          C: formatted.parts.C * weights.C,
+          R: formatted.parts.R * weights.R,
+          E: pick.eContrib,
+          D: formatted.parts.D * weights.D,
+        },
+        lastSeenWeeksAgo: formatted.weeksSinceSeen < 999 ? formatted.weeksSinceSeen : null,
+        cooldownOk: formatted.weeksSinceSeen >= config.cooldownWeeks,
+        cooldownReason: formatted.weeksSinceSeen < config.cooldownWeeks 
+          ? `Used ${config.cooldownWeeks - formatted.weeksSinceSeen}w ago` 
+          : null,
+        reasonSummary,
+      };
+    });
+
+    // New planner response format
+    const plannerResponse = {
+      roleId: body.roleId,
+      asOfWeek: effectiveDate,
+      preset,
+      weights,
+      rankVersion,
+      poolSize: eligible.length,
+      rulesApplied,
+      relaxedConstraintNote,
+      top6,
+    };
+
+    // Legacy response format (for backward compatibility)
+    const legacyResponse = {
       timezone,
       weekStartNext: new Date(effectiveDateObj).toLocaleDateString('en-US'),
       weekStartPreview: new Date(previewDate).toLocaleDateString('en-US'),
@@ -636,6 +730,9 @@ serve(async (req) => {
       ranked,
       logs,
     };
+
+    // Return planner format if asOfWeek is provided, otherwise legacy
+    const response = body.asOfWeek ? plannerResponse : legacyResponse;
 
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

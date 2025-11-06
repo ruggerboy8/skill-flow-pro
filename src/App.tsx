@@ -36,6 +36,7 @@ import AdminBuilder from "@/pages/AdminBuilder";
 import CycleList from "@/pages/admin/CycleList";
 import WeekList from "@/pages/admin/WeekList";
 import WeekEditor from "@/pages/admin/WeekEditor";
+import PlannerPage from "@/pages/planner/PlannerPage";
 import NotFound from "@/pages/NotFound";
 import StatsLayout from "@/pages/StatsLayout";
 import AtAGlance from "@/pages/stats/AtAGlance";
@@ -114,6 +115,9 @@ function AppRoutes() {
         <Route path="builder/:roleId" element={<CycleList />} />
         <Route path="builder/:roleId/:cycle" element={<WeekList />} />
         <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />
+        
+        <Route path="planner/dfi" element={<PlannerPage roleId={1} roleName="DFI" />} />
+        <Route path="planner/rda" element={<PlannerPage roleId={2} roleName="RDA" />} />
 
         {/* legacy redirects */}
         <Route path="admin/organizations" element={<Navigate to="/admin?tab=organizations" replace />} />

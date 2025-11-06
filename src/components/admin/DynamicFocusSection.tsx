@@ -176,11 +176,34 @@ export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
   const handleSimulateMonday = async () => {
     setRunningNow(true);
     try {
-      // Simulate being on Monday 11/10 at 12:01am to trigger rollover
+      // Find the most recent locked week to determine next Monday
+      const { data: latestLocked, error: fetchError } = await supabase
+        .from('weekly_plan' as any)
+        .select('week_start_date')
+        .is('org_id', null)
+        .eq('role_id', roleId)
+        .eq('status', 'locked')
+        .order('week_start_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError || !latestLocked) {
+        throw new Error('No locked week found. Run "Run Now" first.');
+      }
+
+      // Calculate next Monday (7 days after the latest locked week)
+      const nextMonday = format(
+        addWeeks(new Date((latestLocked as any).week_start_date), 1),
+        'yyyy-MM-dd'
+      );
+      
+      // Simulate being on that Monday at 12:01am CT (06:01 UTC)
+      const asOfDate = `${nextMonday}T06:01:00Z`;
+
       const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
         body: { 
           roles: [roleId], 
-          asOf: '2025-11-10T06:01:00Z',  // 12:01am CT on Monday 11/10
+          asOf: asOfDate,
           force: true
         }
       });
@@ -189,7 +212,7 @@ export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
 
       toast({
         title: 'Monday Rollover Complete',
-        description: `Advanced to next week`
+        description: `Advanced to week of ${nextMonday}`
       });
 
       // Reload all weeks to show the new current state

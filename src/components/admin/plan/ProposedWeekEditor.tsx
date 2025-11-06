@@ -104,40 +104,25 @@ export function ProposedWeekEditor({ roleId, weekStartDate, onRefresh }: Propose
 
   const handleSave = async () => {
     try {
-      // Delete existing proposed rows
-      const { error: deleteError } = await supabase
-        .from('weekly_plan')
-        .delete()
-        .is('org_id', null)
-        .eq('role_id', roleId)
-        .eq('week_start_date', weekStartDate)
-        .eq('status', 'proposed');
+      // Update rows in place, preserving rank_version and rank_snapshot
+      for (const row of editedRows) {
+        const { error } = await supabase
+          .from('weekly_plan')
+          .update({
+            action_id: row.action_id,
+            generated_by: 'manual',
+            overridden: true,
+            overridden_at: new Date().toISOString(),
+            // rank_version and rank_snapshot preserved automatically
+          })
+          .eq('id', row.id);
 
-      if (deleteError) throw deleteError;
-
-      // Insert updated rows
-      const rowsToInsert = editedRows.map((row) => ({
-        org_id: null,
-        role_id: roleId,
-        week_start_date: weekStartDate,
-        display_order: row.display_order,
-        action_id: row.action_id,
-        status: 'proposed',
-        generated_by: 'manual',
-        overridden: true,
-        overridden_at: new Date().toISOString(),
-        self_select: false
-      }));
-
-      const { error: insertError } = await supabase
-        .from('weekly_plan')
-        .insert(rowsToInsert);
-
-      if (insertError) throw insertError;
+        if (error) throw error;
+      }
 
       toast({
         title: 'Success',
-        description: 'Proposed week updated and marked as overridden'
+        description: 'Proposed week updated and marked as overridden. Rank provenance preserved.'
       });
 
       setEditMode(false);
@@ -167,17 +152,26 @@ export function ProposedWeekEditor({ roleId, weekStartDate, onRefresh }: Propose
       <div className="text-center py-8 text-muted-foreground">
         <Clock className="h-12 w-12 mx-auto mb-2 opacity-50" />
         <p>No proposed week found for {weekStartDate}</p>
-        <p className="text-sm mt-1">Run the sequencer to generate a proposed week</p>
+        <p className="text-sm mt-1">Use Sequencer Controls (Dev) to generate a proposed week</p>
       </div>
     );
   }
 
+  const isSequencerGenerated = rows.every(r => r.generated_by === 'auto');
+  const isManualOverride = rows.some(r => r.generated_by === 'manual');
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Edit2 className="h-4 w-4" />
-          <span>Editable proposed assignments</span>
+        <div className="flex items-center gap-2">
+          <Edit2 className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Editable proposed assignments</span>
+          {isSequencerGenerated && (
+            <Badge variant="default">🤖 Sequencer-Generated</Badge>
+          )}
+          {isManualOverride && (
+            <Badge variant="secondary">✏️ Manually Overridden</Badge>
+          )}
         </div>
         {!editMode ? (
           <Button onClick={handleEdit} size="sm">

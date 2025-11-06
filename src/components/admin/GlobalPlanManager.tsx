@@ -5,11 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { AlertCircle, CheckCircle2, AlertTriangle, Clock, Lock, FileText, History, Zap } from 'lucide-react';
 import { LockedWeekViewer } from './plan/LockedWeekViewer';
 import { ProposedWeekEditor } from './plan/ProposedWeekEditor';
 import { PlanHistory } from './plan/PlanHistory';
 import { TimeTravelPanel } from './plan/TimeTravelPanel';
+import { SequencerDevPanel } from './SequencerDevPanel';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { addDays, addWeeks } from 'date-fns';
 
@@ -194,12 +195,25 @@ export function GlobalPlanManager({ roleId, roleName }: GlobalPlanManagerProps) 
             </AccordionContent>
           </AccordionItem>
 
+          {/* Sequencer Controls (Dev) */}
+          <AccordionItem value="sequencer">
+            <AccordionTrigger>
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-orange-500" />
+                <span>Sequencer Controls (Dev)</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <SequencerDevPanel roleId={roleId} roleName={roleName} onRefresh={handleRefresh} />
+            </AccordionContent>
+          </AccordionItem>
+
           {/* History */}
           <AccordionItem value="history">
             <AccordionTrigger>
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                History
+                <History className="h-4 w-4" />
+                <span>Plan History</span>
               </div>
             </AccordionTrigger>
             <AccordionContent>
@@ -212,7 +226,7 @@ export function GlobalPlanManager({ roleId, roleName }: GlobalPlanManagerProps) 
             <AccordionTrigger>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                Time-Travel Controls (Dev)
+                <span>Time Travel Panel (Dev)</span>
               </div>
             </AccordionTrigger>
             <AccordionContent>

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { addWeeks, addDays } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -268,32 +268,45 @@ export function GlobalSequencerTest({ roleId, roleName }: GlobalSequencerTestPro
   return (
     <Card className="border-primary/20">
       <CardHeader>
-        <CardTitle className="text-lg">Global Sequencer Test ({roleName})</CardTitle>
+        <CardTitle className="text-lg">Legacy Test Panel ({roleName})</CardTitle>
         <CardDescription>
-          Test global weekly_plan (org_id IS NULL) for Cycle 4+. Current week: {thisMondayStr}, Next: {nextMondayStr}
+          Legacy tools for testing. Use Sequencer Controls (Dev) for production workflows.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => { loadProMoves(); setSeedPickerOpen(true); }} disabled={loading} size="sm">
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Seed This Week (Locked) + Next Week (Proposed)
-          </Button>
-          <Button onClick={() => { loadProMoves(); setOverridePickerOpen(true); }} disabled={loading} size="sm" variant="outline">
-            Override Proposed
-          </Button>
-          <Button onClick={handleSimulateRollover} disabled={loading} size="sm" variant="outline">
-            Simulate Monday Rollover
-          </Button>
-          <Button onClick={handleClear} disabled={loading} size="sm" variant="destructive">
-            Clear Test Data
+          <Button onClick={handlePreview} disabled={loading} size="sm" variant="secondary">
+            Preview As Me
           </Button>
           <Button onClick={handleClearLegacyC4} disabled={loading} size="sm" variant="outline">
             Clear Legacy Cycle 4
           </Button>
-          <Button onClick={handlePreview} disabled={loading} size="sm" variant="secondary">
-            Preview As Me
-          </Button>
+        </div>
+
+        {/* Danger Zone - Manual Bypass */}
+        <div className="mt-6 p-4 border-2 border-destructive/50 rounded-lg space-y-2">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <span className="font-semibold text-destructive">Danger Zone - Bypass Sequencer (Dev Only)</span>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">
+            These actions bypass the sequencer. Use only for emergency data seeding.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => { loadProMoves(); setSeedPickerOpen(true); }} disabled={loading} size="sm" variant="destructive">
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Manual Seed (6 Moves)
+            </Button>
+            <Button onClick={() => { loadProMoves(); setOverridePickerOpen(true); }} disabled={loading} size="sm" variant="outline">
+              Manual Override
+            </Button>
+            <Button onClick={handleSimulateRollover} disabled={loading} size="sm" variant="outline">
+              Simulate Rollover
+            </Button>
+            <Button onClick={handleClear} disabled={loading} size="sm" variant="destructive">
+              Clear All Data
+            </Button>
+          </div>
         </div>
 
         {previewData && (

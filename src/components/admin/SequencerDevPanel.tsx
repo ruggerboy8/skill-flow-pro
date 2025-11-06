@@ -130,80 +130,26 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
   const handleProposeNextWeek = async () => {
     setLoading(true);
     try {
-      const { nextMondayStr } = mondayStrings(asOfDate || undefined);
-
-      // Call sequencer-rank to get top 3
-      const { data: rankData, error: rankError } = await supabase.functions.invoke('sequencer-rank', {
+      // Call sequencer-rollover with proposeOnly mode
+      const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
         body: {
-          roleId,
-          effectiveDate: asOfDate || undefined,
-          timezone: APP_TZ,
-          weights,
+          roles: [roleId],
+          asOf: asOfDate || undefined,
+          force: true,
+          proposeOnly: true,
         },
       });
 
-      if (rankError) throw rankError;
+      if (error) throw error;
 
-      const top3 = rankData?.next?.slice(0, 3);
-      if (!top3 || top3.length < 3) {
-        throw new Error('Insufficient moves to propose');
+      const result = data?.results?.[0];
+      if (result?.status === 'error') {
+        throw new Error(result.error || 'Failed to propose week');
       }
-
-      // Check for overridden week
-      const { data: existing } = await supabase
-        .from('weekly_plan')
-        .select('overridden')
-        .is('org_id', null)
-        .eq('role_id', roleId)
-        .eq('week_start_date', nextMondayStr)
-        .limit(1)
-        .single();
-
-      if (existing?.overridden) {
-        toast({
-          title: 'Week Already Overridden',
-          description: 'Manual overrides prevent regeneration',
-          variant: 'destructive',
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Delete existing proposed
-      await supabase
-        .from('weekly_plan')
-        .delete()
-        .is('org_id', null)
-        .eq('role_id', roleId)
-        .eq('week_start_date', nextMondayStr);
-
-      // Insert new proposed rows
-      const rows = top3.map((move: any, i: number) => ({
-        org_id: null,
-        role_id: roleId,
-        week_start_date: nextMondayStr,
-        display_order: i + 1,
-        action_id: move.proMoveId,
-        status: 'proposed',
-        generated_by: 'auto',
-        overridden: false,
-        self_select: false,
-        rank_version: rankData.ranked?.[0]?.drivers?.[0] || 'v1',
-        rank_snapshot: {
-          top3: rankData.next.slice(0, 3).map((m: any) => m.proMoveId),
-          top5: rankData.next.slice(0, 5).map((m: any) => m.proMoveId),
-          weights: rankData.weights || weights,
-          poolSize: rankData.ranked?.length || 0,
-        },
-      }));
-
-      const { error: insertError } = await supabase.from('weekly_plan').insert(rows);
-
-      if (insertError) throw insertError;
 
       toast({
         title: 'Success',
-        description: `Proposed ${nextMondayStr} with sequencer picks`,
+        description: `Proposed next week with sequencer picks`,
       });
 
       onRefresh?.();

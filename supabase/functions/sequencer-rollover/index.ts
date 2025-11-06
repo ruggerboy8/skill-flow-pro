@@ -92,19 +92,18 @@ Deno.serve(async (req) => {
     for (const roleId of roles) {
       const roleLogs: string[] = [];
       try {
-        // Step 1: Lock current week
+        // Step 1: Lock current week with row count verification
         roleLogs.push(`[Lock This Week] Locking ${currentWeekStr} for role ${roleId}`);
         
-        // Check if current week exists and what status it has
+        // First, check what exists
         const { data: existingCurrent, error: checkError } = await supabase
           .from('weekly_plan')
           .select('id, status')
           .is('org_id', null)
           .eq('role_id', roleId)
-          .eq('week_start_date', currentWeekStr)
-          .limit(1);
+          .eq('week_start_date', currentWeekStr);
 
-        console.log(`[Lock This Week] Query result:`, { existingCurrent, checkError });
+        console.log(`[Lock This Week] Query result:`, { count: existingCurrent?.length, existingCurrent, checkError });
         roleLogs.push(`[Lock This Week] Found ${existingCurrent?.length || 0} existing rows`);
 
         if (!existingCurrent || existingCurrent.length === 0) {
@@ -113,19 +112,22 @@ Deno.serve(async (req) => {
           if (!dryRun) {
             await generateWeekPlan(supabase, null, roleId, currentWeekStr, globalTz, false, 'locked', roleLogs);
           }
-        } else if (existingCurrent[0].status === 'locked') {
-          // Already locked - this shouldn't happen in normal flow
-          roleLogs.push(`[Lock This Week] Week is already locked - skipping lock step`);
-        } else if (existingCurrent[0].status === 'proposed') {
-          // Update proposed → locked
-          roleLogs.push(`[Lock This Week] Updating proposed week to locked`);
+        } else if (existingCurrent.every(row => row.status === 'locked')) {
+          // Already locked - normal steady state
+          roleLogs.push(`[Lock This Week] Week is already locked (${existingCurrent.length} rows) ✓`);
+        } else {
+          // Has proposed rows - lock them
+          const proposedRows = existingCurrent.filter(row => row.status === 'proposed');
+          roleLogs.push(`[Lock This Week] Found ${proposedRows.length} proposed rows to lock`);
+          
           if (!dryRun) {
-            console.log(`[Lock This Week] Attempting UPDATE with:`, {
+            console.log(`[Lock This Week] Attempting UPDATE:`, {
               org_id: null,
               role_id: roleId,
               week_start_date: currentWeekStr,
               current_status: 'proposed',
-              new_status: 'locked'
+              new_status: 'locked',
+              expected_rows: proposedRows.length
             });
 
             const { data: updateData, error: lockError, count } = await supabase
@@ -135,15 +137,27 @@ Deno.serve(async (req) => {
               .eq('role_id', roleId)
               .eq('week_start_date', currentWeekStr)
               .eq('status', 'proposed')
-              .select();
+              .select('*', { count: 'exact' });
 
             console.log(`[Lock This Week] UPDATE result:`, { updateData, lockError, count });
 
             if (lockError) {
-              roleLogs.push(`[Lock This Week] RLS/UPDATE Error: ${lockError.message}`);
+              roleLogs.push(`[Lock This Week] ERROR: ${lockError.message}`);
               console.error(`[Lock This Week] Full error:`, lockError);
+              throw new Error(`Failed to lock week: ${lockError.message}`);
+            }
+            
+            // Assert we locked the expected number of rows
+            if (count !== proposedRows.length) {
+              roleLogs.push(`[Lock This Week] WARNING: Expected to lock ${proposedRows.length} rows but locked ${count}`);
+              console.warn(`[Lock This Week] Row count mismatch`, { expected: proposedRows.length, actual: count });
             } else {
-              roleLogs.push(`[Lock This Week] Locked successfully (${count} rows, data: ${JSON.stringify(updateData)}) ✓`);
+              roleLogs.push(`[Lock This Week] Locked ${count} rows successfully ✓`);
+            }
+            
+            // If we didn't lock exactly 3, warn loudly
+            if (count !== 3) {
+              roleLogs.push(`[Lock This Week] ⚠️ PARTIAL WEEK: Expected 3 rows, locked ${count}`);
             }
           } else {
             roleLogs.push('[Lock This Week] Skipped (dry run)');
@@ -158,25 +172,34 @@ Deno.serve(async (req) => {
           roleLogs.push('[Generate Next] Skipped (dry run)');
         }
 
-        // Log to sequencer_runs
+        // Log to sequencer_runs (non-fatal)
         if (!dryRun) {
-          console.log(`[sequencer_runs] Attempting INSERT with org_id=NULL`);
-          const { data: runData, error: runError } = await supabase
-            .from('sequencer_runs')
-            .insert({
-              org_id: null,
-              role_id: roleId,
-              target_week_start: currentWeekStr,
-              mode: 'global_cron',
-              success: true,
-              logs: roleLogs,
-              run_at: new Date().toISOString()
-            })
-            .select();
-          
-          console.log(`[sequencer_runs] INSERT result:`, { runData, runError });
-          if (runError) {
-            console.error(`[sequencer_runs] Failed to log run:`, runError);
+          try {
+            console.log(`[sequencer_runs] Attempting INSERT with org_id=NULL, mode=global_cron`);
+            const { data: runData, error: runError } = await supabase
+              .from('sequencer_runs')
+              .insert({
+                org_id: null,
+                role_id: roleId,
+                target_week_start: currentWeekStr,
+                mode: 'global_cron',
+                success: true,
+                logs: roleLogs.slice(0, 50), // Limit log size
+                run_at: new Date().toISOString()
+              })
+              .select();
+            
+            console.log(`[sequencer_runs] INSERT result:`, { runData, runError });
+            
+            if (runError) {
+              console.warn(`[sequencer_runs] Non-fatal logging error:`, runError);
+              roleLogs.push(`[sequencer_runs] Logging failed (non-fatal): ${runError.message}`);
+            } else {
+              roleLogs.push(`[sequencer_runs] Logged run successfully ✓`);
+            }
+          } catch (logError: any) {
+            console.warn('[sequencer_runs] Exception during logging (non-fatal):', logError);
+            roleLogs.push(`[sequencer_runs] Exception (non-fatal): ${logError.message}`);
           }
         }
 
@@ -340,7 +363,7 @@ async function generateWeekPlan(
     logs.push(`[generateWeekPlan] Delete error: ${deleteError.message}`);
   }
 
-  // Insert new plan (global: org_id = NULL)
+  // Insert new plan (global: org_id = NULL) using upsert to handle duplicates
   const planRows = nextPicks.slice(0, 3).map((pick: any, index: number) => ({
     org_id: null,
     role_id: roleId,
@@ -353,20 +376,29 @@ async function generateWeekPlan(
     overridden: false
   }));
 
-  console.log(`[generateWeekPlan] Attempting INSERT with:`, planRows);
+  console.log(`[generateWeekPlan] Attempting UPSERT with:`, planRows);
 
-  const { data: insertData, error: insertError } = await supabase
+  const { data: insertData, error: insertError, count } = await supabase
     .from('weekly_plan')
-    .insert(planRows)
+    .upsert(planRows, { 
+      onConflict: 'role_id,week_start_date,display_order',
+      count: 'exact'
+    })
     .select();
 
-  console.log(`[generateWeekPlan] INSERT result:`, { insertData, insertError });
+  console.log(`[generateWeekPlan] UPSERT result:`, { insertData, insertError, count });
 
   if (insertError) {
-    logs.push(`[generateWeekPlan] RLS/INSERT Error: ${insertError.message}`);
+    logs.push(`[generateWeekPlan] ERROR: ${insertError.message}`);
     console.error(`[generateWeekPlan] Full insert error:`, insertError);
     throw new Error(`Failed to insert plan: ${insertError.message}`);
   }
 
-  logs.push(`[generateWeekPlan] Generated ${planRows.length} moves for ${weekStartDate} (status: ${status})`);
+  // Verify we inserted/updated exactly 3 rows
+  if (count !== 3) {
+    logs.push(`[generateWeekPlan] ⚠️ PARTIAL WEEK: Expected 3 rows, got ${count}`);
+    console.warn(`[generateWeekPlan] Row count mismatch`, { expected: 3, actual: count });
+  }
+
+  logs.push(`[generateWeekPlan] Generated ${count} moves for ${weekStartDate} (status: ${status}) ✓`);
 }

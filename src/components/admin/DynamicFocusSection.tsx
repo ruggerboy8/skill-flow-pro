@@ -179,7 +179,7 @@ export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
       // Find the most recent locked week to determine next Monday
       const { data: latestLocked, error: fetchError } = await supabase
         .from('weekly_plan' as any)
-        .select('week_start_date')
+        .select('week_start_date, status')
         .is('org_id', null)
         .eq('role_id', roleId)
         .eq('status', 'locked')
@@ -191,14 +191,23 @@ export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
         throw new Error('No locked week found. Run "Run Now" first.');
       }
 
+      const currentWeekStr = (latestLocked as any).week_start_date;
+      
       // Calculate next Monday (7 days after the latest locked week)
       const nextMonday = format(
-        addWeeks(new Date((latestLocked as any).week_start_date), 1),
+        addWeeks(new Date(currentWeekStr), 1),
         'yyyy-MM-dd'
       );
       
       // Simulate being on that Monday at 12:01am CT (06:01 UTC)
       const asOfDate = `${nextMonday}T06:01:00Z`;
+
+      console.log('[Test Monday Rollover] Invoking with:', {
+        roleId,
+        currentWeek: currentWeekStr,
+        nextMonday,
+        asOfDate
+      });
 
       const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
         body: { 
@@ -210,15 +219,30 @@ export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
 
       if (error) throw error;
 
+      console.log('[Test Monday Rollover] Response:', data);
+
+      // Verify the result by checking both weeks
+      const { data: afterState } = await supabase
+        .from('weekly_plan' as any)
+        .select('week_start_date, status, display_order')
+        .is('org_id', null)
+        .eq('role_id', roleId)
+        .in('week_start_date', [currentWeekStr, nextMonday, format(addWeeks(new Date(nextMonday), 1), 'yyyy-MM-dd')])
+        .order('week_start_date')
+        .order('display_order');
+
+      console.table(afterState);
+
       toast({
         title: 'Monday Rollover Complete',
-        description: `Advanced to week of ${nextMonday}`
+        description: `Advanced to week of ${nextMonday}. Check console for details.`
       });
 
       // Reload all weeks to show the new current state
       await loadWeeks();
       await loadHealthStatus();
     } catch (error: any) {
+      console.error('[Test Monday Rollover] Error:', error);
       toast({
         title: 'Error',
         description: error.message,

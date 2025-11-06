@@ -206,7 +206,7 @@ export function GlobalPlanManager({ roleId, roleName }: GlobalPlanManagerProps) 
               </div>
             </AccordionTrigger>
             <AccordionContent>
-              <SequencerDevPanel roleId={roleId} roleName={roleName} onRefresh={handleRefresh} />
+              <SequencerDevPanel roleId={roleId} roleName={roleName} />
             </AccordionContent>
           </AccordionItem>
 

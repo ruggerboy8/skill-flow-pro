@@ -3,11 +3,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GlobalPlanManager } from '@/components/admin/GlobalPlanManager';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
-import { WeeklyProMovesPanel } from '@/components/admin/WeeklyProMovesPanel';
-import { GlobalSequencerTest } from '@/components/admin/GlobalSequencerTest';
+import { SequencerDevPanel } from '@/components/admin/SequencerDevPanel';
 
 export default function AdminBuilder() {
   console.log('=== NEW ADMINBUILDER LOADING ===');
@@ -63,32 +61,26 @@ export default function AdminBuilder() {
       <h1 className="text-3xl font-bold">Admin Builder</h1>
       
       <Tabs defaultValue="dfi" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="dfi">DFI Plan</TabsTrigger>
-          <TabsTrigger value="rda">RDA Plan</TabsTrigger>
-          <TabsTrigger value="dfi-legacy">DFI Onboarding</TabsTrigger>
-          <TabsTrigger value="rda-legacy">RDA Onboarding</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="dfi">DFI</TabsTrigger>
+          <TabsTrigger value="rda">RDA</TabsTrigger>
           <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
         </TabsList>
         
         <TabsContent value="dfi" className="space-y-6">
-          <GlobalPlanManager roleId={1} roleName="DFI" />
+          <h2 className="text-xl font-semibold">Legacy Week Builder (Cycles 1–3)</h2>
+          <SimpleFocusBuilder roleFilter={1} />
+          
+          <h2 className="text-xl font-semibold mt-8">Pro-Move Recommender</h2>
+          <SequencerDevPanel roleId={1} roleName="DFI" />
         </TabsContent>
 
         <TabsContent value="rda" className="space-y-6">
-          <GlobalPlanManager roleId={2} roleName="RDA" />
-        </TabsContent>
-        
-        <TabsContent value="dfi-legacy" className="space-y-6">
-          <h2 className="text-xl font-semibold">Static Onboarding Builder - DFI (Cycles 1–3)</h2>
-          <GlobalSequencerTest roleId={1} roleName="DFI" />
-          <SimpleFocusBuilder roleFilter={1} />
-        </TabsContent>
-
-        <TabsContent value="rda-legacy" className="space-y-6">
-          <h2 className="text-xl font-semibold">Static Onboarding Builder - RDA (Cycles 1–3)</h2>
-          <GlobalSequencerTest roleId={2} roleName="RDA" />
+          <h2 className="text-xl font-semibold">Legacy Week Builder (Cycles 1–3)</h2>
           <SimpleFocusBuilder roleFilter={2} />
+          
+          <h2 className="text-xl font-semibold mt-8">Pro-Move Recommender</h2>
+          <SequencerDevPanel roleId={2} roleName="RDA" />
         </TabsContent>
         
         <TabsContent value="library" className="space-y-6">

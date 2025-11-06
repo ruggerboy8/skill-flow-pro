@@ -10,7 +10,7 @@ import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { RecommenderPanel } from '@/components/planner/RecommenderPanel';
 import { HistoryPanel } from '@/components/planner/HistoryPanel';
-import { SchedulerPlaceholder } from '@/components/planner/SchedulerPlaceholder';
+import { WeekBuilderPanel } from '@/components/planner/WeekBuilderPanel';
 import { usePlannerParams } from '@/hooks/usePlannerParams';
 
 export default function AdminBuilder() {
@@ -138,7 +138,7 @@ function PlannerTabContent({ roleId, roleName }: { roleId: number; roleName: str
         onPresetChange={setPreset}
       />
 
-      <SchedulerPlaceholder />
+      <WeekBuilderPanel roleId={roleId} roleName={roleName} />
 
       <HistoryPanel roleId={roleId} roleName={roleName} />
     </div>

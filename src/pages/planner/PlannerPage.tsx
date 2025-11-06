@@ -3,7 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { RecommenderPanel } from '@/components/planner/RecommenderPanel';
 import { HistoryPanel } from '@/components/planner/HistoryPanel';
-import { SchedulerPlaceholder } from '@/components/planner/SchedulerPlaceholder';
+import { WeekBuilderPanel } from '@/components/planner/WeekBuilderPanel';
 import { usePlannerParams } from '@/hooks/usePlannerParams';
 
 interface PlannerPageProps {
@@ -42,7 +42,7 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
         onPresetChange={setPreset}
       />
 
-      <SchedulerPlaceholder />
+      <WeekBuilderPanel roleId={roleId} roleName={roleName} />
 
       <HistoryPanel roleId={roleId} roleName={roleName} />
     </div>

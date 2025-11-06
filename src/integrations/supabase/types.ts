@@ -1116,6 +1116,7 @@ export type Database = {
           self_select: boolean
           status: string
           updated_at: string
+          updated_by: string | null
           week_start_date: string
         }
         Insert: {
@@ -1134,6 +1135,7 @@ export type Database = {
           self_select?: boolean
           status?: string
           updated_at?: string
+          updated_by?: string | null
           week_start_date: string
         }
         Update: {
@@ -1152,6 +1154,7 @@ export type Database = {
           self_select?: boolean
           status?: string
           updated_at?: string
+          updated_by?: string | null
           week_start_date?: string
         }
         Relationships: [

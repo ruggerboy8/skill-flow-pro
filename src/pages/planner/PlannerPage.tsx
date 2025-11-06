@@ -19,22 +19,16 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Pro-Move Planner</h1>
+          <h1 className="text-3xl font-bold">Pro-Move Planner - {roleName}</h1>
           <p className="text-muted-foreground">
-            Analyze, recommend, and assign global pro-moves for {roleName}
+            Analyze, recommend, and assign global pro-moves
           </p>
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/admin')}>
+          <Button variant="outline" onClick={() => navigate('/builder')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Admin
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => navigate(roleId === 1 ? '/planner/rda' : '/planner/dfi')}
-          >
-            Switch to {roleId === 1 ? 'RDA' : 'DFI'}
+            Back to Builder
           </Button>
         </div>
       </div>
@@ -48,9 +42,9 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
         onPresetChange={setPreset}
       />
 
-      <HistoryPanel roleId={roleId} roleName={roleName} />
-
       <SchedulerPlaceholder />
+
+      <HistoryPanel roleId={roleId} roleName={roleName} />
     </div>
   );
 }

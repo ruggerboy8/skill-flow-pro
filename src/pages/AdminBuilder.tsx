@@ -4,10 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
-import { SequencerDevPanel } from '@/components/admin/SequencerDevPanel';
+import { RecommenderPanel } from '@/components/planner/RecommenderPanel';
+import { HistoryPanel } from '@/components/planner/HistoryPanel';
+import { SchedulerPlaceholder } from '@/components/planner/SchedulerPlaceholder';
+import { usePlannerParams } from '@/hooks/usePlannerParams';
 
 export default function AdminBuilder() {
   console.log('=== NEW ADMINBUILDER LOADING ===');
@@ -63,43 +66,42 @@ export default function AdminBuilder() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Admin Builder</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/admin')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Admin
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/planner/dfi')} className="gap-2">
-            <Calendar className="h-4 w-4" />
-            DFI Planner
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/planner/rda')} className="gap-2">
-            <Calendar className="h-4 w-4" />
-            RDA Planner
-          </Button>
-        </div>
+        <Button variant="outline" onClick={() => navigate('/admin')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Admin
+        </Button>
       </div>
       
-      <Tabs defaultValue="dfi" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="dfi">DFI</TabsTrigger>
-          <TabsTrigger value="rda">RDA</TabsTrigger>
+      <Tabs defaultValue="onboarding" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+          <TabsTrigger value="dfi-planner">DFI Planner</TabsTrigger>
+          <TabsTrigger value="rda-planner">RDA Planner</TabsTrigger>
           <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="dfi" className="space-y-6">
-          <h2 className="text-xl font-semibold">Legacy Week Builder (Cycles 1–3)</h2>
-          <SimpleFocusBuilder roleFilter={1} />
-          
-          <h2 className="text-xl font-semibold mt-8">Pro-Move Recommender</h2>
-          <SequencerDevPanel roleId={1} roleName="DFI" />
+        <TabsContent value="onboarding" className="space-y-6">
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-xl font-semibold mb-4">DFI Onboarding Builder</h2>
+              <p className="text-sm text-muted-foreground mb-4">Legacy week builder for Cycles 1–3</p>
+              <SimpleFocusBuilder roleFilter={1} />
+            </div>
+            
+            <div>
+              <h2 className="text-xl font-semibold mb-4">RDA Onboarding Builder</h2>
+              <p className="text-sm text-muted-foreground mb-4">Legacy week builder for Cycles 1–3</p>
+              <SimpleFocusBuilder roleFilter={2} />
+            </div>
+          </div>
         </TabsContent>
 
-        <TabsContent value="rda" className="space-y-6">
-          <h2 className="text-xl font-semibold">Legacy Week Builder (Cycles 1–3)</h2>
-          <SimpleFocusBuilder roleFilter={2} />
-          
-          <h2 className="text-xl font-semibold mt-8">Pro-Move Recommender</h2>
-          <SequencerDevPanel roleId={2} roleName="RDA" />
+        <TabsContent value="dfi-planner" className="space-y-6">
+          <PlannerTabContent roleId={1} roleName="DFI" />
+        </TabsContent>
+
+        <TabsContent value="rda-planner" className="space-y-6">
+          <PlannerTabContent roleId={2} roleName="RDA" />
         </TabsContent>
         
         <TabsContent value="library" className="space-y-6">
@@ -107,6 +109,27 @@ export default function AdminBuilder() {
           <ProMoveLibrary />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function PlannerTabContent({ roleId, roleName }: { roleId: number; roleName: string }) {
+  const { asOfWeek, preset, setAsOfWeek, setPreset } = usePlannerParams();
+
+  return (
+    <div className="space-y-6">
+      <RecommenderPanel
+        roleId={roleId}
+        roleName={roleName}
+        asOfWeek={asOfWeek}
+        preset={preset}
+        onWeekChange={setAsOfWeek}
+        onPresetChange={setPreset}
+      />
+
+      <SchedulerPlaceholder />
+
+      <HistoryPanel roleId={roleId} roleName={roleName} />
     </div>
   );
 }

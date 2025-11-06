@@ -50,7 +50,7 @@ export function ProposedWeekEditor({ roleId, weekStartDate, onRefresh }: Propose
           generated_by,
           overridden,
           rank_version,
-          pro_moves(action_statement, competencies(domains(domain_name)))
+          pro_moves(action_statement, competencies(domains!competencies_domain_id_fkey(domain_name)))
         `)
         .is('org_id', null)
         .eq('role_id', roleId)

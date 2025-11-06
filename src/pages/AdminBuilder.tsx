@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { RecommenderPanel } from '@/components/planner/RecommenderPanel';
 import { HistoryPanel } from '@/components/planner/HistoryPanel';
 import { SchedulerPlaceholder } from '@/components/planner/SchedulerPlaceholder';
@@ -82,17 +83,27 @@ export default function AdminBuilder() {
         
         <TabsContent value="onboarding" className="space-y-6">
           <div className="space-y-8">
-            <div>
-              <h2 className="text-xl font-semibold mb-4">DFI Onboarding Builder</h2>
-              <p className="text-sm text-muted-foreground mb-4">Legacy week builder for Cycles 1–3</p>
-              <SimpleFocusBuilder roleFilter={1} />
-            </div>
+            {/* DFI Section */}
+            <Card>
+              <CardHeader className="bg-muted/30">
+                <h2 className="text-lg font-semibold">DFI Onboarding Builder</h2>
+                <p className="text-sm text-muted-foreground">Configure week-by-week pro-move assignments for DFI onboarding (Cycles 1–3)</p>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <SimpleFocusBuilder roleFilter={1} />
+              </CardContent>
+            </Card>
             
-            <div>
-              <h2 className="text-xl font-semibold mb-4">RDA Onboarding Builder</h2>
-              <p className="text-sm text-muted-foreground mb-4">Legacy week builder for Cycles 1–3</p>
-              <SimpleFocusBuilder roleFilter={2} />
-            </div>
+            {/* RDA Section */}
+            <Card>
+              <CardHeader className="bg-muted/30">
+                <h2 className="text-lg font-semibold">RDA Onboarding Builder</h2>
+                <p className="text-sm text-muted-foreground">Configure week-by-week pro-move assignments for RDA onboarding (Cycles 1–3)</p>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <SimpleFocusBuilder roleFilter={2} />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

@@ -105,9 +105,16 @@ export function SimpleFocusBuilder({ roleFilter }: SimpleFocusBuilderProps) {
   };
 
   const handleWeekSelect = (cycle: number, week: number) => {
-    setSelectedCycle(cycle);
-    setSelectedWeek(week);
-    // Don't reset slots here - loadExistingWeek will handle it
+    // Toggle: if clicking the same week, deselect it
+    if (selectedCycle === cycle && selectedWeek === week) {
+      setSelectedCycle(null);
+      setSelectedWeek(null);
+      setSlots([]);
+    } else {
+      setSelectedCycle(cycle);
+      setSelectedWeek(week);
+      // Don't reset slots here - loadExistingWeek will handle it
+    }
   };
 
   const validateSlots = () => {
@@ -196,28 +203,26 @@ export function SimpleFocusBuilder({ roleFilter }: SimpleFocusBuilderProps) {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Week Context Bar */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Week Builder</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CycleWeekGrid 
-            onWeekSelect={handleWeekSelect}
-            selectedRole={selectedRole}
-            selectedCycle={selectedCycle}
-            selectedWeek={selectedWeek}
-          />
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      {/* Week Selection Grid */}
+      <CycleWeekGrid 
+        onWeekSelect={handleWeekSelect}
+        selectedRole={selectedRole}
+        selectedCycle={selectedCycle}
+        selectedWeek={selectedWeek}
+      />
 
-      {/* Slot Canvas */}
+      {/* Slot Canvas - Only shown when week is selected */}
       {selectedCycle && selectedWeek && selectedRole && (
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="border-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              Week Focus Slots - Cycle {selectedCycle}, Week {selectedWeek}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             {loading ? (
-              <div className="text-center py-8">Loading existing week data...</div>
+              <div className="text-center py-8 text-muted-foreground">Loading existing week data...</div>
             ) : (
               <SlotCanvas
                 slots={slots}
@@ -231,22 +236,18 @@ export function SimpleFocusBuilder({ roleFilter }: SimpleFocusBuilderProps) {
 
       {/* Save Footer */}
       {selectedCycle && selectedWeek && selectedRole && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Week has {slots.length}–3 moves (max 2 self-select)
-            </div>
-              <Button
-                onClick={handleSave}
-                disabled={!canSave() || saving}
-                className="min-w-[120px]"
-              >
-                {saving ? "Saving..." : "Save Week"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+          <div className="text-sm text-muted-foreground">
+            Week has {slots.length} of 1–3 moves (max 2 self-select)
+          </div>
+          <Button
+            onClick={handleSave}
+            disabled={!canSave() || saving}
+            className="min-w-[120px]"
+          >
+            {saving ? "Saving..." : "Save Week"}
+          </Button>
+        </div>
       )}
     </div>
   );

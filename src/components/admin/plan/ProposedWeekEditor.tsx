@@ -107,34 +107,42 @@ export function ProposedWeekEditor({ roleId, weekStartDate, onRefresh }: Propose
       // Fetch original rows to preserve rank provenance
       const { data: originalRows, error: fetchError } = await supabase
         .from('weekly_plan')
-        .select('id, rank_version, rank_snapshot')
+        .select('id, action_id, rank_version, rank_snapshot')
         .in('id', editedRows.map(r => r.id));
 
       if (fetchError) throw fetchError;
 
-      // Update rows in place, preserving rank_version and rank_snapshot
+      let changedCount = 0;
+
+      // Update only the rows that actually changed
       for (const row of editedRows) {
         const original = originalRows?.find(o => o.id === row.id);
         
-        const { error } = await supabase
-          .from('weekly_plan')
-          .update({
-            action_id: row.action_id,
-            generated_by: 'manual',
-            overridden: true,
-            overridden_at: new Date().toISOString(),
-            // CRITICAL: Preserve original rank provenance
-            rank_version: original?.rank_version || null,
-            rank_snapshot: original?.rank_snapshot || null,
-          })
-          .eq('id', row.id);
+        // Only update if action_id changed
+        if (original && original.action_id !== row.action_id) {
+          const { error } = await supabase
+            .from('weekly_plan')
+            .update({
+              action_id: row.action_id,
+              generated_by: 'manual',
+              overridden: true,
+              overridden_at: new Date().toISOString(),
+              // CRITICAL: Preserve original rank provenance
+              rank_version: original.rank_version || null,
+              rank_snapshot: original.rank_snapshot || null,
+            })
+            .eq('id', row.id);
 
-        if (error) throw error;
+          if (error) throw error;
+          changedCount++;
+        }
       }
 
       toast({
         title: 'Success',
-        description: 'Proposed week updated and marked as overridden. Original rank provenance preserved.'
+        description: changedCount > 0 
+          ? `${changedCount} pro-move(s) updated and marked as overridden. Original rank provenance preserved.`
+          : 'No changes detected.'
       });
 
       setEditMode(false);

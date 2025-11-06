@@ -171,6 +171,7 @@ export function GlobalPlanManager({ roleId, roleName }: GlobalPlanManagerProps) 
             </AccordionTrigger>
             <AccordionContent>
               <LockedWeekViewer
+                key={`locked-${refreshKey}`}
                 roleId={roleId}
                 weekStartDate={thisMonday}
                 onRefresh={handleRefresh}
@@ -188,6 +189,7 @@ export function GlobalPlanManager({ roleId, roleName }: GlobalPlanManagerProps) 
             </AccordionTrigger>
             <AccordionContent>
               <ProposedWeekEditor
+                key={`proposed-${refreshKey}`}
                 roleId={roleId}
                 weekStartDate={nextMonday}
                 onRefresh={handleRefresh}

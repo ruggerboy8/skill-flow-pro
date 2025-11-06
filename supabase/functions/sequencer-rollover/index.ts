@@ -363,7 +363,7 @@ async function generateWeekPlan(
     logs.push(`[generateWeekPlan] Delete error: ${deleteError.message}`);
   }
 
-  // Insert new plan (global: org_id = NULL) using upsert to handle duplicates
+  // Insert new plan (global: org_id = NULL)
   const planRows = nextPicks.slice(0, 3).map((pick: any, index: number) => ({
     org_id: null,
     role_id: roleId,
@@ -376,17 +376,14 @@ async function generateWeekPlan(
     overridden: false
   }));
 
-  console.log(`[generateWeekPlan] Attempting UPSERT with:`, planRows);
+  console.log(`[generateWeekPlan] Attempting INSERT with:`, planRows);
 
   const { data: insertData, error: insertError, count } = await supabase
     .from('weekly_plan')
-    .upsert(planRows, { 
-      onConflict: 'role_id,week_start_date,display_order',
-      count: 'exact'
-    })
-    .select();
+    .insert(planRows)
+    .select('*', { count: 'exact' });
 
-  console.log(`[generateWeekPlan] UPSERT result:`, { insertData, insertError, count });
+  console.log(`[generateWeekPlan] INSERT result:`, { insertData, insertError, count });
 
   if (insertError) {
     logs.push(`[generateWeekPlan] ERROR: ${insertError.message}`);
@@ -394,7 +391,7 @@ async function generateWeekPlan(
     throw new Error(`Failed to insert plan: ${insertError.message}`);
   }
 
-  // Verify we inserted/updated exactly 3 rows
+  // Verify we inserted exactly 3 rows
   if (count !== 3) {
     logs.push(`[generateWeekPlan] ⚠️ PARTIAL WEEK: Expected 3 rows, got ${count}`);
     console.warn(`[generateWeekPlan] Row count mismatch`, { expected: 3, actual: count });

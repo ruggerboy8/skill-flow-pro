@@ -1322,6 +1322,15 @@ export type Database = {
         }
         Relationships: []
       }
+      pro_move_usage_view: {
+        Row: {
+          action_id: number | null
+          attempts: number | null
+          avg_confidence: number | null
+          last_score_date: string | null
+        }
+        Relationships: []
+      }
       v_onboarding_progress: {
         Row: {
           current_cycle: number | null

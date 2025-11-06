@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X } from 'lucide-react';
 import { normalizeToPlannerWeek } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
+import { fetchProMoveMetaByIds } from '@/lib/proMoves';
 
 interface WeekSlot {
   displayOrder: 1 | 2 | 3;
@@ -121,42 +122,17 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
 
     // Batch fetch pro-move details
     if (allActionIds.size > 0) {
-      const { data: movesData, error: movesError } = await supabase
-        .from('pro_moves')
-        .select(`
-          action_id,
-          action_statement,
-          competencies:fk_pro_moves_competency_id!inner(
-            domains:fk_competencies_domain_id!inner(domain_name)
-          )
-        `)
-        .in('action_id', Array.from(allActionIds));
+      const moveMap = await fetchProMoveMetaByIds(Array.from(allActionIds));
 
-      if (movesError) {
-        console.error('Batch fetch pro-moves error:', movesError);
-      }
-
-      const moveMap = new Map(
-        (movesData || []).map((m: any) => [
-          m.action_id,
-          {
-            statement: m.action_statement || '',
-            domain: m.competencies?.domains?.domain_name || '',
-          }
-        ])
-      );
-
-      // Fill in move details and check locks
       for (const week of weeks) {
         for (const slot of week.slots) {
           if (slot.actionId) {
-            const moveData = moveMap.get(slot.actionId);
-            if (moveData) {
-              slot.actionStatement = moveData.statement;
-              slot.domainName = moveData.domain;
+            const m = moveMap.get(slot.actionId);
+            if (m) {
+              slot.actionStatement = m.statement;
+              slot.domainName = m.domain;
             }
           }
-          
           const slotKey = `${week.weekStart}-${slot.displayOrder}`;
           slot.isLocked = scoresBySlot.has(slotKey);
         }
@@ -200,17 +176,9 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
     
     if (!targetWeek || !targetOrder) return;
 
-    // Fetch pro-move details
-    const { data: pmData } = await supabase
-      .from('pro_moves')
-      .select(`
-        action_statement,
-        competencies:fk_pro_moves_competency_id!inner(
-          domains:fk_competencies_domain_id!inner(domain_name)
-        )
-      `)
-      .eq('action_id', actionId)
-      .single();
+    // Fetch pro-move details using unified helper
+    const metaMap = await fetchProMoveMetaByIds([actionId]);
+    const meta = metaMap.get(actionId);
 
     // Update local state
     const updatedWeeks = weeks.map(w => 
@@ -222,8 +190,8 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                 ? { 
                     ...s, 
                     actionId,
-                    actionStatement: pmData?.action_statement || '',
-                    domainName: (pmData?.competencies as any)?.domains?.domain_name || ''
+                    actionStatement: meta?.statement || '',
+                    domainName: meta?.domain || ''
                   }
                 : s
             )
@@ -452,7 +420,8 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                         }
                         
                         try {
-                          const data = JSON.parse(e.dataTransfer.getData('application/json'));
+                          const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+                          const data = JSON.parse(raw);
                           await handleSelectProMove(data.actionId, week.weekStart, slot.displayOrder);
                         } catch (error) {
                           console.error('Drop error:', error);

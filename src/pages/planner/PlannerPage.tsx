@@ -35,30 +35,34 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-[400px_1fr] gap-4 items-start">
-        {/* Left Column: Recommender (max height with internal scroll) */}
-        <div className="max-h-[calc(100vh-180px)] overflow-hidden">
-          <RecommenderPanel
-            roleId={roleId}
-            roleName={roleName}
-            asOfWeek={asOfWeek}
-            preset={preset}
-            onWeekChange={setAsOfWeek}
-            onPresetChange={setPreset}
-            usedActionIds={usedActionIds}
-          />
-        </div>
+      <div className="flex gap-4 items-start">
+        {/* Left: fixed sidebar */}
+        <aside className="w-[400px] shrink-0">
+          <div className="max-h-[calc(100vh-180px)] overflow-hidden">
+            <RecommenderPanel
+              roleId={roleId}
+              roleName={roleName}
+              asOfWeek={asOfWeek}
+              preset={preset}
+              onWeekChange={setAsOfWeek}
+              onPresetChange={setPreset}
+              usedActionIds={usedActionIds}
+            />
+          </div>
+        </aside>
 
-        {/* Right Column: Week Builder + History (sticky) */}
-        <div className="space-y-6 sticky top-4">
-          <WeekBuilderPanel 
-            roleId={roleId} 
-            roleName={roleName}
-            onUsedActionIdsChange={setUsedActionIds}
-          />
-          
-          <HistoryPanel roleId={roleId} roleName={roleName} />
-        </div>
+        {/* Right: main column (sticky inside) */}
+        <main className="flex-1 min-w-0">
+          <div className="space-y-6 sticky top-4">
+            <WeekBuilderPanel 
+              roleId={roleId} 
+              roleName={roleName}
+              onUsedActionIdsChange={setUsedActionIds}
+            />
+            
+            <HistoryPanel roleId={roleId} roleName={roleName} />
+          </div>
+        </main>
       </div>
     </div>
   );

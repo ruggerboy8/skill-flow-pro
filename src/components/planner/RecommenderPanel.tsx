@@ -187,13 +187,16 @@ export function RecommenderPanel({
                         e.preventDefault();
                         return;
                       }
-                      e.dataTransfer.effectAllowed = 'copy';
-                      e.dataTransfer.setData('application/json', JSON.stringify({
+                      const payload = JSON.stringify({
                         actionId: move.proMoveId,
                         actionStatement: move.name,
                         domainName: move.domain,
                         competencyTag: move.competencyTag,
-                      }));
+                      });
+                      e.dataTransfer.effectAllowed = 'copy';
+                      e.dataTransfer.setData('application/json', payload);
+                      // Fallback for browsers that block custom MIME types
+                      e.dataTransfer.setData('text/plain', payload);
                     }}
                     className={`p-3 border rounded-lg space-y-2 transition-all ${
                       isUsed 

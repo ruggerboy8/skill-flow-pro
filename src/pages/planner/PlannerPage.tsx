@@ -35,25 +35,31 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
-        <RecommenderPanel
-          roleId={roleId}
-          roleName={roleName}
-          asOfWeek={asOfWeek}
-          preset={preset}
-          onWeekChange={setAsOfWeek}
-          onPresetChange={setPreset}
-          usedActionIds={usedActionIds}
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
+        {/* Left Column: Recommender (Sticky) */}
+        <div className="space-y-4">
+          <RecommenderPanel
+            roleId={roleId}
+            roleName={roleName}
+            asOfWeek={asOfWeek}
+            preset={preset}
+            onWeekChange={setAsOfWeek}
+            onPresetChange={setPreset}
+            usedActionIds={usedActionIds}
+          />
+        </div>
 
-        <WeekBuilderPanel 
-          roleId={roleId} 
-          roleName={roleName}
-          onUsedActionIdsChange={setUsedActionIds}
-        />
+        {/* Right Column: Week Builder + History */}
+        <div className="space-y-6">
+          <WeekBuilderPanel 
+            roleId={roleId} 
+            roleName={roleName}
+            onUsedActionIdsChange={setUsedActionIds}
+          />
+          
+          <HistoryPanel roleId={roleId} roleName={roleName} />
+        </div>
       </div>
-
-      <HistoryPanel roleId={roleId} roleName={roleName} />
     </div>
   );
 }

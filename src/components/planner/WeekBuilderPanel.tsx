@@ -5,24 +5,19 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X } from 'lucide-react';
-import { getChicagoMonday } from '@/lib/plannerUtils';
+import { normalizeToPlannerWeek } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
-import { getDomainColor } from '@/lib/domainColors';
 
 interface WeekSlot {
-  id?: number;
   displayOrder: 1 | 2 | 3;
   actionId: number | null;
-  actionStatement?: string;
-  domainName?: string;
-  generatedBy?: string;
-  updatedBy?: string;
-  updatedAt?: string;
+  actionStatement: string;
+  domainName: string;
+  status?: string;
   isLocked: boolean;
-  isLoading?: boolean;
 }
 
-interface WeekData {
+interface WeekAssignment {
   weekStart: string;
   slots: WeekSlot[];
 }
@@ -35,148 +30,168 @@ interface WeekBuilderPanelProps {
 
 export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: WeekBuilderPanelProps) {
   const { toast } = useToast();
-  const [weeks, setWeeks] = useState<WeekData[]>([]);
+  const [weeks, setWeeks] = useState<WeekAssignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [baseMonday, setBaseMonday] = useState<string>('');
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ weekStart: string; displayOrder: number } | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [savingChanges, setSavingChanges] = useState(false);
+  const baseMonday = normalizeToPlannerWeek(new Date());
+  const [displayedBaseMonday, setDisplayedBaseMonday] = useState(baseMonday);
 
   useEffect(() => {
-    const today = new Date();
-    const monday = getChicagoMonday(today);
-    setBaseMonday(monday);
-    loadWeeks(monday);
-  }, [roleId]);
+    loadWeeks(displayedBaseMonday);
+  }, [roleId, displayedBaseMonday]);
 
   const loadWeeks = async (startMonday: string) => {
     setLoading(true);
-    const mondays = [
-      startMonday,
-      getNextMonday(startMonday),
-    ];
-
-    const weeksData: WeekData[] = [];
-
-    for (const monday of mondays) {
-      const slots = await loadSlotsForWeek(monday);
-      weeksData.push({ weekStart: monday, slots });
-    }
-
-    setWeeks(weeksData);
-    setLoading(false);
     
-    // Notify parent of used action IDs
-    if (onUsedActionIdsChange) {
-      const usedIds = weeksData
-        .flatMap(w => w.slots)
-        .filter(s => s.actionId)
-        .map(s => s.actionId as number);
-      onUsedActionIdsChange(usedIds);
-    }
-  };
+    const monday2 = getNextMonday(startMonday);
+    const mondays = [startMonday, monday2];
 
-  const loadSlotsForWeek = async (weekStart: string): Promise<WeekSlot[]> => {
-    // Fetch existing plan rows
+    // Fetch all weekly_plan rows
     const { data: planRows } = await supabase
       .from('weekly_plan')
-      .select('id, display_order, action_id, generated_by, updated_by, updated_at')
+      .select('id, display_order, action_id, status, week_start_date')
       .is('org_id', null)
       .eq('role_id', roleId)
-      .eq('week_start_date', weekStart)
+      .in('week_start_date', mondays)
+      .order('week_start_date')
       .order('display_order');
 
-    const slots: WeekSlot[] = [1, 2, 3].map(order => ({
-      displayOrder: order as 1 | 2 | 3,
-      actionId: null,
-      isLocked: false,
+    // Check which slots are locked
+    const planIds = (planRows || []).map(r => r.id);
+    const scoresBySlot = new Map<string, boolean>();
+    
+    if (planIds.length > 0) {
+      const { data: scores } = await supabase
+        .from('weekly_scores')
+        .select('weekly_focus_id')
+        .in('weekly_focus_id', planIds.map(id => `plan:${id}`));
+
+      (scores || []).forEach((s: any) => {
+        const planId = s.weekly_focus_id.replace('plan:', '');
+        const row = planRows?.find(r => r.id.toString() === planId);
+        if (row) {
+          const key = `${row.week_start_date}-${row.display_order}`;
+          scoresBySlot.set(key, true);
+        }
+      });
+    }
+
+    // Collect all action IDs for batch fetch
+    const allActionIds = new Set<number>();
+    (planRows || []).forEach(row => {
+      if (row.action_id) allActionIds.add(row.action_id);
+    });
+
+    // Build week structures
+    const weeks: WeekAssignment[] = mondays.map(monday => ({
+      weekStart: monday,
+      slots: [1, 2, 3].map(order => ({
+        displayOrder: order as 1 | 2 | 3,
+        actionId: null,
+        actionStatement: '',
+        domainName: '',
+        status: '',
+        isLocked: false,
+      }))
     }));
 
-    if (planRows) {
-      for (const row of planRows) {
-        const idx = row.display_order - 1;
-        if (idx >= 0 && idx < 3) {
-          // Check if locked (has scores)
-          const { count } = await supabase
-            .from('weekly_scores')
-            .select('*', { count: 'exact', head: true })
-            .eq('weekly_focus_id', `plan:${row.id}`);
+    // Fill in plan data
+    for (const row of planRows || []) {
+      if (row.action_id) {
+        allActionIds.add(row.action_id);
+      }
 
-          const isLocked = (count || 0) > 0;
+      const slot: WeekSlot = {
+        displayOrder: row.display_order as 1 | 2 | 3,
+        actionId: row.action_id,
+        actionStatement: '',
+        domainName: '',
+        status: row.status,
+        isLocked: false,
+      };
 
-          // Fetch pro-move details if action_id exists
-          let actionStatement = '';
-          let domainName = '';
-          if (row.action_id) {
-            const { data: pmData } = await supabase
-              .from('pro_moves')
-              .select(`
-                action_statement,
-                competency_id,
-                competencies!pro_moves_competency_id_fkey(
-                  domain_id,
-                  domains!competencies_domain_id_fkey(domain_name)
-                )
-              `)
-              .eq('action_id', row.action_id)
-              .single();
+      const weekIdx = weeks.findIndex(w => w.weekStart === row.week_start_date);
+      if (weekIdx >= 0) {
+        weeks[weekIdx].slots[row.display_order - 1] = slot;
+      }
+    }
 
-            if (pmData) {
-              actionStatement = pmData.action_statement || '';
-              domainName = (pmData.competencies as any)?.domains?.domain_name || '';
+    // Batch fetch pro-move details
+    if (allActionIds.size > 0) {
+      const { data: movesData, error: movesError } = await supabase
+        .from('pro_moves')
+        .select(`
+          action_id,
+          action_statement,
+          competencies!inner(
+            domains!inner(domain_name)
+          )
+        `)
+        .in('action_id', Array.from(allActionIds));
+
+      if (movesError) {
+        console.error('Batch fetch pro-moves error:', movesError);
+      }
+
+      const moveMap = new Map(
+        (movesData || []).map((m: any) => [
+          m.action_id,
+          {
+            statement: m.action_statement || '',
+            domain: m.competencies?.domains?.domain_name || '',
+          }
+        ])
+      );
+
+      // Fill in move details and check locks
+      for (const week of weeks) {
+        for (const slot of week.slots) {
+          if (slot.actionId) {
+            const moveData = moveMap.get(slot.actionId);
+            if (moveData) {
+              slot.actionStatement = moveData.statement;
+              slot.domainName = moveData.domain;
             }
           }
-
-          slots[idx] = {
-            id: row.id,
-            displayOrder: row.display_order as 1 | 2 | 3,
-            actionId: row.action_id,
-            actionStatement,
-            domainName,
-            generatedBy: row.generated_by,
-            updatedBy: row.updated_by,
-            updatedAt: row.updated_at,
-            isLocked,
-          };
+          
+          const slotKey = `${week.weekStart}-${slot.displayOrder}`;
+          slot.isLocked = scoresBySlot.has(slotKey);
         }
       }
     }
 
-    return slots;
+    setWeeks(weeks);
+    setHasUnsavedChanges(false);
+    setLoading(false);
+    
+    // Calculate used action IDs
+    const used = weeks.flatMap(w => w.slots.map(s => s.actionId).filter(Boolean) as number[]);
+    if (onUsedActionIdsChange) {
+      onUsedActionIdsChange(used);
+    }
   };
 
   const getNextMonday = (monday: string): string => {
     const d = new Date(monday + 'T12:00:00');
     d.setDate(d.getDate() + 7);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return d.toISOString().split('T')[0];
   };
 
   const getPrevMonday = (monday: string): string => {
     const d = new Date(monday + 'T12:00:00');
     d.setDate(d.getDate() - 7);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return d.toISOString().split('T')[0];
   };
 
   const handleNavigatePrev = () => {
-    const newBase = getPrevMonday(baseMonday);
-    setBaseMonday(newBase);
-    loadWeeks(newBase);
+    setDisplayedBaseMonday(getPrevMonday(displayedBaseMonday));
   };
 
   const handleNavigateNext = () => {
-    const newBase = getNextMonday(baseMonday);
-    setBaseMonday(newBase);
-    loadWeeks(newBase);
-  };
-
-  const handleOpenPicker = (weekStart: string, displayOrder: number) => {
-    setSelectedSlot({ weekStart, displayOrder });
-    setPickerOpen(true);
+    setDisplayedBaseMonday(getNextMonday(displayedBaseMonday));
   };
 
   const handleSelectProMove = async (actionId: number, weekStart?: string, displayOrder?: number) => {
@@ -185,61 +200,128 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
     
     if (!targetWeek || !targetOrder) return;
 
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast({ title: 'Error', description: 'Not authenticated', variant: 'destructive' });
-      return;
-    }
+    // Fetch pro-move details
+    const { data: pmData } = await supabase
+      .from('pro_moves')
+      .select(`
+        action_statement,
+        competencies!inner(
+          domains!inner(domain_name)
+        )
+      `)
+      .eq('action_id', actionId)
+      .single();
 
-    // Call planner-upsert
-    const { data, error } = await supabase.functions.invoke('planner-upsert', {
-      body: {
-        action: 'saveWeek',
-        roleId,
-        weekStartDate: targetWeek,
-        picks: [{ displayOrder: targetOrder, actionId, generatedBy: 'manual' }],
-        updaterUserId: user.id,
-      }
-    });
-
-    if (error || !data?.ok) {
-      toast({ title: 'Error', description: error?.message || 'Failed to save', variant: 'destructive' });
-      return;
-    }
-
-    if (data.data.skippedLocked.length > 0) {
-      toast({ title: 'Slot Locked', description: 'Cannot modify slot with submitted scores', variant: 'destructive' });
-      return;
-    }
-
-    toast({ title: 'Saved', description: 'Pro-move assigned successfully' });
-    loadWeeks(baseMonday);
+    // Update local state
+    const updatedWeeks = weeks.map(w => 
+      w.weekStart === targetWeek 
+        ? {
+            ...w,
+            slots: w.slots.map(s => 
+              s.displayOrder === targetOrder
+                ? { 
+                    ...s, 
+                    actionId,
+                    actionStatement: pmData?.action_statement || '',
+                    domainName: (pmData?.competencies as any)?.domains?.domain_name || ''
+                  }
+                : s
+            )
+          }
+        : w
+    );
+    
+    setWeeks(updatedWeeks);
+    setHasUnsavedChanges(true);
     setPickerOpen(false);
+    
+    // Update used IDs
+    const used = updatedWeeks.flatMap(w => w.slots.map(s => s.actionId).filter(Boolean) as number[]);
+    if (onUsedActionIdsChange) {
+      onUsedActionIdsChange(used);
+    }
   };
 
   const handleClearSlot = async (weekStart: string, displayOrder: number) => {
+    const updatedWeeks = weeks.map(w => 
+      w.weekStart === weekStart 
+        ? {
+            ...w,
+            slots: w.slots.map(s => 
+              s.displayOrder === displayOrder
+                ? { ...s, actionId: null, actionStatement: '', domainName: '' }
+                : s
+            )
+          }
+        : w
+    );
+    
+    setWeeks(updatedWeeks);
+    setHasUnsavedChanges(true);
+    
+    const used = updatedWeeks.flatMap(w => w.slots.map(s => s.actionId).filter(Boolean) as number[]);
+    if (onUsedActionIdsChange) {
+      onUsedActionIdsChange(used);
+    }
+  };
+
+  const handleSaveAll = async () => {
+    setSavingChanges(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    // Set to null (clear)
-    const { data, error } = await supabase.functions.invoke('planner-upsert', {
-      body: {
-        action: 'saveWeek',
-        roleId,
-        weekStartDate: weekStart,
-        picks: [{ displayOrder, actionId: 0, generatedBy: 'manual' }],
-        updaterUserId: user.id,
-      }
-    });
-
-    if (error || !data?.ok || data.data.skippedLocked.length > 0) {
-      toast({ title: 'Error', description: 'Cannot clear locked slot', variant: 'destructive' });
+    if (!user) {
+      setSavingChanges(false);
       return;
     }
 
-    toast({ title: 'Cleared', description: 'Slot cleared successfully' });
-    loadWeeks(baseMonday);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const week of weeks) {
+      const picks = week.slots
+        .filter(s => s.actionId !== null)
+        .map(s => ({ displayOrder: s.displayOrder, actionId: s.actionId!, generatedBy: 'manual' }));
+
+      if (picks.length === 0) continue;
+
+      const { data, error } = await supabase.functions.invoke('planner-upsert', {
+        body: {
+          action: 'saveWeek',
+          roleId,
+          weekStartDate: week.weekStart,
+          picks,
+          updaterUserId: user.id,
+        }
+      });
+
+      if (error || !data?.ok) {
+        errorCount++;
+        console.error(`Failed to save week ${week.weekStart}:`, error || data?.message);
+      } else {
+        if (data.data.skippedLocked.length > 0) {
+          toast({ 
+            title: 'Some slots locked', 
+            description: `${data.data.skippedLocked.length} slot(s) in ${week.weekStart} have scores`,
+            variant: 'destructive' 
+          });
+        }
+        successCount++;
+      }
+    }
+
+    setSavingChanges(false);
+
+    if (errorCount > 0) {
+      toast({ 
+        title: 'Partial save', 
+        description: `${successCount} week(s) saved, ${errorCount} failed`,
+        variant: 'destructive' 
+      });
+    } else {
+      toast({ title: 'Saved', description: `${successCount} week(s) saved successfully` });
+    }
+
+    setHasUnsavedChanges(false);
+    await loadWeeks(displayedBaseMonday);
   };
 
   const formatDate = (dateStr: string) => {
@@ -267,6 +349,15 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
               <CardDescription>Assign pro-moves to upcoming weeks for {roleName}</CardDescription>
             </div>
             <div className="flex gap-2">
+              {hasUnsavedChanges && (
+                <Button 
+                  onClick={handleSaveAll} 
+                  size="sm"
+                  disabled={savingChanges}
+                >
+                  {savingChanges ? 'Saving...' : '💾 Save Changes'}
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handleNavigatePrev}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -293,23 +384,27 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                       onDragOver={(e) => {
                         if (!slot.isLocked) {
                           e.preventDefault();
-                          e.currentTarget.classList.add('ring-2', 'ring-primary');
+                          e.currentTarget.classList.add('ring-2', 'ring-primary', 'bg-primary/5');
                         }
                       }}
                       onDragLeave={(e) => {
-                        e.currentTarget.classList.remove('ring-2', 'ring-primary');
+                        e.currentTarget.classList.remove('ring-2', 'ring-primary', 'bg-primary/5');
                       }}
                       onDrop={async (e) => {
                         e.preventDefault();
-                        e.currentTarget.classList.remove('ring-2', 'ring-primary');
+                        e.currentTarget.classList.remove('ring-2', 'ring-primary', 'bg-primary/5');
                         
-                        if (slot.isLocked) return;
+                        if (slot.isLocked) {
+                          toast({ title: 'Locked', description: 'Slot has submitted scores', variant: 'destructive' });
+                          return;
+                        }
                         
                         try {
                           const data = JSON.parse(e.dataTransfer.getData('application/json'));
                           await handleSelectProMove(data.actionId, week.weekStart, slot.displayOrder);
                         } catch (error) {
                           console.error('Drop error:', error);
+                          toast({ title: 'Error', description: 'Failed to assign pro-move', variant: 'destructive' });
                         }
                       }}
                     >
@@ -338,9 +433,12 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                           </div>
                           {slot.domainName && (
                             <Badge 
-                              variant="secondary" 
+                              variant="outline" 
                               className="text-xs"
-                              style={{ backgroundColor: `hsl(${getDomainColor(slot.domainName)})` }}
+                              style={{
+                                borderColor: `hsl(var(--domain-${slot.domainName.toLowerCase().replace(/\s+/g, '-')}))`,
+                                color: `hsl(var(--domain-${slot.domainName.toLowerCase().replace(/\s+/g, '-')}))`
+                              }}
                             >
                               {slot.domainName}
                             </Badge>
@@ -350,7 +448,10 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleOpenPicker(week.weekStart, slot.displayOrder)}
+                                onClick={() => {
+                                  setSelectedSlot({ weekStart: week.weekStart, displayOrder: slot.displayOrder });
+                                  setPickerOpen(true);
+                                }}
                                 className="h-7 text-xs"
                               >
                                 Replace
@@ -370,7 +471,10 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleOpenPicker(week.weekStart, slot.displayOrder)}
+                          onClick={() => {
+                            setSelectedSlot({ weekStart: week.weekStart, displayOrder: slot.displayOrder });
+                            setPickerOpen(true);
+                          }}
                           className="w-full text-xs"
                         >
                           Choose from Library

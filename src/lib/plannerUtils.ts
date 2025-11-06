@@ -6,8 +6,8 @@ const PLANNER_TZ = 'America/Chicago';
 /**
  * Get the Monday of the week containing the given date in America/Chicago timezone
  */
-export function getChicagoMonday(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
+export function getChicagoMonday(date: Date | string = new Date()): string {
+  const d = typeof date === 'string' ? new Date(date + 'T12:00:00') : date;
   
   // Convert to Chicago timezone
   const chicagoDateStr = d.toLocaleString('en-US', { timeZone: PLANNER_TZ });
@@ -29,6 +29,14 @@ export function getChicagoMonday(date: Date | string): string {
   const day = String(monday.getDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Normalize any date input to a Chicago Monday string (YYYY-MM-DD)
+ * Use this as the single source of truth for all planner date operations
+ */
+export function normalizeToPlannerWeek(input: Date | string): string {
+  return getChicagoMonday(input);
 }
 
 /**

@@ -314,7 +314,16 @@ serve(async (req) => {
       weekStart,
     }));
 
-    logs.push(`Found ${lastSelected.length} last-selected records (${lastSelectedFocus?.length || 0} focus + ${lastSelectedPlan?.length || 0} plan)`);
+    logs.push(`Last selected records: focus=${lastSelectedFocus?.length || 0}, plan=${lastSelectedPlan?.length || 0}, total=${lastSelected.length}`);
+    
+    // Log never-seen moves
+    const neverSeen = eligible.filter(m => !lastSelected.some(ls => ls.proMoveId === m.id));
+    logs.push(`Never assigned moves: ${neverSeen.length} (e.g., ${neverSeen.slice(0, 3).map(m => m.name).join(', ')})`);
+    
+    // Log sample confidence data
+    logs.push(`Total confidence records: ${confidenceHistory.length}`);
+    const movesWithConf = new Set(confidenceHistory.map(c => c.proMoveId));
+    logs.push(`Moves with confidence data: ${movesWithConf.size}/${eligible.length}`);
 
     // 5. Fetch domain coverage (last 8 weeks) - handle both weekly_focus and weekly_plan
     // From weekly_focus
@@ -680,8 +689,9 @@ serve(async (req) => {
       
       // Build reason summary
       const reasons = [];
-      if (formatted.parts.C > 0.3) reasons.push(`Low avg confidence`);
-      if (formatted.weeksSinceSeen > 4) reasons.push(`not practiced in ${formatted.weeksSinceSeen} weeks`);
+      if (formatted.parts.C > 0.3) reasons.push(`low avg confidence`);
+      if (formatted.weeksSinceSeen === 999) reasons.push(`never practiced`);
+      else if (formatted.weeksSinceSeen > 4) reasons.push(`not practiced in ${formatted.weeksSinceSeen} weeks`);
       if (pick.eContrib > 0.05) reasons.push(`eval gap (${competencyTag})`);
       if (formatted.parts.D > 0.1) reasons.push(`underrepresented domain`);
       const reasonSummary = reasons.join('; ') || 'Balanced priority';
@@ -704,6 +714,8 @@ serve(async (req) => {
           ? `Used ${config.cooldownWeeks - formatted.weeksSinceSeen}w ago` 
           : null,
         reasonSummary,
+        confStatus: formatted.status,
+        confSeverity: formatted.severity,
       };
     });
 
@@ -717,8 +729,9 @@ serve(async (req) => {
       
       // Build reason summary
       const reasons = [];
-      if (formatted.parts.C > 0.3) reasons.push(`Low avg confidence`);
-      if (formatted.weeksSinceSeen > 4) reasons.push(`not practiced in ${formatted.weeksSinceSeen} weeks`);
+      if (formatted.parts.C > 0.3) reasons.push(`low avg confidence`);
+      if (formatted.weeksSinceSeen === 999) reasons.push(`never practiced`);
+      else if (formatted.weeksSinceSeen > 4) reasons.push(`not practiced in ${formatted.weeksSinceSeen} weeks`);
       if (pick.eContrib > 0.05) reasons.push(`eval gap (${competencyTag})`);
       if (formatted.parts.D > 0.1) reasons.push(`underrepresented domain`);
       const reasonSummary = reasons.join('; ') || 'Balanced priority';
@@ -741,6 +754,8 @@ serve(async (req) => {
           ? `Used ${config.cooldownWeeks - formatted.weeksSinceSeen}w ago` 
           : null,
         reasonSummary,
+        confStatus: formatted.status,
+        confSeverity: formatted.severity,
       };
     });
 

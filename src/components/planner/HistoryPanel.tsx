@@ -46,10 +46,13 @@ export function HistoryPanel({ roleId, roleName }: HistoryPanelProps) {
     setLoading(true);
     try {
       const now = new Date();
-      const targetMonth = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-      const startOfWindow = new Date(targetMonth);
-      startOfWindow.setDate(startOfWindow.getDate() - 84); // 12 weeks before
-      const endOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
+      
+      // Show: 3 months past → 3 months future
+      const startDate = new Date(now);
+      startDate.setMonth(startDate.getMonth() - 3 + monthOffset);
+      
+      const endDate = new Date(now);
+      endDate.setMonth(endDate.getMonth() + 3 + monthOffset);
 
       const { data, error } = await supabase
         .from('weekly_plan')
@@ -59,14 +62,18 @@ export function HistoryPanel({ roleId, roleName }: HistoryPanelProps) {
           display_order,
           action_id,
           generated_by,
-          overridden,
           rank_version,
-          pro_moves!inner(name, domains!inner(name))
+          pro_moves!inner(
+            action_statement, 
+            competencies!inner(
+              domains!inner(domain_name)
+            )
+          )
         `)
         .is('org_id', null)
         .eq('role_id', roleId)
-        .gte('week_start_date', startOfWindow.toISOString().split('T')[0])
-        .lte('week_start_date', endOfMonth.toISOString().split('T')[0])
+        .gte('week_start_date', startDate.toISOString().split('T')[0])
+        .lte('week_start_date', endDate.toISOString().split('T')[0])
         .order('week_start_date', { ascending: false })
         .order('display_order', { ascending: true });
 
@@ -86,13 +93,19 @@ export function HistoryPanel({ roleId, roleName }: HistoryPanelProps) {
           };
         }
         grouped[weekStart].moves.push({
-          name: row.pro_moves.name,
-          domain: row.pro_moves.domains.name,
+          name: row.pro_moves.action_statement,
+          domain: row.pro_moves.competencies.domains.domain_name,
           displayOrder: row.display_order,
         });
       });
 
-      setWeeks(Object.values(grouped));
+      // Separate past and future
+      const todayStr = now.toISOString().split('T')[0];
+      const allWeeks = Object.values(grouped);
+      const futureWeeks = allWeeks.filter(w => w.weekStart >= todayStr);
+      const pastWeeks = allWeeks.filter(w => w.weekStart < todayStr).reverse();
+
+      setWeeks([...futureWeeks, ...pastWeeks]);
     } catch (error) {
       console.error('Error loading history:', error);
     } finally {
@@ -139,7 +152,7 @@ export function HistoryPanel({ roleId, roleName }: HistoryPanelProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">Loading...</div>
         ) : weeks.length === 0 ? (
@@ -147,48 +160,64 @@ export function HistoryPanel({ roleId, roleName }: HistoryPanelProps) {
             No assignments found for this period
           </div>
         ) : (
-          <div className="space-y-2">
-            {weeks.map((week) => (
-              <div
-                key={week.weekStart}
-                className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                onClick={() => setSelectedWeek(week)}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">Week of {formatWeekOf(week.weekStart)}</span>
-                      <Badge variant={week.status === 'locked' ? 'default' : 'secondary'}>
+          <>
+            {weeks.map((week, idx) => {
+              const weekDate = new Date(week.weekStart + 'T12:00:00');
+              const isFuture = week.weekStart >= new Date().toISOString().split('T')[0];
+              const isPast = !isFuture;
+              const showFutureHeader = idx === 0 && isFuture;
+              const showPastHeader = idx > 0 && weeks[idx - 1].weekStart >= new Date().toISOString().split('T')[0] && isPast;
+
+              return (
+                <div key={week.weekStart}>
+                  {showFutureHeader && (
+                    <div className="text-sm font-semibold text-muted-foreground py-2 mb-2">
+                      📅 Upcoming Weeks
+                    </div>
+                  )}
+                  {showPastHeader && (
+                    <div className="text-sm font-semibold text-muted-foreground py-2 mb-2 border-t pt-4">
+                      📜 Past Weeks
+                    </div>
+                  )}
+                  
+                  <div className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold">Week of {formatWeekOf(week.weekStart)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {week.generatedBy === 'sequencer' || week.generatedBy === 'auto' ? '🤖 Auto' : '✏️ Manual'}
+                          {week.rankVersion && ` • v${week.rankVersion}`}
+                        </p>
+                      </div>
+                      <Badge variant={week.status === 'scheduled' ? 'default' : 'secondary'}>
                         {week.status}
                       </Badge>
-                      {week.generatedBy && (
-                        <Badge variant="outline" className="gap-1">
-                          {week.generatedBy === 'auto' ? (
-                            <>
-                              <Bot className="h-3 w-3" />
-                              Auto
-                            </>
-                          ) : (
-                            <>
-                              <Edit className="h-3 w-3" />
-                              Manual
-                            </>
-                          )}
-                        </Badge>
-                      )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {week.moves.slice(0, 3).map((move, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs">
-                          {move.domain}
-                        </Badge>
+
+                    <div className="space-y-2">
+                      {week.moves.map((move, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm">
+                          <span className="font-medium text-muted-foreground">#{move.displayOrder}</span>
+                          <Badge 
+                            variant="outline" 
+                            className="shrink-0"
+                            style={{
+                              borderColor: `hsl(var(--domain-${move.domain.toLowerCase().replace(/\s+/g, '-')}))`,
+                              color: `hsl(var(--domain-${move.domain.toLowerCase().replace(/\s+/g, '-')}))`
+                            }}
+                          >
+                            {move.domain}
+                          </Badge>
+                          <span className="text-muted-foreground truncate">{move.name}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              );
+            })}
+          </>
         )}
 
         <Sheet open={!!selectedWeek} onOpenChange={() => setSelectedWeek(null)}>

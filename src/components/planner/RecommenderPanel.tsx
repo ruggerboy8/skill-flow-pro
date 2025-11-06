@@ -202,9 +202,20 @@ export function RecommenderPanel({
             )}
 
             {/* Top 6 cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               {results.top6.map((move, idx) => (
-                <Card key={move.proMoveId} className="relative">
+                <Card 
+                  key={move.proMoveId} 
+                  className="relative cursor-grab active:cursor-grabbing"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('application/json', JSON.stringify({
+                      actionId: move.proMoveId,
+                      actionStatement: move.name,
+                      domainName: move.domain,
+                    }));
+                  }}
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
                       <Badge variant="secondary" className="text-xs">
@@ -218,8 +229,15 @@ export function RecommenderPanel({
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold">Score</span>
-                      <span className="text-lg font-bold">{move.score.toFixed(3)}</span>
+                      <span className="text-sm font-semibold">Need Score</span>
+                      <span 
+                        className="text-lg font-bold"
+                        style={{ 
+                          color: `hsl(${120 - (move.score * 120)}, 70%, 45%)` 
+                        }}
+                      >
+                        {Math.round(move.score * 100)}
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">

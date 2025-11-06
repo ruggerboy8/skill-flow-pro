@@ -33,16 +33,21 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
         </div>
       </div>
 
-      <RecommenderPanel
-        roleId={roleId}
-        roleName={roleName}
-        asOfWeek={asOfWeek}
-        preset={preset}
-        onWeekChange={setAsOfWeek}
-        onPresetChange={setPreset}
-      />
+      <div className="grid grid-cols-2 gap-6">
+        <RecommenderPanel
+          roleId={roleId}
+          roleName={roleName}
+          asOfWeek={asOfWeek}
+          preset={preset}
+          onWeekChange={setAsOfWeek}
+          onPresetChange={setPreset}
+        />
 
-      <WeekBuilderPanel roleId={roleId} roleName={roleName} />
+        <WeekBuilderPanel 
+          roleId={roleId} 
+          roleName={roleName}
+        />
+      </div>
 
       <HistoryPanel roleId={roleId} roleName={roleName} />
     </div>

@@ -52,7 +52,6 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
     const mondays = [
       startMonday,
       getNextMonday(startMonday),
-      getNextMonday(getNextMonday(startMonday)),
     ];
 
     const weeksData: WeekData[] = [];
@@ -129,15 +128,21 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
   };
 
   const getNextMonday = (monday: string): string => {
-    const d = new Date(monday + 'T00:00:00Z');
-    d.setUTCDate(d.getUTCDate() + 7);
-    return d.toISOString().split('T')[0];
+    const d = new Date(monday + 'T12:00:00');
+    d.setDate(d.getDate() + 7);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const getPrevMonday = (monday: string): string => {
-    const d = new Date(monday + 'T00:00:00Z');
-    d.setUTCDate(d.getUTCDate() - 7);
-    return d.toISOString().split('T')[0];
+    const d = new Date(monday + 'T12:00:00');
+    d.setDate(d.getDate() - 7);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const handleNavigatePrev = () => {
@@ -157,10 +162,11 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
     setPickerOpen(true);
   };
 
-  const handleSelectProMove = async (actionId: number) => {
-    if (!selectedSlot) return;
-
-    const { weekStart, displayOrder } = selectedSlot;
+  const handleSelectProMove = async (actionId: number, weekStart?: string, displayOrder?: number) => {
+    const targetWeek = weekStart || selectedSlot?.weekStart;
+    const targetOrder = displayOrder || selectedSlot?.displayOrder;
+    
+    if (!targetWeek || !targetOrder) return;
 
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
@@ -174,8 +180,8 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
       body: {
         action: 'saveWeek',
         roleId,
-        weekStartDate: weekStart,
-        picks: [{ displayOrder, actionId, generatedBy: 'manual' }],
+        weekStartDate: targetWeek,
+        picks: [{ displayOrder: targetOrder, actionId, generatedBy: 'manual' }],
         updaterUserId: user.id,
       }
     });
@@ -192,7 +198,7 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
 
     toast({ title: 'Saved', description: 'Pro-move assigned successfully' });
     loadWeeks(baseMonday);
-    onRefreshHistory?.();
+    if (onRefreshHistory) onRefreshHistory();
     setPickerOpen(false);
   };
 
@@ -218,11 +224,11 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
 
     toast({ title: 'Cleared', description: 'Slot cleared successfully' });
     loadWeeks(baseMonday);
-    onRefreshHistory?.();
+    if (onRefreshHistory) onRefreshHistory();
   };
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr + 'T00:00:00Z');
+    const d = new Date(dateStr + 'T12:00:00');
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
@@ -256,22 +262,41 @@ export function WeekBuilderPanel({ roleId, roleName, onRefreshHistory }: WeekBui
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-4">
-            {weeks.map((week, weekIdx) => (
+          <div className="grid grid-cols-2 gap-4">
+            {weeks.map((week) => (
               <Card key={week.weekStart} className="border-primary/20">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">
-                    {weekIdx === 0 ? 'This Week' : weekIdx === 1 ? 'Next Week' : 'Week +2'}
-                  </CardTitle>
-                  <CardDescription className="text-xs">
+                  <CardTitle className="text-base font-bold">
                     Week of {formatDate(week.weekStart)}
-                  </CardDescription>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {week.slots.map((slot) => (
                     <div
                       key={slot.displayOrder}
                       className="border rounded-lg p-3 space-y-2 bg-card"
+                      onDragOver={(e) => {
+                        if (!slot.isLocked) {
+                          e.preventDefault();
+                          e.currentTarget.classList.add('ring-2', 'ring-primary');
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        e.currentTarget.classList.remove('ring-2', 'ring-primary');
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('ring-2', 'ring-primary');
+                        
+                        if (slot.isLocked) return;
+                        
+                        try {
+                          const data = JSON.parse(e.dataTransfer.getData('application/json'));
+                          await handleSelectProMove(data.actionId, week.weekStart, slot.displayOrder);
+                        } catch (error) {
+                          console.error('Drop error:', error);
+                        }
+                      }}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="text-xs font-medium text-muted-foreground">

@@ -16,7 +16,7 @@ export function getChicagoMonday(date: Date | string): string {
   // Get the day of week (0 = Sunday, 1 = Monday, ...)
   const dayOfWeek = chicagoDate.getDay();
   
-  // Calculate offset to Monday
+  // Calculate days to subtract to get to Monday (0=Sun needs -6, 1=Mon needs 0, 2=Tue needs -1, etc.)
   const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   
   // Get Monday

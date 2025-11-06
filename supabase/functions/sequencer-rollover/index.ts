@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
         // Step 1: Lock current week
         roleLogs.push(`[Lock This Week] Locking ${currentWeekStr} for role ${roleId}`);
         
-        // First check if current week exists at all
+        // Check if current week exists and what status it has
         const { data: existingCurrent } = await supabase
           .from('weekly_plan')
           .select('id, status')
@@ -106,14 +106,18 @@ Deno.serve(async (req) => {
 
         if (!existingCurrent || existingCurrent.length === 0) {
           // First week after gate - generate it as locked
-          roleLogs.push(`[Lock This Week] First week after gate - generating locked plan`);
+          roleLogs.push(`[Lock This Week] No existing week found - generating locked plan`);
           if (!dryRun) {
             await generateWeekPlan(supabase, null, roleId, currentWeekStr, globalTz, false, 'locked', roleLogs);
           }
-        } else {
+        } else if (existingCurrent[0].status === 'locked') {
+          // Already locked - this shouldn't happen in normal flow
+          roleLogs.push(`[Lock This Week] Week is already locked - skipping lock step`);
+        } else if (existingCurrent[0].status === 'proposed') {
           // Update proposed → locked
+          roleLogs.push(`[Lock This Week] Updating proposed week to locked`);
           if (!dryRun) {
-            const { error: lockError } = await supabase
+            const { error: lockError, count } = await supabase
               .from('weekly_plan')
               .update({ status: 'locked', locked_at: new Date().toISOString() })
               .is('org_id', null)
@@ -124,7 +128,7 @@ Deno.serve(async (req) => {
             if (lockError) {
               roleLogs.push(`[Lock This Week] Error: ${lockError.message}`);
             } else {
-              roleLogs.push('[Lock This Week] Locked successfully ✓');
+              roleLogs.push(`[Lock This Week] Locked successfully (${count} rows) ✓`);
             }
           } else {
             roleLogs.push('[Lock This Week] Skipped (dry run)');

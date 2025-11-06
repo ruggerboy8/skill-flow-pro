@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getDomainColor } from '@/lib/domainColors';
@@ -24,6 +24,7 @@ interface StaffInfo {
 }
 
 interface WeekData {
+  weekly_focus_id: string;
   domain_name: string;
   action_statement: string;
   confidence_score: number | null;
@@ -159,44 +160,10 @@ export default function CoachDetail() {
   };
 
   const loadAllWeeksForCycle = async (cycle: number, roleId: number, staffId: string) => {
-    // Load all 6 weeks for the cycle
+    // Load all 6 weeks for the cycle using fallback logic (includes weekly_focus_id for delete functionality)
     for (let week = 1; week <= 6; week++) {
       try {
-        // Skip RPC for current week, use fallback directly
-        const isCurrentWeek = cycle === currentCycle && week === currentWeek;
-        
-        if (!isCurrentWeek) {
-          // Try RPC first for historical weeks
-          const { data: weekData, error } = await supabase.rpc('get_weekly_review', {
-            p_cycle: cycle,
-            p_week: week,
-            p_role_id: roleId,
-            p_staff_id: staffId
-          });
-
-          if (!error && weekData && weekData.length) {
-            // Calculate missing scores
-            const confMissing = weekData.filter((item: WeekData) => item.confidence_score === null).length;
-            const perfMissing = weekData.filter((item: WeekData) => item.performance_score === null).length;
-
-            setCycles(prev => prev.map(c => {
-              if (c.cycle === cycle) {
-                const newWeeks = new Map(c.weeks);
-                newWeeks.set(week, {
-                  loaded: true,
-                  data: weekData,
-                  confMissing,
-                  perfMissing
-                });
-                return { ...c, weeks: newWeeks };
-              }
-              return c;
-            }));
-            continue; // Skip fallback for this week
-          }
-        }
-
-        // Fallback logic (same as loadWeekData)
+        // Use fallback logic to get weekly_focus_id
         const { data: focus } = await supabase
           .from('weekly_focus')
           .select(`
@@ -300,6 +267,7 @@ export default function CoachDetail() {
           const sc = scoreMap[f.id] || { confidence_score: null, performance_score: null };
           
           return {
+            weekly_focus_id: f.id,
             domain_name,
             action_statement,
             confidence_score: sc.confidence_score,
@@ -335,41 +303,7 @@ export default function CoachDetail() {
     if (!staffInfo) return;
 
     try {
-      // Skip RPC for current week (shows "no pro moves" issue), use fallback directly
-      const isCurrentWeek = cycle === currentCycle && week === currentWeek;
-      
-      if (!isCurrentWeek) {
-        // Try RPC first for historical weeks (works fine when scores exist)
-        const { data: weekData, error } = await supabase.rpc('get_weekly_review', {
-          p_cycle: cycle,
-          p_week: week,
-          p_role_id: staffInfo.role_id,
-          p_staff_id: staffInfo.id
-        });
-
-        if (!error && weekData && weekData.length) {
-          // Calculate missing scores
-          const confMissing = weekData.filter((item: WeekData) => item.confidence_score === null).length;
-          const perfMissing = weekData.filter((item: WeekData) => item.performance_score === null).length;
-
-          setCycles(prev => prev.map(c => {
-            if (c.cycle === cycle) {
-              const newWeeks = new Map(c.weeks);
-              newWeeks.set(week, {
-                loaded: true,
-                data: weekData,
-                confMissing,
-                perfMissing
-              });
-              return { ...c, weeks: newWeeks };
-            }
-            return c;
-          }));
-          return;
-        }
-      }
-
-      // Fallback: compose from weekly_focus + optional scores (same logic as StatsScores)
+      // Use fallback logic to get weekly_focus_id (needed for delete functionality)
       const { data: focus } = await supabase
         .from('weekly_focus')
         .select(`
@@ -473,6 +407,7 @@ export default function CoachDetail() {
         const sc = scoreMap[f.id] || { confidence_score: null, performance_score: null };
         
         return {
+          weekly_focus_id: f.id,
           domain_name,
           action_statement,
           confidence_score: sc.confidence_score,
@@ -523,6 +458,36 @@ export default function CoachDetail() {
       }
       return newSet;
     });
+  };
+
+  const handleDeleteScore = async (weeklyFocusId: string, scoreType: 'confidence' | 'performance') => {
+    if (!staffInfo) return;
+    
+    const confirmMsg = scoreType === 'confidence' 
+      ? 'Delete this confidence score?' 
+      : 'Delete this performance score?';
+    
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const updateData = scoreType === 'confidence'
+        ? { confidence_score: null, confidence_date: null, confidence_late: null }
+        : { performance_score: null, performance_date: null, performance_late: null };
+
+      const { error } = await supabase
+        .from('weekly_scores')
+        .update(updateData)
+        .eq('staff_id', staffInfo.id)
+        .eq('weekly_focus_id', weeklyFocusId);
+
+      if (error) throw error;
+
+      // Reload the current cycle to refresh the data
+      loadAllWeeksForCycle(selectedCycle, staffInfo.role_id, staffInfo.id);
+    } catch (error) {
+      console.error(`Error deleting ${scoreType} score:`, error);
+      alert(`Failed to delete ${scoreType} score. Please try again.`);
+    }
   };
 
   const getStatusBadge = (rows: any[] | null) => {
@@ -649,6 +614,30 @@ export default function CoachDetail() {
                                       <p className="text-sm">{item.action_statement}</p>
                                     </div>
                                     <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
+                                    <div className="flex items-center gap-1">
+                                      {item.confidence_score !== null && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleDeleteScore(item.weekly_focus_id, 'confidence')}
+                                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                          title="Delete confidence score"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      {item.performance_score !== null && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleDeleteScore(item.weekly_focus_id, 'performance')}
+                                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                          title="Delete performance score"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
                                 </CardContent>
                               </Card>

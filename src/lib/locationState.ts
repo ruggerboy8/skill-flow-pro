@@ -196,8 +196,14 @@ export async function assembleWeek(params: {
         console.warn('[assembleWeek] No valid assignments from weekly_plan - falling back to focus');
       }
     } else {
-      console.warn('[assembleWeek] ❌ No global plan for Cycle 4+ (week %s, role %d) - found %d rows with error: %s - falling back to focus', 
+      console.warn('[assembleWeek] ❌ No global plan for Cycle 4+ (week %s, role %d) - found %d rows with error: %s', 
         mondayStr, roleId, planData?.length || 0, planErr?.message || 'none');
+      
+      // For Cycle 4+, if no plan data exists, return empty instead of falling back
+      if (cycleNumber >= 4) {
+        console.warn('[assembleWeek] No global plan for Cycle 4+ - returning empty assignments');
+        return [];
+      }
     }
   }
 
@@ -447,15 +453,21 @@ export async function computeWeekState(params: {
         .eq('status', 'locked')
         .order('display_order');
 
-      // Require exactly 3 locked rows
-      if (!planErr && planData && planData.length === 3) {
-        focusIds = planData.map(p => `plan:${p.id}`);
+      // For Cycle 4+, use weekly_plan exclusively (locked global plan)
+      if (!planErr && planData && planData.length > 0) {
+        console.log(`[computeWeekState] ✅ Found ${planData.length} locked weekly_plan rows for global plan`);
+        const allIds = planData.map((p: any) => `plan:${p.id}`);
+        focusIds = allIds;
         dataSource = 'weekly_plan';
         weekLabel = `Week of ${mondayStr}`;
         console.info('[weekState] source=global_weekly_plan cycle=%d week=%s role=%d count=%d', 
           cycleNumber, mondayStr, roleId, planData.length);
       } else {
-        console.warn('[weekState] Expected 3 locked global plan rows for Cycle 4+, got %d - falling back', planData?.length || 0);
+        console.warn('[weekState] No locked global plan rows for Cycle 4+, got %d - showing no pro moves', planData?.length || 0);
+        // For Cycle 4+, don't fall back to weekly_focus
+        focusIds = [];
+        dataSource = 'weekly_plan';
+        weekLabel = `Week of ${mondayStr}`;
       }
     }
 

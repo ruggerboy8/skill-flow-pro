@@ -202,10 +202,17 @@ export default function Week() {
             }
           }
         }));
+      } else if (cycle >= 4) {
+        // For Cycle 4+, if no weekly_plan data exists, don't fall back to weekly_focus
+        console.log('📊 No weekly_plan data for Cycle 4+ - showing no pro moves');
+        setWeeklyFocus([]);
+        setPageLoading(false);
+        setBannerReady(true);
+        return;
       }
     }
 
-    // Fall back to weekly_focus if no weekly_plan data
+    // Fall back to weekly_focus only for Cycle 1-3
     if (!focusData) {
       console.log('📚 Using weekly_focus data source (fallback)');
       const result = await supabase

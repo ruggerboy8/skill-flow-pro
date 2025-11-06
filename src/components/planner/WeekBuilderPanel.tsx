@@ -346,19 +346,55 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
 
   const handleDeleteWeek = async (weekStart: string) => {
     try {
-      // Delete all weekly_plan rows for this week
-      const { error } = await supabase
+      console.log('[WeekBuilderPanel] Attempting to delete week:', {
+        weekStart,
+        roleId,
+        org_id: null,
+      });
+
+      // First verify rows exist
+      const { data: existingRows, error: checkError } = await supabase
         .from('weekly_plan')
-        .delete()
+        .select('id')
         .eq('role_id', roleId)
         .is('org_id', null)
         .eq('week_start_date', weekStart);
 
-      if (error) throw error;
+      if (checkError) {
+        console.error('[WeekBuilderPanel] Error checking existing rows:', checkError);
+        throw checkError;
+      }
+
+      console.log('[WeekBuilderPanel] Found rows to delete:', existingRows);
+
+      if (!existingRows || existingRows.length === 0) {
+        toast({
+          title: 'Nothing to delete',
+          description: 'No pro-moves found for this week',
+        });
+        setDeleteWeekDialogOpen(false);
+        setWeekToDelete(null);
+        return;
+      }
+
+      // Delete all weekly_plan rows for this week
+      const { error: deleteError, count } = await supabase
+        .from('weekly_plan')
+        .delete({ count: 'exact' })
+        .eq('role_id', roleId)
+        .is('org_id', null)
+        .eq('week_start_date', weekStart);
+
+      if (deleteError) {
+        console.error('[WeekBuilderPanel] Delete error:', deleteError);
+        throw deleteError;
+      }
+
+      console.log('[WeekBuilderPanel] Deleted rows count:', count);
 
       toast({
         title: 'Week cleared',
-        description: `All pro-moves removed from week of ${formatDate(weekStart)}`,
+        description: `Removed ${count} pro-move(s) from week of ${formatDate(weekStart)}`,
       });
 
       // Reload weeks
@@ -366,9 +402,10 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
       setDeleteWeekDialogOpen(false);
       setWeekToDelete(null);
     } catch (error: any) {
+      console.error('[WeekBuilderPanel] Delete operation failed:', error);
       toast({
         title: 'Error',
-        description: error.message,
+        description: error.message || 'Failed to delete week',
         variant: 'destructive',
       });
     }

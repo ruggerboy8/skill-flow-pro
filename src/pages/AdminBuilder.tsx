@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Calendar } from 'lucide-react';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 import { SequencerDevPanel } from '@/components/admin/SequencerDevPanel';
@@ -10,6 +12,7 @@ import { SequencerDevPanel } from '@/components/admin/SequencerDevPanel';
 export default function AdminBuilder() {
   console.log('=== NEW ADMINBUILDER LOADING ===');
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -58,7 +61,23 @@ export default function AdminBuilder() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Admin Builder</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Admin Builder</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/admin')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Admin
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/planner/dfi')} className="gap-2">
+            <Calendar className="h-4 w-4" />
+            DFI Planner
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/planner/rda')} className="gap-2">
+            <Calendar className="h-4 w-4" />
+            RDA Planner
+          </Button>
+        </div>
+      </div>
       
       <Tabs defaultValue="dfi" className="w-full">
         <TabsList className="grid w-full grid-cols-3">

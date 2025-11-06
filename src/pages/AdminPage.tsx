@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, MapPin, Building } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Shield, Users, MapPin, Building, Calendar } from "lucide-react";
 import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
 import { AdminLocationsTab } from "@/components/admin/AdminLocationsTab";
 import { AdminOrganizationsTab } from "@/components/admin/AdminOrganizationsTab";
@@ -87,13 +88,29 @@ export default function AdminPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <div className="flex items-center space-x-3">
-        <Shield className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold">Administration</h1>
-          <p className="text-muted-foreground">
-            Manage users, locations, and organizational settings
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <Shield className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">Administration</h1>
+            <p className="text-muted-foreground">
+              Manage users, locations, and organizational settings
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/builder')}>
+            Week Builder
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/planner/dfi')} className="gap-2">
+            <Calendar className="h-4 w-4" />
+            DFI Planner
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/planner/rda')} className="gap-2">
+            <Calendar className="h-4 w-4" />
+            RDA Planner
+          </Button>
         </div>
       </div>
 

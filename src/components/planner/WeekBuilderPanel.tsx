@@ -352,10 +352,27 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
         org_id: null,
       });
 
-      // First verify rows exist
+      // First verify user is super admin
+      const { data: staffData, error: staffError } = await supabase
+        .from('staff')
+        .select('is_super_admin')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+
+      if (staffError || !staffData?.is_super_admin) {
+        console.error('[WeekBuilderPanel] User not authorized:', { staffError, staffData });
+        toast({
+          title: 'Permission denied',
+          description: 'You must be a super admin to delete weeks',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Check what rows exist
       const { data: existingRows, error: checkError } = await supabase
         .from('weekly_plan')
-        .select('id')
+        .select('id, action_id, display_order, status')
         .eq('role_id', roleId)
         .is('org_id', null)
         .eq('week_start_date', weekStart);
@@ -377,13 +394,12 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
         return;
       }
 
-      // Delete all weekly_plan rows for this week
+      // Delete by IDs to ensure we're targeting the exact rows
+      const idsToDelete = existingRows.map(r => r.id);
       const { error: deleteError, count } = await supabase
         .from('weekly_plan')
         .delete({ count: 'exact' })
-        .eq('role_id', roleId)
-        .is('org_id', null)
-        .eq('week_start_date', weekStart);
+        .in('id', idsToDelete);
 
       if (deleteError) {
         console.error('[WeekBuilderPanel] Delete error:', deleteError);

@@ -24,6 +24,7 @@ interface WeeklyFocus {
   action_statement: string;
   self_select?: boolean;
   competency_id?: number;
+  competency_name?: string;
   domain_name?: string;
 }
 
@@ -188,20 +189,38 @@ export default function Week() {
 
       if (planData && planData.length > 0) {
         console.log('📊 Using weekly_plan data source');
+        console.log('Raw planData:', JSON.stringify(planData, null, 2));
+        
         // Transform weekly_plan to weekly_focus structure
-        focusData = planData.map((item: any) => ({
-          id: `plan:${item.id}`,
-          action_id: item.action_id,
-          display_order: item.display_order,
-          self_select: item.self_select,
-          competency_id: item.pro_moves?.competency_id,
-          pro_moves: { action_statement: item.pro_moves?.action_statement },
-          competencies: {
-            domains: {
-              domain_name: item.pro_moves?.competencies?.domains?.domain_name
+        focusData = planData.map((item: any) => {
+          const competencyId = item.pro_moves?.competencies?.competency_id || item.pro_moves?.competency_id;
+          const competencyName = item.pro_moves?.competencies?.name;
+          const domainName = item.pro_moves?.competencies?.domains?.domain_name;
+          
+          console.log('Transforming item:', {
+            id: item.id,
+            action_id: item.action_id,
+            competency_id: competencyId,
+            competency_name: competencyName,
+            domain_name: domainName
+          });
+          
+          return {
+            id: `plan:${item.id}`,
+            action_id: item.action_id,
+            display_order: item.display_order,
+            self_select: item.self_select,
+            competency_id: competencyId,
+            competency_name: competencyName,
+            pro_moves: { action_statement: item.pro_moves?.action_statement },
+            competencies: {
+              name: competencyName,
+              domains: {
+                domain_name: domainName
+              }
             }
-          }
-        }));
+          };
+        });
       } else if (cycle >= 4) {
         // For Cycle 4+, if no weekly_plan data exists, don't fall back to weekly_focus
         console.log('📊 No weekly_plan data for Cycle 4+ - showing no pro moves');
@@ -291,6 +310,7 @@ export default function Week() {
     const transformedFocus: WeeklyFocus[] = (focusData || []).map(item => {
       const isSelSelect = (item as any)?.self_select ?? false;
       const siteMove = (item as any)?.pro_moves;
+      const itemData = item as any;
       
       // Find user's selection - check weekly_self_select first, then fall back to weekly_scores
       let userSelection = null;
@@ -310,6 +330,14 @@ export default function Week() {
         }
       }
       
+      // Get domain name - try multiple paths
+      const domainName = isSelSelect 
+        ? (selectedMove?.competencies?.domains?.domain_name || itemData?.competencies?.domains?.domain_name)
+        : (itemData?.competencies?.domains?.domain_name || siteMove?.competencies?.domains?.domain_name);
+      
+      // Get competency name - try multiple paths
+      const competencyName = itemData?.competency_name || itemData?.competencies?.name || siteMove?.competencies?.name;
+      
       return {
         id: item.id,
         display_order: item.display_order,
@@ -317,10 +345,9 @@ export default function Week() {
           ? (selectedMove?.action_statement || 'Choose a pro-move')
           : (siteMove?.action_statement || 'Unknown move'),
         self_select: isSelSelect,
-        competency_id: (item as any)?.competency_id ?? undefined,
-        domain_name: isSelSelect 
-          ? (selectedMove?.competencies?.domains?.domain_name || ((item as any)?.competencies?.domains as any)?.domain_name)
-          : ((item as any)?.competencies?.domains as any)?.domain_name,
+        competency_id: itemData?.competency_id ?? undefined,
+        competency_name: competencyName,
+        domain_name: domainName,
       };
     });
 
@@ -334,25 +361,34 @@ export default function Week() {
       return;
     }
 
+    console.log('Transformed focus data:', transformedFocus);
     setWeeklyFocus(transformedFocus);
 
-    // Load competency names for display
-    const focusWithCompetency = transformedFocus.filter(f => f.competency_id);
-    if (focusWithCompetency.length > 0) {
+    // Build competency name map - use names already in the data if available
+    const compNameMap: Record<string, string> = {};
+    transformedFocus.forEach(focus => {
+      if (focus.competency_name) {
+        compNameMap[focus.id] = focus.competency_name;
+      }
+    });
+    
+    // Load any missing competency names from database
+    const focusNeedingCompetency = transformedFocus.filter(f => f.competency_id && !compNameMap[f.id]);
+    if (focusNeedingCompetency.length > 0) {
       const { data: competencyData } = await supabase
         .from('competencies')
         .select('competency_id, name')
-        .in('competency_id', focusWithCompetency.map(f => f.competency_id));
+        .in('competency_id', focusNeedingCompetency.map(f => f.competency_id));
       
-      const compNameMap: Record<string, string> = {};
-      focusWithCompetency.forEach(focus => {
+      focusNeedingCompetency.forEach(focus => {
         const comp = competencyData?.find(c => c.competency_id === focus.competency_id);
         if (comp) {
           compNameMap[focus.id] = comp.name;
         }
       });
-      setCompetencyNameById(compNameMap);
     }
+    
+    setCompetencyNameById(compNameMap);
 
     // Scores
     const scoreFocusIds = transformedFocus.map(f => f.id);

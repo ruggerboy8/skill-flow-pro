@@ -13,6 +13,7 @@ import { LocationFormDrawer } from "./LocationFormDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocationWeekContext } from "@/lib/locationState";
+import { format, parseISO } from "date-fns";
 
 interface Location {
   id: string;
@@ -172,8 +173,11 @@ export function AdminLocationsTab() {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";
-    const d = new Date(dateString);
-    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
+    try {
+      return format(parseISO(dateString), 'M/d/yyyy');
+    } catch {
+      return "—";
+    }
   };
 
   const formatTimezone = (timezone: string) => {

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Zap, Save, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
 import { addWeeks, addDays } from 'date-fns';
@@ -44,6 +45,7 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
   const [weights, setWeights] = useState<Weights>({ C: 0.80, R: 0.00, E: 0.15, D: 0.05 });
   const [rankPreview, setRankPreview] = useState<any>(null);
   const [asOfDate, setAsOfDate] = useState<string>('');
+  const [regenerateNext, setRegenerateNext] = useState(false);
 
   const kvKey = `sequencer:weights:role:${roleId}`;
 
@@ -177,6 +179,10 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
   };
 
   const handleForceRollover = async () => {
+    if (!confirm('Force rollover will lock the current week and prepare the next. Continue?')) {
+      return;
+    }
+    
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
@@ -184,14 +190,29 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
           roles: [roleId],
           asOf: asOfDate || undefined,
           force: true,
+          regenerateNextWeek: regenerateNext
         },
       });
 
       if (error) throw error;
 
+      const result = data?.results?.[0];
+      const logs = result?.logs || [];
+      
+      // Parse decision from logs
+      const preservedLine = logs.find((l: string) => l.includes('Preserving complete week'));
+      const regeneratedLine = logs.find((l: string) => l.includes('Regenerated'));
+      
+      let message = 'Force rollover completed. ';
+      if (preservedLine) {
+        message += 'Next week preserved (already complete).';
+      } else if (regeneratedLine) {
+        message += 'Next week regenerated.';
+      }
+
       toast({
         title: 'Rollover Complete',
-        description: 'Locked current, generated next',
+        description: message
       });
 
       console.log('[Rollover Result]', data);
@@ -342,6 +363,20 @@ export function SequencerDevPanel({ roleId, roleName, onRefresh }: SequencerDevP
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Propose Next Week (Write)
           </Button>
+
+          <div className="flex items-center space-x-2 py-2">
+            <Checkbox
+              id="regenerate-next"
+              checked={regenerateNext}
+              onCheckedChange={(checked) => setRegenerateNext(checked === true)}
+            />
+            <label
+              htmlFor="regenerate-next"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Regenerate next week (ignore existing proposed plan)
+            </label>
+          </div>
 
           <Button onClick={handleForceRollover} disabled={loading} className="w-full" variant="outline">
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

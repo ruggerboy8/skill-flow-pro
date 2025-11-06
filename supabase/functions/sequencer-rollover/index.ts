@@ -16,6 +16,7 @@ interface RolloverRequest {
   dryRun?: boolean;
   force?: boolean;
   proposeOnly?: boolean;
+  regenerateNextWeek?: boolean;  // Force re-pick next week
 }
 
 Deno.serve(async (req) => {
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
     );
 
     const body: RolloverRequest = await req.json();
-    const { roles = [1, 2], asOf, dryRun = false, force = false, proposeOnly = false } = body;
+    const { roles = [1, 2], asOf, dryRun = false, force = false, proposeOnly = false, regenerateNextWeek = false } = body;
 
     const logs: string[] = [];
     logs.push(`[Global Rollover] Starting for roles: ${roles.join(', ')}`);
@@ -172,26 +173,36 @@ Deno.serve(async (req) => {
           roleLogs.push('[Lock This Week] Skipped (proposeOnly mode)');
         }
 
-        // Step 2: Generate/refresh next week (unless overridden)
-        roleLogs.push(`[Generate Next] Checking ${nextWeekStr}`);
+        // Step 2: Ensure next week plan (preserve if complete, unless forced)
+        roleLogs.push(`[Ensure Next Week] Checking ${nextWeekStr}`);
         let rankSnapshot: any = null;
         let generatedPicks: number[] = [];
         let wroteCount = 0;
-        
+        let preserved = false;
+
         if (!dryRun) {
-          const genResult = await generateWeekPlan(supabase, null, roleId, nextWeekStr, globalTz, !proposeOnly, 'proposed', roleLogs);
-          rankSnapshot = genResult?.rankSnapshot || null;
-          generatedPicks = genResult?.picks || [];
-          wroteCount = genResult?.wroteCount || 0;
+          const ensureResult = await ensureWeekPlan({
+            supabase,
+            roleId,
+            weekStartDate: nextWeekStr,
+            timezone: globalTz,
+            status: 'proposed',
+            regenerate: regenerateNextWeek,
+            logs: roleLogs
+          });
           
-          // Assert we wrote exactly 3 rows
-          if (wroteCount !== 3) {
-            roleLogs.push(`[Generate Next] ⚠️ WARNING: Expected 3 rows, wrote ${wroteCount}`);
-          } else {
-            roleLogs.push(`[Generate Next] ✅ Wrote ${wroteCount} rows for ${nextWeekStr}`);
+          rankSnapshot = ensureResult.rankSnapshot;
+          generatedPicks = ensureResult.picks;
+          wroteCount = ensureResult.wroteCount;
+          preserved = ensureResult.preserved;
+
+          if (preserved) {
+            roleLogs.push(`[Ensure Next Week] ✅ Preserved existing complete week`);
+          } else if (wroteCount > 0) {
+            roleLogs.push(`[Ensure Next Week] ✅ Regenerated ${wroteCount} slots`);
           }
         } else {
-          roleLogs.push('[Generate Next] Skipped (dry run)');
+          roleLogs.push('[Ensure Next Week] Skipped (dry run)');
         }
 
         // Log to sequencer_runs with enhanced metadata (non-fatal)
@@ -210,7 +221,15 @@ Deno.serve(async (req) => {
                 picks: generatedPicks.length > 0 ? { top3: generatedPicks } : null,
                 weights: rankSnapshot?.weights || null,
                 rank_version: RANK_VERSION,
-                notes: `Locked ${currentWeekStr}, generated ${nextWeekStr}`,
+                notes: JSON.stringify({
+                  currentWeekLocked: !proposeOnly,
+                  nextWeek: {
+                    preserved,
+                    regenerated: !preserved && wroteCount > 0,
+                    reason: preserved ? 'complete' : (regenerateNextWeek ? 'forced' : (wroteCount > 0 ? 'incomplete' : 'none'))
+                  },
+                  wroteCount
+                }),
                 logs: roleLogs.slice(0, 50), // Limit log size
                 run_at: new Date().toISOString()
               })
@@ -329,6 +348,179 @@ function toZonedStart(now: Date, tz: string): Date {
     tz
   );
   return addDays(todayMidnightUtc, -(isoDow - 1));
+}
+
+// Fetch week plan rows for analysis
+async function fetchWeekPlan(
+  supabase: any,
+  roleId: number,
+  weekStart: string
+) {
+  return supabase
+    .from('weekly_plan')
+    .select('id, action_id, display_order, status, overridden, rank_snapshot, rank_version, generated_by')
+    .is('org_id', null)
+    .eq('role_id', roleId)
+    .eq('week_start_date', weekStart)
+    .order('display_order');
+}
+
+// Analyze week completeness
+function analyzeWeek(existing: any[] | null) {
+  const rows = existing ?? [];
+  const count = rows.length;
+  const isComplete = count === 3;
+  const hasOverrides = rows.some(r => r.overridden === true);
+  const overriddenSlots = new Set(
+    rows.filter(r => r.overridden).map(r => r.display_order)
+  );
+  return { count, isComplete, hasOverrides, overriddenSlots, rows };
+}
+
+// Ensure week has a valid plan (preserve complete weeks, regenerate incomplete)
+async function ensureWeekPlan({
+  supabase,
+  roleId,
+  weekStartDate,
+  timezone,
+  status = 'proposed',
+  regenerate = false,
+  logs = []
+}: {
+  supabase: any;
+  roleId: number;
+  weekStartDate: string;
+  timezone: string;
+  status?: 'proposed' | 'locked';
+  regenerate?: boolean;
+  logs?: string[];
+}): Promise<{ picks: number[]; rankSnapshot: any; wroteCount: number; preserved: boolean }> {
+  
+  // Step 1: Fetch and analyze existing week
+  const { data: existing, error: fetchError } = await fetchWeekPlan(supabase, roleId, weekStartDate);
+  if (fetchError) {
+    logs.push(`[ensureWeekPlan] Fetch error: ${fetchError.message}`);
+    throw fetchError;
+  }
+
+  const { isComplete, hasOverrides, overriddenSlots, rows } = analyzeWeek(existing);
+  logs.push(`[ensureWeekPlan] ${weekStartDate} analysis: ${rows.length} rows, complete=${isComplete}, hasOverrides=${hasOverrides}`);
+
+  // Step 2: Preservation check
+  if (!regenerate && isComplete) {
+    logs.push(`[ensureWeekPlan] ✅ Preserving complete week (3/3 rows)`);
+    const existingPicks = rows.map(r => r.action_id);
+    const existingSnapshot = rows[0]?.rank_snapshot || null;
+    return { 
+      picks: existingPicks, 
+      rankSnapshot: existingSnapshot, 
+      wroteCount: 0,
+      preserved: true 
+    };
+  }
+
+  // Step 3: Determine regeneration reason
+  let regenReason = '';
+  if (regenerate) {
+    regenReason = 'forced (regenerateNextWeek=true)';
+  } else if (!isComplete) {
+    regenReason = `incomplete (${rows.length}/3 rows)`;
+  }
+  logs.push(`[ensureWeekPlan] 🔄 Regenerating: ${regenReason}`);
+
+  // Step 4: Delete non-overridden rows only
+  const toDelete = rows.filter(r => !r.overridden).map(r => r.id);
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from('weekly_plan')
+      .delete()
+      .in('id', toDelete);
+    
+    if (delErr) {
+      logs.push(`[ensureWeekPlan] Delete error: ${delErr.message}`);
+      throw delErr;
+    }
+    logs.push(`[ensureWeekPlan] Deleted ${toDelete.length} non-overridden rows`);
+  }
+
+  // Step 5: Calculate open slots (slots not overridden)
+  const openSlots = [1, 2, 3].filter(s => !overriddenSlots.has(s));
+  logs.push(`[ensureWeekPlan] Open slots: [${openSlots.join(',')}]`);
+
+  if (openSlots.length === 0) {
+    logs.push(`[ensureWeekPlan] All slots overridden, no regeneration needed`);
+    return { picks: [], rankSnapshot: null, wroteCount: 0, preserved: false };
+  }
+
+  // Step 6: Call sequencer-rank for fresh picks
+  const { data: rankData, error: rankError } = await supabase.functions.invoke('sequencer-rank', {
+    body: {
+      roleId,
+      effectiveDate: weekStartDate,
+      timezone
+    }
+  });
+
+  if (rankError) {
+    logs.push(`[ensureWeekPlan] Rank error: ${rankError.message}`);
+    throw new Error(`Failed to rank moves: ${rankError.message}`);
+  }
+
+  const nextPicks = rankData?.next || [];
+  if (nextPicks.length === 0) {
+    logs.push(`[ensureWeekPlan] No moves ranked`);
+    throw new Error('Sequencer returned no moves');
+  }
+
+  // Step 7: Take top N picks for open slots
+  const picksForSlots = nextPicks.slice(0, openSlots.length).map((m: any) => m.proMoveId);
+  logs.push(`[ensureWeekPlan] Picks for open slots: [${picksForSlots.join(',')}]`);
+
+  // Build rank snapshot
+  const top3Full = nextPicks.slice(0, 3).map((m: any) => m.proMoveId);
+  const top5 = nextPicks.slice(0, 5).map((m: any) => m.proMoveId);
+  const rankSnapshot = {
+    top3: top3Full,
+    top5,
+    poolSize: rankData.ranked?.length || 0,
+    weights: nextPicks[0]?.parts || null,
+    version: RANK_VERSION
+  };
+
+  // Step 8: Insert rows for open slots
+  const insertRows = openSlots.map((slot, i) => ({
+    org_id: null,
+    role_id: roleId,
+    week_start_date: weekStartDate,
+    display_order: slot,
+    action_id: picksForSlots[i],
+    self_select: false,
+    status,
+    generated_by: 'auto',
+    overridden: false,
+    rank_version: RANK_VERSION,
+    rank_snapshot: rankSnapshot
+  }));
+
+  const { data: insertData, error: insertError, count } = await supabase
+    .from('weekly_plan')
+    .insert(insertRows)
+    .select('*', { count: 'exact' });
+
+  if (insertError) {
+    logs.push(`[ensureWeekPlan] Insert error: ${insertError.message}`);
+    throw insertError;
+  }
+
+  const actualCount = count ?? insertData?.length ?? 0;
+  logs.push(`[ensureWeekPlan] ✅ Wrote ${actualCount} new rows`);
+
+  return { 
+    picks: picksForSlots, 
+    rankSnapshot, 
+    wroteCount: actualCount,
+    preserved: false 
+  };
 }
 
 // Generate a week's plan (global: org_id = null)

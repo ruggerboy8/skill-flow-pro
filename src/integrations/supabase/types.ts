@@ -695,7 +695,7 @@ export type Database = {
           lock_at_local: string | null
           logs: string[] | null
           mode: string
-          org_id: string
+          org_id: string | null
           role_id: number
           run_at: string
           success: boolean
@@ -709,7 +709,7 @@ export type Database = {
           lock_at_local?: string | null
           logs?: string[] | null
           mode: string
-          org_id: string
+          org_id?: string | null
           role_id: number
           run_at?: string
           success: boolean
@@ -723,7 +723,7 @@ export type Database = {
           lock_at_local?: string | null
           logs?: string[] | null
           mode?: string
-          org_id?: string
+          org_id?: string | null
           role_id?: number
           run_at?: string
           success?: boolean

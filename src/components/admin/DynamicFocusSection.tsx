@@ -164,26 +164,25 @@ export function DynamicFocusSection({ roleId }: DynamicFocusSectionProps) {
   };
 
   const handleSimulateMonday = async () => {
-    const simulatedMonday = '2025-11-10';
-    
     setRunningNow(true);
     try {
+      // First, call rollover to advance the weeks
       const { data, error } = await supabase.functions.invoke('sequencer-rollover', {
         body: { 
           roles: [roleId], 
-          asOf: simulatedMonday,
-          force: true
+          force: true  // Use current time, let rollover handle the logic
         }
       });
 
       if (error) throw error;
 
       toast({
-        title: 'Monday Rollover Simulated (Global)',
-        description: `Status: ${data.status || 'success'}`
+        title: 'Monday Rollover Complete',
+        description: `Weeks advanced successfully`
       });
 
-      await loadWeeksForSimulation('2025-11-10', '2025-11-17');
+      // Reload the current state after rollover
+      await loadWeeksForSimulation('2025-11-03', '2025-11-10');
       await loadHealthStatus();
     } catch (error: any) {
       toast({

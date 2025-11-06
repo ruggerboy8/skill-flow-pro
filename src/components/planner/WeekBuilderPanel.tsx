@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X } from 'lucide-react
 import { normalizeToPlannerWeek } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
 import { fetchProMoveMetaByIds } from '@/lib/proMoves';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface WeekSlot {
   displayOrder: 1 | 2 | 3;
@@ -450,11 +451,10 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                           </div>
                           {slot.domainName && (
                             <Badge 
-                              variant="outline" 
+                              variant="secondary" 
                               className="text-xs"
                               style={{
-                                borderColor: `hsl(var(--domain-${slot.domainName.toLowerCase().replace(/\s+/g, '-')}))`,
-                                color: `hsl(var(--domain-${slot.domainName.toLowerCase().replace(/\s+/g, '-')}))`
+                                backgroundColor: `hsl(${getDomainColor(slot.domainName)})`,
                               }}
                             >
                               {slot.domainName}

@@ -133,8 +133,8 @@ export async function assembleWeek(params: {
       .eq('status', 'locked')
       .order('display_order');
 
-    // Require exactly 3 locked rows
-    if (!planErr && planData && planData.length === 3) {
+    // Check if we have locked rows (at least 1)
+    if (!planErr && planData && planData.length > 0) {
       console.info('[assembleWeek] ✅ Using global weekly_plan for Cycle 4+ role=%d week=%s (found %d locked rows)', 
         roleId, mondayStr, planData.length);
       
@@ -170,13 +170,30 @@ export async function assembleWeek(params: {
             source: 'plan',
             weekLabel: `Week of ${mondayStr}`
           });
+        } else if (!plan.action_id) {
+          // Include empty slots so users see all 3 slots even if some are unfilled
+          result.push({
+            weekly_focus_id: `plan:${plan.id}`,
+            type: 'site',
+            pro_move_id: null,
+            action_statement: '',
+            competency_name: 'General',
+            domain_name: '',
+            required: true,
+            locked: false,
+            display_order: plan.display_order,
+            source: 'plan',
+            weekLabel: `Week of ${mondayStr}`
+          });
         }
       }
       
-      if (result.length === 3) {
+      // Return whatever we have (even if less than 3)
+      if (result.length > 0) {
+        console.info('[assembleWeek] Returning %d weekly_plan assignments', result.length);
         return result;
       } else {
-        console.warn('[assembleWeek] Expected 3 locked global plan rows, got %d - falling back', result.length);
+        console.warn('[assembleWeek] No valid assignments from weekly_plan - falling back to focus');
       }
     } else {
       console.warn('[assembleWeek] ❌ No global plan for Cycle 4+ (week %s, role %d) - found %d rows with error: %s - falling back to focus', 

@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { normalizeToPlannerWeek } from '@/lib/plannerUtils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface RecommenderPanelProps {
   roleId: number;
@@ -217,11 +218,10 @@ export function RecommenderPanel({
 
                     <div className="flex flex-wrap gap-1">
                       <Badge 
-                        variant="outline" 
+                        variant="secondary" 
                         className="text-xs"
                         style={{
-                          borderColor: `hsl(var(--domain-${move.domain.toLowerCase().replace(/\s+/g, '-')}))`,
-                          color: `hsl(var(--domain-${move.domain.toLowerCase().replace(/\s+/g, '-')}))`
+                          backgroundColor: `hsl(${getDomainColor(move.domain)})`,
                         }}
                       >
                         {move.domain}

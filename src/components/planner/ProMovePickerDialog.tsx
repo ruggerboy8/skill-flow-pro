@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { Search } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
+import { getDomainOrderIndex } from '@/lib/domainUtils';
 
 interface ProMove {
   action_id: number;
@@ -83,15 +84,17 @@ export function ProMovePickerDialog({
       competencies: compMap.get(m.competency_id) || null,
     }));
 
-    // sort: domain → competency → id
+    // sort: domain (by DOMAIN_ORDER) → competency_id → action_id
     enriched.sort((a, b) => {
       const dA = a.competencies?.domains?.domain_name || '';
       const dB = b.competencies?.domains?.domain_name || '';
-      if (dA !== dB) return dA.localeCompare(dB);
+      const orderA = getDomainOrderIndex(dA);
+      const orderB = getDomainOrderIndex(dB);
+      if (orderA !== orderB) return orderA - orderB;
 
-      const cA = a.competencies?.name || '';
-      const cB = b.competencies?.name || '';
-      if (cA !== cB) return cA.localeCompare(cB);
+      const compIdA = a.competency_id;
+      const compIdB = b.competency_id;
+      if (compIdA !== compIdB) return compIdA - compIdB;
 
       return a.action_id - b.action_id;
     });
@@ -138,7 +141,7 @@ export function ProMovePickerDialog({
           <div className="px-5 py-3 border-b bg-background">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
                   placeholder="Search by move or competency…"
                   value={searchQuery}

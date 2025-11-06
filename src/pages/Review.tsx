@@ -97,7 +97,7 @@ export default function Review() {
               )
             )
           `)
-          .eq('org_id', orgId)
+          .is('org_id', null)
           .eq('role_id', staffRow.role_id)
           .eq('week_start_date', mondayStr)
           .eq('status', 'locked')

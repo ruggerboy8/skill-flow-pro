@@ -119,7 +119,7 @@ export default function Performance() {
             )
           )
         `)
-        .eq('org_id', orgId)
+        .is('org_id', null)
         .eq('role_id', staffData.role_id)
         .eq('week_start_date', mondayStr)
         .eq('status', 'locked')

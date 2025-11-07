@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, CheckCircle, HelpCircle, Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { CheckCircle, HelpCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
 import { cn } from '@/lib/utils';
@@ -20,15 +19,10 @@ interface WeekStatus {
 export function MonthView({ roleId, selectedMonthAnchor, onSelectWeek }: MonthViewProps) {
   const [weeks, setWeeks] = useState<WeekStatus[]>([]);
   const [loading, setLoading] = useState(false);
-  const [currentMonthStart, setCurrentMonthStart] = useState(() => {
-    const d = new Date(selectedMonthAnchor + 'T12:00:00');
-    d.setDate(1);
-    return d.toISOString().split('T')[0];
-  });
 
   useEffect(() => {
     loadMonthData();
-  }, [roleId, currentMonthStart]);
+  }, [roleId, selectedMonthAnchor]);
 
   const getMondaysInMonth = (monthStartStr: string): string[] => {
     const mondays: string[] = [];
@@ -52,7 +46,7 @@ export function MonthView({ roleId, selectedMonthAnchor, onSelectWeek }: MonthVi
   const loadMonthData = async () => {
     setLoading(true);
     
-    const mondays = getMondaysInMonth(currentMonthStart);
+    const mondays = getMondaysInMonth(selectedMonthAnchor);
     
     // Simple query: just check existence of weekly_plan rows
     const { data, error } = await supabase
@@ -80,43 +74,11 @@ export function MonthView({ roleId, selectedMonthAnchor, onSelectWeek }: MonthVi
     setLoading(false);
   };
 
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    const d = new Date(currentMonthStart + 'T12:00:00');
-    d.setMonth(d.getMonth() + (direction === 'prev' ? -1 : 1));
-    setCurrentMonthStart(d.toISOString().split('T')[0]);
-  };
-
   const currentMonday = normalizeToPlannerWeek(new Date());
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>
-            {new Date(currentMonthStart + 'T12:00:00').toLocaleDateString('en-US', { 
-              month: 'long', 
-              year: 'numeric' 
-            })}
-          </CardTitle>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigateMonth('prev')}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigateMonth('next')}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-2 pt-6">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

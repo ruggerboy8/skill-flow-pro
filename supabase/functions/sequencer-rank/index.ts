@@ -498,7 +498,7 @@ serve(async (req) => {
       ? Math.floor((new Date(referenceDate).getTime() - new Date(lastSeenRecord.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000))
       : 999;
 
-    const horizon = RECENCY_HORIZON; // Now always 16
+    const horizon = config.recencyHorizonWeeks === 0 ? 12 : config.recencyHorizonWeeks;
     const cooldown = config.cooldownWeeks;
 
     // Base recency (linear post-cooldown)
@@ -672,18 +672,25 @@ serve(async (req) => {
       const appearances = domainRecord ? domainRecord.appearances : 0;
       const D = 1 - Math.min(appearances / 8, 1);
 
-      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib;
+      // T (Retest Boost) - check if retest is due in preview
+      const retestInfo = retestMap.get(move.id);
+      const retestDue = retestInfo && retestInfo.wasLowConf && 
+        weeksSince >= RETEST_WINDOW_MIN && weeksSince <= RETEST_WINDOW_MAX;
+      const T = retestDue ? RETEST_BOOST : 0;
+
+      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib + T;
 
       const components = [
         { key: 'C', value: C * weights.C },
         { key: 'R', value: R * weights.R },
         { key: 'E', value: eContrib },
         { key: 'D', value: D * weights.D },
+        { key: 'T', value: T },
       ];
       components.sort((a, b) => b.value - a.value);
       const drivers = components.slice(0, 2).map(c => c.key);
 
-      return { ...move, C, R, E: E_raw, D, eContrib, final, drivers, weeksSince };
+      return { ...move, C, R, E: E_raw, D, eContrib, final, drivers, weeksSince, T, retestDue };
     });
 
     scoredPreview.sort((a, b) => {

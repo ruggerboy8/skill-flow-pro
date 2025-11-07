@@ -5,11 +5,16 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2 } from 'lucide-react';
-import { normalizeToPlannerWeek } from '@/lib/plannerUtils';
+import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
 import { fetchProMoveMetaByIds } from '@/lib/proMoves';
 import { getDomainColor } from '@/lib/domainColors';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { MonthView } from './MonthView';
 
 interface WeekSlot {
   displayOrder: 1 | 2 | 3;
@@ -28,19 +33,16 @@ interface WeekAssignment {
 interface WeekBuilderPanelProps {
   roleId: number;
   roleName: string;
-  selectedMonday: string;
-  showTwoWeeks?: boolean;
-  onChangeSelectedMonday?: (monday: string) => void;
 }
 
 export function WeekBuilderPanel({ 
   roleId, 
-  roleName, 
-  selectedMonday,
-  showTwoWeeks = false,
-  onChangeSelectedMonday 
+  roleName
 }: WeekBuilderPanelProps) {
   const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
+  const [selectedMonday, setSelectedMonday] = useState(normalizeToPlannerWeek(new Date()));
+  const [showTwoWeeks, setShowTwoWeeks] = useState(false);
   const [weeks, setWeeks] = useState<WeekAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState<{ weekStart: string; displayOrder: number } | null>(null);
@@ -182,11 +184,11 @@ export function WeekBuilderPanel({
   };
 
   const handleNavigatePrev = () => {
-    onChangeSelectedMonday?.(getPrevMonday(selectedMonday));
+    setSelectedMonday(getPrevMonday(selectedMonday));
   };
 
   const handleNavigateNext = () => {
-    onChangeSelectedMonday?.(getNextMonday(selectedMonday));
+    setSelectedMonday(getNextMonday(selectedMonday));
   };
 
   const handleSelectProMove = async (actionId: number, weekStart?: string, displayOrder?: number) => {
@@ -449,34 +451,99 @@ export function WeekBuilderPanel({
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Week Builder</CardTitle>
-              <CardDescription>Assign pro-moves to {showTwoWeeks ? 'upcoming weeks' : 'the week'} for {roleName}</CardDescription>
+              <CardDescription>Assign pro-moves for {roleName}</CardDescription>
             </div>
-            <div className="flex gap-2">
-              {hasUnsavedChanges && (
+            {hasUnsavedChanges && (
+              <Button 
+                onClick={handleSaveAll} 
+                size="sm"
+                disabled={savingChanges}
+              >
+                {savingChanges ? 'Saving...' : '💾 Save Changes'}
+              </Button>
+            )}
+          </div>
+
+          {/* View Mode Controls */}
+          <div className="flex items-center justify-between">
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'week' | 'month')}>
+              <TabsList>
+                <TabsTrigger value="week">Week View</TabsTrigger>
+                <TabsTrigger value="month">Month View</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {viewMode === 'week' && (
+              <div className="flex items-center gap-3">
                 <Button 
-                  onClick={handleSaveAll} 
-                  size="sm"
-                  disabled={savingChanges}
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleNavigatePrev}
                 >
-                  {savingChanges ? 'Saving...' : '💾 Save Changes'}
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={handleNavigatePrev}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleNavigateNext}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+                <span className="text-sm font-medium min-w-[140px] text-center">
+                  Week of {formatWeekOf(selectedMonday)}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleNavigateNext}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Separator orientation="vertical" className="h-6" />
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="twoWeeks" 
+                    checked={showTwoWeeks} 
+                    onCheckedChange={(checked) => setShowTwoWeeks(checked as boolean)} 
+                  />
+                  <Label htmlFor="twoWeeks" className="text-sm">Show 2 weeks</Label>
+                </div>
+              </div>
+            )}
+
+            {viewMode === 'month' && (
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleNavigatePrev}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[140px] text-center">
+                  {formatWeekOf(selectedMonday)}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleNavigateNext}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
-          <div className={`grid ${showTwoWeeks ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
-            {weeks.map((week) => {
+          {viewMode === 'month' ? (
+            <MonthView
+              roleId={roleId}
+              selectedMonthAnchor={selectedMonday}
+              onSelectWeek={(monday) => {
+                setSelectedMonday(monday);
+                setViewMode('week');
+              }}
+            />
+          ) : (
+            <div className={`grid ${showTwoWeeks ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+              {weeks.map((week) => {
               const isPastWeek = week.weekStart < currentMonday;
               
               return (
@@ -608,8 +675,9 @@ export function WeekBuilderPanel({
                 </CardContent>
               </Card>
               );
-            })}
-          </div>
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 

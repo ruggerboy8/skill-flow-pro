@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { RefreshCw, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { getDomainColor } from '@/lib/domainColors';
 
@@ -37,6 +37,11 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
   const [preset, setPreset] = useState<string>('balanced');
   
   const ITEMS_PER_PAGE = 6;
+
+  // Auto-load recommendations on mount
+  useEffect(() => {
+    loadRecommendations();
+  }, [roleId, preset]);
 
   const loadRecommendations = async () => {
     setLoading(true);
@@ -84,20 +89,15 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Pro-Move Recommender</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              Recommendations as of today
-            </p>
-          </div>
+          <CardTitle>Pro-Move Recommender</CardTitle>
           <Button
             variant="outline"
             size="sm"
             onClick={loadRecommendations}
             disabled={loading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <Play className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Run
           </Button>
         </div>
       </CardHeader>

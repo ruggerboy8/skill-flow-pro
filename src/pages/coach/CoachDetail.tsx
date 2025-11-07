@@ -605,7 +605,7 @@ export default function CoachDetail() {
                                 <CardContent className="p-4">
                                   <div className="flex items-center gap-4">
                                     <Badge 
-                                      style={{ backgroundColor: getDomainColor(item.domain_name) }}
+                                      style={{ backgroundColor: `hsl(${getDomainColor(item.domain_name)})` }}
                                       className="ring-1 ring-border/50 text-foreground"
                                     >
                                       {item.domain_name}

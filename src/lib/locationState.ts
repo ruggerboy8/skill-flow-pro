@@ -415,70 +415,51 @@ export async function computeWeekState(params: {
   let dataSource: 'weekly_plan' | 'weekly_focus' = 'weekly_focus';
   let weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
 
-  // Simple per-render cache
-  type CacheEntry = { ids: string[]; source: string; label: string };
-  const cacheKey = `plan:${roleId}:${mondayStr}`;
-  if (!globalThis.__weekStateCache) {
-    globalThis.__weekStateCache = new Map<string, CacheEntry>();
+  if (cycleNumber >= 4) {
+    // Try global weekly_plan (org_id IS NULL)
+    const { data: planData, error: planErr } = await supabase
+      .from('weekly_plan')
+      .select('id, display_order')
+      .is('org_id', null)
+      .eq('role_id', roleId)
+      .eq('week_start_date', mondayStr)
+      .eq('status', 'locked')
+      .order('display_order');
+
+    // For Cycle 4+, use weekly_plan exclusively (locked global plan)
+    if (!planErr && planData && planData.length > 0) {
+      console.log(`[computeWeekState] ✅ Found ${planData.length} locked weekly_plan rows for global plan`);
+      const allIds = planData.map((p: any) => `plan:${p.id}`);
+      focusIds = allIds;
+      dataSource = 'weekly_plan';
+      weekLabel = `Week of ${mondayStr}`;
+      console.info('[weekState] source=global_weekly_plan cycle=%d week=%s role=%d count=%d', 
+        cycleNumber, mondayStr, roleId, planData.length);
+    } else {
+      console.warn('[weekState] No locked global plan rows for Cycle 4+, got %d - showing no pro moves', planData?.length || 0);
+      // For Cycle 4+, don't fall back to weekly_focus
+      focusIds = [];
+      dataSource = 'weekly_plan';
+      weekLabel = `Week of ${mondayStr}`;
+    }
   }
-  const cache = globalThis.__weekStateCache as Map<string, CacheEntry>;
 
-  if (cache.has(cacheKey)) {
-    const cached = cache.get(cacheKey)!;
-    focusIds = cached.ids;
-    dataSource = cached.source as 'weekly_plan' | 'weekly_focus';
-    weekLabel = cached.label;
-    console.info(`[weekState] cache hit for ${cacheKey} source=${dataSource}`);
-  } else {
-    if (cycleNumber >= 4) {
-      // Try global weekly_plan (org_id IS NULL)
-      const { data: planData, error: planErr } = await supabase
-        .from('weekly_plan')
-        .select('id, display_order')
-        .is('org_id', null)
-        .eq('role_id', roleId)
-        .eq('week_start_date', mondayStr)
-        .eq('status', 'locked')
-        .order('display_order');
+  // Fallback to weekly_focus (Cycles 1-3 or if plan missing)
+  if (focusIds.length === 0) {
+    const { data: focusRows, error: focusErr } = await supabase
+      .from('weekly_focus')
+      .select('id')
+      .eq('role_id', roleId)
+      .eq('cycle', cycleNumber)
+      .eq('week_in_cycle', weekInCycle);
 
-      // For Cycle 4+, use weekly_plan exclusively (locked global plan)
-      if (!planErr && planData && planData.length > 0) {
-        console.log(`[computeWeekState] ✅ Found ${planData.length} locked weekly_plan rows for global plan`);
-        const allIds = planData.map((p: any) => `plan:${p.id}`);
-        focusIds = allIds;
-        dataSource = 'weekly_plan';
-        weekLabel = `Week of ${mondayStr}`;
-        console.info('[weekState] source=global_weekly_plan cycle=%d week=%s role=%d count=%d', 
-          cycleNumber, mondayStr, roleId, planData.length);
-      } else {
-        console.warn('[weekState] No locked global plan rows for Cycle 4+, got %d - showing no pro moves', planData?.length || 0);
-        // For Cycle 4+, don't fall back to weekly_focus
-        focusIds = [];
-        dataSource = 'weekly_plan';
-        weekLabel = `Week of ${mondayStr}`;
-      }
+    if (!focusErr && focusRows) {
+      focusIds = focusRows.map(r => r.id);
+      dataSource = 'weekly_focus';
+      weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
+      console.info('[weekState] source=weekly_focus cycle=%d week=%d role=%d', 
+        cycleNumber, weekInCycle, roleId);
     }
-
-    // Fallback to weekly_focus (Cycles 1-3 or if plan missing)
-    if (focusIds.length === 0) {
-      const { data: focusRows, error: focusErr } = await supabase
-        .from('weekly_focus')
-        .select('id')
-        .eq('role_id', roleId)
-        .eq('cycle', cycleNumber)
-        .eq('week_in_cycle', weekInCycle);
-
-      if (!focusErr && focusRows) {
-        focusIds = focusRows.map(r => r.id);
-        dataSource = 'weekly_focus';
-        weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
-        console.info('[weekState] source=weekly_focus cycle=%d week=%d role=%d', 
-          cycleNumber, weekInCycle, roleId);
-      }
-    }
-
-    // Cache result
-    cache.set(cacheKey, { ids: focusIds, source: dataSource, label: weekLabel });
   }
 
   const required = focusIds.length;

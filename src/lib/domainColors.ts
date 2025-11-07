@@ -7,5 +7,12 @@ export const domainColors: Record<string, string> = {
 };
 
 export const getDomainColor = (domain: string): string => {
-  return domainColors[domain] || '0 0% 95%'; // fallback to gray
+  const key = (domain || '').trim().toLowerCase();
+  const map: Record<string, string> = {
+    'clinical': domainColors.Clinical,
+    'clerical': domainColors.Clerical,
+    'cultural': domainColors.Cultural,
+    'case acceptance': domainColors['Case Acceptance'],
+  };
+  return map[key] || '0 0% 95%'; // fallback to gray
 };

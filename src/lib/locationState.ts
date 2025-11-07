@@ -146,13 +146,13 @@ export async function assembleWeek(params: {
           action_id,
           display_order,
           self_select,
-          pro_moves!weekly_plan_action_id_fkey (
-            action_statement
-          ),
-          competencies!weekly_plan_competency_id_fkey (
-            name,
-            domains!competencies_domain_id_fkey (
-              domain_name
+          pro_moves:action_id (
+            action_statement,
+            competencies:competency_id (
+              name,
+              domains:domain_id (
+                domain_name
+              )
             )
           )
         `)
@@ -172,8 +172,8 @@ export async function assembleWeek(params: {
         type: 'site',
         pro_move_id: plan.action_id,
         action_statement: plan.pro_moves?.action_statement || 'Pro Move',
-        competency_name: plan.competencies?.name || 'General',
-        domain_name: plan.competencies?.domains?.domain_name || 'General',
+        competency_name: plan.pro_moves?.competencies?.name || 'General',
+        domain_name: plan.pro_moves?.competencies?.domains?.domain_name || 'General',
         required: true,
         locked: !!plan.action_id,
         display_order: plan.display_order,

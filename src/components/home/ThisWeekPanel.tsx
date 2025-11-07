@@ -279,7 +279,7 @@ export default function ThisWeekPanel() {
             const scores = weeklyScores.find(s => s.weekly_focus_id === assignment.weekly_focus_id);
 
             return (
-              <div key={assignment.weekly_focus_id} className="rounded-lg p-4 border" style={bgColor ? { backgroundColor: bgColor } : undefined}>
+              <div key={assignment.weekly_focus_id} className="rounded-lg p-4 border" style={bgColor ? { backgroundColor: `hsl(${bgColor})` } : undefined}>
                 {domainName && (
                   <Badge variant="secondary" className="text-xs font-semibold mb-2 bg-white/80 text-gray-900" aria-label={`Domain: ${domainName}`}> 
                     {domainName}

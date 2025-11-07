@@ -183,7 +183,14 @@ export function computeNextAndPreview(
       lastSeen: lastSeenRecord ? formatMmDdYyyy(lastSeenRecord.weekStart) : undefined,
       weeksSinceSeen: lastSeenRecord ? formatWeeksSince(lastSeenRecord.weekStart, nextDate) : 999,
       confidenceN,
-      status: 'ok', // CLC detection happens in edge function
+      status: 'ok' as const,
+      lowConfShare: null,
+      avgConfLast: null,
+      lastPracticedWeeks: lastSeenRecord ? formatWeeksSince(lastSeenRecord.weekStart, nextDate) : 999,
+      retestDue: false,
+      primaryReasonCode: 'TIE' as const,
+      primaryReasonValue: null,
+      domainColorHsl: '0, 0%, 50%',
     };
   });
 
@@ -228,7 +235,14 @@ export function computeNextAndPreview(
       lastSeen: lastSeenRecord ? formatMmDdYyyy(lastSeenRecord.weekStart) : undefined,
       weeksSinceSeen: lastSeenRecord ? formatWeeksSince(lastSeenRecord.weekStart, previewDateStr) : 999,
       confidenceN,
-      status: 'ok', // CLC detection happens in edge function
+      status: 'ok' as const,
+      lowConfShare: null,
+      avgConfLast: null,
+      lastPracticedWeeks: lastSeenRecord ? formatWeeksSince(lastSeenRecord.weekStart, previewDateStr) : 999,
+      retestDue: false,
+      primaryReasonCode: 'TIE' as const,
+      primaryReasonValue: null,
+      domainColorHsl: '0, 0%, 50%',
     };
   });
 

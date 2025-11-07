@@ -87,6 +87,10 @@ serve(async (req) => {
       };
     }
 
+    // Primary reason thresholds
+    const LOW_CONF_THRESHOLD = 0.30;
+    const STALE_WEEKS = 6;
+
     const config = {
       weights,
       cooldownWeeks: body.constraints?.cooldownWeeks ?? body.cooldownWeeks ?? 4,
@@ -439,63 +443,77 @@ serve(async (req) => {
 
     // Score function
     const scoreCandidate = (move: any, referenceDate: string) => {
-      // C (Collective Weakness) - combines tail pain + mean deficit
-      const confData = confidenceHistory.filter(h => h.proMoveId === move.id);
-      let smoothedConf = config.ebPrior;
-      let p_low = 0.5; // Default to neutral
-      let C = 0.5; // Default to neutral
+    // C (Collective Weakness) - combines tail pain + mean deficit
+    const confData = confidenceHistory.filter(h => h.proMoveId === move.id);
+    let smoothedConf = config.ebPrior;
+    let p_low = 0.5; // Default to neutral
+    let C = 0.5; // Default to neutral
+    let avgConfLast: number | null = null;
+    let lowConfShare: number | null = null;
 
-      if (confData.length > 0) {
-        // Calculate mean with existing EB (unchanged)
-        const trimCount = Math.floor(confData.length * config.trimPct);
-        const sorted = confData.map(d => d.avg).sort((a, b) => a - b);
-        const trimmed = sorted.slice(trimCount, sorted.length - trimCount);
-        const sampleMean = trimmed.reduce((sum, v) => sum + v, 0) / trimmed.length;
-        const totalN = confData.reduce((sum, d) => sum + d.n, 0);
-        
-        // EB smoothed mean
-        smoothedConf = (config.ebPrior * config.ebK + sampleMean * totalN) / (config.ebK + totalN);
-        
-        // Calculate low-tail rate with Beta EB approximation
-        let lowCount = 0;
-        confData.forEach(cd => {
-          // Approximate: if week avg ≤ 0.2 (2/10), count all n as low
-          if (cd.avg <= LOW_CUTOFF / 10.0) {
-            lowCount += cd.n;
-          }
-        });
-        
-        // Beta EB: (a + successes) / (a + b + trials)
-        p_low = (BETA_PRIOR_A + lowCount) / (BETA_PRIOR_A + BETA_PRIOR_B + totalN);
-        
-        // Collective Weakness: 60% tail pain + 40% mean deficit
-        const mean_deficit = 1 - smoothedConf;
-        C = 0.6 * p_low + 0.4 * mean_deficit;
-        
-        // Sample-size adjustment: shrink toward neutral if n < MIN_SAMPLES
-        if (totalN < MIN_SAMPLES) {
-          const lambda = Math.max(0, Math.min(1, totalN / MIN_SAMPLES));
-          C = lambda * C + (1 - lambda) * 0.5;
+    if (confData.length > 0) {
+      // Calculate mean with existing EB
+      const trimCount = Math.floor(confData.length * config.trimPct);
+      const sorted = confData.map(d => d.avg).sort((a, b) => a - b);
+      const trimmed = sorted.slice(trimCount, sorted.length - trimCount);
+      const sampleMean = trimmed.reduce((sum, v) => sum + v, 0) / trimmed.length;
+      const totalN = confData.reduce((sum, d) => sum + d.n, 0);
+      
+      // EB smoothed mean
+      smoothedConf = (config.ebPrior * config.ebK + sampleMean * totalN) / (config.ebK + totalN);
+      
+      // Get most recent avg for UI (1-4 scale: avg * 10 / 10 * 4 = avg * 4)
+      const mostRecent = confData.sort((a, b) => 
+        new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime()
+      )[0];
+      avgConfLast = mostRecent ? mostRecent.avg * 10 : null; // Convert 0-1 to 1-10 scale
+      
+      // Calculate low-tail rate with Beta EB approximation
+      let lowCount = 0;
+      confData.forEach(cd => {
+        // Approximate: if week avg ≤ 0.2 (2/10), count all n as low
+        if (cd.avg <= LOW_CUTOFF / 10.0) {
+          lowCount += cd.n;
         }
+      });
+      
+      // Beta EB: (a + successes) / (a + b + trials)
+      p_low = (BETA_PRIOR_A + lowCount) / (BETA_PRIOR_A + BETA_PRIOR_B + totalN);
+      lowConfShare = p_low; // Store for UI
+      
+      // Collective Weakness: 60% tail pain + 40% mean deficit
+      const mean_deficit = 1 - smoothedConf;
+      C = 0.6 * p_low + 0.4 * mean_deficit;
+      
+      // Sample-size adjustment: shrink toward neutral if n < MIN_SAMPLES
+      if (totalN < MIN_SAMPLES) {
+        const lambda = Math.max(0, Math.min(1, totalN / MIN_SAMPLES));
+        C = lambda * C + (1 - lambda) * 0.5;
       }
+    }
 
-      // R (Recency) - Linear post-cooldown + long-trickle tail
-      const lastSeenRecord = lastSelected.find(ls => ls.proMoveId === move.id);
-      const weeksSince = lastSeenRecord
-        ? Math.floor((new Date(referenceDate).getTime() - new Date(lastSeenRecord.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000))
-        : 999;
+    // R (Recency) - Linear post-cooldown + long-trickle tail
+    const lastSeenRecord = lastSelected.find(ls => ls.proMoveId === move.id);
+    const weeksSince = lastSeenRecord
+      ? Math.floor((new Date(referenceDate).getTime() - new Date(lastSeenRecord.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000))
+      : 999;
 
-      const horizon = RECENCY_HORIZON; // Now always 16
-      const cooldown = config.cooldownWeeks;
+    const horizon = RECENCY_HORIZON; // Now always 16
+    const cooldown = config.cooldownWeeks;
 
-      // Base recency (linear post-cooldown)
-      let R = weeksSince <= cooldown ? 0
-            : weeksSince >= horizon  ? 1
-            : (weeksSince - cooldown) / (horizon - cooldown);
+    // Base recency (linear post-cooldown)
+    let R = weeksSince <= cooldown ? 0
+          : weeksSince >= horizon  ? 1
+          : (weeksSince - cooldown) / (horizon - cooldown);
 
-      // Long-trickle tail (ancient moves get a small bonus)
-      const R_long = Math.min(weeksSince / TRICKLE_LONG, 1) * TRICKLE_WEIGHT;
-      R = Math.min(R + R_long, 1); // Cap at 1
+    // Long-trickle tail (ancient moves get a small bonus)
+    const R_long = Math.min(weeksSince / TRICKLE_LONG, 1) * TRICKLE_WEIGHT;
+    R = Math.min(R + R_long, 1); // Cap at 1
+
+    // Check if retest is due
+    const retestInfo = retestMap.get(move.id);
+    const retestDue = retestInfo && retestInfo.wasLowConf && 
+      weeksSince >= RETEST_WINDOW_MIN && weeksSince <= RETEST_WINDOW_MAX;
 
       // E (Eval) - Deficit with capped contribution
       const evalRecord = evals.find(e => e.competencyId === move.competencyId);
@@ -508,19 +526,27 @@ serve(async (req) => {
       const appearances = domainRecord ? domainRecord.appearances : 0;
       const D = 1 - Math.min(appearances / 8, 1);
 
-      // T (Retest Boost) - verify improvement after low-conf selection
-      let T = 0;
-      const retestInfo = retestMap.get(move.id);
-      if (retestInfo && retestInfo.wasLowConf) {
-        const weeksSinceSelection = Math.floor(
-          (new Date(referenceDate).getTime() - new Date(retestInfo.weekStart).getTime()) 
-          / (7 * 24 * 60 * 60 * 1000)
-        );
-        
-        if (weeksSinceSelection >= RETEST_WINDOW_MIN && weeksSinceSelection <= RETEST_WINDOW_MAX) {
-          T = RETEST_BOOST;
-        }
-      }
+    // T (Retest Boost) - verify improvement after low-conf selection
+    let T = 0;
+    if (retestDue) {
+      T = RETEST_BOOST;
+    }
+
+    // Determine primary reason (server-side)
+    let primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE' = 'TIE';
+    let primaryReasonValue: number | null = null;
+
+    if (retestDue) {
+      primaryReasonCode = 'RETEST';
+    } else if (lowConfShare !== null && lowConfShare >= LOW_CONF_THRESHOLD) {
+      primaryReasonCode = 'LOW_CONF';
+      primaryReasonValue = lowConfShare;
+    } else if (weeksSince === 999) {
+      primaryReasonCode = 'NEVER';
+    } else if (weeksSince >= STALE_WEEKS) {
+      primaryReasonCode = 'STALE';
+      primaryReasonValue = weeksSince;
+    }
 
       const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib + T;
 
@@ -534,7 +560,11 @@ serve(async (req) => {
       components.sort((a, b) => b.value - a.value);
       const drivers = components.slice(0, 2).map(c => c.key);
 
-      return { C, R, E: E_raw, D, eContrib, final, drivers, weeksSince, T };
+    return { 
+      C, R, E: E_raw, D, eContrib, final, drivers, weeksSince, T,
+      lowConfShare, avgConfLast, retestDue: retestDue || false,
+      primaryReasonCode, primaryReasonValue
+    };
     };
 
     // Compute Next

@@ -33,6 +33,13 @@ export interface RankedRow {
   n2w?: number;
   recentMeans?: number[];
   reason_tags?: string[];
+  lowConfShare: number | null;
+  avgConfLast: number | null;
+  lastPracticedWeeks: number;
+  retestDue: boolean;
+  primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE';
+  primaryReasonValue: number | null;
+  domainColorHsl: string;
 }
 
 export interface RankResponse {

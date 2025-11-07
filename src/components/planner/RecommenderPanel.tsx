@@ -11,25 +11,13 @@ import { ProMoveRow } from './ProMoveRow';
 import { RecommenderFilters } from './RecommenderFilters';
 import { RecommenderGlossary } from './RecommenderGlossary';
 import { applyFilters, type FilterState } from '@/lib/recommenderUtils';
+import { adaptSequencerRow, type RankedMove } from '@/lib/sequencerAdapter';
 
 interface RecommenderPanelProps {
   roleId: number;
   roleName: string;
 }
 
-interface RankedMove {
-  proMoveId: number;
-  name: string;
-  domainName: string;
-  domainColorHsl: string;
-  finalScore: number;
-  lowConfShare: number | null;
-  avgConfLast: number | null;
-  lastPracticedWeeks: number;
-  retestDue: boolean;
-  primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE';
-  primaryReasonValue: number | null;
-}
 
 const PAGE_SIZE = 12;
 
@@ -66,7 +54,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
 
       if (error) throw error;
 
-      const allMoves = data.ranked || [];
+      const allMoves = (data.ranked || []).map(adaptSequencerRow);
       setRankedAll(allMoves);
       setTopSnapshot(allMoves.slice(0, 6));
       

@@ -30,7 +30,7 @@ export function RecommenderFilters({
 }: RecommenderFiltersProps) {
   const [open, setOpen] = useState(false);
 
-  const toggleSignal = (signal: 'lowConf' | 'retest' | 'stale' | 'never') => {
+  const toggleSignal = (signal: 'low_conf' | 'retest' | 'stale' | 'never') => {
     const current = value.signals || [];
     const updated = current.includes(signal)
       ? current.filter(s => s !== signal)
@@ -64,10 +64,10 @@ export function RecommenderFilters({
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuLabel>Signals</DropdownMenuLabel>
         <DropdownMenuCheckboxItem
-          checked={value.signals?.includes('lowConf') || false}
-          onCheckedChange={() => toggleSignal('lowConf')}
+          checked={value.signals?.includes('low_conf') || false}
+          onCheckedChange={() => toggleSignal('low_conf')}
         >
-          Low confidence (≥30%)
+          Low confidence (≥33%)
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={value.signals?.includes('retest') || false}
@@ -79,7 +79,7 @@ export function RecommenderFilters({
           checked={value.signals?.includes('stale') || false}
           onCheckedChange={() => toggleSignal('stale')}
         >
-          Not seen lately (≥6 weeks)
+          Not seen lately (≥8 weeks)
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={value.signals?.includes('never') || false}

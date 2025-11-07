@@ -1,26 +1,14 @@
-import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatPrimaryReason, formatLastPracticed, getBadges } from '@/lib/recommenderUtils';
+import type { RankedMove } from '@/lib/sequencerAdapter';
 
 interface ProMoveRowProps {
-  move: {
-    proMoveId: number;
-    name: string;
-    domainName: string;
-    domainColorHsl: string;
-    finalScore: number;
-    lowConfShare: number | null;
-    avgConfLast: number | null;
-    lastPracticedWeeks: number;
-    retestDue: boolean;
-    primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE';
-    primaryReasonValue: number | null;
-  };
+  move: RankedMove;
 }
 
 export function ProMoveRow({ move }: ProMoveRowProps) {
   const badges = getBadges(move);
-  const primaryReason = formatPrimaryReason(move.primaryReasonCode, move.primaryReasonValue);
+  const primaryReason = formatPrimaryReason(move);
   
   const needScore = move.finalScore;
   const colorClass = needScore >= 75 ? 'text-destructive' : 
@@ -31,14 +19,8 @@ export function ProMoveRow({ move }: ProMoveRowProps) {
     <div
       draggable={true}
       onDragStart={(e) => {
-        const payload = JSON.stringify({
-          actionId: move.proMoveId,
-          title: move.name,
-          domainName: move.domainName,
-        });
         e.dataTransfer.effectAllowed = 'copy';
-        e.dataTransfer.setData('application/json', payload);
-        e.dataTransfer.setData('text/plain', payload);
+        e.dataTransfer.setData('application/json', JSON.stringify({ actionId: move.proMoveId }));
       }}
       className="p-3 border-b hover:bg-muted/50 cursor-move transition-colors flex items-center gap-3"
     >
@@ -53,49 +35,47 @@ export function ProMoveRow({ move }: ProMoveRowProps) {
           <p className="text-sm font-medium leading-tight truncate flex-1">
             {move.name}
           </p>
-          <div 
-            className="px-2 py-0.5 rounded text-xs font-medium text-white shrink-0"
+          <span 
+            className="px-1.5 py-0.5 text-[10px] rounded text-foreground ring-1 ring-border/50 shrink-0"
             style={{ backgroundColor: `hsl(${move.domainColorHsl})` }}
           >
             {move.domainName}
-          </div>
+          </span>
         </div>
         
-        {primaryReason && (
-          <p className="text-xs text-muted-foreground italic truncate">
-            {primaryReason}
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground italic truncate">
+          {primaryReason}
+        </p>
       </div>
 
       {/* Quick Stats */}
       <div className="flex gap-3 text-xs text-muted-foreground shrink-0">
-        <span>
+        <span title="Low 1-2%">
           {move.lowConfShare !== null ? `${Math.round(move.lowConfShare * 100)}%` : '—'}
         </span>
-        <span>
+        <span title="Last practiced">
           {formatLastPracticed(move.lastPracticedWeeks)}
         </span>
       </div>
 
       {/* Badges */}
       {badges.length > 0 && (
-        <div className="flex gap-1 shrink-0">
-          {badges.map((badge, idx) => (
-            <TooltipProvider key={idx} delayDuration={0}>
-              <Tooltip>
+        <TooltipProvider delayDuration={0}>
+          <div className="flex gap-1 shrink-0">
+            {badges.map((b, i) => (
+              <Tooltip key={i}>
                 <TooltipTrigger asChild>
-                  <Badge variant={badge.variant} className="text-xs cursor-help">
-                    {badge.label}
-                  </Badge>
+                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-foreground cursor-help">
+                    {b.label}
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p className="text-xs">{badge.tooltip}</p>
+                  <span className="text-xs">{b.tooltip}</span>
                 </TooltipContent>
               </Tooltip>
-            </TooltipProvider>
-          ))}
-        </div>
+            ))}
+          </div>
+        </TooltipProvider>
       )}
     </div>
   );

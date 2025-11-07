@@ -1,38 +1,42 @@
 // Utility functions for Recommender Panel
 
-export function formatPrimaryReason(
-  code: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE',
-  value: number | null
-): string {
-  switch (code) {
-    case 'LOW_CONF':
-      return value !== null 
-        ? `${Math.round(value * 100)}% of staff rated this 1–2 last time`
-        : 'Low confidence detected';
+// Formatting and display utilities
+export function formatPrimaryReason(move: {
+  primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE';
+  primaryReasonValue: number | null;
+  lowConfShare: number | null;
+  lastPracticedWeeks: number;
+}): string {
+  switch (move.primaryReasonCode) {
+    case 'LOW_CONF': {
+      const pct = move.lowConfShare != null ? Math.round(move.lowConfShare * 100) : null;
+      return pct != null ? `${pct}% of staff rated it 1–2 last check-in` : 'Low confidence signal';
+    }
     case 'RETEST':
-      return 'Scheduled retest: verify improvement';
+      return 'Scheduled for retest to verify improvement';
     case 'NEVER':
       return 'Never practiced yet';
-    case 'STALE':
-      return value !== null
-        ? `Not practiced in ${value} weeks`
-        : 'Not practiced recently';
+    case 'STALE': {
+      const w = move.lastPracticedWeeks === 999 ? null : move.lastPracticedWeeks;
+      return w != null ? `Not practiced in ${w} weeks` : 'Not practiced recently';
+    }
     case 'TIE':
     default:
-      return '';
+      return 'High overall need this week';
   }
 }
 
 export function formatLastPracticed(weeks: number): string {
   if (weeks === 999) return 'Never';
   if (weeks === 0) return 'This week';
-  return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+  if (weeks === 1) return '1 wk ago';
+  return `${weeks} wks ago`;
 }
 
+// Badge generation logic
 export interface BadgeInfo {
   label: string;
   tooltip: string;
-  variant: 'default' | 'secondary' | 'destructive' | 'outline';
 }
 
 export function getBadges(move: {
@@ -42,70 +46,77 @@ export function getBadges(move: {
   primaryReasonCode: string;
 }): BadgeInfo[] {
   const badges: BadgeInfo[] = [];
-  const LOW_CONF_THRESHOLD = 0.30;
-  const STALE_WEEKS = 6;
-
-  // Max 2 badges, same priority as primary reason
+  
+  // Priority 1: Low confidence (>=33% rated 1-2)
+  if (move.primaryReasonCode === 'LOW_CONF' || (move.lowConfShare !== null && move.lowConfShare >= 0.33)) {
+    badges.push({
+      label: 'Low Conf',
+      tooltip: 'High share of 1–2 scores recently',
+    });
+  }
+  
+  // Priority 2: Retest due
   if (move.retestDue) {
     badges.push({
-      label: 'RETEST',
-      tooltip: 'We scheduled this again to verify improvement',
-      variant: 'default',
+      label: 'Retest',
+      tooltip: 'Return soon to verify improvement',
     });
   }
   
-  if (badges.length < 2 && move.lowConfShare !== null && move.lowConfShare >= LOW_CONF_THRESHOLD) {
+  // Priority 3: Never practiced
+  if (move.lastPracticedWeeks === 999) {
     badges.push({
-      label: 'LOW CONF',
-      tooltip: 'A large share of recent scores were 1–2',
-      variant: 'destructive',
+      label: 'New',
+      tooltip: 'Never practiced yet',
     });
   }
   
-  if (badges.length < 2 && move.lastPracticedWeeks === 999) {
+  // Priority 4: Stale (8+ weeks, not retest, not never)
+  if (!move.retestDue && move.lastPracticedWeeks !== 999 && move.lastPracticedWeeks >= 8) {
     badges.push({
-      label: 'NEVER',
-      tooltip: "This pro-move hasn't been practiced yet",
-      variant: 'secondary',
+      label: 'Stale',
+      tooltip: 'Not practiced in 8+ weeks',
     });
   }
   
-  if (badges.length < 2 && move.lastPracticedWeeks >= STALE_WEEKS && move.lastPracticedWeeks !== 999) {
-    badges.push({
-      label: 'STALE',
-      tooltip: "Hasn't been practiced in a while",
-      variant: 'outline',
-    });
-  }
-
-  return badges.slice(0, 2); // Ensure max 2
+  // Return max 2 badges
+  return badges.slice(0, 2);
 }
 
+// Filtering and sorting functions
 export interface FilterState {
-  signals?: Array<'lowConf' | 'retest' | 'stale' | 'never'>;
-  domains?: string[];
+  signals: ('low_conf' | 'never' | 'stale' | 'retest')[];
+  domains: string[];
 }
+
+const REASON_PRIORITY: Record<string, number> = {
+  'LOW_CONF': 4,
+  'RETEST': 3,
+  'NEVER': 2,
+  'STALE': 1,
+  'TIE': 0,
+};
 
 export function applyFilters(
   moves: any[],
   filters: FilterState,
   sort: 'need' | 'lowConf' | 'weeks' | 'domain'
 ): any[] {
-  let filtered = [...moves];
+  let result = [...moves];
 
-  // Apply signal filters
-  if (filters.signals && filters.signals.length > 0) {
-    filtered = filtered.filter(move => {
-      return filters.signals!.some(signal => {
+  // Apply signal filters (union - include if ANY match)
+  if (filters.signals.length > 0) {
+    result = result.filter((move) => {
+      return filters.signals.some((signal) => {
         switch (signal) {
-          case 'lowConf':
-            return move.lowConfShare !== null && move.lowConfShare >= 0.30;
-          case 'retest':
-            return move.retestDue === true;
-          case 'stale':
-            return move.lastPracticedWeeks >= 6 && move.lastPracticedWeeks !== 999;
+          case 'low_conf':
+            return move.lowConfShare !== null && move.lowConfShare >= 0.33;
           case 'never':
             return move.lastPracticedWeeks === 999;
+          case 'stale':
+            return move.lastPracticedWeeks >= 8 && move.lastPracticedWeeks !== 999;
+          case 'retest':
+            return move.retestDue === true;
           default:
             return false;
         }
@@ -113,30 +124,65 @@ export function applyFilters(
     });
   }
 
-  // Apply domain filters
-  if (filters.domains && filters.domains.length > 0) {
-    filtered = filtered.filter(move => 
-      filters.domains!.includes(move.domainName)
-    );
+  // Apply domain filters (union - include if ANY match)
+  if (filters.domains.length > 0) {
+    result = result.filter((move) => filters.domains.includes(move.domainName));
   }
 
   // Apply sorting
-  filtered.sort((a, b) => {
+  result.sort((a, b) => {
     switch (sort) {
-      case 'need':
-        return b.finalScore - a.finalScore; // Desc
-      case 'lowConf':
-        return (b.lowConfShare || 0) - (a.lowConfShare || 0); // Desc
-      case 'weeks':
-        return b.lastPracticedWeeks - a.lastPracticedWeeks; // Desc (oldest first)
-      case 'domain':
-        return a.domainName.localeCompare(b.domainName); // A-Z
+      case 'need': {
+        // 1. finalScore desc
+        if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
+        // 2. primaryReasonCode priority
+        const aPri = REASON_PRIORITY[a.primaryReasonCode] || 0;
+        const bPri = REASON_PRIORITY[b.primaryReasonCode] || 0;
+        if (bPri !== aPri) return bPri - aPri;
+        // 3. lowConfShare desc (nulls last)
+        if (a.lowConfShare === null && b.lowConfShare !== null) return 1;
+        if (a.lowConfShare !== null && b.lowConfShare === null) return -1;
+        if (a.lowConfShare !== null && b.lowConfShare !== null && b.lowConfShare !== a.lowConfShare) {
+          return b.lowConfShare - a.lowConfShare;
+        }
+        // 4. lastPracticedWeeks desc (999 sorts highest)
+        if (b.lastPracticedWeeks !== a.lastPracticedWeeks) {
+          return b.lastPracticedWeeks - a.lastPracticedWeeks;
+        }
+        // 5. proMoveId asc
+        return a.proMoveId - b.proMoveId;
+      }
+      case 'lowConf': {
+        // 1. lowConfShare desc (nulls last)
+        if (a.lowConfShare === null && b.lowConfShare !== null) return 1;
+        if (a.lowConfShare !== null && b.lowConfShare === null) return -1;
+        if (a.lowConfShare !== null && b.lowConfShare !== null && b.lowConfShare !== a.lowConfShare) {
+          return b.lowConfShare - a.lowConfShare;
+        }
+        // 2. finalScore desc
+        return b.finalScore - a.finalScore;
+      }
+      case 'weeks': {
+        // 1. lastPracticedWeeks desc (999 sorts highest)
+        if (b.lastPracticedWeeks !== a.lastPracticedWeeks) {
+          return b.lastPracticedWeeks - a.lastPracticedWeeks;
+        }
+        // 2. finalScore desc
+        return b.finalScore - a.finalScore;
+      }
+      case 'domain': {
+        // 1. domainName asc
+        if (a.domainName < b.domainName) return -1;
+        if (a.domainName > b.domainName) return 1;
+        // 2. finalScore desc
+        return b.finalScore - a.finalScore;
+      }
       default:
         return 0;
     }
   });
 
-  return filtered;
+  return result;
 }
 
 export function getDomainColorHsl(domainName: string): string {

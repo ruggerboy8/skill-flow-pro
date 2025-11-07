@@ -502,51 +502,13 @@ export function WeekBuilderPanel({
           </div>
 
           {/* View Mode Controls */}
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'week' | 'month')}>
               <TabsList>
                 <TabsTrigger value="week">Week View</TabsTrigger>
                 <TabsTrigger value="month">Month View</TabsTrigger>
               </TabsList>
             </Tabs>
-
-            <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-muted/30">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={viewMode === 'week' ? handleNavigatePrev : handleMonthPrev}
-                className="h-7 w-7 p-0"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              
-              <span className="text-sm font-medium min-w-[160px] text-center">
-                {viewMode === 'week' ? `Week of ${formatWeekOf(selectedMonday)}` : formatMonthYear(getMonthStart(selectedMonday))}
-              </span>
-              
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={viewMode === 'week' ? handleNavigateNext : handleMonthNext}
-                className="h-7 w-7 p-0"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-
-              {viewMode === 'week' && (
-                <>
-                  <Separator orientation="vertical" className="h-6" />
-                  <div className="flex items-center gap-2">
-                    <Checkbox 
-                      id="twoWeeks" 
-                      checked={showTwoWeeks} 
-                      onCheckedChange={(checked) => setShowTwoWeeks(!!checked)} 
-                    />
-                    <Label htmlFor="twoWeeks" className="text-sm whitespace-nowrap">2 weeks</Label>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -561,16 +523,57 @@ export function WeekBuilderPanel({
             />
           ) : (
             <div className={`grid ${showTwoWeeks ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
-              {weeks.map((week) => {
+            {weeks.map((week, weekIndex) => {
               const isPastWeek = week.weekStart < currentMonday;
+              const isFirstWeek = weekIndex === 0;
               
               return (
               <Card key={week.weekStart} className="border-primary/20">
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-bold">
-                      Week of {formatDate(week.weekStart)}
-                    </CardTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    {isFirstWeek ? (
+                      <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-muted/30 flex-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={viewMode === 'week' ? handleNavigatePrev : handleMonthPrev}
+                          className="h-7 w-7 p-0"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        
+                        <span className="text-sm font-medium min-w-[160px] text-center flex-1">
+                          {viewMode === 'week' ? `Week of ${formatWeekOf(week.weekStart)}` : formatMonthYear(getMonthStart(week.weekStart))}
+                        </span>
+                        
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={viewMode === 'week' ? handleNavigateNext : handleMonthNext}
+                          className="h-7 w-7 p-0"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+
+                        {viewMode === 'week' && (
+                          <>
+                            <Separator orientation="vertical" className="h-6" />
+                            <div className="flex items-center gap-2">
+                              <Checkbox 
+                                id="twoWeeks" 
+                                checked={showTwoWeeks} 
+                                onCheckedChange={(checked) => setShowTwoWeeks(!!checked)} 
+                              />
+                              <Label htmlFor="twoWeeks" className="text-sm whitespace-nowrap">2 weeks</Label>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <CardTitle className="text-base font-bold">
+                        Week of {formatDate(week.weekStart)}
+                      </CardTitle>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -578,7 +581,7 @@ export function WeekBuilderPanel({
                         setWeekToDelete(week.weekStart);
                         setDeleteWeekDialogOpen(true);
                       }}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

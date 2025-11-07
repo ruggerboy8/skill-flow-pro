@@ -30,7 +30,7 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
       </div>
 
       <ResizablePanelGroup direction="horizontal" className="gap-4">
-        <ResizablePanel defaultSize={60} minSize={40}>
+        <ResizablePanel defaultSize={50} minSize={40}>
           <div className="h-[calc(100vh-180px)] overflow-y-auto pr-2">
             <RecommenderPanel
               roleId={roleId}
@@ -41,7 +41,7 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
         
         <ResizableHandle withHandle />
         
-        <ResizablePanel defaultSize={40} minSize={25}>
+        <ResizablePanel defaultSize={50} minSize={25}>
           <div className="h-full overflow-y-auto pl-2">
             <WeekBuilderPanel 
               roleId={roleId} 

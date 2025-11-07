@@ -28,10 +28,18 @@ interface WeekAssignment {
 interface WeekBuilderPanelProps {
   roleId: number;
   roleName: string;
-  onUsedActionIdsChange?: (actionIds: number[]) => void;
+  selectedMonday: string;
+  showTwoWeeks?: boolean;
+  onChangeSelectedMonday?: (monday: string) => void;
 }
 
-export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: WeekBuilderPanelProps) {
+export function WeekBuilderPanel({ 
+  roleId, 
+  roleName, 
+  selectedMonday,
+  showTwoWeeks = false,
+  onChangeSelectedMonday 
+}: WeekBuilderPanelProps) {
   const { toast } = useToast();
   const [weeks, setWeeks] = useState<WeekAssignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,24 +47,24 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
   const [pickerOpen, setPickerOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savingChanges, setSavingChanges] = useState(false);
-  const baseMonday = normalizeToPlannerWeek(new Date());
-  const [displayedBaseMonday, setDisplayedBaseMonday] = useState(baseMonday);
   const [deleteWeekDialogOpen, setDeleteWeekDialogOpen] = useState(false);
   const [weekToDelete, setWeekToDelete] = useState<string | null>(null);
 
+  const currentMonday = normalizeToPlannerWeek(new Date());
+
   useEffect(() => {
-    loadWeeks(displayedBaseMonday);
-  }, [roleId, displayedBaseMonday]);
+    loadWeeks(selectedMonday);
+  }, [roleId, selectedMonday, showTwoWeeks]);
 
   const loadWeeks = async (startMonday: string) => {
     setLoading(true);
     
-    const monday2 = getNextMonday(startMonday);
-    const mondays = [startMonday, monday2];
+    const mondays = showTwoWeeks 
+      ? [startMonday, getNextMonday(startMonday)]
+      : [startMonday];
 
     console.log('🔍 [WeekBuilder] Loading weeks:', {
       startMonday,
-      monday2,
       roleId,
       mondays
     });
@@ -159,12 +167,6 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
     setWeeks(weeks);
     setHasUnsavedChanges(false);
     setLoading(false);
-    
-    // Calculate used action IDs
-    const used = weeks.flatMap(w => w.slots.map(s => s.actionId).filter(Boolean) as number[]);
-    if (onUsedActionIdsChange) {
-      onUsedActionIdsChange(used);
-    }
   };
 
   const getNextMonday = (monday: string): string => {
@@ -180,11 +182,11 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
   };
 
   const handleNavigatePrev = () => {
-    setDisplayedBaseMonday(getPrevMonday(displayedBaseMonday));
+    onChangeSelectedMonday?.(getPrevMonday(selectedMonday));
   };
 
   const handleNavigateNext = () => {
-    setDisplayedBaseMonday(getNextMonday(displayedBaseMonday));
+    onChangeSelectedMonday?.(getNextMonday(selectedMonday));
   };
 
   const handleSelectProMove = async (actionId: number, weekStart?: string, displayOrder?: number) => {
@@ -219,12 +221,6 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
     setWeeks(updatedWeeks);
     setHasUnsavedChanges(true);
     setPickerOpen(false);
-    
-    // Update used IDs
-    const used = updatedWeeks.flatMap(w => w.slots.map(s => s.actionId).filter(Boolean) as number[]);
-    if (onUsedActionIdsChange) {
-      onUsedActionIdsChange(used);
-    }
   };
 
   const handleClearSlot = async (weekStart: string, displayOrder: number) => {
@@ -243,11 +239,6 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
     
     setWeeks(updatedWeeks);
     setHasUnsavedChanges(true);
-    
-    const used = updatedWeeks.flatMap(w => w.slots.map(s => s.actionId).filter(Boolean) as number[]);
-    if (onUsedActionIdsChange) {
-      onUsedActionIdsChange(used);
-    }
   };
 
   const handleSaveAll = async () => {
@@ -345,7 +336,7 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
       }
 
       setHasUnsavedChanges(false);
-      await loadWeeks(displayedBaseMonday);
+      await loadWeeks(selectedMonday);
     } catch (error: any) {
       toast({
         title: 'Error saving changes',
@@ -427,7 +418,7 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
       });
 
       // Reload weeks
-      await loadWeeks(displayedBaseMonday);
+      await loadWeeks(selectedMonday);
       setDeleteWeekDialogOpen(false);
       setWeekToDelete(null);
     } catch (error: any) {
@@ -462,22 +453,7 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Week Builder</CardTitle>
-              <CardDescription>Assign pro-moves to upcoming weeks for {roleName}</CardDescription>
-              <div className="mt-2 flex items-center gap-2">
-                <Badge variant="outline" className="font-mono">
-                  Viewing: {formatDate(displayedBaseMonday)}
-                </Badge>
-                {displayedBaseMonday !== baseMonday && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDisplayedBaseMonday(baseMonday)}
-                    className="h-7 text-xs"
-                  >
-                    Go to Current Week
-                  </Button>
-                )}
-              </div>
+              <CardDescription>Assign pro-moves to {showTwoWeeks ? 'upcoming weeks' : 'the week'} for {roleName}</CardDescription>
             </div>
             <div className="flex gap-2">
               {hasUnsavedChanges && (
@@ -499,8 +475,11 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            {weeks.map((week) => (
+          <div className={`grid ${showTwoWeeks ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+            {weeks.map((week) => {
+              const isPastWeek = week.weekStart < currentMonday;
+              
+              return (
               <Card key={week.weekStart} className="border-primary/20">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -558,9 +537,9 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                           Slot #{slot.displayOrder}
                         </div>
                         {slot.isLocked && (
-                          <Badge variant="secondary" className="text-xs gap-1">
+                          <Badge variant={isPastWeek ? "secondary" : "default"} className="text-xs gap-1">
                             <Lock className="h-3 w-3" />
-                            In Use
+                            {isPastWeek ? "Completed" : "In Use"}
                           </Badge>
                         )}
                         {!slot.isLocked && slot.actionId && (
@@ -579,7 +558,7 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                           {slot.domainName && (
                             <Badge 
                               variant="secondary" 
-                              className="text-xs"
+                              className={`text-xs ring-1 ring-border/50 text-foreground ${isPastWeek ? 'opacity-60' : ''}`}
                               style={{
                                 backgroundColor: `hsl(${getDomainColor(slot.domainName)})`,
                               }}
@@ -628,7 +607,8 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
                   ))}
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>

@@ -11,7 +11,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { RecommenderPanel } from '@/components/planner/RecommenderPanel';
 import { HistoryPanel } from '@/components/planner/HistoryPanel';
 import { WeekBuilderPanel } from '@/components/planner/WeekBuilderPanel';
-import { usePlannerParams } from '@/hooks/usePlannerParams';
+import { normalizeToPlannerWeek } from '@/lib/plannerUtils';
 
 export default function AdminBuilder() {
   console.log('=== NEW ADMINBUILDER LOADING ===');
@@ -125,8 +125,10 @@ export default function AdminBuilder() {
 }
 
 function PlannerTabContent({ roleId, roleName }: { roleId: number; roleName: string }) {
-  const { asOfWeek, preset, setAsOfWeek, setPreset } = usePlannerParams();
-  const [usedActionIds, setUsedActionIds] = useState<number[]>([]);
+  const [selectedMonday, setSelectedMonday] = useState(
+    normalizeToPlannerWeek(new Date())
+  );
+  const [showTwoWeeks, setShowTwoWeeks] = useState(false);
 
   return (
     <div className="flex gap-4">
@@ -135,11 +137,6 @@ function PlannerTabContent({ roleId, roleName }: { roleId: number; roleName: str
         <RecommenderPanel
           roleId={roleId}
           roleName={roleName}
-          asOfWeek={asOfWeek}
-          preset={preset}
-          onWeekChange={setAsOfWeek}
-          onPresetChange={setPreset}
-          usedActionIds={usedActionIds}
         />
       </div>
 
@@ -149,7 +146,9 @@ function PlannerTabContent({ roleId, roleName }: { roleId: number; roleName: str
           <WeekBuilderPanel 
             roleId={roleId} 
             roleName={roleName}
-            onUsedActionIdsChange={setUsedActionIds}
+            selectedMonday={selectedMonday}
+            showTwoWeeks={showTwoWeeks}
+            onChangeSelectedMonday={setSelectedMonday}
           />
           
           <HistoryPanel roleId={roleId} roleName={roleName} />

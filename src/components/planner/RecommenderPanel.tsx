@@ -18,14 +18,15 @@ interface RecommenderPanelProps {
 interface ProMoveRecommendation {
   proMoveId: number;
   name: string;
-  domain: string;
-  competencyTag: string;
-  score: number;
-  breakdown: { C: number; R: number; E: number; D: number };
-  lastSeenWeeksAgo: number | null;
-  cooldownOk: boolean;
-  cooldownReason: string | null;
-  reasonSummary: string;
+  domainName: string;
+  domainId: number;
+  parts: { C: number; R: number; E: number; D: number };
+  finalScore: number;
+  weeksSinceSeen: number;
+  confidenceN: number;
+  status: string;
+  reasonSummary?: string;
+  lastSeen?: string;
 }
 
 export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
@@ -150,7 +151,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
         {/* Pro-Move Cards */}
         <div className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto pr-2">
           {visibleMoves.map((move) => {
-            const needScore = Math.round(move.score * 100);
+            const needScore = Math.round(move.finalScore * 100);
             const colorClass = needScore >= 75 ? 'text-red-600' : 
                               needScore >= 50 ? 'text-orange-500' :
                               needScore >= 25 ? 'text-yellow-600' : 'text-green-600';
@@ -163,8 +164,8 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
                   const payload = JSON.stringify({
                     actionId: move.proMoveId,
                     actionStatement: move.name,
-                    domainName: move.domain,
-                    competencyTag: move.competencyTag,
+                    domainName: move.domainName,
+                    competencyTag: '',
                   });
                   e.dataTransfer.effectAllowed = 'copy';
                   e.dataTransfer.setData('application/json', payload);
@@ -188,13 +189,13 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
                     variant="secondary" 
                     className="text-xs"
                     style={{
-                      backgroundColor: `hsl(${getDomainColor(move.domain)})`,
+                      backgroundColor: `hsl(${getDomainColor(move.domainName)})`,
                     }}
                   >
-                    {move.domain}
+                    {move.domainName}
                   </Badge>
 
-                  {move.lastSeenWeeksAgo === null && (
+                  {move.weeksSinceSeen === 999 && (
                     <Badge variant="secondary" className="text-xs">
                       🆕 Never
                     </Badge>
@@ -228,10 +229,10 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
                     <div className="p-2 bg-muted rounded text-xs space-y-1">
                       <div className="font-semibold">Score Breakdown:</div>
                       <div className="grid grid-cols-2 gap-1">
-                        <div>Confidence: {Math.round(move.breakdown.C * 100)}</div>
-                        <div>Recency: {Math.round(move.breakdown.R * 100)}</div>
-                        <div>Eval: {Math.round(move.breakdown.E * 100)}</div>
-                        <div>Diversity: {Math.round(move.breakdown.D * 100)}</div>
+                        <div>Confidence: {Math.round(move.parts.C * 100)}</div>
+                        <div>Recency: {Math.round(move.parts.R * 100)}</div>
+                        <div>Eval: {Math.round(move.parts.E * 100)}</div>
+                        <div>Diversity: {Math.round(move.parts.D * 100)}</div>
                       </div>
                       {move.reasonSummary && (
                         <>
@@ -239,15 +240,14 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
                           <div className="text-muted-foreground">{move.reasonSummary}</div>
                         </>
                       )}
-                      {move.cooldownReason && (
-                        <>
-                          <div className="font-semibold mt-2">Cooldown info:</div>
-                          <div className="text-muted-foreground">{move.cooldownReason}</div>
-                        </>
-                      )}
-                      {move.lastSeenWeeksAgo !== null && (
+                      {move.lastSeen && (
                         <div className="mt-2 text-muted-foreground">
-                          Last assigned: {move.lastSeenWeeksAgo} weeks ago
+                          Last assigned: {move.lastSeen}
+                        </div>
+                      )}
+                      {move.weeksSinceSeen < 999 && (
+                        <div className="text-muted-foreground">
+                          {move.weeksSinceSeen} weeks ago
                         </div>
                       )}
                     </div>

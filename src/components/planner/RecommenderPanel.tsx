@@ -63,7 +63,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
 
       if (error) throw error;
 
-      const allMoves = data.allRanked || data.top6 || [];
+      const allMoves = data.ranked || [];
       setAllRanked(allMoves);
       
       toast({

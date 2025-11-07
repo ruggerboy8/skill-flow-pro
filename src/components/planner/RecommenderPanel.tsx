@@ -139,7 +139,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
         {visibleMoves.length === 0 ? (
           <div className="text-sm text-muted-foreground">No results with current filters.</div>
         ) : (
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
             {visibleMoves.map((move) => (
               <ProMoveCard
                 key={move.proMoveId}

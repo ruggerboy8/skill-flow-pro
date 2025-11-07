@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { RecommenderPanel } from '@/components/planner/RecommenderPanel';
 import { WeekBuilderPanel } from '@/components/planner/WeekBuilderPanel';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
 interface PlannerPageProps {
   roleId: number;
@@ -28,25 +29,27 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
         </Button>
       </div>
 
-      <div className="flex gap-4 items-start">
-        {/* Left: fixed sidebar */}
-        <aside className="w-[400px] shrink-0">
-          <div className="max-h-[calc(100vh-180px)] overflow-y-auto">
+      <ResizablePanelGroup direction="horizontal" className="gap-4">
+        <ResizablePanel defaultSize={65} minSize={40}>
+          <div className="h-[calc(100vh-180px)] overflow-y-auto pr-2">
             <RecommenderPanel
               roleId={roleId}
               roleName={roleName}
             />
           </div>
-        </aside>
-
-        {/* Right: main column with integrated controls */}
-        <main className="flex-1 min-w-0">
-          <WeekBuilderPanel 
-            roleId={roleId} 
-            roleName={roleName}
-          />
-        </main>
-      </div>
+        </ResizablePanel>
+        
+        <ResizableHandle withHandle />
+        
+        <ResizablePanel defaultSize={35} minSize={25}>
+          <div className="h-full overflow-y-auto pl-2">
+            <WeekBuilderPanel 
+              roleId={roleId} 
+              roleName={roleName}
+            />
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }

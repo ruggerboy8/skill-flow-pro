@@ -86,6 +86,8 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
   const startIdx = currentPage * ITEMS_PER_PAGE;
   const visibleMoves = allRanked.slice(startIdx, startIdx + ITEMS_PER_PAGE);
   const totalPages = Math.ceil(allRanked.length / ITEMS_PER_PAGE);
+  const hasPrevPage = currentPage > 0;
+  const hasNextPage = currentPage < totalPages - 1;
 
   return (
     <Card>
@@ -119,33 +121,30 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
           </Select>
         </div>
 
-        {/* Pagination Controls */}
-        {allRanked.length > 0 && (
-          <div className="flex items-center justify-between py-2 border-t">
-            <div className="text-xs text-muted-foreground">
-              Showing {startIdx + 1}-{Math.min(startIdx + ITEMS_PER_PAGE, allRanked.length)} of {allRanked.length}
-            </div>
-            <div className="flex gap-1">
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-                disabled={currentPage === 0}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs px-2 py-1 flex items-center">
-                {currentPage + 1} / {totalPages}
-              </span>
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={currentPage === totalPages - 1}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+        {/* Arrow Pagination */}
+        {allRanked.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2 px-2 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+              disabled={!hasPrevPage}
+              className="gap-1"
+            >
+              ← Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              {startIdx + 1}–{Math.min(startIdx + ITEMS_PER_PAGE, allRanked.length)} of {allRanked.length}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={!hasNextPage}
+              className="gap-1"
+            >
+              Next →
+            </Button>
           </div>
         )}
 

@@ -49,16 +49,12 @@ export function ProMoveCard({ move }: ProMoveCardProps) {
           <p className="text-sm font-medium leading-tight line-clamp-2 mb-2">
             {move.name}
           </p>
-          <Badge 
-            variant="secondary" 
-            className="text-xs"
-            style={{
-              backgroundColor: `hsl(${move.domainColorHsl})`,
-              color: 'white',
-            }}
+          <div 
+            className="px-2 py-1 rounded text-xs font-medium text-white inline-block"
+            style={{ backgroundColor: `hsl(${move.domainColorHsl})` }}
           >
             {move.domainName}
-          </Badge>
+          </div>
         </div>
         <span className={`text-2xl font-bold ${colorClass} shrink-0`}>
           {needScore}
@@ -103,9 +99,9 @@ export function ProMoveCard({ move }: ProMoveCardProps) {
       {/* Badges */}
       {badges.length > 0 && (
         <div className="flex gap-1 pt-2">
-          <TooltipProvider>
-            {badges.map((badge, idx) => (
-              <Tooltip key={idx} delayDuration={0}>
+          {badges.map((badge, idx) => (
+            <TooltipProvider key={idx} delayDuration={0}>
+              <Tooltip>
                 <TooltipTrigger asChild>
                   <Badge variant={badge.variant} className="text-xs cursor-help">
                     {badge.label}
@@ -115,8 +111,8 @@ export function ProMoveCard({ move }: ProMoveCardProps) {
                   <p className="text-xs">{badge.tooltip}</p>
                 </TooltipContent>
               </Tooltip>
-            ))}
-          </TooltipProvider>
+            </TooltipProvider>
+          ))}
         </div>
       )}
     </div>

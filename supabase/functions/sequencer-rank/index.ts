@@ -570,19 +570,15 @@ serve(async (req) => {
     // Compute Next
     const scored = eligible.map(move => ({ ...move, ...scoreCandidate(move, effectiveDate) }));
     
-    // Enhanced deterministic tie-breaks
+    // Enhanced deterministic tie-breaks: finalScore → lowConfShare → lastPracticedWeeks desc → actionId asc
     scored.sort((a, b) => {
       // 1. Final score desc
       if (Math.abs(b.final - a.final) >= 0.0001) return b.final - a.final;
-      // 2. Eval contribution desc (bigger gap wins)
-      if (Math.abs(b.eContrib - a.eContrib) >= 0.0001) return b.eContrib - a.eContrib;
-      // 3. Confidence component desc
-      const cA = a.C * weights.C;
-      const cB = b.C * weights.C;
-      if (Math.abs(cB - cA) >= 0.0001) return cB - cA;
-      // 4. Weeks since seen desc (longer = higher priority)
+      // 2. Low confidence share desc (higher = more problematic)
+      if ((b.lowConfShare || 0) !== (a.lowConfShare || 0)) return (b.lowConfShare || 0) - (a.lowConfShare || 0);
+      // 3. Weeks since practiced desc (longer = higher priority)
       if (a.weeksSince !== b.weeksSince) return b.weeksSince - a.weeksSince;
-      // 5. ID asc (deterministic)
+      // 4. ID asc (deterministic)
       return a.id - b.id;
     });
 
@@ -918,12 +914,16 @@ serve(async (req) => {
 
     // Legacy response format (for backward compatibility)
     const legacyResponse = {
+      ranked,
+      generatedAt: new Date().toISOString(),
+      roleId: body.roleId,
+      preset,
+      // Include legacy fields for backward compatibility
       timezone,
       weekStartNext: new Date(effectiveDateObj).toLocaleDateString('en-US'),
       weekStartPreview: new Date(previewDate).toLocaleDateString('en-US'),
       next,
       preview,
-      ranked,
       logs,
     };
 

@@ -53,16 +53,12 @@ export function ProMoveRow({ move }: ProMoveRowProps) {
           <p className="text-sm font-medium leading-tight truncate flex-1">
             {move.name}
           </p>
-          <Badge 
-            variant="secondary" 
-            className="text-xs shrink-0"
-            style={{
-              backgroundColor: `hsl(${move.domainColorHsl})`,
-              color: 'white',
-            }}
+          <div 
+            className="px-2 py-0.5 rounded text-xs font-medium text-white shrink-0"
+            style={{ backgroundColor: `hsl(${move.domainColorHsl})` }}
           >
             {move.domainName}
-          </Badge>
+          </div>
         </div>
         
         {primaryReason && (
@@ -85,9 +81,9 @@ export function ProMoveRow({ move }: ProMoveRowProps) {
       {/* Badges */}
       {badges.length > 0 && (
         <div className="flex gap-1 shrink-0">
-          <TooltipProvider>
-            {badges.map((badge, idx) => (
-              <Tooltip key={idx} delayDuration={0}>
+          {badges.map((badge, idx) => (
+            <TooltipProvider key={idx} delayDuration={0}>
+              <Tooltip>
                 <TooltipTrigger asChild>
                   <Badge variant={badge.variant} className="text-xs cursor-help">
                     {badge.label}
@@ -97,8 +93,8 @@ export function ProMoveRow({ move }: ProMoveRowProps) {
                   <p className="text-xs">{badge.tooltip}</p>
                 </TooltipContent>
               </Tooltip>
-            ))}
-          </TooltipProvider>
+            </TooltipProvider>
+          ))}
         </div>
       )}
     </div>

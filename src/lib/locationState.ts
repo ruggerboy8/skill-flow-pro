@@ -146,11 +146,11 @@ export async function assembleWeek(params: {
           action_id,
           display_order,
           self_select,
-          pro_moves:action_id (
+          pro_moves!weekly_plan_action_id_fkey (
             action_statement,
-            competencies:competency_id (
+            competencies!fk_pro_moves_competency_id (
               name,
-              domains:domain_id (
+              domains!competencies_domain_id_fkey (
                 domain_name
               )
             )

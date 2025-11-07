@@ -171,6 +171,7 @@ export default function Week() {
           competencies!weekly_plan_competency_id_fkey (
             competency_id,
             name,
+            domain_id,
             domains!competencies_domain_id_fkey (
               domain_id,
               domain_name,

@@ -408,7 +408,7 @@ export async function computeWeekState(params: {
   }
 
   // Calculate Monday anchor in org timezone
-  const mondayStr = format(anchors.mondayZ, 'yyyy-MM-dd');
+  const mondayStr = formatInTimeZone(anchors.mondayZ, orgTz, 'yyyy-MM-dd');
 
   // ----- GRADUATION CHECK: Cycle 4+ uses global weekly_plan -----
   let focusIds: string[] = [];

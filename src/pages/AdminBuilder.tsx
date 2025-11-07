@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
 import { SimpleFocusBuilder } from '@/components/admin/SimpleFocusBuilder';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
@@ -65,10 +64,6 @@ export default function AdminBuilder() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Admin Builder</h1>
-        <Button variant="outline" onClick={() => navigate('/admin')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Admin
-        </Button>
       </div>
       
       <Tabs defaultValue="dfi-planner" className="w-full">

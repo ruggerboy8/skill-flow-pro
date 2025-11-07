@@ -502,7 +502,7 @@ export function WeekBuilderPanel({
           </div>
 
           {/* View Mode Controls */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'week' | 'month')}>
               <TabsList>
                 <TabsTrigger value="week">Week View</TabsTrigger>
@@ -510,56 +510,43 @@ export function WeekBuilderPanel({
               </TabsList>
             </Tabs>
 
-            {viewMode === 'week' ? (
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleNavigatePrev}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium min-w-[160px] text-center">
-                  Week of {formatWeekOf(selectedMonday)}
-                </span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleNavigateNext}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Separator orientation="vertical" className="h-6" />
-                <div className="flex items-center gap-2">
-                  <Checkbox 
-                    id="twoWeeks" 
-                    checked={showTwoWeeks} 
-                    onCheckedChange={(checked) => setShowTwoWeeks(!!checked)} 
-                  />
-                  <Label htmlFor="twoWeeks" className="text-sm">Show 2 weeks</Label>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleMonthPrev}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium min-w-[160px] text-center">
-                  {formatMonthYear(getMonthStart(selectedMonday))}
-                </span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleMonthNext}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-muted/30">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={viewMode === 'week' ? handleNavigatePrev : handleMonthPrev}
+                className="h-7 w-7 p-0"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <span className="text-sm font-medium min-w-[160px] text-center">
+                {viewMode === 'week' ? `Week of ${formatWeekOf(selectedMonday)}` : formatMonthYear(getMonthStart(selectedMonday))}
+              </span>
+              
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={viewMode === 'week' ? handleNavigateNext : handleMonthNext}
+                className="h-7 w-7 p-0"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+
+              {viewMode === 'week' && (
+                <>
+                  <Separator orientation="vertical" className="h-6" />
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="twoWeeks" 
+                      checked={showTwoWeeks} 
+                      onCheckedChange={(checked) => setShowTwoWeeks(!!checked)} 
+                    />
+                    <Label htmlFor="twoWeeks" className="text-sm whitespace-nowrap">2 weeks</Label>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>

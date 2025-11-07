@@ -138,63 +138,51 @@ export async function assembleWeek(params: {
       console.info('[assembleWeek] ✅ Using global weekly_plan for Cycle 4+ role=%d week=%s (found %d locked rows)', 
         roleId, mondayStr, planData.length);
       
-      const result: any[] = [];
-      for (const plan of planData) {
-        if (plan.action_id && !plan.self_select) {
-          const { data: pm } = await supabase
-            .from('pro_moves')
-            .select('action_id, action_statement, competencies!inner(name, domain_id)')
-            .eq('action_id', plan.action_id)
-            .maybeSingle();
+      // Fetch with joins to get all metadata in one query
+      const { data: enrichedPlan, error: enrichErr } = await supabase
+        .from('weekly_plan')
+        .select(`
+          id,
+          action_id,
+          display_order,
+          self_select,
+          pro_moves!weekly_plan_action_id_fkey (
+            action_statement
+          ),
+          competencies!weekly_plan_competency_id_fkey (
+            name,
+            domains!competencies_domain_id_fkey (
+              domain_name
+            )
+          )
+        `)
+        .is('org_id', null)
+        .eq('role_id', roleId)
+        .eq('week_start_date', mondayStr)
+        .eq('status', 'locked')
+        .order('display_order');
 
-          let domainName = 'General';
-          if (pm?.competencies?.domain_id) {
-            const { data: d } = await supabase
-              .from('domains')
-              .select('domain_name')
-              .eq('domain_id', pm.competencies.domain_id)
-              .maybeSingle();
-            domainName = d?.domain_name || 'General';
-          }
-
-          result.push({
-            weekly_focus_id: `plan:${plan.id}`,
-            type: 'site',
-            pro_move_id: pm?.action_id,
-            action_statement: pm?.action_statement || 'Pro Move',
-            competency_name: pm?.competencies?.name || 'General',
-            domain_name: domainName,
-            required: true,
-            locked: true,
-            display_order: plan.display_order,
-            source: 'plan',
-            weekLabel: `Week of ${mondayStr}`
-          });
-        } else if (!plan.action_id) {
-          // Include empty slots so users see all 3 slots even if some are unfilled
-          result.push({
-            weekly_focus_id: `plan:${plan.id}`,
-            type: 'site',
-            pro_move_id: null,
-            action_statement: '',
-            competency_name: 'General',
-            domain_name: '',
-            required: true,
-            locked: false,
-            display_order: plan.display_order,
-            source: 'plan',
-            weekLabel: `Week of ${mondayStr}`
-          });
-        }
+      if (enrichErr || !enrichedPlan) {
+        console.error('[assembleWeek] Failed to fetch enriched plan data:', enrichErr);
+        return [];
       }
+
+      const result: any[] = enrichedPlan.map((plan: any) => ({
+        weekly_focus_id: `plan:${plan.id}`,
+        type: 'site',
+        pro_move_id: plan.action_id,
+        action_statement: plan.pro_moves?.action_statement || 'Pro Move',
+        competency_name: plan.competencies?.name || 'General',
+        domain_name: plan.competencies?.domains?.domain_name || 'General',
+        required: true,
+        locked: !!plan.action_id,
+        display_order: plan.display_order,
+        source: 'plan',
+        weekLabel: `Week of ${mondayStr}`
+      }));
       
-      // Return whatever we have (even if less than 3)
-      if (result.length > 0) {
-        console.info('[assembleWeek] Returning %d weekly_plan assignments', result.length);
-        return result;
-      } else {
-        console.warn('[assembleWeek] No valid assignments from weekly_plan - falling back to focus');
-      }
+      console.info('[assembleWeek] Returning %d weekly_plan assignments', result.length);
+      return result;
     } else {
       console.warn('[assembleWeek] ❌ No global plan for Cycle 4+ (week %s, role %d) - found %d rows with error: %s', 
         mondayStr, roleId, planData?.length || 0, planErr?.message || 'none');

@@ -1102,6 +1102,7 @@ export type Database = {
       weekly_plan: {
         Row: {
           action_id: number | null
+          competency_id: number | null
           created_at: string
           display_order: number
           generated_by: string
@@ -1121,6 +1122,7 @@ export type Database = {
         }
         Insert: {
           action_id?: number | null
+          competency_id?: number | null
           created_at?: string
           display_order: number
           generated_by?: string
@@ -1140,6 +1142,7 @@ export type Database = {
         }
         Update: {
           action_id?: number | null
+          competency_id?: number | null
           created_at?: string
           display_order?: number
           generated_by?: string
@@ -1164,6 +1167,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pro_moves"
             referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "weekly_plan_competency_id_fkey"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "competencies"
+            referencedColumns: ["competency_id"]
           },
           {
             foreignKeyName: "weekly_plan_org_id_fkey"

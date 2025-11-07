@@ -5,6 +5,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+async function getCompetencyId(supabase: any, actionId: number): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('pro_moves')
+    .select('competency_id')
+    .eq('action_id', actionId)
+    .single()
+  
+  if (error || !data) {
+    console.error(`Failed to lookup competency_id for action_id ${actionId}:`, error)
+    return null
+  }
+  
+  return data.competency_id
+}
+
 interface RecommendRequest {
   action: 'recommend'
   roleId: number
@@ -122,11 +137,15 @@ Deno.serve(async (req) => {
               displayOrder: pick.displayOrder,
             })
           } else {
+            // Lookup competency_id
+            const competencyId = await getCompetencyId(supabase, pick.actionId)
+            
             // Update existing row
             const { error: updateError } = await supabase
               .from('weekly_plan')
               .update({
                 action_id: pick.actionId,
+                competency_id: competencyId,
                 generated_by: pick.generatedBy,
                 updated_by: updaterUserId,
                 updated_at: new Date().toISOString(),
@@ -145,6 +164,9 @@ Deno.serve(async (req) => {
             })
           }
         } else if (pick.actionId && pick.actionId !== 0) {
+          // Lookup competency_id
+          const competencyId = await getCompetencyId(supabase, pick.actionId)
+          
           // Insert new row only if actionId is not null/0
           const { data: inserted, error: insertError } = await supabase
             .from('weekly_plan')
@@ -154,6 +176,7 @@ Deno.serve(async (req) => {
               week_start_date: weekStartDate,
               display_order: pick.displayOrder,
               action_id: pick.actionId,
+              competency_id: competencyId,
               generated_by: pick.generatedBy,
               updated_by: updaterUserId,
               status: 'locked',

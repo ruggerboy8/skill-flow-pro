@@ -723,7 +723,7 @@ serve(async (req) => {
       }
     }
 
-    // Format response with CLC detection
+    // Format response with CLC detection + new UI fields
     const formatRow = (pick: any, refDate: string) => {
       const ls = lastSelected.find(l => l.proMoveId === pick.id);
       const moveConfData = confidenceHistory.filter(h => h.proMoveId === pick.id);
@@ -745,23 +745,55 @@ serve(async (req) => {
       if (pick.weeksSince === 999) reason_tags.push('never_practiced');
       if (pick.R >= 0.8) reason_tags.push('long_unseen');
 
+      // Determine primary reason (for UI display)
+      let primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE' = 'TIE';
+      let primaryReasonValue: number | null = null;
+      
+      if (pick.retestDue) {
+        primaryReasonCode = 'RETEST';
+      } else if ((pick.lowConfShare || 0) >= LOW_CONF_THRESHOLD) {
+        primaryReasonCode = 'LOW_CONF';
+        primaryReasonValue = pick.lowConfShare;
+      } else if (pick.weeksSince === 999) {
+        primaryReasonCode = 'NEVER';
+      } else if (pick.weeksSince >= STALE_WEEKS) {
+        primaryReasonCode = 'STALE';
+        primaryReasonValue = pick.weeksSince;
+      }
+
+      // Domain color HSL
+      const domainColors: Record<string, string> = {
+        'Clinical': '214, 78%, 52%',
+        'Clerical': '155, 70%, 45%',
+        'Cultural': '280, 65%, 60%',
+        'Case Acceptance': '25, 85%, 55%',
+      };
+      const domainColorHsl = domainColors[pick.domainName] || '0, 0%, 50%';
+
       return {
         proMoveId: pick.id,
         name: pick.name,
         domainId: pick.domainId,
         domainName: pick.domainName,
+        domainColorHsl,
         parts: { C: pick.C, R: pick.R, E: pick.E, D: pick.D, T: pick.T || 0 },
         evalContrib: pick.eContrib,
-        finalScore: pick.final,
+        finalScore: Math.round(pick.final * 100), // Scale to 0-100
         drivers: pick.drivers,
         lastSeen: ls ? new Date(ls.weekStart).toLocaleDateString('en-US') : undefined,
         weeksSinceSeen: pick.weeksSince,
+        lastPracticedWeeks: pick.weeksSince,
         confidenceN,
         status: classification.status,
         severity: classification.severity,
         n2w: classification.n2w,
         recentMeans: classification.recentMeans,
         reason_tags,
+        lowConfShare: pick.lowConfShare,
+        avgConfLast: pick.avgConfLast,
+        retestDue: pick.retestDue || false,
+        primaryReasonCode,
+        primaryReasonValue,
       };
     };
 

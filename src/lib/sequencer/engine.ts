@@ -290,7 +290,14 @@ export function buildRankedList(
       lastSeen: lastSeenRecord ? formatMmDdYyyy(lastSeenRecord.weekStart) : undefined,
       weeksSinceSeen: lastSeenRecord ? formatWeeksSince(lastSeenRecord.weekStart, inputs.effectiveDate) : 999,
       confidenceN,
-      status: 'ok', // CLC detection happens in edge function
+      status: 'ok' as const,
+      lowConfShare: null,
+      avgConfLast: null,
+      lastPracticedWeeks: lastSeenRecord ? formatWeeksSince(lastSeenRecord.weekStart, inputs.effectiveDate) : 999,
+      retestDue: false,
+      primaryReasonCode: 'TIE' as const,
+      primaryReasonValue: null,
+      domainColorHsl: '0, 0%, 50%',
     };
   });
 }

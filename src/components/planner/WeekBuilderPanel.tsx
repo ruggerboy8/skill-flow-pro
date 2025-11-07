@@ -55,8 +55,9 @@ export function WeekBuilderPanel({
   const currentMonday = normalizeToPlannerWeek(new Date());
 
   useEffect(() => {
+    if (viewMode === 'month') return; // skip week fetching in month view
     loadWeeks(selectedMonday);
-  }, [roleId, selectedMonday, showTwoWeeks]);
+  }, [roleId, selectedMonday, showTwoWeeks, viewMode]);
 
   const loadWeeks = async (startMonday: string) => {
     setLoading(true);
@@ -189,6 +190,38 @@ export function WeekBuilderPanel({
 
   const handleNavigateNext = () => {
     setSelectedMonday(getNextMonday(selectedMonday));
+  };
+
+  const formatMonthYear = (dateStr: string) => {
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const getFirstMondayOfMonth = (dateStr: string): string => {
+    const d = new Date(dateStr + 'T12:00:00');
+    d.setDate(1);
+    while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  };
+
+  const getMonthStart = (dateStr: string): string => {
+    const d = new Date(dateStr + 'T12:00:00');
+    d.setDate(1);
+    return d.toISOString().split('T')[0];
+  };
+
+  const handleMonthPrev = () => {
+    const d = new Date(selectedMonday + 'T12:00:00');
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    setSelectedMonday(getFirstMondayOfMonth(d.toISOString().split('T')[0]));
+  };
+
+  const handleMonthNext = () => {
+    const d = new Date(selectedMonday + 'T12:00:00');
+    d.setDate(1);
+    d.setMonth(d.getMonth() + 1);
+    setSelectedMonday(getFirstMondayOfMonth(d.toISOString().split('T')[0]));
   };
 
   const handleSelectProMove = async (actionId: number, weekStart?: string, displayOrder?: number) => {
@@ -477,7 +510,7 @@ export function WeekBuilderPanel({
               </TabsList>
             </Tabs>
 
-            {viewMode === 'week' && (
+            {viewMode === 'week' ? (
               <div className="flex items-center gap-3">
                 <Button 
                   variant="outline" 
@@ -486,7 +519,7 @@ export function WeekBuilderPanel({
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium min-w-[140px] text-center">
+                <span className="text-sm font-medium min-w-[160px] text-center">
                   Week of {formatWeekOf(selectedMonday)}
                 </span>
                 <Button 
@@ -501,29 +534,27 @@ export function WeekBuilderPanel({
                   <Checkbox 
                     id="twoWeeks" 
                     checked={showTwoWeeks} 
-                    onCheckedChange={(checked) => setShowTwoWeeks(checked as boolean)} 
+                    onCheckedChange={(checked) => setShowTwoWeeks(!!checked)} 
                   />
                   <Label htmlFor="twoWeeks" className="text-sm">Show 2 weeks</Label>
                 </div>
               </div>
-            )}
-
-            {viewMode === 'month' && (
+            ) : (
               <div className="flex items-center gap-3">
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={handleNavigatePrev}
+                  onClick={handleMonthPrev}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium min-w-[140px] text-center">
-                  {formatWeekOf(selectedMonday)}
+                <span className="text-sm font-medium min-w-[160px] text-center">
+                  {formatMonthYear(getMonthStart(selectedMonday))}
                 </span>
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={handleNavigateNext}
+                  onClick={handleMonthNext}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -535,7 +566,7 @@ export function WeekBuilderPanel({
           {viewMode === 'month' ? (
             <MonthView
               roleId={roleId}
-              selectedMonthAnchor={selectedMonday}
+              selectedMonthAnchor={getMonthStart(selectedMonday)}
               onSelectWeek={(monday) => {
                 setSelectedMonday(monday);
                 setViewMode('week');

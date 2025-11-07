@@ -159,68 +159,91 @@ export default function Week() {
       
       const { data: planData, error: planError } = await supabase
         .from('weekly_plan')
-        .select(`
-          id,
-          action_id,
-          display_order,
-          self_select,
-          pro_moves (
-            action_id,
-            action_statement,
-            competency_id,
-            competencies (
-              competency_id,
-              name,
-              domain_id,
-              domains!competencies_domain_id_fkey (
-                domain_id,
-                domain_name
-              )
-            )
-          )
-        `)
+        .select('id, action_id, display_order, self_select')
         .is('org_id', null)
         .eq('role_id', staff.role_id)
         .eq('week_start_date', mondayStr)
         .eq('status', 'locked')
         .order('display_order');
 
-      console.log('Weekly_plan result:', { planData, planError });
+      console.log('🔍 [Week.tsx] Weekly_plan query:', {
+        orgId: null,
+        roleId: staff.role_id,
+        mondayStr,
+        cycle,
+        planData,
+        planError
+      });
 
       if (planData && planData.length > 0) {
-        console.log('📊 Using weekly_plan data source');
-        console.log('Raw planData:', JSON.stringify(planData, null, 2));
+        console.log('📊 Using weekly_plan data source - fetching metadata');
         
-        // Transform weekly_plan to weekly_focus structure
-        focusData = planData.map((item: any) => {
-          const competencyId = item.pro_moves?.competencies?.competency_id || item.pro_moves?.competency_id;
-          const competencyName = item.pro_moves?.competencies?.name;
-          const domainName = item.pro_moves?.competencies?.domains?.domain_name;
-          
-          console.log('Transforming item:', {
-            id: item.id,
-            action_id: item.action_id,
-            competency_id: competencyId,
-            competency_name: competencyName,
-            domain_name: domainName
+        // Collect action IDs
+        const actionIds = planData.map((p: any) => p.action_id).filter(Boolean);
+        
+        if (actionIds.length > 0) {
+          // Fetch pro-move metadata separately (same pattern as WeekBuilderPanel)
+          const { data: proMoves } = await supabase
+            .from('pro_moves')
+            .select(`
+              action_id,
+              action_statement,
+              competency_id,
+              competencies!pro_moves_competency_id_fkey (
+                competency_id,
+                name,
+                domain_id,
+                domains!competencies_domain_id_fkey (
+                  domain_id,
+                  domain_name
+                )
+              )
+            `)
+            .in('action_id', actionIds);
+
+          console.log('📊 Pro-moves metadata:', proMoves);
+
+          // Create lookup map
+          const proMoveMap = new Map();
+          (proMoves || []).forEach((pm: any) => {
+            proMoveMap.set(pm.action_id, {
+              statement: pm.action_statement,
+              competency_id: pm.competency_id,
+              competency_name: pm.competencies?.name,
+              domain_name: pm.competencies?.domains?.domain_name
+            });
           });
-          
-          return {
-            id: `plan:${item.id}`,
-            action_id: item.action_id,
-            display_order: item.display_order,
-            self_select: item.self_select,
-            competency_id: competencyId,
-            competency_name: competencyName,
-            pro_moves: { action_statement: item.pro_moves?.action_statement },
-            competencies: {
-              name: competencyName,
-              domains: {
-                domain_name: domainName
+
+          // Transform weekly_plan to weekly_focus structure
+          focusData = planData.map((item: any) => {
+            const meta = proMoveMap.get(item.action_id);
+            
+            console.log('Transforming item:', {
+              id: item.id,
+              action_id: item.action_id,
+              meta
+            });
+            
+            return {
+              id: `plan:${item.id}`,
+              action_id: item.action_id,
+              display_order: item.display_order,
+              self_select: item.self_select,
+              competency_id: meta?.competency_id,
+              competency_name: meta?.competency_name,
+              pro_moves: { action_statement: meta?.statement },
+              competencies: {
+                name: meta?.competency_name,
+                domains: {
+                  domain_name: meta?.domain_name
+                }
               }
-            }
-          };
-        });
+            };
+          });
+        } else {
+          console.warn('No action IDs found in weekly_plan data');
+          focusData = [];
+        }
       } else if (cycle >= 4) {
         // For Cycle 4+, if no weekly_plan data exists, don't fall back to weekly_focus
         console.log('📊 No weekly_plan data for Cycle 4+ - showing no pro moves');

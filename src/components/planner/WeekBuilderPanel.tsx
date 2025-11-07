@@ -54,8 +54,15 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
     const monday2 = getNextMonday(startMonday);
     const mondays = [startMonday, monday2];
 
+    console.log('🔍 [WeekBuilder] Loading weeks:', {
+      startMonday,
+      monday2,
+      roleId,
+      mondays
+    });
+
     // Fetch all weekly_plan rows
-    const { data: planRows } = await supabase
+    const { data: planRows, error: planError } = await supabase
       .from('weekly_plan')
       .select('id, display_order, action_id, status, week_start_date')
       .is('org_id', null)
@@ -63,6 +70,12 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
       .in('week_start_date', mondays)
       .order('week_start_date')
       .order('display_order');
+
+    console.log('📊 [WeekBuilder] Query result:', {
+      planRowsCount: planRows?.length || 0,
+      planRows,
+      planError
+    });
 
     // Check which slots are locked
     const planIds = (planRows || []).map(r => r.id);
@@ -450,6 +463,21 @@ export function WeekBuilderPanel({ roleId, roleName, onUsedActionIdsChange }: We
             <div>
               <CardTitle>Week Builder</CardTitle>
               <CardDescription>Assign pro-moves to upcoming weeks for {roleName}</CardDescription>
+              <div className="mt-2 flex items-center gap-2">
+                <Badge variant="outline" className="font-mono">
+                  Viewing: {formatDate(displayedBaseMonday)}
+                </Badge>
+                {displayedBaseMonday !== baseMonday && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDisplayedBaseMonday(baseMonday)}
+                    className="h-7 text-xs"
+                  >
+                    Go to Current Week
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="flex gap-2">
               {hasUnsavedChanges && (

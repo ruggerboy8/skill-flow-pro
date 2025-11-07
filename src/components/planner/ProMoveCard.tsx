@@ -1,14 +1,17 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatPrimaryReason, formatLastPracticed, getBadges } from '@/lib/recommenderUtils';
 import type { RankedMove } from '@/lib/sequencerAdapter';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface ProMoveCardProps {
   move: RankedMove;
+  highPriority?: boolean;
 }
 
-export function ProMoveCard({ move }: ProMoveCardProps) {
+export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
   const badges = getBadges(move);
   const primaryReason = formatPrimaryReason(move);
+  const domainHsl = getDomainColor(move.domainName);
   
   const needScore = move.finalScore;
   const colorClass = needScore >= 75 ? 'text-destructive' : 
@@ -28,12 +31,26 @@ export function ProMoveCard({ move }: ProMoveCardProps) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-sm leading-tight mb-1">{move.name}</h4>
-          <span 
-            className="inline-block px-1.5 py-0.5 text-[10px] rounded text-foreground ring-1 ring-border/50"
-            style={{ backgroundColor: `hsl(${move.domainColorHsl})` }}
-          >
-            {move.domainName}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span 
+              className="px-1.5 py-0.5 text-[10px] rounded text-foreground ring-1 ring-border/50"
+              style={{ backgroundColor: `hsl(${domainHsl})` }}
+            >
+              {move.domainName}
+            </span>
+            {highPriority && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="px-1.5 py-0.5 text-[10px] rounded bg-primary/10 text-primary ring-1 ring-primary/30">
+                      High priority
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent><span className="text-xs">Top 6 this run</span></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
         <span 
           className={`text-2xl font-bold shrink-0 ${colorClass}`}

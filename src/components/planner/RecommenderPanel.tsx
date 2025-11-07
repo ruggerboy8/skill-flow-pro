@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Play } from 'lucide-react';
 import { ProMoveCard } from './ProMoveCard';
-import { ProMoveRow } from './ProMoveRow';
 import { RecommenderFilters } from './RecommenderFilters';
 import { RecommenderGlossary } from './RecommenderGlossary';
 import { applyFilters, type FilterState } from '@/lib/recommenderUtils';
@@ -24,8 +23,8 @@ const PAGE_SIZE = 12;
 export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [topSnapshot, setTopSnapshot] = useState<RankedMove[]>([]);
   const [rankedAll, setRankedAll] = useState<RankedMove[]>([]);
+  const [top6Ids, setTop6Ids] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState<FilterState>({ signals: [], domains: [] });
   const [sort, setSort] = useState<'need' | 'lowConf' | 'weeks' | 'domain'>('need');
   const [page, setPage] = useState(0);
@@ -56,7 +55,10 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
 
       const allMoves = (data.ranked || []).map(adaptSequencerRow);
       setRankedAll(allMoves);
-      setTopSnapshot(allMoves.slice(0, 6));
+      
+      // Capture top 6 IDs before any filters/sorts
+      const initialTop6 = (data.ranked || []).slice(0, 6).map((x: any) => x.proMoveId);
+      setTop6Ids(new Set(initialTop6));
       
       toast({
         title: 'Recommendations loaded',
@@ -88,104 +90,94 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
   }, [filters, sort]);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex-none">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
             <CardTitle>Pro-Move Recommender</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-[180px]">
+              <Label htmlFor="preset" className="text-xs text-muted-foreground">Preset</Label>
+              <Select value={preset} onValueChange={setPreset}>
+                <SelectTrigger id="preset" className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="balanced">Balanced</SelectItem>
+                  <SelectItem value="confidence_recovery">Confidence Focus</SelectItem>
+                  <SelectItem value="eval_focus">Eval Focus</SelectItem>
+                  <SelectItem value="variety_first">Variety First</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={loadRecommendations}
               disabled={loading}
+              className="gap-2"
             >
-              <Play className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <Play className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Run
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="preset" className="text-xs">Preset</Label>
-            <Select value={preset} onValueChange={setPreset}>
-              <SelectTrigger id="preset" className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="balanced">Balanced</SelectItem>
-                <SelectItem value="confidence_recovery">Confidence Focus</SelectItem>
-                <SelectItem value="eval_focus">Eval Focus</SelectItem>
-                <SelectItem value="variety_first">Variety First</SelectItem>
-              </SelectContent>
-            </Select>
+        </div>
+
+        <div className="mt-3">
+          <RecommenderFilters
+            value={filters}
+            onChange={setFilters}
+            sort={sort}
+            onSortChange={setSort}
+            availableDomains={availableDomains}
+          />
+        </div>
+      </CardHeader>
+
+      <CardContent className="flex-1 overflow-y-auto space-y-3">
+        {visibleMoves.length === 0 ? (
+          <div className="text-sm text-muted-foreground">No results with current filters.</div>
+        ) : (
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleMoves.map((move) => (
+              <ProMoveCard
+                key={move.proMoveId}
+                move={move}
+                highPriority={top6Ids.has(move.proMoveId)}
+              />
+            ))}
           </div>
+        )}
 
-          {/* Top 6 Picks */}
-          {topSnapshot.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Top 6 Picks</h3>
-              <div className="grid gap-3">
-                {topSnapshot.map((move) => (
-                  <ProMoveCard key={move.proMoveId} move={move} />
-                ))}
-              </div>
-            </div>
-          )}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2 px-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={!hasPrevPage}
+              className="gap-1"
+            >
+              ← Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, filteredMoves.length)} of {filteredMoves.length}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={!hasNextPage}
+              className="gap-1"
+            >
+              Next →
+            </Button>
+          </div>
+        )}
 
-          {/* Full List with Filters */}
-          {rankedAll.length > 6 && (
-            <>
-              <div className="border-t pt-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Full List</h3>
-                  <RecommenderFilters
-                    value={filters}
-                    onChange={setFilters}
-                    sort={sort}
-                    onSortChange={setSort}
-                    availableDomains={availableDomains}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  {visibleMoves.map((move) => (
-                    <ProMoveRow key={move.proMoveId} move={move} />
-                  ))}
-                </div>
-
-                {/* Arrow Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-2 px-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPage(p => Math.max(0, p - 1))}
-                      disabled={!hasPrevPage}
-                      className="gap-1"
-                    >
-                      ← Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, filteredMoves.length)} of {filteredMoves.length}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                      disabled={!hasNextPage}
-                      className="gap-1"
-                    >
-                      Next →
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          <RecommenderGlossary />
-        </CardContent>
-      </Card>
-    </div>
+        <RecommenderGlossary />
+      </CardContent>
+    </Card>
   );
 }

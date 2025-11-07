@@ -149,7 +149,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
         )}
 
         {/* Pro-Move Cards */}
-        <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+        <div className="space-y-3 max-h-[calc(100vh-400px)] overflow-y-auto pr-2">
           {visibleMoves.map((move) => {
             const needScore = Math.round(move.finalScore * 100);
             const colorClass = needScore >= 75 ? 'text-red-600' : 

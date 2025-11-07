@@ -92,12 +92,12 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex-none">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <CardTitle>Pro-Move Recommender</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-[180px]">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="w-[160px]">
               <Label htmlFor="preset" className="text-xs text-muted-foreground">Preset</Label>
               <Select value={preset} onValueChange={setPreset}>
                 <SelectTrigger id="preset" className="h-8 text-xs">
@@ -116,7 +116,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
               size="sm"
               onClick={loadRecommendations}
               disabled={loading}
-              className="gap-2"
+              className="gap-2 shrink-0"
             >
               <Play className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Run
@@ -124,7 +124,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
           </div>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 space-y-3">
           <RecommenderFilters
             value={filters}
             onChange={setFilters}
@@ -132,6 +132,32 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
             onSortChange={setSort}
             availableDomains={availableDomains}
           />
+          
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={!hasPrevPage}
+                className="gap-1"
+              >
+                ← Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, filteredMoves.length)} of {filteredMoves.length}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={!hasNextPage}
+                className="gap-1"
+              >
+                Next →
+              </Button>
+            </div>
+          )}
         </div>
       </CardHeader>
 
@@ -147,32 +173,6 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
                 highPriority={top6Ids.has(move.proMoveId)}
               />
             ))}
-          </div>
-        )}
-
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-2 px-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setPage(p => Math.max(0, p - 1))}
-              disabled={!hasPrevPage}
-              className="gap-1"
-            >
-              ← Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, filteredMoves.length)} of {filteredMoves.length}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-              disabled={!hasNextPage}
-              className="gap-1"
-            >
-              Next →
-            </Button>
           </div>
         )}
 

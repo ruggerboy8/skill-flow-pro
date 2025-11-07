@@ -6,6 +6,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Collective Weakness constants
+const LOW_CUTOFF = 2; // 1-10 scale: ≤2 is "low confidence"
+const MIN_SAMPLES = 12; // Minimum staff-weeks to trust signals
+const BETA_PRIOR_A = 3; // Beta prior for low-rate EB
+const BETA_PRIOR_B = 3;
+
+// Retest constants
+const RETEST_WINDOW_MIN = 2; // weeks
+const RETEST_WINDOW_MAX = 4; // weeks
+const RETEST_BOOST = 0.10;
+
+// Recency constants
+const RECENCY_HORIZON = 16; // Fixed horizon
+const TRICKLE_LONG = 24; // Long-tail bonus threshold
+const TRICKLE_WEIGHT = 0.20; // Long-tail contribution weight
+
 interface RankRequest {
   roleId: 1 | 2;
   // New planner contract
@@ -52,10 +68,10 @@ serve(async (req) => {
     
     // Map presets to weights
     const presetWeights: Record<string, { C: number; R: number; E: number; D: number }> = {
-      balanced: { C: 0.50, R: 0.30, E: 0.15, D: 0.05 },
+      balanced: { C: 0.55, R: 0.25, E: 0.15, D: 0.05 },
       confidence_recovery: { C: 0.70, R: 0.15, E: 0.10, D: 0.05 },
-      eval_focus: { C: 0.35, R: 0.20, E: 0.40, D: 0.05 },
-      variety_first: { C: 0.40, R: 0.20, E: 0.10, D: 0.30 },
+      eval_focus: { C: 0.40, R: 0.20, E: 0.35, D: 0.05 },
+      variety_first: { C: 0.45, R: 0.20, E: 0.05, D: 0.30 },
     };
     
     // Use preset weights if no custom weights provided
@@ -75,7 +91,7 @@ serve(async (req) => {
       weights,
       cooldownWeeks: body.constraints?.cooldownWeeks ?? body.cooldownWeeks ?? 4,
       diversityMinDomainsPerWeek: body.constraints?.minDistinctDomains ?? body.diversityMinDomainsPerWeek ?? 2,
-      recencyHorizonWeeks: body.recencyHorizonWeeks ?? 0,
+      recencyHorizonWeeks: body.recencyHorizonWeeks ?? RECENCY_HORIZON,
       ebPrior: body.ebPrior ?? 0.70,
       ebK: body.ebK ?? 20,
       trimPct: body.trimPct ?? 0.05,
@@ -84,7 +100,7 @@ serve(async (req) => {
     };
 
     const logs: string[] = [];
-    const rankVersion = 'v3.3';
+    const rankVersion = 'v4.0-collective';
     const rulesApplied: string[] = [
       `cooldown=${config.cooldownWeeks}w`,
       `minDistinctDomains=${config.diversityMinDomainsPerWeek}`,
@@ -316,6 +332,38 @@ serve(async (req) => {
 
     logs.push(`Last selected records: focus=${lastSelectedFocus?.length || 0}, plan=${lastSelectedPlan?.length || 0}, total=${lastSelected.length}`);
     
+    // 6. Fetch rank snapshots for retest boost detection
+    const { data: snapshotData, error: snapshotError } = await supabase
+      .from('weekly_plan')
+      .select('action_id, week_start_date, rank_snapshot')
+      .eq('role_id', body.roleId)
+      .is('org_id', null)
+      .not('action_id', 'is', null)
+      .not('rank_snapshot', 'is', null)
+      .order('week_start_date', { ascending: false })
+      .limit(100);
+
+    if (snapshotError) console.warn('Snapshot fetch failed:', snapshotError);
+
+    // Build map: action_id -> most recent selection with snapshot
+    const retestMap = new Map<number, { weekStart: string; wasLowConf: boolean }>();
+    snapshotData?.forEach((row: any) => {
+      if (retestMap.has(row.action_id)) return; // Keep first (most recent)
+      
+      const snapshot = row.rank_snapshot;
+      // Check for low_conf_trigger tag OR infer from C value
+      const wasLowConf = 
+        snapshot?.reason_tags?.includes('low_conf_trigger') ||
+        (snapshot?.parts?.C >= 0.60);
+      
+      retestMap.set(row.action_id, {
+        weekStart: row.week_start_date,
+        wasLowConf
+      });
+    });
+
+    logs.push(`Retest map: ${retestMap.size} moves with selection history`);
+    
     // Log never-seen moves
     const neverSeen = eligible.filter(m => !lastSelected.some(ls => ls.proMoveId === m.id));
     logs.push(`Never assigned moves: ${neverSeen.length} (e.g., ${neverSeen.slice(0, 3).map(m => m.name).join(', ')})`);
@@ -391,29 +439,63 @@ serve(async (req) => {
 
     // Score function
     const scoreCandidate = (move: any, referenceDate: string) => {
-      // C (Confidence)
+      // C (Collective Weakness) - combines tail pain + mean deficit
       const confData = confidenceHistory.filter(h => h.proMoveId === move.id);
       let smoothedConf = config.ebPrior;
+      let p_low = 0.5; // Default to neutral
+      let C = 0.5; // Default to neutral
+
       if (confData.length > 0) {
+        // Calculate mean with existing EB (unchanged)
         const trimCount = Math.floor(confData.length * config.trimPct);
         const sorted = confData.map(d => d.avg).sort((a, b) => a - b);
         const trimmed = sorted.slice(trimCount, sorted.length - trimCount);
         const sampleMean = trimmed.reduce((sum, v) => sum + v, 0) / trimmed.length;
         const totalN = confData.reduce((sum, d) => sum + d.n, 0);
+        
+        // EB smoothed mean
         smoothedConf = (config.ebPrior * config.ebK + sampleMean * totalN) / (config.ebK + totalN);
+        
+        // Calculate low-tail rate with Beta EB approximation
+        let lowCount = 0;
+        confData.forEach(cd => {
+          // Approximate: if week avg ≤ 0.2 (2/10), count all n as low
+          if (cd.avg <= LOW_CUTOFF / 10.0) {
+            lowCount += cd.n;
+          }
+        });
+        
+        // Beta EB: (a + successes) / (a + b + trials)
+        p_low = (BETA_PRIOR_A + lowCount) / (BETA_PRIOR_A + BETA_PRIOR_B + totalN);
+        
+        // Collective Weakness: 60% tail pain + 40% mean deficit
+        const mean_deficit = 1 - smoothedConf;
+        C = 0.6 * p_low + 0.4 * mean_deficit;
+        
+        // Sample-size adjustment: shrink toward neutral if n < MIN_SAMPLES
+        if (totalN < MIN_SAMPLES) {
+          const lambda = Math.max(0, Math.min(1, totalN / MIN_SAMPLES));
+          C = lambda * C + (1 - lambda) * 0.5;
+        }
       }
-      const C = 1 - smoothedConf;
 
-      // R (Recency) - Linear post-cooldown
+      // R (Recency) - Linear post-cooldown + long-trickle tail
       const lastSeenRecord = lastSelected.find(ls => ls.proMoveId === move.id);
       const weeksSince = lastSeenRecord
         ? Math.floor((new Date(referenceDate).getTime() - new Date(lastSeenRecord.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000))
         : 999;
-      const horizon = config.recencyHorizonWeeks === 0 ? 12 : config.recencyHorizonWeeks;
+
+      const horizon = RECENCY_HORIZON; // Now always 16
       const cooldown = config.cooldownWeeks;
-      const R = weeksSince <= cooldown ? 0
-              : weeksSince >= horizon  ? 1
-              : (weeksSince - cooldown) / (horizon - cooldown);
+
+      // Base recency (linear post-cooldown)
+      let R = weeksSince <= cooldown ? 0
+            : weeksSince >= horizon  ? 1
+            : (weeksSince - cooldown) / (horizon - cooldown);
+
+      // Long-trickle tail (ancient moves get a small bonus)
+      const R_long = Math.min(weeksSince / TRICKLE_LONG, 1) * TRICKLE_WEIGHT;
+      R = Math.min(R + R_long, 1); // Cap at 1
 
       // E (Eval) - Deficit with capped contribution
       const evalRecord = evals.find(e => e.competencyId === move.competencyId);
@@ -426,18 +508,33 @@ serve(async (req) => {
       const appearances = domainRecord ? domainRecord.appearances : 0;
       const D = 1 - Math.min(appearances / 8, 1);
 
-      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib;
+      // T (Retest Boost) - verify improvement after low-conf selection
+      let T = 0;
+      const retestInfo = retestMap.get(move.id);
+      if (retestInfo && retestInfo.wasLowConf) {
+        const weeksSinceSelection = Math.floor(
+          (new Date(referenceDate).getTime() - new Date(retestInfo.weekStart).getTime()) 
+          / (7 * 24 * 60 * 60 * 1000)
+        );
+        
+        if (weeksSinceSelection >= RETEST_WINDOW_MIN && weeksSinceSelection <= RETEST_WINDOW_MAX) {
+          T = RETEST_BOOST;
+        }
+      }
+
+      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib + T;
 
       const components = [
         { key: 'C', value: C * weights.C },
         { key: 'R', value: R * weights.R },
-        { key: 'E', value: eContrib }, // Use capped contribution for drivers
+        { key: 'E', value: eContrib },
         { key: 'D', value: D * weights.D },
+        { key: 'T', value: T },
       ];
       components.sort((a, b) => b.value - a.value);
       const drivers = components.slice(0, 2).map(c => c.key);
 
-      return { C, R, E: E_raw, D, eContrib, final, drivers, weeksSince };
+      return { C, R, E: E_raw, D, eContrib, final, drivers, weeksSince, T };
     };
 
     // Compute Next
@@ -463,8 +560,8 @@ serve(async (req) => {
     if (scored.length > 0) {
       const sample = scored[0];
       logs.push(`Sample breakdown [${sample.name}]:`);
-      logs.push(`  Raw: C=${sample.C.toFixed(3)}, R=${sample.R.toFixed(3)}, E_raw=${sample.E.toFixed(3)}, D=${sample.D.toFixed(3)}`);
-      logs.push(`  Weighted: C*w=${(sample.C * weights.C).toFixed(3)}, R*w=${(sample.R * weights.R).toFixed(3)}, E_contrib=${sample.eContrib.toFixed(3)}, D*w=${(sample.D * weights.D).toFixed(3)}`);
+      logs.push(`  Raw: C=${sample.C.toFixed(3)}, R=${sample.R.toFixed(3)}, E_raw=${sample.E.toFixed(3)}, D=${sample.D.toFixed(3)}, T=${sample.T.toFixed(3)}`);
+      logs.push(`  Weighted: C*w=${(sample.C * weights.C).toFixed(3)}, R*w=${(sample.R * weights.R).toFixed(3)}, E_contrib=${sample.eContrib.toFixed(3)}, D*w=${(sample.D * weights.D).toFixed(3)}, T=${sample.T.toFixed(3)}`);
       logs.push(`  Final: ${sample.final.toFixed(3)}, Drivers: ${sample.drivers.join(', ')}`);
     }
 
@@ -615,13 +712,20 @@ serve(async (req) => {
       
       const classification = classifyConfidence(1 - pick.C, recentWeeks);
       
+      // Generate reason tags
+      const reason_tags: string[] = [];
+      if (pick.C >= 0.60) reason_tags.push('low_conf_trigger');
+      if (pick.T > 0) reason_tags.push('retest_window');
+      if (pick.weeksSince === 999) reason_tags.push('never_practiced');
+      if (pick.R >= 0.8) reason_tags.push('long_unseen');
+
       return {
         proMoveId: pick.id,
         name: pick.name,
         domainId: pick.domainId,
         domainName: pick.domainName,
-        parts: { C: pick.C, R: pick.R, E: pick.E, D: pick.D }, // E is E_raw for introspection
-        evalContrib: pick.eContrib, // Show capped contribution
+        parts: { C: pick.C, R: pick.R, E: pick.E, D: pick.D, T: pick.T || 0 },
+        evalContrib: pick.eContrib,
         finalScore: pick.final,
         drivers: pick.drivers,
         lastSeen: ls ? new Date(ls.weekStart).toLocaleDateString('en-US') : undefined,
@@ -631,6 +735,7 @@ serve(async (req) => {
         severity: classification.severity,
         n2w: classification.n2w,
         recentMeans: classification.recentMeans,
+        reason_tags,
       };
     };
 
@@ -650,12 +755,19 @@ serve(async (req) => {
       
       const classification = classifyConfidence(1 - p.C, recentWeeks);
       
+      // Generate reason tags
+      const reason_tags: string[] = [];
+      if (p.C >= 0.60) reason_tags.push('low_conf_trigger');
+      if (p.T > 0) reason_tags.push('retest_window');
+      if (ws === 999) reason_tags.push('never_practiced');
+      if (p.R >= 0.8) reason_tags.push('long_unseen');
+      
       return {
         proMoveId: p.id,
         name: p.name,
         domainId: p.domainId,
         domainName: p.domainName,
-        parts: { C: p.C, R: p.R, E: p.E, D: p.D },
+        parts: { C: p.C, R: p.R, E: p.E, D: p.D, T: p.T || 0 },
         finalScore: p.final,
         drivers: p.drivers,
         lastSeen: ls ? new Date(ls.weekStart).toLocaleDateString('en-US') : undefined,
@@ -665,6 +777,7 @@ serve(async (req) => {
         severity: classification.severity,
         n2w: classification.n2w,
         recentMeans: classification.recentMeans,
+        reason_tags,
       };
     });
 

@@ -60,17 +60,21 @@ export function scoreCandidate(
   // Final weighted sum
   const final = C * weights.C + R * weights.R + E * weights.E + D * weights.D;
 
+  // T component - not used in this engine version, set to 0
+  const T = 0;
+
   // Determine top 2 drivers
   const components = [
     { key: 'C' as const, value: C * weights.C },
     { key: 'R' as const, value: R * weights.R },
     { key: 'E' as const, value: E * weights.E },
     { key: 'D' as const, value: D * weights.D },
+    { key: 'T' as const, value: T },
   ];
   components.sort((a, b) => b.value - a.value);
   const drivers = components.slice(0, 2).map(c => c.key);
 
-  return { C, R, E, D, final, drivers };
+  return { C, R, E, D, T, final, drivers };
 }
 
 export function computeWeek(
@@ -172,6 +176,7 @@ export function computeNextAndPreview(
         R: pick.breakdown.R,
         E: pick.breakdown.E,
         D: pick.breakdown.D,
+        T: pick.breakdown.T || 0,
       },
       finalScore: pick.breakdown.final,
       drivers: pick.breakdown.drivers,
@@ -216,6 +221,7 @@ export function computeNextAndPreview(
         R: pick.breakdown.R,
         E: pick.breakdown.E,
         D: pick.breakdown.D,
+        T: pick.breakdown.T || 0,
       },
       finalScore: pick.breakdown.final,
       drivers: pick.breakdown.drivers,
@@ -263,6 +269,7 @@ export function buildRankedList(
         R: move.breakdown.R,
         E: move.breakdown.E,
         D: move.breakdown.D,
+        T: move.breakdown.T || 0,
       },
       finalScore: move.breakdown.final,
       drivers: move.breakdown.drivers,

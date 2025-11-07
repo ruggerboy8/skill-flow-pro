@@ -23,6 +23,12 @@ interface WeekSlot {
   domainName: string;
   status?: string;
   isLocked: boolean;
+  rankSnapshot?: {
+    parts: { C: number; R: number; E: number; D: number; T: number };
+    final: number;
+    reason_tags: string[];
+    version: string;
+  };
 }
 
 interface WeekAssignment {
@@ -333,7 +339,8 @@ export function WeekBuilderPanel({
         const picks = week.slots.map(s => ({ 
           displayOrder: s.displayOrder as 1 | 2 | 3, 
           actionId: s.actionId || null, 
-          generatedBy: 'manual' as const
+          generatedBy: 'manual' as const,
+          rankSnapshot: s.rankSnapshot || null,
         }));
 
         const { data, error } = await supabase.functions.invoke('planner-upsert', {
@@ -623,7 +630,33 @@ export function WeekBuilderPanel({
                         try {
                           const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
                           const data = JSON.parse(raw);
-                          await handleSelectProMove(data.actionId, week.weekStart, slot.displayOrder);
+                          
+                          // Fetch pro-move details
+                          const metaMap = await fetchProMoveMetaByIds([data.actionId]);
+                          const meta = metaMap.get(data.actionId);
+                          
+                          // Update local state with rankSnapshot
+                          const updatedWeeks = weeks.map(w => 
+                            w.weekStart === week.weekStart 
+                              ? {
+                                  ...w,
+                                  slots: w.slots.map(s => 
+                                    s.displayOrder === slot.displayOrder
+                                      ? { 
+                                          ...s, 
+                                          actionId: data.actionId,
+                                          actionStatement: meta?.statement || data.actionStatement || '',
+                                          domainName: meta?.domain || data.domainName || '',
+                                          rankSnapshot: data.rankSnapshot || null,
+                                        }
+                                      : s
+                                  )
+                                }
+                              : w
+                          );
+                          
+                          setWeeks(updatedWeeks);
+                          setHasUnsavedChanges(true);
                         } catch (error) {
                           console.error('Drop error:', error);
                           toast({ title: 'Error', description: 'Failed to assign pro-move', variant: 'destructive' });

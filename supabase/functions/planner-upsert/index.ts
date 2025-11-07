@@ -34,6 +34,12 @@ interface SaveWeekRequest {
     displayOrder: 1 | 2 | 3
     actionId: number | null
     generatedBy: 'manual' | 'auto'
+    rankSnapshot?: {
+      parts: { C: number; R: number; E: number; D: number; T: number }
+      final: number
+      reason_tags: string[]
+      version: string
+    }
   }>
   updaterUserId: string
 }
@@ -149,6 +155,8 @@ Deno.serve(async (req) => {
                 generated_by: pick.generatedBy,
                 updated_by: updaterUserId,
                 updated_at: new Date().toISOString(),
+                rank_snapshot: pick.rankSnapshot || null,
+                rank_version: pick.rankSnapshot?.version || null,
               })
               .eq('id', existing.id)
 
@@ -181,6 +189,8 @@ Deno.serve(async (req) => {
               updated_by: updaterUserId,
               status: 'locked',
               self_select: false,
+              rank_snapshot: pick.rankSnapshot || null,
+              rank_version: pick.rankSnapshot?.version || null,
             })
             .select('id')
             .single()

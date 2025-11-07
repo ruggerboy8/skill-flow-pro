@@ -22,17 +22,17 @@ export interface RankedRow {
   name: string;
   domainId: number;
   domainName: string;
-  parts: { C: number; R: number; E: number; D: number }; // 0..1
-  finalScore: number; // 0..1
-  drivers: ('C' | 'R' | 'E' | 'D')[];
-  lastSeen?: string; // "MM-DD-YYYY"
+  parts: { C: number; R: number; E: number; D: number; T: number };
+  finalScore: number;
+  drivers: ('C' | 'R' | 'E' | 'D' | 'T')[];
+  lastSeen?: string;
   weeksSinceSeen: number;
-  confidenceN: number; // sum of 'n' used for EB smoothing
-  // CLC Detector fields
+  confidenceN: number;
   status: 'critical' | 'watch' | 'ok';
-  severity?: number; // 0..1 when status='critical'
-  n2w?: number; // sum of last-2-week Ns
-  recentMeans?: number[]; // up to 2 numbers (0..1)
+  severity?: number;
+  n2w?: number;
+  recentMeans?: number[];
+  reason_tags?: string[];
 }
 
 export interface RankResponse {
@@ -101,8 +101,9 @@ export interface ScoreBreakdown {
   R: number;
   E: number;
   D: number;
+  T: number;
   final: number;
-  drivers: ('C' | 'R' | 'E' | 'D')[];
+  drivers: ('C' | 'R' | 'E' | 'D' | 'T')[];
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {

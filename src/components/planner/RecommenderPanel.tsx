@@ -20,13 +20,14 @@ interface ProMoveRecommendation {
   name: string;
   domainName: string;
   domainId: number;
-  parts: { C: number; R: number; E: number; D: number };
+  parts: { C: number; R: number; E: number; D: number; T?: number };
   finalScore: number;
   weeksSinceSeen: number;
   confidenceN: number;
   status: string;
   reasonSummary?: string;
   lastSeen?: string;
+  reason_tags?: string[];
 }
 
 export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
@@ -166,6 +167,25 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
                     actionStatement: move.name,
                     domainName: move.domainName,
                     competencyTag: '',
+                    rankSnapshot: {
+                      parts: {
+                        C: move.parts.C,
+                        R: move.parts.R,
+                        E: move.parts.E,
+                        D: move.parts.D,
+                        T: move.parts.T || 0,
+                      },
+                      final: move.finalScore,
+                      reason_tags: move.reason_tags || (() => {
+                        const tags: string[] = [];
+                        if (move.parts.C >= 0.60) tags.push('low_conf_trigger');
+                        if ((move.parts.T || 0) > 0) tags.push('retest_window');
+                        if (move.weeksSinceSeen === 999) tags.push('never_practiced');
+                        if (move.parts.R >= 0.8) tags.push('long_unseen');
+                        return tags;
+                      })(),
+                      version: 'v4.0',
+                    },
                   });
                   e.dataTransfer.effectAllowed = 'copy';
                   e.dataTransfer.setData('application/json', payload);
@@ -226,13 +246,16 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2">
-                    <div className="p-2 bg-muted rounded text-xs space-y-1">
+                      <div className="p-2 bg-muted rounded text-xs space-y-1">
                       <div className="font-semibold">Score Breakdown:</div>
                       <div className="grid grid-cols-2 gap-1">
                         <div>Confidence: {Math.round(move.parts.C * 100)}</div>
                         <div>Recency: {Math.round(move.parts.R * 100)}</div>
                         <div>Eval: {Math.round(move.parts.E * 100)}</div>
                         <div>Diversity: {Math.round(move.parts.D * 100)}</div>
+                        {(move.parts.T || 0) > 0 && (
+                          <div className="col-span-2">Retest Boost: {Math.round((move.parts.T || 0) * 100)}</div>
+                        )}
                       </div>
                       {move.reasonSummary && (
                         <>

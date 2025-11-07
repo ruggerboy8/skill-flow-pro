@@ -509,7 +509,7 @@ export function WeekBuilderPanel({
           </div>
 
           {/* View Mode Controls */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'week' | 'month')}>
               <TabsList>
                 <TabsTrigger value="week">Week View</TabsTrigger>
@@ -518,36 +518,38 @@ export function WeekBuilderPanel({
             </Tabs>
 
             {viewMode === 'week' ? (
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleNavigatePrev}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-medium min-w-[160px] text-center">
-                  Week of {formatWeekOf(selectedMonday)}
-                </span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleNavigateNext}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Separator orientation="vertical" className="h-6" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleNavigatePrev}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium text-center whitespace-nowrap">
+                    Week of {formatWeekOf(selectedMonday)}
+                  </span>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleNavigateNext}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Separator orientation="vertical" className="h-6 hidden md:block" />
                 <div className="flex items-center gap-2">
                   <Checkbox 
                     id="twoWeeks" 
                     checked={showTwoWeeks} 
                     onCheckedChange={(checked) => setShowTwoWeeks(!!checked)} 
                   />
-                  <Label htmlFor="twoWeeks" className="text-sm">Show 2 weeks</Label>
+                  <Label htmlFor="twoWeeks" className="text-sm whitespace-nowrap">Show 2 weeks</Label>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -555,7 +557,7 @@ export function WeekBuilderPanel({
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium min-w-[160px] text-center">
+                <span className="text-sm font-medium text-center whitespace-nowrap">
                   {formatMonthYear(getMonthStart(selectedMonday))}
                 </span>
                 <Button 

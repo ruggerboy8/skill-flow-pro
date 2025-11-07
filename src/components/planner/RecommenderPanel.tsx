@@ -134,17 +134,17 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
           />
           
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-1">
+            <div className="flex items-center justify-between px-1 gap-2 flex-wrap">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={!hasPrevPage}
-                className="gap-1"
+                className="gap-1 shrink-0"
               >
                 ← Previous
               </Button>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
                 {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, filteredMoves.length)} of {filteredMoves.length}
               </span>
               <Button
@@ -152,7 +152,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
                 size="sm"
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={!hasNextPage}
-                className="gap-1"
+                className="gap-1 shrink-0"
               >
                 Next →
               </Button>

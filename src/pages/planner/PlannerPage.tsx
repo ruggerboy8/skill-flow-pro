@@ -31,7 +31,7 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
       <div className="flex gap-4 items-start">
         {/* Left: fixed sidebar */}
         <aside className="w-[400px] shrink-0">
-          <div className="max-h-[calc(100vh-180px)] overflow-hidden">
+          <div className="max-h-[calc(100vh-180px)] overflow-y-auto">
             <RecommenderPanel
               roleId={roleId}
               roleName={roleName}

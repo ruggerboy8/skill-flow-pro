@@ -127,7 +127,7 @@ function PlannerTabContent({ roleId, roleName }: { roleId: number; roleName: str
     <div className="flex gap-4">
       {/* Left: Recommender */}
       <div className="w-[400px] shrink-0">
-        <div className="max-h-[calc(100vh-280px)] overflow-hidden">
+        <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
           <RecommenderPanel
             roleId={roleId}
             roleName={roleName}

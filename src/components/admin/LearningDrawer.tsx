@@ -345,6 +345,8 @@ export function LearningDrawer({
   async function handleSaveLink(link: { id?: string; url: string; title?: string }) {
     setIsSaving(true);
     try {
+      let updatedLinks: LinkResource[];
+      
       if (link.id) {
         // Update existing
         await supabase
@@ -352,9 +354,8 @@ export function LearningDrawer({
           .update({ url: link.url, title: link.title })
           .eq('id', link.id);
         
-        setLinks((prev) =>
-          prev.map((l) => (l.id === link.id ? { ...l, url: link.url, title: link.title } : l))
-        );
+        updatedLinks = links.map((l) => (l.id === link.id ? { ...l, url: link.url, title: link.title } : l));
+        setLinks(updatedLinks);
       } else {
         // Insert new
         const { data } = await supabase
@@ -370,15 +371,19 @@ export function LearningDrawer({
           .single();
         
         if (data) {
-          setLinks((prev) => [
-            ...prev,
+          updatedLinks = [
+            ...links,
             { id: data.id, url: link.url, title: link.title, display_order: links.length + 10 },
-          ]);
+          ];
+          setLinks(updatedLinks);
+        } else {
+          updatedLinks = links;
         }
       }
 
       setShowLinkEditor(false);
       setEditingLink(null);
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links: updatedLinks }));
       
       toast({
         title: 'Success',
@@ -407,7 +412,9 @@ export function LearningDrawer({
         .delete()
         .eq('id', link.id);
 
-      setLinks((prev) => prev.filter((l) => l.id !== link.id));
+      const updatedLinks = links.filter((l) => l.id !== link.id);
+      setLinks(updatedLinks);
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links: updatedLinks }));
       
       toast({
         title: 'Success',
@@ -441,6 +448,7 @@ export function LearningDrawer({
 
       await Promise.all(updates);
 
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links: reorderedLinks }));
       emitSummary();
     } catch (error) {
       toast({

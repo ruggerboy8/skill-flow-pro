@@ -263,9 +263,9 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 <Label className="text-sm font-semibold">
                   {scopeType === 'org' ? 'Select Organizations' : 'Select Locations'} (multiple)
                 </Label>
-                <div className="space-y-2 max-h-48 overflow-y-auto p-2 border rounded-md">
+                <div className="space-y-2 max-h-48 overflow-y-auto p-2 border rounded-md bg-background">
                   {scopeType === 'org' 
-                    ? organizations.map((org) => (
+                    ? (organizations.length > 0 ? organizations.map((org) => (
                         <label key={org.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
                           <input
                             type="checkbox"
@@ -281,8 +281,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                           />
                           <span className="text-sm">{org.name}</span>
                         </label>
+                      )) : (
+                        <p className="text-sm text-muted-foreground p-2">No organizations available</p>
                       ))
-                    : locations.map((location) => (
+                    : (locations.length > 0 ? locations.map((location) => (
                         <label key={location.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
                           <input
                             type="checkbox"
@@ -303,6 +305,8 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                             )}
                           </div>
                         </label>
+                      )) : (
+                        <p className="text-sm text-muted-foreground p-2">No locations available</p>
                       ))
                   }
                 </div>

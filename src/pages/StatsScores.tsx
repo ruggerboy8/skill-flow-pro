@@ -4,6 +4,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,15 +12,19 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
-import { Trash2 } from 'lucide-react';
+import { GraduationCap, Trash2 } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { getLocationWeekContext } from '@/lib/locationState';
+import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 
 interface WeekData {
   domain_name: string;
   action_statement: string;
   confidence_score: number | null;
   performance_score: number | null;
+  action_id: number | null;
+  resource_count: number;
+  is_self_select?: boolean;
 }
 
 interface WeekStatusRow {
@@ -326,19 +331,24 @@ export default function StatsScores() {
       const rows: WeekData[] = (focus ?? []).map((f: any) => {
         let action_statement = 'Pro Move';
         let compId: number | null = null;
+        let action_id: number | null = null;
+        let is_self_select = f.self_select;
         
         if (f.self_select) {
           const selection = selectionsMap[f.id];
           if (selection?.pro_moves) {
             action_statement = selection.pro_moves.action_statement;
             compId = selection.pro_moves.competency_id;
+            action_id = selection.selected_pro_move_id;
           } else {
             action_statement = 'Self-Select';
             compId = f.competency_id;
+            action_id = null;
           }
         } else {
           action_statement = f.pro_moves?.action_statement || 'Pro Move';
           compId = f.pro_moves?.competency_id;
+          action_id = f.action_id;
         }
         
         const domain_name = compId ? (domainMap[compId] || 'General') : 'General';
@@ -348,9 +358,33 @@ export default function StatsScores() {
           domain_name,
           action_statement,
           confidence_score: sc.confidence_score,
-          performance_score: sc.performance_score
+          performance_score: sc.performance_score,
+          action_id,
+          resource_count: 0, // Will be populated below
+          is_self_select
         };
       });
+
+      // Fetch resource counts for all action_ids
+      const actionIds = rows.map(r => r.action_id).filter((id): id is number => id !== null);
+      if (actionIds.length > 0) {
+        const { data: resourceCounts } = await supabase
+          .from('pro_move_resources')
+          .select('action_id')
+          .in('action_id', actionIds)
+          .eq('status', 'published');
+        
+        const countMap: Record<number, number> = {};
+        (resourceCounts ?? []).forEach(rc => {
+          countMap[rc.action_id] = (countMap[rc.action_id] || 0) + 1;
+        });
+        
+        rows.forEach(row => {
+          if (row.action_id) {
+            row.resource_count = countMap[row.action_id] || 0;
+          }
+        });
+      }
 
       return rows;
     } catch (error) {
@@ -548,6 +582,8 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [learnDrawerOpen, setLearnDrawerOpen] = useState(false);
+  const [selectedLearnItem, setSelectedLearnItem] = useState<WeekData | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -745,6 +781,48 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
                     {item.action_statement}
                   </span>
                   <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
+                  
+                  {/* Learn Button */}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1.5"
+                          disabled={!item.action_id || item.resource_count === 0}
+                          onClick={() => {
+                            if (item.action_id && item.resource_count > 0) {
+                              setSelectedLearnItem(item);
+                              setLearnDrawerOpen(true);
+                            } else if (item.is_self_select && !item.action_id) {
+                              toast({
+                                title: 'No pro-move selected',
+                                description: 'Please select a pro-move for this slot first.',
+                                variant: 'default',
+                              });
+                            }
+                          }}
+                          aria-label={`Learn: ${item.action_statement}`}
+                        >
+                          <GraduationCap className="h-3.5 w-3.5" />
+                          <span className="text-xs">Learn</span>
+                          {item.resource_count > 0 && (
+                            <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center text-[10px] ml-0.5">
+                              {item.resource_count}
+                            </Badge>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {!item.action_id && item.is_self_select
+                          ? 'Choose a pro-move first'
+                          : item.resource_count === 0
+                          ? 'No learning materials yet'
+                          : `${item.resource_count} learning resource${item.resource_count > 1 ? 's' : ''}`}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               ))}
             </div>
@@ -753,6 +831,16 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
           )}
         </AccordionContent>
       </AccordionItem>
+
+      {selectedLearnItem && (
+        <LearnerLearnDrawer
+          open={learnDrawerOpen}
+          onOpenChange={setLearnDrawerOpen}
+          actionId={selectedLearnItem.action_id!}
+          proMoveTitle={selectedLearnItem.action_statement}
+          domainName={selectedLearnItem.domain_name}
+        />
+      )}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

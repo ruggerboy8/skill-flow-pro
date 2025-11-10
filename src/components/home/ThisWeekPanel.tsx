@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -16,9 +17,11 @@ import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
 import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
+import { GraduationCap } from 'lucide-react';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { buildWeekBanner } from '@/v2/weekCta';
 import { enforceWeeklyRolloverNow } from '@/v2/rollover';
+import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 
 interface Staff { id: string; role_id: number; }
 interface WeeklyScore { 
@@ -42,6 +45,9 @@ export default function ThisWeekPanel() {
   const [loading, setLoading] = useState<boolean>(true);
   const [weekOfDate, setWeekOfDate] = useState<string>('');
   const [SimBannerComponent, setSimBannerComponent] = useState<React.ComponentType | null>(null);
+  const [learnDrawerOpen, setLearnDrawerOpen] = useState(false);
+  const [selectedLearnAssignment, setSelectedLearnAssignment] = useState<WeekAssignment | null>(null);
+  const [resourceCounts, setResourceCounts] = useState<Record<number, number>>({});
 
   // Load dev tools conditionally
   useEffect(() => {
@@ -122,6 +128,26 @@ export default function ThisWeekPanel() {
       // Load current week assignments and context based on user progress
       const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);
       setWeekAssignments(assignments);
+
+      // Fetch resource counts for pro-moves
+      const actionIds = assignments
+        .map(a => a.pro_move_id)
+        .filter((id): id is number => id !== null && id !== undefined);
+      
+      if (actionIds.length > 0) {
+        const { data: resourceCounts } = await supabase
+          .from('pro_move_resources')
+          .select('action_id')
+          .in('action_id', actionIds)
+          .eq('status', 'published');
+        
+        const countMap: Record<number, number> = {};
+        (resourceCounts ?? []).forEach(rc => {
+          countMap[rc.action_id] = (countMap[rc.action_id] || 0) + 1;
+        });
+        
+        setResourceCounts(countMap);
+      }
 
       // Get location-specific time anchors for state computation
       const locationTimeContext = await getLocationWeekContext(staffData.primary_location_id, effectiveNow);
@@ -268,6 +294,7 @@ export default function ThisWeekPanel() {
             
             // Find scores for this assignment
             const scores = weeklyScores.find(s => s.weekly_focus_id === assignment.weekly_focus_id);
+            const resourceCount = assignment.pro_move_id ? (resourceCounts[assignment.pro_move_id] || 0) : 0;
 
             return (
               <div key={assignment.weekly_focus_id} className="rounded-lg p-4 border" style={bgColor ? { backgroundColor: `hsl(${bgColor})` } : undefined}>
@@ -283,11 +310,53 @@ export default function ThisWeekPanel() {
                       {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
                     </p>
                   </div>
-                  <div className="flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <ConfPerfDelta 
                       confidence={scores?.confidence_score} 
                       performance={scores?.performance_score} 
                     />
+                    
+                    {/* Learn Button */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1.5"
+                            disabled={!assignment.pro_move_id || resourceCount === 0}
+                            onClick={() => {
+                              if (assignment.pro_move_id && resourceCount > 0) {
+                                setSelectedLearnAssignment(assignment);
+                                setLearnDrawerOpen(true);
+                              } else if (isUnchosen) {
+                                toast({
+                                  title: 'No pro-move selected',
+                                  description: 'Please select a pro-move for this slot first.',
+                                  variant: 'default',
+                                });
+                              }
+                            }}
+                            aria-label={`Learn: ${assignment.action_statement}`}
+                          >
+                            <GraduationCap className="h-3.5 w-3.5" />
+                            <span className="text-xs">Learn</span>
+                            {resourceCount > 0 && (
+                              <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center text-[10px] ml-0.5">
+                                {resourceCount}
+                              </Badge>
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {isUnchosen
+                            ? 'Choose a pro-move first'
+                            : resourceCount === 0
+                            ? 'No learning materials yet'
+                            : `${resourceCount} learning resource${resourceCount > 1 ? 's' : ''}`}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               </div>
@@ -312,6 +381,16 @@ export default function ThisWeekPanel() {
         {/* Simulation status below CTA when active */}
         {SimBannerComponent && <SimBannerComponent />}
       </CardContent>
+
+      {selectedLearnAssignment && selectedLearnAssignment.pro_move_id && (
+        <LearnerLearnDrawer
+          open={learnDrawerOpen}
+          onOpenChange={setLearnDrawerOpen}
+          actionId={selectedLearnAssignment.pro_move_id}
+          proMoveTitle={selectedLearnAssignment.action_statement || 'Pro Move'}
+          domainName={selectedLearnAssignment.domain_name || 'General'}
+        />
+      )}
     </Card>
   );
 }

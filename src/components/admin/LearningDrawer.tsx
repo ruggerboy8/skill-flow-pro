@@ -421,7 +421,7 @@ export function LearningDrawer({
         description: 'Link deleted',
       });
 
-      emitSummary();
+      emitSummary({ links: updatedLinks.length });
     } catch (error) {
       toast({
         title: 'Error',

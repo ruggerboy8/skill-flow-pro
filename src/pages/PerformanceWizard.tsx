@@ -284,18 +284,38 @@ export default function PerformanceWizard() {
     }
 
     // Build the weekly focus with actual selected pro moves
-    const cycleLength = staffData.locations?.cycle_length_weeks || 6;
-    const programStart = staffData.locations?.program_start_date ? new Date(staffData.locations.program_start_date) : null;
+    // For current week: use actual current Monday
+    // For repair: try to get week_start_date from data or fall back to cycle/week display
+    let weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
+    
+    if (!isRepair) {
+      // Calculate current Monday for current week
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const thisMonday = new Date(now);
+      thisMonday.setDate(now.getDate() + daysToMonday);
+      thisMonday.setHours(0, 0, 0, 0);
+      weekLabel = `Week of ${format(thisMonday, 'MMM d')}`;
+    } else {
+      // For repair mode, try to get week_start_date from weekly_focus
+      const focusIds = weekAssignments.map(a => a.weekly_focus_id);
+      if (focusIds.length > 0) {
+        const { data: focusWithDate } = await supabase
+          .from('weekly_focus')
+          .select('week_start_date')
+          .in('id', focusIds)
+          .limit(1)
+          .maybeSingle();
+        
+        if (focusWithDate?.week_start_date) {
+          const weekStart = new Date(focusWithDate.week_start_date);
+          weekLabel = `Week of ${format(weekStart, 'MMM d')}`;
+        }
+      }
+    }
     
     const transformedFocusData: WeeklyFocus[] = weekAssignments.map((assignment) => {
-      let weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
-      if (programStart) {
-        const weeksFromStart = (cycleNumber - 1) * cycleLength + (weekInCycle - 1);
-        const weekStart = new Date(programStart);
-        weekStart.setDate(programStart.getDate() + weeksFromStart * 7);
-        weekLabel = `Week of ${format(weekStart, 'MMM d')}`;
-      }
-      
       return {
         id: assignment.weekly_focus_id,
         display_order: assignment.display_order,

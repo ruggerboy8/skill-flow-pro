@@ -433,15 +433,15 @@ export default function Week() {
 
   // Calculate week start date from cycle/week
   const getWeekLabel = () => {
-    if (!staff?.locations?.program_start_date) return `Cycle ${cycle}, Week ${weekInCycle}`;
+    // Calculate current Monday
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const thisMonday = new Date(now);
+    thisMonday.setDate(now.getDate() + daysToMonday);
+    thisMonday.setHours(0, 0, 0, 0);
     
-    const cycleLength = staff.locations.cycle_length_weeks || 6;
-    const programStart = new Date(staff.locations.program_start_date);
-    const weeksFromStart = (cycle - 1) * cycleLength + (weekInCycle - 1);
-    const weekStart = new Date(programStart);
-    weekStart.setDate(programStart.getDate() + weeksFromStart * 7);
-    
-    return `Week of ${format(weekStart, 'MMM d')}`;
+    return `Week of ${format(thisMonday, 'MMM d')}`;
   };
 
   const total = weeklyFocus.length;

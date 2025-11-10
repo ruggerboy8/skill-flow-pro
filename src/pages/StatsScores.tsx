@@ -604,7 +604,7 @@ function WeekAccordion({ cycle, week, staffData, onExpand, weekData, weekStatus,
                 >
                   <Badge 
                     className="text-xs font-semibold ring-1 ring-border/50"
-                    style={{ backgroundColor: getDomainColor(item.domain_name) }}
+                    style={{ backgroundColor: `hsl(${getDomainColor(item.domain_name)})` }}
                   >
                     {item.domain_name}
                   </Badge>

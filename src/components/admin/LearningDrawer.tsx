@@ -14,6 +14,7 @@ import { MarkdownPreview } from './MarkdownPreview';
 import { LinkEditor } from './LinkEditor';
 import { DraggableList } from './DraggableList';
 import { extractYouTubeId, isValidYouTubeUrl } from '@/lib/youtubeHelpers';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface LearningDrawerProps {
   actionId: number;
@@ -147,11 +148,12 @@ export function LearningDrawer({
         .update({ description })
         .eq('action_id', actionId);
       
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links }));
+      
       toast({
         title: 'Success',
         description: 'Description saved',
       });
-      setInitialSnap(JSON.stringify({ description, videoUrl, script, links }));
     } catch (error) {
       toast({
         title: 'Error',
@@ -263,9 +265,14 @@ export function LearningDrawer({
   async function saveScript() {
     setIsSaving(true);
     try {
-      const trimmed = script.trim();
+      // Check if script is truly empty (strip HTML tags to get actual text)
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = script;
+      const textContent = tempDiv.textContent || tempDiv.innerText || '';
+      const isEmpty = textContent.trim().length === 0;
       
-      if (!trimmed) {
+      if (isEmpty) {
+        // Delete the script if it exists
         if (scriptResourceId) {
           await supabase
             .from('pro_move_resources')
@@ -273,21 +280,22 @@ export function LearningDrawer({
             .eq('id', scriptResourceId);
           setScriptResourceId(undefined);
         }
+        setScript('');
         
-      toast({
-        title: 'Success',
-        description: 'Script removed',
-      });
-      setInitialSnap(JSON.stringify({ description, videoUrl, script: '', links }));
-      emitSummary({ script: false });
-      return;
+        toast({
+          title: 'Success',
+          description: 'Script removed',
+        });
+        setInitialSnap(JSON.stringify({ description, videoUrl, script: '', links }));
+        emitSummary({ script: false });
+        return;
       }
 
       if (scriptResourceId) {
         // Update existing
         await supabase
           .from('pro_move_resources')
-          .update({ content_md: trimmed })
+          .update({ content_md: script })
           .eq('id', scriptResourceId);
       } else {
         // Insert new
@@ -296,7 +304,7 @@ export function LearningDrawer({
           .insert({
             action_id: actionId,
             type: 'script',
-            content_md: trimmed,
+            content_md: script,
             display_order: 1,
           })
           .select()
@@ -305,12 +313,13 @@ export function LearningDrawer({
         setScriptResourceId(data?.id);
       }
 
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links }));
+
       toast({
         title: 'Success',
         description: 'Script saved',
       });
 
-      setInitialSnap(JSON.stringify({ description, videoUrl, script: trimmed, links }));
       emitSummary({ script: true });
     } catch (error) {
       toast({
@@ -463,9 +472,22 @@ export function LearningDrawer({
             <GraduationCap className="h-5 w-5 text-primary" />
             <SheetTitle>Learning Materials</SheetTitle>
           </div>
-          <div className="space-y-1 pt-2">
-            <p className="text-sm font-medium">{proMoveTitle}</p>
-            <Badge variant="secondary">{domainName}</Badge>
+          <div className="space-y-2 pt-3">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Pro Move</p>
+              <p className="text-sm font-medium leading-snug">{proMoveTitle}</p>
+            </div>
+            <Badge 
+              variant="secondary"
+              style={{ 
+                backgroundColor: `${getDomainColor(domainName)}20`,
+                color: getDomainColor(domainName),
+                borderColor: getDomainColor(domainName)
+              }}
+              className="border"
+            >
+              {domainName}
+            </Badge>
           </div>
         </SheetHeader>
 

@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Edit, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Edit, Eye, EyeOff, Trash2, GraduationCap } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
+import { LearningDrawer } from './LearningDrawer';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
@@ -61,6 +62,9 @@ export function ProMoveList({
   const { toast } = useToast();
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
   const [loading, setLoading] = useState(true);
+  const [materialsCount, setMaterialsCount] = useState<Map<number, number>>(new Map());
+  const [learningDrawerOpen, setLearningDrawerOpen] = useState(false);
+  const [selectedProMove, setSelectedProMove] = useState<ProMove | null>(null);
 
   useEffect(() => {
     loadProMoves();
@@ -155,6 +159,20 @@ export function ProMoveList({
       
       console.log('=== FORMATTED PRO MOVES ===', formattedData);
       setProMoves(formattedData);
+      
+      // Fetch materials count for all loaded pro-moves
+      if (formattedData.length > 0) {
+        const actionIds = formattedData.map(pm => pm.action_id);
+        const { data: countsData } = await supabase.rpc('get_materials_count', {
+          p_action_ids: actionIds
+        });
+        
+        const countsMap = new Map<number, number>();
+        countsData?.forEach(({ action_id, material_count }) => {
+          countsMap.set(action_id, material_count);
+        });
+        setMaterialsCount(countsMap);
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -232,6 +250,21 @@ export function ProMoveList({
     return new Date(dateString).toLocaleDateString();
   };
 
+  const openLearningDrawer = (proMove: ProMove) => {
+    setSelectedProMove(proMove);
+    setLearningDrawerOpen(true);
+  };
+
+  const handleLearningDrawerClose = () => {
+    setLearningDrawerOpen(false);
+    setSelectedProMove(null);
+  };
+
+  const handleLearningDrawerSaved = () => {
+    // Refresh materials count
+    loadProMoves();
+  };
+
   if (loading) {
     return <div className="text-center py-8">Loading pro-moves...</div>;
   }
@@ -264,6 +297,12 @@ export function ProMoveList({
             <SortableTableHead sortKey="updated_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
               Updated
             </SortableTableHead>
+            <TableHead>
+              <div className="flex items-center gap-1">
+                <GraduationCap className="h-4 w-4" />
+                <span>Materials</span>
+              </div>
+            </TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -307,8 +346,26 @@ export function ProMoveList({
                 </div>
               </TableCell>
               <TableCell>{formatDate(proMove.updated_at)}</TableCell>
+              <TableCell>
+                {materialsCount.get(proMove.action_id) ? (
+                  <Badge variant="secondary" className="gap-1">
+                    <GraduationCap className="h-3 w-3" />
+                    {materialsCount.get(proMove.action_id)}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground text-sm">—</span>
+                )}
+              </TableCell>
               <TableCell className="text-right">
                 <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openLearningDrawer(proMove)}
+                    title="Learning Materials"
+                  >
+                    <GraduationCap className="w-4 h-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -374,6 +431,17 @@ export function ProMoveList({
           ))}
         </TableBody>
       </Table>
+
+      {selectedProMove && (
+        <LearningDrawer
+          actionId={selectedProMove.action_id}
+          proMoveTitle={selectedProMove.action_statement}
+          domainName={selectedProMove.domain_name}
+          open={learningDrawerOpen}
+          onOpenChange={setLearningDrawerOpen}
+          onSaved={handleLearningDrawerSaved}
+        />
+      )}
     </div>
   );
 }

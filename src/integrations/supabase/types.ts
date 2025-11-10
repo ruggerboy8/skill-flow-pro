@@ -415,7 +415,7 @@ export type Database = {
           },
         ]
       }
-      learning_resources: {
+      learning_resources_legacy: {
         Row: {
           body_md: string | null
           created_at: string
@@ -618,6 +618,56 @@ export type Database = {
       pro_move_resources: {
         Row: {
           action_id: number
+          content_md: string | null
+          created_at: string
+          display_order: number
+          id: string
+          provider: string | null
+          status: string
+          title: string | null
+          type: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          action_id: number
+          content_md?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          provider?: string | null
+          status?: string
+          title?: string | null
+          type: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          action_id?: number
+          content_md?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          provider?: string | null
+          status?: string
+          title?: string | null
+          type?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pro_move_resources_action_id_fkey1"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+        ]
+      }
+      pro_move_resources_legacy: {
+        Row: {
+          action_id: number
           resource_id: string
           sort_order: number
         }
@@ -643,7 +693,7 @@ export type Database = {
             foreignKeyName: "pro_move_resources_resource_id_fkey"
             columns: ["resource_id"]
             isOneToOne: false
-            referencedRelation: "learning_resources"
+            referencedRelation: "learning_resources_legacy"
             referencedColumns: ["id"]
           },
         ]
@@ -802,7 +852,7 @@ export type Database = {
             foreignKeyName: "resource_events_resource_id_fkey"
             columns: ["resource_id"]
             isOneToOne: false
-            referencedRelation: "learning_resources"
+            referencedRelation: "learning_resources_legacy"
             referencedColumns: ["id"]
           },
           {
@@ -1859,9 +1909,29 @@ export type Database = {
           staff_name: string
         }[]
       }
+      get_materials_count: {
+        Args: { p_action_ids: number[] }
+        Returns: {
+          action_id: number
+          material_count: number
+        }[]
+      }
       get_performance_trend: {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json
+      }
+      get_pro_move_resources: {
+        Args: { p_action_id: number }
+        Returns: {
+          content_md: string
+          display_order: number
+          id: string
+          provider: string
+          status: string
+          title: string
+          type: string
+          url: string
+        }[]
       }
       get_resource_usage_summary: {
         Args: { p_action_id: number }

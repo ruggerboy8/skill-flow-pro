@@ -26,7 +26,14 @@ const formats = [
 ];
 
 export function MarkdownPreview({ value, onChange, maxChars = 10000 }: MarkdownPreviewProps) {
-  const charCount = value.length;
+  // Strip HTML tags to get actual text length
+  const getTextLength = (html: string) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent?.length || 0;
+  };
+  
+  const charCount = getTextLength(value);
   const isNearLimit = charCount > maxChars * 0.8;
   
   return (

@@ -390,7 +390,7 @@ export function LearningDrawer({
         description: 'Link saved',
       });
 
-      emitSummary();
+      emitSummary({ links: updatedLinks.length });
     } catch (error) {
       toast({
         title: 'Error',
@@ -449,7 +449,7 @@ export function LearningDrawer({
       await Promise.all(updates);
 
       setInitialSnap(JSON.stringify({ description, videoUrl, script, links: reorderedLinks }));
-      emitSummary();
+      emitSummary({ links: reorderedLinks.length });
     } catch (error) {
       toast({
         title: 'Error',

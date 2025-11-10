@@ -681,42 +681,42 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
   return (
     <>
       <AccordionItem value={`week-${weekRow.week_of}`} className="border rounded" id={`week-${weekRow.week_of}`}>
-        <AccordionTrigger className="px-3 py-2 text-sm" onClick={onExpand}>
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-3">
-              <span className="font-medium">Week of {weekLabel}</span>
-              {isCurrentWeek && (
-                <Badge variant="outline" className="text-xs">Current Week</Badge>
-              )}
-              {generateRepairLinks()}
-            </div>
-            <div className="flex items-center gap-2">
-              <span 
-                className={`text-lg font-bold ${statusGlyph.color}`}
-                title={statusGlyph.title}
-              >
-                {statusGlyph.glyph}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {weekRow.perf_count}/{weekRow.total}
-              </span>
-              {isSuperAdmin && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeleteDialog(true);
-                  }}
-                  disabled={deleteLoading}
+        <div className="relative">
+          <AccordionTrigger className="px-3 py-2 text-sm" onClick={onExpand}>
+            <div className="flex items-center justify-between w-full pr-8">
+              <div className="flex items-center gap-3">
+                <span className="font-medium">Week of {weekLabel}</span>
+                {isCurrentWeek && (
+                  <Badge variant="outline" className="text-xs">Current Week</Badge>
+                )}
+                {generateRepairLinks()}
+              </div>
+              <div className="flex items-center gap-2">
+                <span 
+                  className={`text-lg font-bold ${statusGlyph.color}`}
+                  title={statusGlyph.title}
                 >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              )}
+                  {statusGlyph.glyph}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {weekRow.perf_count}/{weekRow.total}
+                </span>
+              </div>
             </div>
-          </div>
-        </AccordionTrigger>
+          </AccordionTrigger>
+          {isSuperAdmin && (
+            <button
+              className="absolute right-2 top-2 h-6 w-6 p-0 text-red-600 hover:text-red-800 hover:bg-red-50 rounded flex items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteDialog(true);
+              }}
+              disabled={deleteLoading}
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          )}
+        </div>
         
         <AccordionContent className="px-3 pb-3">
           {!isPrefetched ? (

@@ -126,13 +126,14 @@ export function LearningDrawer({
     }
   }
 
-  function emitSummary() {
+  function emitSummary(overrides?: { video?: boolean; script?: boolean; links?: number }) {
     const summary = {
-      video: !!videoResourceId,
-      script: !!scriptResourceId,
-      links: links.length,
-      total: (videoResourceId ? 1 : 0) + (scriptResourceId ? 1 : 0) + links.length,
+      video: overrides?.video ?? !!videoResourceId,
+      script: overrides?.script ?? !!scriptResourceId,
+      links: overrides?.links ?? links.length,
+      total: 0,
     };
+    summary.total = (summary.video ? 1 : 0) + (summary.script ? 1 : 0) + summary.links;
     onResourcesChange?.(summary);
   }
 
@@ -209,7 +210,7 @@ export function LearningDrawer({
       });
 
       setInitialSnap(JSON.stringify({ description, videoUrl: nextUrl, script, links }));
-      emitSummary();
+      emitSummary({ video: true });
     } catch (error) {
       toast({
         title: 'Error',
@@ -247,7 +248,7 @@ export function LearningDrawer({
       });
 
       setInitialSnap(JSON.stringify({ description, videoUrl: '', script, links }));
-      emitSummary();
+      emitSummary({ video: false });
     } catch (error) {
       toast({
         title: 'Error',
@@ -273,13 +274,13 @@ export function LearningDrawer({
           setScriptResourceId(undefined);
         }
         
-        toast({
-          title: 'Success',
-          description: 'Script removed',
-        });
-        setInitialSnap(JSON.stringify({ description, videoUrl, script: '', links }));
-        emitSummary();
-        return;
+      toast({
+        title: 'Success',
+        description: 'Script removed',
+      });
+      setInitialSnap(JSON.stringify({ description, videoUrl, script: '', links }));
+      emitSummary({ script: false });
+      return;
       }
 
       if (scriptResourceId) {
@@ -310,7 +311,7 @@ export function LearningDrawer({
       });
 
       setInitialSnap(JSON.stringify({ description, videoUrl, script: trimmed, links }));
-      emitSummary();
+      emitSummary({ script: true });
     } catch (error) {
       toast({
         title: 'Error',

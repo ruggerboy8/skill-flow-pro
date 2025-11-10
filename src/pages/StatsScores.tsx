@@ -320,8 +320,9 @@ export default function StatsScores() {
       const { data, error } = await supabase.rpc('get_week_detail_by_week', {
         p_staff_id: staffData!.id,
         p_role_id: staffData!.role_id,
-        p_week_of: row.week_of
-      });
+        p_week_of: row.week_of,
+        p_source: row.source
+      } as any);
 
       if (error) {
         console.error('Error loading ongoing week detail:', error);

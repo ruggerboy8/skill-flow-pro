@@ -9,12 +9,15 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { getDomainColor } from '@/lib/domainColors';
+import { format } from 'date-fns';
 
 interface Staff {
   id: string;
   role_id: number;
   locations?: {
     organization_id: string;
+    program_start_date?: string;
+    cycle_length_weeks?: number;
   };
 }
 
@@ -79,7 +82,7 @@ export default function Week() {
   const loadStaffProfile = async () => {
     const { data, error } = await supabase
       .from('staff')
-      .select('id, role_id, locations(organization_id)')
+      .select('id, role_id, locations(organization_id, program_start_date, cycle_length_weeks)')
       .eq('user_id', user!.id)
       .maybeSingle();
 
@@ -428,6 +431,19 @@ export default function Week() {
   const getScoreForFocus = (focusId: string) =>
     weeklyScores.find(score => score.weekly_focus_id === focusId);
 
+  // Calculate week start date from cycle/week
+  const getWeekLabel = () => {
+    if (!staff?.locations?.program_start_date) return `Cycle ${cycle}, Week ${weekInCycle}`;
+    
+    const cycleLength = staff.locations.cycle_length_weeks || 6;
+    const programStart = new Date(staff.locations.program_start_date);
+    const weeksFromStart = (cycle - 1) * cycleLength + (weekInCycle - 1);
+    const weekStart = new Date(programStart);
+    weekStart.setDate(programStart.getDate() + weeksFromStart * 7);
+    
+    return `Week of ${format(weekStart, 'MMM d')}`;
+  };
+
   const total = weeklyFocus.length;
   const confCount = weeklyFocus.filter(f => getScoreForFocus(f.id)?.confidence_score != null).length;
   const perfCount = weeklyFocus.filter(f => getScoreForFocus(f.id)?.performance_score != null).length;
@@ -624,7 +640,7 @@ export default function Week() {
           <CardHeader className="text-center">
             <CardTitle>No Pro Moves Set</CardTitle>
             <CardDescription>
-              No Pro Moves have been configured for Cycle {cycle}, Week {weekInCycle}
+              No Pro Moves have been configured for {getWeekLabel()}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -644,7 +660,7 @@ export default function Week() {
           <CardHeader>
             <CardTitle className="text-center">ProMoves</CardTitle>
             <CardDescription className="text-center">
-              Cycle {cycle}, Week {weekInCycle}
+              {getWeekLabel()}
             </CardDescription>
           </CardHeader>
 

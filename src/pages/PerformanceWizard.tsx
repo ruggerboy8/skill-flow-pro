@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
 import { nowUtc, getAnchors } from '@/lib/centralTime';
+import { format } from 'date-fns';
 import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
@@ -29,6 +30,10 @@ interface Assignment {
 interface Staff {
   id: string;
   role_id: number;
+  locations?: {
+    program_start_date?: string;
+    cycle_length_weeks?: number;
+  };
 }
 
 interface WeeklyFocus {
@@ -39,6 +44,7 @@ interface WeeklyFocus {
   week_in_cycle: number;
   domain_name: string;
   competency_name?: string;
+  week_label?: string;
 }
 
 interface WeeklyScore {
@@ -122,7 +128,7 @@ export default function PerformanceWizard() {
     // Load staff profile with location info
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
-      .select('id, role_id, primary_location_id')
+      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks)')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -278,15 +284,29 @@ export default function PerformanceWizard() {
     }
 
     // Build the weekly focus with actual selected pro moves
-    const transformedFocusData: WeeklyFocus[] = weekAssignments.map((assignment) => ({
-      id: assignment.weekly_focus_id,
-      display_order: assignment.display_order,
-      action_statement: assignment.action_statement || '',
-      cycle: cycleNumber,
-      week_in_cycle: weekInCycle,
-      domain_name: assignment.domain_name,
-      competency_name: undefined // Could be added to assignments if needed
-    }));
+    const cycleLength = staffData.locations?.cycle_length_weeks || 6;
+    const programStart = staffData.locations?.program_start_date ? new Date(staffData.locations.program_start_date) : null;
+    
+    const transformedFocusData: WeeklyFocus[] = weekAssignments.map((assignment) => {
+      let weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
+      if (programStart) {
+        const weeksFromStart = (cycleNumber - 1) * cycleLength + (weekInCycle - 1);
+        const weekStart = new Date(programStart);
+        weekStart.setDate(programStart.getDate() + weeksFromStart * 7);
+        weekLabel = `Week of ${format(weekStart, 'MMM d')}`;
+      }
+      
+      return {
+        id: assignment.weekly_focus_id,
+        display_order: assignment.display_order,
+        action_statement: assignment.action_statement || '',
+        cycle: cycleNumber,
+        week_in_cycle: weekInCycle,
+        domain_name: assignment.domain_name,
+        competency_name: undefined, // Could be added to assignments if needed
+        week_label: weekLabel
+      };
+    });
 
     setWeeklyFocus(transformedFocusData);
     setExistingScores(scoresData);
@@ -470,11 +490,11 @@ export default function PerformanceWizard() {
                 {currentIndex + 1} / {weeklyFocus.length}
               </Badge>
               <Badge variant="secondary" className="bg-white/80 text-gray-900">
-                Cycle {currentFocus.cycle}, Week {currentFocus.week_in_cycle}
+                {currentFocus.week_label || `Cycle ${currentFocus.cycle}, Week ${currentFocus.week_in_cycle}`}
               </Badge>
             </div>
             <CardTitle className="text-center text-gray-900">
-              {isRepair ? `Backfill Performance - Cycle ${currentFocus.cycle}, Week ${currentFocus.week_in_cycle}` : 'Rate Your Performance'}
+              {isRepair ? `Backfill Performance - ${currentFocus.week_label || `Cycle ${currentFocus.cycle}, Week ${currentFocus.week_in_cycle}`}` : 'Rate Your Performance'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 p-3 sm:p-6">

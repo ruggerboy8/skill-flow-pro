@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { format } from 'date-fns';
 import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
@@ -22,6 +23,10 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 interface Staff {
   id: string;
   role_id: number;
+  locations?: {
+    program_start_date?: string;
+    cycle_length_weeks?: number;
+  };
 }
 
 interface WeeklyFocus {
@@ -31,6 +36,7 @@ interface WeeklyFocus {
   cycle: number;
   week_in_cycle: number;
   domain_name: string;
+  week_label?: string;
 }
 
 export default function ConfidenceWizard() {
@@ -117,7 +123,7 @@ export default function ConfidenceWizard() {
     // Load staff profile with location info
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
-      .select('id, role_id, primary_location_id')
+      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks)')
       .eq('user_id', user.id)
       .single();
 
@@ -227,14 +233,28 @@ export default function ConfidenceWizard() {
     }
 
     // Transform assignments to WeeklyFocus format with correct cycle info
-    const transformedFocusData: WeeklyFocus[] = assignments.map((assignment) => ({
-      id: assignment.weekly_focus_id,
-      display_order: assignment.display_order,
-      action_statement: assignment.action_statement || '',
-      cycle: cycleNumber || 1,
-      week_in_cycle: weekInCycle || 1,
-      domain_name: assignment.domain_name
-    }));
+    const cycleLength = staffData.locations?.cycle_length_weeks || 6;
+    const programStart = staffData.locations?.program_start_date ? new Date(staffData.locations.program_start_date) : null;
+    
+    const transformedFocusData: WeeklyFocus[] = assignments.map((assignment) => {
+      let weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
+      if (programStart && cycleNumber && weekInCycle) {
+        const weeksFromStart = (cycleNumber - 1) * cycleLength + (weekInCycle - 1);
+        const weekStart = new Date(programStart);
+        weekStart.setDate(programStart.getDate() + weeksFromStart * 7);
+        weekLabel = `Week of ${format(weekStart, 'MMM d')}`;
+      }
+      
+      return {
+        id: assignment.weekly_focus_id,
+        display_order: assignment.display_order,
+        action_statement: assignment.action_statement || '',
+        cycle: cycleNumber || 1,
+        week_in_cycle: weekInCycle || 1,
+        domain_name: assignment.domain_name,
+        week_label: weekLabel
+      };
+    });
 
     setWeeklyFocus(transformedFocusData);
 
@@ -541,7 +561,7 @@ export default function ConfidenceWizard() {
               </Badge>
             </div>
             <CardTitle className="text-center text-gray-900">
-              {isRepair ? `Backfill Confidence - Cycle ${currentFocus.cycle}, Week ${currentFocus.week_in_cycle}` : 'Rate Your Confidence'}
+              {isRepair ? `Backfill Confidence - ${currentFocus.week_label || `Cycle ${currentFocus.cycle}, Week ${currentFocus.week_in_cycle}`}` : 'Rate Your Confidence'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 p-3 sm:p-6">

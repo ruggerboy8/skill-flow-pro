@@ -415,6 +415,73 @@ export type Database = {
           },
         ]
       }
+      learning_resources: {
+        Row: {
+          body_md: string | null
+          created_at: string
+          id: string
+          is_primary: boolean
+          org_id: string | null
+          role_id: number | null
+          status: string
+          tags: string[] | null
+          title: string
+          type: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          body_md?: string | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          org_id?: string | null
+          role_id?: number | null
+          status?: string
+          tags?: string[] | null
+          title: string
+          type: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          body_md?: string | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          org_id?: string | null
+          role_id?: number | null
+          status?: string
+          tags?: string[] | null
+          title?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_resources_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learning_resources_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "learning_resources_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["role_id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           active: boolean | null
@@ -548,6 +615,39 @@ export type Database = {
         }
         Relationships: []
       }
+      pro_move_resources: {
+        Row: {
+          action_id: number
+          resource_id: string
+          sort_order: number
+        }
+        Insert: {
+          action_id: number
+          resource_id: string
+          sort_order?: number
+        }
+        Update: {
+          action_id?: number
+          resource_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pro_move_resources_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "pro_move_resources_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "learning_resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pro_moves: {
         Row: {
           action_id: number
@@ -671,6 +771,55 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      resource_events: {
+        Row: {
+          action_id: number
+          created_at: string
+          event_type: string
+          id: number
+          resource_id: string
+          staff_id: string
+        }
+        Insert: {
+          action_id: number
+          created_at?: string
+          event_type: string
+          id?: number
+          resource_id: string
+          staff_id: string
+        }
+        Update: {
+          action_id?: number
+          created_at?: string
+          event_type?: string
+          id?: number
+          resource_id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_events_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "learning_resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_events_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_events_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
       }
       roles: {
         Row: {
@@ -1713,6 +1862,30 @@ export type Database = {
       get_performance_trend: {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json
+      }
+      get_resource_usage_summary: {
+        Args: { p_action_id: number }
+        Returns: {
+          last_30d_opens: number
+          lifetime_opens: number
+          resource_id: string
+          title: string
+          type: string
+          video_90_completions: number
+        }[]
+      }
+      get_resources_for_actions: {
+        Args: { p_action_ids: number[]; p_org_id: string; p_role_id: number }
+        Returns: {
+          action_id: number
+          body_md: string
+          is_primary: boolean
+          resource_id: string
+          sort_order: number
+          title: string
+          type: string
+          url: string
+        }[]
       }
       get_staff_domain_avgs: {
         Args: {

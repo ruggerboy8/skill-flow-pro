@@ -1613,6 +1613,7 @@ export type Database = {
         Returns: {
           conf_count: number
           cycle: number
+          is_current_week: boolean
           perf_count: number
           source: string
           total: number

@@ -206,7 +206,7 @@ export default function StatsScores() {
           pro_moves(action_statement, competency_id)
         `)
         .eq('user_id', user?.id)
-        .in('weekly_focus_id', (focus ?? []).map((f: any) => f.id));
+        .in('weekly_focus_id', (focus ?? []).map((f: any) => String(f.id)));
 
       const selectionsMap: Record<string, any> = {};
       (userSelections ?? []).forEach((sel: any) => {
@@ -251,7 +251,7 @@ export default function StatsScores() {
           .from('weekly_scores')
           .select('weekly_focus_id, confidence_score, performance_score')
           .eq('staff_id', staffData.id)
-          .in('weekly_focus_id', focusIds);
+          .in('weekly_focus_id', focusIds.map(String));
         (scores ?? []).forEach((s: any) => {
           scoreMap[s.weekly_focus_id] = {
             confidence_score: s.confidence_score,

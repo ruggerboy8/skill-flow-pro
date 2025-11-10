@@ -123,6 +123,9 @@ export default function ThisWeekPanel() {
       const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);
       console.log('Progress-based assignments:', assignments);
       console.log('Progress-based week:', { cycleNumber, weekInCycle });
+      console.log('Program start date from location:', staffData.primary_location_id);
+      console.log('Effective now for calculation:', effectiveNow);
+      console.log('Expected: Cycle 4 Week 2, Got:', `Cycle ${cycleNumber} Week ${weekInCycle}`);
       setWeekAssignments(assignments);
 
       // Get location-specific time anchors for state computation
@@ -259,13 +262,6 @@ export default function ThisWeekPanel() {
       <CardHeader className="pb-2">
         <CardTitle>This Week's Pro Moves</CardTitle>
         <CardDescription>Week of {weekOfDate}</CardDescription>
-        {locationWeekContext && (
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline" className="text-xs">
-              Cycle {locationWeekContext.cycleNumber}, Week {locationWeekContext.weekInCycle}
-            </Badge>
-          </div>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Pro Moves list */}

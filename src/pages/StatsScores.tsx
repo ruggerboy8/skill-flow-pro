@@ -777,52 +777,28 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
                   >
                     {item.domain_name}
                   </Badge>
+                  
+                  {/* Learn Button - positioned after domain */}
+                  {item.resource_count > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1.5"
+                      onClick={() => {
+                        setSelectedLearnItem(item);
+                        setLearnDrawerOpen(true);
+                      }}
+                      aria-label={`Learn: ${item.action_statement}`}
+                    >
+                      <GraduationCap className="h-3 w-3" />
+                      <span className="text-xs">Learn</span>
+                    </Button>
+                  )}
+                  
                   <span className="flex-1 text-sm">
                     {item.action_statement}
                   </span>
                   <ConfPerfDelta confidence={item.confidence_score} performance={item.performance_score} />
-                  
-                  {/* Learn Button */}
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 gap-1.5"
-                          disabled={!item.action_id || item.resource_count === 0}
-                          onClick={() => {
-                            if (item.action_id && item.resource_count > 0) {
-                              setSelectedLearnItem(item);
-                              setLearnDrawerOpen(true);
-                            } else if (item.is_self_select && !item.action_id) {
-                              toast({
-                                title: 'No pro-move selected',
-                                description: 'Please select a pro-move for this slot first.',
-                                variant: 'default',
-                              });
-                            }
-                          }}
-                          aria-label={`Learn: ${item.action_statement}`}
-                        >
-                          <GraduationCap className="h-3.5 w-3.5" />
-                          <span className="text-xs">Learn</span>
-                          {item.resource_count > 0 && (
-                            <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center text-[10px] ml-0.5">
-                              {item.resource_count}
-                            </Badge>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {!item.action_id && item.is_self_select
-                          ? 'Choose a pro-move first'
-                          : item.resource_count === 0
-                          ? 'No learning materials yet'
-                          : `${item.resource_count} learning resource${item.resource_count > 1 ? 's' : ''}`}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
                 </div>
               ))}
             </div>

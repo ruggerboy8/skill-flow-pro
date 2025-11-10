@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -298,11 +298,30 @@ export default function ThisWeekPanel() {
 
             return (
               <div key={assignment.weekly_focus_id} className="rounded-lg p-4 border" style={bgColor ? { backgroundColor: `hsl(${bgColor})` } : undefined}>
-                {domainName && (
-                  <Badge variant="secondary" className="text-xs font-semibold mb-2 bg-white/80 text-gray-900" aria-label={`Domain: ${domainName}`}> 
-                    {domainName}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2 mb-2">
+                  {domainName && (
+                    <Badge variant="secondary" className="text-xs font-semibold bg-white/80 text-gray-900" aria-label={`Domain: ${domainName}`}> 
+                      {domainName}
+                    </Badge>
+                  )}
+                  
+                  {/* Learn Button - positioned after domain */}
+                  {resourceCount > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 gap-1.5 bg-white/80"
+                      onClick={() => {
+                        setSelectedLearnAssignment(assignment);
+                        setLearnDrawerOpen(true);
+                      }}
+                      aria-label={`Learn: ${assignment.action_statement}`}
+                    >
+                      <GraduationCap className="h-3 w-3" />
+                      <span className="text-xs">Learn</span>
+                    </Button>
+                  )}
+                </div>
 
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-2 flex-1">
@@ -315,48 +334,6 @@ export default function ThisWeekPanel() {
                       confidence={scores?.confidence_score} 
                       performance={scores?.performance_score} 
                     />
-                    
-                    {/* Learn Button */}
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 gap-1.5"
-                            disabled={!assignment.pro_move_id || resourceCount === 0}
-                            onClick={() => {
-                              if (assignment.pro_move_id && resourceCount > 0) {
-                                setSelectedLearnAssignment(assignment);
-                                setLearnDrawerOpen(true);
-                              } else if (isUnchosen) {
-                                toast({
-                                  title: 'No pro-move selected',
-                                  description: 'Please select a pro-move for this slot first.',
-                                  variant: 'default',
-                                });
-                              }
-                            }}
-                            aria-label={`Learn: ${assignment.action_statement}`}
-                          >
-                            <GraduationCap className="h-3.5 w-3.5" />
-                            <span className="text-xs">Learn</span>
-                            {resourceCount > 0 && (
-                              <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center text-[10px] ml-0.5">
-                                {resourceCount}
-                              </Badge>
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {isUnchosen
-                            ? 'Choose a pro-move first'
-                            : resourceCount === 0
-                            ? 'No learning materials yet'
-                            : `${resourceCount} learning resource${resourceCount > 1 ? 's' : ''}`}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
                   </div>
                 </div>
               </div>

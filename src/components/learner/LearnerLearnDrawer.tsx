@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { getDomainColor } from '@/lib/domainColors';
 import { extractYouTubeId } from '@/lib/youtubeHelpers';
-import ReactMarkdown from 'react-markdown';
+
 
 interface LearnerLearnDrawerProps {
   open: boolean;
@@ -167,9 +167,10 @@ export function LearnerLearnDrawer({
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <h3 className="font-medium">Script</h3>
                   </div>
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <ReactMarkdown>{scriptResource.content_md}</ReactMarkdown>
-                  </div>
+                  <div 
+                    className="prose prose-sm max-w-none dark:prose-invert"
+                    dangerouslySetInnerHTML={{ __html: scriptResource.content_md }}
+                  />
                 </section>
               </>
             )}
@@ -185,23 +186,28 @@ export function LearnerLearnDrawer({
                   </div>
                   <div className="space-y-2">
                     {linkResources.map((link) => (
-                      <a
+                      <Button
                         key={link.id}
-                        href={link.url || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                        variant="outline"
+                        className="w-full justify-start p-3 h-auto"
+                        asChild
                       >
-                        <div className="flex items-center gap-2">
-                          <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <div className="min-w-0">
-                            {link.title && (
-                              <p className="font-medium text-sm truncate">{link.title}</p>
-                            )}
-                            <p className="text-xs text-muted-foreground truncate">{link.url}</p>
+                        <a
+                          href={link.url || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <div className="flex items-center gap-2 w-full">
+                            <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <div className="min-w-0 text-left">
+                              {link.title && (
+                                <p className="font-medium text-sm truncate">{link.title}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground truncate">{link.url}</p>
+                            </div>
                           </div>
-                        </div>
-                      </a>
+                        </a>
+                      </Button>
                     ))}
                   </div>
                 </section>

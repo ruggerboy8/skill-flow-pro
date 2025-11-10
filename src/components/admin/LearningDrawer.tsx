@@ -21,7 +21,7 @@ interface LearningDrawerProps {
   domainName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSaved?: () => void;
+  onResourcesChange?: (summary: { video: boolean; script: boolean; links: number; total: number }) => void;
 }
 
 interface LinkResource {
@@ -37,9 +37,10 @@ export function LearningDrawer({
   domainName,
   open,
   onOpenChange,
-  onSaved,
+  onResourcesChange,
 }: LearningDrawerProps) {
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [description, setDescription] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [videoId, setVideoId] = useState<string | null>(null);
@@ -50,6 +51,7 @@ export function LearningDrawer({
   const [editingLink, setEditingLink] = useState<LinkResource | null>(null);
   const [showLinkEditor, setShowLinkEditor] = useState(false);
   const [videoError, setVideoError] = useState<string>();
+  const [initialSnap, setInitialSnap] = useState<string>('');
 
   useEffect(() => {
     if (!open || !actionId) return;
@@ -81,23 +83,37 @@ export function LearningDrawer({
         setVideoUrl(video.url || '');
         setVideoId(extractYouTubeId(video.url || ''));
         setVideoResourceId(video.id);
+      } else {
+        setVideoUrl('');
+        setVideoId(null);
+        setVideoResourceId(undefined);
       }
 
       const scriptRes = resources?.find((r) => r.type === 'script');
       if (scriptRes) {
         setScript(scriptRes.content_md || '');
         setScriptResourceId(scriptRes.id);
+      } else {
+        setScript('');
+        setScriptResourceId(undefined);
       }
 
       const linkResources = resources?.filter((r) => r.type === 'link') || [];
-      setLinks(
-        linkResources.map((r) => ({
-          id: r.id,
-          url: r.url || '',
-          title: r.title || undefined,
-          display_order: r.display_order,
-        }))
-      );
+      const linksData = linkResources.map((r) => ({
+        id: r.id,
+        url: r.url || '',
+        title: r.title || undefined,
+        display_order: r.display_order,
+      }));
+      setLinks(linksData);
+
+      // Set initial snapshot for dirty tracking
+      setInitialSnap(JSON.stringify({
+        description: pm?.description || '',
+        videoUrl: video?.url || '',
+        script: scriptRes?.content_md || '',
+        links: linksData,
+      }));
     } catch (error) {
       console.error('Error loading learning resources:', error);
       toast({
@@ -110,7 +126,20 @@ export function LearningDrawer({
     }
   }
 
+  function emitSummary() {
+    const summary = {
+      video: !!videoResourceId,
+      script: !!scriptResourceId,
+      links: links.length,
+      total: (videoResourceId ? 1 : 0) + (scriptResourceId ? 1 : 0) + links.length,
+    };
+    onResourcesChange?.(summary);
+  }
+
+  const isDirty = initialSnap !== JSON.stringify({ description, videoUrl, script, links });
+
   async function saveDescription() {
+    setIsSaving(true);
     try {
       await supabase
         .from('pro_moves')
@@ -121,60 +150,86 @@ export function LearningDrawer({
         title: 'Success',
         description: 'Description saved',
       });
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links }));
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to save description',
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   }
 
-  async function saveVideo() {
+  async function saveVideo(nextUrl: string) {
     setVideoError(undefined);
+    setIsSaving(true);
     
-    if (!videoUrl.trim()) {
-      // Delete video if URL is empty
-      if (videoResourceId) {
-        try {
-          await supabase
-            .from('pro_move_resources')
-            .delete()
-            .eq('id', videoResourceId);
-          
-          setVideoResourceId(undefined);
-          setVideoId(null);
-          
-          toast({
-            title: 'Success',
-            description: 'Video removed',
-          });
-        } catch (error) {
-          toast({
-            title: 'Error',
-            description: 'Failed to remove video',
-            variant: 'destructive',
-          });
-        }
-      }
-      return;
-    }
-
-    const extractedId = extractYouTubeId(videoUrl);
-    if (!extractedId) {
-      setVideoError('Invalid YouTube URL. Please use a valid YouTube link.');
-      return;
-    }
-
     try {
-      // Delete existing video first
+      if (!nextUrl.trim()) {
+        await removeVideo();
+        return;
+      }
+
+      const extractedId = extractYouTubeId(nextUrl);
+      if (!extractedId) {
+        setVideoError('Invalid YouTube URL. Please use a valid YouTube link.');
+        return;
+      }
+
+      if (videoResourceId) {
+        // Update existing
+        await supabase
+          .from('pro_move_resources')
+          .update({ url: nextUrl, provider: 'youtube' })
+          .eq('id', videoResourceId);
+      } else {
+        // Insert new
+        const { data } = await supabase
+          .from('pro_move_resources')
+          .insert({
+            action_id: actionId,
+            type: 'video',
+            provider: 'youtube',
+            url: nextUrl,
+            display_order: 0,
+          })
+          .select()
+          .single();
+        setVideoResourceId(data?.id);
+      }
+
+      setVideoUrl(nextUrl);
+      setVideoId(extractedId);
+
+      toast({
+        title: 'Success',
+        description: 'Video saved',
+      });
+
+      setInitialSnap(JSON.stringify({ description, videoUrl: nextUrl, script, links }));
+      emitSummary();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save video',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function removeVideo() {
+    setIsSaving(true);
+    try {
       if (videoResourceId) {
         await supabase
           .from('pro_move_resources')
           .delete()
           .eq('id', videoResourceId);
       } else {
-        // Delete any other video for this action (safety)
         await supabase
           .from('pro_move_resources')
           .delete()
@@ -182,47 +237,39 @@ export function LearningDrawer({
           .eq('type', 'video');
       }
 
-      // Insert new video
-      const { data } = await supabase
-        .from('pro_move_resources')
-        .insert({
-          action_id: actionId,
-          type: 'video',
-          provider: 'youtube',
-          url: videoUrl,
-          display_order: 0,
-        })
-        .select()
-        .single();
-
-      setVideoId(extractedId);
-      setVideoResourceId(data?.id);
+      setVideoResourceId(undefined);
+      setVideoUrl('');
+      setVideoId(null);
 
       toast({
         title: 'Success',
-        description: 'Video saved',
+        description: 'Video removed',
       });
-      
-      onSaved?.();
+
+      setInitialSnap(JSON.stringify({ description, videoUrl: '', script, links }));
+      emitSummary();
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to save video',
+        description: 'Failed to remove video',
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   }
 
   async function saveScript() {
+    setIsSaving(true);
     try {
-      if (!script.trim()) {
-        // Delete script if empty
+      const trimmed = script.trim();
+      
+      if (!trimmed) {
         if (scriptResourceId) {
           await supabase
             .from('pro_move_resources')
             .delete()
             .eq('id', scriptResourceId);
-          
           setScriptResourceId(undefined);
         }
         
@@ -230,6 +277,8 @@ export function LearningDrawer({
           title: 'Success',
           description: 'Script removed',
         });
+        setInitialSnap(JSON.stringify({ description, videoUrl, script: '', links }));
+        emitSummary();
         return;
       }
 
@@ -237,7 +286,7 @@ export function LearningDrawer({
         // Update existing
         await supabase
           .from('pro_move_resources')
-          .update({ content_md: script })
+          .update({ content_md: trimmed })
           .eq('id', scriptResourceId);
       } else {
         // Insert new
@@ -246,7 +295,7 @@ export function LearningDrawer({
           .insert({
             action_id: actionId,
             type: 'script',
-            content_md: script,
+            content_md: trimmed,
             display_order: 1,
           })
           .select()
@@ -259,14 +308,17 @@ export function LearningDrawer({
         title: 'Success',
         description: 'Script saved',
       });
-      
-      onSaved?.();
+
+      setInitialSnap(JSON.stringify({ description, videoUrl, script: trimmed, links }));
+      emitSummary();
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to save script',
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -281,6 +333,7 @@ export function LearningDrawer({
   }
 
   async function handleSaveLink(link: { id?: string; url: string; title?: string }) {
+    setIsSaving(true);
     try {
       if (link.id) {
         // Update existing
@@ -321,20 +374,23 @@ export function LearningDrawer({
         title: 'Success',
         description: 'Link saved',
       });
-      
-      onSaved?.();
+
+      emitSummary();
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to save link',
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   }
 
   async function handleDeleteLink(link: LinkResource) {
     if (!link.id) return;
 
+    setIsSaving(true);
     try {
       await supabase
         .from('pro_move_resources')
@@ -347,20 +403,23 @@ export function LearningDrawer({
         title: 'Success',
         description: 'Link deleted',
       });
-      
-      onSaved?.();
+
+      emitSummary();
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to delete link',
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   }
 
   async function handleReorderLinks(reorderedLinks: LinkResource[]) {
     setLinks(reorderedLinks);
 
+    setIsSaving(true);
     try {
       // Update display_order for all links
       const updates = reorderedLinks.map((link, index) => 
@@ -371,19 +430,32 @@ export function LearningDrawer({
       );
 
       await Promise.all(updates);
-      
-      onSaved?.();
+
+      emitSummary();
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to reorder links',
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet 
+      open={open} 
+      onOpenChange={(next) => {
+        if (!next) {
+          if (isSaving) return;
+          if (isDirty) {
+            if (!window.confirm('Discard unsaved changes?')) return;
+          }
+        }
+        onOpenChange(next);
+      }}
+    >
       <SheetContent className="sm:max-w-[600px] overflow-y-auto">
         <SheetHeader>
           <div className="flex items-center gap-2">
@@ -443,18 +515,16 @@ export function LearningDrawer({
               {videoId && <YouTubePreview videoId={videoId} />}
 
               <div className="flex gap-2">
-                <Button type="button" onClick={saveVideo} size="sm">
+                <Button type="button" onClick={() => saveVideo(videoUrl)} size="sm" disabled={isSaving}>
                   Save Video
                 </Button>
                 {videoResourceId && (
                   <Button
                     type="button"
-                    onClick={() => {
-                      setVideoUrl('');
-                      saveVideo();
-                    }}
+                    onClick={removeVideo}
                     variant="outline"
                     size="sm"
+                    disabled={isSaving}
                   >
                     <Trash2 className="h-4 w-4 mr-1" />
                     Remove
@@ -475,7 +545,7 @@ export function LearningDrawer({
               <MarkdownPreview value={script} onChange={setScript} />
 
               <div className="flex gap-2">
-                <Button type="button" onClick={saveScript} size="sm">
+                <Button type="button" onClick={saveScript} size="sm" disabled={isSaving}>
                   Save Script
                 </Button>
                 {scriptResourceId && script && (
@@ -483,29 +553,11 @@ export function LearningDrawer({
                     type="button"
                     onClick={async () => {
                       setScript('');
-                      // Delete script resource
-                      try {
-                        await supabase
-                          .from('pro_move_resources')
-                          .delete()
-                          .eq('id', scriptResourceId);
-                        
-                        setScriptResourceId(undefined);
-                        
-                        toast({
-                          title: 'Success',
-                          description: 'Script cleared',
-                        });
-                      } catch (error) {
-                        toast({
-                          title: 'Error',
-                          description: 'Failed to clear script',
-                          variant: 'destructive',
-                        });
-                      }
+                      await saveScript();
                     }}
                     variant="outline"
                     size="sm"
+                    disabled={isSaving}
                   >
                     <Trash2 className="h-4 w-4 mr-1" />
                     Clear

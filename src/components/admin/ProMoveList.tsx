@@ -260,9 +260,13 @@ export function ProMoveList({
     setSelectedProMove(null);
   };
 
-  const handleLearningDrawerSaved = () => {
-    // Refresh materials count
-    loadProMoves();
+  const handleResourcesChange = (actionId: number, summary: { video: boolean; script: boolean; links: number; total: number }) => {
+    // Update materials count for this specific action without reloading the list
+    setMaterialsCount((prev) => {
+      const updated = new Map(prev);
+      updated.set(actionId, summary.total);
+      return updated;
+    });
   };
 
   if (loading) {
@@ -439,7 +443,7 @@ export function ProMoveList({
           domainName={selectedProMove.domain_name}
           open={learningDrawerOpen}
           onOpenChange={setLearningDrawerOpen}
-          onSaved={handleLearningDrawerSaved}
+          onResourcesChange={(summary) => handleResourcesChange(selectedProMove.action_id, summary)}
         />
       )}
     </div>

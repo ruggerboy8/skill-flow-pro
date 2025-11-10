@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,12 +29,10 @@ interface WeekStatusRow {
   cycle: number | null;
   week_in_cycle: number | null;
   source: 'onboarding' | 'ongoing';
-  is_current_week: boolean;
 }
 
 interface MonthData {
   monthLabel: string;
-  monthKey: string;
   weeks: WeekStatusRow[];
   loadedWeekData: Map<string, WeekData[]>;
 }
@@ -63,13 +60,6 @@ export default function StatsScores() {
   const [currentWeekOf, setCurrentWeekOf] = useState<string | null>(null);
   const [currentCycle, setCurrentCycle] = useState<number | null>(null);
   const [currentWeek, setCurrentWeek] = useState<number | null>(null);
-  
-  // Controlled accordion state
-  const [openYears, setOpenYears] = useState<string[]>([]);
-  const [openMonths, setOpenMonths] = useState<string[]>([]);
-  const [openWeeks, setOpenWeeks] = useState<string[]>([]);
-  const [prefetchedWeeks, setPrefetchedWeeks] = useState<Set<string>>(new Set());
-  
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -142,44 +132,37 @@ export default function StatsScores() {
         return;
       }
 
-      // Find current week from server data
-      const currentWeekRow = rows.find(r => r.is_current_week);
-      const currentMonday = currentWeekRow?.week_of || mondayOf(new Date()).toISOString().split('T')[0];
+      // Compute current Monday
+      const currentMonday = mondayOf(new Date()).toISOString().split('T')[0];
       setCurrentWeekOf(currentMonday);
 
-      // Build stable structure: Year → Month (with monthKey for sorting)
-      const yearMap = new Map<number, Map<string, { label: string; firstOfMonth: Date; weeks: WeekStatusRow[] }>>();
+      // Group by Year → Month
+      const yearMap = new Map<number, Map<string, WeekStatusRow[]>>();
       
       rows.forEach(row => {
-        const d = new Date(row.week_of);
-        const y = d.getFullYear();
-        const monthKey = `${y}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const firstOfMonth = new Date(y, d.getMonth(), 1);
+        const weekDate = new Date(row.week_of);
+        const year = weekDate.getFullYear();
+        const monthLabel = weekDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-        if (!yearMap.has(y)) yearMap.set(y, new Map());
-        const m = yearMap.get(y)!;
-        if (!m.has(monthKey)) {
-          m.set(monthKey, {
-            label: firstOfMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
-            firstOfMonth,
-            weeks: []
-          });
+        if (!yearMap.has(year)) {
+          yearMap.set(year, new Map());
         }
-        m.get(monthKey)!.weeks.push(row);
+        const monthMap = yearMap.get(year)!;
+        if (!monthMap.has(monthLabel)) {
+          monthMap.set(monthLabel, []);
+        }
+        monthMap.get(monthLabel)!.push(row);
       });
 
-      // Convert maps → arrays with stable sorting
-      const yearData: YearData[] = [...yearMap.entries()]
+      // Convert to YearData structure
+      const yearData: YearData[] = Array.from(yearMap.entries())
         .map(([year, monthMap]) => ({
           year,
-          months: [...monthMap.entries()]
-            .map(([key, { label, weeks }]) => ({
-              monthLabel: label,
-              monthKey: key,
-              weeks: weeks.sort((a, b) => new Date(b.week_of).getTime() - new Date(a.week_of).getTime()),
-              loadedWeekData: new Map<string, WeekData[]>()
-            }))
-            .sort((a, b) => b.monthKey.localeCompare(a.monthKey)) // YYYY-MM desc
+          months: Array.from(monthMap.entries()).map(([monthLabel, weeks]) => ({
+            monthLabel,
+            weeks: weeks.sort((a, b) => new Date(b.week_of).getTime() - new Date(a.week_of).getTime()),
+            loadedWeekData: new Map()
+          }))
         }))
         .sort((a, b) => b.year - a.year);
 
@@ -188,25 +171,6 @@ export default function StatsScores() {
       // Auto-select most recent year
       if (yearData.length > 0) {
         setSelectedYear(yearData[0].year);
-      }
-
-      // Set default-open accordions for current week
-      if (currentWeekRow) {
-        const d = new Date(currentWeekRow.week_of);
-        const yKey = `year-${d.getFullYear()}`;
-        const mKey = `month-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const wKey = `week-${currentWeekRow.week_of}`;
-
-        setOpenYears([yKey]);
-        setOpenMonths([mKey]);
-        setOpenWeeks([wKey]);
-
-        // Prefetch current week data
-        const yIdx = yearData.findIndex(y => y.year === d.getFullYear());
-        const mIdx = yIdx >= 0 ? yearData[yIdx].months.findIndex(m => m.monthKey === mKey.replace('month-', '')) : -1;
-        if (yIdx >= 0 && mIdx >= 0) {
-          onWeekExpand(d.getFullYear(), yearData[yIdx].months[mIdx].monthKey, currentWeekRow, true);
-        }
       }
     } catch (error) {
       console.error('Error loading calendar data:', error);
@@ -347,10 +311,7 @@ export default function StatsScores() {
     }
   };
 
-  const onWeekExpand = async (yearValue: number, monthKey: string, row: WeekStatusRow, isPrefetch = false) => {
-    // Avoid redundant fetches
-    if (prefetchedWeeks.has(row.week_of)) return;
-
+  const onWeekExpand = async (yearIndex: number, monthIndex: number, row: WeekStatusRow) => {
     let weekData: WeekData[];
 
     if (row.source === 'onboarding' && row.cycle && row.week_in_cycle) {
@@ -371,24 +332,9 @@ export default function StatsScores() {
       }
     }
 
-    setPrefetchedWeeks(prev => new Set(prev).add(row.week_of));
-
     setYears(prev => {
-      const updated = prev.map(y => ({ 
-        ...y, 
-        months: y.months.map(m => ({ 
-          ...m, 
-          loadedWeekData: new Map(m.loadedWeekData) 
-        })) 
-      }));
-      
-      const yIdx = updated.findIndex(y => y.year === yearValue);
-      const mIdx = yIdx >= 0 ? updated[yIdx].months.findIndex(m => m.monthKey === monthKey) : -1;
-
-      if (yIdx >= 0 && mIdx >= 0) {
-        updated[yIdx].months[mIdx].loadedWeekData.set(row.week_of, weekData);
-      }
-
+      const updated = [...prev];
+      updated[yearIndex].months[monthIndex].loadedWeekData.set(row.week_of, weekData);
       return updated;
     });
   };
@@ -413,47 +359,15 @@ export default function StatsScores() {
 
   const filteredYears = selectedYear ? years.filter(y => y.year === selectedYear) : years;
 
-  const jumpToCurrentWeek = () => {
-    if (!currentWeekOf) return;
-    
-    const d = new Date(currentWeekOf);
-    const yKey = `year-${d.getFullYear()}`;
-    const mKey = `month-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const wKey = `week-${currentWeekOf}`;
-
-    setOpenYears([yKey]);
-    setOpenMonths([mKey]);
-    setOpenWeeks([wKey]);
-
-    setTimeout(() => {
-      const element = document.getElementById(wKey);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 100);
-  };
-
   return (
     <div className="space-y-4 max-w-full overflow-x-hidden">
-      {/* Status Legend & Jump Button */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center justify-center bg-muted/30 p-3 rounded-lg flex-1">
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span title="All done">✓ all done</span>
-            <span title="In progress">● in progress</span>
-            <span title="Not started">— not started</span>
-          </div>
+      {/* Status Legend */}
+      <div className="flex items-center justify-center bg-muted/30 p-3 rounded-lg">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span>✓ all done</span>
+          <span>● in progress / late</span>
+          <span>— not started</span>
         </div>
-        {currentWeekOf && (
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={jumpToCurrentWeek}
-            className="shrink-0"
-          >
-            Jump to Current Week
-          </Button>
-        )}
       </div>
       
       {/* Year Selector */}
@@ -473,31 +387,30 @@ export default function StatsScores() {
       )}
       
       {/* Year → Month → Week Accordion */}
-      <Accordion type="multiple" value={openYears} onValueChange={setOpenYears} className="space-y-4">
-        {filteredYears.map((yearData) => (
+      <Accordion type="multiple" className="space-y-4">
+        {filteredYears.map((yearData, yearIndex) => (
           <AccordionItem key={yearData.year} value={`year-${yearData.year}`} className="border rounded-lg">
             <AccordionTrigger className="px-4">
               <h3 className="text-lg font-semibold">{yearData.year}</h3>
             </AccordionTrigger>
             
             <AccordionContent className="px-4 pb-4">
-              <Accordion type="multiple" value={openMonths} onValueChange={setOpenMonths} className="space-y-2">
-                {yearData.months.map((monthData) => (
-                  <AccordionItem key={monthData.monthKey} value={`month-${monthData.monthKey}`} className="border rounded">
+              <Accordion type="multiple" className="space-y-2">
+                {yearData.months.map((monthData, monthIndex) => (
+                  <AccordionItem key={monthData.monthLabel} value={`month-${monthData.monthLabel}`} className="border rounded">
                     <AccordionTrigger className="px-3 py-2">
                       <span className="font-medium">{monthData.monthLabel}</span>
                     </AccordionTrigger>
                     
                     <AccordionContent className="px-3 pb-3">
-                      <Accordion type="multiple" value={openWeeks} onValueChange={setOpenWeeks} className="space-y-2">
+                      <Accordion type="multiple" className="space-y-2">
                         {monthData.weeks.map(weekRow => (
                           <WeekAccordion
                             key={weekRow.week_of}
                             weekRow={weekRow}
                             staffData={staffData}
-                            onExpand={() => onWeekExpand(yearData.year, monthData.monthKey, weekRow)}
-                            weekData={monthData.loadedWeekData.get(weekRow.week_of)}
-                            isPrefetched={prefetchedWeeks.has(weekRow.week_of)}
+                            onExpand={() => onWeekExpand(yearIndex, monthIndex, weekRow)}
+                            weekData={monthData.loadedWeekData.get(weekRow.week_of) || []}
                             onWeekDeleted={() => loadCalendarData()}
                             currentWeekOf={currentWeekOf}
                             currentCycle={currentCycle}
@@ -522,8 +435,7 @@ interface WeekAccordionProps {
   weekRow: WeekStatusRow;
   staffData: { id: string; role_id: number } | null;
   onExpand: () => void;
-  weekData: WeekData[] | undefined;
-  isPrefetched: boolean;
+  weekData: WeekData[];
   onWeekDeleted: () => void;
   currentWeekOf: string | null;
   currentCycle: number | null;
@@ -531,7 +443,7 @@ interface WeekAccordionProps {
   location: any;
 }
 
-function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, onWeekDeleted, currentWeekOf, currentCycle, currentWeek, location }: WeekAccordionProps) {
+function WeekAccordion({ weekRow, staffData, onExpand, weekData, onWeekDeleted, currentWeekOf, currentCycle, currentWeek, location }: WeekAccordionProps) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -610,7 +522,7 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
     day: 'numeric' 
   });
 
-  const isCurrentWeek = weekRow.is_current_week;
+  const isCurrentWeek = weekRow.week_of === currentWeekOf;
 
   const isPastWeek = () => {
     if (currentCycle == null || currentWeek == null) return false;
@@ -656,15 +568,14 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
     );
   };
 
-  const getStatusGlyph = () => {
+  const getStatusBadge = () => {
     const { total, conf_count, perf_count } = weekRow;
-    if (total === 0) return { glyph: '—', title: 'No data', color: 'text-muted-foreground' };
-    if (perf_count === total && total > 0) return { glyph: '✓', title: 'All done', color: 'text-green-600' };
-    if (conf_count === total && perf_count < total) return { glyph: '●', title: 'In progress', color: 'text-yellow-600' };
-    return { glyph: '—', title: 'Not started', color: 'text-muted-foreground' };
+    if (total === 0) return null;
+    if (conf_count === 0) return null;
+    if (perf_count === total) return <span className="text-green-600 text-lg font-bold">✓</span>;
+    if (conf_count === total && perf_count < total) return <span className="text-yellow-600 text-lg font-bold">●</span>;
+    return null;
   };
-
-  const statusGlyph = getStatusGlyph();
 
   return (
     <>
@@ -679,15 +590,7 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
               {generateRepairLinks()}
             </div>
             <div className="flex items-center gap-2">
-              <span 
-                className={`text-lg font-bold ${statusGlyph.color}`}
-                title={statusGlyph.title}
-              >
-                {statusGlyph.glyph}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {weekRow.perf_count}/{weekRow.total}
-              </span>
+              {getStatusBadge()}
               {isSuperAdmin && (
                 <Button
                   variant="ghost"
@@ -707,15 +610,7 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
         </AccordionTrigger>
         
         <AccordionContent className="px-3 pb-3">
-          {!isPrefetched ? (
-            <div className="space-y-2 py-2">
-              <div className="animate-pulse flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                <div className="h-5 w-20 bg-muted rounded" />
-                <div className="flex-1 h-4 bg-muted rounded" />
-                <div className="h-4 w-16 bg-muted rounded" />
-              </div>
-            </div>
-          ) : weekData && weekData.length > 0 ? (
+          {weekData.length > 0 ? (
             <div className="space-y-2">
               {weekData.map((item, index) => (
                 <div
@@ -736,7 +631,7 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground py-4 text-sm text-center">No data available</p>
+            <p className="text-muted-foreground py-4">Loading...</p>
           )}
         </AccordionContent>
       </AccordionItem>

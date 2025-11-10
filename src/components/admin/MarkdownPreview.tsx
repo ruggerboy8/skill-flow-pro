@@ -1,11 +1,29 @@
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 interface MarkdownPreviewProps {
   value: string;
   onChange: (value: string) => void;
   maxChars?: number;
 }
+
+const modules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    ['link'],
+    ['clean']
+  ],
+};
+
+const formats = [
+  'header',
+  'bold', 'italic', 'underline',
+  'list', 'bullet',
+  'link'
+];
 
 export function MarkdownPreview({ value, onChange, maxChars = 10000 }: MarkdownPreviewProps) {
   const charCount = value.length;
@@ -20,11 +38,14 @@ export function MarkdownPreview({ value, onChange, maxChars = 10000 }: MarkdownP
         </span>
       </div>
       
-      <Textarea
+      <ReactQuill
+        theme="snow"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
+        modules={modules}
+        formats={formats}
         placeholder="Enter your script content here..."
-        className="min-h-[300px] text-sm resize-y"
+        className="bg-background [&_.ql-container]:min-h-[300px] [&_.ql-editor]:min-h-[300px]"
       />
       
       {isNearLimit && (

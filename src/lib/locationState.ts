@@ -56,11 +56,16 @@ export async function getLocationWeekContext(locationId: string, now: Date = new
   const anchors = getWeekAnchors(now, location.timezone);
   const currentMonday = new Date(anchors.mondayZ);
   
+  // Get the Monday of the week containing program start date
+  const programStartAnchors = getWeekAnchors(programStartDate, location.timezone);
+  const programStartMonday = new Date(programStartAnchors.mondayZ);
+  
   console.log('  - Current Monday:', currentMonday.toISOString());
   console.log('  - Program start (parsed):', programStartDate.toISOString());
+  console.log('  - Program start Monday:', programStartMonday.toISOString());
   
-  // Calculate week index from program start using Monday anchor
-  const daysDiff = Math.floor((currentMonday.getTime() - programStartDate.getTime()) / (1000 * 60 * 60 * 24));
+  // Calculate week index from program start Monday
+  const daysDiff = Math.floor((currentMonday.getTime() - programStartMonday.getTime()) / (1000 * 60 * 60 * 24));
   const weekIndex = Math.floor(daysDiff / 7);
   
   console.log('  - Days diff:', daysDiff);

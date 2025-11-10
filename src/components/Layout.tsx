@@ -52,6 +52,15 @@ export default function Layout() {
     return location.pathname.startsWith(href);
   };
 
+  // Show loading state until roles are loaded
+  if (roleLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   // All users now use sidebar navigation
   return (
     <div className="min-h-screen bg-background">
@@ -71,13 +80,7 @@ export default function Layout() {
             </header>
             
             <main className="flex-1 p-6 overflow-auto w-full min-w-0">
-              {roleLoading ? (
-                <div className="flex items-center justify-center min-h-[50vh]">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : (
-                <Outlet />
-              )}
+              <Outlet />
             </main>
           </div>
         </div>

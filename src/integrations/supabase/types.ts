@@ -1612,12 +1612,11 @@ export type Database = {
         Args: { p_role_id: number; p_staff_id: string }
         Returns: {
           conf_count: number
-          cycle: number
+          cycle_weeks: Json
           is_current_week: boolean
           perf_count: number
           source: string
           total: number
-          week_in_cycle: number
           week_of: string
         }[]
       }

@@ -27,8 +27,7 @@ interface WeekStatusRow {
   total: number;
   conf_count: number;
   perf_count: number;
-  cycle: number | null;
-  week_in_cycle: number | null;
+  cycle_weeks: Array<{ cycle: number | null; week: number | null }>;
   source: 'onboarding' | 'ongoing';
   is_current_week: boolean;
 }
@@ -365,8 +364,15 @@ export default function StatsScores() {
 
     let weekData: WeekData[];
 
-    if (row.source === 'onboarding' && row.cycle && row.week_in_cycle) {
-      weekData = await loadWeekData(row.cycle, row.week_in_cycle);
+    // For onboarding weeks, load data for all cycle-weeks on this calendar date
+    if (row.source === 'onboarding' && row.cycle_weeks.length > 0) {
+      // Get the first cycle-week (they all share the same week_of date)
+      const firstCycleWeek = row.cycle_weeks[0];
+      if (firstCycleWeek.cycle && firstCycleWeek.week) {
+        weekData = await loadWeekData(firstCycleWeek.cycle, firstCycleWeek.week);
+      } else {
+        weekData = [];
+      }
     } else {
       const { data, error } = await supabase.rpc('get_week_detail_by_week', {
         p_staff_id: staffData!.id,
@@ -573,15 +579,21 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
     try {
       let data, error;
 
-      if (weekRow.source === 'onboarding' && weekRow.cycle && weekRow.week_in_cycle) {
-        const result = await supabase.rpc('delete_week_data', {
-          p_staff_id: staffData.id,
-          p_role_id: staffData.role_id,
-          p_cycle: weekRow.cycle,
-          p_week: weekRow.week_in_cycle
-        });
-        data = result.data;
-        error = result.error;
+      if (weekRow.source === 'onboarding' && weekRow.cycle_weeks.length > 0) {
+        // Delete data for the first cycle-week (they all share the same week_of)
+        const firstCycleWeek = weekRow.cycle_weeks[0];
+        if (firstCycleWeek.cycle && firstCycleWeek.week) {
+          const result = await supabase.rpc('delete_week_data', {
+            p_staff_id: staffData.id,
+            p_role_id: staffData.role_id,
+            p_cycle: firstCycleWeek.cycle,
+            p_week: firstCycleWeek.week
+          });
+          data = result.data;
+          error = result.error;
+        } else {
+          throw new Error('Invalid cycle-week data');
+        }
       } else {
         const result = await supabase.rpc('delete_week_data_by_week', {
           p_staff_id: staffData.id,
@@ -626,8 +638,11 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
 
   const isPastWeek = () => {
     if (currentCycle == null || currentWeek == null) return false;
-    if (weekRow.cycle && weekRow.week_in_cycle) {
-      return weekRow.cycle < currentCycle || (weekRow.cycle === currentCycle && weekRow.week_in_cycle < currentWeek);
+    if (weekRow.source === 'onboarding' && weekRow.cycle_weeks.length > 0) {
+      const firstCycleWeek = weekRow.cycle_weeks[0];
+      if (firstCycleWeek.cycle && firstCycleWeek.week) {
+        return firstCycleWeek.cycle < currentCycle || (firstCycleWeek.cycle === currentCycle && firstCycleWeek.week < currentWeek);
+      }
     }
     return new Date(weekRow.week_of) < new Date(currentWeekOf || '');
   };
@@ -647,9 +662,12 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
     let baseUrlConf = `/confidence/current/step/1?mode=repair&weekOf=${weekRow.week_of}`;
     let baseUrlPerf = `/performance/current/step/1?mode=repair&weekOf=${weekRow.week_of}`;
     
-    if (weekRow.cycle && weekRow.week_in_cycle) {
-      baseUrlConf += `&cycle=${weekRow.cycle}&wk=${weekRow.week_in_cycle}`;
-      baseUrlPerf += `&cycle=${weekRow.cycle}&wk=${weekRow.week_in_cycle}`;
+    if (weekRow.source === 'onboarding' && weekRow.cycle_weeks.length > 0) {
+      const firstCycleWeek = weekRow.cycle_weeks[0];
+      if (firstCycleWeek.cycle && firstCycleWeek.week) {
+        baseUrlConf += `&cycle=${firstCycleWeek.cycle}&wk=${firstCycleWeek.week}`;
+        baseUrlPerf += `&cycle=${firstCycleWeek.cycle}&wk=${firstCycleWeek.week}`;
+      }
     }
 
     return (

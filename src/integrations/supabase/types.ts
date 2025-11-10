@@ -1613,6 +1613,7 @@ export type Database = {
         Returns: {
           conf_count: number
           cycle: number
+          is_current_week: boolean
           perf_count: number
           source: string
           total: number
@@ -1801,7 +1802,12 @@ export type Database = {
         }[]
       }
       get_week_detail_by_week: {
-        Args: { p_role_id: number; p_staff_id: string; p_week_of: string }
+        Args: {
+          p_role_id: number
+          p_source: string
+          p_staff_id: string
+          p_week_of: string
+        }
         Returns: {
           action_statement: string
           confidence_score: number

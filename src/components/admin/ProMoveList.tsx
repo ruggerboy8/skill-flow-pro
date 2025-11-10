@@ -315,11 +315,6 @@ export function ProMoveList({
             <TableRow key={proMove.action_id}>
               <TableCell className="max-w-md">
                 <div className="font-medium">{proMove.action_statement}</div>
-                {proMove.description && (
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {proMove.description}
-                  </div>
-                )}
                 {proMove.resources_url && (
                   <div className="text-sm text-blue-600 mt-1">
                     <a href={proMove.resources_url} target="_blank" rel="noopener noreferrer">

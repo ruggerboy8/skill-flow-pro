@@ -414,7 +414,7 @@ export function LearningDrawer({
                 placeholder="Brief description of this pro-move..."
                 className="min-h-[100px]"
               />
-              <Button onClick={saveDescription} size="sm">
+              <Button type="button" onClick={saveDescription} size="sm">
                 Save Description
               </Button>
             </section>
@@ -443,11 +443,12 @@ export function LearningDrawer({
               {videoId && <YouTubePreview videoId={videoId} />}
 
               <div className="flex gap-2">
-                <Button onClick={saveVideo} size="sm">
+                <Button type="button" onClick={saveVideo} size="sm">
                   Save Video
                 </Button>
                 {videoResourceId && (
                   <Button
+                    type="button"
                     onClick={() => {
                       setVideoUrl('');
                       saveVideo();
@@ -474,14 +475,34 @@ export function LearningDrawer({
               <MarkdownPreview value={script} onChange={setScript} />
 
               <div className="flex gap-2">
-                <Button onClick={saveScript} size="sm">
+                <Button type="button" onClick={saveScript} size="sm">
                   Save Script
                 </Button>
                 {scriptResourceId && script && (
                   <Button
-                    onClick={() => {
+                    type="button"
+                    onClick={async () => {
                       setScript('');
-                      saveScript();
+                      // Delete script resource
+                      try {
+                        await supabase
+                          .from('pro_move_resources')
+                          .delete()
+                          .eq('id', scriptResourceId);
+                        
+                        setScriptResourceId(undefined);
+                        
+                        toast({
+                          title: 'Success',
+                          description: 'Script cleared',
+                        });
+                      } catch (error) {
+                        toast({
+                          title: 'Error',
+                          description: 'Failed to clear script',
+                          variant: 'destructive',
+                        });
+                      }
                     }}
                     variant="outline"
                     size="sm"

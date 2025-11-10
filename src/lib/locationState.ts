@@ -45,16 +45,17 @@ export async function getLocationWeekContext(locationId: string, now: Date = new
   const programStartDate = new Date(location.program_start_date);
   const cycleLength = location.cycle_length_weeks;
   
-  // Calculate week index from program start
-  const daysDiff = Math.floor((now.getTime() - programStartDate.getTime()) / (1000 * 60 * 60 * 24));
+  // Get time anchors for this location's timezone to find Monday of current week
+  const anchors = getWeekAnchors(now, location.timezone);
+  const currentMonday = new Date(anchors.mondayZ);
+  
+  // Calculate week index from program start using Monday anchor
+  const daysDiff = Math.floor((currentMonday.getTime() - programStartDate.getTime()) / (1000 * 60 * 60 * 24));
   const weekIndex = Math.floor(daysDiff / 7);
   
   // Calculate cycle number and week in cycle
   const cycleNumber = Math.max(1, Math.floor(weekIndex / cycleLength) + 1);
   const weekInCycle = Math.max(1, (weekIndex % cycleLength) + 1);
-  
-  // Get time anchors for this location's timezone
-  const anchors = getWeekAnchors(now, location.timezone);
 
   return {
     weekInCycle,

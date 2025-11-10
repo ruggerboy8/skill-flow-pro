@@ -512,7 +512,10 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, onWeekDeleted, 
     }
   }
 
-  const weekLabel = new Date(weekRow.week_of).toLocaleDateString('en-US', { 
+  // Parse as local date to avoid timezone shift (YYYY-MM-DD should display as-is)
+  const [year, month, day] = weekRow.week_of.split('-').map(Number);
+  const weekDate = new Date(year, month - 1, day);
+  const weekLabel = weekDate.toLocaleDateString('en-US', { 
     weekday: 'short', 
     month: 'short', 
     day: 'numeric' 

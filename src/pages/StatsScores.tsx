@@ -183,6 +183,18 @@ export default function StatsScores() {
         }))
         .sort((a, b) => b.year - a.year);
 
+      console.log('📊 Calendar data built:', {
+        totalYears: yearData.length,
+        years: yearData.map(y => ({
+          year: y.year,
+          months: y.months.map(m => ({
+            month: m.monthLabel,
+            weekCount: m.weeks.length,
+            weeks: m.weeks.map(w => w.week_of)
+          }))
+        }))
+      });
+
       setYears(yearData);
       
       // Auto-select most recent year

@@ -121,11 +121,6 @@ export default function ThisWeekPanel() {
       
       // Load current week assignments and context based on user progress
       const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);
-      console.log('Progress-based assignments:', assignments);
-      console.log('Progress-based week:', { cycleNumber, weekInCycle });
-      console.log('Program start date from location:', staffData.primary_location_id);
-      console.log('Effective now for calculation:', effectiveNow);
-      console.log('Expected: Cycle 4 Week 2, Got:', `Cycle ${cycleNumber} Week ${weekInCycle}`);
       setWeekAssignments(assignments);
 
       // Get location-specific time anchors for state computation

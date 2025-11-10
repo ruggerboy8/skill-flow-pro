@@ -31,7 +31,6 @@ async function findUserActiveWeek(
 ): Promise<{ cycleNumber: number; weekInCycle: number }> {
   // Explicit opt-in to progress mode (legacy / special sims)
   if (simOverrides?.mode === "progress") {
-    console.log("[week-assembly] Using PROGRESS-based week calculation (explicit opt-in)");
     const { data: locationData } = await supabase
       .from("locations")
       .select("cycle_length_weeks")
@@ -63,7 +62,6 @@ async function findUserActiveWeek(
   }
 
   // Default: SITE-CENTRIC (location calendar)
-  console.log("[week-assembly] Using SITE-centric (time/location) week calculation");
   const context = await getLocationWeekContext(locationId, now ?? new Date());
   return { cycleNumber: context.cycleNumber, weekInCycle: context.weekInCycle };
 }
@@ -81,9 +79,6 @@ export async function assembleCurrentWeek(
   weekInCycle: number;
 }> {
   try {
-    console.log("=== ASSEMBLING CURRENT WEEK (SITE-CENTRIC) ===");
-    console.log("Input params:", { userId, simOverrides });
-
     const effectiveNow =
       simOverrides?.enabled && simOverrides?.nowISO
         ? new Date(simOverrides.nowISO)
@@ -100,9 +95,6 @@ export async function assembleCurrentWeek(
     if (!staffData.primary_location_id)
       throw new Error("Staff member has no assigned location");
 
-    console.log("Staff data:", staffData);
-    console.log("Effective now:", effectiveNow);
-
     // Derive active week (site-centric by default)
     const { cycleNumber, weekInCycle } = await findUserActiveWeek(
       userId,
@@ -113,8 +105,6 @@ export async function assembleCurrentWeek(
       effectiveNow
     );
 
-    console.log("Active week (site-centric):", { cycleNumber, weekInCycle });
-
     // Build assignments
     const assignments = await locationAssembleWeek({
       userId,
@@ -124,8 +114,6 @@ export async function assembleCurrentWeek(
       weekInCycle,
       simOverrides,
     });
-
-    console.log("Assignments:", assignments);
 
     return {
       assignments: assignments.sort((a, b) => a.display_order - b.display_order),

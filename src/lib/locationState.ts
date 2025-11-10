@@ -45,13 +45,6 @@ export async function getLocationWeekContext(locationId: string, now: Date = new
   const programStartDate = new Date(location.program_start_date);
   const cycleLength = location.cycle_length_weeks;
   
-  console.log('[getLocationWeekContext] DEBUG:');
-  console.log('  - Location ID:', locationId);
-  console.log('  - Program start date:', location.program_start_date);
-  console.log('  - Timezone:', location.timezone);
-  console.log('  - Cycle length:', cycleLength);
-  console.log('  - Now (input):', now.toISOString());
-  
   // Get time anchors for this location's timezone to find Monday of current week
   const anchors = getWeekAnchors(now, location.timezone);
   const currentMonday = new Date(anchors.mondayZ);
@@ -60,23 +53,13 @@ export async function getLocationWeekContext(locationId: string, now: Date = new
   const programStartAnchors = getWeekAnchors(programStartDate, location.timezone);
   const programStartMonday = new Date(programStartAnchors.mondayZ);
   
-  console.log('  - Current Monday:', currentMonday.toISOString());
-  console.log('  - Program start (parsed):', programStartDate.toISOString());
-  console.log('  - Program start Monday:', programStartMonday.toISOString());
-  
   // Calculate week index from program start Monday
   const daysDiff = Math.floor((currentMonday.getTime() - programStartMonday.getTime()) / (1000 * 60 * 60 * 24));
   const weekIndex = Math.floor(daysDiff / 7);
   
-  console.log('  - Days diff:', daysDiff);
-  console.log('  - Week index (0-based):', weekIndex);
-  
   // Calculate cycle number and week in cycle
   const cycleNumber = Math.max(1, Math.floor(weekIndex / cycleLength) + 1);
   const weekInCycle = Math.max(1, (weekIndex % cycleLength) + 1);
-
-  console.log('  - Calculated cycle:', cycleNumber);
-  console.log('  - Calculated week in cycle:', weekInCycle);
 
   return {
     weekInCycle,

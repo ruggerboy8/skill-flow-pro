@@ -478,18 +478,23 @@ export async function computeWeekState(params: {
   // DUAL-SYSTEM SCORE QUERY: Query scores using focus IDs from BOTH systems
   // This ensures we find scores regardless of whether they were submitted
   // against weekly_focus (UUID) or weekly_plan (prefixed) IDs
-  console.log('[weekState] 🔍 Searching for scores with focus IDs:', focusIds);
-  
-  const { data: scores } = await supabase
+  const { data: scores, error: scoresError } = await supabase
     .from('weekly_scores')
     .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id')
     .eq('staff_id', staffId)
     .in('weekly_focus_id', focusIds);
 
-  // Debug logging for score filtering
-  console.log('=== DEBUG SCORES FILTERING ===');
-  console.log('Focus IDs for current week:', focusIds);
-  console.log('All scores found:', scores);
+  // Enhanced debug logging
+  console.log(`[weekState] 📊 Staff ${staffId} @ location ${locationId} (Cycle ${cycleNumber}, Week ${weekInCycle})`);
+  console.log(`[weekState]    Data source: ${dataSource}, Focus IDs count: ${focusIds.length}`);
+  console.log(`[weekState]    Scores query: ${scores?.length || 0} results${scoresError ? `, ERROR: ${scoresError.message}` : ''}`);
+  if (scores && scores.length > 0) {
+    console.log(`[weekState]    Score details:`, scores.map(s => ({
+      focus_id: s.weekly_focus_id?.substring(0, 8) + '...',
+      conf: s.confidence_score,
+      perf: s.performance_score
+    })));
+  }
   
   const confCount = (scores ?? []).filter(s => s.confidence_score !== null).length;
   const perfCount = (scores ?? []).filter(s => s.performance_score !== null).length;

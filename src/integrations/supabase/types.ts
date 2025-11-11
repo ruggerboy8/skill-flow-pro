@@ -2099,6 +2099,7 @@ export type Database = {
         Args: { p_role_id: number; p_staff_id: string }
         Returns: Json
       }
+      recover_orphaned_scores: { Args: never; Returns: Json }
       replace_weekly_focus: {
         Args: {
           p_cycle: number

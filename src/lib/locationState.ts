@@ -447,20 +447,11 @@ export async function computeWeekState(params: {
   const staffId = staff.id;
 
   // Query scores against exactly these IDs (from assembleWeek)
-  console.log(`[weekState] 🔍 Query for staff ${staffId}:`, { 
-    allIds, 
-    dataSource,
-    cycleNumber, 
-    weekInCycle 
-  });
-  
   const { data: scores, error: scoresError } = await supabase
     .from('weekly_scores')
     .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id')
     .eq('staff_id', staffId)
     .in('weekly_focus_id', allIds);
-  
-  console.log(`[weekState] 📊 Query returned ${scores?.length || 0} scores${scoresError ? `, ERROR: ${scoresError.message}` : ''}`);
 
   // P2 FIX: Check completion per required slot, not by totals
   const byId = new Map(allIds.map(id => [id, { conf: false, perf: false }]));

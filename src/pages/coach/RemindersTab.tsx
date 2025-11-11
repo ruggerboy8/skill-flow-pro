@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Mail, CheckCircle2, X, Send, Edit2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { computeStaffStatusNew } from '@/lib/coachStatus';
 import { toast } from '@/hooks/use-toast';
 
 interface StaffMember {
@@ -109,69 +108,58 @@ export default function RemindersTab() {
   }
 
   const loadStaffData = async () => {
+    if (!user) return;
+    
     try {
-      const now = new Date();
-      
-      // Get current user's organization for Lead RDA scoping
-      let myOrgId: string | null = null;
-      if (isLead && !isCoach && !isSuperAdmin) {
-        const { data: myStaff } = await supabase
-          .from('staff')
-          .select(`
-            id,
-            primary_location_id,
-            locations!primary_location_id(organization_id)
-          `)
-          .eq('user_id', user?.id)
-          .maybeSingle();
-        
-        myOrgId = myStaff?.locations?.organization_id ?? null;
-      }
-      
-      // Get staff roster
-      const { data: staffData, error } = await supabase
-        .from('staff')
-        .select(`
-          id,
-          name,
-          email,
-          user_id,
-          primary_location_id,
-          role_id,
-          hire_date,
-          onboarding_weeks,
-          is_participant,
-          locations(organization_id)
-        `)
-        .eq('is_participant', true);
+      // Use the bulk RPC to get all staff statuses
+      const { data: statuses, error } = await supabase.rpc('get_staff_statuses', {
+        p_coach_user_id: user.id
+      });
 
       if (error) throw error;
 
-      // Process staff data
-      const processedStaff: StaffMember[] = (staffData as any[])
-        .filter((member: any) => member.user_id !== user?.id) // Exclude self
-        .filter((member: any) => {
-          // Lead RDAs only see their organization
-          if (isLead && !isCoach && !isSuperAdmin) {
-            return member.locations?.organization_id === myOrgId;
-          }
-          return true;
+      const statusArray = (statuses || []) as any[];
+      
+      // Build staff list from statuses
+      const processedStaff: StaffMember[] = await Promise.all(
+        statusArray.map(async (status) => {
+          // Get email for each staff member
+          const { data: staffData } = await supabase
+            .from('staff')
+            .select('email, user_id')
+            .eq('id', status.staff_id)
+            .maybeSingle();
+          
+          return {
+            id: status.staff_id,
+            name: status.staff_name,
+            email: staffData?.email || '',
+            role_id: status.role_id,
+            user_id: staffData?.user_id || '',
+            onboarding_weeks: status.onboarding_weeks_left,
+          };
         })
-        .map((member: any) => ({
-          id: member.id,
-          name: member.name,
-          email: member.email,
-          role_id: member.role_id,
-          user_id: member.user_id,
-          hire_date: member.hire_date,
-          onboarding_weeks: member.onboarding_weeks || 6,
-          primary_location_id: member.primary_location_id,
-        }));
+      );
 
       setStaff(processedStaff);
       
-      // Compute statuses and filter
-      await computeReminderLists(processedStaff, now);
+      // Filter reminder lists based on status_state
+      const needConfidence = statusArray
+        .filter((s: any) => s.status_state === 'can_checkin' || s.status_state === 'missed_checkin')
+        .map((s: any) => processedStaff.find(p => p.id === s.staff_id))
+        .filter(Boolean) as StaffMember[];
+
+      const needPerformance = statusArray
+        .filter((s: any) => 
+          s.status_state === 'can_checkout' || 
+          s.status_state === 'missed_checkout' ||
+          s.status_state === 'missed_checkin' // Include missed checkin in performance reminders too
+        )
+        .map((s: any) => processedStaff.find(p => p.id === s.staff_id))
+        .filter(Boolean) as StaffMember[];
+
+      setConfidenceList(needConfidence);
+      setPerformanceList(needPerformance);
     } catch (error) {
       console.error('Error loading staff data:', error);
       toast({
@@ -184,44 +172,6 @@ export default function RemindersTab() {
     }
   };
 
-  const computeReminderLists = async (staffList: StaffMember[], now: Date) => {
-    const statusPromises = staffList.map(async (s) => {
-      const status = await computeStaffStatusNew(
-        s.user_id, 
-        { 
-          id: s.id, 
-          role_id: s.role_id, 
-          hire_date: s.hire_date, 
-          onboarding_weeks: s.onboarding_weeks,
-          primary_location_id: s.primary_location_id
-        }, 
-        now
-      );
-      
-      return { staff: s, status };
-    });
-
-    const results = await Promise.all(statusPromises);
-
-    // Filter for confidence reminders: can_checkin or missed_checkin
-    const needConfidence = results
-      .filter(({ status }) => 
-        status.state === 'can_checkin' || status.state === 'missed_checkin'
-      )
-      .map(({ staff }) => staff);
-
-    // Filter for performance reminders: can_checkout, missed_checkout, or missed_checkin
-    const needPerformance = results
-      .filter(({ status }) => 
-        status.state === 'can_checkout' || 
-        status.state === 'missed_checkout' || 
-        status.state === 'missed_checkin'
-      )
-      .map(({ staff }) => staff);
-
-    setConfidenceList(needConfidence);
-    setPerformanceList(needPerformance);
-  };
 
   function openPreview(type: TemplateKey) {
     const list = type === 'confidence' ? confidenceList : performanceList;

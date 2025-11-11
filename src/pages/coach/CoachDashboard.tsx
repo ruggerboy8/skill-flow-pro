@@ -9,33 +9,27 @@ import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import StaffRow from '@/components/coach/StaffRow';
-import { computeStaffStatusNew, getSortRank } from '@/lib/coachStatus';
-import { getISOWeek, getISOWeekYear } from 'date-fns';
-interface StaffScore {
-  confidence_score: number | null;
-  performance_score: number | null;
-  updated_at: string | null;
-  weekly_focus: {
-    id: string;
-    cycle: number;
-    week_in_cycle: number;
-    iso_year: number;
-    iso_week: number;
-  };
-}
-
-interface StaffMember {
-  id: string;
-  name: string;
+interface StaffStatus {
+  staff_id: string;
+  staff_name: string;
   role_id: number;
   role_name: string;
-  location: string | null;
-  organization: string | null;
-  user_id: string;
-  hire_date?: string | null;
-  onboarding_weeks: number;
-  primary_location_id?: string | null;
-  weekly_scores: StaffScore[];
+  location_id: string;
+  location_name: string;
+  organization_name: string;
+  status_state: string;
+  status_label: string;
+  status_detail: string;
+  status_severity: string;
+  backlog_count: number;
+  last_activity_at: string | null;
+  last_activity_kind: string | null;
+  last_activity_text: string;
+  deadline_at: string | null;
+  week_label: string;
+  cycle_number: number;
+  week_in_cycle: number;
+  onboarding_weeks_left: number;
 }
 
 export default function CoachDashboard() {
@@ -43,11 +37,8 @@ export default function CoachDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isCoach, isLead } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [rows, setRows] = useState<{
-    member: { id: string; name: string; role_name: string; location: string | null };
-    status: Awaited<ReturnType<typeof computeStaffStatusNew>>;
-  }[]>([]);
+  const [allStatuses, setAllStatuses] = useState<StaffStatus[]>([]);
+  const [filteredRows, setFilteredRows] = useState<StaffStatus[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [organizations, setOrganizations] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
@@ -86,7 +77,7 @@ export default function CoachDashboard() {
 
   useEffect(() => {
     applyFilters();
-  }, [staff, selectedLocation, selectedOrganization, selectedRole, search]);
+  }, [allStatuses, selectedLocation, selectedOrganization, selectedRole, search]);
 
   // Sync URL params with filter state
   useEffect(() => {
@@ -109,113 +100,44 @@ export default function CoachDashboard() {
   const hasActiveFilters = selectedOrganization !== 'all' || selectedLocation !== 'all' || selectedRole !== 'all' || search.trim() !== '';
 
   const loadStaffData = async () => {
+    if (!user) return;
+    
     try {
-      const now = new Date();
-      
-      // Get current user's scopes for Lead RDA filtering using junction table
-      let myScopeOrgIds: string[] = [];
-      let myScopeLocationIds: string[] = [];
-      
-      if (isLead && !isCoach && !isSuperAdmin) {
-        const { data: myStaff } = await supabase
-          .from('staff')
-          .select('id')
-          .eq('user_id', user?.id)
-          .maybeSingle();
-        
-        if (myStaff) {
-          const { data: myScopes } = await supabase
-            .from('coach_scopes')
-            .select('scope_type, scope_id')
-            .eq('staff_id', myStaff.id);
-          
-          if (myScopes) {
-            myScopeOrgIds = myScopes.filter(s => s.scope_type === 'org').map(s => s.scope_id);
-            myScopeLocationIds = myScopes.filter(s => s.scope_type === 'location').map(s => s.scope_id);
-          }
-        }
-      }
-      
-      // Get staff roster with additional fields needed for new system
-      const { data: staffData, error } = await supabase
-        .from('staff')
-        .select(`
-          id,
-          name,
-          user_id,
-          primary_location_id,
-          role_id,
-          hire_date,
-          onboarding_weeks,
-          is_participant,
-          roles!inner(role_name),
-          locations(name, organization_id, organizations!locations_organization_id_fkey(name))
-        `)
-        .eq('is_participant', true);
+      // Single bulk RPC call to get all staff statuses
+      const { data: statuses, error } = await supabase.rpc('get_staff_statuses' as any, {
+        p_coach_user_id: user.id,
+        p_now: new Date().toISOString()
+      }) as { data: StaffStatus[] | null, error: any };
 
       if (error) throw error;
 
-      // Normalize staff data to our shape
-      const processedStaff: StaffMember[] = (staffData as any[])
-        // TEMPORARILY SHOWING SUPER ADMINS: .filter((member: any) => member.user_id !== user?.id) // Exclude self
-        .filter((member: any) => {
-          // Lead RDAs only see their scopes (OR logic)
-          if (isLead && !isCoach && !isSuperAdmin) {
-            if (myScopeOrgIds.length > 0) {
-              return myScopeOrgIds.includes(member.locations?.organization_id);
-            } else if (myScopeLocationIds.length > 0) {
-              return myScopeLocationIds.includes(member.primary_location_id);
-            }
-            return false;
-          }
-          return true;
-        })
-        .map((member: any) => ({
-          id: member.id,
-          name: member.name,
-          role_id: member.role_id,
-          role_name: (member.roles as any).role_name,
-          location: member.locations?.name ?? null,
-          organization: member.locations?.organizations?.name ?? null,
-          user_id: member.user_id,
-          hire_date: member.hire_date,
-          onboarding_weeks: member.onboarding_weeks || 6,
-          primary_location_id: member.primary_location_id,
-          weekly_scores: []
-        }));
+      const statusArray = statuses || [];
+      setAllStatuses(statusArray);
 
-      setStaff(processedStaff);
-
-      // Extract unique locations, organizations, and roles for filters
-      const uniqueLocations = [
-        ...new Set(processedStaff.map((s) => s.location).filter(Boolean)),
-      ] as string[];
-      const uniqueOrganizations = [
-        ...new Set(processedStaff.map((s) => s.organization).filter(Boolean)),
-      ] as string[];
-      const uniqueRoles = [
-        ...new Set(processedStaff.map((s) => s.role_name)),
-      ] as string[];
+      // Extract unique filter values from the results
+      const uniqueLocations = [...new Set(statusArray.map(s => s.location_name).filter(Boolean))] as string[];
+      const uniqueOrganizations = [...new Set(statusArray.map(s => s.organization_name).filter(Boolean))] as string[];
+      const uniqueRoles = [...new Set(statusArray.map(s => s.role_name).filter(Boolean))] as string[];
 
       setLocations(uniqueLocations);
       setOrganizations(uniqueOrganizations);
       setRoles(uniqueRoles);
     } catch (error) {
-      console.error('Error loading staff data:', error);
+      console.error('Error loading staff statuses:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = async () => {
-    let filtered = staff;
+  const applyFilters = () => {
+    let filtered = allStatuses;
 
     if (selectedLocation !== 'all') {
-      filtered = filtered.filter((s) => s.location === selectedLocation);
+      filtered = filtered.filter((s) => s.location_name === selectedLocation);
     }
 
     if (selectedOrganization !== 'all') {
-      filtered = filtered.filter((s) => s.organization === selectedOrganization);
+      filtered = filtered.filter((s) => s.organization_name === selectedOrganization);
     }
 
     if (selectedRole !== 'all') {
@@ -224,40 +146,10 @@ export default function CoachDashboard() {
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      filtered = filtered.filter((s) => s.name.toLowerCase().includes(q));
+      filtered = filtered.filter((s) => s.staff_name.toLowerCase().includes(q));
     }
 
-    const now = new Date();
-    
-    // P1 FIX: Use each staff member's location for context
-    // Compute status for all staff members in parallel instead of sequentially
-    const statusPromises = filtered.map(async (s) => {
-      // CRITICAL: Pass each staff member's own location, not a shared location
-      const status = await computeStaffStatusNew(
-        s.user_id, 
-        { 
-          id: s.id, 
-          role_id: s.role_id, 
-          hire_date: s.hire_date, 
-          onboarding_weeks: s.onboarding_weeks,
-          primary_location_id: s.primary_location_id  // Each staff's location
-        }, 
-        now
-      );
-      
-      return {
-        member: { id: s.id, name: s.name, role_name: s.role_name, location: s.location },
-        status,
-      };
-    });
-
-    const mapped = await Promise.all(statusPromises);
-
-    mapped.sort(
-      (a, b) => getSortRank(a.status) - getSortRank(b.status) || a.member.name.localeCompare(b.member.name)
-    );
-
-    setRows(mapped);
+    setFilteredRows(filtered);
   };
 
 
@@ -364,18 +256,35 @@ export default function CoachDashboard() {
         
         {/* Staff Rows */}
         <div className="space-y-2">
-          {rows.map(({ member, status }) => (
+          {filteredRows.map((staffStatus) => (
             <StaffRow
-              key={member.id}
-              member={member}
-              status={status}
-              onClick={() => navigate(`/coach/${member.id}`)}
+              key={staffStatus.staff_id}
+              member={{
+                id: staffStatus.staff_id,
+                name: staffStatus.staff_name,
+                role_name: staffStatus.role_name,
+                location: staffStatus.location_name
+              }}
+              status={{
+                color: staffStatus.status_severity as any,
+                reason: staffStatus.status_detail,
+                label: staffStatus.status_label,
+                severity: staffStatus.status_severity as any,
+                detail: staffStatus.status_detail,
+                lastActivityText: staffStatus.last_activity_text,
+                tooltip: staffStatus.status_detail,
+                lastActivity: staffStatus.last_activity_at ? {
+                  kind: staffStatus.last_activity_kind as any,
+                  at: new Date(staffStatus.last_activity_at)
+                } : undefined
+              }}
+              onClick={() => navigate(`/coach/${staffStatus.staff_id}`)}
             />
           ))}
         </div>
       </div>
 
-      {rows.length === 0 && (
+      {filteredRows.length === 0 && (
         <Card>
           <CardContent className="py-16 text-center">
             <p className="text-muted-foreground">No staff members match the selected filters.</p>

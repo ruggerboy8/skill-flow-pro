@@ -91,7 +91,7 @@ serve(async (req) => {
     console.log(`Text length: ${text.length} characters`);
 
     // Call Hume TTS API (v0) using direct HTTP
-    const humeResponse = await fetch('https://api.hume.ai/v0/tts/batches', {
+    const humeResponse = await fetch('https://api.hume.ai/v0/tts', {
       method: 'POST',
       headers: {
         'X-Hume-Api-Key': humeApiKey,
@@ -99,15 +99,16 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text,
-        voice: voiceName,
-        // Optional acting instructions to modulate delivery
-        ...(actingInstructions ? { prosody: { speed: 1.0, pitch: 0.0, energy: actingInstructions } } : {}),
-        format: {
-          encoding: 'wav',
-          sample_rate: 24000,
-          container: 'wav'
-        }
+        utterances: [
+          {
+            text,
+            voice: {
+              name: voiceName,
+              provider: 'HUME_AI'
+            },
+            ...(actingInstructions ? { description: actingInstructions } : {})
+          }
+        ]
       }),
     });
 
@@ -123,9 +124,22 @@ serve(async (req) => {
       );
     }
 
-    // Get the audio data
-    const audioArrayBuffer = await humeResponse.arrayBuffer();
-    const audioBuf = new Uint8Array(audioArrayBuffer);
+    // Get the JSON response with base64 audio
+    const result = await humeResponse.json();
+    const audioBase64 = result.generations?.[0]?.audio;
+    
+    if (!audioBase64) {
+      return new Response(
+        JSON.stringify({ error: 'No audio data returned from Hume' }), 
+        {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Decode base64 to binary
+    const audioBuf = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
 
     console.log(`Received audio: ${audioBuf.length} bytes`);
 

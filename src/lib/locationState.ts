@@ -446,36 +446,12 @@ export async function computeWeekState(params: {
   // current staff id from userId
   const staffId = staff.id;
 
-  // CRITICAL DEBUG: Log the exact IDs we're searching for
-  console.log(`[weekState] 🔍 Searching for these focus IDs:`, allIds);
-
   // Query scores against exactly these IDs (from assembleWeek)
   const { data: scores, error: scoresError } = await supabase
     .from('weekly_scores')
     .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id')
     .eq('staff_id', staffId)
     .in('weekly_focus_id', allIds);
-
-  // Also check what IDs actually exist for this staff member in weekly_scores
-  const { data: allStaffScores } = await supabase
-    .from('weekly_scores')
-    .select('weekly_focus_id')
-    .eq('staff_id', staffId)
-    .limit(10);
-
-  // Enhanced debug logging
-  console.log(`[weekState] 📊 Staff ${staffId} @ location ${locationId} (Cycle ${cycleNumber}, Week ${weekInCycle})`);
-  console.log(`[weekState]    Data source: ${dataSource}, All IDs: ${allIds.length}, Required IDs: ${required}`);
-  console.log(`[weekState]    IDs we're looking for:`, allIds.map(id => String(id).substring(0, 30)));
-  console.log(`[weekState]    IDs that exist in DB for this staff:`, allStaffScores?.map(s => String(s.weekly_focus_id).substring(0, 30)) || []);
-  console.log(`[weekState]    Scores query: ${scores?.length || 0} results${scoresError ? `, ERROR: ${scoresError.message}` : ''}`);
-  if (scores && scores.length > 0) {
-    console.log(`[weekState]    Score details:`, scores.map(s => ({
-      focus_id: String(s.weekly_focus_id).substring(0, 20),
-      conf: s.confidence_score,
-      perf: s.performance_score
-    })));
-  }
 
   // P2 FIX: Check completion per required slot, not by totals
   const byId = new Map(allIds.map(id => [id, { conf: false, perf: false }]));

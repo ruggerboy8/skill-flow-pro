@@ -2003,6 +2003,31 @@ export type Database = {
           self_avg: number
         }[]
       }
+      get_staff_statuses: {
+        Args: { p_coach_user_id: string; p_now?: string }
+        Returns: {
+          backlog_count: number
+          cycle_number: number
+          deadline_at: string
+          last_activity_at: string
+          last_activity_kind: string
+          last_activity_text: string
+          location_id: string
+          location_name: string
+          onboarding_weeks_left: number
+          organization_name: string
+          role_id: number
+          role_name: string
+          staff_id: string
+          staff_name: string
+          status_detail: string
+          status_label: string
+          status_severity: string
+          status_state: string
+          week_in_cycle: number
+          week_label: string
+        }[]
+      }
       get_staff_summary: {
         Args: never
         Returns: {

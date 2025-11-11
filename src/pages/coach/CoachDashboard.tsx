@@ -103,15 +103,13 @@ export default function CoachDashboard() {
     if (!user) return;
     
     try {
-      // Single bulk RPC call to get all staff statuses
-      const { data: statuses, error } = await supabase.rpc('get_staff_statuses' as any, {
-        p_coach_user_id: user.id,
-        p_now: new Date().toISOString()
-      }) as { data: StaffStatus[] | null, error: any };
+      const { data: statuses, error } = await supabase.rpc('get_staff_statuses', {
+        p_coach_user_id: user.id
+      });
 
       if (error) throw error;
 
-      const statusArray = statuses || [];
+      const statusArray = (statuses || []) as StaffStatus[];
       setAllStatuses(statusArray);
 
       // Extract unique filter values from the results

@@ -415,54 +415,17 @@ export async function computeWeekState(params: {
   // Calculate Monday anchor in org timezone
   const mondayStr = formatInTimeZone(anchors.mondayZ, orgTz, 'yyyy-MM-dd');
 
-  // ----- DUAL-SYSTEM LOOKUP: Search both weekly_plan AND weekly_focus -----
-  let focusIds: string[] = [];
-  let dataSource: 'weekly_plan' | 'weekly_focus' | 'mixed' = 'weekly_focus';
-  let weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
+  // ----- P0 FIX: Use assembleWeek as single source of truth for IDs -----
+  const assignments = await assembleWeek({
+    userId,
+    roleId,
+    locationId,
+    cycleNumber,
+    weekInCycle,
+    simOverrides,
+  });
 
-  // Always check weekly_focus for cycles 1-3 (UUID IDs)
-  if (cycleNumber < 4) {
-    const { data: focusRows, error: focusErr } = await supabase
-      .from('weekly_focus')
-      .select('id')
-      .eq('role_id', roleId)
-      .eq('cycle', cycleNumber)
-      .eq('week_in_cycle', weekInCycle);
-
-    if (!focusErr && focusRows && focusRows.length > 0) {
-      focusIds = focusRows.map(r => r.id);
-      dataSource = 'weekly_focus';
-      console.info('[weekState] ✅ Found %d weekly_focus assignments (cycle=%d week=%d role=%d)', 
-        focusRows.length, cycleNumber, weekInCycle, roleId);
-    }
-  }
-
-  // For Cycle 4+, use global weekly_plan (prefixed IDs)
-  if (cycleNumber >= 4) {
-    const { data: planData, error: planErr } = await supabase
-      .from('weekly_plan')
-      .select('id, display_order')
-      .is('org_id', null)
-      .eq('role_id', roleId)
-      .eq('week_start_date', mondayStr)
-      .eq('status', 'locked')
-      .order('display_order');
-
-    if (!planErr && planData && planData.length > 0) {
-      const planIds = planData.map((p: any) => `plan:${p.id}`);
-      focusIds = planIds;
-      dataSource = 'weekly_plan';
-      weekLabel = `Week of ${mondayStr}`;
-      console.info('[weekState] ✅ Found %d locked weekly_plan assignments (week=%s role=%d)', 
-        planData.length, mondayStr, roleId);
-    } else {
-      console.warn('[weekState] ⚠️ No locked global plan for Cycle 4+, got %d rows', planData?.length || 0);
-    }
-  }
-
-  const required = focusIds.length;
-
-  if (required === 0) {
+  if (!assignments || assignments.length === 0) {
     console.warn('[weekState] ❌ No assignments found for cycle=%d week=%d role=%d', 
       cycleNumber, weekInCycle, roleId);
     return {
@@ -472,43 +435,52 @@ export async function computeWeekState(params: {
     };
   }
 
+  const allIds = assignments.map(a => a.weekly_focus_id);
+  const requiredIds = assignments.filter(a => a.required).map(a => a.weekly_focus_id);
+  const required = requiredIds.length;
+
+  // Derive source + label for display
+  const dataSource = allIds.some(id => String(id).startsWith('plan:')) ? 'weekly_plan' : 'weekly_focus';
+  const weekLabel = assignments[0]?.weekLabel || `Cycle ${cycleNumber}, Week ${weekInCycle}`;
+
   // current staff id from userId
   const staffId = staff.id;
 
-  // DUAL-SYSTEM SCORE QUERY: Query scores using focus IDs from BOTH systems
-  // This ensures we find scores regardless of whether they were submitted
-  // against weekly_focus (UUID) or weekly_plan (prefixed) IDs
+  // Query scores against exactly these IDs (from assembleWeek)
   const { data: scores, error: scoresError } = await supabase
     .from('weekly_scores')
     .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id')
     .eq('staff_id', staffId)
-    .in('weekly_focus_id', focusIds);
+    .in('weekly_focus_id', allIds);
 
   // Enhanced debug logging
   console.log(`[weekState] 📊 Staff ${staffId} @ location ${locationId} (Cycle ${cycleNumber}, Week ${weekInCycle})`);
-  console.log(`[weekState]    Data source: ${dataSource}, Focus IDs count: ${focusIds.length}`);
+  console.log(`[weekState]    Data source: ${dataSource}, All IDs: ${allIds.length}, Required IDs: ${required}`);
   console.log(`[weekState]    Scores query: ${scores?.length || 0} results${scoresError ? `, ERROR: ${scoresError.message}` : ''}`);
   if (scores && scores.length > 0) {
     console.log(`[weekState]    Score details:`, scores.map(s => ({
-      focus_id: s.weekly_focus_id?.substring(0, 8) + '...',
+      focus_id: String(s.weekly_focus_id).substring(0, 20),
       conf: s.confidence_score,
       perf: s.performance_score
     })));
   }
-  
-  const confCount = (scores ?? []).filter(s => s.confidence_score !== null).length;
-  const perfCount = (scores ?? []).filter(s => s.performance_score !== null).length;
-  
-  console.log('Confidence count:', confCount, '/ required:', required);
-  console.log('Performance count:', perfCount, '/ required:', required);
+
+  // P2 FIX: Check completion per required slot, not by totals
+  const byId = new Map(allIds.map(id => [id, { conf: false, perf: false }]));
+  for (const s of (scores ?? [])) {
+    const row = byId.get(s.weekly_focus_id);
+    if (!row) continue;
+    if (s.confidence_score != null) row.conf = true;
+    if (s.performance_score != null) row.perf = true;
+  }
+
+  let confComplete = requiredIds.every(id => byId.get(id)?.conf);
+  let perfComplete = requiredIds.every(id => byId.get(id)?.perf);
+
+  console.log('[weekState] Confidence complete:', confComplete, '(required slots:', required, ')');
+  console.log('[weekState] Performance complete:', perfComplete, '(required slots:', required, ')');
 
   // Apply simulation overrides for confidence/performance status
-  let confComplete = confCount >= required;
-  let perfComplete = perfCount >= required;
-  
-  console.log('Confidence complete:', confComplete);
-  console.log('Performance complete:', perfComplete);
-  
   if (simOverrides?.enabled) {
     if (simOverrides.forceHasConfidence !== null && simOverrides.forceHasConfidence !== undefined) {
       confComplete = simOverrides.forceHasConfidence;

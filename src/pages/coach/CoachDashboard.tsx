@@ -229,8 +229,10 @@ export default function CoachDashboard() {
 
     const now = new Date();
     
+    // P1 FIX: Use each staff member's location for context
     // Compute status for all staff members in parallel instead of sequentially
     const statusPromises = filtered.map(async (s) => {
+      // CRITICAL: Pass each staff member's own location, not a shared location
       const status = await computeStaffStatusNew(
         s.user_id, 
         { 
@@ -238,7 +240,7 @@ export default function CoachDashboard() {
           role_id: s.role_id, 
           hire_date: s.hire_date, 
           onboarding_weeks: s.onboarding_weeks,
-          primary_location_id: s.primary_location_id
+          primary_location_id: s.primary_location_id  // Each staff's location
         }, 
         now
       );

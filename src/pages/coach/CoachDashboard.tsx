@@ -157,7 +157,7 @@ export default function CoachDashboard() {
 
       // Normalize staff data to our shape
       const processedStaff: StaffMember[] = (staffData as any[])
-        .filter((member: any) => member.user_id !== user?.id) // Exclude self
+        // TEMPORARILY SHOWING SUPER ADMINS: .filter((member: any) => member.user_id !== user?.id) // Exclude self
         .filter((member: any) => {
           // Lead RDAs only see their scopes (OR logic)
           if (isLead && !isCoach && !isSuperAdmin) {

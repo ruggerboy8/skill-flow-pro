@@ -415,13 +415,30 @@ export async function computeWeekState(params: {
   // Calculate Monday anchor in org timezone
   const mondayStr = formatInTimeZone(anchors.mondayZ, orgTz, 'yyyy-MM-dd');
 
-  // ----- GRADUATION CHECK: Cycle 4+ uses global weekly_plan -----
+  // ----- DUAL-SYSTEM LOOKUP: Search both weekly_plan AND weekly_focus -----
   let focusIds: string[] = [];
-  let dataSource: 'weekly_plan' | 'weekly_focus' = 'weekly_focus';
+  let dataSource: 'weekly_plan' | 'weekly_focus' | 'mixed' = 'weekly_focus';
   let weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
 
+  // Always check weekly_focus for cycles 1-3 (UUID IDs)
+  if (cycleNumber < 4) {
+    const { data: focusRows, error: focusErr } = await supabase
+      .from('weekly_focus')
+      .select('id')
+      .eq('role_id', roleId)
+      .eq('cycle', cycleNumber)
+      .eq('week_in_cycle', weekInCycle);
+
+    if (!focusErr && focusRows && focusRows.length > 0) {
+      focusIds = focusRows.map(r => r.id);
+      dataSource = 'weekly_focus';
+      console.info('[weekState] ✅ Found %d weekly_focus assignments (cycle=%d week=%d role=%d)', 
+        focusRows.length, cycleNumber, weekInCycle, roleId);
+    }
+  }
+
+  // For Cycle 4+, use global weekly_plan (prefixed IDs)
   if (cycleNumber >= 4) {
-    // Try global weekly_plan (org_id IS NULL)
     const { data: planData, error: planErr } = await supabase
       .from('weekly_plan')
       .select('id, display_order')
@@ -431,45 +448,23 @@ export async function computeWeekState(params: {
       .eq('status', 'locked')
       .order('display_order');
 
-    // For Cycle 4+, use weekly_plan exclusively (locked global plan)
     if (!planErr && planData && planData.length > 0) {
-      console.log(`[computeWeekState] ✅ Found ${planData.length} locked weekly_plan rows for global plan`);
-      const allIds = planData.map((p: any) => `plan:${p.id}`);
-      focusIds = allIds;
+      const planIds = planData.map((p: any) => `plan:${p.id}`);
+      focusIds = planIds;
       dataSource = 'weekly_plan';
       weekLabel = `Week of ${mondayStr}`;
-      console.info('[weekState] source=global_weekly_plan cycle=%d week=%s role=%d count=%d', 
-        cycleNumber, mondayStr, roleId, planData.length);
+      console.info('[weekState] ✅ Found %d locked weekly_plan assignments (week=%s role=%d)', 
+        planData.length, mondayStr, roleId);
     } else {
-      console.warn('[weekState] No locked global plan rows for Cycle 4+, got %d - showing no pro moves', planData?.length || 0);
-      // For Cycle 4+, don't fall back to weekly_focus
-      focusIds = [];
-      dataSource = 'weekly_plan';
-      weekLabel = `Week of ${mondayStr}`;
-    }
-  }
-
-  // Fallback to weekly_focus (Cycles 1-3 or if plan missing)
-  if (focusIds.length === 0) {
-    const { data: focusRows, error: focusErr } = await supabase
-      .from('weekly_focus')
-      .select('id')
-      .eq('role_id', roleId)
-      .eq('cycle', cycleNumber)
-      .eq('week_in_cycle', weekInCycle);
-
-    if (!focusErr && focusRows) {
-      focusIds = focusRows.map(r => r.id);
-      dataSource = 'weekly_focus';
-      weekLabel = `Cycle ${cycleNumber}, Week ${weekInCycle}`;
-      console.info('[weekState] source=weekly_focus cycle=%d week=%d role=%d', 
-        cycleNumber, weekInCycle, roleId);
+      console.warn('[weekState] ⚠️ No locked global plan for Cycle 4+, got %d rows', planData?.length || 0);
     }
   }
 
   const required = focusIds.length;
 
   if (required === 0) {
+    console.warn('[weekState] ❌ No assignments found for cycle=%d week=%d role=%d', 
+      cycleNumber, weekInCycle, roleId);
     return {
       state: 'no_assignments',
       backlogCount: 0,
@@ -480,7 +475,11 @@ export async function computeWeekState(params: {
   // current staff id from userId
   const staffId = staff.id;
 
-  // Get weekly_scores for those focus IDs (this week only!)
+  // DUAL-SYSTEM SCORE QUERY: Query scores using focus IDs from BOTH systems
+  // This ensures we find scores regardless of whether they were submitted
+  // against weekly_focus (UUID) or weekly_plan (prefixed) IDs
+  console.log('[weekState] 🔍 Searching for scores with focus IDs:', focusIds);
+  
   const { data: scores } = await supabase
     .from('weekly_scores')
     .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id')

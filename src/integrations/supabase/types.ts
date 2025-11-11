@@ -621,7 +621,9 @@ export type Database = {
           content_md: string | null
           created_at: string
           display_order: number
+          duration_ms: number | null
           id: string
+          metadata: Json | null
           provider: string | null
           status: string
           title: string | null
@@ -634,7 +636,9 @@ export type Database = {
           content_md?: string | null
           created_at?: string
           display_order?: number
+          duration_ms?: number | null
           id?: string
+          metadata?: Json | null
           provider?: string | null
           status?: string
           title?: string | null
@@ -647,7 +651,9 @@ export type Database = {
           content_md?: string | null
           created_at?: string
           display_order?: number
+          duration_ms?: number | null
           id?: string
+          metadata?: Json | null
           provider?: string | null
           status?: string
           title?: string | null

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GraduationCap, Video, FileText, Link as LinkIcon, Plus, Trash2 } from 'lucide-react';
+import { GraduationCap, Video, FileText, Link as LinkIcon, Plus, Trash2, Volume2, Loader2 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { YouTubePreview } from './YouTubePreview';
@@ -53,6 +54,13 @@ export function LearningDrawer({
   const [showLinkEditor, setShowLinkEditor] = useState(false);
   const [videoError, setVideoError] = useState<string>();
   const [initialSnap, setInitialSnap] = useState<string>('');
+  
+  // Audio state
+  const [audioUrl, setAudioUrl] = useState<string>();
+  const [audioResourceId, setAudioResourceId] = useState<string>();
+  const [generatingAudio, setGeneratingAudio] = useState(false);
+  const [voiceName, setVoiceName] = useState('Ava Song');
+  const [actingInstructions, setActingInstructions] = useState('');
 
   useEffect(() => {
     if (!open || !actionId) return;
@@ -108,12 +116,25 @@ export function LearningDrawer({
       }));
       setLinks(linksData);
 
+      // Load audio resource
+      const audioRes = resources?.find((r) => r.type === 'audio');
+      if (audioRes) {
+        setAudioUrl(audioRes.url || '');
+        setAudioResourceId(audioRes.id);
+        const metadata = audioRes.metadata as any;
+        setVoiceName(metadata?.voiceName || 'Ava Song');
+      } else {
+        setAudioUrl(undefined);
+        setAudioResourceId(undefined);
+      }
+
       // Set initial snapshot for dirty tracking
       setInitialSnap(JSON.stringify({
         description: pm?.description || '',
         videoUrl: video?.url || '',
         script: scriptRes?.content_md || '',
         links: linksData,
+        audio: audioRes?.url || '',
       }));
     } catch (error) {
       console.error('Error loading learning resources:', error);
@@ -127,18 +148,18 @@ export function LearningDrawer({
     }
   }
 
-  function emitSummary(overrides?: { video?: boolean; script?: boolean; links?: number }) {
+  function emitSummary(overrides?: { video?: boolean; script?: boolean; links?: number; audio?: boolean }) {
     const summary = {
       video: overrides?.video ?? !!videoResourceId,
       script: overrides?.script ?? !!scriptResourceId,
       links: overrides?.links ?? links.length,
       total: 0,
     };
-    summary.total = (summary.video ? 1 : 0) + (summary.script ? 1 : 0) + summary.links;
+    summary.total = (summary.video ? 1 : 0) + (summary.script ? 1 : 0) + summary.links + (overrides?.audio ?? !!audioResourceId ? 1 : 0);
     onResourcesChange?.(summary);
   }
 
-  const isDirty = initialSnap !== JSON.stringify({ description, videoUrl, script, links });
+  const isDirty = initialSnap !== JSON.stringify({ description, videoUrl, script, links, audio: audioUrl });
 
   async function saveDescription() {
     setIsSaving(true);
@@ -148,7 +169,7 @@ export function LearningDrawer({
         .update({ description })
         .eq('action_id', actionId);
       
-      setInitialSnap(JSON.stringify({ description, videoUrl, script, links }));
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links, audio: audioUrl }));
       
       toast({
         title: 'Success',
@@ -211,7 +232,7 @@ export function LearningDrawer({
         description: 'Video saved',
       });
 
-      setInitialSnap(JSON.stringify({ description, videoUrl: nextUrl, script, links }));
+      setInitialSnap(JSON.stringify({ description, videoUrl: nextUrl, script, links, audio: audioUrl }));
       emitSummary({ video: true });
     } catch (error) {
       toast({
@@ -249,7 +270,7 @@ export function LearningDrawer({
         description: 'Video removed',
       });
 
-      setInitialSnap(JSON.stringify({ description, videoUrl: '', script, links }));
+      setInitialSnap(JSON.stringify({ description, videoUrl: '', script, links, audio: audioUrl }));
       emitSummary({ video: false });
     } catch (error) {
       toast({
@@ -286,7 +307,7 @@ export function LearningDrawer({
           title: 'Success',
           description: 'Script removed',
         });
-        setInitialSnap(JSON.stringify({ description, videoUrl, script: '', links }));
+        setInitialSnap(JSON.stringify({ description, videoUrl, script: '', links, audio: audioUrl }));
         emitSummary({ script: false });
         return;
       }
@@ -313,7 +334,7 @@ export function LearningDrawer({
         setScriptResourceId(data?.id);
       }
 
-      setInitialSnap(JSON.stringify({ description, videoUrl, script, links }));
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links, audio: audioUrl }));
 
       toast({
         title: 'Success',
@@ -383,7 +404,7 @@ export function LearningDrawer({
 
       setShowLinkEditor(false);
       setEditingLink(null);
-      setInitialSnap(JSON.stringify({ description, videoUrl, script, links: updatedLinks }));
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links: updatedLinks, audio: audioUrl }));
       
       toast({
         title: 'Success',
@@ -414,7 +435,7 @@ export function LearningDrawer({
 
       const updatedLinks = links.filter((l) => l.id !== link.id);
       setLinks(updatedLinks);
-      setInitialSnap(JSON.stringify({ description, videoUrl, script, links: updatedLinks }));
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links: updatedLinks, audio: audioUrl }));
       
       toast({
         title: 'Success',
@@ -448,12 +469,92 @@ export function LearningDrawer({
 
       await Promise.all(updates);
 
-      setInitialSnap(JSON.stringify({ description, videoUrl, script, links: reorderedLinks }));
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links: reorderedLinks, audio: audioUrl }));
       emitSummary({ links: reorderedLinks.length });
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to reorder links',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function generateAudio() {
+    if (!script || !script.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Script is empty. Please add content before generating audio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setGeneratingAudio(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-audio', {
+        body: {
+          actionId,
+          scriptMd: script,
+          voiceName,
+          actingInstructions: actingInstructions.trim() || undefined
+        }
+      });
+
+      if (error) throw error;
+
+      setAudioUrl(data.url);
+      setAudioResourceId(data.resourceId);
+      
+      toast({
+        title: 'Success',
+        description: 'Audio generated successfully',
+      });
+
+      emitSummary({ audio: true });
+    } catch (e: any) {
+      console.error('Audio generation error:', e);
+      toast({
+        title: 'Error',
+        description: e?.message || 'Failed to generate audio',
+        variant: 'destructive',
+      });
+    } finally {
+      setGeneratingAudio(false);
+    }
+  }
+
+  async function deleteAudio() {
+    setIsSaving(true);
+    try {
+      if (audioResourceId) {
+        await supabase
+          .from('pro_move_resources')
+          .delete()
+          .eq('id', audioResourceId);
+      } else {
+        await supabase
+          .from('pro_move_resources')
+          .delete()
+          .eq('action_id', actionId)
+          .eq('type', 'audio');
+      }
+
+      setAudioUrl(undefined);
+      setAudioResourceId(undefined);
+
+      toast({
+        title: 'Success',
+        description: 'Audio removed',
+      });
+
+      emitSummary({ audio: false });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete audio',
         variant: 'destructive',
       });
     } finally {
@@ -595,6 +696,110 @@ export function LearningDrawer({
                   </Button>
                 )}
               </div>
+            </section>
+
+            <Separator />
+
+            {/* Audio Section */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Volume2 className="h-4 w-4 text-muted-foreground" />
+                <h3 className="font-medium">Audio Narration</h3>
+              </div>
+              
+              {audioUrl ? (
+                <div className="space-y-3">
+                  <audio 
+                    controls 
+                    preload="metadata" 
+                    src={audioUrl}
+                    className="w-full"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      onClick={generateAudio}
+                      size="sm"
+                      variant="outline"
+                      disabled={generatingAudio || isSaving || !script}
+                    >
+                      {generatingAudio ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        'Replace Audio'
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={deleteAudio}
+                      variant="outline"
+                      size="sm"
+                      disabled={isSaving || generatingAudio}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="voice-select">Voice</Label>
+                    <Select value={voiceName} onValueChange={setVoiceName}>
+                      <SelectTrigger id="voice-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Ava Song">Ava Song (Warm, Clear)</SelectItem>
+                        <SelectItem value="Kora">Kora (Professional)</SelectItem>
+                        <SelectItem value="Dacher">Dacher (Authoritative)</SelectItem>
+                        <SelectItem value="Stella">Stella (Friendly)</SelectItem>
+                        <SelectItem value="Whimsy">Whimsy (Energetic)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="acting-instructions">Acting Instructions (Optional)</Label>
+                    <Input
+                      id="acting-instructions"
+                      value={actingInstructions}
+                      onChange={(e) => setActingInstructions(e.target.value)}
+                      placeholder="e.g., enthusiastic, calm, professional"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Describe how the voice should sound (tone, energy, mood)
+                    </p>
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={generateAudio}
+                    size="sm"
+                    disabled={generatingAudio || isSaving || !script}
+                  >
+                    {generatingAudio ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        Generating Audio...
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="h-4 w-4 mr-1" />
+                        Generate Audio from Script
+                      </>
+                    )}
+                  </Button>
+                  {!script && (
+                    <p className="text-xs text-muted-foreground">
+                      Add a script above to generate audio
+                    </p>
+                  )}
+                </div>
+              )}
             </section>
 
             <Separator />

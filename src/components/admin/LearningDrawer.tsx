@@ -255,11 +255,13 @@ export function LearningDrawer({
       await saveScriptInternal();
 
       // Save audio draft if present
+      let finalAudioUrl = audioUrl;
       if (audioState === 'draft' && draftMetadata) {
-        await saveAudio();
+        const savedUrl = await saveAudio();
+        if (savedUrl) finalAudioUrl = savedUrl;
       }
 
-      setInitialSnap(JSON.stringify({ description, videoUrl, script, links, audio: audioUrl }));
+      setInitialSnap(JSON.stringify({ description, videoUrl, script, links, audio: finalAudioUrl }));
       
       toast({
         title: 'Success',
@@ -593,14 +595,14 @@ export function LearningDrawer({
     }
   }
 
-  async function saveAudio() {
+  async function saveAudio(): Promise<string | undefined> {
     if (audioState !== 'draft' || !draftMetadata) {
       toast({
         title: 'Error',
         description: 'No draft audio to save',
         variant: 'destructive',
       });
-      return;
+      return undefined;
     }
 
     setSavingAudio(true);
@@ -651,6 +653,7 @@ export function LearningDrawer({
         });
 
         emitSummary({ audio: true });
+        return publicData.publicUrl;
       } else {
         throw new Error('Failed to get public URL for saved audio');
       }
@@ -661,6 +664,7 @@ export function LearningDrawer({
         description: e?.message || 'Failed to save audio',
         variant: 'destructive',
       });
+      return undefined;
     } finally {
       setSavingAudio(false);
     }

@@ -90,10 +90,7 @@ export function LearningDrawer({
   const [savedVersion, setSavedVersion] = useState<number>();
   
   // Computed properties
-  const currentScriptHash = script ? hashString(script) : '';
-  const scriptChanged = savedScriptHash && savedScriptHash !== currentScriptHash;
-  const canSave = audioState === 'draft' && draftMetadata?.scriptHash === currentScriptHash;
-  const needsRegeneration = audioState === 'saved' && scriptChanged;
+  const hasAudio = audioState === 'draft' || audioState === 'saved';
 
   useEffect(() => {
     if (!open || !actionId) return;
@@ -590,10 +587,10 @@ export function LearningDrawer({
   }
 
   async function saveAudio() {
-    if (!canSave || !draftMetadata) {
+    if (audioState !== 'draft' || !draftMetadata) {
       toast({
         title: 'Error',
-        description: 'Cannot save: draft does not match current script',
+        description: 'No draft audio to save',
         variant: 'destructive',
       });
       return;
@@ -607,6 +604,7 @@ export function LearningDrawer({
       }
 
       const requestId = crypto.randomUUID();
+      const currentScriptHash = script ? hashString(script) : '';
       
       const { data, error } = await supabase.functions.invoke('save-audio', {
         body: {
@@ -615,7 +613,7 @@ export function LearningDrawer({
           voiceName: draftMetadata.voice,
           durationSec: draftMetadata.durationSec,
           generationId: draftMetadata.generationId,
-          scriptHash: draftMetadata.scriptHash,
+          scriptHash: currentScriptHash, // Use current script hash
           requestId
         }
       });
@@ -636,7 +634,7 @@ export function LearningDrawer({
         // Switch to saved state
         setAudioUrl(signedData.signedUrl + `?v=${data.version}`);
         setAudioResourceId(data.resourceId);
-        setSavedScriptHash(draftMetadata.scriptHash);
+        setSavedScriptHash(currentScriptHash);
         setSavedVersion(data.version);
         setAudioState('saved');
         
@@ -652,6 +650,54 @@ export function LearningDrawer({
       toast({
         title: 'Error',
         description: e?.message || 'Failed to save audio',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingAudio(false);
+    }
+  }
+
+  async function clearAudio() {
+    if (!window.confirm('Delete this audio recording?')) return;
+    
+    setSavingAudio(true);
+    try {
+      // Clean up draft state
+      if (draftAudioBlob) {
+        URL.revokeObjectURL(draftAudioBlob);
+        setDraftAudioBlob(undefined);
+      }
+      delete (window as any).__draftAudioBase64;
+      setDraftMetadata(undefined);
+      
+      // If saved, delete from DB
+      if (audioResourceId) {
+        const { error } = await supabase
+          .from('pro_move_resources')
+          .delete()
+          .eq('id', audioResourceId);
+        
+        if (error) throw error;
+      }
+      
+      // Reset all audio state
+      setAudioState('empty');
+      setAudioUrl(undefined);
+      setAudioResourceId(undefined);
+      setSavedScriptHash(undefined);
+      setSavedVersion(undefined);
+      
+      toast({
+        title: 'Audio Deleted',
+        description: 'Audio recording removed successfully',
+      });
+      
+      emitSummary({ audio: false });
+    } catch (e: any) {
+      console.error('Clear audio error:', e);
+      toast({
+        title: 'Error',
+        description: e?.message || 'Failed to delete audio',
         variant: 'destructive',
       });
     } finally {
@@ -802,11 +848,6 @@ export function LearningDrawer({
               <div className="flex items-center gap-2">
                 <Volume2 className="h-4 w-4 text-muted-foreground" />
                 <h3 className="font-medium">Audio Narration</h3>
-                {needsRegeneration && (
-                  <Badge variant="outline" className="text-xs text-orange-600 border-orange-600">
-                    Script changed—regenerate to update
-                  </Badge>
-                )}
               </div>
               
               <div className="space-y-3">
@@ -868,72 +909,54 @@ export function LearningDrawer({
 
                 {/* Controls */}
                 <div className="flex gap-2 flex-wrap">
-                  {audioState === 'empty' && (
+                  <Button
+                    type="button"
+                    onClick={generateAudio}
+                    size="sm"
+                    variant={hasAudio ? "outline" : "default"}
+                    disabled={generatingAudio || savingAudio || !script}
+                  >
+                    {generatingAudio ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="h-4 w-4 mr-1" />
+                        Generate
+                      </>
+                    )}
+                  </Button>
+                  
+                  {audioState === 'draft' && (
                     <Button
                       type="button"
-                      onClick={generateAudio}
+                      onClick={saveAudio}
                       size="sm"
-                      disabled={generatingAudio || !script}
+                      disabled={savingAudio}
                     >
-                      {generatingAudio ? (
+                      {savingAudio ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          Generating...
+                          Saving...
                         </>
                       ) : (
-                        <>
-                          <Volume2 className="h-4 w-4 mr-1" />
-                          Generate
-                        </>
+                        'Save'
                       )}
                     </Button>
                   )}
                   
-                  {audioState === 'draft' && (
-                    <>
-                      <Button
-                        type="button"
-                        onClick={saveAudio}
-                        size="sm"
-                        disabled={savingAudio || !canSave}
-                      >
-                        {savingAudio ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          'Save'
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={generateAudio}
-                        variant="outline"
-                        size="sm"
-                        disabled={generatingAudio || savingAudio}
-                      >
-                        Regenerate
-                      </Button>
-                    </>
-                  )}
-                  
-                  {audioState === 'saved' && (
+                  {hasAudio && (
                     <Button
                       type="button"
-                      onClick={generateAudio}
+                      onClick={clearAudio}
                       variant="outline"
                       size="sm"
-                      disabled={generatingAudio || !script}
+                      disabled={generatingAudio || savingAudio}
                     >
-                      {generatingAudio ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        'Regenerate'
-                      )}
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Clear
                     </Button>
                   )}
                 </div>
@@ -941,11 +964,6 @@ export function LearningDrawer({
                 {!script && (
                   <p className="text-xs text-muted-foreground">
                     Add a script above to generate audio
-                  </p>
-                )}
-                {!canSave && audioState === 'draft' && (
-                  <p className="text-xs text-orange-600">
-                    Script changed after generation—regenerate to save
                   </p>
                 )}
               </div>

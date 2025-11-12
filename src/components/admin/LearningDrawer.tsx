@@ -33,27 +33,27 @@ const TONE_PRESETS = [
   {
     name: "Warm Professional",
     description: "Everyday communication, bookings, intros",
-    instructions: "Speak with a calm, confident tone—friendly but focused, like someone who genuinely enjoys helping others."
+    instructions: "Speak with a calm, friendly tone—confident but relaxed, like someone who's genuinely happy to help and knows what they're doing."
   },
   {
     name: "Empathetic Reassurance",
-    description: "Cancellations, objections, sensitive calls",
-    instructions: "Sound steady and caring, as if you're talking to a parent who's slightly worried but you've got everything under control."
+    description: "Cancellations, objections, worried parents",
+    instructions: "Sound steady and kind, keeping your voice soft but certain—like you're helping someone feel taken care of, not corrected."
   },
   {
     name: "Bright Hospitality",
     description: "Greetings, confirmations, light rapport",
-    instructions: "Bring a light, upbeat energy—as if you're welcoming someone at the front door and want them to feel instantly at ease."
+    instructions: "Bring an upbeat, welcoming tone—as if you're smiling while you talk and want the other person to feel instantly comfortable."
   },
   {
     name: "Clear Instructional",
-    description: "Policy explanations, processes, directions",
-    instructions: "Deliver lines with patient clarity, pausing slightly between key points so the listener can follow without confusion."
+    description: "Policies, directions, next steps",
+    instructions: "Speak slowly and clearly, with patience and warmth—guiding the listener step by step so they never feel rushed or confused."
   },
   {
-    name: "Poised Confidence",
-    description: "Technology, credibility, high-trust messaging",
-    instructions: "Speak with polished assurance—measured pacing, relaxed tone, and crisp articulation that projects expertise."
+    name: "Confident Caregiver",
+    description: "Treatment explanations, credibility, reassurance",
+    instructions: "Use a calm, assured tone that blends professionalism with empathy—like a trusted team member explaining something important in simple terms."
   }
 ];
 
@@ -907,17 +907,17 @@ export function LearningDrawer({
                     <SelectTrigger id="tone-preset">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-background">
                       {TONE_PRESETS.map(preset => (
                         <SelectItem key={preset.name} value={preset.name}>
-                          {preset.name}
+                          <div className="flex flex-col gap-0.5 py-1">
+                            <span className="font-medium">{preset.name}</span>
+                            <span className="text-xs text-muted-foreground italic">{preset.description}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {TONE_PRESETS.find(p => p.name === tonePreset)?.description}
-                  </p>
                 </div>
 
                 {/* Audio preview */}

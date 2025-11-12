@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2, Unlock } from 'lucide-react';
 import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
 import { fetchProMoveMetaByIds } from '@/lib/proMoves';
@@ -23,6 +23,7 @@ interface WeekSlot {
   domainName: string;
   status?: string;
   isLocked: boolean;
+  planId?: number | null;
   rankSnapshot?: {
     parts: { C: number; R: number; E: number; D: number; T: number };
     final: number;
@@ -57,13 +58,33 @@ export function WeekBuilderPanel({
   const [savingChanges, setSavingChanges] = useState(false);
   const [deleteWeekDialogOpen, setDeleteWeekDialogOpen] = useState(false);
   const [weekToDelete, setWeekToDelete] = useState<string | null>(null);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
+  const [slotToUnlock, setSlotToUnlock] = useState<{ weekStart: string; displayOrder: number; planId: number | null } | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const currentMonday = normalizeToPlannerWeek(new Date());
+
+  useEffect(() => {
+    checkSuperAdmin();
+  }, []);
 
   useEffect(() => {
     if (viewMode === 'month') return; // skip week fetching in month view
     loadWeeks(selectedMonday);
   }, [roleId, selectedMonday, showTwoWeeks, viewMode]);
+
+  const checkSuperAdmin = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: staffData } = await supabase
+      .from('staff')
+      .select('is_super_admin')
+      .eq('user_id', user.id)
+      .single();
+
+    setIsSuperAdmin(staffData?.is_super_admin || false);
+  };
 
   const loadWeeks = async (startMonday: string) => {
     setLoading(true);
@@ -146,6 +167,7 @@ export function WeekBuilderPanel({
         domainName: '',
         status: row.status,
         isLocked: false,
+        planId: row.id,
       };
 
       const weekIdx = weeks.findIndex(w => w.weekStart === row.week_start_date);
@@ -473,6 +495,48 @@ export function WeekBuilderPanel({
     }
   };
 
+  const handleForceUnlock = async () => {
+    if (!slotToUnlock?.planId) return;
+
+    try {
+      const planIdStr = `plan:${slotToUnlock.planId}`;
+      
+      console.log('[WeekBuilderPanel] Force unlocking slot:', {
+        planId: slotToUnlock.planId,
+        planIdStr,
+        weekStart: slotToUnlock.weekStart,
+        displayOrder: slotToUnlock.displayOrder,
+      });
+
+      // Delete all scores for this plan ID
+      const { error: deleteError, count } = await supabase
+        .from('weekly_scores')
+        .delete({ count: 'exact' })
+        .eq('weekly_focus_id', planIdStr);
+
+      if (deleteError) throw deleteError;
+
+      console.log('[WeekBuilderPanel] Deleted scores count:', count);
+
+      toast({
+        title: 'Slot unlocked',
+        description: `Removed ${count || 0} score(s) from slot #${slotToUnlock.displayOrder}`,
+      });
+
+      // Reload weeks
+      await loadWeeks(selectedMonday);
+      setUnlockDialogOpen(false);
+      setSlotToUnlock(null);
+    } catch (error: any) {
+      console.error('[WeekBuilderPanel] Force unlock failed:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to unlock slot',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -670,10 +734,30 @@ export function WeekBuilderPanel({
                           Slot #{slot.displayOrder}
                         </div>
                         {slot.isLocked && (
-                          <Badge variant={isPastWeek ? "secondary" : "default"} className="text-xs gap-1">
-                            <Lock className="h-3 w-3" />
-                            {isPastWeek ? "Completed" : "In Use"}
-                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge variant={isPastWeek ? "secondary" : "default"} className="text-xs gap-1">
+                              <Lock className="h-3 w-3" />
+                              {isPastWeek ? "Completed" : "In Use"}
+                            </Badge>
+                            {isSuperAdmin && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setSlotToUnlock({
+                                    weekStart: week.weekStart,
+                                    displayOrder: slot.displayOrder,
+                                    planId: slot.planId || null,
+                                  });
+                                  setUnlockDialogOpen(true);
+                                }}
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-warning"
+                                title="Force unlock (admin only)"
+                              >
+                                <Unlock className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
                         )}
                         {!slot.isLocked && slot.actionId && (
                           <Badge variant="outline" className="text-xs gap-1">
@@ -771,6 +855,27 @@ export function WeekBuilderPanel({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Week
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={unlockDialogOpen} onOpenChange={setUnlockDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force unlock this slot?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete ALL submitted scores for slot #{slotToUnlock?.displayOrder} in the week of {slotToUnlock?.weekStart && formatDate(slotToUnlock.weekStart)}. 
+              This affects all users who have scored this pro-move. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleForceUnlock}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Force Unlock
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

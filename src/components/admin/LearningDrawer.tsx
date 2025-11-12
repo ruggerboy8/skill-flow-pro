@@ -156,13 +156,18 @@ export function LearningDrawer({
         setAudioResourceId(audioRes.id);
         
         // Get signed URL for preview
-        const { data: signedData } = await supabase.storage
+        const { data: signedData, error: signError } = await supabase.storage
           .from('pro-move-audio')
           .createSignedUrl(audioRes.url, 3600); // 1 hour
         
         if (signedData?.signedUrl) {
-          setAudioUrl(signedData.signedUrl + `?v=${metadata?.version || 1}`);
+          // Construct full URL - signedUrl is a relative path
+          const supabaseUrl = supabase.storage.url.replace('/storage/v1', '');
+          const fullUrl = `${supabaseUrl}${signedData.signedUrl}?v=${metadata?.version || 1}`;
+          setAudioUrl(fullUrl);
           setAudioState('saved');
+        } else if (signError) {
+          console.error('Error creating signed URL:', signError);
         }
       } else {
         setAudioUrl(undefined);
@@ -621,7 +626,7 @@ export function LearningDrawer({
       if (error) throw error;
 
       // Get signed URL for the saved file
-      const { data: signedData } = await supabase.storage
+      const { data: signedData, error: signError } = await supabase.storage
         .from('pro-move-audio')
         .createSignedUrl(data.url, 3600);
       
@@ -631,8 +636,12 @@ export function LearningDrawer({
         setDraftAudioBlob(undefined);
         delete (window as any).__draftAudioBase64;
         
+        // Construct full URL - signedUrl is a relative path
+        const supabaseUrl = supabase.storage.url.replace('/storage/v1', '');
+        const fullUrl = `${supabaseUrl}${signedData.signedUrl}`;
+        
         // Switch to saved state
-        setAudioUrl(signedData.signedUrl + `?v=${data.version}`);
+        setAudioUrl(fullUrl);
         setAudioResourceId(data.resourceId);
         setSavedScriptHash(currentScriptHash);
         setSavedVersion(data.version);
@@ -644,6 +653,9 @@ export function LearningDrawer({
         });
 
         emitSummary({ audio: true });
+      } else if (signError) {
+        console.error('Error creating signed URL:', signError);
+        throw new Error('Failed to create signed URL for saved audio');
       }
     } catch (e: any) {
       console.error('Audio save error:', e);

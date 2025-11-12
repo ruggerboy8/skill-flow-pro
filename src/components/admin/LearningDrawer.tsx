@@ -250,6 +250,11 @@ export function LearningDrawer({
       // Save or remove script
       await saveScriptInternal();
 
+      // Save audio draft if present
+      if (audioState === 'draft' && draftMetadata) {
+        await saveAudio();
+      }
+
       setInitialSnap(JSON.stringify({ description, videoUrl, script, links, audio: audioUrl }));
       
       toast({
@@ -952,24 +957,6 @@ export function LearningDrawer({
                       </>
                     )}
                   </Button>
-                  
-                  {audioState === 'draft' && (
-                    <Button
-                      type="button"
-                      onClick={saveAudio}
-                      size="sm"
-                      disabled={savingAudio}
-                    >
-                      {savingAudio ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        'Save'
-                      )}
-                    </Button>
-                  )}
                   
                   {hasAudio && (
                     <Button

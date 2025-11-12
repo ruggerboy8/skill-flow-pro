@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { YouTubePreview } from './YouTubePreview';
@@ -94,6 +95,7 @@ export function LearningDrawer({
   const [showLinkEditor, setShowLinkEditor] = useState(false);
   const [videoError, setVideoError] = useState<string>();
   const [initialSnap, setInitialSnap] = useState<string>('');
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   
   // Audio state machine
   type AudioState = 'empty' | 'draft' | 'saved';
@@ -296,6 +298,7 @@ export function LearningDrawer({
           provider: 'youtube',
           url: nextUrl,
           display_order: 0,
+          status: 'active',
         })
         .select()
         .single();
@@ -384,6 +387,7 @@ export function LearningDrawer({
           type: 'script',
           content_md: script,
           display_order: 1,
+          status: 'active',
         })
         .select()
         .single();
@@ -428,6 +432,7 @@ export function LearningDrawer({
             url: link.url,
             title: link.title,
             display_order: links.length + 10,
+            status: 'active',
           })
           .select()
           .single();
@@ -706,18 +711,20 @@ export function LearningDrawer({
   }
 
   return (
-    <Sheet 
-      open={open} 
-      onOpenChange={(next) => {
-        if (!next) {
-          if (isSaving) return;
-          if (isDirty) {
-            if (!window.confirm('Discard unsaved changes?')) return;
+    <>
+      <Sheet 
+        open={open} 
+        onOpenChange={(next) => {
+          if (!next) {
+            if (isSaving) return;
+            if (isDirty) {
+              setShowUnsavedDialog(true);
+              return;
+            }
           }
-        }
-        onOpenChange(next);
-      }}
-    >
+          onOpenChange(next);
+        }}
+      >
       <SheetContent className="sm:max-w-[600px] overflow-y-auto">
         <SheetHeader>
           <div className="flex items-center gap-2">
@@ -1039,5 +1046,28 @@ export function LearningDrawer({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+
+    <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have unsaved changes. If you close now, your changes will be lost.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep Editing</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setShowUnsavedDialog(false);
+              onOpenChange(false);
+            }}
+          >
+            Discard Changes
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }

@@ -162,8 +162,8 @@ export function LearningDrawer({
         
         if (signedData?.signedUrl) {
           // Construct full URL - signedUrl is a relative path
-          const supabaseUrl = supabase.storage.url.replace('/storage/v1', '');
-          const fullUrl = `${supabaseUrl}${signedData.signedUrl}?v=${metadata?.version || 1}`;
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const fullUrl = `${supabaseUrl}${signedData.signedUrl}`;
           setAudioUrl(fullUrl);
           setAudioState('saved');
         } else if (signError) {
@@ -637,7 +637,7 @@ export function LearningDrawer({
         delete (window as any).__draftAudioBase64;
         
         // Construct full URL - signedUrl is a relative path
-        const supabaseUrl = supabase.storage.url.replace('/storage/v1', '');
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const fullUrl = `${supabaseUrl}${signedData.signedUrl}`;
         
         // Switch to saved state

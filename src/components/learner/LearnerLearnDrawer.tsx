@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
-import { GraduationCap, Video, FileText, Link as LinkIcon, X, Volume2 } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { getDomainColor } from '@/lib/domainColors';
-import { extractYouTubeId } from '@/lib/youtubeHelpers';
-
+import { useState, useEffect } from "react";
+import { GraduationCap, Video, FileText, Link as LinkIcon, X, Volume2 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { getDomainColor } from "@/lib/domainColors";
+import { extractYouTubeId } from "@/lib/youtubeHelpers";
 
 interface LearnerLearnDrawerProps {
   open: boolean;
@@ -35,7 +34,7 @@ export function LearnerLearnDrawer({
   domainName,
 }: LearnerLearnDrawerProps) {
   const [loading, setLoading] = useState(true);
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState("");
   const [videoResource, setVideoResource] = useState<Resource | null>(null);
   const [scriptResource, setScriptResource] = useState<Resource | null>(null);
   const [audioResource, setAudioResource] = useState<Resource | null>(null);
@@ -50,41 +49,35 @@ export function LearnerLearnDrawer({
     setLoading(true);
     try {
       // Fetch description from pro_moves
-      const { data: pm } = await supabase
-        .from('pro_moves')
-        .select('description')
-        .eq('action_id', actionId)
-        .single();
+      const { data: pm } = await supabase.from("pro_moves").select("description").eq("action_id", actionId).single();
 
       // Fetch all active resources
       const { data: resources } = await supabase
-        .from('pro_move_resources')
-        .select('*')
-        .eq('action_id', actionId)
-        .eq('status', 'active')
-        .order('display_order');
+        .from("pro_move_resources")
+        .select("*")
+        .eq("action_id", actionId)
+        .eq("status", "active")
+        .order("display_order");
 
-      setDescription(pm?.description || '');
+      setDescription(pm?.description || "");
 
       // Find video (prefer lowest display_order)
-      const video = resources?.find((r) => r.type === 'video');
+      const video = resources?.find((r) => r.type === "video");
       setVideoResource(video || null);
 
       // Find script
-      const script = resources?.find((r) => r.type === 'script');
+      const script = resources?.find((r) => r.type === "script");
       setScriptResource(script || null);
 
       // Find audio (only active status with public URL)
-      const audio = resources?.find((r) => r.type === 'audio' && r.status === 'active');
+      const audio = resources?.find((r) => r.type === "audio" && r.status === "active");
       if (audio) {
-        const { data: publicData } = supabase.storage
-          .from('pro-move-audio')
-          .getPublicUrl(audio.url);
-        
+        const { data: publicData } = supabase.storage.from("pro-move-audio").getPublicUrl(audio.url);
+
         if (publicData?.publicUrl) {
           setAudioResource({
             ...audio,
-            url: publicData.publicUrl
+            url: publicData.publicUrl,
           });
         } else {
           setAudioResource(null);
@@ -94,14 +87,14 @@ export function LearnerLearnDrawer({
       }
 
       // Find all links
-      const links = resources?.filter((r) => r.type === 'link') || [];
+      const links = resources?.filter((r) => r.type === "link") || [];
       setLinkResources(links);
     } catch (error) {
-      console.error('Error loading learning resources:', error);
+      console.error("Error loading learning resources:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to load learning resources',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to load learning resources",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -155,9 +148,10 @@ export function LearnerLearnDrawer({
               <section className="space-y-2">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  <h3 id="why-matters" className="font-medium">Why this matters</h3>
+                  <h3 id="why-matters" className="font-medium">
+                    Why this matters
+                  </h3>
                 </div>
-                <p className="text-xs text-muted-foreground italic">30-sec read: what good looks like.</p>
                 <div className="text-sm text-muted-foreground whitespace-pre-wrap" aria-labelledby="why-matters">
                   {description}
                 </div>
@@ -172,7 +166,9 @@ export function LearnerLearnDrawer({
               <section className="space-y-2">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  <h3 id="try-saying" className="font-medium">Try saying it like this</h3>
+                  <h3 id="try-saying" className="font-medium">
+                    Try saying it like this
+                  </h3>
                 </div>
                 <p className="text-xs text-muted-foreground italic">Use this wording or make it your own.</p>
                 <div
@@ -238,23 +234,12 @@ export function LearnerLearnDrawer({
                 </div>
                 <div className="space-y-2">
                   {linkResources.map((link) => (
-                    <Button
-                      key={link.id}
-                      variant="outline"
-                      className="w-full justify-start p-3 h-auto"
-                      asChild
-                    >
-                      <a
-                        href={link.url || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                    <Button key={link.id} variant="outline" className="w-full justify-start p-3 h-auto" asChild>
+                      <a href={link.url || "#"} target="_blank" rel="noopener noreferrer">
                         <div className="flex items-center gap-2 w-full min-w-0">
                           <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
                           <div className="min-w-0 text-left flex-1">
-                            {link.title && (
-                              <p className="font-medium text-sm truncate">{link.title}</p>
-                            )}
+                            {link.title && <p className="font-medium text-sm truncate">{link.title}</p>}
                             <p className="text-xs text-muted-foreground truncate">{link.url}</p>
                           </div>
                         </div>

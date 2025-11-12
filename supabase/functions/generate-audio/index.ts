@@ -19,6 +19,16 @@ function stripMarkdownToText(md: string): string {
     .trim();
 }
 
+// Map voice names to Hume voice IDs
+const VOICE_ID_MAP: Record<string, string> = {
+  'Ava Song': 'ava-song-id', // Replace with actual ID from Hume
+  'Kora': 'kora-id', // Replace with actual ID from Hume
+  'Dacher': 'dacher-id', // Replace with actual ID from Hume
+  'Stella': 'stella-id', // Replace with actual ID from Hume
+  'Whimsy': 'whimsy-id', // Replace with actual ID from Hume
+  'Jessica': '03012e0c-8b7e-4c9d-9579-04bea0a56674'
+};
+
 // Compute SHA-256 hash of text for integrity checking
 async function computeScriptHash(text: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -103,6 +113,12 @@ serve(async (req) => {
     // Compute script hash for integrity checking
     const scriptHash = await computeScriptHash(text);
 
+    // Get voice ID - try to use ID if voice name is recognized, otherwise use name
+    const voiceId = VOICE_ID_MAP[voiceName];
+    const voiceConfig = voiceId 
+      ? { id: voiceId }
+      : { name: voiceName, provider: 'HUME_AI' };
+
     // Call Hume TTS API (v0) using direct HTTP
     const humeResponse = await fetch('https://api.hume.ai/v0/tts', {
       method: 'POST',
@@ -115,10 +131,7 @@ serve(async (req) => {
         utterances: [
           {
             text,
-            voice: {
-              name: voiceName,
-              provider: 'HUME_AI'
-            },
+            voice: voiceConfig,
             ...(actingInstructions ? { description: actingInstructions } : {})
           }
         ]

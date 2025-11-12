@@ -864,6 +864,7 @@ export function LearningDrawer({
                       <SelectItem value="Dacher">Dacher (Authoritative)</SelectItem>
                       <SelectItem value="Stella">Stella (Friendly)</SelectItem>
                       <SelectItem value="Whimsy">Whimsy (Energetic)</SelectItem>
+                      <SelectItem value="Jessica">Jessica</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

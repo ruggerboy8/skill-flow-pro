@@ -56,12 +56,12 @@ export function LearnerLearnDrawer({
         .eq('action_id', actionId)
         .single();
 
-      // Fetch all published resources
+      // Fetch all active resources
       const { data: resources } = await supabase
         .from('pro_move_resources')
         .select('*')
         .eq('action_id', actionId)
-        .eq('status', 'published')
+        .eq('status', 'active')
         .order('display_order');
 
       setDescription(pm?.description || '');
@@ -74,18 +74,17 @@ export function LearnerLearnDrawer({
       const script = resources?.find((r) => r.type === 'script');
       setScriptResource(script || null);
 
-      // Find audio (only active status with signed URL)
+      // Find audio (only active status with public URL)
       const audio = resources?.find((r) => r.type === 'audio' && r.status === 'active');
       if (audio) {
-        const { data: signedData } = await supabase.storage
+        const { data: publicData } = supabase.storage
           .from('pro-move-audio')
-          .createSignedUrl(audio.url, 3600);
+          .getPublicUrl(audio.url);
         
-        if (signedData?.signedUrl) {
-          const metadata = audio.metadata as any;
+        if (publicData?.publicUrl) {
           setAudioResource({
             ...audio,
-            url: signedData.signedUrl + `?v=${metadata?.version || 1}`
+            url: publicData.publicUrl
           });
         } else {
           setAudioResource(null);

@@ -161,7 +161,7 @@ serve(async (req) => {
         .insert({
           action_id: actionId,
           type: 'audio',
-          provider: 'HUME_AI',
+          provider: 'hume',
           url: filename,  // Store path, not public URL
           display_order: 2,
           status: 'active',

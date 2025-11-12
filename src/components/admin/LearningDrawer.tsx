@@ -12,7 +12,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { YouTubePreview } from './YouTubePreview';
-import { MarkdownPreview } from './MarkdownPreview';
 import { LinkEditor } from './LinkEditor';
 import { DraggableList } from './DraggableList';
 import { extractYouTubeId, isValidYouTubeUrl } from '@/lib/youtubeHelpers';
@@ -816,7 +815,16 @@ export function LearningDrawer({
                 <h3 className="font-medium">Script</h3>
               </div>
               
-              <MarkdownPreview value={script} onChange={setScript} />
+              <p className="text-xs text-muted-foreground italic">
+                Please check spelling and grammar before saving.
+              </p>
+              
+              <Textarea
+                value={script}
+                onChange={(e) => setScript(e.target.value)}
+                placeholder="Add script content here..."
+                className="min-h-[200px] font-mono text-sm"
+              />
 
               {scriptResourceId && script && (
                 <Button

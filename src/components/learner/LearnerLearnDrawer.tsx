@@ -74,9 +74,25 @@ export function LearnerLearnDrawer({
       const script = resources?.find((r) => r.type === 'script');
       setScriptResource(script || null);
 
-      // Find audio
-      const audio = resources?.find((r) => r.type === 'audio');
-      setAudioResource(audio || null);
+      // Find audio (only active status with signed URL)
+      const audio = resources?.find((r) => r.type === 'audio' && r.status === 'active');
+      if (audio) {
+        const { data: signedData } = await supabase.storage
+          .from('pro-move-audio')
+          .createSignedUrl(audio.url, 3600);
+        
+        if (signedData?.signedUrl) {
+          const metadata = audio.metadata as any;
+          setAudioResource({
+            ...audio,
+            url: signedData.signedUrl + `?v=${metadata?.version || 1}`
+          });
+        } else {
+          setAudioResource(null);
+        }
+      } else {
+        setAudioResource(null);
+      }
 
       // Find all links
       const links = resources?.filter((r) => r.type === 'link') || [];

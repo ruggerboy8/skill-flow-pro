@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,6 +17,15 @@ function stripMarkdownToText(md: string): string {
     .replace(/[#>*_~`>-]+/g, '')      // md syntax chars
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// Compute SHA-256 hash of text for integrity checking
+async function computeScriptHash(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 serve(async (req) => {
@@ -69,10 +79,10 @@ serve(async (req) => {
       });
     }
 
-    const { actionId, scriptMd, voiceName = 'Ava Song', actingInstructions } = await req.json();
+    const { scriptMd, voiceName = 'Ava Song', actingInstructions, mode = 'generate' } = await req.json();
 
-    if (!actionId || !scriptMd) {
-      return new Response(JSON.stringify({ error: 'Missing actionId or scriptMd' }), {
+    if (!scriptMd) {
+      return new Response(JSON.stringify({ error: 'Missing scriptMd' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -87,8 +97,11 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Generating audio for action ${actionId} with voice ${voiceName}`);
+    console.log(`Generating audio with voice ${voiceName}, mode: ${mode}`);
     console.log(`Text length: ${text.length} characters`);
+
+    // Compute script hash for integrity checking
+    const scriptHash = await computeScriptHash(text);
 
     // Call Hume TTS API (v0) using direct HTTP
     const humeResponse = await fetch('https://api.hume.ai/v0/tts', {
@@ -127,6 +140,7 @@ serve(async (req) => {
     // Get the JSON response with base64 audio
     const result = await humeResponse.json();
     const audioBase64 = result.generations?.[0]?.audio;
+    const generationId = result.generations?.[0]?.id || crypto.randomUUID();
     
     if (!audioBase64) {
       return new Response(
@@ -138,98 +152,18 @@ serve(async (req) => {
       );
     }
 
-    // Decode base64 to binary
-    const audioBuf = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
+    console.log(`Generated audio: ${audioBase64.length} base64 chars, generation_id: ${generationId}`);
 
-    console.log(`Received audio: ${audioBuf.length} bytes`);
-
-    // Upload to Supabase Storage
-    const ts = Date.now();
-    const filename = `action-${actionId}/pm-audio-${ts}.wav`;
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('pro-move-audio')
-      .upload(filename, audioBuf, { 
-        contentType: 'audio/wav',
-        upsert: true 
-      });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      return new Response(
-        JSON.stringify({ error: 'Upload failed', details: uploadError.message }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage
-      .from('pro-move-audio')
-      .getPublicUrl(filename);
-
-    const publicUrl = publicUrlData?.publicUrl;
-    if (!publicUrl) {
-      return new Response(
-        JSON.stringify({ error: 'Unable to resolve public URL' }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    console.log(`Audio uploaded to: ${publicUrl}`);
-
-    // Remove any existing audio for this action
-    await supabase
-      .from('pro_move_resources')
-      .delete()
-      .eq('action_id', actionId)
-      .eq('type', 'audio');
-
-    // Insert new audio resource
-    const { data: inserted, error: insertError } = await supabase
-      .from('pro_move_resources')
-      .insert({
-        action_id: actionId,
-        type: 'audio',
-        provider: 'hume',
-        url: publicUrl,
-        display_order: 2,
-        status: 'published',
-        metadata: {
-          voiceName,
-          generatedAt: new Date().toISOString(),
-          mime: 'audio/wav',
-          textLength: text.length,
-          ...(actingInstructions ? { actingInstructions } : {})
-        }
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('DB insert error:', insertError);
-      return new Response(
-        JSON.stringify({ error: 'DB insert failed', details: insertError.message }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    console.log(`Audio resource created: ${inserted.id}`);
-
+    // Return audio data for client-side preview (no DB/Storage write in generate mode)
     return new Response(
       JSON.stringify({
-        resourceId: inserted.id,
-        url: publicUrl,
+        audioBase64,
+        scriptHash,
+        generationId,
         voiceName,
-        textLength: text.length
+        textLength: text.length,
+        // Estimate duration (very rough: ~150 words/min, ~5 chars/word)
+        durationSec: Math.ceil((text.length / 5) / 150 * 60)
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

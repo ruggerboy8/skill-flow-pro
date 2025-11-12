@@ -6,6 +6,9 @@ verify_jwt = true
 [functions.generate-audio]
 verify_jwt = true
 
+[functions.save-audio]
+verify_jwt = true
+
 [functions.sequencer-rank]
 verify_jwt = true
 

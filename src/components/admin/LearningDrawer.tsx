@@ -17,6 +17,17 @@ import { DraggableList } from './DraggableList';
 import { extractYouTubeId, isValidYouTubeUrl } from '@/lib/youtubeHelpers';
 import { getDomainColor } from '@/lib/domainColors';
 
+// Simple hash function for script integrity checking
+function hashString(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString(36);
+}
+
 interface LearningDrawerProps {
   actionId: number;
   proMoveTitle: string;
@@ -55,12 +66,34 @@ export function LearningDrawer({
   const [videoError, setVideoError] = useState<string>();
   const [initialSnap, setInitialSnap] = useState<string>('');
   
-  // Audio state
+  // Audio state machine
+  type AudioState = 'empty' | 'draft' | 'saved';
+  const [audioState, setAudioState] = useState<AudioState>('empty');
   const [audioUrl, setAudioUrl] = useState<string>();
   const [audioResourceId, setAudioResourceId] = useState<string>();
   const [generatingAudio, setGeneratingAudio] = useState(false);
+  const [savingAudio, setSavingAudio] = useState(false);
   const [voiceName, setVoiceName] = useState('Ava Song');
   const [actingInstructions, setActingInstructions] = useState('');
+  
+  // Draft audio (in memory, not saved)
+  const [draftAudioBlob, setDraftAudioBlob] = useState<string>();
+  const [draftMetadata, setDraftMetadata] = useState<{
+    scriptHash: string;
+    generationId: string;
+    durationSec: number;
+    voice: string;
+  }>();
+  
+  // Saved audio metadata
+  const [savedScriptHash, setSavedScriptHash] = useState<string>();
+  const [savedVersion, setSavedVersion] = useState<number>();
+  
+  // Computed properties
+  const currentScriptHash = script ? hashString(script) : '';
+  const scriptChanged = savedScriptHash && savedScriptHash !== currentScriptHash;
+  const canSave = audioState === 'draft' && draftMetadata?.scriptHash === currentScriptHash;
+  const needsRegeneration = audioState === 'saved' && scriptChanged;
 
   useEffect(() => {
     if (!open || !actionId) return;
@@ -116,16 +149,30 @@ export function LearningDrawer({
       }));
       setLinks(linksData);
 
-      // Load audio resource
-      const audioRes = resources?.find((r) => r.type === 'audio');
+      // Load audio resource (only active)
+      const audioRes = resources?.find((r) => r.type === 'audio' && r.status === 'active');
       if (audioRes) {
-        setAudioUrl(audioRes.url || '');
-        setAudioResourceId(audioRes.id);
         const metadata = audioRes.metadata as any;
-        setVoiceName(metadata?.voiceName || 'Ava Song');
+        setSavedScriptHash(metadata?.script_sha256);
+        setSavedVersion(metadata?.version || 1);
+        setVoiceName(metadata?.voice || 'Ava Song');
+        setAudioResourceId(audioRes.id);
+        
+        // Get signed URL for preview
+        const { data: signedData } = await supabase.storage
+          .from('pro-move-audio')
+          .createSignedUrl(audioRes.url, 3600); // 1 hour
+        
+        if (signedData?.signedUrl) {
+          setAudioUrl(signedData.signedUrl + `?v=${metadata?.version || 1}`);
+          setAudioState('saved');
+        }
       } else {
         setAudioUrl(undefined);
         setAudioResourceId(undefined);
+        setAudioState('empty');
+        setSavedScriptHash(undefined);
+        setSavedVersion(undefined);
       }
 
       // Set initial snapshot for dirty tracking
@@ -493,10 +540,12 @@ export function LearningDrawer({
     }
 
     setGeneratingAudio(true);
+    setDraftAudioBlob(undefined);
+    setDraftMetadata(undefined);
+    
     try {
       const { data, error } = await supabase.functions.invoke('generate-audio', {
         body: {
-          actionId,
           scriptMd: script,
           voiceName,
           actingInstructions: actingInstructions.trim() || undefined
@@ -505,15 +554,29 @@ export function LearningDrawer({
 
       if (error) throw error;
 
-      setAudioUrl(data.url);
-      setAudioResourceId(data.resourceId);
+      // Convert base64 to blob URL for preview
+      const audioBytes = Uint8Array.from(atob(data.audioBase64), c => c.charCodeAt(0));
+      const blob = new Blob([audioBytes], { type: 'audio/wav' });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      setDraftAudioBlob(blobUrl);
+      setDraftMetadata({
+        scriptHash: data.scriptHash,
+        generationId: data.generationId,
+        durationSec: data.durationSec,
+        voice: voiceName
+      });
+      setAudioState('draft');
+      
+      // Store base64 for later save
+      (window as any).__draftAudioBase64 = data.audioBase64;
       
       toast({
-        title: 'Success',
-        description: 'Audio generated successfully',
+        title: 'Audio Generated',
+        description: 'Preview the audio below. Click Save to store it.',
       });
 
-      emitSummary({ audio: true });
+      emitSummary({ audio: false }); // Draft doesn't count yet
     } catch (e: any) {
       console.error('Audio generation error:', e);
       toast({
@@ -526,39 +589,73 @@ export function LearningDrawer({
     }
   }
 
-  async function deleteAudio() {
-    setIsSaving(true);
-    try {
-      if (audioResourceId) {
-        await supabase
-          .from('pro_move_resources')
-          .delete()
-          .eq('id', audioResourceId);
-      } else {
-        await supabase
-          .from('pro_move_resources')
-          .delete()
-          .eq('action_id', actionId)
-          .eq('type', 'audio');
-      }
-
-      setAudioUrl(undefined);
-      setAudioResourceId(undefined);
-
-      toast({
-        title: 'Success',
-        description: 'Audio removed',
-      });
-
-      emitSummary({ audio: false });
-    } catch (error) {
+  async function saveAudio() {
+    if (!canSave || !draftMetadata) {
       toast({
         title: 'Error',
-        description: 'Failed to delete audio',
+        description: 'Cannot save: draft does not match current script',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSavingAudio(true);
+    try {
+      const audioBase64 = (window as any).__draftAudioBase64;
+      if (!audioBase64) {
+        throw new Error('Draft audio not found in memory');
+      }
+
+      const requestId = crypto.randomUUID();
+      
+      const { data, error } = await supabase.functions.invoke('save-audio', {
+        body: {
+          actionId,
+          audioBase64,
+          voiceName: draftMetadata.voice,
+          durationSec: draftMetadata.durationSec,
+          generationId: draftMetadata.generationId,
+          scriptHash: draftMetadata.scriptHash,
+          requestId
+        }
+      });
+
+      if (error) throw error;
+
+      // Get signed URL for the saved file
+      const { data: signedData } = await supabase.storage
+        .from('pro-move-audio')
+        .createSignedUrl(data.url, 3600);
+      
+      if (signedData?.signedUrl) {
+        // Clean up draft
+        if (draftAudioBlob) URL.revokeObjectURL(draftAudioBlob);
+        setDraftAudioBlob(undefined);
+        delete (window as any).__draftAudioBase64;
+        
+        // Switch to saved state
+        setAudioUrl(signedData.signedUrl + `?v=${data.version}`);
+        setAudioResourceId(data.resourceId);
+        setSavedScriptHash(draftMetadata.scriptHash);
+        setSavedVersion(data.version);
+        setAudioState('saved');
+        
+        toast({
+          title: 'Audio Saved',
+          description: `Version ${data.version} saved successfully`,
+        });
+
+        emitSummary({ audio: true });
+      }
+    } catch (e: any) {
+      console.error('Audio save error:', e);
+      toast({
+        title: 'Error',
+        description: e?.message || 'Failed to save audio',
         variant: 'destructive',
       });
     } finally {
-      setIsSaving(false);
+      setSavingAudio(false);
     }
   }
 
@@ -705,23 +802,78 @@ export function LearningDrawer({
               <div className="flex items-center gap-2">
                 <Volume2 className="h-4 w-4 text-muted-foreground" />
                 <h3 className="font-medium">Audio Narration</h3>
+                {needsRegeneration && (
+                  <Badge variant="outline" className="text-xs text-orange-600 border-orange-600">
+                    Script changed—regenerate to update
+                  </Badge>
+                )}
               </div>
               
-              {audioUrl ? (
-                <div className="space-y-3">
-                  <audio 
-                    controls 
-                    preload="metadata" 
-                    src={audioUrl}
-                    className="w-full"
+              <div className="space-y-3">
+                {/* Voice selection - always visible */}
+                <div className="space-y-2">
+                  <Label htmlFor="voice-select">Voice</Label>
+                  <Select value={voiceName} onValueChange={setVoiceName} disabled={generatingAudio || savingAudio}>
+                    <SelectTrigger id="voice-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Ava Song">Ava Song (Warm, Clear)</SelectItem>
+                      <SelectItem value="Kora">Kora (Professional)</SelectItem>
+                      <SelectItem value="Dacher">Dacher (Authoritative)</SelectItem>
+                      <SelectItem value="Stella">Stella (Friendly)</SelectItem>
+                      <SelectItem value="Whimsy">Whimsy (Energetic)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="acting-instructions">Acting Instructions (Optional)</Label>
+                  <Input
+                    id="acting-instructions"
+                    value={actingInstructions}
+                    onChange={(e) => setActingInstructions(e.target.value)}
+                    placeholder="e.g., enthusiastic, calm, professional"
+                    disabled={generatingAudio || savingAudio}
                   />
-                  <div className="flex gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Describe how the voice should sound (tone, energy, mood)
+                  </p>
+                </div>
+
+                {/* Audio preview */}
+                {(audioState === 'draft' && draftAudioBlob) && (
+                  <div className="space-y-2">
+                    <Label>Preview Draft</Label>
+                    <audio 
+                      controls 
+                      preload="metadata" 
+                      src={draftAudioBlob}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+                
+                {(audioState === 'saved' && audioUrl) && (
+                  <div className="space-y-2">
+                    <Label>Saved Audio {savedVersion && `(v${savedVersion})`}</Label>
+                    <audio 
+                      controls 
+                      preload="metadata" 
+                      src={audioUrl}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+
+                {/* Controls */}
+                <div className="flex gap-2 flex-wrap">
+                  {audioState === 'empty' && (
                     <Button
                       type="button"
                       onClick={generateAudio}
                       size="sm"
-                      variant="outline"
-                      disabled={generatingAudio || isSaving || !script}
+                      disabled={generatingAudio || !script}
                     >
                       {generatingAudio ? (
                         <>
@@ -729,77 +881,74 @@ export function LearningDrawer({
                           Generating...
                         </>
                       ) : (
-                        'Replace Audio'
+                        <>
+                          <Volume2 className="h-4 w-4 mr-1" />
+                          Generate
+                        </>
                       )}
                     </Button>
+                  )}
+                  
+                  {audioState === 'draft' && (
+                    <>
+                      <Button
+                        type="button"
+                        onClick={saveAudio}
+                        size="sm"
+                        disabled={savingAudio || !canSave}
+                      >
+                        {savingAudio ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          'Save'
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={generateAudio}
+                        variant="outline"
+                        size="sm"
+                        disabled={generatingAudio || savingAudio}
+                      >
+                        Regenerate
+                      </Button>
+                    </>
+                  )}
+                  
+                  {audioState === 'saved' && (
                     <Button
                       type="button"
-                      onClick={deleteAudio}
+                      onClick={generateAudio}
                       variant="outline"
                       size="sm"
-                      disabled={isSaving || generatingAudio}
+                      disabled={generatingAudio || !script}
                     >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
+                      {generatingAudio ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        'Regenerate'
+                      )}
                     </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="voice-select">Voice</Label>
-                    <Select value={voiceName} onValueChange={setVoiceName}>
-                      <SelectTrigger id="voice-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Ava Song">Ava Song (Warm, Clear)</SelectItem>
-                        <SelectItem value="Kora">Kora (Professional)</SelectItem>
-                        <SelectItem value="Dacher">Dacher (Authoritative)</SelectItem>
-                        <SelectItem value="Stella">Stella (Friendly)</SelectItem>
-                        <SelectItem value="Whimsy">Whimsy (Energetic)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="acting-instructions">Acting Instructions (Optional)</Label>
-                    <Input
-                      id="acting-instructions"
-                      value={actingInstructions}
-                      onChange={(e) => setActingInstructions(e.target.value)}
-                      placeholder="e.g., enthusiastic, calm, professional"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Describe how the voice should sound (tone, energy, mood)
-                    </p>
-                  </div>
-
-                  <Button
-                    type="button"
-                    onClick={generateAudio}
-                    size="sm"
-                    disabled={generatingAudio || isSaving || !script}
-                  >
-                    {generatingAudio ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        Generating Audio...
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 className="h-4 w-4 mr-1" />
-                        Generate Audio from Script
-                      </>
-                    )}
-                  </Button>
-                  {!script && (
-                    <p className="text-xs text-muted-foreground">
-                      Add a script above to generate audio
-                    </p>
                   )}
                 </div>
-              )}
+
+                {!script && (
+                  <p className="text-xs text-muted-foreground">
+                    Add a script above to generate audio
+                  </p>
+                )}
+                {!canSave && audioState === 'draft' && (
+                  <p className="text-xs text-orange-600">
+                    Script changed after generation—regenerate to save
+                  </p>
+                )}
+              </div>
             </section>
 
             <Separator />

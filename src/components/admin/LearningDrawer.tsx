@@ -828,7 +828,7 @@ export function LearningDrawer({
                 value={script}
                 onChange={(e) => setScript(e.target.value)}
                 placeholder="Add script content here..."
-                className="min-h-[200px] font-mono text-sm"
+                className="min-h-[200px]"
               />
 
               {scriptResourceId && script && (

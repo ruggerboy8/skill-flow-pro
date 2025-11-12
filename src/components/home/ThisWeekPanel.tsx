@@ -139,7 +139,7 @@ export default function ThisWeekPanel() {
           .from('pro_move_resources')
           .select('action_id')
           .in('action_id', actionIds)
-          .eq('status', 'published');
+          .eq('status', 'active');
         
         const countMap: Record<number, number> = {};
         (resourceCounts ?? []).forEach(rc => {

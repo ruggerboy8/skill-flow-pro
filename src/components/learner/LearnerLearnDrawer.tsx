@@ -110,9 +110,16 @@ export function LearnerLearnDrawer({
 
   const videoId = videoResource?.url ? extractYouTubeId(videoResource.url) : null;
 
+  // Compute presence flags for conditional rendering
+  const hasDescription = Boolean(description);
+  const hasScript = Boolean(scriptResource?.content_md);
+  const hasAudio = Boolean(audioResource?.url);
+  const hasVideo = Boolean(videoId);
+  const hasLinks = linkResources.length > 0;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+      <SheetContent className="sm:max-w-[600px] overflow-y-auto overflow-x-hidden">
         <SheetHeader>
           <div className="flex items-center gap-2">
             <GraduationCap className="h-5 w-5 text-primary" />
@@ -143,118 +150,123 @@ export function LearnerLearnDrawer({
           </div>
         ) : (
           <div className="space-y-6 py-6">
-            {/* Description Section */}
-            {description && (
-              <section className="space-y-3">
+            {/* 1. Why this matters (Description) */}
+            {hasDescription && (
+              <section className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="font-medium">Description</h3>
+                  <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <h3 id="why-matters" className="font-medium">Why this matters</h3>
                 </div>
-                <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                <p className="text-xs text-muted-foreground italic">30-sec read: what good looks like.</p>
+                <div className="text-sm text-muted-foreground whitespace-pre-wrap" aria-labelledby="why-matters">
                   {description}
                 </div>
               </section>
             )}
 
-            {/* Video Section */}
-            {videoId && (
-              <>
-                {description && <div className="border-t" />}
-                <section className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Video className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="font-medium">Video</h3>
-                  </div>
-                  <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                    <iframe
-                      className="absolute top-0 left-0 w-full h-full rounded-lg"
-                      src={`https://www.youtube.com/embed/${videoId}`}
-                      title="YouTube video"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                </section>
-              </>
+            {/* Divider after description if more sections follow */}
+            {hasDescription && (hasScript || hasAudio || hasVideo || hasLinks) && <div className="border-t" />}
+
+            {/* 2. Try saying it like this (Script) */}
+            {hasScript && (
+              <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <h3 id="try-saying" className="font-medium">Try saying it like this</h3>
+                </div>
+                <p className="text-xs text-muted-foreground italic">Use this wording or make it your own.</p>
+                <div
+                  className="prose prose-sm max-w-none dark:prose-invert prose-pre:whitespace-pre-wrap prose-pre:break-words leading-relaxed"
+                  aria-labelledby="try-saying"
+                  dangerouslySetInnerHTML={{ __html: scriptResource!.content_md! }}
+                />
+              </section>
             )}
 
-            {/* Script Section */}
-            {scriptResource?.content_md && (
-              <>
-                {(description || videoId) && <div className="border-t" />}
-                <section className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="font-medium">Script</h3>
-                  </div>
-                  <div 
-                    className="prose prose-sm max-w-none dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: scriptResource.content_md }}
+            {/* Divider after script if more sections follow */}
+            {(hasDescription || hasScript) && (hasAudio || hasVideo || hasLinks) && <div className="border-t" />}
+
+            {/* 3. Listen (Audio) */}
+            {hasAudio && (
+              <section className="space-y-2 pb-2">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <h3 className="font-medium">Listen</h3>
+                </div>
+                <p className="text-xs text-muted-foreground italic">Hear an example.</p>
+                <audio
+                  controls
+                  preload="metadata"
+                  src={audioResource!.url!}
+                  className="w-full"
+                  aria-label="Sample script audio"
+                />
+              </section>
+            )}
+
+            {/* Divider after audio if more sections follow */}
+            {(hasDescription || hasScript || hasAudio) && (hasVideo || hasLinks) && <div className="border-t" />}
+
+            {/* 4. Video */}
+            {hasVideo && (
+              <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Video className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <h3 className="font-medium">Video</h3>
+                </div>
+                <div className="relative w-full aspect-video">
+                  <iframe
+                    className="absolute inset-0 w-full h-full rounded-lg"
+                    src={`https://www.youtube.com/embed/${videoId}`}
+                    title="Learning video"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
                   />
-                </section>
-              </>
+                </div>
+              </section>
             )}
 
-            {/* Audio Section */}
-            {audioResource?.url && (
-              <>
-                {(description || videoId || scriptResource?.content_md) && <div className="border-t" />}
-                <section className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Volume2 className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="font-medium">Audio Narration</h3>
-                  </div>
-                  <audio 
-                    controls 
-                    preload="metadata" 
-                    src={audioResource.url}
-                    className="w-full"
-                  />
-                </section>
-              </>
-            )}
+            {/* Divider after video if links follow */}
+            {(hasDescription || hasScript || hasAudio || hasVideo) && hasLinks && <div className="border-t" />}
 
-            {/* Links Section */}
-            {linkResources.length > 0 && (
-              <>
-                {(description || videoId || scriptResource?.content_md || audioResource?.url) && <div className="border-t" />}
-                <section className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="font-medium">Additional Links</h3>
-                  </div>
-                  <div className="space-y-2">
-                    {linkResources.map((link) => (
-                      <Button
-                        key={link.id}
-                        variant="outline"
-                        className="w-full justify-start p-3 h-auto"
-                        asChild
+            {/* 5. Additional Links */}
+            {hasLinks && (
+              <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <LinkIcon className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <h3 className="font-medium">Additional Links</h3>
+                </div>
+                <div className="space-y-2">
+                  {linkResources.map((link) => (
+                    <Button
+                      key={link.id}
+                      variant="outline"
+                      className="w-full justify-start p-3 h-auto"
+                      asChild
+                    >
+                      <a
+                        href={link.url || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
-                        <a
-                          href={link.url || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <div className="flex items-center gap-2 w-full">
-                            <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                            <div className="min-w-0 text-left">
-                              {link.title && (
-                                <p className="font-medium text-sm truncate">{link.title}</p>
-                              )}
-                              <p className="text-xs text-muted-foreground truncate">{link.url}</p>
-                            </div>
+                        <div className="flex items-center gap-2 w-full min-w-0">
+                          <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                          <div className="min-w-0 text-left flex-1">
+                            {link.title && (
+                              <p className="font-medium text-sm truncate">{link.title}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground truncate">{link.url}</p>
                           </div>
-                        </a>
-                      </Button>
-                    ))}
-                  </div>
-                </section>
-              </>
+                        </div>
+                      </a>
+                    </Button>
+                  ))}
+                </div>
+              </section>
             )}
 
             {/* Empty state */}
-            {!description && !videoId && !scriptResource?.content_md && !audioResource?.url && linkResources.length === 0 && (
+            {!hasDescription && !hasScript && !hasAudio && !hasVideo && !hasLinks && (
               <div className="text-center py-12 text-muted-foreground">
                 <GraduationCap className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">No learning materials available yet.</p>

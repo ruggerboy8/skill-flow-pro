@@ -28,6 +28,35 @@ function hashString(str: string): string {
   return hash.toString(36);
 }
 
+// Tone presets for audio generation
+const TONE_PRESETS = [
+  {
+    name: "Warm Professional",
+    description: "Everyday communication, bookings, intros",
+    instructions: "Speak with a calm, confident tone—friendly but focused, like someone who genuinely enjoys helping others."
+  },
+  {
+    name: "Empathetic Reassurance",
+    description: "Cancellations, objections, sensitive calls",
+    instructions: "Sound steady and caring, as if you're talking to a parent who's slightly worried but you've got everything under control."
+  },
+  {
+    name: "Bright Hospitality",
+    description: "Greetings, confirmations, light rapport",
+    instructions: "Bring a light, upbeat energy—as if you're welcoming someone at the front door and want them to feel instantly at ease."
+  },
+  {
+    name: "Clear Instructional",
+    description: "Policy explanations, processes, directions",
+    instructions: "Deliver lines with patient clarity, pausing slightly between key points so the listener can follow without confusion."
+  },
+  {
+    name: "Poised Confidence",
+    description: "Technology, credibility, high-trust messaging",
+    instructions: "Speak with polished assurance—measured pacing, relaxed tone, and crisp articulation that projects expertise."
+  }
+];
+
 interface LearningDrawerProps {
   actionId: number;
   proMoveTitle: string;
@@ -74,7 +103,7 @@ export function LearningDrawer({
   const [generatingAudio, setGeneratingAudio] = useState(false);
   const [savingAudio, setSavingAudio] = useState(false);
   const [voiceName, setVoiceName] = useState('Ava Song');
-  const [actingInstructions, setActingInstructions] = useState('');
+  const [tonePreset, setTonePreset] = useState(TONE_PRESETS[0].name);
   
   // Draft audio (in memory, not saved)
   const [draftAudioBlob, setDraftAudioBlob] = useState<string>();
@@ -155,19 +184,14 @@ export function LearningDrawer({
         setVoiceName(metadata?.voice || 'Ava Song');
         setAudioResourceId(audioRes.id);
         
-        // Get signed URL for preview
-        const { data: signedData, error: signError } = await supabase.storage
+        // Get public URL for preview
+        const { data: publicData } = supabase.storage
           .from('pro-move-audio')
-          .createSignedUrl(audioRes.url, 3600); // 1 hour
+          .getPublicUrl(audioRes.url);
         
-        if (signedData?.signedUrl) {
-          // Construct full URL - signedUrl is a relative path
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-          const fullUrl = `${supabaseUrl}${signedData.signedUrl}`;
-          setAudioUrl(fullUrl);
+        if (publicData?.publicUrl) {
+          setAudioUrl(publicData.publicUrl);
           setAudioState('saved');
-        } else if (signError) {
-          console.error('Error creating signed URL:', signError);
         }
       } else {
         setAudioUrl(undefined);
@@ -546,11 +570,12 @@ export function LearningDrawer({
     setDraftMetadata(undefined);
     
     try {
+      const selectedPreset = TONE_PRESETS.find(p => p.name === tonePreset);
       const { data, error } = await supabase.functions.invoke('generate-audio', {
         body: {
           scriptMd: script,
           voiceName,
-          actingInstructions: actingInstructions.trim() || undefined
+          actingInstructions: selectedPreset?.instructions
         }
       });
 
@@ -625,23 +650,19 @@ export function LearningDrawer({
 
       if (error) throw error;
 
-      // Get signed URL for the saved file
-      const { data: signedData, error: signError } = await supabase.storage
+      // Get public URL for the saved file
+      const { data: publicData } = supabase.storage
         .from('pro-move-audio')
-        .createSignedUrl(data.url, 3600);
+        .getPublicUrl(data.url);
       
-      if (signedData?.signedUrl) {
+      if (publicData?.publicUrl) {
         // Clean up draft
         if (draftAudioBlob) URL.revokeObjectURL(draftAudioBlob);
         setDraftAudioBlob(undefined);
         delete (window as any).__draftAudioBase64;
         
-        // Construct full URL - signedUrl is a relative path
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const fullUrl = `${supabaseUrl}${signedData.signedUrl}`;
-        
         // Switch to saved state
-        setAudioUrl(fullUrl);
+        setAudioUrl(publicData.publicUrl);
         setAudioResourceId(data.resourceId);
         setSavedScriptHash(currentScriptHash);
         setSavedVersion(data.version);
@@ -649,13 +670,12 @@ export function LearningDrawer({
         
         toast({
           title: 'Audio Saved',
-          description: `Version ${data.version} saved successfully`,
+          description: 'Audio saved successfully',
         });
 
         emitSummary({ audio: true });
-      } else if (signError) {
-        console.error('Error creating signed URL:', signError);
-        throw new Error('Failed to create signed URL for saved audio');
+      } else {
+        throw new Error('Failed to get public URL for saved audio');
       }
     } catch (e: any) {
       console.error('Audio save error:', e);
@@ -882,16 +902,21 @@ export function LearningDrawer({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="acting-instructions">Acting Instructions (Optional)</Label>
-                  <Input
-                    id="acting-instructions"
-                    value={actingInstructions}
-                    onChange={(e) => setActingInstructions(e.target.value)}
-                    placeholder="e.g., enthusiastic, calm, professional"
-                    disabled={generatingAudio || savingAudio}
-                  />
+                  <Label htmlFor="tone-preset">Tone & Style</Label>
+                  <Select value={tonePreset} onValueChange={setTonePreset} disabled={generatingAudio || savingAudio}>
+                    <SelectTrigger id="tone-preset">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TONE_PRESETS.map(preset => (
+                        <SelectItem key={preset.name} value={preset.name}>
+                          {preset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-muted-foreground">
-                    Describe how the voice should sound (tone, energy, mood)
+                    {TONE_PRESETS.find(p => p.name === tonePreset)?.description}
                   </p>
                 </div>
 
@@ -910,7 +935,7 @@ export function LearningDrawer({
                 
                 {(audioState === 'saved' && audioUrl) && (
                   <div className="space-y-2">
-                    <Label>Saved Audio {savedVersion && `(v${savedVersion})`}</Label>
+                    <Label>Saved Audio</Label>
                     <audio 
                       controls 
                       preload="metadata" 

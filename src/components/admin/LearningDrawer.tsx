@@ -160,7 +160,11 @@ export function LearningDrawer({
 
       const scriptRes = resources?.find((r) => r.type === 'script');
       if (scriptRes) {
-        setScript(scriptRes.content_md || '');
+        // Strip HTML tags from legacy content
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = scriptRes.content_md || '';
+        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+        setScript(plainText);
         setScriptResourceId(scriptRes.id);
       } else {
         setScript('');
@@ -356,13 +360,9 @@ export function LearningDrawer({
   }
 
   async function saveScriptInternal() {
-    // Check if script is truly empty (strip HTML tags to get actual text)
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = script;
-    const textContent = tempDiv.textContent || tempDiv.innerText || '';
-    const isEmpty = textContent.trim().length === 0;
+    const trimmedScript = script.trim();
     
-    if (isEmpty) {
+    if (!trimmedScript) {
       // Delete the script if it exists
       if (scriptResourceId) {
         await supabase
@@ -380,7 +380,7 @@ export function LearningDrawer({
       // Update existing
       await supabase
         .from('pro_move_resources')
-        .update({ content_md: script })
+        .update({ content_md: trimmedScript })
         .eq('id', scriptResourceId);
     } else {
       // Insert new
@@ -389,7 +389,7 @@ export function LearningDrawer({
         .insert({
           action_id: actionId,
           type: 'script',
-          content_md: script,
+          content_md: trimmedScript,
           display_order: 1,
           status: 'active',
         })

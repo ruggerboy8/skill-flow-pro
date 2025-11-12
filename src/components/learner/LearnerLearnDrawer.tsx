@@ -172,10 +172,11 @@ export function LearnerLearnDrawer({
                 </div>
                 <p className="text-xs text-muted-foreground italic">Use this wording or make it your own.</p>
                 <div
-                  className="prose prose-sm max-w-none dark:prose-invert prose-pre:whitespace-pre-wrap prose-pre:break-words leading-relaxed"
+                  className="text-sm whitespace-pre-wrap leading-relaxed bg-muted/30 p-4 rounded-lg border"
                   aria-labelledby="try-saying"
-                  dangerouslySetInnerHTML={{ __html: scriptResource!.content_md! }}
-                />
+                >
+                  {scriptResource!.content_md}
+                </div>
               </section>
             )}
 

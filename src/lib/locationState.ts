@@ -55,7 +55,16 @@ export async function getLocationWeekContext(locationId: string, now: Date = new
   
   // Calculate week index from program start Monday
   const daysDiff = Math.floor((currentMonday.getTime() - programStartMonday.getTime()) / (1000 * 60 * 60 * 24));
-  const weekIndex = Math.floor(daysDiff / 7);
+  let weekIndex = Math.floor(daysDiff / 7);
+  
+  // Check if we're before the performance deadline (Friday 5pm)
+  // If so, we're still working on the previous week's assignments
+  const beforePerformanceDeadline = now < anchors.checkout_due;
+  
+  if (beforePerformanceDeadline && weekIndex > 0) {
+    // Subtract 1 to get the active assignment week (previous week)
+    weekIndex = weekIndex - 1;
+  }
   
   // Calculate cycle number and week in cycle
   const cycleNumber = Math.max(1, Math.floor(weekIndex / cycleLength) + 1);

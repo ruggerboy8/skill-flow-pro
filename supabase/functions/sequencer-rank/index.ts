@@ -273,6 +273,20 @@ serve(async (req) => {
 
     logs.push(`Collected ${confidenceHistory.length} confidence data points`);
 
+    // Track individual low-confidence counts (scores ≤ 2 on 1-10 scale)
+    const individualLowCounts = new Map<number, { lowCount: number; totalCount: number }>();
+    confData?.forEach((row: any) => {
+      const actionId = focusIdToActionId.get(row.weekly_focus_id);
+      if (!actionId) return;
+      
+      const existing = individualLowCounts.get(actionId) || { lowCount: 0, totalCount: 0 };
+      const isLow = row.confidence_score <= 2; // 1-10 scale
+      individualLowCounts.set(actionId, {
+        lowCount: existing.lowCount + (isLow ? 1 : 0),
+        totalCount: existing.totalCount + 1
+      });
+    });
+
     // 3. Fetch latest quarterly evals (Alcan-wide per role)
     const { data: evalData, error: evalError } = await supabase.rpc(
       'seq_latest_quarterly_evals',
@@ -468,17 +482,11 @@ serve(async (req) => {
       )[0];
       avgConfLast = mostRecent ? mostRecent.avg * 10 : null; // Convert 0-1 to 1-10 scale
       
-      // Calculate low-tail rate with Beta EB approximation
-      let lowCount = 0;
-      confData.forEach(cd => {
-        // Approximate: if week avg ≤ 0.2 (2/10), count all n as low
-        if (cd.avg <= LOW_CUTOFF / 10.0) {
-          lowCount += cd.n;
-        }
-      });
+      // Calculate low-tail rate using individual confidence scores
+      const individualCounts = individualLowCounts.get(move.id) || { lowCount: 0, totalCount: 0 };
       
-      // Beta EB: (a + successes) / (a + b + trials)
-      p_low = (BETA_PRIOR_A + lowCount) / (BETA_PRIOR_A + BETA_PRIOR_B + totalN);
+      // Beta EB: (a + low_count) / (a + b + total_count)
+      p_low = (BETA_PRIOR_A + individualCounts.lowCount) / (BETA_PRIOR_A + BETA_PRIOR_B + individualCounts.totalCount);
       lowConfShare = p_low; // Store for UI
       
       // Collective Weakness: 60% tail pain + 40% mean deficit

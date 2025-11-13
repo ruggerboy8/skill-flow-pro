@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Collective Weakness constants
-const LOW_CUTOFF = 2; // 1-10 scale: ≤2 is "low confidence"
+const LOW_CUTOFF = 2; // 1-4 scale: ≤2 is "low confidence"
 const MIN_SAMPLES = 12; // Minimum staff-weeks to trust signals
 const BETA_PRIOR_A = 3; // Beta prior for low-rate EB
 const BETA_PRIOR_B = 3;
@@ -256,7 +256,7 @@ serve(async (req) => {
       const key = `${actionId}-${weekStart.toISOString().split('T')[0]}`;
       const existing = confidenceMap.get(key) || { sum: 0, count: 0 };
       confidenceMap.set(key, {
-        sum: existing.sum + row.confidence_score / 10.0,
+        sum: existing.sum + row.confidence_score / 4.0,
         count: existing.count + 1,
       });
     });
@@ -280,7 +280,7 @@ serve(async (req) => {
       if (!actionId) return;
       
       const existing = individualLowCounts.get(actionId) || { lowCount: 0, totalCount: 0 };
-      const isLow = row.confidence_score <= 2; // 1-10 scale
+      const isLow = row.confidence_score <= 2; // 1-4 scale
       individualLowCounts.set(actionId, {
         lowCount: existing.lowCount + (isLow ? 1 : 0),
         totalCount: existing.totalCount + 1
@@ -480,7 +480,7 @@ serve(async (req) => {
       const mostRecent = confData.sort((a, b) => 
         new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime()
       )[0];
-      avgConfLast = mostRecent ? mostRecent.avg * 10 : null; // Convert 0-1 to 1-10 scale
+      avgConfLast = mostRecent ? mostRecent.avg * 4 : null; // Convert 0-1 to 1-4 scale
       
       // Calculate low-tail rate using individual confidence scores
       const individualCounts = individualLowCounts.get(move.id) || { lowCount: 0, totalCount: 0 };

@@ -63,13 +63,7 @@ export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
       <p className="text-xs text-muted-foreground italic">{primaryReason}</p>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-4 gap-2 text-xs">
-        <div>
-          <span className="text-muted-foreground">Low 1–2%:</span>
-          <div className="font-medium">
-            {move.lowConfShare !== null ? `${Math.round(move.lowConfShare * 100)}%` : '—'}
-          </div>
-        </div>
+      <div className="grid grid-cols-3 gap-2 text-xs">
         <div>
           <span className="text-muted-foreground">Avg conf:</span>
           <div className="font-medium">

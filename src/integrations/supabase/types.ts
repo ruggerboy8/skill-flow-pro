@@ -2012,7 +2012,9 @@ export type Database = {
       get_staff_statuses: {
         Args: { p_coach_user_id: string; p_now?: string }
         Returns: {
+          assignment_monday: string
           backlog_count: number
+          conf_count: number
           cycle_number: number
           deadline_at: string
           last_activity_at: string
@@ -2022,8 +2024,11 @@ export type Database = {
           location_name: string
           onboarding_weeks_left: number
           organization_name: string
+          perf_count: number
+          required_count: number
           role_id: number
           role_name: string
+          source: string
           staff_id: string
           staff_name: string
           status_detail: string

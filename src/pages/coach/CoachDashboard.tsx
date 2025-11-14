@@ -5,11 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { X } from 'lucide-react';
+import { X, CheckCircle, Clock, AlertTriangle, MinusCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import StaffRow from '@/components/coach/StaffRow';
+
 interface StaffStatus {
   staff_id: string;
   staff_name: string;
@@ -32,12 +33,54 @@ interface StaffStatus {
   backlog_count: number;
   last_activity_kind: string | null;
   last_activity_at: string | null;
-  status_state: string;
-  is_onboarding: boolean;
-  week_label: string;
-  plan_count: number;
-  focus_count: number;
+  source_used: string;
   tz: string;
+}
+
+type PillColor = 'green' | 'yellow' | 'red' | 'gray';
+
+interface StatusPill {
+  label: string;
+  color: PillColor;
+  icon: any;
+}
+
+function statusPill(
+  required: number,
+  conf: number,
+  perf: number,
+  anchors: { checkin_due: Date; checkout_open: Date; checkout_due: Date },
+  now: Date
+): StatusPill {
+  if (required === 0) return { label: 'No assignments', color: 'gray', icon: MinusCircle };
+
+  const confDone = conf >= required;
+  const perfDone = perf >= required;
+
+  if (now <= anchors.checkin_due) {
+    return confDone
+      ? { label: 'Complete', color: 'green', icon: CheckCircle }
+      : { label: 'Missing confidence', color: 'yellow', icon: Clock };
+  }
+
+  if (now < anchors.checkout_open) {
+    return confDone
+      ? { label: 'Complete', color: 'green', icon: CheckCircle }
+      : { label: 'Missing confidence', color: 'red', icon: AlertTriangle };
+  }
+
+  if (now <= anchors.checkout_due) {
+    if (!confDone && !perfDone) return { label: 'Missing confidence & performance', color: 'red', icon: AlertTriangle };
+    if (!confDone) return { label: 'Missing confidence', color: 'red', icon: AlertTriangle };
+    if (!perfDone) return { label: 'Missing performance', color: 'yellow', icon: Clock };
+    return { label: 'Complete', color: 'green', icon: CheckCircle };
+  }
+
+  // after deadline
+  if (confDone && perfDone) return { label: 'Complete', color: 'green', icon: CheckCircle };
+  if (!confDone && !perfDone) return { label: 'Missing confidence & performance', color: 'red', icon: AlertTriangle };
+  if (!confDone) return { label: 'Missing confidence', color: 'red', icon: AlertTriangle };
+  return { label: 'Missing performance', color: 'red', icon: AlertTriangle };
 }
 
 export default function CoachDashboard() {

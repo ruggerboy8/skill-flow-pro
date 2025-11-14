@@ -198,6 +198,45 @@ export default function CoachDashboard() {
       filtered = filtered.filter((s) => s.staff_name.toLowerCase().includes(q));
     }
 
+    // Sort by label priority (most urgent first), then by name
+    const labelOrder: Record<string, number> = {
+      'Missing confidence & performance': 0,
+      'Missing confidence': 1,
+      'Missing performance': 2,
+      'Complete': 3,
+      'No assignments': 4,
+    };
+
+    filtered = filtered.sort((a, b) => {
+      const now = new Date();
+      const pillA = statusPill(
+        a.required_count,
+        a.conf_count,
+        a.perf_count,
+        {
+          checkin_due: new Date(a.checkin_due),
+          checkout_open: new Date(a.checkout_open),
+          checkout_due: new Date(a.checkout_due),
+        },
+        now
+      );
+      const pillB = statusPill(
+        b.required_count,
+        b.conf_count,
+        b.perf_count,
+        {
+          checkin_due: new Date(b.checkin_due),
+          checkout_open: new Date(b.checkout_open),
+          checkout_due: new Date(b.checkout_due),
+        },
+        now
+      );
+
+      const priorityDiff = labelOrder[pillA.label] - labelOrder[pillB.label];
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.staff_name.localeCompare(b.staff_name);
+    });
+
     setFilteredRows(filtered);
   };
 

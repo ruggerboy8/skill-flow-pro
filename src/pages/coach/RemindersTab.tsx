@@ -119,6 +119,7 @@ export default function RemindersTab() {
       if (error) throw error;
 
       const statusArray = (statuses || []) as any[];
+      const now = new Date();
       
       // Build staff list from statuses
       const processedStaff: StaffMember[] = await Promise.all(
@@ -136,27 +137,38 @@ export default function RemindersTab() {
             email: staffData?.email || '',
             role_id: status.role_id,
             user_id: staffData?.user_id || '',
-            onboarding_weeks: status.onboarding_weeks_left,
+            onboarding_weeks: 0,
           };
         })
       );
 
       setStaff(processedStaff);
       
-      // Filter reminder lists based on status_state
-      const needConfidence = statusArray
-        .filter((s: any) => s.status_state === 'can_checkin' || s.status_state === 'missed_checkin')
-        .map((s: any) => processedStaff.find(p => p.id === s.staff_id))
-        .filter(Boolean) as StaffMember[];
+      // Determine who needs reminders based on counts and deadlines
+      const needConfidence: StaffMember[] = [];
+      const needPerformance: StaffMember[] = [];
 
-      const needPerformance = statusArray
-        .filter((s: any) => 
-          s.status_state === 'can_checkout' || 
-          s.status_state === 'missed_checkout' ||
-          s.status_state === 'missed_checkin' // Include missed checkin in performance reminders too
-        )
-        .map((s: any) => processedStaff.find(p => p.id === s.staff_id))
-        .filter(Boolean) as StaffMember[];
+      statusArray.forEach((s: any) => {
+        const confDone = s.conf_count >= s.required_count;
+        const perfDone = s.perf_count >= s.required_count;
+        const checkinDue = new Date(s.checkin_due);
+        const checkoutOpen = new Date(s.checkout_open);
+        
+        const staff = processedStaff.find(p => p.id === s.staff_id);
+        if (!staff || s.required_count === 0) return;
+
+        // Need confidence reminder if:
+        // - Not done with confidence AND we're past or approaching checkin deadline
+        if (!confDone && now >= checkinDue) {
+          needConfidence.push(staff);
+        }
+
+        // Need performance reminder if:
+        // - Checkout is open AND performance not done
+        if (now >= checkoutOpen && !perfDone) {
+          needPerformance.push(staff);
+        }
+      });
 
       setConfidenceList(needConfidence);
       setPerformanceList(needPerformance);

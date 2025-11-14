@@ -306,35 +306,26 @@ export default function CoachDashboard() {
         {/* Staff Rows */}
         <div className="space-y-2">
           {filteredRows.map((row) => {
-            // Map status_state to UI-friendly labels
-            const statusLabel = 
-              row.status_state === 'no_assignments' ? 'No Assignments' :
-              row.status_state === 'done' ? 'Complete' :
-              row.status_state === 'can_checkin' ? 'Can Check In' :
-              row.status_state === 'missed_checkin' ? 'Missed Check-in' :
-              row.status_state === 'wait_for_thu' ? 'Waiting for Thursday' :
-              row.status_state === 'can_checkout' ? 'Can Check Out' :
-              row.status_state === 'missed_checkout' ? 'Missed Check-out' :
-              'Unknown';
+            const now = new Date();
+            const pill = statusPill(
+              row.required_count,
+              row.conf_count,
+              row.perf_count,
+              {
+                checkin_due: new Date(row.checkin_due),
+                checkout_open: new Date(row.checkout_open),
+                checkout_due: new Date(row.checkout_due),
+              },
+              now
+            );
 
-            // Map to severity
-            const severity = 
-              row.status_state === 'missed_checkin' || row.status_state === 'missed_checkout' ? 'red' :
-              row.status_state === 'can_checkin' || row.status_state === 'can_checkout' ? 'yellow' :
-              row.status_state === 'done' ? 'green' :
-              row.status_state === 'no_assignments' ? 'yellow' :
-              'grey';
-
-            // Format last activity text
             const lastActivityText = row.last_activity_at
-              ? `${row.last_activity_kind === 'performance' ? 'Check-out' : 'Check-in'} ${format(new Date(row.last_activity_at), 'MMM d, h:mm a')}`
-              : null;
+              ? `${row.last_activity_kind === 'confidence' ? 'Confidence' : 'Performance'} submitted ${format(new Date(row.last_activity_at), 'EEE h:mma')}`
+              : 'No check-in yet';
 
-            // Build status detail with debug info
-            const debugInfo = `[Debug: ${row.phase} | C${row.cycle_number}W${row.week_in_cycle} | ${row.conf_count}/${row.required_count} conf, ${row.perf_count}/${row.required_count} perf | plan:${row.plan_count} focus:${row.focus_count} | ${row.tz}]`;
-            const statusDetail = row.status_state === 'no_assignments'
-              ? `No locked assignments for ${row.active_monday}. ${debugInfo}`
-              : `${row.conf_count}/${row.required_count} check-ins, ${row.perf_count}/${row.required_count} check-outs. ${debugInfo}`;
+            const statusDetail = pill.label === 'No assignments'
+              ? `No locked assignments for ${row.active_monday} (debug: ${row.phase} c${row.cycle_number}w${row.week_in_cycle} ${row.conf_count}/${row.required_count} conf ${row.perf_count}/${row.required_count} perf source: ${row.source_used} ${row.tz})`
+              : `${pill.label} (${row.conf_count}/${row.required_count} conf, ${row.perf_count}/${row.required_count} perf)`;
 
             return (
               <StaffRow
@@ -346,28 +337,21 @@ export default function CoachDashboard() {
                   location: row.location_name,
                 }}
                 status={{
-                  color: severity as any,
-                  reason: statusLabel,
-                  subtext: statusDetail,
-                  tooltip: statusDetail,
-                  lastActivity: row.last_activity_at ? {
-                    kind: row.last_activity_kind as 'confidence' | 'performance',
-                    at: new Date(row.last_activity_at)
-                  } : undefined,
-                  label: statusLabel,
-                  severity: severity as any,
+                  color: pill.color as any,
+                  reason: pill.label,
+                  label: pill.label,
+                  severity: pill.color,
                   detail: statusDetail,
-                  lastActivityText: lastActivityText || undefined
+                  lastActivityText,
+                  icon: pill.icon,
                 }}
-                isOnboarding={row.is_onboarding}
                 debugInfo={{
                   activeMonday: row.active_monday,
                   phase: row.phase,
                   cycle: row.cycle_number,
                   week: row.week_in_cycle,
-                  planCount: row.plan_count,
-                  focusCount: row.focus_count,
-                  tz: row.tz
+                  source: row.source_used,
+                  tz: row.tz,
                 }}
                 onClick={() => navigate(`/coach/${row.staff_id}`)}
               />

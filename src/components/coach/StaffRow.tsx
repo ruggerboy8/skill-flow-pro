@@ -94,35 +94,24 @@ export default function StaffRow({ member, status, debugInfo, onClick }: StaffRo
             </div>
 
             {/* Status - col-span-5 to match header */}
-            <div className="col-span-5 text-right">
-              {tooltipText ? (
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${chipClass}`}
-                        aria-label={`Status: ${chipText}`}
-                        title={tooltipText}
-                      >
-                        {chipText}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{tooltipText}</p>
+            <div className="col-span-5 flex items-center justify-end">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      className={`${chipClass} border cursor-help transition-transform hover:scale-105 flex items-center gap-1.5`}
+                    >
+                      {Icon && <Icon className="h-3.5 w-3.5" />}
+                      <span>{chipText}</span>
+                    </Badge>
+                  </TooltipTrigger>
+                  {tooltipText && (
+                    <TooltipContent side="left" className="max-w-xs">
+                      <p className="text-sm">{tooltipText}</p>
                     </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : (
-                <div
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${chipClass}`}
-                  aria-label={`Status: ${chipText}`}
-                >
-                  {chipText}
-                </div>
-              )}
-              {status.subtext && (
-                <div className="text-xs text-muted-foreground mt-0.5">{status.subtext}</div>
-              )}
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </button>

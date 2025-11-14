@@ -14,27 +14,22 @@ interface StaffStatus {
   staff_name: string;
   role_id: number;
   role_name: string;
-  organization_name: string;
   location_id: string;
   location_name: string;
-  assignment_monday: string;
-  cycle_number: number;
-  week_in_cycle: number;
-  week_label: string;
-  source: string;
-  required_count: number;
-  conf_count: number;
-  perf_count: number;
+  organization_name: string;
   status_state: string;
   status_label: string;
-  status_severity: string;
   status_detail: string;
-  last_activity_at: string | null;
-  last_activity_text: string;
-  last_activity_kind: string | null;
-  deadline_at: string | null;
-  onboarding_weeks_left: number;
+  status_severity: string;
   backlog_count: number;
+  last_activity_at: string | null;
+  last_activity_kind: string | null;
+  last_activity_text: string;
+  deadline_at: string | null;
+  week_label: string;
+  cycle_number: number;
+  week_in_cycle: number;
+  onboarding_weeks_left: number;
 }
 
 export default function CoachDashboard() {
@@ -42,7 +37,6 @@ export default function CoachDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isCoach, isLead } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [allStatuses, setAllStatuses] = useState<StaffStatus[]>([]);
   const [filteredRows, setFilteredRows] = useState<StaffStatus[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
@@ -108,18 +102,12 @@ export default function CoachDashboard() {
   const loadStaffData = async () => {
     if (!user) return;
     
-    setLoading(true);
-    setError(null);
     try {
       const { data: statuses, error } = await supabase.rpc('get_staff_statuses', {
         p_coach_user_id: user.id
       });
 
-      if (error) {
-        setError(`Database error: ${error.message}`);
-        console.error('Error fetching staff statuses:', error);
-        return;
-      }
+      if (error) throw error;
 
       const statusArray = (statuses || []) as StaffStatus[];
       setAllStatuses(statusArray);
@@ -132,9 +120,8 @@ export default function CoachDashboard() {
       setLocations(uniqueLocations);
       setOrganizations(uniqueOrganizations);
       setRoles(uniqueRoles);
-    } catch (error: any) {
-      setError(`Failed to load staff data: ${error?.message || 'Unknown error'}`);
-      console.error('Unexpected error loading staff statuses:', error);
+    } catch (error) {
+      console.error('Error loading staff statuses:', error);
     } finally {
       setLoading(false);
     }
@@ -185,24 +172,6 @@ export default function CoachDashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Coach Dashboard</h1>
-
-      {error && (
-        <Card className="border-destructive/50 bg-destructive/10">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <div className="rounded-full p-1 bg-destructive/20">
-                <svg className="h-5 w-5 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-destructive mb-1">Dashboard Error</h3>
-                <p className="text-sm text-muted-foreground">{error}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Filters Bar */}
       <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4 mb-6">

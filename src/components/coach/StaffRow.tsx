@@ -76,12 +76,6 @@ export default function StaffRow({ member, status, debugInfo, onClick }: StaffRo
               {member.location && (
                 <p className="text-xs text-muted-foreground mt-0.5">{member.location}</p>
               )}
-              {debugInfo && (
-                <p className="text-xs text-muted-foreground mt-1 font-mono">
-                  {debugInfo.activeMonday} | {debugInfo.phase} | C{debugInfo.cycle}W{debugInfo.week} | 
-                  source:{debugInfo.source} | {debugInfo.tz}
-                </p>
-              )}
             </div>
 
             {/* Last Activity - col-span-3 to match header */}

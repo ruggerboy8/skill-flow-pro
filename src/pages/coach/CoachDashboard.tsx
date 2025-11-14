@@ -384,14 +384,6 @@ export default function CoachDashboard() {
                   lastActivityText,
                   icon: pill.icon,
                 }}
-                debugInfo={{
-                  activeMonday: row.active_monday,
-                  phase: row.phase,
-                  cycle: row.cycle_number,
-                  week: row.week_in_cycle,
-                  source: row.source_used,
-                  tz: row.tz,
-                }}
                 onClick={() => navigate(`/coach/${row.staff_id}`)}
               />
             );

@@ -16,16 +16,25 @@ export interface StaffRowProps {
     subtext?: string;
     tooltip?: string;
     lastActivity?: { kind: 'confidence' | 'performance'; at: Date };
-    // New coach-focused fields
     label?: string;
     severity?: 'green' | 'yellow' | 'red' | 'grey';
     detail?: string;
     lastActivityText?: string;
   };
+  isOnboarding?: boolean;
+  debugInfo?: {
+    activeMonday: string;
+    phase: string;
+    cycle: number;
+    week: number;
+    planCount: number;
+    focusCount: number;
+    tz: string;
+  };
   onClick: () => void;
 }
 
-export default function StaffRow({ member, status, onClick }: StaffRowProps) {
+export default function StaffRow({ member, status, isOnboarding, debugInfo, onClick }: StaffRowProps) {
   // Use severity if available, fallback to color
   const severity = status.severity || status.color;
   
@@ -78,9 +87,20 @@ export default function StaffRow({ member, status, onClick }: StaffRowProps) {
                 <Badge variant="secondary" className="shrink-0">
                   {member.role_name}
                 </Badge>
+                {isOnboarding && (
+                  <Badge variant="outline" className="shrink-0 text-xs">
+                    Onboarding
+                  </Badge>
+                )}
               </div>
               {member.location && (
                 <p className="text-xs text-muted-foreground mt-0.5">{member.location}</p>
+              )}
+              {debugInfo && (
+                <p className="text-xs text-muted-foreground mt-1 font-mono">
+                  {debugInfo.activeMonday} | {debugInfo.phase} | C{debugInfo.cycle}W{debugInfo.week} | 
+                  plan:{debugInfo.planCount} focus:{debugInfo.focusCount} | {debugInfo.tz}
+                </p>
               )}
             </div>
 

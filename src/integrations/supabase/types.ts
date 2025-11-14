@@ -2019,8 +2019,6 @@ export type Database = {
           checkout_open: string
           conf_count: number
           cycle_number: number
-          focus_count: number
-          is_onboarding: boolean
           last_activity_at: string
           last_activity_kind: string
           location_id: string
@@ -2029,16 +2027,14 @@ export type Database = {
           organization_name: string
           perf_count: number
           phase: string
-          plan_count: number
           required_count: number
           role_id: number
           role_name: string
+          source_used: string
           staff_id: string
           staff_name: string
-          status_state: string
           tz: string
           week_in_cycle: number
-          week_label: string
         }[]
       }
       get_staff_summary: {

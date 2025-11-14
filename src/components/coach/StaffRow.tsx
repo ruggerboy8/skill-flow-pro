@@ -17,52 +17,37 @@ export interface StaffRowProps {
     tooltip?: string;
     lastActivity?: { kind: 'confidence' | 'performance'; at: Date };
     label?: string;
-    severity?: 'green' | 'yellow' | 'red' | 'grey';
+    severity?: 'green' | 'yellow' | 'red' | 'grey' | 'gray';
     detail?: string;
     lastActivityText?: string;
+    icon?: any;
   };
-  isOnboarding?: boolean;
   debugInfo?: {
     activeMonday: string;
     phase: string;
     cycle: number;
     week: number;
-    planCount: number;
-    focusCount: number;
+    source: string;
     tz: string;
   };
   onClick: () => void;
 }
 
-export default function StaffRow({ member, status, isOnboarding, debugInfo, onClick }: StaffRowProps) {
-  // Use severity if available, fallback to color
+export default function StaffRow({ member, status, debugInfo, onClick }: StaffRowProps) {
   const severity = status.severity || status.color;
   
   const chipClass = 
     severity === "green"
-      ? "bg-[hsl(var(--positive))] text-white"
+      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
       : severity === "yellow"
-      ? "bg-[hsl(var(--warning))] text-white"
+      ? "bg-amber-100 text-amber-800 border-amber-300"
       : severity === "red"
-      ? "bg-destructive text-destructive-foreground"
-      : "bg-secondary text-secondary-foreground";
+      ? "bg-red-100 text-red-800 border-red-300"
+      : "bg-zinc-100 text-zinc-700 border-zinc-300";
 
-  // Use new label if available, fallback to mapped reason
-  const chipText = status.label || 
-    (status.reason === "No assignments" ? "No Assignments" :
-    status.reason === "Missed check-in" ? "Missed Check-in" :
-    status.reason === "Can check in" ? "Can Check In" :
-    status.reason === "Waiting for Thursday" ? "Waiting" :
-    status.reason === "Can check out" ? "Can Check Out" :
-    status.reason === "Missed check-out" ? "Missed Check-out" :
-    status.reason === "Complete" ? "Complete" :
-    status.color === "green" ? "On Track" :
-    status.color === "red" ? "Action Required" :
-    status.color === "yellow" ? "Pending Action" :
-    "On Track");
-
-  // Use detail for tooltip if available, fallback to tooltip
+  const chipText = status.label || status.reason;
   const tooltipText = status.detail || status.tooltip;
+  const Icon = status.icon;
   
   // Compose an aria-label without "undefined"
   const aria = tooltipText
@@ -87,11 +72,6 @@ export default function StaffRow({ member, status, isOnboarding, debugInfo, onCl
                 <Badge variant="secondary" className="shrink-0">
                   {member.role_name}
                 </Badge>
-                {isOnboarding && (
-                  <Badge variant="outline" className="shrink-0 text-xs">
-                    Onboarding
-                  </Badge>
-                )}
               </div>
               {member.location && (
                 <p className="text-xs text-muted-foreground mt-0.5">{member.location}</p>
@@ -99,7 +79,7 @@ export default function StaffRow({ member, status, isOnboarding, debugInfo, onCl
               {debugInfo && (
                 <p className="text-xs text-muted-foreground mt-1 font-mono">
                   {debugInfo.activeMonday} | {debugInfo.phase} | C{debugInfo.cycle}W{debugInfo.week} | 
-                  plan:{debugInfo.planCount} focus:{debugInfo.focusCount} | {debugInfo.tz}
+                  source:{debugInfo.source} | {debugInfo.tz}
                 </p>
               )}
             </div>

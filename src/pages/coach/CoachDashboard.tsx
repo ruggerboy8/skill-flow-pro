@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { X } from 'lucide-react';
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import StaffRow from '@/components/coach/StaffRow';
@@ -16,20 +17,27 @@ interface StaffStatus {
   role_name: string;
   location_id: string;
   location_name: string;
+  organization_id: string;
   organization_name: string;
-  status_state: string;
-  status_label: string;
-  status_detail: string;
-  status_severity: string;
-  backlog_count: number;
-  last_activity_at: string | null;
-  last_activity_kind: string | null;
-  last_activity_text: string;
-  deadline_at: string | null;
-  week_label: string;
+  active_monday: string;
   cycle_number: number;
   week_in_cycle: number;
-  onboarding_weeks_left: number;
+  phase: string;
+  checkin_due: string;
+  checkout_open: string;
+  checkout_due: string;
+  required_count: number;
+  conf_count: number;
+  perf_count: number;
+  backlog_count: number;
+  last_activity_kind: string | null;
+  last_activity_at: string | null;
+  status_state: string;
+  is_onboarding: boolean;
+  week_label: string;
+  plan_count: number;
+  focus_count: number;
+  tz: string;
 }
 
 export default function CoachDashboard() {
@@ -254,31 +262,74 @@ export default function CoachDashboard() {
         
         {/* Staff Rows */}
         <div className="space-y-2">
-          {filteredRows.map((staffStatus) => (
-            <StaffRow
-              key={staffStatus.staff_id}
-              member={{
-                id: staffStatus.staff_id,
-                name: staffStatus.staff_name,
-                role_name: staffStatus.role_name,
-                location: staffStatus.location_name
-              }}
-              status={{
-                color: staffStatus.status_severity as any,
-                reason: staffStatus.status_detail,
-                label: staffStatus.status_label,
-                severity: staffStatus.status_severity as any,
-                detail: staffStatus.status_detail,
-                lastActivityText: staffStatus.last_activity_text,
-                tooltip: staffStatus.status_detail,
-                lastActivity: staffStatus.last_activity_at ? {
-                  kind: staffStatus.last_activity_kind as any,
-                  at: new Date(staffStatus.last_activity_at)
-                } : undefined
-              }}
-              onClick={() => navigate(`/coach/${staffStatus.staff_id}`)}
-            />
-          ))}
+          {filteredRows.map((row) => {
+            // Map status_state to UI-friendly labels
+            const statusLabel = 
+              row.status_state === 'no_assignments' ? 'No Assignments' :
+              row.status_state === 'done' ? 'Complete' :
+              row.status_state === 'can_checkin' ? 'Can Check In' :
+              row.status_state === 'missed_checkin' ? 'Missed Check-in' :
+              row.status_state === 'wait_for_thu' ? 'Waiting for Thursday' :
+              row.status_state === 'can_checkout' ? 'Can Check Out' :
+              row.status_state === 'missed_checkout' ? 'Missed Check-out' :
+              'Unknown';
+
+            // Map to severity
+            const severity = 
+              row.status_state === 'missed_checkin' || row.status_state === 'missed_checkout' ? 'red' :
+              row.status_state === 'can_checkin' || row.status_state === 'can_checkout' ? 'yellow' :
+              row.status_state === 'done' ? 'green' :
+              row.status_state === 'no_assignments' ? 'yellow' :
+              'grey';
+
+            // Format last activity text
+            const lastActivityText = row.last_activity_at
+              ? `${row.last_activity_kind === 'performance' ? 'Check-out' : 'Check-in'} ${format(new Date(row.last_activity_at), 'MMM d, h:mm a')}`
+              : null;
+
+            // Build status detail with debug info
+            const debugInfo = `[Debug: ${row.phase} | C${row.cycle_number}W${row.week_in_cycle} | ${row.conf_count}/${row.required_count} conf, ${row.perf_count}/${row.required_count} perf | plan:${row.plan_count} focus:${row.focus_count} | ${row.tz}]`;
+            const statusDetail = row.status_state === 'no_assignments'
+              ? `No locked assignments for ${row.active_monday}. ${debugInfo}`
+              : `${row.conf_count}/${row.required_count} check-ins, ${row.perf_count}/${row.required_count} check-outs. ${debugInfo}`;
+
+            return (
+              <StaffRow
+                key={row.staff_id}
+                member={{
+                  id: row.staff_id,
+                  name: row.staff_name,
+                  role_name: row.role_name,
+                  location: row.location_name,
+                }}
+                status={{
+                  color: severity as any,
+                  reason: statusLabel,
+                  subtext: statusDetail,
+                  tooltip: statusDetail,
+                  lastActivity: row.last_activity_at ? {
+                    kind: row.last_activity_kind as 'confidence' | 'performance',
+                    at: new Date(row.last_activity_at)
+                  } : undefined,
+                  label: statusLabel,
+                  severity: severity as any,
+                  detail: statusDetail,
+                  lastActivityText: lastActivityText || undefined
+                }}
+                isOnboarding={row.is_onboarding}
+                debugInfo={{
+                  activeMonday: row.active_monday,
+                  phase: row.phase,
+                  cycle: row.cycle_number,
+                  week: row.week_in_cycle,
+                  planCount: row.plan_count,
+                  focusCount: row.focus_count,
+                  tz: row.tz
+                }}
+                onClick={() => navigate(`/coach/${row.staff_id}`)}
+              />
+            );
+          })}
         </div>
       </div>
 

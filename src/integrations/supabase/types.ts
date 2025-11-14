@@ -2012,29 +2012,31 @@ export type Database = {
       get_staff_statuses: {
         Args: { p_coach_user_id: string; p_now?: string }
         Returns: {
-          assignment_monday: string
+          active_monday: string
           backlog_count: number
+          checkin_due: string
+          checkout_due: string
+          checkout_open: string
           conf_count: number
           cycle_number: number
-          deadline_at: string
+          focus_count: number
+          is_onboarding: boolean
           last_activity_at: string
           last_activity_kind: string
-          last_activity_text: string
           location_id: string
           location_name: string
-          onboarding_weeks_left: number
+          organization_id: string
           organization_name: string
           perf_count: number
+          phase: string
+          plan_count: number
           required_count: number
           role_id: number
           role_name: string
-          source: string
           staff_id: string
           staff_name: string
-          status_detail: string
-          status_label: string
-          status_severity: string
           status_state: string
+          tz: string
           week_in_cycle: number
           week_label: string
         }[]

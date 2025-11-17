@@ -116,7 +116,7 @@ export default function CoachDashboard() {
             organization_id,
             program_start_date,
             cycle_length_weeks,
-            organizations:organization_id(
+            organizations!locations_organization_id_fkey(
               id,
               name
             )

@@ -9,6 +9,8 @@ import { Mail, CheckCircle2, X, Send, Edit2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { addDays, addHours } from 'date-fns';
 
 interface StaffMember {
   id: string;
@@ -23,6 +25,31 @@ interface StaffMember {
 
 type TemplateKey = 'confidence' | 'performance';
 type Templates = Record<TemplateKey, { subject: string; body: string }>;
+
+function weekOfInTZ(now: Date, tz: string) {
+  const dow = Number(formatInTimeZone(now, tz, 'i'));
+  const daysToMonday = -(dow - 1);
+  const monday = addDays(now, daysToMonday);
+  return formatInTimeZone(monday, tz, 'yyyy-MM-dd');
+}
+
+function deadlinesForWeek(weekOf: string, tz: string) {
+  const mondayLocalMidnightUtc = fromZonedTime(`${weekOf}T00:00:00`, tz);
+  const checkinDueUtc = addHours(addDays(mondayLocalMidnightUtc, 1), 12); // Tue 12:00 local
+  const checkoutOpenUtc = addHours(addDays(mondayLocalMidnightUtc, 3), 0); // Thu 00:00 local
+  return { checkinDueUtc, checkoutOpenUtc };
+}
+
+function dedup(arr: StaffMember[]) {
+  const seen = new Set<string>();
+  return arr.filter(x => {
+    const key = (x.email || '').toLowerCase();
+    if (!key) return false;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export default function RemindersTab() {
   const { user, isCoach, isLead } = useAuth();
@@ -107,88 +134,130 @@ export default function RemindersTab() {
     }
   }
 
-  const loadStaffData = async () => {
+  async function loadStaffData() {
     if (!user) return;
-    
+    setLoading(true);
     try {
-      // Use the bulk RPC to get all staff statuses
-      const { data: statuses, error } = await supabase.rpc('get_staff_statuses', {
-        p_coach_user_id: user.id
+      // 1) Pull staff in one go, including emails
+      const { data: staffRows, error: staffErr } = await supabase
+        .from('staff')
+        .select(`
+          id, name, email, user_id, role_id, is_participant, onboarding_weeks,
+          locations:primary_location_id(id, name, timezone, organization_id,
+            organizations!locations_organization_id_fkey(id, name)
+          ),
+          roles:role_id(role_name)
+        `)
+        .eq('is_participant', true)
+        .not('primary_location_id', 'is', null);
+      if (staffErr) throw staffErr;
+
+      const now = new Date();
+
+      const meta = (staffRows ?? []).map((s: any) => {
+        const tz = s.locations?.timezone || 'America/Chicago';
+        const week_of = weekOfInTZ(now, tz);
+        return {
+          id: s.id,
+          name: s.name,
+          email: s.email || '',
+          user_id: s.user_id,
+          tz,
+          week_of,
+          role_id: s.role_id,
+          role_name: s.roles?.role_name || 'Unknown',
+          location_name: s.locations?.name || 'Unknown',
+          org_name: s.locations?.organizations?.name || 'Unknown',
+          onboarding_weeks: s.onboarding_weeks || 0,
+        };
       });
 
-      if (error) throw error;
+      const staffIds = meta.map(m => m.id);
+      const weekKeys = Array.from(new Set(meta.map(m => m.week_of)));
 
-      const statusArray = (statuses || []) as any[];
-      const now = new Date();
-      
-      // Build staff list from statuses
-      const processedStaff: StaffMember[] = await Promise.all(
-        statusArray.map(async (status) => {
-          // Get email for each staff member
-          const { data: staffData } = await supabase
-            .from('staff')
-            .select('email, user_id')
-            .eq('id', status.staff_id)
-            .maybeSingle();
-          
-          return {
-            id: status.staff_id,
-            name: status.staff_name,
-            email: staffData?.email || '',
-            role_id: status.role_id,
-            user_id: staffData?.user_id || '',
-            onboarding_weeks: 0,
-          };
-        })
-      );
+      // 2) Pull all weekly_scores for these staff and week(s) in one shot
+      const { data: scoreRows, error: wsErr } = await supabase
+        .from('weekly_scores')
+        .select('staff_id, week_of, confidence_score, performance_score')
+        .in('staff_id', staffIds)
+        .in('week_of', weekKeys);
+      if (wsErr) throw wsErr;
 
-      setStaff(processedStaff);
-      
-      // Determine who needs reminders based on counts and deadlines
+      // 3) Reduce to booleans (has_conf / has_perf) for the current week
+      const byKey = new Map<string, { has_conf: boolean; has_perf: boolean }>();
+      for (const m of meta) byKey.set(m.id + '|' + m.week_of, { has_conf: false, has_perf: false });
+      for (const r of (scoreRows ?? [])) {
+        const k = r.staff_id + '|' + r.week_of;
+        const a = byKey.get(k);
+        if (!a) continue;
+        if (r.confidence_score !== null) a.has_conf = true;
+        if (r.performance_score !== null) a.has_perf = true;
+      }
+
+      // 4) Build reminder sets based on local deadlines
+      const nowUtc = new Date();
       const needConfidence: StaffMember[] = [];
       const needPerformance: StaffMember[] = [];
 
-      statusArray.forEach((s: any) => {
-        const confDone = s.conf_count >= s.required_count;
-        const perfDone = s.perf_count >= s.required_count;
-        const checkinDue = new Date(s.checkin_due);
-        const checkoutOpen = new Date(s.checkout_open);
-        
-        const staff = processedStaff.find(p => p.id === s.staff_id);
-        if (!staff || s.required_count === 0) return;
+      for (const m of meta) {
+        const k = m.id + '|' + m.week_of;
+        const a = byKey.get(k)!;
+        const { checkinDueUtc, checkoutOpenUtc } = deadlinesForWeek(m.week_of, m.tz);
 
-        // Need confidence reminder if:
-        // - Not done with confidence AND we're past or approaching checkin deadline
-        if (!confDone && now >= checkinDue) {
-          needConfidence.push(staff);
+        if (!a.has_conf && nowUtc >= checkinDueUtc) {
+          needConfidence.push({
+            id: m.id,
+            name: m.name,
+            email: m.email,
+            role_id: m.role_id,
+            user_id: m.user_id,
+            onboarding_weeks: m.onboarding_weeks,
+          });
         }
 
-        // Need performance reminder if:
-        // - Checkout is open AND performance not done
-        if (now >= checkoutOpen && !perfDone) {
-          needPerformance.push(staff);
+        if (!a.has_perf && nowUtc >= checkoutOpenUtc) {
+          needPerformance.push({
+            id: m.id,
+            name: m.name,
+            email: m.email,
+            role_id: m.role_id,
+            user_id: m.user_id,
+            onboarding_weeks: m.onboarding_weeks,
+          });
         }
-      });
+      }
 
-      setConfidenceList(needConfidence);
-      setPerformanceList(needPerformance);
-    } catch (error) {
+      // Filter to only those with emails and deduplicate
+      const withEmail = (x: StaffMember[]) => dedup(x.filter(p => !!p.email));
+
+      setStaff(meta.map(m => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        role_id: m.role_id,
+        user_id: m.user_id,
+        onboarding_weeks: m.onboarding_weeks,
+      })));
+      setConfidenceList(withEmail(needConfidence));
+      setPerformanceList(withEmail(needPerformance));
+    } catch (error: any) {
       console.error('Error loading staff data:', error);
       toast({
-        title: "Error",
-        description: "Failed to load staff data",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to load staff data',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  };
+  }
 
 
   function openPreview(type: TemplateKey) {
     const list = type === 'confidence' ? confidenceList : performanceList;
+    const dedupedList = dedup(list);
     setModalType(type);
-    setRecipients(list);
+    setRecipients(dedupedList);
     setSubject(templates[type].subject);
     setBody(templates[type].body);
     setModalOpen(true);

@@ -199,10 +199,25 @@ export default function RemindersTab() {
       const needConfidence: StaffMember[] = [];
       const needPerformance: StaffMember[] = [];
 
+      console.log('📧 Reminder logic - Current time (UTC):', nowUtc.toISOString());
+      console.log('📧 Staff to check:', meta.length);
+      console.log('📧 Sample staff week_of:', meta.slice(0, 3).map(m => ({ name: m.name, week_of: m.week_of, tz: m.tz })));
+
       for (const m of meta) {
         const k = m.id + '|' + m.week_of;
         const a = byKey.get(k)!;
         const { checkinDueUtc, checkoutOpenUtc } = deadlinesForWeek(m.week_of, m.tz);
+
+        const debugInfo = {
+          name: m.name,
+          has_conf: a.has_conf,
+          has_perf: a.has_perf,
+          checkinDue: checkinDueUtc.toISOString(),
+          checkoutOpen: checkoutOpenUtc.toISOString(),
+          isPastConfDeadline: nowUtc >= checkinDueUtc,
+          isPastPerfDeadline: nowUtc >= checkoutOpenUtc,
+        };
+        if (meta.indexOf(m) < 3) console.log('📧 Staff check:', debugInfo);
 
         if (!a.has_conf && nowUtc >= checkinDueUtc) {
           needConfidence.push({
@@ -230,6 +245,9 @@ export default function RemindersTab() {
       // Filter to only those with emails and deduplicate
       const withEmail = (x: StaffMember[]) => dedup(x.filter(p => !!p.email));
 
+      console.log('📧 Need confidence (before filter):', needConfidence.length);
+      console.log('📧 Need performance (before filter):', needPerformance.length);
+
       setStaff(meta.map(m => ({
         id: m.id,
         name: m.name,
@@ -240,6 +258,9 @@ export default function RemindersTab() {
       })));
       setConfidenceList(withEmail(needConfidence));
       setPerformanceList(withEmail(needPerformance));
+
+      console.log('📧 Final confidence list:', withEmail(needConfidence).length);
+      console.log('📧 Final performance list:', withEmail(needPerformance).length);
     } catch (error: any) {
       console.error('Error loading staff data:', error);
       toast({

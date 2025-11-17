@@ -12,6 +12,7 @@ type ScoreUpdate = {
   confidence_source?: 'backfill' | 'live' | 'backfill_historical';
   performance_source?: 'backfill' | 'live' | 'backfill_historical';
   entered_by?: string | null;
+  week_of?: string | null; // Monday date of the week (YYYY-MM-DD format)
 };
 
 type PayloadConfidence = {
@@ -94,8 +95,8 @@ export function useReliableSubmission() {
   const writeWeeklyScores = async (updates: ScoreUpdate[]) => {
     if (!updates?.length) return;
     
-    // Validate updates before sending
-    const validatedUpdates = updates.map(update => {
+    // Validate and enrich updates before sending
+    const enrichedUpdates = await Promise.all(updates.map(async (update) => {
       const focusId = update.weekly_focus_id;
       
       // Validate focus ID format
@@ -118,16 +119,37 @@ export function useReliableSubmission() {
         console.warn('[Submission] Attempting to upsert record with both scores null:', update);
       }
       
-      console.info('[Submission] Writing score with focus_id=%s conf=%s perf=%s', 
-        focusId, update.confidence_score, update.performance_score);
+      // Populate week_of if missing
+      let weekOf = update.week_of;
+      if (!weekOf) {
+        if (isPlanId) {
+          const planId = parseInt(focusId.replace('plan:', ''), 10);
+          const { data: planData } = await supabase
+            .from('weekly_plan')
+            .select('week_start_date')
+            .eq('id', planId)
+            .single();
+          weekOf = planData?.week_start_date || null;
+        } else {
+          const { data: focusData } = await supabase
+            .from('weekly_focus')
+            .select('week_start_date')
+            .eq('id', focusId)
+            .single();
+          weekOf = focusData?.week_start_date || null;
+        }
+      }
       
-      return update;
-    });
+      console.info('[Submission] Writing score with focus_id=%s conf=%s perf=%s week_of=%s', 
+        focusId, update.confidence_score, update.performance_score, weekOf);
+      
+      return { ...update, week_of: weekOf };
+    }));
 
-    console.log(`[Submission] Writing ${validatedUpdates.length} score updates`);
+    console.log(`[Submission] Writing ${enrichedUpdates.length} score updates`);
     const { error } = await supabase
       .from('weekly_scores')
-      .upsert(validatedUpdates, {
+      .upsert(enrichedUpdates, {
         onConflict: 'staff_id,weekly_focus_id',
         ignoreDuplicates: false,
       });

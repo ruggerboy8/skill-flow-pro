@@ -57,26 +57,29 @@ function statusPill(
   const confDone = conf >= required;
   const perfDone = perf >= required;
 
+  // Before checkin deadline (before Tuesday 12pm)
   if (now <= anchors.checkin_due) {
     return confDone
-      ? { label: 'Complete', color: 'green', icon: CheckCircle }
-      : { label: 'Missing confidence', color: 'yellow', icon: Clock };
+      ? { label: 'Waiting for Thursday', color: 'green', icon: CheckCircle }
+      : { label: 'Confidence due today', color: 'yellow', icon: Clock };
   }
 
+  // Between checkin deadline and checkout opening (Tuesday 12pm - Thursday 00:01)
   if (now < anchors.checkout_open) {
     return confDone
-      ? { label: 'Complete', color: 'green', icon: CheckCircle }
+      ? { label: 'Waiting for Thursday', color: 'green', icon: CheckCircle }
       : { label: 'Missing confidence', color: 'red', icon: AlertTriangle };
   }
 
+  // Between checkout opening and deadline (Thursday 00:01 - Friday 5pm)
   if (now <= anchors.checkout_due) {
     if (!confDone && !perfDone) return { label: 'Missing confidence & performance', color: 'red', icon: AlertTriangle };
     if (!confDone) return { label: 'Missing confidence', color: 'red', icon: AlertTriangle };
-    if (!perfDone) return { label: 'Missing performance', color: 'yellow', icon: Clock };
+    if (!perfDone) return { label: 'Performance due', color: 'yellow', icon: Clock };
     return { label: 'Complete', color: 'green', icon: CheckCircle };
   }
 
-  // after deadline
+  // After both deadlines
   if (confDone && perfDone) return { label: 'Complete', color: 'green', icon: CheckCircle };
   if (!confDone && !perfDone) return { label: 'Missing confidence & performance', color: 'red', icon: AlertTriangle };
   if (!confDone) return { label: 'Missing confidence', color: 'red', icon: AlertTriangle };

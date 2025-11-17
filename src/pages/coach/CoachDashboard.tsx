@@ -5,13 +5,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { X, CheckCircle, Clock, AlertTriangle, MinusCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import StaffRow from '@/components/coach/StaffRow';
 
-interface StaffStatus {
+interface StaffWeekData {
   staff_id: string;
   staff_name: string;
   role_id: number;
@@ -20,70 +20,14 @@ interface StaffStatus {
   location_name: string;
   organization_id: string;
   organization_name: string;
-  active_monday: string;
-  cycle_number: number;
-  week_in_cycle: number;
-  phase: string;
-  checkin_due: string;
-  checkout_open: string;
-  checkout_due: string;
-  required_count: number;
-  conf_count: number;
-  perf_count: number;
-  backlog_count: number;
-  last_activity_kind: string | null;
-  last_activity_at: string | null;
-  source_used: string;
   tz: string;
-}
-
-type PillColor = 'green' | 'yellow' | 'red' | 'gray';
-
-interface StatusPill {
-  label: string;
-  color: PillColor;
-  icon: any;
-}
-
-function statusPill(
-  required: number,
-  conf: number,
-  perf: number,
-  anchors: { checkin_due: Date; checkout_open: Date; checkout_due: Date },
-  now: Date
-): StatusPill {
-  if (required === 0) return { label: 'No assignments', color: 'gray', icon: MinusCircle };
-
-  const confDone = conf >= required;
-  const perfDone = perf >= required;
-
-  // Before checkin deadline (before Tuesday 12pm)
-  if (now <= anchors.checkin_due) {
-    return confDone
-      ? { label: 'Waiting for Thursday', color: 'green', icon: CheckCircle }
-      : { label: 'Confidence due today', color: 'yellow', icon: Clock };
-  }
-
-  // Between checkin deadline and checkout opening (Tuesday 12pm - Thursday 00:01)
-  if (now < anchors.checkout_open) {
-    return confDone
-      ? { label: 'Waiting for Thursday', color: 'green', icon: CheckCircle }
-      : { label: 'Missing confidence', color: 'red', icon: AlertTriangle };
-  }
-
-  // Between checkout opening and deadline (Thursday 00:01 - Friday 5pm)
-  if (now <= anchors.checkout_due) {
-    if (!confDone && !perfDone) return { label: 'Missing confidence & performance', color: 'red', icon: AlertTriangle };
-    if (!confDone) return { label: 'Missing confidence', color: 'red', icon: AlertTriangle };
-    if (!perfDone) return { label: 'Performance due', color: 'yellow', icon: Clock };
-    return { label: 'Complete', color: 'green', icon: CheckCircle };
-  }
-
-  // After both deadlines
-  if (confDone && perfDone) return { label: 'Complete', color: 'green', icon: CheckCircle };
-  if (!confDone && !perfDone) return { label: 'Missing confidence & performance', color: 'red', icon: AlertTriangle };
-  if (!confDone) return { label: 'Missing confidence', color: 'red', icon: AlertTriangle };
-  return { label: 'Missing performance', color: 'red', icon: AlertTriangle };
+  week_of: string | null;
+  confidence_score: number | null;
+  performance_score: number | null;
+  confidence_late: boolean | null;
+  performance_late: boolean | null;
+  confidence_date: string | null;
+  performance_date: string | null;
 }
 
 export default function CoachDashboard() {
@@ -91,8 +35,8 @@ export default function CoachDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, isCoach, isLead } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [allStatuses, setAllStatuses] = useState<StaffStatus[]>([]);
-  const [filteredRows, setFilteredRows] = useState<StaffStatus[]>([]);
+  const [allStaff, setAllStaff] = useState<StaffWeekData[]>([]);
+  const [filteredRows, setFilteredRows] = useState<StaffWeekData[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [organizations, setOrganizations] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
@@ -102,7 +46,6 @@ export default function CoachDashboard() {
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Redirect if not coach, super admin, or lead RDA
   useEffect(() => {
     if (!loading && !(isCoach || isSuperAdmin || isLead)) {
       navigate('/');
@@ -111,7 +54,7 @@ export default function CoachDashboard() {
 
   useEffect(() => {
     loadStaffData();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -131,9 +74,8 @@ export default function CoachDashboard() {
 
   useEffect(() => {
     applyFilters();
-  }, [allStatuses, selectedLocation, selectedOrganization, selectedRole, search]);
+  }, [allStaff, selectedLocation, selectedOrganization, selectedRole, search]);
 
-  // Sync URL params with filter state
   useEffect(() => {
     const params = new URLSearchParams();
     if (selectedOrganization !== 'all') params.set('org', selectedOrganization);
@@ -155,87 +97,126 @@ export default function CoachDashboard() {
 
   const loadStaffData = async () => {
     if (!user) return;
-    
+
     try {
-      const { data: statuses, error } = await supabase.rpc('get_staff_statuses', {
-        p_coach_user_id: user.id
-      });
+      const now = new Date();
+      
+      const { data: staffData, error: staffError } = await supabase
+        .from('staff')
+        .select(`
+          id,
+          name,
+          role_id,
+          primary_location_id,
+          roles:role_id(role_name),
+          locations:primary_location_id(
+            id,
+            name,
+            timezone,
+            organization_id,
+            program_start_date,
+            cycle_length_weeks,
+            organizations:organization_id(
+              id,
+              name
+            )
+          )
+        `)
+        .eq('is_participant', true)
+        .not('primary_location_id', 'is', null);
 
-      if (error) throw error;
+      if (staffError) throw staffError;
 
-      const statusArray = (statuses || []) as StaffStatus[];
-      setAllStatuses(statusArray);
+      const staffWithScores = await Promise.all(
+        (staffData || []).map(async (staff: any) => {
+          const tz = staff.locations?.timezone || 'America/Chicago';
+          
+          const nowInTz = toZonedTime(now, tz);
+          const dayOfWeek = nowInTz.getDay();
+          const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          const currentMonday = new Date(nowInTz);
+          currentMonday.setDate(currentMonday.getDate() + daysToMonday);
+          currentMonday.setHours(0, 0, 0, 0);
+          const weekOf = format(currentMonday, 'yyyy-MM-dd');
 
-      // Extract unique filter values from the results
-      const uniqueLocations = [...new Set(statusArray.map(s => s.location_name).filter(Boolean))] as string[];
-      const uniqueOrganizations = [...new Set(statusArray.map(s => s.organization_name).filter(Boolean))] as string[];
-      const uniqueRoles = [...new Set(statusArray.map(s => s.role_name).filter(Boolean))] as string[];
+          const { data: scoreData } = await supabase
+            .from('weekly_scores')
+            .select('*')
+            .eq('staff_id', staff.id)
+            .eq('week_of', weekOf)
+            .maybeSingle();
 
-      setLocations(uniqueLocations);
-      setOrganizations(uniqueOrganizations);
+          return {
+            staff_id: staff.id,
+            staff_name: staff.name,
+            role_id: staff.role_id,
+            role_name: staff.roles?.role_name || 'Unknown',
+            location_id: staff.locations?.id || '',
+            location_name: staff.locations?.name || 'Unknown',
+            organization_id: staff.locations?.organizations?.id || '',
+            organization_name: staff.locations?.organizations?.name || 'Unknown',
+            tz,
+            week_of: weekOf,
+            confidence_score: scoreData?.confidence_score ?? null,
+            performance_score: scoreData?.performance_score ?? null,
+            confidence_late: scoreData?.confidence_late ?? null,
+            performance_late: scoreData?.performance_late ?? null,
+            confidence_date: scoreData?.confidence_date ?? null,
+            performance_date: scoreData?.performance_date ?? null,
+          };
+        })
+      );
+
+      setAllStaff(staffWithScores);
+
+      const uniqueOrgs = Array.from(new Set(staffWithScores.map(s => s.organization_name))).sort();
+      const uniqueLocs = Array.from(new Set(staffWithScores.map(s => s.location_name))).sort();
+      const uniqueRoles = Array.from(new Set(staffWithScores.map(s => s.role_name))).sort();
+
+      setOrganizations(uniqueOrgs);
+      setLocations(uniqueLocs);
       setRoles(uniqueRoles);
-    } catch (error) {
-      console.error('Error loading staff statuses:', error);
+    } catch (err) {
+      console.error('Error loading staff:', err);
     } finally {
       setLoading(false);
     }
   };
 
   const applyFilters = () => {
-    let filtered = allStatuses;
-
-    if (selectedLocation !== 'all') {
-      filtered = filtered.filter((s) => s.location_name === selectedLocation);
-    }
+    let filtered = [...allStaff];
 
     if (selectedOrganization !== 'all') {
-      filtered = filtered.filter((s) => s.organization_name === selectedOrganization);
+      filtered = filtered.filter(s => s.organization_name === selectedOrganization);
     }
-
+    if (selectedLocation !== 'all') {
+      filtered = filtered.filter(s => s.location_name === selectedLocation);
+    }
     if (selectedRole !== 'all') {
-      filtered = filtered.filter((s) => s.role_name === selectedRole);
+      filtered = filtered.filter(s => s.role_name === selectedRole);
     }
-
     if (search.trim()) {
       const q = search.toLowerCase();
-      filtered = filtered.filter((s) => s.staff_name.toLowerCase().includes(q));
+      filtered = filtered.filter(s => s.staff_name.toLowerCase().includes(q));
     }
 
-    // Sort by label priority (most urgent first), then by name
-    const labelOrder: Record<string, number> = {
-      'Missing confidence & performance': 0,
-      'Missing confidence': 1,
-      'Missing performance': 2,
-      'Complete': 3,
-      'No assignments': 4,
-    };
+    filtered.sort((a, b) => {
+      const aConfMissing = !a.confidence_score;
+      const aPerfMissing = !a.performance_score;
+      const bConfMissing = !b.confidence_score;
+      const bPerfMissing = !b.performance_score;
 
-    filtered = filtered.sort((a, b) => {
-      const now = new Date();
-      const pillA = statusPill(
-        a.required_count,
-        a.conf_count,
-        a.perf_count,
-        {
-          checkin_due: new Date(a.checkin_due),
-          checkout_open: new Date(a.checkout_open),
-          checkout_due: new Date(a.checkout_due),
-        },
-        now
-      );
-      const pillB = statusPill(
-        b.required_count,
-        b.conf_count,
-        b.perf_count,
-        {
-          checkin_due: new Date(b.checkin_due),
-          checkout_open: new Date(b.checkout_open),
-          checkout_due: new Date(b.checkout_due),
-        },
-        now
-      );
+      const getPriority = (confMissing: boolean, perfMissing: boolean) => {
+        if (confMissing && perfMissing) return 3;
+        if (confMissing) return 2;
+        if (perfMissing) return 1;
+        return 0;
+      };
 
-      const priorityDiff = labelOrder[pillA.label] - labelOrder[pillB.label];
+      const aPriority = getPriority(aConfMissing, aPerfMissing);
+      const bPriority = getPriority(bConfMissing, bPerfMissing);
+
+      const priorityDiff = bPriority - aPriority;
       if (priorityDiff !== 0) return priorityDiff;
       return a.staff_name.localeCompare(b.staff_name);
     });
@@ -243,19 +224,13 @@ export default function CoachDashboard() {
     setFilteredRows(filtered);
   };
 
-
-
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Coach Dashboard</h1>
-        <div className="flex gap-4">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-48" />
-        </div>
-        <div className="grid gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map(i => (
+            <Skeleton key={i} className="h-20 w-full" />
           ))}
         </div>
       </div>
@@ -263,144 +238,160 @@ export default function CoachDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Coach Dashboard</h1>
-
-      {/* Filters Bar */}
-      <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4 mb-6">
-        <div className="flex gap-4 flex-wrap items-center">
-          {/* Only show org filter for Coaches and Super Admins */}
-          {(isCoach || isSuperAdmin) && (
-            <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Organizations" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Organizations</SelectItem>
-                {organizations.map((organization) => (
-                  <SelectItem key={organization} value={organization}>
-                    {organization}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location} value={location}>
-                  {location}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedRole} onValueChange={setSelectedRole}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Positions" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Positions</SelectItem>
-              {roles.map((role) => (
-                <SelectItem key={role} value={role}>
-                  {role}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name"
-            className="w-64"
-            aria-label="Search staff by name"
-          />
-          
-          {hasActiveFilters && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={clearFilters}
-              className="gap-2"
-            >
-              <X className="h-4 w-4" />
-              Clear Filters
-            </Button>
-          )}
-        </div>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Coach Dashboard</h1>
+        <p className="text-muted-foreground mt-1">Monitor staff progress and check-ins</p>
       </div>
 
-      {/* Staff List */}
-      <div className="space-y-4">
-        {/* Column Headers */}
-        <div className="grid grid-cols-12 gap-4 px-4 py-2 text-sm font-medium text-muted-foreground border-b">
-          <div className="col-span-4">Staff Member</div>
-          <div className="col-span-3 text-right">Last Activity</div>
-          <div className="col-span-5 text-right">Status</div>
-        </div>
-        
-        {/* Staff Rows */}
-        <div className="space-y-2">
-          {filteredRows.map((row) => {
-            const now = new Date();
-            const pill = statusPill(
-              row.required_count,
-              row.conf_count,
-              row.perf_count,
-              {
-                checkin_due: new Date(row.checkin_due),
-                checkout_open: new Date(row.checkout_open),
-                checkout_due: new Date(row.checkout_due),
-              },
-              now
-            );
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {isSuperAdmin && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Organization</label>
+                <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Organizations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Organizations</SelectItem>
+                    {organizations.map(org => (
+                      <SelectItem key={org} value={org}>{org}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-            const lastActivityText = row.last_activity_at
-              ? `${row.last_activity_kind === 'confidence' ? 'Confidence' : 'Performance'} submitted ${format(new Date(row.last_activity_at), 'EEE h:mma')}`
-              : 'No check-in yet';
+            <div>
+              <label className="text-sm font-medium mb-2 block">Location</label>
+              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Locations" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {locations.map(loc => (
+                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            const statusDetail = pill.label === 'No assignments'
-              ? `No locked assignments for ${row.active_monday} (debug: ${row.phase} c${row.cycle_number}w${row.week_in_cycle} ${row.conf_count}/${row.required_count} conf ${row.perf_count}/${row.required_count} perf source: ${row.source_used} ${row.tz})`
-              : `${pill.label} (${row.conf_count}/${row.required_count} conf, ${row.perf_count}/${row.required_count} perf)`;
+            <div>
+              <label className="text-sm font-medium mb-2 block">Role</label>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Roles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {roles.map(role => (
+                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            return (
-              <StaffRow
-                key={row.staff_id}
-                member={{
-                  id: row.staff_id,
-                  name: row.staff_name,
-                  role_name: row.role_name,
-                  location: row.location_name,
-                }}
-                status={{
-                  color: pill.color as any,
-                  reason: pill.label,
-                  label: pill.label,
-                  severity: pill.color,
-                  detail: statusDetail,
-                  lastActivityText,
-                  icon: pill.icon,
-                }}
-                onClick={() => navigate(`/coach/${row.staff_id}`)}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Search</label>
+              <Input
+                placeholder="Search by name..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
-            );
-          })}
-        </div>
-      </div>
+            </div>
 
-      {filteredRows.length === 0 && (
+            {hasActiveFilters && (
+              <div className="flex items-end">
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear Filters
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {filteredRows.length} of {allStaff.length} staff members
+          </p>
+        </div>
+
         <Card>
-          <CardContent className="py-16 text-center">
-            <p className="text-muted-foreground">No staff members match the selected filters.</p>
+          <CardContent className="p-0">
+            <div className="grid grid-cols-12 gap-4 px-4 py-2 text-sm font-medium text-muted-foreground border-b">
+              <div className="col-span-4">Name / Role</div>
+              <div className="col-span-4 text-right">Last Activity</div>
+              <div className="col-span-2 text-center">Conf</div>
+              <div className="col-span-2 text-center">Perf</div>
+            </div>
+
+            <div className="space-y-2">
+              {filteredRows.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No staff members match the selected filters
+                </div>
+              ) : (
+                filteredRows.map((row) => {
+                  let lastActivityText = 'No check-in yet';
+                  if (row.confidence_date || row.performance_date) {
+                    const confDate = row.confidence_date ? new Date(row.confidence_date) : null;
+                    const perfDate = row.performance_date ? new Date(row.performance_date) : null;
+                    
+                    let mostRecent: Date | null = null;
+                    let activityKind = '';
+                    
+                    if (confDate && perfDate) {
+                      mostRecent = confDate > perfDate ? confDate : perfDate;
+                      activityKind = confDate > perfDate ? 'confidence' : 'performance';
+                    } else if (confDate) {
+                      mostRecent = confDate;
+                      activityKind = 'confidence';
+                    } else if (perfDate) {
+                      mostRecent = perfDate;
+                      activityKind = 'performance';
+                    }
+                    
+                    if (mostRecent) {
+                      const zonedDate = toZonedTime(mostRecent, row.tz);
+                      const dayOfWeek = format(zonedDate, 'EEE');
+                      const monthDay = format(zonedDate, 'M/d');
+                      const time = format(zonedDate, 'h:mma');
+                      lastActivityText = `${activityKind} ${dayOfWeek} ${monthDay} @ ${time}`;
+                    }
+                  }
+
+                  return (
+                    <StaffRow
+                      key={row.staff_id}
+                      member={{
+                        id: row.staff_id,
+                        name: row.staff_name,
+                        role_name: row.role_name,
+                        location: row.location_name
+                      }}
+                      confStatus={
+                        row.confidence_score === null ? 'missing' :
+                        row.confidence_late ? 'late' : 'complete'
+                      }
+                      perfStatus={
+                        row.performance_score === null ? 'missing' :
+                        row.performance_late ? 'late' : 'complete'
+                      }
+                      lastActivityText={lastActivityText}
+                      onClick={() => navigate(`/coach/${row.staff_id}`)}
+                    />
+                  );
+                })
+              )}
+            </div>
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   );
 }

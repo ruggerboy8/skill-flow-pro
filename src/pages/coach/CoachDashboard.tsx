@@ -144,6 +144,8 @@ export default function CoachDashboard() {
             .select('*')
             .eq('staff_id', staff.id)
             .eq('week_of', weekOf)
+            .order('updated_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
 
           return {

@@ -97,29 +97,18 @@ export default function CoachDashboard() {
 
   const loadStaffData = async () => {
     if (!user) return;
+    setLoading(true);
 
     try {
-      const now = new Date();
-      
+      // 1) Load staff (unchanged)
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
         .select(`
-          id,
-          name,
-          role_id,
-          primary_location_id,
+          id, name, role_id, primary_location_id,
           roles:role_id(role_name),
           locations:primary_location_id(
-            id,
-            name,
-            timezone,
-            organization_id,
-            program_start_date,
-            cycle_length_weeks,
-            organizations!locations_organization_id_fkey(
-              id,
-              name
-            )
+            id, name, timezone, organization_id, program_start_date, cycle_length_weeks,
+            organizations!locations_organization_id_fkey(id, name)
           )
         `)
         .eq('is_participant', true)
@@ -127,70 +116,149 @@ export default function CoachDashboard() {
 
       if (staffError) throw staffError;
 
-      const staffWithScores = await Promise.all(
-        (staffData || []).map(async (staff: any) => {
-          const tz = staff.locations?.timezone || 'America/Chicago';
-          
-          const nowInTz = toZonedTime(now, tz);
-          const dayOfWeek = nowInTz.getDay();
-          const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-          const currentMonday = new Date(nowInTz);
-          currentMonday.setDate(currentMonday.getDate() + daysToMonday);
-          currentMonday.setHours(0, 0, 0, 0);
-          const weekOf = format(currentMonday, 'yyyy-MM-dd');
+      // 2) For each staff, compute their local Monday (assignment week)
+      const now = new Date();
+      type StaffMeta = {
+        staff_id: string;
+        staff_name: string;
+        role_id: number;
+        role_name: string;
+        location_id: string;
+        location_name: string;
+        organization_id: string;
+        organization_name: string;
+        tz: string;
+        week_of: string;
+      };
 
-          // Fetch all weekly scores for this staff member and week (multiple rows per staff)
-          const { data: scoreRows } = await supabase
-            .from('weekly_scores')
-            .select('confidence_score, performance_score, confidence_late, performance_late, confidence_date, performance_date')
-            .eq('staff_id', staff.id)
-            .eq('week_of', weekOf);
+      const staffMeta: StaffMeta[] = (staffData || []).map((s: any) => {
+        const tz = s.locations?.timezone || 'America/Chicago';
+        const nowInTz = toZonedTime(now, tz);
+        const dow = nowInTz.getDay();                  // 0=Sun..6=Sat
+        const daysToMonday = dow === 0 ? -6 : 1 - dow; // local Monday
+        const monday = new Date(nowInTz);
+        monday.setDate(monday.getDate() + daysToMonday);
+        monday.setHours(0,0,0,0);
+        const weekOf = format(monday, 'yyyy-MM-dd');
 
-          // Aggregate the multiple rows
-          const confSubmitted = scoreRows?.filter(r => r.confidence_score !== null).length || 0;
-          const perfSubmitted = scoreRows?.filter(r => r.performance_score !== null).length || 0;
-          const anyConfLate = scoreRows?.some(r => r.confidence_late) || false;
-          const anyPerfLate = scoreRows?.some(r => r.performance_late) || false;
+        return {
+          staff_id: s.id,
+          staff_name: s.name,
+          role_id: s.role_id,
+          role_name: s.roles?.role_name || 'Unknown',
+          location_id: s.locations?.id || '',
+          location_name: s.locations?.name || 'Unknown',
+          organization_id: s.locations?.organizations?.id || '',
+          organization_name: s.locations?.organizations?.name || 'Unknown',
+          tz,
+          week_of: weekOf,
+        };
+      });
 
-          // Get most recent activity date across all rows
-          const allDates = [
-            ...(scoreRows?.map(r => r.confidence_date).filter(Boolean) || []),
-            ...(scoreRows?.map(r => r.performance_date).filter(Boolean) || [])
-          ];
-          const mostRecentDate = allDates.length > 0 
-            ? new Date(Math.max(...allDates.map(d => new Date(d).getTime()))) 
-            : null;
+      // 3) Group staff by week_of (keeps requests tiny; often 1–2 groups)
+      const groupMap = new Map<string, string[]>(); // week_of -> [staff_ids]
+      for (const s of staffMeta) {
+        const arr = groupMap.get(s.week_of) || [];
+        arr.push(s.staff_id);
+        groupMap.set(s.week_of, arr);
+      }
 
-          return {
-            staff_id: staff.id,
-            staff_name: staff.name,
-            role_id: staff.role_id,
-            role_name: staff.roles?.role_name || 'Unknown',
-            location_id: staff.locations?.id || '',
-            location_name: staff.locations?.name || 'Unknown',
-            organization_id: staff.locations?.organizations?.id || '',
-            organization_name: staff.locations?.organizations?.name || 'Unknown',
-            tz,
-            week_of: weekOf,
-            confidence_score: confSubmitted,
-            performance_score: perfSubmitted,
-            confidence_late: anyConfLate,
-            performance_late: anyPerfLate,
-            confidence_date: mostRecentDate?.toISOString() || null,
-            performance_date: mostRecentDate?.toISOString() || null,
-          };
-        })
-      );
+      // 4) Fetch weekly_scores per group and aggregate in memory
+      type Agg = {
+        has_conf: boolean;
+        has_perf: boolean;
+        conf_late: boolean;
+        perf_late: boolean;
+        last_activity_at: string | null; // ISO
+        last_activity_kind: 'confidence' | 'performance' | null;
+      };
+      const aggByStaff = new Map<string, Agg>();
 
-      setAllStaff(staffWithScores);
+      for (const [weekOf, staffIds] of groupMap) {
+        const { data: rows, error } = await supabase
+          .from('weekly_scores')
+          .select('staff_id, confidence_score, performance_score, confidence_late, performance_late, confidence_date, performance_date, week_of')
+          .in('staff_id', staffIds)
+          .eq('week_of', weekOf);
 
-      const uniqueOrgs = Array.from(new Set(staffWithScores.map(s => s.organization_name))).sort();
-      const uniqueLocs = Array.from(new Set(staffWithScores.map(s => s.location_name))).sort();
-      const uniqueRoles = Array.from(new Set(staffWithScores.map(s => s.role_name))).sort();
+        if (error) throw error;
 
-      setOrganizations(uniqueOrgs);
-      setLocations(uniqueLocs);
-      setRoles(uniqueRoles);
+        // initialize with defaults
+        for (const id of staffIds) {
+          if (!aggByStaff.has(id)) {
+            aggByStaff.set(id, {
+              has_conf: false,
+              has_perf: false,
+              conf_late: false,
+              perf_late: false,
+              last_activity_at: null,
+              last_activity_kind: null,
+            });
+          }
+        }
+
+        // fold rows
+        for (const r of rows || []) {
+          const a = aggByStaff.get(r.staff_id)!;
+
+          if (r.confidence_score !== null) {
+            a.has_conf = true;
+            a.conf_late = a.conf_late || !!r.confidence_late;
+            if (!a.last_activity_at || new Date(r.confidence_date) > new Date(a.last_activity_at)) {
+              a.last_activity_at = r.confidence_date;
+              a.last_activity_kind = 'confidence';
+            }
+          }
+
+          if (r.performance_score !== null) {
+            a.has_perf = true;
+            a.perf_late = a.perf_late || !!r.performance_late;
+            if (!a.last_activity_at || new Date(r.performance_date) > new Date(a.last_activity_at)) {
+              a.last_activity_at = r.performance_date;
+              a.last_activity_kind = 'performance';
+            }
+          }
+        }
+      }
+
+      // 5) Build the UI rows (one per staff)
+      const rows = staffMeta.map(s => {
+        const a = aggByStaff.get(s.staff_id) ?? {
+          has_conf: false,
+          has_perf: false,
+          conf_late: false,
+          perf_late: false,
+          last_activity_at: null,
+          last_activity_kind: null,
+        };
+
+        return {
+          staff_id: s.staff_id,
+          staff_name: s.staff_name,
+          role_id: s.role_id,
+          role_name: s.role_name,
+          location_id: s.location_id,
+          location_name: s.location_name,
+          organization_id: s.organization_id,
+          organization_name: s.organization_name,
+          tz: s.tz,
+          week_of: s.week_of,
+          // keep the prop names you already use downstream
+          confidence_score: a.has_conf ? 1 : 0,
+          performance_score: a.has_perf ? 1 : 0,
+          confidence_late: a.has_conf && a.conf_late,
+          performance_late: a.has_perf && a.perf_late,
+          confidence_date: a.last_activity_kind === 'confidence' ? a.last_activity_at : null,
+          performance_date: a.last_activity_kind === 'performance' ? a.last_activity_at : null,
+        };
+      });
+
+      setAllStaff(rows);
+
+      // 6) facet lists
+      setOrganizations(Array.from(new Set(rows.map(s => s.organization_name))).sort());
+      setLocations(Array.from(new Set(rows.map(s => s.location_name))).sort());
+      setRoles(Array.from(new Set(rows.map(s => s.role_name))).sort());
     } catch (err) {
       console.error('Error loading staff:', err);
     } finally {
@@ -374,7 +442,7 @@ export default function CoachDashboard() {
                     if (mostRecent) {
                       const zonedDate = toZonedTime(mostRecent, row.tz);
                       const dayOfWeek = format(zonedDate, 'EEE');
-                      const monthDay = format(zonedDate, 'M/d');
+                      const monthDay = format(zonedDate, 'MM/dd');
                       const time = format(zonedDate, 'h:mma');
                       lastActivityText = `${activityKind} ${dayOfWeek} ${monthDay} @ ${time}`;
                     }

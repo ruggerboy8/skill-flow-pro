@@ -1420,6 +1420,7 @@ export type Database = {
           site_action_id: number | null
           staff_id: string | null
           updated_at: string | null
+          week_of: string | null
           weekly_focus_id: string | null
         }
         Insert: {
@@ -1438,6 +1439,7 @@ export type Database = {
           site_action_id?: number | null
           staff_id?: string | null
           updated_at?: string | null
+          week_of?: string | null
           weekly_focus_id?: string | null
         }
         Update: {
@@ -1456,6 +1458,7 @@ export type Database = {
           site_action_id?: number | null
           staff_id?: string | null
           updated_at?: string | null
+          week_of?: string | null
           weekly_focus_id?: string | null
         }
         Relationships: [

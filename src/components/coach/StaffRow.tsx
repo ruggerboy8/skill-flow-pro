@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { format } from 'date-fns';
+import { CheckCircle, AlertCircle, X } from 'lucide-react';
 
 export interface StaffRowProps {
   member: {
@@ -10,62 +10,40 @@ export interface StaffRowProps {
     role_name: string;
     location: string | null;
   };
-  status: {
-    color: "grey" | "yellow" | "green" | "red";
-    reason: string;
-    subtext?: string;
-    tooltip?: string;
-    lastActivity?: { kind: 'confidence' | 'performance'; at: Date };
-    label?: string;
-    severity?: 'green' | 'yellow' | 'red' | 'grey' | 'gray';
-    detail?: string;
-    lastActivityText?: string;
-    icon?: any;
-  };
-  debugInfo?: {
-    activeMonday: string;
-    phase: string;
-    cycle: number;
-    week: number;
-    source: string;
-    tz: string;
-  };
+  confStatus: 'missing' | 'complete' | 'late';
+  perfStatus: 'missing' | 'complete' | 'late';
+  lastActivityText: string;
   onClick: () => void;
 }
 
-export default function StaffRow({ member, status, debugInfo, onClick }: StaffRowProps) {
-  const severity = status.severity || status.color;
-  
-  const chipClass = 
-    severity === "green"
-      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-      : severity === "yellow"
-      ? "bg-amber-100 text-amber-800 border-amber-300"
-      : severity === "red"
-      ? "bg-red-100 text-red-800 border-red-300"
-      : "bg-zinc-100 text-zinc-700 border-zinc-300";
+export default function StaffRow({ member, confStatus, perfStatus, lastActivityText, onClick }: StaffRowProps) {
+  const getStatusIcon = (status: 'missing' | 'complete' | 'late') => {
+    if (status === 'missing') {
+      return <X className="h-5 w-5 text-muted-foreground" />;
+    } else if (status === 'complete') {
+      return <CheckCircle className="h-5 w-5 text-emerald-600" />;
+    } else {
+      return <AlertCircle className="h-5 w-5 text-amber-600" />;
+    }
+  };
 
-  const chipText = status.label || status.reason;
-  const tooltipText = status.detail || status.tooltip;
-  const Icon = status.icon;
-  
-  // Compose an aria-label without "undefined"
-  const aria = tooltipText
-    ? `${member.name} — ${status.reason}`
-    : `${member.name}`;
+  const getStatusTooltip = (type: 'confidence' | 'performance', status: 'missing' | 'complete' | 'late') => {
+    if (status === 'missing') return `${type} not submitted`;
+    if (status === 'late') return `${type} submitted late`;
+    return `${type} submitted on time`;
+  };
 
   return (
     <Card className="transition-shadow hover:shadow-md">
       <CardContent className="p-0">
-        {/* Make the row keyboard-accessible */}
         <button
           type="button"
           onClick={onClick}
-          aria-label={aria}
+          aria-label={`${member.name} - View details`}
           className="w-full text-left p-4 focus:outline-none focus:ring-2 focus:ring-ring rounded-lg"
         >
-          <div className="grid grid-cols-12 gap-4 items-start">
-            {/* Name and Role - col-span-4 to match header */}
+          <div className="grid grid-cols-12 gap-4 items-center">
+            {/* Name and Role - col-span-4 */}
             <div className="col-span-4 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold truncate">{member.name}</h3>
@@ -78,32 +56,43 @@ export default function StaffRow({ member, status, debugInfo, onClick }: StaffRo
               )}
             </div>
 
-            {/* Last Activity - col-span-3 to match header */}
-            <div className="col-span-3">
+            {/* Last Activity - col-span-4 */}
+            <div className="col-span-4">
               <div className="text-right">
                 <div className="text-xs text-muted-foreground">
-                  {status.lastActivityText || 'No check-in yet'}
+                  {lastActivityText}
                 </div>
               </div>
             </div>
 
-            {/* Status - col-span-5 to match header */}
-            <div className="col-span-5 flex items-center justify-end">
+            {/* Confidence Status - col-span-2 */}
+            <div className="col-span-2 flex items-center justify-center">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge
-                      className={`${chipClass} border cursor-help transition-transform hover:scale-105 flex items-center gap-1.5`}
-                    >
-                      {Icon && <Icon className="h-3.5 w-3.5" />}
-                      <span>{chipText}</span>
-                    </Badge>
+                    <div className="cursor-help">
+                      {getStatusIcon(confStatus)}
+                    </div>
                   </TooltipTrigger>
-                  {tooltipText && (
-                    <TooltipContent side="left" className="max-w-xs">
-                      <p className="text-sm">{tooltipText}</p>
-                    </TooltipContent>
-                  )}
+                  <TooltipContent>
+                    <p className="text-sm">{getStatusTooltip('confidence', confStatus)}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+
+            {/* Performance Status - col-span-2 */}
+            <div className="col-span-2 flex items-center justify-center">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-help">
+                      {getStatusIcon(perfStatus)}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-sm">{getStatusTooltip('performance', perfStatus)}</p>
+                  </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>

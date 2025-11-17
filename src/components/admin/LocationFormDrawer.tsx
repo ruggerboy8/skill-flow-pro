@@ -59,11 +59,16 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
 
   useEffect(() => {
     if (location && open) {
+      // Parse the date string directly without timezone conversion
+      const dateStr = location.program_start_date; // Already in YYYY-MM-DD format
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const dateObj = new Date(year, month - 1, day); // Month is 0-indexed
+      
       setFormData({
         name: location.name,
         organization_id: location.organization_id || "",
         timezone: location.timezone,
-        program_start_date: new Date(location.program_start_date),
+        program_start_date: dateObj,
         cycle_length_weeks: location.cycle_length_weeks,
       });
     } else if (open) {

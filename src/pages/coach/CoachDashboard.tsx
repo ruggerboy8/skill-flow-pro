@@ -139,14 +139,27 @@ export default function CoachDashboard() {
           currentMonday.setHours(0, 0, 0, 0);
           const weekOf = format(currentMonday, 'yyyy-MM-dd');
 
-          const { data: scoreData } = await supabase
+          // Fetch all weekly scores for this staff member and week (multiple rows per staff)
+          const { data: scoreRows } = await supabase
             .from('weekly_scores')
-            .select('*')
+            .select('confidence_score, performance_score, confidence_late, performance_late, confidence_date, performance_date')
             .eq('staff_id', staff.id)
-            .eq('week_of', weekOf)
-            .order('updated_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .eq('week_of', weekOf);
+
+          // Aggregate the multiple rows
+          const confSubmitted = scoreRows?.filter(r => r.confidence_score !== null).length || 0;
+          const perfSubmitted = scoreRows?.filter(r => r.performance_score !== null).length || 0;
+          const anyConfLate = scoreRows?.some(r => r.confidence_late) || false;
+          const anyPerfLate = scoreRows?.some(r => r.performance_late) || false;
+
+          // Get most recent activity date across all rows
+          const allDates = [
+            ...(scoreRows?.map(r => r.confidence_date).filter(Boolean) || []),
+            ...(scoreRows?.map(r => r.performance_date).filter(Boolean) || [])
+          ];
+          const mostRecentDate = allDates.length > 0 
+            ? new Date(Math.max(...allDates.map(d => new Date(d).getTime()))) 
+            : null;
 
           return {
             staff_id: staff.id,
@@ -159,12 +172,12 @@ export default function CoachDashboard() {
             organization_name: staff.locations?.organizations?.name || 'Unknown',
             tz,
             week_of: weekOf,
-            confidence_score: scoreData?.confidence_score ?? null,
-            performance_score: scoreData?.performance_score ?? null,
-            confidence_late: scoreData?.confidence_late ?? null,
-            performance_late: scoreData?.performance_late ?? null,
-            confidence_date: scoreData?.confidence_date ?? null,
-            performance_date: scoreData?.performance_date ?? null,
+            confidence_score: confSubmitted,
+            performance_score: perfSubmitted,
+            confidence_late: anyConfLate,
+            performance_late: anyPerfLate,
+            confidence_date: mostRecentDate?.toISOString() || null,
+            performance_date: mostRecentDate?.toISOString() || null,
           };
         })
       );
@@ -377,11 +390,11 @@ export default function CoachDashboard() {
                         location: row.location_name
                       }}
                       confStatus={
-                        row.confidence_score === null ? 'missing' :
+                        row.confidence_score === 0 ? 'missing' :
                         row.confidence_late ? 'late' : 'complete'
                       }
                       perfStatus={
-                        row.performance_score === null ? 'missing' :
+                        row.performance_score === 0 ? 'missing' :
                         row.performance_late ? 'late' : 'complete'
                       }
                       lastActivityText={lastActivityText}

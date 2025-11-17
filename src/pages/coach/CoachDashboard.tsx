@@ -169,8 +169,8 @@ export default function CoachDashboard() {
         has_perf: boolean;
         conf_late: boolean;
         perf_late: boolean;
-        last_activity_at: string | null; // ISO
-        last_activity_kind: 'confidence' | 'performance' | null;
+        last_conf_date: string | null;
+        last_perf_date: string | null;
       };
       const aggByStaff = new Map<string, Agg>();
 
@@ -191,8 +191,8 @@ export default function CoachDashboard() {
               has_perf: false,
               conf_late: false,
               perf_late: false,
-              last_activity_at: null,
-              last_activity_kind: null,
+              last_conf_date: null,
+              last_perf_date: null,
             });
           }
         }
@@ -204,18 +204,16 @@ export default function CoachDashboard() {
           if (r.confidence_score !== null) {
             a.has_conf = true;
             a.conf_late = a.conf_late || !!r.confidence_late;
-            if (!a.last_activity_at || new Date(r.confidence_date) > new Date(a.last_activity_at)) {
-              a.last_activity_at = r.confidence_date;
-              a.last_activity_kind = 'confidence';
+            if (!a.last_conf_date || new Date(r.confidence_date) > new Date(a.last_conf_date)) {
+              a.last_conf_date = r.confidence_date;
             }
           }
 
           if (r.performance_score !== null) {
             a.has_perf = true;
             a.perf_late = a.perf_late || !!r.performance_late;
-            if (!a.last_activity_at || new Date(r.performance_date) > new Date(a.last_activity_at)) {
-              a.last_activity_at = r.performance_date;
-              a.last_activity_kind = 'performance';
+            if (!a.last_perf_date || new Date(r.performance_date) > new Date(a.last_perf_date)) {
+              a.last_perf_date = r.performance_date;
             }
           }
         }
@@ -228,8 +226,8 @@ export default function CoachDashboard() {
           has_perf: false,
           conf_late: false,
           perf_late: false,
-          last_activity_at: null,
-          last_activity_kind: null,
+          last_conf_date: null,
+          last_perf_date: null,
         };
 
         return {
@@ -248,8 +246,8 @@ export default function CoachDashboard() {
           performance_score: a.has_perf ? 1 : 0,
           confidence_late: a.has_conf && a.conf_late,
           performance_late: a.has_perf && a.perf_late,
-          confidence_date: a.last_activity_kind === 'confidence' ? a.last_activity_at : null,
-          performance_date: a.last_activity_kind === 'performance' ? a.last_activity_at : null,
+          confidence_date: a.last_conf_date,
+          performance_date: a.last_perf_date,
         };
       });
 

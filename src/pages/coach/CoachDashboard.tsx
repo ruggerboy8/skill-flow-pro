@@ -163,7 +163,36 @@ export default function CoachDashboard() {
         groupMap.set(s.week_of, arr);
       }
 
-      // 4) Fetch weekly_scores per group and aggregate in memory
+      // 4) Fetch weekly_scores for current week (DB determines week_of via trigger)
+      // Get all scores from the past 10 days (covers current week for all timezones)
+      const tenDaysAgo = new Date();
+      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+      const allStaffIds = staffMeta.map(s => s.staff_id);
+      
+      const { data: wsRows, error: wsErr } = await supabase
+        .from('weekly_scores')
+        .select('staff_id, confidence_score, performance_score, confidence_late, performance_late, confidence_date, performance_date, week_of')
+        .in('staff_id', allStaffIds)
+        .gte('created_at', tenDaysAgo.toISOString());
+
+      if (wsErr) throw wsErr;
+
+      console.log('📈 Weekly scores fetched:', wsRows?.length || 0);
+      if ((wsRows?.length ?? 0) === 0) {
+        console.warn('⚠️ Empty scores - likely RLS or week_of mismatch');
+      } else {
+        console.table(
+          wsRows!.slice(0, 5).map(r => ({
+            staff_id: r.staff_id.slice(0, 8),
+            week_of: r.week_of,
+            has_conf: r.confidence_score !== null,
+            has_perf: r.performance_score !== null,
+          }))
+        );
+      }
+
+      // Aggregate by staff_id + week_of
       type Agg = {
         has_conf: boolean;
         has_perf: boolean;
@@ -172,63 +201,62 @@ export default function CoachDashboard() {
         last_conf_date: string | null;
         last_perf_date: string | null;
       };
-      const aggByStaff = new Map<string, Agg>();
-
-      for (const [weekOf, staffIds] of groupMap) {
-        const { data: rows, error } = await supabase
-          .from('weekly_scores')
-          .select('staff_id, confidence_score, performance_score, confidence_late, performance_late, confidence_date, performance_date, week_of')
-          .in('staff_id', staffIds)
-          .eq('week_of', weekOf);
-
-        if (error) throw error;
-
-        // initialize with defaults
-        for (const id of staffIds) {
-          if (!aggByStaff.has(id)) {
-            aggByStaff.set(id, {
-              has_conf: false,
-              has_perf: false,
-              conf_late: false,
-              perf_late: false,
-              last_conf_date: null,
-              last_perf_date: null,
-            });
-          }
-        }
-
-        // fold rows
-        for (const r of rows || []) {
-          const a = aggByStaff.get(r.staff_id)!;
-
-          if (r.confidence_score !== null) {
-            a.has_conf = true;
-            a.conf_late = a.conf_late || !!r.confidence_late;
-            if (!a.last_conf_date || new Date(r.confidence_date) > new Date(a.last_conf_date)) {
-              a.last_conf_date = r.confidence_date;
-            }
-          }
-
-          if (r.performance_score !== null) {
-            a.has_perf = true;
-            a.perf_late = a.perf_late || !!r.performance_late;
-            if (!a.last_perf_date || new Date(r.performance_date) > new Date(a.last_perf_date)) {
-              a.last_perf_date = r.performance_date;
-            }
-          }
-        }
+      
+      // Compute current week_of for each staff in their timezone
+      const staffWeekOf = new Map<string, string>();
+      const currentTime = new Date();
+      for (const s of staffMeta) {
+        const localTime = toZonedTime(currentTime, s.tz);
+        const dow = localTime.getDay();
+        const daysToMonday = dow === 0 ? -6 : -(dow - 1);
+        const monday = new Date(localTime);
+        monday.setDate(monday.getDate() + daysToMonday);
+        const weekOf = format(monday, 'yyyy-MM-dd');
+        staffWeekOf.set(s.staff_id, weekOf);
       }
 
-      // 5) Build the UI rows (one per staff)
-      const rows = staffMeta.map(s => {
-        const a = aggByStaff.get(s.staff_id) ?? {
+      const aggByStaff = new Map<string, Agg>();
+      
+      // Initialize all staff with defaults
+      for (const s of staffMeta) {
+        aggByStaff.set(s.staff_id, {
           has_conf: false,
           has_perf: false,
           conf_late: false,
           perf_late: false,
           last_conf_date: null,
           last_perf_date: null,
-        };
+        });
+      }
+
+      // Aggregate scores for current week only
+      for (const r of wsRows || []) {
+        const expectedWeekOf = staffWeekOf.get(r.staff_id);
+        if (r.week_of !== expectedWeekOf) continue; // Skip other weeks
+
+        const a = aggByStaff.get(r.staff_id)!;
+
+        if (r.confidence_score !== null) {
+          a.has_conf = true;
+          a.conf_late = a.conf_late || !!r.confidence_late;
+          if (!a.last_conf_date || new Date(r.confidence_date) > new Date(a.last_conf_date)) {
+            a.last_conf_date = r.confidence_date;
+          }
+        }
+
+        if (r.performance_score !== null) {
+          a.has_perf = true;
+          a.perf_late = a.perf_late || !!r.performance_late;
+          if (!a.last_perf_date || new Date(r.performance_date) > new Date(a.last_perf_date)) {
+            a.last_perf_date = r.performance_date;
+          }
+        }
+      }
+
+      // 5) Build the UI rows (one per staff)
+      const rows = staffMeta.map(s => {
+        const weekOf = staffWeekOf.get(s.staff_id)!;
+        const a = aggByStaff.get(s.staff_id)!;
 
         return {
           staff_id: s.staff_id,
@@ -240,8 +268,7 @@ export default function CoachDashboard() {
           organization_id: s.organization_id,
           organization_name: s.organization_name,
           tz: s.tz,
-          week_of: s.week_of,
-          // keep the prop names you already use downstream
+          week_of: weekOf,
           confidence_score: a.has_conf ? 1 : 0,
           performance_score: a.has_perf ? 1 : 0,
           confidence_late: a.has_conf && a.conf_late,
@@ -250,6 +277,8 @@ export default function CoachDashboard() {
           performance_date: a.last_perf_date,
         };
       });
+
+      console.log('✅ Final rows:', rows.length, 'with activity:', rows.filter(r => r.confidence_score || r.performance_score).length);
 
       setAllStaff(rows);
 

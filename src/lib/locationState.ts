@@ -120,9 +120,8 @@ export async function assembleWeek(params: {
 }): Promise<any[]> {
   const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
-  // ----- GRADUATION CHECK: Cycle 5+ uses global weekly_plan -----
-  // Temporarily changed from 4 to 5 to allow Week 19 (Cycle 4, Week 1) to use weekly_focus
-  if (cycleNumber >= 5) {
+  // ----- GRADUATION CHECK: Cycle 4+ uses global weekly_plan -----
+  if (cycleNumber >= 4) {
     const { data: location } = await supabase
       .from('locations')
       .select('timezone')

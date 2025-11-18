@@ -213,7 +213,15 @@ export default function ConfidenceWizard() {
       return;
     } else {
       // Normal current week logic
-      const result = await assembleCurrentWeek(user.id, overrides);
+      const result = await assembleCurrentWeek(
+        user.id,
+        {
+          id: staffData.id,
+          role_id: staffData.role_id,
+          primary_location_id: staffData.primary_location_id
+        },
+        overrides
+      );
       assignments = result.assignments;
       cycleNumber = result.cycleNumber;
       weekInCycle = result.weekInCycle;

@@ -3,13 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { nowUtc, nextMondayStr, CT_TZ } from '@/lib/centralTime';
+import { CT_TZ } from '@/lib/centralTime';
 import { getWeekAnchors } from '@/v2/time';
 import { isV2 } from '@/lib/featureFlags';
 import { useNow } from '@/providers/NowProvider';
@@ -95,7 +93,15 @@ export default function ThisWeekPanel() {
       });
       
       // Load current week assignments and context based on user progress
-      const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(user.id, overrides);
+      const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(
+        user.id,
+        {
+          id: staff.id,
+          role_id: staff.role_id!,
+          primary_location_id: staff.primary_location_id!
+        },
+        overrides
+      );
       setWeekAssignments(assignments);
 
       // Fetch resource counts for pro-moves

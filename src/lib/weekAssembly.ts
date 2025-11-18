@@ -72,6 +72,7 @@ async function findUserActiveWeek(
  */
 export async function assembleCurrentWeek(
   userId: string,
+  staffData: { id: string; role_id: number; primary_location_id: string },
   simOverrides?: any
 ): Promise<{
   assignments: WeekAssignment[];
@@ -84,14 +85,7 @@ export async function assembleCurrentWeek(
         ? new Date(simOverrides.nowISO)
         : new Date();
 
-    // Staff + location
-    const { data: staffData } = await supabase
-      .from("staff")
-      .select("id, role_id, primary_location_id")
-      .eq("user_id", userId)
-      .single();
-
-    if (!staffData) throw new Error("Staff record not found");
+    // Use staff data passed from caller (no redundant query)
     if (!staffData.primary_location_id)
       throw new Error("Staff member has no assigned location");
 

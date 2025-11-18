@@ -7,30 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useWeeklyAssignments } from '@/hooks/useWeeklyAssignments';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getDomainColor } from '@/lib/domainColors';
 
-interface WeeklyFocus {
-  id: string;
-  display_order: number;
-  self_select?: boolean;
-  competency_id?: number;
-  pro_moves?: {
-    action_statement: string;
-  };
-  competencies?: {
-    domains?: { domain_name?: string }
-  };
-}
-
 export default function Confidence() {
   const { week } = useParams();
-  const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [scores, setScores] = useState<{ [key: string]: number }>({});
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submittedCount, setSubmittedCount] = useState(0);
   const [selectedActions, setSelectedActions] = useState<{ [key: string]: string | null }>({});
@@ -42,6 +28,16 @@ export default function Confidence() {
 
   const weekNum = Number(week); // week param is now just "1", "2", etc.
 
+  // Fetch weekly assignments using the shared hook
+  const { data: weeklyFocus = [], isLoading: assignmentsLoading } = useWeeklyAssignments({
+    roleId: staff?.role_id,
+    cycle: 1,
+    weekInCycle: weekNum,
+    enabled: !!staff && !staffLoading,
+  });
+
+  const loading = staffLoading || assignmentsLoading;
+
 const now = nowUtc();
 const { monCheckInZ, tueDueZ } = getAnchors(now);
 const beforeCheckIn = now < monCheckInZ;
@@ -49,10 +45,10 @@ const afterTueNoon = now >= tueDueZ;
 const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.length;
 
   useEffect(() => {
-    if (staff) {
-      loadData();
+    if (staff && weeklyFocus.length > 0) {
+      loadScoresAndOptions();
     }
-  }, [staff, week]);
+  }, [staff, weeklyFocus]);
 
   // Route guards with toasts for deep-links
   useEffect(() => {
@@ -72,118 +68,31 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     }
   }, [loading, weeklyFocus, afterTueNoon, hasConfidence, navigate]);
 
-  const loadData = async () => {
-    if (!staff || !user) return;
-
-    console.log('Loading confidence data for week:', week, 'user:', user.id, 'staff:', staff);
-
-    // Try weekly_plan first (for orgs with sequencer)
-    const orgId = staff.locations?.organization_id;
-    let focusData: any[] | null = null;
-    let focusError: any = null;
-    
-    if (orgId) {
-      // Calculate current Monday
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const thisMonday = new Date(now);
-      thisMonday.setDate(now.getDate() + daysToMonday);
-      thisMonday.setHours(0, 0, 0, 0);
-      const mondayStr = thisMonday.toISOString().split('T')[0];
-
-      const { data: planData, error: planError } = await supabase
-        .from('weekly_plan')
-        .select(`
-          id,
-          action_id,
-          display_order,
-          self_select,
-          pro_moves (
-            action_id,
-            action_statement,
-            competency_id,
-            competencies (
-              competency_id,
-              name,
-              domain_id,
-              domains!competencies_domain_id_fkey (
-                domain_id,
-                domain_name
-              )
-            )
-          )
-        `)
-        .is('org_id', null)
-        .eq('role_id', staff.role_id!)
-        .eq('week_start_date', mondayStr)
-        .eq('status', 'locked')
-        .order('display_order');
-
-      if (planData && planData.length > 0) {
-        console.log('📊 [Confidence] Using weekly_plan data source');
-        focusData = planData.map((item: any) => ({
-          id: `plan:${item.id}`,
-          action_id: item.action_id,
-          display_order: item.display_order,
-          self_select: item.self_select,
-          competency_id: item.pro_moves?.competency_id,
-          pro_moves: { action_statement: item.pro_moves?.action_statement },
-          competencies: {
-            name: item.pro_moves?.competencies?.name,
-            domains: {
-              domain_name: item.pro_moves?.competencies?.domains?.domain_name
-            }
-          }
-        }));
-      }
+  // Route guards with toasts for deep-links
+  useEffect(() => {
+    if (!loading && weeklyFocus.length > 0 && beforeCheckIn) {
+      toast({ title: 'Confidence opens at 9:00 a.m. CT.' });
+      navigate('/');
     }
+  }, [loading, weeklyFocus, beforeCheckIn, navigate]);
 
-    // Fall back to weekly_focus if no weekly_plan data
-    if (!focusData) {
-      console.log('📚 [Confidence] Using weekly_focus data source (fallback)');
-      const result = await supabase
-        .from('weekly_focus')
-        .select(`
-          id,
-          display_order,
-          self_select,
-          competency_id,
-          pro_moves (
-            action_statement
-          ),
-          competencies (
-            name,
-            domains!competencies_domain_id_fkey (
-              domain_name
-            )
-          )
-        `)
-        .eq('cycle', 1) // Use cycle 1 for now
-        .eq('week_in_cycle', weekNum)
-        .eq('role_id', staff.role_id!)
-        .order('display_order');
-      
-      focusData = result.data;
-      focusError = result.error;
-    }
-
-    if (focusError) {
-      console.error('Focus error:', focusError);
+  useEffect(() => {
+    if (!loading && weeklyFocus.length > 0 && afterTueNoon && !hasConfidence) {
       toast({
-        title: 'Error',
-        description: 'No Pro Moves found for this week',
-        variant: 'destructive'
+        title: 'Confidence window closed',
+        description: `You'll get a fresh start on Mon, ${nextMondayStr(now)}.`
       });
       navigate('/');
-      return;
     }
+  }, [loading, weeklyFocus, afterTueNoon, hasConfidence, navigate]);
 
-    console.log('Focus data found:', focusData);
-    setWeeklyFocus(focusData);
+  const loadScoresAndOptions = async () => {
+    if (!staff || !user || weeklyFocus.length === 0) return;
+
+    console.log('Loading scores and options for week:', week);
 
     // Load existing confidence scores for this week
-    const focusIds = focusData.map((f) => f.id);
+    const focusIds = weeklyFocus.map((f) => f.id);
     const { data: existing, error: existingError } = await supabase
       .from('weekly_scores')
       .select('weekly_focus_id, confidence_score, selected_action_id')
@@ -198,46 +107,46 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     setSubmittedCount(submitted);
 
     // Pre-fill selected actions if previously chosen
-    const selectedByFocus: { [key: string]: string | null } = {};
-    (existing || []).forEach((r) => {
+    const selectedActionsMap: { [key: string]: string | null } = {};
+    existing?.forEach((r) => {
       if (r.selected_action_id) {
-        selectedByFocus[r.weekly_focus_id] = r.selected_action_id as unknown as string;
+        selectedActionsMap[r.weekly_focus_id] = r.selected_action_id.toString();
       }
     });
-    if (Object.keys(selectedByFocus).length > 0) {
-      setSelectedActions((prev) => ({ ...prev, ...selectedByFocus }));
-    }
+    setSelectedActions(selectedActionsMap);
 
-    // Load self-select options for competencies
-    const compIds = Array.from(
-      new Set(
-        focusData
-          .filter((f) => f.self_select && !!f.competency_id)
-          .map((f) => f.competency_id as number)
-      )
-    );
+    // Pre-fill scores
+    const scoresMap: { [key: string]: number } = {};
+    existing?.forEach((r) => {
+      if (r.confidence_score != null) {
+        scoresMap[r.weekly_focus_id] = r.confidence_score;
+      }
+    });
+    setScores(scoresMap);
 
-    if (compIds.length > 0) {
-      const { data: opts, error: optsError } = await supabase
+    // Load pro-move options for self-select competencies
+    const selfSelectFocus = weeklyFocus.filter(f => f.self_select && f.competency_id);
+    if (selfSelectFocus.length > 0) {
+      const competencyIds = selfSelectFocus.map(f => f.competency_id).filter(Boolean) as number[];
+      const { data: proMoves } = await supabase
         .from('pro_moves')
         .select('action_id, action_statement, competency_id')
-        .in('competency_id', compIds)
+        .in('competency_id', competencyIds)
+        .eq('active', true)
         .order('action_statement');
 
-      if (optsError) {
-        console.error('Options load error:', optsError);
-      } else if (opts) {
-        const grouped: { [key: number]: { action_id: string; action_statement: string }[] } = {};
-        opts.forEach((o: any) => {
-          const cid = o.competency_id as number;
-          if (!grouped[cid]) grouped[cid] = [];
-          grouped[cid].push({ action_id: o.action_id, action_statement: o.action_statement });
+      const optionsMap: { [key: number]: { action_id: string; action_statement: string }[] } = {};
+      (proMoves || []).forEach((pm: any) => {
+        if (!optionsMap[pm.competency_id]) {
+          optionsMap[pm.competency_id] = [];
+        }
+        optionsMap[pm.competency_id].push({
+          action_id: pm.action_id.toString(),
+          action_statement: pm.action_statement,
         });
-        setOptionsByCompetency(grouped);
-      }
+      });
+      setOptionsByCompetency(optionsMap);
     }
-
-    setLoading(false);
   };
 
   const handleScoreChange = (focusId: string, score: string) => {
@@ -412,13 +321,13 @@ setSubmitting(true);
                       {index + 1}
                     </Badge>
                     <CardTitle className="text-sm font-medium leading-relaxed flex items-center gap-2">
-                      {focus.pro_moves?.action_statement || 'Self-Select'}
-                      {focus.competencies?.domains?.domain_name && (
+                      {focus.action_statement || 'Self-Select'}
+                      {focus.domain_name && (
                         <span
                           className="inline-flex items-center rounded px-2 py-0.5 text-[10px]"
-                          style={{ backgroundColor: getDomainColor(focus.competencies.domains.domain_name) }}
+                          style={{ backgroundColor: getDomainColor(focus.domain_name) }}
                         >
-                          {focus.competencies.domains.domain_name}
+                          {focus.domain_name}
                         </span>
                       )}
                     </CardTitle>

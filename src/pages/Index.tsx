@@ -1,52 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import ThisWeekPanel from '@/components/home/ThisWeekPanel';
 import { SimFloatingButton } from '@/devtools/SimConsole';
 
-interface Staff {
-  id: string;
-  role_id: number;
-}
-
 export default function Index() {
-  const [staff, setStaff] = useState<Staff | null>(null);
   const { user } = useAuth();
-  const { toast } = useToast();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (user) {
-      loadStaffProfile();
-    }
-  }, [user]);
-
-  const loadStaffProfile = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('staff')
-      .select('id, role_id')
-      .eq('user_id', user.id)
-      .single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // No staff record found, redirect to setup
-        navigate('/setup');
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to load profile",
-          variant: "destructive"
-        });
-      }
-    } else {
-      setStaff(data);
-    }
-  };
+  const { data: staff } = useStaffProfile();
 
   return (
     <div className="min-h-screen bg-background p-4">

@@ -5,21 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { getDomainColor } from '@/lib/domainColors';
 import { format } from 'date-fns';
-
-interface Staff {
-  id: string;
-  role_id: number;
-  locations?: {
-    organization_id: string;
-    program_start_date?: string;
-    cycle_length_weeks?: number;
-  };
-}
 
 interface WeeklyFocus {
   id: string;
@@ -39,7 +30,6 @@ interface WeeklyScore {
 }
 
 export default function Week() {
-  const [staff, setStaff] = useState<Staff | null>(null);
   const [cycle, setCycle] = useState(1);
   const [weekInCycle, setWeekInCycle] = useState(1);
 
@@ -54,16 +44,17 @@ export default function Week() {
   const [bannerReady, setBannerReady] = useState(false);
 
   const { user } = useAuth();
+  const { data: staff } = useStaffProfile();
   const { toast } = useToast();
   const navigate = useNavigate();
   const params = useParams();
 
   // ---------- load staff + choose default week ----------
   useEffect(() => {
-    if (user) {
-      loadStaffProfile();
+    if (staff) {
+      selectDefaultWeek(staff);
     }
-  }, [user]);
+  }, [staff]);
 
   useEffect(() => {
     if (params.weekId) {
@@ -79,25 +70,10 @@ export default function Week() {
     }
   }, [staff, cycle, weekInCycle]);
 
-  const loadStaffProfile = async () => {
-    const { data, error } = await supabase
-      .from('staff')
-      .select('id, role_id, locations(organization_id, program_start_date, cycle_length_weeks)')
-      .eq('user_id', user!.id)
-      .maybeSingle();
-
-    if (error || !data) {
-      navigate('/setup');
-      return;
-    }
-
-    setStaff(data);
-    await selectDefaultWeek(data);
-  };
-
   // Optimized: Fetches all cycle 1 weekly_focus data in 2 bulk queries instead of 12 sequential queries
   // Note: Only handles Cycle 1 (weekly_focus). Cycle 4+ users land on current week via date calculation.
-  const selectDefaultWeek = async (s: Staff) => {
+  const selectDefaultWeek = async (s: typeof staff) => {
+    if (!s) return;
     // Query 1: Fetch ALL weekly_focus for cycle 1 (all 6 weeks) in one go
     const { data: allFocusRows, error: focusError } = await supabase
       .from('weekly_focus')

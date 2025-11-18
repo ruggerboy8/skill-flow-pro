@@ -193,8 +193,12 @@ export default function CoachDetail() {
         throw error;
       }
 
+      // Parse JSONB response
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      const assignments = parsed?.assignments || [];
+
       // Handle self-select slots: fetch user selections for display names
-      const selfSelectIds = (data || [])
+      const selfSelectIds = assignments
         .filter((row: any) => row.self_select)
         .map((row: any) => row.focus_id);
 
@@ -216,7 +220,7 @@ export default function CoachDetail() {
       }
 
       // Map RPC results to WeekData format
-      const rows: WeekData[] = (data || []).map((row: any) => {
+      const rows: WeekData[] = assignments.map((row: any) => {
         let action_statement = row.action_statement;
 
         // Override with user selection if applicable

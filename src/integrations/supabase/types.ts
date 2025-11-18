@@ -1657,6 +1657,109 @@ export type Database = {
           },
         ]
       }
+      view_weekly_scores_audit: {
+        Row: {
+          confidence_date: string | null
+          confidence_late: boolean | null
+          confidence_score: number | null
+          confidence_source: Database["public"]["Enums"]["score_source"] | null
+          created_at: string | null
+          cycle: number | null
+          entered_by: string | null
+          location_name: string | null
+          organization_id: string | null
+          organization_name: string | null
+          performance_date: string | null
+          performance_late: boolean | null
+          performance_score: number | null
+          performance_source: Database["public"]["Enums"]["score_source"] | null
+          primary_location_id: string | null
+          role_id: number | null
+          role_name: string | null
+          score_id: string | null
+          selected_action_id: number | null
+          site_action_id: number | null
+          staff_email: string | null
+          staff_id: string | null
+          staff_name: string | null
+          updated_at: string | null
+          week_in_cycle: number | null
+          week_of: string | null
+          weekly_focus_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_org_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_primary_location_id_fkey"
+            columns: ["primary_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_primary_location_id_fkey"
+            columns: ["primary_location_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "staff_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "staff_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_selected_action_id_fkey"
+            columns: ["selected_action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_site_action_fk"
+            columns: ["site_action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       view_weekly_scores_with_competency: {
         Row: {
           action_id: number | null

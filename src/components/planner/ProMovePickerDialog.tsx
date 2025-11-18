@@ -206,7 +206,7 @@ export function ProMovePickerDialog({
                               variant="secondary"
                               className="text-xs"
                               style={{
-                                backgroundColor: `hsl(${getDomainColor(domain)})`,
+                                backgroundColor: getDomainColor(domain),
                               }}
                             >
                               {domain}

@@ -34,7 +34,7 @@ export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
           <div className="flex items-center gap-2 flex-wrap">
             <span 
               className="px-1.5 py-0.5 text-[10px] rounded text-foreground ring-1 ring-border/50"
-              style={{ backgroundColor: `hsl(${domainHsl})` }}
+              style={{ backgroundColor: domainHsl }}
             >
               {move.domainName}
             </span>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
 
 interface Competency {
   competency_id: number;
@@ -79,7 +79,7 @@ export function CompetencyGrid({ selectedRole, onCompetencySelect, selectedCompe
                     style={{ 
                       backgroundColor: selectedCompetency === competency.competency_id 
                         ? getDomainColor(domain) 
-                        : `${getDomainColor(domain)}40`
+                        : `hsl(${getDomainColorRaw(domain)} / 0.25)`
                     }}
                     onClick={() => onCompetencySelect(competency.competency_id)}
                   >

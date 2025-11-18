@@ -6,10 +6,10 @@ export default function CoachLayout() {
   const navigate = useNavigate();
   
   // Extract the tab from the pathname
-  const currentTab = location.pathname === '/coach/reminders' ? 'reminders' : 'dashboard';
+  const currentTab = location.pathname === '/coach/reminders' ? 'reminders' : 'staff';
   
   const handleTabChange = (value: string) => {
-    if (value === 'dashboard') {
+    if (value === 'staff') {
       navigate('/coach');
     } else {
       navigate(`/coach/${value}`);
@@ -22,7 +22,7 @@ export default function CoachLayout() {
       
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="staff">Staff</TabsTrigger>
           <TabsTrigger value="reminders">Reminders</TabsTrigger>
         </TabsList>
         

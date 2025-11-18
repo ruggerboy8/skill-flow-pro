@@ -15,7 +15,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useCoachRosterCoverage, type RosterStaff, type CoverageData } from '@/hooks/useCoachRosterCoverage';
+import { useCoachStaffStatuses, type StaffStatus } from '@/hooks/useCoachStaffStatuses';
 import { useConfidenceSpotlight, type SpotlightItem } from '@/hooks/useConfidenceSpotlight';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -46,8 +46,8 @@ export default function CoachDashboard() {
   const [drillOpen, setDrillOpen] = useState(false);
   const [drillItem, setDrillItem] = useState<SpotlightItem | null>(null);
 
-  // Load roster and coverage
-  const { roster, coverage, loading, reload } = useCoachRosterCoverage();
+  // Load staff statuses via RPC
+  const { statuses, loading, reload } = useCoachStaffStatuses();
 
   // Check super admin
   useEffect(() => {
@@ -75,23 +75,23 @@ export default function CoachDashboard() {
 
   // Unique filter options
   const organizations = useMemo(() => {
-    return Array.from(new Set(roster.map(s => s.organization_name))).sort();
-  }, [roster]);
+    return Array.from(new Set(statuses.map(s => s.organization_name))).sort();
+  }, [statuses]);
 
   const locations = useMemo(() => {
     const filtered = selectedOrganization === 'all'
-      ? roster
-      : roster.filter(s => s.organization_name === selectedOrganization);
+      ? statuses
+      : statuses.filter(s => s.organization_name === selectedOrganization);
     return Array.from(new Set(filtered.map(s => s.location_name))).sort();
-  }, [roster, selectedOrganization]);
+  }, [statuses, selectedOrganization]);
 
   const roles = useMemo(() => {
-    return Array.from(new Set(roster.map(s => s.role_name))).sort();
-  }, [roster]);
+    return Array.from(new Set(statuses.map(s => s.role_name))).sort();
+  }, [statuses]);
 
   // Apply filters
-  const filteredRoster = useMemo(() => {
-    let filtered = [...roster];
+  const filteredStatuses = useMemo(() => {
+    let filtered = [...statuses];
 
     if (selectedOrganization !== 'all') {
       filtered = filtered.filter(s => s.organization_name === selectedOrganization);
@@ -110,15 +110,31 @@ export default function CoachDashboard() {
       filtered = filtered.filter(s =>
         s.staff_name.toLowerCase().includes(q) ||
         s.location_name.toLowerCase().includes(q) ||
-        s.role_name.toLowerCase().includes(q)
+        s.role_name.toLowerCase().includes(q) ||
+        (s.email && s.email.toLowerCase().includes(q))
       );
     }
 
     return filtered;
-  }, [roster, selectedOrganization, selectedLocation, selectedRole, search]);
+  }, [statuses, selectedOrganization, selectedLocation, selectedRole, search]);
+
+  // Convert to roster format for spotlight
+  const rosterForSpotlight = useMemo(() => filteredStatuses.map(s => ({
+    staff_id: s.staff_id,
+    staff_name: s.staff_name,
+    email: s.email || '',
+    role_id: s.role_id,
+    role_name: s.role_name,
+    location_id: s.location_id,
+    location_name: s.location_name,
+    organization_id: s.organization_id,
+    organization_name: s.organization_name,
+    tz: s.tz,
+    week_of: s.active_monday,
+  })), [filteredStatuses]);
 
   // Load spotlight
-  const { spotlightItems, loading: spotlightLoading } = useConfidenceSpotlight(filteredRoster, lookbackWeeks);
+  const { spotlightItems, loading: spotlightLoading } = useConfidenceSpotlight(rosterForSpotlight, lookbackWeeks);
 
   // Persist filters to URL - merge params to avoid overwriting
   useEffect(() => {
@@ -155,47 +171,42 @@ export default function CoachDashboard() {
 
   const hasActiveFilters = selectedOrganization !== 'all' || selectedLocation !== 'all' || selectedRole !== 'all' || search.trim() !== '';
 
-  // Coverage helpers
+  // Coverage helpers - derive from RPC status data
   const sortedRows = useMemo(() => {
-    const rows = filteredRoster.map(staff => ({
-      ...staff,
-      coverageData: coverage.get(staff.staff_id) || {
-        staff_id: staff.staff_id,
-        conf_submitted: false,
-        perf_submitted: false,
-        conf_late: false,
-        perf_late: false,
-        confidence_date: null,
-        performance_date: null,
-      },
+    const rows = filteredStatuses.map(status => ({
+      ...status,
+      conf_submitted: status.conf_count >= status.required_count,
+      perf_submitted: status.perf_count >= status.required_count,
+      conf_late: false, // TODO: extend RPC to include late flags
+      perf_late: false,
     }));
 
     // Sort: missing both > missing conf > missing perf > complete, then A-Z by name
     return rows.sort((a, b) => {
-      const aPriority = (!a.coverageData.conf_submitted && !a.coverageData.perf_submitted) ? 0
-        : !a.coverageData.conf_submitted ? 1
-        : !a.coverageData.perf_submitted ? 2
+      const aPriority = (!a.conf_submitted && !a.perf_submitted) ? 0
+        : !a.conf_submitted ? 1
+        : !a.perf_submitted ? 2
         : 3;
 
-      const bPriority = (!b.coverageData.conf_submitted && !b.coverageData.perf_submitted) ? 0
-        : !b.coverageData.conf_submitted ? 1
-        : !b.coverageData.perf_submitted ? 2
+      const bPriority = (!b.conf_submitted && !b.perf_submitted) ? 0
+        : !b.conf_submitted ? 1
+        : !b.perf_submitted ? 2
         : 3;
 
       if (aPriority !== bPriority) return aPriority - bPriority;
 
       return a.staff_name.localeCompare(b.staff_name);
     });
-  }, [filteredRoster, coverage]);
+  }, [filteredStatuses]);
 
-  const missingConfCount = sortedRows.filter(r => !r.coverageData.conf_submitted).length;
-  const missingPerfCount = sortedRows.filter(r => !r.coverageData.perf_submitted).length;
+  const missingConfCount = sortedRows.filter(r => !r.conf_submitted).length;
+  const missingPerfCount = sortedRows.filter(r => !r.perf_submitted).length;
 
-  // Copy emails logic (reuse dedup from RemindersTab)
+  // Copy emails logic
   const copyMissingConfEmails = () => {
-    const missing = sortedRows.filter(r => !r.coverageData.conf_submitted);
-    const deduped = dedup(missing);
-    const emails = deduped.map(s => s.email).join(', ');
+    const missing = sortedRows.filter(r => !r.conf_submitted);
+    const deduped = dedup(missing, r => r.email || '');
+    const emails = deduped.map(s => s.email).filter(Boolean).join(', ');
 
     navigator.clipboard.writeText(emails).then(() => {
       toast({ title: 'Copied', description: `${deduped.length} emails copied` });
@@ -205,9 +216,9 @@ export default function CoachDashboard() {
   };
 
   const copyMissingPerfEmails = () => {
-    const missing = sortedRows.filter(r => !r.coverageData.perf_submitted);
-    const deduped = dedup(missing);
-    const emails = deduped.map(s => s.email).join(', ');
+    const missing = sortedRows.filter(r => !r.perf_submitted);
+    const deduped = dedup(missing, r => r.email || '');
+    const emails = deduped.map(s => s.email).filter(Boolean).join(', ');
 
     navigator.clipboard.writeText(emails).then(() => {
       toast({ title: 'Copied', description: `${deduped.length} emails copied` });
@@ -216,11 +227,10 @@ export default function CoachDashboard() {
     });
   };
 
-  function dedup(arr: typeof sortedRows) {
+  function dedup<T>(items: T[], keyFn: (item: T) => string): T[] {
     const seen = new Set<string>();
-    return arr.filter(x => {
-      const key = (x.email || '').toLowerCase();
-      if (!key) return false;
+    return items.filter(item => {
+      const key = keyFn(item);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -380,7 +390,7 @@ export default function CoachDashboard() {
                 <div>
                   <CardTitle>Staff Coverage</CardTitle>
                   <CardDescription className="mt-2">
-                    {filteredRoster.length} staff · {missingConfCount} missing confidence · {missingPerfCount} missing performance
+                    {filteredStatuses.length} staff · {missingConfCount} missing confidence · {missingPerfCount} missing performance
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
@@ -394,7 +404,7 @@ export default function CoachDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {filteredRoster.length === 0 ? (
+              {filteredStatuses.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   No staff match the selected filters
                 </div>
@@ -425,15 +435,15 @@ export default function CoachDashboard() {
                         </TableCell>
                         <TableCell className="text-center">
                           <StatusCell
-                            submitted={row.coverageData.conf_submitted}
-                            late={row.coverageData.conf_late}
+                            submitted={row.conf_submitted}
+                            late={row.conf_late}
                             type="confidence"
                           />
                         </TableCell>
                         <TableCell className="text-center">
                           <StatusCell
-                            submitted={row.coverageData.perf_submitted}
-                            late={row.coverageData.perf_late}
+                            submitted={row.perf_submitted}
+                            late={row.perf_late}
                             type="performance"
                           />
                         </TableCell>
@@ -599,31 +609,13 @@ function StatusCell({ submitted, late, type }: { submitted: boolean; late: boole
   );
 }
 
-function formatLastActivity(row: { staff_name: string; tz: string; coverageData: CoverageData }): string {
-  const confDate = row.coverageData.confidence_date ? new Date(row.coverageData.confidence_date) : null;
-  const perfDate = row.coverageData.performance_date ? new Date(row.coverageData.performance_date) : null;
-
-  if (!confDate && !perfDate) return 'No activity';
-
-  // Determine which is latest and use only that label
-  let label: string;
-  let latest: Date;
-  
-  if (confDate && perfDate) {
-    if (confDate > perfDate) {
-      label = 'confidence';
-      latest = confDate;
-    } else {
-      label = 'performance';
-      latest = perfDate;
-    }
-  } else if (confDate) {
-    label = 'confidence';
-    latest = confDate;
-  } else {
-    label = 'performance';
-    latest = perfDate!;
+function formatLastActivity(row: { last_activity_at: string | null; last_activity_kind: string | null; tz: string }): string {
+  if (!row.last_activity_at || !row.last_activity_kind) {
+    return 'No activity';
   }
+
+  const label = row.last_activity_kind;
+  const latest = new Date(row.last_activity_at);
 
   const formatted = formatInTimeZone(latest, row.tz, "EEE MM/dd '@' h:mma");
   const tzAbbr = formatInTimeZone(latest, row.tz, 'zzz');

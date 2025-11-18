@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { QuarterlyEvalsTab } from '@/components/coach/QuarterlyEvalsTab';
+import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 
 interface StaffInfo {
   id: string;
@@ -365,6 +366,9 @@ export default function CoachDetail() {
         </TabsList>
         
         <TabsContent value="performance" className="space-y-4">
+          {/* On-Time Submission Rate */}
+          <OnTimeRateWidget staffId={staffInfo.id} />
+          
           {years.length === 0 ? (
             <Card>
               <CardContent className="py-16 text-center">

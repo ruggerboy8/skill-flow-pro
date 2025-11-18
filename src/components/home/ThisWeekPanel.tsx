@@ -266,7 +266,7 @@ export default function ThisWeekPanel() {
             const resourceCount = assignment.pro_move_id ? (resourceCounts[assignment.pro_move_id] || 0) : 0;
 
             return (
-              <div key={assignment.weekly_focus_id} className="rounded-lg p-4 border" style={bgColor ? { backgroundColor: `hsl(${bgColor})` } : undefined}>
+              <div key={assignment.weekly_focus_id} className="rounded-lg p-4 border" style={bgColor ? { backgroundColor: bgColor } : undefined}>
                 <div className="flex items-center gap-2 mb-2">
                   {domainName && (
                     <Badge variant="secondary" className="text-xs font-semibold bg-white/80 text-gray-900" aria-label={`Domain: ${domainName}`}> 

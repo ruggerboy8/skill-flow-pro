@@ -26,15 +26,21 @@ export default function CoachDashboard() {
   const { toast } = useToast();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Filter state
+  // Filter state - restore from URL params
   const [selectedOrganization, setSelectedOrganization] = useState(searchParams.get('org') || 'all');
   const [selectedLocation, setSelectedLocation] = useState(searchParams.get('loc') || 'all');
   const [selectedRole, setSelectedRole] = useState(searchParams.get('role') || 'all');
   const [search, setSearch] = useState(searchParams.get('q') || '');
-  const [lookbackWeeks, setLookbackWeeks] = useState(parseInt(searchParams.get('lookback') || '4'));
+  const [lookbackWeeks, setLookbackWeeks] = useState(() => {
+    const param = searchParams.get('lookback');
+    return param ? Math.max(1, Math.min(12, parseInt(param))) : 4;
+  });
 
-  // Internal view state (staff vs location-role)
-  const [internalView, setInternalView] = useState<'staff' | 'location-role'>('staff');
+  // Internal view state (staff vs location-role) - restore from URL
+  const [internalView, setInternalView] = useState<'staff' | 'location-role'>(() => {
+    const view = searchParams.get('view');
+    return view === 'location-role' ? 'location-role' : 'staff';
+  });
 
   // Spotlight drill state
   const [drillOpen, setDrillOpen] = useState(false);
@@ -114,17 +120,30 @@ export default function CoachDashboard() {
   // Load spotlight
   const { spotlightItems, loading: spotlightLoading } = useConfidenceSpotlight(filteredRoster, lookbackWeeks);
 
-  // Persist filters to URL
+  // Persist filters to URL - merge params to avoid overwriting
   useEffect(() => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams);
+    
     if (selectedOrganization !== 'all') params.set('org', selectedOrganization);
+    else params.delete('org');
+    
     if (selectedLocation !== 'all') params.set('loc', selectedLocation);
+    else params.delete('loc');
+    
     if (selectedRole !== 'all') params.set('role', selectedRole);
+    else params.delete('role');
+    
     if (search.trim()) params.set('q', search.trim());
+    else params.delete('q');
+    
     if (lookbackWeeks !== 4) params.set('lookback', String(lookbackWeeks));
+    else params.delete('lookback');
+    
+    if (internalView !== 'staff') params.set('view', internalView);
+    else params.delete('view');
 
     setSearchParams(params, { replace: true });
-  }, [selectedOrganization, selectedLocation, selectedRole, search, lookbackWeeks, setSearchParams]);
+  }, [selectedOrganization, selectedLocation, selectedRole, search, lookbackWeeks, internalView, setSearchParams]);
 
   // Clear filters
   const clearFilters = () => {
@@ -270,7 +289,7 @@ export default function CoachDashboard() {
       <Tabs value={internalView} onValueChange={(v) => setInternalView(v as any)}>
         <TabsList>
           <TabsTrigger value="staff">Staff</TabsTrigger>
-          <TabsTrigger value="location-role" disabled>Location × Role</TabsTrigger>
+          <TabsTrigger value="location-role">Location × Role</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -439,7 +458,7 @@ export default function CoachDashboard() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[1, 2, 3, 4, 6, 8, 12].map(w => (
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(w => (
                       <SelectItem key={w} value={String(w)}>
                         {w} {w === 1 ? 'week' : 'weeks'}
                       </SelectItem>
@@ -586,16 +605,28 @@ function formatLastActivity(row: { staff_name: string; tz: string; coverageData:
 
   if (!confDate && !perfDate) return 'No activity';
 
-  const latest = confDate && perfDate
-    ? (confDate > perfDate ? confDate : perfDate)
-    : (confDate || perfDate)!;
-
-  const parts = [];
-  if (confDate) parts.push('confidence');
-  if (perfDate) parts.push('performance');
+  // Determine which is latest and use only that label
+  let label: string;
+  let latest: Date;
+  
+  if (confDate && perfDate) {
+    if (confDate > perfDate) {
+      label = 'confidence';
+      latest = confDate;
+    } else {
+      label = 'performance';
+      latest = perfDate;
+    }
+  } else if (confDate) {
+    label = 'confidence';
+    latest = confDate;
+  } else {
+    label = 'performance';
+    latest = perfDate!;
+  }
 
   const formatted = formatInTimeZone(latest, row.tz, "EEE MM/dd '@' h:mma");
   const tzAbbr = formatInTimeZone(latest, row.tz, 'zzz');
 
-  return `${parts.join(' | ')} · ${formatted} ${tzAbbr}`;
+  return `${label} · ${formatted} ${tzAbbr}`;
 }

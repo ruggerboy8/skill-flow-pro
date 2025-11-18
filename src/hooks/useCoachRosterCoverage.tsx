@@ -52,10 +52,11 @@ export function useCoachRosterCoverage() {
             name,
             organization_id,
             timezone,
-            organizations:organization_id(name)
+            organizations!locations_organization_id_fkey(name)
           )
         `)
-        .eq('is_participant', true);
+        .eq('is_participant', true)
+        .not('primary_location_id', 'is', null);
 
       if (staffError) throw staffError;
 

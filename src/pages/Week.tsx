@@ -311,29 +311,73 @@ export default function Week() {
 
     // Get self-select choices separately - check both weekly_self_select and weekly_scores
     const allFocusIds = (focusData || []).map(f => f.id);
-    console.log('Focus IDs for selections query:', allFocusIds);
+    console.log('Focus IDs for parallel queries:', allFocusIds);
     
-    const { data: selectionsData, error: selectionsError } = await supabase
-      .from('weekly_self_select')
-      .select(`
-        weekly_focus_id,
-        selected_pro_move_id,
-        pro_moves ( action_statement, competencies ( domains!competencies_domain_id_fkey ( domain_name ) ) )
-      `)
-      .eq('user_id', user!.id)
-      .in('weekly_focus_id', allFocusIds);
+    // Collect all competency IDs upfront for parallel fetch
+    const allCompetencyIds = (focusData || [])
+      .map((f: any) => f.competency_id)
+      .filter(Boolean);
+    
+    // Fire all queries in PARALLEL - no more waterfall!
+    const [
+      selectionsResult,
+      scoresResult,
+      carryoverResult,
+      competenciesResult
+    ] = await Promise.all([
+      // Query 1: weekly_self_select
+      supabase
+        .from('weekly_self_select')
+        .select(`
+          weekly_focus_id,
+          selected_pro_move_id,
+          pro_moves ( action_statement, competencies ( domains!competencies_domain_id_fkey ( domain_name ) ) )
+        `)
+        .eq('user_id', user!.id)
+        .in('weekly_focus_id', allFocusIds),
+      
+      // Query 2: weekly_scores (CONSOLIDATED - fetch once with all fields)
+      supabase
+        .from('weekly_scores')
+        .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
+        .eq('staff_id', staff.id)
+        .in('weekly_focus_id', allFocusIds),
+      
+      // Query 3: Carryover check
+      supabase
+        .from('weekly_scores')
+        .select('updated_at, weekly_focus!inner(cycle, week_in_cycle, role_id)')
+        .eq('staff_id', staff.id)
+        .eq('weekly_focus.role_id', staff.role_id)
+        .not('confidence_score', 'is', null)
+        .is('performance_score', null)
+        .order('updated_at', { ascending: false })
+        .limit(1),
+      
+      // Query 4: All competencies upfront
+      allCompetencyIds.length > 0
+        ? supabase
+            .from('competencies')
+            .select('competency_id, name')
+            .in('competency_id', allCompetencyIds)
+        : Promise.resolve({ data: [], error: null })
+    ]);
 
-    console.log('Selections data result:', { selectionsData, selectionsError });
+    // Extract data with fallbacks
+    const selectionsData = selectionsResult.data || [];
+    const scoresData = scoresResult.data || [];
+    const carryoverData = carryoverResult.data || [];
+    const competencyData = competenciesResult.data || [];
 
-    // Also get scores to check for selected_action_id as fallback
-    const { data: scoresData } = await supabase
-      .from('weekly_scores')
-      .select('weekly_focus_id, selected_action_id')
-      .eq('staff_id', staff.id)
-      .in('weekly_focus_id', allFocusIds);
+    console.log('Parallel queries complete:', { 
+      selections: selectionsData.length, 
+      scores: scoresData.length,
+      carryover: carryoverData.length,
+      competencies: competencyData.length
+    });
 
-    // Get pro moves for any selected_action_ids from scores
-    const selectedActionIds = (scoresData || [])
+    // Secondary query: Get pro moves for any selected_action_ids not already in selectionsData
+    const selectedActionIds = scoresData
       .map(s => s.selected_action_id)
       .filter(Boolean);
     
@@ -407,54 +451,26 @@ export default function Week() {
     console.log('Transformed focus data:', transformedFocus);
     setWeeklyFocus(transformedFocus);
 
-    // Build competency name map - use names already in the data if available
+    // Build competency name map using pre-fetched competency data
     const compNameMap: Record<string, string> = {};
     transformedFocus.forEach(focus => {
       if (focus.competency_name) {
         compNameMap[focus.id] = focus.competency_name;
-      }
-    });
-    
-    // Load any missing competency names from database
-    const focusNeedingCompetency = transformedFocus.filter(f => f.competency_id && !compNameMap[f.id]);
-    if (focusNeedingCompetency.length > 0) {
-      const { data: competencyData } = await supabase
-        .from('competencies')
-        .select('competency_id, name')
-        .in('competency_id', focusNeedingCompetency.map(f => f.competency_id));
-      
-      focusNeedingCompetency.forEach(focus => {
-        const comp = competencyData?.find(c => c.competency_id === focus.competency_id);
+      } else if (focus.competency_id) {
+        const comp = competencyData.find(c => c.competency_id === focus.competency_id);
         if (comp) {
           compNameMap[focus.id] = comp.name;
         }
-      });
-    }
+      }
+    });
     
     setCompetencyNameById(compNameMap);
 
-    // Scores
-    const scoreFocusIds = transformedFocus.map(f => f.id);
-    const { data: weeklyScoresData } = await supabase
-      .from('weekly_scores')
-      .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
-      .eq('staff_id', staff.id)
-      .in('weekly_focus_id', scoreFocusIds);
+    // Set scores (already fetched in parallel)
+    setWeeklyScores(scoresData);
 
-    setWeeklyScores(weeklyScoresData || []);
-
-    // Carryover check (pending performance in the most recent week)
-    const { data: pending } = await supabase
-      .from('weekly_scores')
-      .select('updated_at, weekly_focus!inner(cycle, week_in_cycle, role_id)')
-      .eq('staff_id', staff.id)
-      .eq('weekly_focus.role_id', staff.role_id)
-      .not('confidence_score', 'is', null)
-      .is('performance_score', null)
-      .order('updated_at', { ascending: false })
-      .limit(1);
-
-    const wf: any = pending && pending[0] && (pending[0] as any).weekly_focus;
+    // Set carryover (already fetched in parallel)
+    const wf: any = carryoverData[0]?.weekly_focus;
     if (wf) {
       setCarryoverPending({ cycle: wf.cycle, week_in_cycle: wf.week_in_cycle });
     }

@@ -112,18 +112,23 @@ export function useCoachRosterCoverage() {
         });
       }
 
-      // 3. Build coverage map
+      // 3. Build coverage map - use Map keyed by staff_id+week_of for efficiency
+      const scoreMap = new Map<string, any>();
+      (scoreRows || []).forEach(s => {
+        if (s.week_of) {
+          scoreMap.set(`${s.staff_id}:${s.week_of}`, s);
+        }
+      });
+
       const coverageMap = new Map<string, CoverageData>();
 
       staffMeta.forEach(staff => {
-        const score = (scoreRows || []).find(
-          s => s.staff_id === staff.staff_id && s.week_of === staff.week_of
-        );
+        const score = scoreMap.get(`${staff.staff_id}:${staff.week_of}`);
 
         coverageMap.set(staff.staff_id, {
           staff_id: staff.staff_id,
-          conf_submitted: score?.confidence_score !== null,
-          perf_submitted: score?.performance_score !== null,
+          conf_submitted: score ? score.confidence_score !== null : false,
+          perf_submitted: score ? score.performance_score !== null : false,
           conf_late: score?.confidence_late || false,
           perf_late: score?.performance_late || false,
           confidence_date: score?.confidence_date || null,

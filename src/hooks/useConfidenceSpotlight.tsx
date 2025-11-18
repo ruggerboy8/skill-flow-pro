@@ -35,12 +35,18 @@ export function useConfidenceSpotlight(
     setError(null);
 
     try {
-      // 1. Compute date range
+      // 1. Compute date range: current Monday through (current Monday - (N-1) weeks)
       const now = new Date();
       // Use a representative timezone for computing the range (doesn't matter much for aggregate data)
       const tz = filteredRoster[0]?.tz || 'America/Chicago';
       const currentMonday = computeWeekOf(now, tz);
-      const startMonday = format(subWeeks(new Date(currentMonday), lookbackWeeks), 'yyyy-MM-dd');
+      
+      // Clamp lookbackWeeks to 1-12
+      const clampedWeeks = Math.max(1, Math.min(12, lookbackWeeks));
+      
+      // Subtract (N-1) weeks, so lookbackWeeks=1 means just current week
+      const weeksToSubtract = Math.max(0, clampedWeeks - 1);
+      const startMonday = format(subWeeks(new Date(currentMonday), weeksToSubtract), 'yyyy-MM-dd');
 
       // 2. Query weekly_scores for confidence submissions
       const staffIds = filteredRoster.map(s => s.staff_id);

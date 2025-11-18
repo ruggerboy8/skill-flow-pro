@@ -95,33 +95,70 @@ export default function Week() {
     await selectDefaultWeek(data);
   };
 
+  // Optimized: Fetches all cycle 1 weekly_focus data in 2 bulk queries instead of 12 sequential queries
+  // Note: Only handles Cycle 1 (weekly_focus). Cycle 4+ users land on current week via date calculation.
   const selectDefaultWeek = async (s: Staff) => {
+    // Query 1: Fetch ALL weekly_focus for cycle 1 (all 6 weeks) in one go
+    const { data: allFocusRows, error: focusError } = await supabase
+      .from('weekly_focus')
+      .select('id, week_in_cycle')
+      .eq('role_id', s.role_id)
+      .eq('cycle', 1)
+      .order('week_in_cycle', { ascending: true });
+
+    if (focusError || !allFocusRows || allFocusRows.length === 0) {
+      // No focus data, default to week 1
+      setCycle(1);
+      setWeekInCycle(1);
+      return;
+    }
+
+    // Collect all focus IDs across all weeks
+    const allFocusIds = allFocusRows.map(f => f.id);
+
+    // Query 2: Fetch ALL weekly_scores for this user matching any focus ID
+    const { data: allScoresData, error: scoresError } = await supabase
+      .from('weekly_scores')
+      .select('weekly_focus_id, confidence_score, performance_score')
+      .eq('staff_id', s.id)
+      .in('weekly_focus_id', allFocusIds);
+
+    // Build a Map of scores for fast lookup
+    const scoresMap = new Map<string, { conf: number | null; perf: number | null }>();
+    (allScoresData || []).forEach((score: any) => {
+      scoresMap.set(score.weekly_focus_id, {
+        conf: score.confidence_score,
+        perf: score.performance_score
+      });
+    });
+
+    // In-memory computation: loop through weeks 1-6
     let carryoverWeek: number | null = null;
     let greyWeek: number | null = null;
 
     for (let w = 1; w <= 6; w++) {
-      const { data: focusRows } = await supabase
-        .from('weekly_focus')
-        .select('id')
-        .eq('role_id', s.role_id)
-        .eq('cycle', 1)
-        .eq('week_in_cycle', w);
+      const focusIdsForWeek = allFocusRows.filter(f => f.week_in_cycle === w).map(f => f.id);
+      if (focusIdsForWeek.length === 0) continue;
 
-      const focusIds = (focusRows || []).map((f: any) => f.id);
-      if (focusIds.length === 0) continue;
+      const total = focusIdsForWeek.length;
+      const hasAllConf = focusIdsForWeek.every(fid => {
+        const score = scoresMap.get(fid);
+        return score && score.conf !== null;
+      });
+      const hasAllPerf = focusIdsForWeek.every(fid => {
+        const score = scoresMap.get(fid);
+        return score && score.perf !== null;
+      });
 
-      const { data: scoresData } = await supabase
-        .from('weekly_scores')
-        .select('weekly_focus_id, confidence_score, performance_score')
-        .eq('staff_id', s.id)
-        .in('weekly_focus_id', focusIds);
-
-      const total = focusIds.length;
-      const hasAllConf = (scoresData || []).length === total && (scoresData || []).every((r: any) => r.confidence_score !== null);
-      const hasAllPerf = (scoresData || []).length === total && (scoresData || []).every((r: any) => r.performance_score !== null);
-
-      if (hasAllConf && !hasAllPerf && carryoverWeek === null) carryoverWeek = w;
-      if (!hasAllConf && greyWeek === null) greyWeek = w;
+      // Carryover week: has all confidence but not all performance
+      if (hasAllConf && !hasAllPerf && carryoverWeek === null) {
+        carryoverWeek = w;
+      }
+      
+      // Grey week: missing at least one confidence score
+      if (!hasAllConf && greyWeek === null) {
+        greyWeek = w;
+      }
     }
 
     const chosen = carryoverWeek ?? greyWeek ?? 1;

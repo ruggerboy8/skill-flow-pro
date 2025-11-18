@@ -113,27 +113,54 @@ export function useCoachRosterCoverage() {
         });
       }
 
-      // 3. Build coverage map - use Map keyed by staff_id+week_of for efficiency
-      const scoreMap = new Map<string, any>();
+      // 3. Build coverage map - aggregate all rows per staff+week
+      // Group scores by staff_id+week_of (there can be multiple rows per week)
+      const scoresByStaffWeek = new Map<string, any[]>();
       (scoreRows || []).forEach(s => {
         if (s.week_of) {
-          scoreMap.set(`${s.staff_id}:${s.week_of}`, s);
+          const key = `${s.staff_id}:${s.week_of}`;
+          if (!scoresByStaffWeek.has(key)) {
+            scoresByStaffWeek.set(key, []);
+          }
+          scoresByStaffWeek.get(key)!.push(s);
         }
       });
 
       const coverageMap = new Map<string, CoverageData>();
 
       staffMeta.forEach(staff => {
-        const score = scoreMap.get(`${staff.staff_id}:${staff.week_of}`);
+        const scores = scoresByStaffWeek.get(`${staff.staff_id}:${staff.week_of}`) || [];
+        
+        // Check if ANY row has confidence/performance submitted
+        const hasConfidence = scores.some(s => s.confidence_score !== null);
+        const hasPerformance = scores.some(s => s.performance_score !== null);
+        
+        // Get latest dates and late flags
+        const confRows = scores.filter(s => s.confidence_score !== null);
+        const perfRows = scores.filter(s => s.performance_score !== null);
+        
+        const latestConfDate = confRows.length > 0 
+          ? confRows.reduce((latest, row) => {
+              const rowDate = row.confidence_date ? new Date(row.confidence_date) : null;
+              return rowDate && (!latest || rowDate > latest) ? rowDate : latest;
+            }, null as Date | null)
+          : null;
+          
+        const latestPerfDate = perfRows.length > 0
+          ? perfRows.reduce((latest, row) => {
+              const rowDate = row.performance_date ? new Date(row.performance_date) : null;
+              return rowDate && (!latest || rowDate > latest) ? rowDate : latest;
+            }, null as Date | null)
+          : null;
 
         coverageMap.set(staff.staff_id, {
           staff_id: staff.staff_id,
-          conf_submitted: score ? score.confidence_score !== null : false,
-          perf_submitted: score ? score.performance_score !== null : false,
-          conf_late: score?.confidence_late || false,
-          perf_late: score?.performance_late || false,
-          confidence_date: score?.confidence_date || null,
-          performance_date: score?.performance_date || null,
+          conf_submitted: hasConfidence,
+          perf_submitted: hasPerformance,
+          conf_late: confRows.some(s => s.confidence_late),
+          perf_late: perfRows.some(s => s.performance_late),
+          confidence_date: latestConfDate ? latestConfDate.toISOString() : null,
+          performance_date: latestPerfDate ? latestPerfDate.toISOString() : null,
         });
       });
 

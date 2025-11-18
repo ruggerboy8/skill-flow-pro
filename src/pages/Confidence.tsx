@@ -6,19 +6,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getDomainColor } from '@/lib/domainColors';
-
-interface Staff {
-  id: string;
-  role_id: number;
-  locations?: {
-    organization_id: string;
-  };
-}
 
 interface WeeklyFocus {
   id: string;
@@ -35,7 +28,6 @@ interface WeeklyFocus {
 
 export default function Confidence() {
   const { week } = useParams();
-  const [staff, setStaff] = useState<Staff | null>(null);
   const [weeklyFocus, setWeeklyFocus] = useState<WeeklyFocus[]>([]);
   const [scores, setScores] = useState<{ [key: string]: number }>({});
   const [loading, setLoading] = useState(true);
@@ -44,6 +36,7 @@ export default function Confidence() {
   const [selectedActions, setSelectedActions] = useState<{ [key: string]: string | null }>({});
   const [optionsByCompetency, setOptionsByCompetency] = useState<{ [key: number]: { action_id: string; action_statement: string }[] }>({});
   const { user } = useAuth();
+  const { data: staff, isLoading: staffLoading } = useStaffProfile();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -56,10 +49,10 @@ const afterTueNoon = now >= tueDueZ;
 const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.length;
 
   useEffect(() => {
-    if (user) {
+    if (staff) {
       loadData();
     }
-  }, [user, week]);
+  }, [staff, week]);
 
   // Route guards with toasts for deep-links
   useEffect(() => {
@@ -80,28 +73,12 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
   }, [loading, weeklyFocus, afterTueNoon, hasConfidence, navigate]);
 
   const loadData = async () => {
-    if (!user) return;
+    if (!staff || !user) return;
 
-    console.log('Loading confidence data for week:', week, 'user:', user.id);
-
-    // Load staff profile
-    const { data: staffData, error: staffError } = await supabase
-      .from('staff')
-      .select('id, role_id, locations(organization_id)')
-      .eq('user_id', user.id)
-      .single();
-
-    if (staffError || !staffData) {
-      console.error('Staff error:', staffError);
-      navigate('/setup');
-      return;
-    }
-
-    console.log('Staff data loaded:', staffData);
-    setStaff(staffData);
+    console.log('Loading confidence data for week:', week, 'user:', user.id, 'staff:', staff);
 
     // Try weekly_plan first (for orgs with sequencer)
-    const orgId = staffData.locations?.organization_id;
+    const orgId = staff.locations?.organization_id;
     let focusData: any[] | null = null;
     let focusError: any = null;
     
@@ -138,7 +115,7 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
           )
         `)
         .is('org_id', null)
-        .eq('role_id', staffData.role_id)
+        .eq('role_id', staff.role_id!)
         .eq('week_start_date', mondayStr)
         .eq('status', 'locked')
         .order('display_order');
@@ -184,7 +161,7 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
         `)
         .eq('cycle', 1) // Use cycle 1 for now
         .eq('week_in_cycle', weekNum)
-        .eq('role_id', staffData.role_id)
+        .eq('role_id', staff.role_id!)
         .order('display_order');
       
       focusData = result.data;
@@ -210,7 +187,7 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     const { data: existing, error: existingError } = await supabase
       .from('weekly_scores')
       .select('weekly_focus_id, confidence_score, selected_action_id')
-      .eq('staff_id', staffData.id)
+      .eq('staff_id', staff.id)
       .in('weekly_focus_id', focusIds);
 
     if (existingError) {

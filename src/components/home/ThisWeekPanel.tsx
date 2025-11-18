@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, nextMondayStr, CT_TZ } from '@/lib/centralTime';
@@ -23,7 +24,6 @@ import { buildWeekBanner } from '@/v2/weekCta';
 import { enforceWeeklyRolloverNow } from '@/v2/rollover';
 import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 
-interface Staff { id: string; role_id: number; }
 interface WeeklyScore { 
   weekly_focus_id: string; 
   confidence_score: number | null; 
@@ -32,12 +32,12 @@ interface WeeklyScore {
 
 export default function ThisWeekPanel() {
   const { user, isParticipant } = useAuth();
+  const { data: staff, isLoading: staffLoading } = useStaffProfile({ redirectToSetup: true });
   const { toast } = useToast();
   const navigate = useNavigate();
   const now = useNow();
   const { overrides } = useSim();
 
-  const [staff, setStaff] = useState<Staff | null>(null);
   const [weekContext, setWeekContext] = useState<StaffStatus | null>(null);
   const [locationWeekContext, setLocationWeekContext] = useState<LocationWeekContext | null>(null);
   const [weekAssignments, setWeekAssignments] = useState<WeekAssignment[]>([]);
@@ -60,26 +60,6 @@ export default function ThisWeekPanel() {
     }
   }, []);
 
-  // Load staff profile
-  useEffect(() => {
-    if (user) void loadStaff();
-  }, [user]);
-
-  async function loadStaff() {
-    const { data, error } = await supabase
-      .from('staff')
-      .select('id, role_id')
-      .eq('user_id', user!.id)
-      .maybeSingle();
-
-    if (error || !data) {
-      navigate('/setup');
-      return;
-    }
-
-    setStaff(data);
-  }
-
   // Load current week data and compute state
   useEffect(() => {
     // Early return for non-participants to avoid heavy computation
@@ -87,8 +67,8 @@ export default function ThisWeekPanel() {
       setLoading(false);
       return;
     }
-    if (staff) void loadCurrentWeek();
-  }, [staff, overrides, isParticipant]); // Re-run when simulation overrides change
+    if (staff && !staffLoading) void loadCurrentWeek();
+  }, [staff, staffLoading, overrides, isParticipant]); // Re-run when staff loads or simulation overrides change
 
   async function loadCurrentWeek() {
     if (!staff || !user) return;
@@ -100,17 +80,6 @@ export default function ThisWeekPanel() {
       console.log('Current time (now):', now);
       console.log('Staff:', staff);
       console.log('Simulation overrides:', overrides);
-      
-      // Get staff info including location
-      const { data: staffData } = await supabase
-        .from('staff')
-        .select('id, role_id, primary_location_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!staffData?.primary_location_id) {
-        throw new Error('Staff member has no assigned location');
-      }
 
       // Use simulated time if available
       const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
@@ -119,9 +88,9 @@ export default function ThisWeekPanel() {
       // Enforce weekly rollover (idempotent)
       await enforceWeeklyRolloverNow({
         userId: user.id,
-        staffId: staffData.id,
-        roleId: staffData.role_id,
-        locationId: staffData.primary_location_id,
+        staffId: staff.id,
+        roleId: staff.role_id!,
+        locationId: staff.primary_location_id!,
         now: effectiveNow,
       });
       
@@ -150,7 +119,7 @@ export default function ThisWeekPanel() {
       }
 
       // Get location-specific time anchors for state computation
-      const locationTimeContext = await getLocationWeekContext(staffData.primary_location_id, effectiveNow);
+      const locationTimeContext = await getLocationWeekContext(staff.primary_location_id!, effectiveNow);
       setLocationWeekContext({ ...locationTimeContext, cycleNumber, weekInCycle });
       
       // Calculate week of date using location timezone
@@ -166,8 +135,8 @@ export default function ThisWeekPanel() {
       // Compute current week state with simulation overrides (location-based unified)
       const context = await computeWeekState({
         userId: user.id,
-        locationId: staffData.primary_location_id,
-        roleId: staffData.role_id,
+        locationId: staff.primary_location_id!,
+        roleId: staff.role_id!,
         now: effectiveNow,
         simOverrides: overrides.enabled ? overrides : undefined,
         weekContext: { cycleNumber, weekInCycle }
@@ -181,7 +150,7 @@ export default function ThisWeekPanel() {
         const { data: scores } = await supabase
           .from('weekly_scores')
           .select('weekly_focus_id, confidence_score, performance_score')
-          .eq('staff_id', staffData.id)
+          .eq('staff_id', staff.id)
           .in('weekly_focus_id', focusIds);
         
         setWeeklyScores(scores || []);

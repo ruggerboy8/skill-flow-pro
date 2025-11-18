@@ -773,7 +773,7 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
                 >
                   <Badge 
                     className="text-xs font-semibold ring-1 ring-border/50 text-black"
-                    style={{ backgroundColor: `hsl(${getDomainColor(item.domain_name)})` }}
+                    style={{ backgroundColor: getDomainColor(item.domain_name) }}
                   >
                     {item.domain_name}
                   </Badge>

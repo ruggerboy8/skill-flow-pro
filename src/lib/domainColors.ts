@@ -1,4 +1,4 @@
-// HSL colors for domains matching design system
+// HSL colors for domains matching design system (raw components)
 export const domainColors: Record<string, string> = {
   Clinical: '211 100% 92%',      // Light blue
   Clerical: '123 41% 88%',       // Light green
@@ -6,7 +6,8 @@ export const domainColors: Record<string, string> = {
   'Case Acceptance': '36 100% 90%' // Light orange
 };
 
-export const getDomainColor = (domain: string): string => {
+// Returns raw HSL components for alpha blending
+export const getDomainColorRaw = (domain: string): string => {
   const key = (domain || '').trim().toLowerCase();
   const map: Record<string, string> = {
     'clinical': domainColors.Clinical,
@@ -15,4 +16,9 @@ export const getDomainColor = (domain: string): string => {
     'case acceptance': domainColors['Case Acceptance'],
   };
   return map[key] || '0 0% 95%'; // fallback to gray
+};
+
+// Returns fully qualified CSS color string
+export const getDomainColor = (domain: string): string => {
+  return `hsl(${getDomainColorRaw(domain)})`;
 };

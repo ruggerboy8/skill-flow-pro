@@ -15,7 +15,7 @@ import { YouTubePreview } from './YouTubePreview';
 import { LinkEditor } from './LinkEditor';
 import { DraggableList } from './DraggableList';
 import { extractYouTubeId, isValidYouTubeUrl } from '@/lib/youtubeHelpers';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
 
 // Simple hash function for script integrity checking
 function hashString(str: string): string {
@@ -747,7 +747,7 @@ export function LearningDrawer({
             <Badge 
               variant="secondary"
               style={{ 
-                backgroundColor: `${getDomainColor(domainName)}20`,
+                backgroundColor: `hsl(${getDomainColorRaw(domainName)} / 0.2)`,
                 color: getDomainColor(domainName),
                 borderColor: getDomainColor(domainName)
               }}

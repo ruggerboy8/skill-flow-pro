@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { getDomainColor } from "@/lib/domainColors";
+import { getDomainColor, getDomainColorRaw } from "@/lib/domainColors";
 import { extractYouTubeId } from "@/lib/youtubeHelpers";
 
 interface LearnerLearnDrawerProps {
@@ -126,7 +126,7 @@ export function LearnerLearnDrawer({
             <Badge
               variant="secondary"
               style={{
-                backgroundColor: `${getDomainColor(domainName)}20`,
+                backgroundColor: `hsl(${getDomainColorRaw(domainName)} / 0.2)`,
                 color: getDomainColor(domainName),
                 borderColor: getDomainColor(domainName),
               }}

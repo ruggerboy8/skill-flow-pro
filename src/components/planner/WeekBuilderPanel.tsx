@@ -777,7 +777,7 @@ export function WeekBuilderPanel({
                               variant="secondary" 
                               className={`text-xs ring-1 ring-border/50 text-foreground ${isPastWeek ? 'opacity-60' : ''}`}
                               style={{
-                                backgroundColor: `hsl(${getDomainColor(slot.domainName)})`,
+                                backgroundColor: getDomainColor(slot.domainName),
                               }}
                             >
                               {slot.domainName}

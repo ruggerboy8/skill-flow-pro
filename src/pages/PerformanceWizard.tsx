@@ -494,7 +494,7 @@ export default function PerformanceWizard() {
   return (
     <div className="min-h-screen p-2 sm:p-4 bg-background">
       <div className="max-w-md mx-auto space-y-4">
-        <Card style={{ backgroundColor: `hsl(${getDomainColor(currentFocus.domain_name)})` }}>
+        <Card style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}>
           {/* Submission Status Indicator */}
           {pendingCount > 0 && (
             <div className="absolute top-2 right-2 z-10">

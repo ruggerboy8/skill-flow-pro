@@ -177,7 +177,7 @@ export default function CoachDetail() {
     }
   };
 
-  const loadWeekData = async (cycle: number, week: number): Promise<WeekData[]> => {
+  const loadWeekData = async (cycle: number, week: number, weekOf: string): Promise<WeekData[]> => {
     if (!staffInfo) return [];
 
     try {
@@ -249,6 +249,7 @@ export default function CoachDetail() {
           .from('weekly_scores')
           .select('weekly_focus_id, confidence_score, performance_score')
           .eq('staff_id', staffInfo.id)
+          .eq('week_of', weekOf)
           .in('weekly_focus_id', focusIds);
         (scores ?? []).forEach((s: any) => {
           scoreMap[s.weekly_focus_id] = {
@@ -301,7 +302,7 @@ export default function CoachDetail() {
     let weekData: WeekData[];
 
     if (row.source === 'onboarding' && row.cycle !== null && row.week_in_cycle !== null) {
-      weekData = await loadWeekData(row.cycle, row.week_in_cycle);
+      weekData = await loadWeekData(row.cycle, row.week_in_cycle, row.week_of);
     } else {
       // For ongoing weeks, would need similar logic for weekly_plan
       weekData = [];

@@ -2053,6 +2053,23 @@ export type Database = {
           staff_id: string
         }[]
       }
+      get_staff_week_assignments: {
+        Args: { p_role_id: number; p_staff_id: string; p_week_start: string }
+        Returns: {
+          action_statement: string
+          competency_id: number
+          confidence_date: string
+          confidence_score: number
+          display_order: number
+          domain_name: string
+          focus_id: string
+          performance_date: string
+          performance_score: number
+          required: boolean
+          self_select: boolean
+          source: string
+        }[]
+      }
       get_strengths_weaknesses: {
         Args: {
           p_end?: string

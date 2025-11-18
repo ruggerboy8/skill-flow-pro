@@ -181,117 +181,66 @@ export default function CoachDetail() {
     if (!staffInfo) return [];
 
     try {
-      const { data: focus } = await supabase
-        .from('weekly_focus')
-        .select(`
-          id,
-          display_order,
-          self_select,
-          competency_id,
-          pro_moves(action_statement, competency_id)
-        `)
-        .eq('cycle', cycle)
-        .eq('week_in_cycle', week)
-        .eq('role_id', staffInfo.role_id)
-        .order('display_order');
-
-      const focusIds = (focus ?? []).map((f: any) => f.id);
-
-      const { data: userSelections } = await supabase
-        .from('weekly_self_select')
-        .select(`
-          weekly_focus_id,
-          selected_pro_move_id,
-          pro_moves(action_statement, competency_id)
-        `)
-        .eq('user_id', staffInfo.id)
-        .in('weekly_focus_id', focusIds);
-
-      const selectionsMap: Record<string, any> = {};
-      (userSelections ?? []).forEach((sel: any) => {
-        selectionsMap[sel.weekly_focus_id] = sel;
+      // Use unified RPC that handles both weekly_focus and weekly_plan
+      const { data, error } = await supabase.rpc('get_staff_week_assignments', {
+        p_staff_id: staffInfo.id,
+        p_role_id: staffInfo.role_id,
+        p_week_start: weekOf
       });
 
-      const allCompIds = Array.from(
-        new Set([
-          ...(focus ?? []).map((f: any) => f.pro_moves?.competency_id).filter(Boolean),
-          ...(focus ?? []).map((f: any) => f.competency_id).filter(Boolean),
-          ...(userSelections ?? []).map((sel: any) => sel.pro_moves?.competency_id).filter(Boolean)
-        ])
-      ) as number[];
-      
-      let domainMap: Record<number, string> = {};
-      if (allCompIds.length) {
-        const { data: comps } = await supabase
-          .from('competencies')
-          .select('competency_id, domain_id')
-          .in('competency_id', allCompIds);
-
-        const domainIds = Array.from(new Set((comps ?? []).map(c => c.domain_id).filter(Boolean)));
-        if (domainIds.length) {
-          const { data: domains } = await supabase
-            .from('domains')
-            .select('domain_id, domain_name')
-            .in('domain_id', domainIds);
-          const idName: Record<number, string> = {};
-          (domains ?? []).forEach(d => { idName[d.domain_id] = d.domain_name; });
-          (comps ?? []).forEach(c => {
-            if (c.domain_id && idName[c.domain_id]) {
-              domainMap[c.competency_id] = idName[c.domain_id];
-            }
-          });
-        }
+      if (error) {
+        console.error('[CoachDetail] RPC error:', error);
+        throw error;
       }
 
-      let scoreMap: Record<string, { confidence_score: number|null, performance_score: number|null }> = {};
-      if (focusIds.length) {
-        const { data: scores } = await supabase
-          .from('weekly_scores')
-          .select('weekly_focus_id, confidence_score, performance_score')
-          .eq('staff_id', staffInfo.id)
-          .eq('week_of', weekOf)
-          .in('weekly_focus_id', focusIds);
-        (scores ?? []).forEach((s: any) => {
-          scoreMap[s.weekly_focus_id] = {
-            confidence_score: s.confidence_score,
-            performance_score: s.performance_score
-          };
+      // Handle self-select slots: fetch user selections for display names
+      const selfSelectIds = (data || [])
+        .filter((row: any) => row.self_select)
+        .map((row: any) => row.focus_id);
+
+      let selectionsMap: Record<string, any> = {};
+      if (selfSelectIds.length > 0) {
+        const { data: userSelections } = await supabase
+          .from('weekly_self_select')
+          .select(`
+            weekly_focus_id,
+            selected_pro_move_id,
+            pro_moves(action_statement, competency_id)
+          `)
+          .eq('user_id', staffInfo.id)
+          .in('weekly_focus_id', selfSelectIds);
+
+        (userSelections ?? []).forEach((sel: any) => {
+          selectionsMap[sel.weekly_focus_id] = sel;
         });
       }
 
-      const rows: WeekData[] = (focus ?? []).map((f: any) => {
-        let action_statement = 'Pro Move';
-        let compId: number | null = null;
-        
-        if (f.self_select) {
-          const selection = selectionsMap[f.id];
+      // Map RPC results to WeekData format
+      const rows: WeekData[] = (data || []).map((row: any) => {
+        let action_statement = row.action_statement;
+
+        // Override with user selection if applicable
+        if (row.self_select) {
+          const selection = selectionsMap[row.focus_id];
           if (selection?.pro_moves) {
             action_statement = selection.pro_moves.action_statement;
-            compId = selection.pro_moves.competency_id;
           } else {
-            action_statement = 'Self-Select';
-            compId = f.competency_id;
+            action_statement = 'Self-Select (not chosen)';
           }
-        } else {
-          action_statement = f.pro_moves?.action_statement || 'Pro Move';
-          compId = f.pro_moves?.competency_id;
         }
-        
-        const domain_name = compId ? (domainMap[compId] || 'General') : 'General';
-        const sc = scoreMap[f.id] || { confidence_score: null, performance_score: null };
-        
+
         return {
-          weekly_focus_id: f.id,
-          domain_name,
+          weekly_focus_id: row.focus_id,
+          domain_name: row.domain_name,
           action_statement,
-          confidence_score: sc.confidence_score,
-          performance_score: sc.performance_score
+          confidence_score: row.confidence_score ?? null,
+          performance_score: row.performance_score ?? null
         };
       });
 
       return rows;
     } catch (error) {
-      console.error('Error loading week data:', error);
+      console.error('[CoachDetail] Error loading week data:', error);
       return [];
     }
   };
@@ -301,12 +250,8 @@ export default function CoachDetail() {
 
     let weekData: WeekData[];
 
-    if (row.source === 'onboarding' && row.cycle !== null && row.week_in_cycle !== null) {
-      weekData = await loadWeekData(row.cycle, row.week_in_cycle, row.week_of);
-    } else {
-      // For ongoing weeks, would need similar logic for weekly_plan
-      weekData = [];
-    }
+    // RPC handles both weekly_focus (cycles 1-3) and weekly_plan (cycles 4+)
+    weekData = await loadWeekData(row.cycle ?? 1, row.week_in_cycle ?? 1, row.week_of);
 
     setPrefetchedWeeks(prev => new Set([...prev, row.week_of]));
 

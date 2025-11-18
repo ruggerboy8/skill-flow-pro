@@ -68,24 +68,6 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     }
   }, [loading, weeklyFocus, afterTueNoon, hasConfidence, navigate]);
 
-  // Route guards with toasts for deep-links
-  useEffect(() => {
-    if (!loading && weeklyFocus.length > 0 && beforeCheckIn) {
-      toast({ title: 'Confidence opens at 9:00 a.m. CT.' });
-      navigate('/');
-    }
-  }, [loading, weeklyFocus, beforeCheckIn, navigate]);
-
-  useEffect(() => {
-    if (!loading && weeklyFocus.length > 0 && afterTueNoon && !hasConfidence) {
-      toast({
-        title: 'Confidence window closed',
-        description: `You'll get a fresh start on Mon, ${nextMondayStr(now)}.`
-      });
-      navigate('/');
-    }
-  }, [loading, weeklyFocus, afterTueNoon, hasConfidence, navigate]);
-
   const loadScoresAndOptions = async () => {
     if (!staff || !user || weeklyFocus.length === 0) return;
 

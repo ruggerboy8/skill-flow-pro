@@ -684,7 +684,8 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
     let baseUrlConf = `/confidence/current/step/1?mode=repair&weekOf=${weekRow.week_of}`;
     let baseUrlPerf = `/performance/current/step/1?mode=repair&weekOf=${weekRow.week_of}`;
     
-    if (weekRow.source === 'onboarding' && weekRow.cycle !== null && weekRow.week_in_cycle !== null) {
+    // Always add cycle/week if available (not just for onboarding)
+    if (weekRow.cycle !== null && weekRow.week_in_cycle !== null) {
       baseUrlConf += `&cycle=${weekRow.cycle}&wk=${weekRow.week_in_cycle}`;
       baseUrlPerf += `&cycle=${weekRow.cycle}&wk=${weekRow.week_in_cycle}`;
     }

@@ -142,68 +142,131 @@ export default function PerformanceWizard() {
     // Use the unified site-based approach to get assignments
     let weekAssignments, cycleNumber, weekInCycle;
     
-    if (isRepair && targetCycle !== null && targetWeek !== null && !isNaN(targetCycle) && !isNaN(targetWeek)) {
-      // For repair mode, load specific cycle/week assignments
-      console.log('Loading repair data for cycle/week:', { targetCycle, targetWeek });
+    // Handle repair mode - either with cycle/week or just weekOf
+    if (isRepair) {
+      const weekOf = qs.get('weekOf');
       
-      // Determine if this is a focus (cycles 1-3) or plan (cycle 4+) week
-      const isOnboarding = targetCycle <= 3;
+      if (!weekOf) {
+        console.error('Repair mode requires weekOf parameter');
+        toast({
+          title: 'Error',
+          description: 'Invalid repair parameters. Please try again from the Stats page.',
+          variant: 'destructive'
+        });
+        setLoading(false);
+        return;
+      }
+
+      console.log('Loading repair data for weekOf:', weekOf);
       
-      if (isOnboarding) {
-        // Query weekly_focus for cycles 1-3
-        const { data: focusData } = await supabase
-          .from('weekly_focus')
-          .select(`
-            id,
-            display_order,
-            competency_id,
-            self_select,
-            cycle,
-            week_in_cycle,
-            action_id,
-            pro_moves!weekly_focus_action_id_fkey ( 
-              action_statement,
+      // Try to use cycle/week if available, otherwise use weekOf to determine source
+      if (targetCycle !== null && targetWeek !== null && !isNaN(targetCycle) && !isNaN(targetWeek)) {
+        // Have cycle/week - use them to determine source
+        const isOnboarding = targetCycle <= 3;
+        
+        if (isOnboarding) {
+          // Query weekly_focus for cycles 1-3
+          const { data: focusData } = await supabase
+            .from('weekly_focus')
+            .select(`
+              id,
+              display_order,
+              competency_id,
+              self_select,
+              cycle,
+              week_in_cycle,
+              action_id,
+              pro_moves!weekly_focus_action_id_fkey ( 
+                action_statement,
+                competencies ( 
+                  name,
+                  domains!competencies_domain_id_fkey ( domain_name )
+                )
+              ),
               competencies ( 
                 name,
                 domains!competencies_domain_id_fkey ( domain_name )
               )
-            ),
-            competencies ( 
-              name,
-              domains!competencies_domain_id_fkey ( domain_name )
-            )
-          `)
-          .eq('role_id', staffData.role_id)
-          .eq('cycle', targetCycle)
-          .eq('week_in_cycle', targetWeek)
-          .order('display_order');
+            `)
+            .eq('role_id', staffData.role_id)
+            .eq('cycle', targetCycle)
+            .eq('week_in_cycle', targetWeek)
+            .order('display_order');
 
-        console.log('Repair query result (focus):', { focusData });
+          console.log('Repair query result (focus):', { focusData });
 
-        weekAssignments = (focusData || []).map((item: any) => {
-          let domainName = 'Unknown';
-          if (item.pro_moves?.competencies?.domains?.domain_name) {
-            domainName = item.pro_moves.competencies.domains.domain_name;
-          } else if (item.competencies?.domains?.domain_name) {
-            domainName = item.competencies.domains.domain_name;
-          }
+          weekAssignments = (focusData || []).map((item: any) => {
+            let domainName = 'Unknown';
+            if (item.pro_moves?.competencies?.domains?.domain_name) {
+              domainName = item.pro_moves.competencies.domains.domain_name;
+            } else if (item.competencies?.domains?.domain_name) {
+              domainName = item.competencies.domains.domain_name;
+            }
 
-          return {
-            weekly_focus_id: item.id,
-            type: item.self_select ? 'self_select' : 'site',
-            display_order: item.display_order,
-            action_statement: item.pro_moves?.action_statement || '',
-            domain_name: domainName,
-            required: true,
-            locked: false
-          };
-        });
-      } else {
-        // Query weekly_plan for cycle 4+
-        const weekOf = qs.get('weekOf');
-        if (!weekOf) {
-          throw new Error('weekOf required for plan repair');
+            return {
+              weekly_focus_id: item.id,
+              type: item.self_select ? 'self_select' : 'site',
+              display_order: item.display_order,
+              action_statement: item.pro_moves?.action_statement || '',
+              domain_name: domainName,
+              required: true,
+              locked: false
+            };
+          });
+        } else {
+          // Query weekly_plan for cycle 4+
+          const { data: planData } = await supabase
+            .from('weekly_plan')
+            .select(`
+              id,
+              display_order,
+              competency_id,
+              self_select,
+              action_id,
+              pro_moves!weekly_plan_action_id_fkey ( 
+                action_statement,
+                competencies ( 
+                  name,
+                  domains!competencies_domain_id_fkey ( domain_name )
+                )
+              ),
+              competencies ( 
+                name,
+                domains!competencies_domain_id_fkey ( domain_name )
+              )
+            `)
+            .eq('role_id', staffData.role_id)
+            .eq('week_start_date', weekOf)
+            .eq('status', 'locked')
+            .order('display_order');
+
+          console.log('Repair query result (plan):', { planData });
+
+          weekAssignments = (planData || []).map((item: any) => {
+            let domainName = 'Unknown';
+            if (item.pro_moves?.competencies?.domains?.domain_name) {
+              domainName = item.pro_moves.competencies.domains.domain_name;
+            } else if (item.competencies?.domains?.domain_name) {
+              domainName = item.competencies.domains.domain_name;
+            }
+
+            return {
+              weekly_focus_id: `plan:${item.id}`,
+              type: item.self_select ? 'self_select' : 'site',
+              display_order: item.display_order,
+              action_statement: item.pro_moves?.action_statement || '',
+              domain_name: domainName,
+              required: true,
+              locked: false
+            };
+          });
         }
+        
+        cycleNumber = targetCycle;
+        weekInCycle = targetWeek;
+      } else {
+        // No cycle/week - query weekly_plan by weekOf (assume ongoing phase)
+        console.log('No cycle/week params, querying weekly_plan by weekOf');
         
         const { data: planData } = await supabase
           .from('weekly_plan')
@@ -230,7 +293,18 @@ export default function PerformanceWizard() {
           .eq('status', 'locked')
           .order('display_order');
 
-        console.log('Repair query result (plan):', { planData });
+        console.log('Repair query result (plan by weekOf):', { planData });
+
+        if (!planData || planData.length === 0) {
+          console.error('No weekly_plan data found for weekOf:', weekOf);
+          toast({
+            title: 'Error',
+            description: 'No assignments found for this week. Please try again.',
+            variant: 'destructive'
+          });
+          setLoading(false);
+          return;
+        }
 
         weekAssignments = (planData || []).map((item: any) => {
           let domainName = 'Unknown';
@@ -250,23 +324,14 @@ export default function PerformanceWizard() {
             locked: false
           };
         });
+        
+        // Set cycle/week to unknown for display
+        cycleNumber = 0;
+        weekInCycle = 0;
       }
       
       console.log('repair mode assignments', weekAssignments);
-      console.log('cycle info:', { cycleNumber: targetCycle, weekInCycle: targetWeek });
-
-      cycleNumber = targetCycle;
-      weekInCycle = targetWeek;
-    } else if (isRepair) {
-      // If repair mode but invalid params, show error and exit
-      console.error('Repair mode enabled but invalid parameters:', { targetCycle, targetWeek });
-      toast({
-        title: 'Error',
-        description: 'Invalid repair parameters. Please try again from the Stats page.',
-        variant: 'destructive'
-      });
-      setLoading(false);
-      return;
+      console.log('cycle info:', { cycleNumber, weekInCycle });
     } else {
       // Normal current week logic
       const result = await assembleCurrentWeek(

@@ -47,7 +47,8 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
       // Call RPC to get all submission windows (including missing)
       const { data, error } = await supabase.rpc('get_staff_submission_windows', {
         p_staff_id: staffId,
-      });
+        p_since: cutoffDate,
+      } as any);
 
       console.debug('OnTimeRateWidget: submission windows', {
         staffId,
@@ -59,15 +60,16 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
 
       if (error) throw error;
 
-      // Filter to only required submissions
-      const requiredWindows = data?.filter((w: any) => w.required) || [];
+      const now = new Date();
+      const windows = data ?? [];
+      const pastDueWindows = windows.filter((w: any) => new Date(w.due_at) <= now);
       
       // Calculate stats
-      const totalExpected = requiredWindows.length;
-      const onTime = requiredWindows.filter((w: any) => w.status === 'on_time').length;
-      const late = requiredWindows.filter((w: any) => w.status === 'late').length;
-      const missing = requiredWindows.filter((w: any) => w.status === 'missing').length;
-      const pending = requiredWindows.filter((w: any) => w.status === 'pending').length;
+      const totalExpected = pastDueWindows.length;
+      const onTime = pastDueWindows.filter((w: any) => w.status === 'on_time').length;
+      const late = pastDueWindows.filter((w: any) => w.status === 'late' || w.submitted_late).length;
+      const missing = pastDueWindows.filter((w: any) => w.status === 'missing').length;
+      const pending = windows.filter((w: any) => w.status === 'pending').length;
 
       const rate = totalExpected > 0 ? (onTime / totalExpected) * 100 : 0;
 

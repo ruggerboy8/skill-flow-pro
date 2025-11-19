@@ -712,6 +712,7 @@ export type Database = {
           competency_id: number | null
           date_added: string | null
           description: string | null
+          intervention_text: string | null
           resources_url: string | null
           role_id: number | null
           status: string | null
@@ -727,6 +728,7 @@ export type Database = {
           competency_id?: number | null
           date_added?: string | null
           description?: string | null
+          intervention_text?: string | null
           resources_url?: string | null
           role_id?: number | null
           status?: string | null
@@ -742,6 +744,7 @@ export type Database = {
           competency_id?: number | null
           date_added?: string | null
           description?: string | null
+          intervention_text?: string | null
           resources_url?: string | null
           role_id?: number | null
           status?: string | null

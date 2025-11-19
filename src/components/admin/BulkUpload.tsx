@@ -196,11 +196,13 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
     setLoading(true);
     try {
       const data = validRows.map(row => ({
+        action_id: row.data.action_id && row.data.action_id.trim() !== '' ? parseInt(row.data.action_id) : null,
         role_name: row.data.role_name,
         competency_name: row.data.competency_name,
         text: row.data.text,
         description: row.data.description || null,
         resources_url: row.data.resources_url || null,
+        intervention_text: row.data.intervention_text || null,
         active: row.data.active === 'false' ? false : true
       }));
 
@@ -314,7 +316,9 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                 </ul>
                 <p className="font-medium mt-4 mb-2">Optional columns:</p>
                 <ul className="list-disc list-inside space-y-1">
+                  <li><code>action_id</code> - For updates only (leave blank for new)</li>
                   <li><code>description</code> - Coach notes</li>
+                  <li><code>intervention_text</code> - Intervention guidance</li>
                   <li><code>resources_url</code> - Training materials URL</li>
                   <li><code>active</code> - true/false (defaults to true)</li>
                 </ul>

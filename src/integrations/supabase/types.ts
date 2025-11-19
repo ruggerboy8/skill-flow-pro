@@ -1938,6 +1938,16 @@ export type Database = {
         Args: { p_role_id: number; p_staff_id: string; p_week_of: string }
         Returns: Json
       }
+      get_best_weekly_win: {
+        Args: { p_staff_id: string }
+        Returns: {
+          action_statement: string
+          domain_name: string
+          lift_amount: number
+          week_of: string
+          win_type: string
+        }[]
+      }
       get_calendar_week_status: {
         Args: { p_role_id: number; p_staff_id: string }
         Returns: {

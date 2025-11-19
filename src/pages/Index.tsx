@@ -1,6 +1,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import ThisWeekPanel from '@/components/home/ThisWeekPanel';
+import { RecentWinBanner } from '@/components/home/RecentWinBanner';
 import { SimFloatingButton } from '@/devtools/SimConsole';
 
 export default function Index() {
@@ -13,6 +14,8 @@ export default function Index() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">ProMoves Progress</h1>
         </div>
+
+        <RecentWinBanner />
 
         <ThisWeekPanel />
         

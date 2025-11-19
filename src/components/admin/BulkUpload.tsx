@@ -51,14 +51,14 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
-      parseCSV(text);
+      await parseCSV(text);
     };
     reader.readAsText(file);
   };
@@ -100,7 +100,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
     return result;
   };
 
-  const parseCSV = (text: string) => {
+  const parseCSV = async (text: string) => {
     const lines = text.split('\n').filter(line => line.trim() && !line.startsWith('#'));
     const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, ''));
     
@@ -145,7 +145,17 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
 
       row.role_id = role.role_id;
       row.competency_id = competency.competency_id;
-      row.status = 'new'; // For now, assume all are new. In a full implementation, we'd check for existing ones
+
+      // Check if pro-move already exists
+      const { data: existing } = await supabase
+        .from('pro_moves')
+        .select('action_id')
+        .eq('role_id', role.role_id)
+        .eq('competency_id', competency.competency_id)
+        .ilike('action_statement', rowData.text)
+        .maybeSingle();
+
+      row.status = existing ? 'update' : 'new';
       parsed.push(row);
     }
 

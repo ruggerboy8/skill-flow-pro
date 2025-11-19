@@ -304,21 +304,19 @@ export default function CoachProMoves() {
                   <TableHead className="text-right">Avg</TableHead>
                   <TableHead className="text-right">Count</TableHead>
                   <TableHead className="text-right">Last</TableHead>
-                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {spotlightItems.map(item => (
-                  <TableRow key={item.action_id}>
+                  <TableRow 
+                    key={item.action_id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openDrill(item)}
+                  >
                     <TableCell className="font-medium">{item.action_statement}</TableCell>
                     <TableCell className="text-right">{item.avg_confidence.toFixed(1)}</TableCell>
                     <TableCell className="text-right">{item.submission_count}</TableCell>
                     <TableCell className="text-right">{format(new Date(item.last_date), 'MMM d')}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => openDrill(item)}>
-                        Drill
-                      </Button>
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

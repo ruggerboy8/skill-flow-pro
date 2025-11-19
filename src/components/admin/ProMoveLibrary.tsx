@@ -93,9 +93,9 @@ export function ProMoveLibrary() {
 
   const downloadTemplate = () => {
     const competencyNames = competencies.map(c => c.name).join('", "');
-    const csvContent = `role_name,competency_name,text,description,resources_url,active
-DFI,"Example Competency","Example pro-move text","Optional description","Optional URL",true
-RDA,"Example Competency","Example pro-move text","Optional description","Optional URL",true
+    const csvContent = `role_name,competency_name,text,description,resources_url,intervention_text,active
+DFI,"Example Competency","Example pro-move text","Optional description","Optional URL","Optional intervention text",true
+RDA,"Example Competency","Example pro-move text","Optional description","Optional URL","Optional intervention text",true
 
 # Available competency names: "${competencyNames}"`;
 
@@ -108,6 +108,85 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const downloadCurrentLibrary = async () => {
+    try {
+      // Fetch all pro_moves with their role and competency names
+      const { data, error } = await supabase
+        .from('pro_moves')
+        .select(`
+          action_id,
+          action_statement,
+          description,
+          resources_url,
+          intervention_text,
+          active,
+          roles!pro_moves_role_id_fkey(role_name),
+          competencies!pro_moves_competency_id_fkey(name)
+        `)
+        .order('action_id');
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast({
+          title: "No data",
+          description: "No pro-moves found to download.",
+        });
+        return;
+      }
+
+      // Format data for CSV
+      const csvRows = data.map(pm => ({
+        role_name: (pm.roles as any)?.role_name || '',
+        competency_name: (pm.competencies as any)?.name || '',
+        text: pm.action_statement || '',
+        description: pm.description || '',
+        resources_url: pm.resources_url || '',
+        intervention_text: pm.intervention_text || '',
+        active: pm.active ? 'true' : 'false'
+      }));
+
+      // Generate CSV content
+      const headers = ['role_name', 'competency_name', 'text', 'description', 'resources_url', 'intervention_text', 'active'];
+      const csvContent = [
+        headers.join(','),
+        ...csvRows.map(row => 
+          headers.map(header => {
+            const value = row[header as keyof typeof row];
+            // Escape values that contain commas or quotes
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+              return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+          }).join(',')
+        )
+      ].join('\n');
+
+      // Download the file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pro-moves-library-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download complete",
+        description: `Downloaded ${data.length} pro-moves.`,
+      });
+    } catch (error: any) {
+      console.error('Error downloading library:', error);
+      toast({
+        title: "Download failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAddProMove = () => {
@@ -135,7 +214,11 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={downloadCurrentLibrary}>
+            <Download className="w-4 h-4 mr-2" />
+            Download Library
+          </Button>
           <Button variant="outline" onClick={downloadTemplate}>
             <Download className="w-4 h-4 mr-2" />
             Template

@@ -59,24 +59,30 @@ export function getWeekInCycle(cycleStartDate: Date, cycleLengthWeeks: number, n
 }
 
 /**
- * Check if staff member is eligible for pro moves (past onboarding)
+ * Check if staff member is eligible for pro moves based on hire date
+ * Eligibility starts on the Monday on or after hire date
  */
-export function isEligibleForProMoves(staff: { hire_date?: string | null; onboarding_weeks: number }, now: Date = new Date()): boolean {
+export function isEligibleForProMoves(staff: { hire_date?: string | null }, now: Date = new Date()): boolean {
   if (!staff.hire_date) return true; // Assume eligible if no hire date
 
   const hireDate = new Date(staff.hire_date);
-  const participationStart = new Date(hireDate.getTime() + (staff.onboarding_weeks * 7 * 24 * 60 * 60 * 1000));
+  // Find the Monday on or after hire date
+  const dayOfWeek = hireDate.getDay();
+  const daysUntilMonday = dayOfWeek === 1 ? 0 : (8 - dayOfWeek) % 7;
+  const participationStart = new Date(hireDate.getTime() + (daysUntilMonday * 24 * 60 * 60 * 1000));
   return now >= participationStart;
 }
 
 /**
- * Get onboarding weeks remaining
+ * Get number of weeks until eligibility for a staff member
  */
-export function getOnboardingWeeksLeft(staff: { hire_date?: string | null; onboarding_weeks: number }, now: Date = new Date()): number {
+export function getOnboardingWeeksLeft(staff: { hire_date?: string | null }, now: Date = new Date()): number {
   if (!staff.hire_date) return 0;
 
   const hireDate = new Date(staff.hire_date);
-  const participationStart = new Date(hireDate.getTime() + (staff.onboarding_weeks * 7 * 24 * 60 * 60 * 1000));
+  const dayOfWeek = hireDate.getDay();
+  const daysUntilMonday = dayOfWeek === 1 ? 0 : (8 - dayOfWeek) % 7;
+  const participationStart = new Date(hireDate.getTime() + (daysUntilMonday * 24 * 60 * 60 * 1000));
   
   if (now >= participationStart) return 0;
   

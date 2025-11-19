@@ -1002,7 +1002,6 @@ export type Database = {
           is_super_admin: boolean
           location: string | null
           name: string
-          onboarding_weeks: number
           organization: string | null
           participation_start_at: string | null
           primary_location_id: string | null
@@ -1025,7 +1024,6 @@ export type Database = {
           is_super_admin?: boolean
           location?: string | null
           name: string
-          onboarding_weeks?: number
           organization?: string | null
           participation_start_at?: string | null
           primary_location_id?: string | null
@@ -1048,7 +1046,6 @@ export type Database = {
           is_super_admin?: boolean
           location?: string | null
           name?: string
-          onboarding_weeks?: number
           organization?: string | null
           participation_start_at?: string | null
           primary_location_id?: string | null

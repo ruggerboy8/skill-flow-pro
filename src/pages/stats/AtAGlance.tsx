@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-import ConsistencyPanel from '@/components/stats/ConsistencyPanel';
+import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 import PerformanceTrajectoryPanel from '@/components/stats/PerformanceTrajectoryPanel';
 import CalibrationPanel from '@/components/stats/CalibrationPanel';
 
@@ -15,10 +15,8 @@ interface Staff {
 
 export default function AtAGlance() {
   const [staff, setStaff] = useState<Staff | null>(null);
-  const [consistency, setConsistency] = useState<any>(null);
   const [trajectory, setTrajectory] = useState<any>(null);
   const [calibration, setCalibration] = useState<any>(null);
-  const [loadingConsistency, setLoadingConsistency] = useState(true);
   const [loadingTrajectory, setLoadingTrajectory] = useState(true);
   const [loadingCalibration, setLoadingCalibration] = useState(true);
   const { user } = useAuth();
@@ -60,17 +58,16 @@ export default function AtAGlance() {
 
     const run = async () => {
       try {
-        const [{ data: c }, { data: t }, { data: k }] = await Promise.all([
-          supabase.rpc('get_consistency', { p_staff_id: staff.id, p_weeks: 6, p_tz: staff.timezone || 'America/Chicago' }),
+        const [{ data: t }, { data: k }] = await Promise.all([
           supabase.rpc('get_performance_trend', { p_staff_id: staff.id, p_role_id: staff.role_id, p_window: 6 }),
           supabase.rpc('get_calibration', { p_staff_id: staff.id, p_role_id: staff.role_id, p_window: 6 }),
         ]);
         if (cancelled) return;
-        setConsistency(c); setTrajectory(t); setCalibration(k);
+        setTrajectory(t); setCalibration(k);
       } catch (e) {
         if (!cancelled) console.error(e);
       } finally {
-        if (!cancelled) { setLoadingConsistency(false); setLoadingTrajectory(false); setLoadingCalibration(false); }
+        if (!cancelled) { setLoadingTrajectory(false); setLoadingCalibration(false); }
       }
     };
 
@@ -90,7 +87,7 @@ export default function AtAGlance() {
 
   return (
     <div className="space-y-6">
-      <ConsistencyPanel data={consistency} loading={loadingConsistency} tz={staff?.timezone} />
+      <OnTimeRateWidget staffId={staff.id} />
       <PerformanceTrajectoryPanel data={trajectory} loading={loadingTrajectory} />
       <CalibrationPanel data={calibration} loading={loadingCalibration} />
     </div>

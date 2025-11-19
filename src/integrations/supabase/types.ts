@@ -1659,6 +1659,7 @@ export type Database = {
           action_id: number | null
           cycle_number: number | null
           due_at: string | null
+          is_self_select: boolean | null
           location_id: string | null
           metric: string | null
           on_time: boolean | null
@@ -2162,11 +2163,12 @@ export type Database = {
         }[]
       }
       get_staff_submission_windows: {
-        Args: { p_staff_id: string }
+        Args: { p_since?: string; p_staff_id: string }
         Returns: {
           action_id: number
           cycle_number: number
           due_at: string
+          is_self_select: boolean
           location_id: string
           metric: string
           on_time: boolean

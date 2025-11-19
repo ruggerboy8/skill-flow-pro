@@ -122,8 +122,8 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
           resources_url,
           intervention_text,
           active,
-          roles!pro_moves_role_id_fkey(role_name),
-          competencies!pro_moves_competency_id_fkey(name)
+          roles!fk_pro_moves_role_id(role_name),
+          competencies!fk_pro_moves_competency_id(name)
         `)
         .order('action_id');
 

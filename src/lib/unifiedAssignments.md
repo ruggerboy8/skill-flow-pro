@@ -67,32 +67,25 @@ All surfaces now use compatible logic that automatically switches between `weekl
 - Shows individual week details with full assignment list
 - Removed hardcoded `weekly_focus` queries
 
-## Participation Start and Onboarding Logic
+## Participation Start Logic
 
-Staff become eligible for required submissions based on their hire date and onboarding period:
+Staff become eligible for required submissions based on their hire date:
 
-1. **Participation Start**: The Monday following their hire date
-   - Formula: `date_trunc('week', hire_date + 1 day) + 7 days`
-   - Example: Hired on Wednesday → submissions start the following Monday
+1. **Participation Start**: The Monday on or after their hire date
+   - If hired on a Monday: submissions start that Monday
+   - If hired on any other day: submissions start the following Monday
+   - Formula: `CASE WHEN EXTRACT(DOW FROM hire_date) = 1 THEN hire_date ELSE hire_date + ((8 - EXTRACT(DOW FROM hire_date)::integer) % 7) END`
 
-2. **Eligibility Window**: Participation start + onboarding buffer
-   - Formula: `participation_start_monday + (onboarding_weeks * 7 days)`
-   - Example: 2-week onboarding → required submissions start 2 weeks after participation start
-
-3. **Required Submissions Begin**: The later of:
-   - `eligible_monday` (hire date + 1 week + onboarding buffer)
+2. **Required Submissions Begin**: The later of:
+   - `participation_start_monday` (Monday on/after hire date)
    - `location_program_start_monday` (location's program start date)
 
-4. **NULL Handling**:
-   - Missing `hire_date` defaults to `created_at::date`
-   - Missing `onboarding_weeks` defaults to `0` (no buffer)
-   - This ensures all staff have valid participation windows
+3. **Legacy Onboarding Support**: The `onboarding_weeks` column has been removed. All staff now have submissions required starting immediately on their participation Monday.
 
 ### Database Fields
 
 - `staff.hire_date`: NOT NULL, defaults to CURRENT_DATE
-- `staff.onboarding_weeks`: Nullable integer (0 if NULL)
-- `staff.created_at`: Fallback for legacy records
+- `staff.created_at`: Used as fallback if hire_date was NULL during migration
 
 ## Last Activity Selection Logic
 

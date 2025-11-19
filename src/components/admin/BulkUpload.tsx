@@ -146,16 +146,34 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
       row.role_id = role.role_id;
       row.competency_id = competency.competency_id;
 
-      // Check if pro-move already exists
-      const { data: existing } = await supabase
-        .from('pro_moves')
-        .select('action_id')
-        .eq('role_id', role.role_id)
-        .eq('competency_id', competency.competency_id)
-        .ilike('action_statement', rowData.text)
-        .maybeSingle();
+      // Prioritize ID-based matching
+      if (rowData.action_id && rowData.action_id.trim() !== '') {
+        // ID provided - must match exactly
+        const { data: existing } = await supabase
+          .from('pro_moves')
+          .select('action_id')
+          .eq('action_id', parseInt(rowData.action_id))
+          .maybeSingle();
 
-      row.status = existing ? 'update' : 'new';
+        if (existing) {
+          row.status = 'update';
+        } else {
+          row.status = 'error';
+          row.error = `Pro-move ID ${rowData.action_id} not found in database`;
+        }
+      } else {
+        // No ID - fall back to text-based matching
+        const { data: existing } = await supabase
+          .from('pro_moves')
+          .select('action_id')
+          .eq('role_id', role.role_id)
+          .eq('competency_id', competency.competency_id)
+          .ilike('action_statement', rowData.text)
+          .maybeSingle();
+
+        row.status = existing ? 'update' : 'new';
+      }
+
       parsed.push(row);
     }
 

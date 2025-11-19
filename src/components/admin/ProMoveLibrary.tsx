@@ -145,6 +145,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
 
       // Format data for CSV
       const csvRows = data.map(pm => ({
+        action_id: pm.action_id,
         role_name: (pm.roles as any)?.role_name || '',
         competency_name: (pm.competencies as any)?.name || '',
         text: pm.action_statement || '',
@@ -155,7 +156,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
       }));
 
       // Generate CSV content
-      const headers = ['role_name', 'competency_name', 'text', 'description', 'resources_url', 'intervention_text', 'active'];
+      const headers = ['action_id', 'role_name', 'competency_name', 'text', 'description', 'resources_url', 'intervention_text', 'active'];
       const csvContent = [
         headers.join(','),
         ...csvRows.map(row => 

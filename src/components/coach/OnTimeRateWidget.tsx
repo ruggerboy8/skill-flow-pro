@@ -15,6 +15,9 @@ interface SubmissionStats {
   totalSubmissions: number;
   onTimeSubmissions: number;
   rate: number;
+  late: number;
+  missing: number;
+  pending: number;
 }
 
 export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
@@ -41,52 +44,37 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
         cutoffDate = date.toISOString().split('T')[0];
       }
 
-      // Build query
-      let query = supabase
-        .from('weekly_scores')
-        .select('confidence_score, confidence_late, performance_score, performance_late, confidence_date, performance_date')
-        .eq('staff_id', staffId);
-
-      if (cutoffDate) {
-        query = query.or(`confidence_date.gte.${cutoffDate},performance_date.gte.${cutoffDate}`);
-      }
-
-      const { data, error } = await query;
+      // Call RPC to get all submission windows (including missing)
+      const { data, error } = await supabase.rpc('get_staff_submission_windows', {
+        p_staff_id: staffId,
+        p_since: cutoffDate
+      });
 
       if (error) throw error;
 
+      // Filter to only required submissions
+      const requiredWindows = data?.filter((w: any) => w.required) || [];
+      
       // Calculate stats
-      let totalSubmissions = 0;
-      let onTimeSubmissions = 0;
+      const totalExpected = requiredWindows.length;
+      const onTime = requiredWindows.filter((w: any) => w.status === 'on_time').length;
+      const late = requiredWindows.filter((w: any) => w.status === 'late').length;
+      const missing = requiredWindows.filter((w: any) => w.status === 'missing').length;
+      const pending = requiredWindows.filter((w: any) => w.status === 'pending').length;
 
-      data?.forEach(row => {
-        // Count confidence submissions
-        if (row.confidence_score !== null) {
-          totalSubmissions++;
-          if (!row.confidence_late) {
-            onTimeSubmissions++;
-          }
-        }
-
-        // Count performance submissions
-        if (row.performance_score !== null) {
-          totalSubmissions++;
-          if (!row.performance_late) {
-            onTimeSubmissions++;
-          }
-        }
-      });
-
-      const rate = totalSubmissions > 0 ? (onTimeSubmissions / totalSubmissions) * 100 : 0;
+      const rate = totalExpected > 0 ? (onTime / totalExpected) * 100 : 0;
 
       setStats({
-        totalSubmissions,
-        onTimeSubmissions,
-        rate
+        totalSubmissions: totalExpected,
+        onTimeSubmissions: onTime,
+        rate,
+        late,
+        missing,
+        pending
       });
     } catch (error) {
       console.error('Error loading on-time stats:', error);
-      setStats({ totalSubmissions: 0, onTimeSubmissions: 0, rate: 0 });
+      setStats({ totalSubmissions: 0, onTimeSubmissions: 0, rate: 0, late: 0, missing: 0, pending: 0 });
     } finally {
       setLoading(false);
     }
@@ -162,7 +150,10 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                 <span className="text-sm text-muted-foreground">
-                  {stats.onTimeSubmissions} of {stats.totalSubmissions} submissions on time
+                  {stats.onTimeSubmissions} of {stats.totalSubmissions} on time
+                  {stats.late > 0 && `, ${stats.late} late`}
+                  {stats.missing > 0 && `, ${stats.missing} missing`}
+                  {stats.pending > 0 && `, ${stats.pending} pending`}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">

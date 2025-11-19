@@ -1657,6 +1657,28 @@ export type Database = {
           },
         ]
       }
+      view_staff_submission_windows: {
+        Row: {
+          action_id: number | null
+          cycle_number: number | null
+          due_at: string | null
+          location_id: string | null
+          metric: string | null
+          on_time: boolean | null
+          required: boolean | null
+          role_id: number | null
+          slot_index: number | null
+          staff_id: string | null
+          staff_name: string | null
+          status: string | null
+          submitted_at: string | null
+          submitted_late: boolean | null
+          week_in_cycle: number | null
+          week_of: string | null
+          weekly_focus_id: string | null
+        }
+        Relationships: []
+      }
       view_weekly_scores_audit: {
         Row: {
           confidence_date: string | null
@@ -2141,6 +2163,22 @@ export type Database = {
           staff_name: string
           tz: string
           week_in_cycle: number
+        }[]
+      }
+      get_staff_submission_windows: {
+        Args: { p_since?: string; p_staff_id: string }
+        Returns: {
+          action_id: number
+          cycle: number
+          due_at: string
+          metric: string
+          on_time: boolean
+          required: boolean
+          slot_index: number
+          status: string
+          submitted_at: string
+          week_in_cycle: number
+          week_of: string
         }[]
       }
       get_staff_summary: {

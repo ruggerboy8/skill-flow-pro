@@ -168,6 +168,7 @@ export async function assembleWeek(params: {
           self_select,
           pro_moves!weekly_plan_action_id_fkey (
             action_statement,
+            intervention_text,
             competencies!fk_pro_moves_competency_id (
               name,
               domains!competencies_domain_id_fkey (
@@ -192,6 +193,7 @@ export async function assembleWeek(params: {
         type: 'site',
         pro_move_id: plan.action_id,
         action_statement: plan.pro_moves?.action_statement || 'Pro Move',
+        intervention_text: plan.pro_moves?.intervention_text || null,
         competency_name: plan.pro_moves?.competencies?.name || 'General',
         domain_name: plan.pro_moves?.competencies?.domains?.domain_name || 'General',
         required: true,
@@ -266,7 +268,7 @@ export async function assembleWeek(params: {
   async function hydrateAction(actionId: number) {
     const { data: pm } = await supabase
       .from('pro_moves')
-      .select('action_id, action_statement, competencies!inner(name, domain_id)')
+      .select('action_id, action_statement, intervention_text, competencies!inner(name, domain_id)')
       .eq('action_id', actionId)
       .maybeSingle();
 
@@ -283,6 +285,7 @@ export async function assembleWeek(params: {
     return {
       pro_move_id: pm?.action_id,
       action_statement: pm?.action_statement || 'Pro Move',
+      intervention_text: pm?.intervention_text || null,
       competency_name: pm?.competencies?.name || 'General',
       domain_name: domainName
     };

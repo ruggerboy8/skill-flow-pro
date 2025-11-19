@@ -19,6 +19,15 @@ import { Label } from '@/components/ui/label';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
 import { useReliableSubmission } from '@/hooks/useReliableSubmission';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Staff {
   id: string;
@@ -36,6 +45,7 @@ interface WeeklyFocus {
   cycle: number;
   week_in_cycle: number;
   domain_name: string;
+  intervention_text?: string | null;
   week_label?: string;
 }
 
@@ -53,6 +63,7 @@ export default function ConfidenceWizard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [hasConfidence, setHasConfidence] = useState(false);
+  const [showIntervention, setShowIntervention] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -173,6 +184,7 @@ export default function ConfidenceWizard() {
               action_id,
               pro_moves!weekly_focus_action_id_fkey ( 
                 action_statement,
+                intervention_text,
                 competencies ( 
                   name,
                   domains!competencies_domain_id_fkey ( domain_name )
@@ -203,6 +215,7 @@ export default function ConfidenceWizard() {
               type: item.self_select ? 'self_select' : 'site',
               display_order: item.display_order,
               action_statement: item.pro_moves?.action_statement || '',
+              intervention_text: item.pro_moves?.intervention_text || null,
               domain_name: domainName,
               required: true,
               locked: false
@@ -220,6 +233,7 @@ export default function ConfidenceWizard() {
               action_id,
               pro_moves!weekly_plan_action_id_fkey ( 
                 action_statement,
+                intervention_text,
                 competencies ( 
                   name,
                   domains!competencies_domain_id_fkey ( domain_name )
@@ -314,6 +328,7 @@ export default function ConfidenceWizard() {
             type: item.self_select ? 'self_select' : 'site',
             display_order: item.display_order,
             action_statement: item.pro_moves?.action_statement || '',
+            intervention_text: item.pro_moves?.intervention_text || null,
             domain_name: domainName,
             required: true,
             locked: false
@@ -392,6 +407,7 @@ export default function ConfidenceWizard() {
         id: assignment.weekly_focus_id,
         display_order: assignment.display_order,
         action_statement: assignment.action_statement || '',
+        intervention_text: assignment.intervention_text || null,
         cycle: cycleNumber || 1,
         week_in_cycle: weekInCycle || 1,
         domain_name: assignment.domain_name,
@@ -474,13 +490,32 @@ export default function ConfidenceWizard() {
     return `${newPath}${currentSearch}`;
   };
 
-  const handleNext = () => {
+  const attemptNext = () => {
+    // Bypass for Repair Mode (History doesn't need coaching)
+    if (isRepair) {
+      proceed();
+      return;
+    }
+
+    const score = currentFocus ? scores[currentFocus.id] : null;
+
+    // Trigger if score is Low (1 or 2)
+    if (score !== null && score <= 2) {
+      setShowIntervention(true);
+    } else {
+      proceed();
+    }
+  };
+
+  const proceed = () => {
     if (currentIndex < weeklyFocus.length - 1) {
       navigate(preserveSearchParams(`/confidence/current/step/${currentIndex + 2}`));
     } else {
       handleSubmit();
     }
   };
+
+  const handleNext = attemptNext; // Keep the old name for compatibility
 
   const handleBack = () => {
     if (currentIndex > 0) {
@@ -798,6 +833,38 @@ export default function ConfidenceWizard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Smart Friction: Intervention Modal */}
+      <AlertDialog open={showIntervention} onOpenChange={setShowIntervention}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              <AlertDialogTitle>Unsure? That's okay.</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base pt-2">
+              You flagged this as 'low confidence'.
+              <br/><br/>
+
+              {/* THE DATABASE DRIVEN CONTENT */}
+              <div className="p-4 bg-amber-50 border border-amber-100 rounded-md text-amber-900 font-medium text-sm leading-relaxed">
+                "{currentFocus?.intervention_text || "Make it a point to ask a Lead or your Manager about this today."}"
+              </div>
+
+              <br/>
+              <strong>Better to ask now than guess later!</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => {
+              setShowIntervention(false);
+              proceed();
+            }}>
+              Will do
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

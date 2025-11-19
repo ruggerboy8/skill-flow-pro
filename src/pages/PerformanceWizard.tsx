@@ -17,6 +17,15 @@ import { useSim } from '@/devtools/SimProvider';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
 import { useReliableSubmission } from '@/hooks/useReliableSubmission';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Assignment {
   weekly_focus_id: string;
@@ -66,6 +75,7 @@ export default function PerformanceWizard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isCarryoverWeek, setIsCarryoverWeek] = useState(false);
+  const [showVictory, setShowVictory] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -466,13 +476,30 @@ export default function PerformanceWizard() {
     return `${newPath}${currentSearch}`;
   };
 
-  const handleNext = () => {
+  const attemptNext = () => {
+    if (!currentFocus) return;
+
+    const perfScore = performanceScores[currentFocus.id]; // Today
+    const confScore = getConfidenceScore(currentFocus.id); // Monday
+
+    // Trigger: Low Start + High Finish
+    // We ALLOW this in Repair Mode because celebrating past wins is good.
+    if (perfScore >= 3 && confScore > 0 && confScore <= 2) {
+      setShowVictory(true);
+    } else {
+      proceed();
+    }
+  };
+
+  const proceed = () => {
     if (currentIndex < weeklyFocus.length - 1) {
       navigate(preserveSearchParams(`/performance/current/step/${currentIndex + 2}`));
     } else {
       handleSubmit();
     }
   };
+
+  const handleNext = attemptNext; // Keep the old name for compatibility
 
   const handleBack = () => {
     if (currentIndex > 0) {
@@ -692,6 +719,31 @@ export default function PerformanceWizard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Smart Friction: Victory Modal */}
+      <AlertDialog open={showVictory} onOpenChange={setShowVictory}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🚀</span>
+              <AlertDialogTitle>That's a Pro Move.</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base">
+              You flagged this as 'low confidence' on Monday and turned it around to a <strong>{performanceScores[currentFocus?.id || '']}</strong> today.
+              <br/><br/>
+              That is exactly the growth we are looking for.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => {
+              setShowVictory(false);
+              proceed();
+            }}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

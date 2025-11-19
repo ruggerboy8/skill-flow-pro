@@ -47,7 +47,14 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
       // Call RPC to get all submission windows (including missing)
       const { data, error } = await supabase.rpc('get_staff_submission_windows', {
         p_staff_id: staffId,
-        p_since: cutoffDate
+      });
+
+      console.debug('OnTimeRateWidget: submission windows', {
+        staffId,
+        cutoffDate,
+        rowCount: data?.length || 0,
+        error: error?.message,
+        sampleRow: data?.[0]
       });
 
       if (error) throw error;

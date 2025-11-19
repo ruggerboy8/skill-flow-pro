@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,8 @@ interface User {
   is_participant: boolean;
   coach_scope_type?: 'org' | 'location' | null;
   coach_scope_id?: string | null;
+  created_at?: string;
+  hire_date?: string | null;
 }
 
 interface EditUserDrawerProps {
@@ -52,6 +55,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const [selectedAction, setSelectedAction] = useState<'participant' | 'lead' | 'coach' | 'coach_participant' | 'super_admin'>('participant');
   const [scopeType, setScopeType] = useState<'org' | 'location'>('org');
   const [scopeIds, setScopeIds] = useState<string[]>([]);
+  const [hireDate, setHireDate] = useState<string>('');
 
   useEffect(() => {
     if (user && open) {
@@ -77,6 +81,9 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         setScopeType('org');
         setScopeIds([]);
       }
+      
+      // Initialize hire date from user data
+      setHireDate(user.hire_date?.slice(0, 10) || user.created_at?.slice(0, 10) || '');
     }
   }, [user, open]);
 
@@ -100,6 +107,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         action: 'role_preset',
         user_id: user.user_id,
         preset: selectedAction,
+        hire_date: hireDate || null,
       };
       
       if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') {
@@ -211,6 +219,20 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 <p className="text-xs text-muted-foreground">{getScopeText()}</p>
               )}
             </div>
+          </div>
+
+          {/* Hire Date */}
+          <div className="space-y-2">
+            <Label htmlFor="hire-date">Hire Date</Label>
+            <Input
+              id="hire-date"
+              type="date"
+              value={hireDate}
+              onChange={(e) => setHireDate(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Submissions become required starting the Monday after hire date + onboarding weeks buffer
+            </p>
           </div>
 
           {/* Action Selection */}

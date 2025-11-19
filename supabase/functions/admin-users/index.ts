@@ -292,7 +292,7 @@ serve(async (req: Request) => {
       }
 
       case "role_preset": {
-        const { user_id, preset, coach_scope_type, coach_scope_ids } = payload ?? {};
+        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date } = payload ?? {};
         
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
@@ -406,9 +406,14 @@ serve(async (req: Request) => {
         }
         
         // Update staff record
+        const updates = { ...config };
+        if (hire_date !== undefined) {
+          updates.hire_date = hire_date;
+        }
+        
         const { data: updatedStaff, error: updateErr } = await admin
           .from("staff")
-          .update(config)
+          .update(updates)
           .eq("user_id", user_id)
           .select("id")
           .maybeSingle();

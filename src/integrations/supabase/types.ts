@@ -993,7 +993,7 @@ export type Database = {
           coach_scope_type: string | null
           created_at: string | null
           email: string
-          hire_date: string | null
+          hire_date: string
           home_route: string | null
           id: string
           is_coach: boolean
@@ -1016,7 +1016,7 @@ export type Database = {
           coach_scope_type?: string | null
           created_at?: string | null
           email: string
-          hire_date?: string | null
+          hire_date?: string
           home_route?: string | null
           id?: string
           is_coach?: boolean
@@ -1039,7 +1039,7 @@ export type Database = {
           coach_scope_type?: string | null
           created_at?: string | null
           email?: string
-          hire_date?: string | null
+          hire_date?: string
           home_route?: string | null
           id?: string
           is_coach?: boolean
@@ -2164,44 +2164,27 @@ export type Database = {
           week_in_cycle: number
         }[]
       }
-      get_staff_submission_windows:
-        | {
-            Args: { p_since?: string; p_staff_id: string }
-            Returns: {
-              action_id: number
-              cycle: number
-              due_at: string
-              metric: string
-              on_time: boolean
-              required: boolean
-              slot_index: number
-              status: string
-              submitted_at: string
-              week_in_cycle: number
-              week_of: string
-            }[]
-          }
-        | {
-            Args: { p_staff_id: string }
-            Returns: {
-              action_id: number
-              cycle_number: number
-              due_at: string
-              location_id: string
-              metric: string
-              on_time: boolean
-              required: boolean
-              role_id: number
-              slot_index: number
-              staff_id: string
-              staff_name: string
-              status: string
-              submitted_at: string
-              submitted_late: boolean
-              week_in_cycle: number
-              week_of: string
-            }[]
-          }
+      get_staff_submission_windows: {
+        Args: { p_staff_id: string }
+        Returns: {
+          action_id: number
+          cycle_number: number
+          due_at: string
+          location_id: string
+          metric: string
+          on_time: boolean
+          required: boolean
+          role_id: number
+          slot_index: number
+          staff_id: string
+          staff_name: string
+          status: string
+          submitted_at: string
+          submitted_late: boolean
+          week_in_cycle: number
+          week_of: string
+        }[]
+      }
       get_staff_summary: {
         Args: never
         Returns: {

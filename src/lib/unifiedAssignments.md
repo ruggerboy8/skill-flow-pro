@@ -67,6 +67,33 @@ All surfaces now use compatible logic that automatically switches between `weekl
 - Shows individual week details with full assignment list
 - Removed hardcoded `weekly_focus` queries
 
+## Participation Start and Onboarding Logic
+
+Staff become eligible for required submissions based on their hire date and onboarding period:
+
+1. **Participation Start**: The Monday following their hire date
+   - Formula: `date_trunc('week', hire_date + 1 day) + 7 days`
+   - Example: Hired on Wednesday → submissions start the following Monday
+
+2. **Eligibility Window**: Participation start + onboarding buffer
+   - Formula: `participation_start_monday + (onboarding_weeks * 7 days)`
+   - Example: 2-week onboarding → required submissions start 2 weeks after participation start
+
+3. **Required Submissions Begin**: The later of:
+   - `eligible_monday` (hire date + 1 week + onboarding buffer)
+   - `location_program_start_monday` (location's program start date)
+
+4. **NULL Handling**:
+   - Missing `hire_date` defaults to `created_at::date`
+   - Missing `onboarding_weeks` defaults to `0` (no buffer)
+   - This ensures all staff have valid participation windows
+
+### Database Fields
+
+- `staff.hire_date`: NOT NULL, defaults to CURRENT_DATE
+- `staff.onboarding_weeks`: Nullable integer (0 if NULL)
+- `staff.created_at`: Fallback for legacy records
+
 ## Last Activity Selection Logic
 
 When determining a staff member's most recent activity, the system:

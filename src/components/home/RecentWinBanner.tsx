@@ -5,6 +5,7 @@ import { TrendingUp, Star, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useStaffProfile } from "@/hooks/useStaffProfile";
 import { getDomainColor } from "@/lib/domainColors";
+import { format, parseISO, isSameWeek, subWeeks } from "date-fns";
 
 interface WinData {
   week_of: string;
@@ -62,6 +63,23 @@ export function RecentWinBanner() {
   // Don't render anything while loading or if no win
   if (loading || !win || !visible) return null;
 
+  // Helper to generate narrative header based on timing
+  const getHeaderNarrative = (dateStr: string, type: 'growth' | 'perfect'): string => {
+    const winDate = parseISO(dateStr);
+    const today = new Date();
+    
+    // Check if win occurred specifically last week (Mon-Sun)
+    // weekStartsOn: 1 means Monday
+    const isLastWeek = isSameWeek(winDate, subWeeks(today, 1), { weekStartsOn: 1 });
+    
+    if (type === 'perfect') {
+      return isLastWeek ? "Your Perfect Week" : "Consistency Streak";
+    }
+    
+    // For Growth wins
+    return isLastWeek ? "Last Week's Breakthrough" : "Recent Growth";
+  };
+
   // Style configuration
   const isGrowth = win.win_type === 'growth';
   
@@ -71,7 +89,7 @@ export function RecentWinBanner() {
     iconColor: "text-emerald-600 dark:text-emerald-400",
     icon: TrendingUp,
     badgeBg: "bg-emerald-200 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100",
-    title: "Growth Detected",
+    title: getHeaderNarrative(win.week_of, 'growth'),
     badgeText: `+${win.lift_amount} LIFT`
   } : {
     bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
@@ -79,7 +97,7 @@ export function RecentWinBanner() {
     iconColor: "text-blue-600 dark:text-blue-400",
     icon: Star,
     badgeBg: "bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-100",
-    title: "Perfect Week",
+    title: getHeaderNarrative(win.week_of, 'perfect'),
     badgeText: "100% SCORE"
   };
   
@@ -96,11 +114,22 @@ export function RecentWinBanner() {
           
           {/* Content */}
           <div className="flex-1 min-w-0 pt-0.5">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              {/* The Human Headline */}
               <span className={`text-xs font-bold uppercase tracking-wider ${styles.iconColor}`}>
                 {styles.title}
               </span>
-              <Badge variant="secondary" className={`text-[10px] h-5 px-1.5 border-0 ${styles.badgeBg}`}>
+              
+              {/* Divider Dot */}
+              <span className="text-[10px] text-muted-foreground">•</span>
+              
+              {/* Date Context (e.g., "Nov 12") */}
+              <span className="text-[10px] font-medium text-muted-foreground">
+                {format(parseISO(win.week_of), "MMM d")}
+              </span>
+              
+              {/* Score Badge (pushed right on mobile, inline on desktop) */}
+              <Badge variant="secondary" className={`text-[10px] h-5 px-1.5 border-0 ml-auto sm:ml-0 ${styles.badgeBg}`}>
                 {styles.badgeText}
               </Badge>
             </div>

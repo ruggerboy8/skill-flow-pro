@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Download, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Upload, Download, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -384,6 +384,16 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
             </div>
           )}
 
+          {loading && step === 'preview' && (
+            <div className="space-y-6 text-center py-12">
+              <Loader2 className="w-16 h-16 text-primary mx-auto animate-spin" />
+              <div>
+                <h3 className="text-lg font-medium mb-2">Processing Upload</h3>
+                <p className="text-muted-foreground">Please wait while we process your pro-moves...</p>
+              </div>
+            </div>
+          )}
+
           {step === 'complete' && results && (
             <div className="space-y-6 text-center">
               <CheckCircle className="w-16 h-16 text-green-600 mx-auto" />
@@ -392,6 +402,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                 <div className="space-y-2">
                   <p>Created: <strong>{(results as any).created || 0}</strong> new pro-moves</p>
                   <p>Updated: <strong>{(results as any).updated || 0}</strong> existing pro-moves</p>
+                  <p>Skipped: <strong>{(results as any).skipped || 0}</strong> deleted IDs</p>
                   {(results as any).errors && (results as any).errors.length > 0 && (
                     <p className="text-red-600">
                       Errors: <strong>{(results as any).errors.length}</strong> rows failed

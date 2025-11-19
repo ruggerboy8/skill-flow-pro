@@ -64,13 +64,6 @@ export type Database = {
             referencedColumns: ["staff_id"]
           },
           {
-            foreignKeyName: "admin_audit_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
-            referencedColumns: ["staff_id"]
-          },
-          {
             foreignKeyName: "admin_audit_scope_location_id_fkey"
             columns: ["scope_location_id"]
             isOneToOne: false
@@ -103,13 +96,6 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "view_evaluation_items_enriched"
-            referencedColumns: ["staff_id"]
-          },
-          {
-            foreignKeyName: "admin_audit_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
             referencedColumns: ["staff_id"]
           },
         ]
@@ -218,13 +204,6 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "view_evaluation_items_enriched"
-            referencedColumns: ["staff_id"]
-          },
-          {
-            foreignKeyName: "coach_scopes_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
             referencedColumns: ["staff_id"]
           },
         ]
@@ -434,13 +413,6 @@ export type Database = {
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
           },
-          {
-            foreignKeyName: "evaluations_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
-            referencedColumns: ["staff_id"]
-          },
         ]
       }
       learning_resources_legacy: {
@@ -612,13 +584,6 @@ export type Database = {
             columns: ["coach_staff_id"]
             isOneToOne: false
             referencedRelation: "view_evaluation_items_enriched"
-            referencedColumns: ["staff_id"]
-          },
-          {
-            foreignKeyName: "manager_priorities_coach_staff_id_fkey"
-            columns: ["coach_staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
             referencedColumns: ["staff_id"]
           },
         ]
@@ -910,13 +875,6 @@ export type Database = {
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
           },
-          {
-            foreignKeyName: "resource_events_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
-            referencedColumns: ["staff_id"]
-          },
         ]
       }
       roles: {
@@ -1173,13 +1131,6 @@ export type Database = {
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
           },
-          {
-            foreignKeyName: "staff_audit_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
-            referencedColumns: ["staff_id"]
-          },
         ]
       }
       staging_prompts: {
@@ -1278,13 +1229,6 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "view_evaluation_items_enriched"
-            referencedColumns: ["staff_id"]
-          },
-          {
-            foreignKeyName: "user_backlog_v2_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
             referencedColumns: ["staff_id"]
           },
         ]
@@ -1546,13 +1490,6 @@ export type Database = {
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
           },
-          {
-            foreignKeyName: "weekly_scores_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
-            referencedColumns: ["staff_id"]
-          },
         ]
       }
       weekly_self_select: {
@@ -1739,36 +1676,7 @@ export type Database = {
           week_in_cycle: number | null
           week_of: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "staff_primary_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "staff_primary_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "v_onboarding_progress"
-            referencedColumns: ["location_id"]
-          },
-          {
-            foreignKeyName: "staff_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "roles"
-            referencedColumns: ["role_id"]
-          },
-          {
-            foreignKeyName: "staff_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "v_onboarding_progress"
-            referencedColumns: ["role_id"]
-          },
-        ]
+        Relationships: []
       }
       view_weekly_scores_audit: {
         Row: {
@@ -1871,13 +1779,6 @@ export type Database = {
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
           },
-          {
-            foreignKeyName: "weekly_scores_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
-            referencedColumns: ["staff_id"]
-          },
         ]
       }
       view_weekly_scores_with_competency: {
@@ -1972,13 +1873,6 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "view_evaluation_items_enriched"
-            referencedColumns: ["staff_id"]
-          },
-          {
-            foreignKeyName: "weekly_scores_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_staff_submission_windows"
             referencedColumns: ["staff_id"]
           },
         ]
@@ -2270,22 +2164,44 @@ export type Database = {
           week_in_cycle: number
         }[]
       }
-      get_staff_submission_windows: {
-        Args: { p_since?: string; p_staff_id: string }
-        Returns: {
-          action_id: number
-          cycle: number
-          due_at: string
-          metric: string
-          on_time: boolean
-          required: boolean
-          slot_index: number
-          status: string
-          submitted_at: string
-          week_in_cycle: number
-          week_of: string
-        }[]
-      }
+      get_staff_submission_windows:
+        | {
+            Args: { p_since?: string; p_staff_id: string }
+            Returns: {
+              action_id: number
+              cycle: number
+              due_at: string
+              metric: string
+              on_time: boolean
+              required: boolean
+              slot_index: number
+              status: string
+              submitted_at: string
+              week_in_cycle: number
+              week_of: string
+            }[]
+          }
+        | {
+            Args: { p_staff_id: string }
+            Returns: {
+              action_id: number
+              cycle_number: number
+              due_at: string
+              location_id: string
+              metric: string
+              on_time: boolean
+              required: boolean
+              role_id: number
+              slot_index: number
+              staff_id: string
+              staff_name: string
+              status: string
+              submitted_at: string
+              submitted_late: boolean
+              week_in_cycle: number
+              week_of: string
+            }[]
+          }
       get_staff_summary: {
         Args: never
         Returns: {

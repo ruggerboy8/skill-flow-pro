@@ -45,7 +45,6 @@ export async function computeStaffStatusNew(
     id: string;
     role_id: number;
     hire_date?: string | null;
-    onboarding_weeks: number;
     primary_location_id?: string | null;
   },
   now?: Date

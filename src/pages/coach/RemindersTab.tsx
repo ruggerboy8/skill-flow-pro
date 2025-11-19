@@ -19,7 +19,6 @@ interface StaffMember {
   role_id: number;
   user_id: string;
   hire_date?: string | null;
-  onboarding_weeks: number;
   primary_location_id?: string | null;
 }
 
@@ -142,7 +141,7 @@ export default function RemindersTab() {
       const { data: staffRows, error: staffErr } = await supabase
         .from('staff')
         .select(`
-          id, name, email, user_id, role_id, is_participant, onboarding_weeks,
+          id, name, email, user_id, role_id, is_participant,
           locations:primary_location_id(id, name, timezone, organization_id,
             organizations!locations_organization_id_fkey(id, name)
           ),
@@ -168,7 +167,6 @@ export default function RemindersTab() {
           role_name: s.roles?.role_name || 'Unknown',
           location_name: s.locations?.name || 'Unknown',
           org_name: s.locations?.organizations?.name || 'Unknown',
-          onboarding_weeks: s.onboarding_weeks || 0,
         };
       });
 
@@ -226,7 +224,6 @@ export default function RemindersTab() {
             email: m.email,
             role_id: m.role_id,
             user_id: m.user_id,
-            onboarding_weeks: m.onboarding_weeks,
           });
         }
 
@@ -237,7 +234,6 @@ export default function RemindersTab() {
             email: m.email,
             role_id: m.role_id,
             user_id: m.user_id,
-            onboarding_weeks: m.onboarding_weeks,
           });
         }
       }
@@ -254,7 +250,6 @@ export default function RemindersTab() {
         email: m.email,
         role_id: m.role_id,
         user_id: m.user_id,
-        onboarding_weeks: m.onboarding_weeks,
       })));
       setConfidenceList(withEmail(needConfidence));
       setPerformanceList(withEmail(needPerformance));
@@ -303,7 +298,6 @@ export default function RemindersTab() {
       name: newName.trim() || newEmail.split('@')[0],
       email: newEmail.trim(),
       role_id: 0,
-      onboarding_weeks: 0,
     };
 
     setRecipients(prev => [...prev, recipient]);

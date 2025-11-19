@@ -112,8 +112,8 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
 
   const downloadCurrentLibrary = async () => {
     try {
-      // Fetch all pro_moves with their role and competency names
-      const { data, error } = await supabase
+      // Fetch pro_moves with their role and competency names, respecting active filter
+      let query = supabase
         .from('pro_moves')
         .select(`
           action_id,
@@ -124,8 +124,14 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
           active,
           roles!fk_pro_moves_role_id(role_name),
           competencies!fk_pro_moves_competency_id(name)
-        `)
-        .order('action_id');
+        `);
+
+      // Filter by active status if enabled
+      if (showActiveOnly) {
+        query = query.eq('active', true);
+      }
+
+      const { data, error } = await query.order('action_id');
 
       if (error) throw error;
 

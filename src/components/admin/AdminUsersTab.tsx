@@ -35,6 +35,7 @@ interface User {
   is_participant: boolean;
   coach_scope_type?: 'org' | 'location' | null;
   coach_scope_id?: string | null;
+  hire_date?: string | null;
 }
 
 interface Role {

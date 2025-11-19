@@ -146,63 +146,111 @@ export default function PerformanceWizard() {
       // For repair mode, load specific cycle/week assignments
       console.log('Loading repair data for cycle/week:', { targetCycle, targetWeek });
       
-      // Use a better query that gets domain info through pro_moves
-      const { data: focusData } = await supabase
-        .from('weekly_focus')
-        .select(`
-          id,
-          display_order,
-          competency_id,
-          self_select,
-          cycle,
-          week_in_cycle,
-          action_id,
-          pro_moves!weekly_focus_action_id_fkey ( 
-            action_statement,
+      // Determine if this is a focus (cycles 1-3) or plan (cycle 4+) week
+      const isOnboarding = targetCycle <= 3;
+      
+      if (isOnboarding) {
+        // Query weekly_focus for cycles 1-3
+        const { data: focusData } = await supabase
+          .from('weekly_focus')
+          .select(`
+            id,
+            display_order,
+            competency_id,
+            self_select,
+            cycle,
+            week_in_cycle,
+            action_id,
+            pro_moves!weekly_focus_action_id_fkey ( 
+              action_statement,
+              competencies ( 
+                name,
+                domains!competencies_domain_id_fkey ( domain_name )
+              )
+            ),
             competencies ( 
               name,
               domains!competencies_domain_id_fkey ( domain_name )
             )
-          ),
-          competencies ( 
-            name,
-            domains!competencies_domain_id_fkey ( domain_name )
-          )
-        `)
-        .eq('role_id', staffData.role_id)
-        .eq('cycle', targetCycle)
-        .eq('week_in_cycle', targetWeek)
-        .order('display_order');
+          `)
+          .eq('role_id', staffData.role_id)
+          .eq('cycle', targetCycle)
+          .eq('week_in_cycle', targetWeek)
+          .order('display_order');
 
-      console.log('Repair query result:', { focusData, focusError: null });
+        console.log('Repair query result (focus):', { focusData });
 
-      weekAssignments = (focusData || []).map((item: any) => {
-        // Get domain from pro_moves or competencies
-        let domainName = 'Unknown';
-        if (item.pro_moves?.competencies?.domains?.domain_name) {
-          domainName = item.pro_moves.competencies.domains.domain_name;
-        } else if (item.competencies?.domains?.domain_name) {
-          domainName = item.competencies.domains.domain_name;
+        weekAssignments = (focusData || []).map((item: any) => {
+          let domainName = 'Unknown';
+          if (item.pro_moves?.competencies?.domains?.domain_name) {
+            domainName = item.pro_moves.competencies.domains.domain_name;
+          } else if (item.competencies?.domains?.domain_name) {
+            domainName = item.competencies.domains.domain_name;
+          }
+
+          return {
+            weekly_focus_id: item.id,
+            type: item.self_select ? 'self_select' : 'site',
+            display_order: item.display_order,
+            action_statement: item.pro_moves?.action_statement || '',
+            domain_name: domainName,
+            required: true,
+            locked: false
+          };
+        });
+      } else {
+        // Query weekly_plan for cycle 4+
+        const weekOf = qs.get('weekOf');
+        if (!weekOf) {
+          throw new Error('weekOf required for plan repair');
         }
+        
+        const { data: planData } = await supabase
+          .from('weekly_plan')
+          .select(`
+            id,
+            display_order,
+            competency_id,
+            self_select,
+            action_id,
+            pro_moves!weekly_plan_action_id_fkey ( 
+              action_statement,
+              competencies ( 
+                name,
+                domains!competencies_domain_id_fkey ( domain_name )
+              )
+            ),
+            competencies ( 
+              name,
+              domains!competencies_domain_id_fkey ( domain_name )
+            )
+          `)
+          .eq('role_id', staffData.role_id)
+          .eq('week_start_date', weekOf)
+          .eq('status', 'locked')
+          .order('display_order');
 
-        return {
-          weekly_focus_id: item.id,
-          type: item.self_select ? 'self_select' : 'site',
-          display_order: item.display_order,
-          action_statement: item.pro_moves?.action_statement || '',
-          domain_name: domainName,
-          required: true,
-          locked: false
-        };
-      });
-      
-      // Debug domain data
-      console.log('Domain data in repair mode:', focusData?.map(f => ({
-        id: f.id,
-        action_statement: f.pro_moves?.action_statement,
-        domain_from_pro_moves: f.pro_moves?.competencies?.domains?.domain_name,
-        domain_from_competencies: f.competencies?.domains?.domain_name
-      })));
+        console.log('Repair query result (plan):', { planData });
+
+        weekAssignments = (planData || []).map((item: any) => {
+          let domainName = 'Unknown';
+          if (item.pro_moves?.competencies?.domains?.domain_name) {
+            domainName = item.pro_moves.competencies.domains.domain_name;
+          } else if (item.competencies?.domains?.domain_name) {
+            domainName = item.competencies.domains.domain_name;
+          }
+
+          return {
+            weekly_focus_id: `plan:${item.id}`,
+            type: item.self_select ? 'self_select' : 'site',
+            display_order: item.display_order,
+            action_statement: item.pro_moves?.action_statement || '',
+            domain_name: domainName,
+            required: true,
+            locked: false
+          };
+        });
+      }
       
       console.log('repair mode assignments', weekAssignments);
       console.log('cycle info:', { cycleNumber: targetCycle, weekInCycle: targetWeek });

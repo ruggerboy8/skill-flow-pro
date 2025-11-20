@@ -132,7 +132,7 @@ export function RecentWinBanner() {
             </div>
             
             <div className="flex-1 min-w-0 pt-0.5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <h3 className={`text-sm font-bold ${theme.textTitle} tracking-tight`}>
                   {narrative.headline}
                 </h3>

@@ -843,16 +843,10 @@ export default function ConfidenceWizard() {
               <AlertDialogTitle>Unsure? That's okay.</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-base pt-2">
-              You flagged this as 'low confidence'.
-              <br/><br/>
-
               {/* THE DATABASE DRIVEN CONTENT */}
               <div className="p-4 bg-amber-50 border border-amber-100 rounded-md text-amber-900 font-medium text-sm leading-relaxed">
                 "{currentFocus?.intervention_text || "Make it a point to ask a Lead or your Manager about this today."}"
               </div>
-
-              <br/>
-              <strong>Better to ask now than guess later!</strong>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

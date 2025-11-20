@@ -63,103 +63,112 @@ export function RecentWinBanner() {
   // Don't render anything while loading or if no win
   if (loading || !win || !visible) return null;
 
-  // Helper to generate narrative header based on timing
-  const getHeaderNarrative = (dateStr: string, type: 'growth' | 'perfect'): string => {
-    const winDate = parseISO(dateStr);
+  // Helper to generate full narrative package
+  const getWinNarrative = (win: WinData) => {
+    const date = parseISO(win.week_of);
     const today = new Date();
-    
-    // Check if win occurred specifically last week (Mon-Sun)
-    // weekStartsOn: 1 means Monday
-    const isLastWeek = isSameWeek(winDate, subWeeks(today, 1), { weekStartsOn: 1 });
-    
-    if (type === 'perfect') {
-      return isLastWeek ? "Your Perfect Week" : "Consistency Streak";
+    const isLastWeek = isSameWeek(date, subWeeks(today, 1), { weekStartsOn: 1 });
+    const timeLabel = isLastWeek ? "Last Week" : "Recent History";
+
+    // 1. PERFECT WEEK (Maintenance)
+    if (win.win_type === 'perfect') {
+      return {
+        headline: isLastWeek ? "Your Perfect Week" : "Consistency Streak",
+        badge: "Solid Gold",
+        context: "You maintained our highest standard across the board.",
+        color: "blue",
+        timeLabel
+      };
     }
-    
-    // For Growth wins
-    return isLastWeek ? "Last Week's Breakthrough" : "Recent Growth";
+
+    // 2. BIG GROWTH (+2 or more)
+    if (win.lift_amount >= 2) {
+      return {
+        headline: "Breakthrough",
+        badge: "Level Up",
+        context: "You flagged this as a gap on Monday and closed it by Friday:",
+        color: "emerald",
+        timeLabel
+      };
+    }
+
+    // 3. SMALL GROWTH (+1)
+    return {
+      headline: "Trending Up",
+      badge: "Progress",
+      context: "You are building real confidence in this area:",
+      color: "emerald",
+      timeLabel
+    };
   };
 
-  // Style configuration
-  const isGrowth = win.win_type === 'growth';
-  
-  const styles = isGrowth ? {
-    bg: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800",
-    iconBg: "bg-emerald-100 dark:bg-emerald-900",
-    iconColor: "text-emerald-600 dark:text-emerald-400",
-    icon: TrendingUp,
-    badgeBg: "bg-emerald-200 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100",
-    title: getHeaderNarrative(win.week_of, 'growth'),
-    badgeText: `+${win.lift_amount} LIFT`
+  // Get narrative and theme
+  const narrative = getWinNarrative(win);
+  const isEmerald = narrative.color === 'emerald';
+
+  const theme = isEmerald ? {
+    cardBorder: "border-emerald-200 bg-emerald-50/50",
+    iconBox: "bg-emerald-100 text-emerald-700",
+    textTitle: "text-emerald-800",
+    badge: "bg-emerald-200 text-emerald-800 border-emerald-200",
+    Icon: TrendingUp
   } : {
-    bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
-    iconBg: "bg-blue-100 dark:bg-blue-900",
-    iconColor: "text-blue-600 dark:text-blue-400",
-    icon: Star,
-    badgeBg: "bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-100",
-    title: getHeaderNarrative(win.week_of, 'perfect'),
-    badgeText: "100% SCORE"
+    cardBorder: "border-blue-200 bg-blue-50/50",
+    iconBox: "bg-blue-100 text-blue-700",
+    textTitle: "text-blue-800",
+    badge: "bg-blue-200 text-blue-800 border-blue-200",
+    Icon: Star
   };
-  
-  const Icon = styles.icon;
 
   return (
-    <div className="animate-in slide-in-from-top-2 duration-500 fade-in">
-      <Card className={`relative border shadow-sm overflow-hidden ${styles.bg}`}>
-        <CardContent className="p-4 flex gap-3 items-start">
-          {/* Icon */}
-          <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${styles.iconBg}`}>
-            <Icon className={`h-5 w-5 ${styles.iconColor}`} />
-          </div>
+    <div className="mb-6 animate-in slide-in-from-top-2 duration-500 fade-in">
+      <Card className={`relative border shadow-sm overflow-hidden ${theme.cardBorder}`}>
+        <CardContent className="p-4">
           
-          {/* Content */}
-          <div className="flex-1 min-w-0 pt-0.5">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              {/* The Human Headline */}
-              <span className={`text-xs font-bold uppercase tracking-wider ${styles.iconColor}`}>
-                {styles.title}
-              </span>
-              
-              {/* Divider Dot */}
-              <span className="text-[10px] text-muted-foreground">•</span>
-              
-              {/* Date Context (e.g., "Nov 12") */}
-              <span className="text-[10px] font-medium text-muted-foreground">
-                {format(parseISO(win.week_of), "MMM d")}
-              </span>
-              
-              {/* Score Badge (pushed right on mobile, inline on desktop) */}
-              <Badge variant="secondary" className={`text-[10px] h-5 px-1.5 border-0 ml-auto sm:ml-0 ${styles.badgeBg}`}>
-                {styles.badgeText}
-              </Badge>
+          {/* 1. Header Row: Icon | Headline | Badge */}
+          <div className="flex items-start gap-3 mb-3">
+            <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${theme.iconBox}`}>
+              <theme.Icon className="h-4 w-4" />
             </div>
             
-            <p className="text-sm text-foreground font-medium leading-tight line-clamp-2">
-              {win.action_statement}
-            </p>
-            
-            {/* Domain tag (only for growth) */}
-            {isGrowth && win.domain_name && (
-              <div className="mt-2 flex items-center gap-1">
-                <div 
-                  className="h-1.5 w-1.5 rounded-full" 
-                  style={{ backgroundColor: getDomainColor(win.domain_name) }}
-                />
-                <span className="text-[10px] text-muted-foreground uppercase font-medium">
-                  {win.domain_name}
-                </span>
+            <div className="flex-1 min-w-0 pt-0.5">
+              <div className="flex items-center justify-between">
+                <h3 className={`text-sm font-bold ${theme.textTitle} tracking-tight`}>
+                  {narrative.headline}
+                </h3>
+                <Badge variant="secondary" className={`text-[10px] px-1.5 h-5 font-bold ${theme.badge}`}>
+                  {narrative.badge}
+                </Badge>
               </div>
-            )}
+              <p className="text-[10px] text-muted-foreground font-medium">
+                {narrative.timeLabel} • {format(parseISO(win.week_of), "MMM d")}
+              </p>
+            </div>
           </div>
 
-          {/* Dismiss button */}
+          {/* 2. The "Why" (Context) */}
+          <div className="space-y-2">
+            <p className="text-xs text-slate-600 leading-snug">
+              {narrative.context}
+            </p>
+            
+            {/* 3. The "What" (Pro Move Quote) */}
+            <div className="p-3 bg-white/80 rounded-md border border-black/5 shadow-sm">
+              <p className="text-sm font-medium text-slate-800 leading-snug line-clamp-2 italic">
+                "{win.action_statement}"
+              </p>
+            </div>
+          </div>
+
+          {/* Dismiss Button */}
           <button 
             onClick={handleDismiss}
-            className="text-muted-foreground hover:text-foreground transition-colors -mt-1 -mr-1 p-1"
+            className="absolute top-1 right-1 p-2 text-slate-400 hover:text-slate-600"
             aria-label="Dismiss celebration"
           >
             <X className="h-4 w-4" />
           </button>
+
         </CardContent>
       </Card>
     </div>

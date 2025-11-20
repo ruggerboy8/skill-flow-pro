@@ -1,14 +1,14 @@
 # Pro-Moves Bulk Upload Template
 # Required columns: role_name, competency_name, text
-# Optional columns: action_id, description, resources_url, intervention_text, active
+# Optional columns: action_id, description, resources_url, intervention_text, script, active
 #
 # IMPORTANT: Leave action_id blank for NEW pro-moves. 
 # Fill action_id when UPDATING existing pro-moves (download current library to get IDs).
 # If action_id is provided, it MUST exist in the database or the row will error.
 
-action_id,role_name,competency_name,text,description,resources_url,intervention_text,active
-,"DFI","Effective Objection Handling","Handle patient concerns professionally, addressing their specific needs","Coach notes here","https://example.com/training","Example intervention text","true"
-,"DFI","Establishing Credibility","Build trust with patients through professional communication","","","","true"
+action_id,role_name,competency_name,text,description,resources_url,intervention_text,script,active
+,"DFI","Effective Objection Handling","Handle patient concerns professionally, addressing their specific needs","Coach notes here","https://example.com/training","Example intervention text","Example script for audio narration","true"
+,"DFI","Establishing Credibility","Build trust with patients through professional communication","","","","","true"
 ,"DFI","Facilitating Smooth Processes","Ensure seamless patient experience, coordinating all touchpoints","","","","true"
 ,"DFI","Treatment Communication","Clearly explain treatment options, including benefits and risks","","","","true"
 ,"DFI","Communication Balancing","Balance multiple communication priorities throughout the day","","","","true"

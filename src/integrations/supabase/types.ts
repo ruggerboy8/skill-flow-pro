@@ -1951,33 +1951,19 @@ export type Database = {
           out_win_type: string
         }[]
       }
-      get_calendar_week_status:
-        | {
-            Args: { p_role_id: number; p_staff_id: string }
-            Returns: {
-              conf_count: number
-              cycle: number
-              is_current_week: boolean
-              perf_count: number
-              source: string
-              total: number
-              week_in_cycle: number
-              week_of: string
-            }[]
-          }
-        | {
-            Args: { p_role_id: number; p_staff_id: string }
-            Returns: {
-              conf_count: number
-              cycle: number
-              is_current_week: boolean
-              perf_count: number
-              source: string
-              total: number
-              week_in_cycle: number
-              week_of: string
-            }[]
-          }
+      get_calendar_week_status: {
+        Args: { p_role_id: number; p_staff_id: string }
+        Returns: {
+          conf_count: number
+          cycle: number
+          is_current_week: boolean
+          perf_count: number
+          source: string
+          total: number
+          week_in_cycle: number
+          week_of: string
+        }[]
+      }
       get_calibration: {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json

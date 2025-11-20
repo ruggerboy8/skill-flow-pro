@@ -93,9 +93,9 @@ export function ProMoveLibrary() {
 
   const downloadTemplate = () => {
     const competencyNames = competencies.map(c => c.name).join('", "');
-    const csvContent = `role_name,competency_name,text,description,resources_url,intervention_text,active
-DFI,"Example Competency","Example pro-move text","Optional description","Optional URL","Optional intervention text",true
-RDA,"Example Competency","Example pro-move text","Optional description","Optional URL","Optional intervention text",true
+    const csvContent = `role_name,competency_name,text,description,resources_url,intervention_text,script,active
+DFI,"Example Competency","Example pro-move text","Optional description","Optional URL","Optional intervention text","Optional script for audio",true
+RDA,"Example Competency","Example pro-move text","Optional description","Optional URL","Optional intervention text","Optional script for audio",true
 
 # Available competency names: "${competencyNames}"`;
 
@@ -131,11 +131,11 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
         query = query.eq('active', true);
       }
 
-      const { data, error } = await query.order('action_id');
+      const { data: proMovesData, error } = await query.order('action_id');
 
       if (error) throw error;
 
-      if (!data || data.length === 0) {
+      if (!proMovesData || proMovesData.length === 0) {
         toast({
           title: "No data",
           description: "No pro-moves found to download.",
@@ -143,8 +143,21 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
         return;
       }
 
+      // Fetch script resources for all pro-moves
+      const actionIds = proMovesData.map(pm => pm.action_id);
+      const { data: scriptResources } = await supabase
+        .from('pro_move_resources')
+        .select('action_id, content_md')
+        .eq('type', 'script')
+        .in('action_id', actionIds);
+
+      // Create a map of action_id to script content
+      const scriptMap = new Map(
+        (scriptResources || []).map(r => [r.action_id, r.content_md])
+      );
+
       // Format data for CSV
-      const csvRows = data.map(pm => ({
+      const csvRows = proMovesData.map(pm => ({
         action_id: pm.action_id,
         role_name: (pm.roles as any)?.role_name || '',
         competency_name: (pm.competencies as any)?.name || '',
@@ -152,11 +165,12 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
         description: pm.description || '',
         resources_url: pm.resources_url || '',
         intervention_text: pm.intervention_text || '',
+        script: scriptMap.get(pm.action_id) || '',
         active: pm.active ? 'true' : 'false'
       }));
 
       // Generate CSV content
-      const headers = ['action_id', 'role_name', 'competency_name', 'text', 'description', 'resources_url', 'intervention_text', 'active'];
+      const headers = ['action_id', 'role_name', 'competency_name', 'text', 'description', 'resources_url', 'intervention_text', 'script', 'active'];
       const csvContent = [
         headers.join(','),
         ...csvRows.map(row => 
@@ -184,7 +198,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
 
       toast({
         title: "Download complete",
-        description: `Downloaded ${data.length} pro-moves.`,
+        description: `Downloaded ${proMovesData.length} pro-moves.`,
       });
     } catch (error: any) {
       console.error('Error downloading library:', error);

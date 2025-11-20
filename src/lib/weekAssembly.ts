@@ -10,6 +10,7 @@ export interface WeekAssignment {
   action_statement: string;
   domain_name: string;
   intervention_text?: string | null;
+  intervention_text?: string | null;
   required: boolean;
   locked: boolean;
   backlog_id?: string;

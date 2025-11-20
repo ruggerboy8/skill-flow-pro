@@ -1944,11 +1944,11 @@ export type Database = {
       get_best_weekly_win: {
         Args: { p_staff_id: string }
         Returns: {
-          action_statement: string
-          domain_name: string
-          lift_amount: number
-          week_of: string
-          win_type: string
+          out_action_statement: string
+          out_domain_name: string
+          out_lift_amount: number
+          out_week_of: string
+          out_win_type: string
         }[]
       }
       get_calendar_week_status: {

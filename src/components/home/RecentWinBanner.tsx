@@ -8,11 +8,11 @@ import { getDomainColor } from "@/lib/domainColors";
 import { format, parseISO, isSameWeek, subWeeks } from "date-fns";
 
 interface WinData {
-  week_of: string;
-  action_statement: string;
-  domain_name: string;
-  lift_amount: number;
-  win_type: 'growth' | 'perfect';
+  out_week_of: string;
+  out_action_statement: string;
+  out_domain_name: string;
+  out_lift_amount: number;
+  out_win_type: 'growth' | 'perfect';
 }
 
 export function RecentWinBanner() {
@@ -65,13 +65,13 @@ export function RecentWinBanner() {
 
   // Helper to generate full narrative package
   const getWinNarrative = (win: WinData) => {
-    const date = parseISO(win.week_of);
+    const date = parseISO(win.out_week_of);
     const today = new Date();
     const isLastWeek = isSameWeek(date, subWeeks(today, 1), { weekStartsOn: 1 });
     const timeLabel = isLastWeek ? "Last Week" : "Recent History";
 
     // 1. PERFECT WEEK (Maintenance)
-    if (win.win_type === 'perfect') {
+    if (win.out_win_type === 'perfect') {
       return {
         headline: isLastWeek ? "Your Perfect Week" : "Consistency Streak",
         badge: "Solid Gold",
@@ -82,7 +82,7 @@ export function RecentWinBanner() {
     }
 
     // 2. BIG GROWTH (+2 or more)
-    if (win.lift_amount >= 2) {
+    if (win.out_lift_amount >= 2) {
       return {
         headline: "Breakthrough",
         badge: "Level Up",
@@ -141,7 +141,7 @@ export function RecentWinBanner() {
                 </Badge>
               </div>
               <p className="text-[10px] text-muted-foreground font-medium">
-                {narrative.timeLabel} • {format(parseISO(win.week_of), "MMM d")}
+                {narrative.timeLabel} • {format(parseISO(win.out_week_of), "MMM d")}
               </p>
             </div>
           </div>
@@ -155,7 +155,7 @@ export function RecentWinBanner() {
             {/* 3. The "What" (Pro Move Quote) */}
             <div className="p-3 bg-white/80 rounded-md border border-black/5 shadow-sm">
               <p className="text-sm font-medium text-slate-800 leading-snug line-clamp-2 italic">
-                "{win.action_statement}"
+                "{win.out_action_statement}"
               </p>
             </div>
           </div>

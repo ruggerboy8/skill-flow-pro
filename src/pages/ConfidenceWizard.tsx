@@ -799,7 +799,7 @@ export default function ConfidenceWizard() {
                   )}
                 </div>
               ) : (
-                <p className="text-sm font-medium text-gray-900">{currentFocus.action_statement}</p>
+                <p className="text-lg md:text-xl font-medium leading-relaxed text-slate-800 tracking-tight">{currentFocus.action_statement}</p>
               )}
             </div>
 
@@ -844,8 +844,13 @@ export default function ConfidenceWizard() {
             </div>
             <AlertDialogDescription className="text-base pt-2">
               {/* THE DATABASE DRIVEN CONTENT */}
-              <div className="p-4 bg-amber-50 border border-amber-100 rounded-md text-amber-900 font-medium text-sm leading-relaxed">
-                "{currentFocus?.intervention_text || "Make it a point to ask a Lead or your Manager about this today."}"
+              <div className="mt-4 mb-4 p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-r-md shadow-sm">
+                <div className="flex gap-3">
+                  <span className="text-2xl select-none">💡</span>
+                  <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                    "{currentFocus?.intervention_text || "Make it a point to ask a Lead or your Manager about this today."}"
+                  </p>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

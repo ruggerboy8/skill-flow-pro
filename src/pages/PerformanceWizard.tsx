@@ -683,7 +683,7 @@ export default function PerformanceWizard() {
                   </Badge>
                 )}
               </div>
-              <p className="text-sm font-medium mb-2 text-gray-900">{currentFocus.action_statement}</p>
+              <p className="text-lg md:text-xl font-medium leading-relaxed text-slate-800 tracking-tight mb-2">{currentFocus.action_statement}</p>
               <Badge variant="secondary" className="text-xs bg-white text-gray-900">
                 Your confidence: {getConfidenceScore(currentFocus.id)}
               </Badge>

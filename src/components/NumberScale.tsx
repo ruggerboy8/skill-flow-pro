@@ -30,21 +30,29 @@ export default function NumberScale({ value, onChange, disabled, hideTips }: Num
     setPersistentTooltip(score);
   };
 
+  const getSemanticColor = (num: number, isSelected: boolean) => {
+    if (!isSelected) return "hover:bg-slate-50 border-slate-200 text-slate-600";
+    
+    switch(num) {
+      case 1: return "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200";
+      case 2: return "bg-orange-100 border-orange-300 text-orange-800 hover:bg-orange-200";
+      case 3: return "bg-blue-100 border-blue-300 text-blue-800 hover:bg-blue-200";
+      case 4: return "bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-200";
+      default: return "bg-primary text-primary-foreground";
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-2">
         {[1, 2, 3, 4].map((score) => (
           <Button
             key={score}
-            variant={value === score ? "default" : "outline"}
+            variant="outline"
             onClick={() => handleClick(score)}
             disabled={disabled}
             aria-label={`${score === 4 ? 'Confidence' : 'Performance'} ${score} – ${tooltipText[score as keyof typeof tooltipText]}`}
-            className={`h-12 text-lg font-semibold ${
-              value === score 
-                ? 'bg-primary text-primary-foreground' 
-                : 'hover:bg-accent hover:text-accent-foreground'
-            }`}
+            className={`h-12 w-full text-lg font-semibold transition-all ${getSemanticColor(score, value === score)}`}
           >
             {score}
           </Button>

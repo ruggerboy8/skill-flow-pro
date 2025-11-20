@@ -203,6 +203,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
         description: row.data.description || null,
         resources_url: row.data.resources_url || null,
         intervention_text: row.data.intervention_text || null,
+        script: row.data.script || null,
         active: row.data.active === 'false' ? false : true
       }));
 

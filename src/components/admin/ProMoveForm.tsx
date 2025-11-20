@@ -51,7 +51,6 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
     role_id: '',
     competency_id: '',
     action_statement: '',
-    description: '',
     resources_url: ''
   });
   const [filteredCompetencies, setFilteredCompetencies] = useState<Competency[]>(competencies);
@@ -62,7 +61,6 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
         role_id: proMove.role_id?.toString() || '',
         competency_id: proMove.competency_id?.toString() || '',
         action_statement: proMove.action_statement || '',
-        description: proMove.description || '',
         resources_url: proMove.resources_url || ''
       });
     } else if (selectedRole && selectedRole !== 'all') {
@@ -164,7 +162,6 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
         role_id: parseInt(formData.role_id),
         competency_id: parseInt(formData.competency_id),
         action_statement: formData.action_statement.trim(),
-        description: formData.description.trim() || null,
         resources_url: formData.resources_url.trim() || null,
         active: true
       };
@@ -275,17 +272,6 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
               value={formData.action_statement}
               onChange={(e) => setFormData({ ...formData, action_statement: e.target.value })}
               rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Optional coach notes or description..."
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={2}
             />
           </div>
 

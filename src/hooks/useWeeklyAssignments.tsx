@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 
 export interface WeeklyAssignment {
   id: string;
@@ -34,13 +35,89 @@ export function useWeeklyAssignments({
   weekInCycle,
   enabled = true,
 }: UseWeeklyAssignmentsParams) {
+  const v2Enabled = useWeeklyAssignmentsV2Enabled;
+
   return useQuery({
-    queryKey: ['weekly-assignments', roleId, cycle, weekInCycle],
+    queryKey: ['weekly-assignments', roleId, cycle, weekInCycle, v2Enabled],
     queryFn: async () => {
       if (!roleId) {
         throw new Error('Role ID is required');
       }
 
+      // ========== PHASE 2: DUAL-READ PATH ==========
+      if (v2Enabled) {
+        console.log('🚀 [useWeeklyAssignments] Using weekly_assignments V2 (feature flag ON)');
+        
+        // Calculate current Monday for week_start_date query
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const thisMonday = new Date(now);
+        thisMonday.setDate(now.getDate() + daysToMonday);
+        thisMonday.setHours(0, 0, 0, 0);
+        const mondayStr = thisMonday.toISOString().split('T')[0];
+
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('weekly_assignments')
+          .select(`
+            id,
+            action_id,
+            display_order,
+            self_select,
+            competency_id,
+            source,
+            pro_moves!weekly_assignments_action_id_fkey (
+              action_id,
+              action_statement,
+              competency_id,
+              competencies!pro_moves_competency_id_fkey (
+                competency_id,
+                name,
+                domain_id,
+                domains!competencies_domain_id_fkey (
+                  domain_id,
+                  domain_name
+                )
+              )
+            ),
+            competencies!weekly_assignments_competency_id_fkey (
+              competency_id,
+              name,
+              domain_id,
+              domains!competencies_domain_id_fkey (
+                domain_id,
+                domain_name
+              )
+            )
+          `)
+          .eq('role_id', roleId)
+          .eq('week_start_date', mondayStr)
+          .eq('status', 'locked')
+          .is('superseded_at', null)
+          .order('display_order');
+
+        if (assignmentsError) {
+          throw assignmentsError;
+        }
+
+        console.log(`📊 [useWeeklyAssignments V2] Found ${assignmentsData?.length || 0} assignments for ${mondayStr}`);
+
+        const mappedData = (assignmentsData || []).map((item: any) => ({
+          id: `assign:${item.id}`,
+          action_id: item.action_id,
+          display_order: item.display_order,
+          self_select: item.self_select,
+          competency_id: item.pro_moves?.competency_id || item.competency_id,
+          competency_name: item.pro_moves?.competencies?.name || item.competencies?.name,
+          domain_name: item.pro_moves?.competencies?.domains?.domain_name || item.competencies?.domains?.domain_name,
+          action_statement: item.pro_moves?.action_statement || '',
+        }));
+
+        return mappedData as WeeklyAssignment[];
+      }
+
+      // ========== LEGACY PATH (default) ==========
+      console.log('📚 [useWeeklyAssignments] Using legacy weekly_plan/weekly_focus (V2 flag OFF)');
       let focusData: any[] | null = null;
 
       // Calculate current Monday for weekly_plan query

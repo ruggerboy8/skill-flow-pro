@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { getDomainColor } from '@/lib/domainColors';
 import { format } from 'date-fns';
+import { useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 
 interface WeeklyFocus {
   id: string;
@@ -48,6 +49,7 @@ export default function Week() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const params = useParams();
+  const v2Enabled = useWeeklyAssignmentsV2Enabled;
 
   // ---------- load staff + choose default week ----------
   useEffect(() => {
@@ -156,12 +158,13 @@ export default function Week() {
     console.log('=== WEEK.TSX DEBUG ===');
     console.log('Loading week data for:', { cycle, weekInCycle, staffRoleId: staff.role_id, userId: user!.id });
     
-    // Try weekly_plan first (for orgs with sequencer)
-    const orgId = staff.locations?.organization_id;
     let focusData: any[] | null = null;
     let focusError: any = null;
-    
-    if (orgId) {
+
+    // ========== PHASE 2: DUAL-READ PATH ==========
+    if (v2Enabled) {
+      console.log('🚀 [Week.tsx] Using weekly_assignments V2 (feature flag ON)');
+      
       // Calculate current Monday
       const now = new Date();
       const dayOfWeek = now.getDay();
@@ -171,20 +174,19 @@ export default function Week() {
       thisMonday.setHours(0, 0, 0, 0);
       const mondayStr = thisMonday.toISOString().split('T')[0];
 
-      console.log('Attempting weekly_plan query:', { orgId, roleId: staff.role_id, mondayStr });
-      
-      const { data: planData, error: planError } = await supabase
-        .from('weekly_plan')
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('weekly_assignments')
         .select(`
           id,
           display_order,
           action_id,
           competency_id,
           self_select,
-          pro_moves!weekly_plan_action_id_fkey (
+          source,
+          pro_moves!weekly_assignments_action_id_fkey (
             action_statement
           ),
-          competencies!weekly_plan_competency_id_fkey (
+          competencies!weekly_assignments_competency_id_fkey (
             competency_id,
             name,
             domain_id,
@@ -195,84 +197,162 @@ export default function Week() {
             )
           )
         `)
-        .is('org_id', null)
         .eq('role_id', staff.role_id)
         .eq('week_start_date', mondayStr)
         .eq('status', 'locked')
+        .is('superseded_at', null)
         .order('display_order');
 
-      console.log('🔍 [Week.tsx] Weekly_plan query:', {
-        orgId: null,
+      console.log('🔍 [Week.tsx V2] Weekly_assignments query:', {
         roleId: staff.role_id,
         mondayStr,
-        cycle,
-        planData,
-        planError
+        assignmentsData,
+        assignmentsError
       });
 
-      if (planData && planData.length > 0) {
-        console.log('📊 Using weekly_plan data source with direct joins');
-        
-        // Transform weekly_plan to weekly_focus structure
-        focusData = planData.map((item: any) => {
-          console.log('Transforming item:', {
-            id: item.id,
-            action_id: item.action_id,
-            competency_id: item.competency_id,
-            competencies: item.competencies
-          });
-          
-          return {
-            id: `plan:${item.id}`,
-            action_id: item.action_id,
-            display_order: item.display_order,
-            self_select: item.self_select,
-            competency_id: item.competency_id,
-            competency_name: item.competencies?.name || 'Unknown',
-            pro_moves: { action_statement: item.pro_moves?.action_statement || '' },
-            competencies: {
-              name: item.competencies?.name || 'Unknown',
-              domains: {
-                domain_id: item.competencies?.domains?.domain_id || 0,
-                domain_name: item.competencies?.domains?.domain_name || 'Unknown',
-                color_hex: item.competencies?.domains?.color_hex || '#666666'
-              }
+      if (assignmentsError) {
+        focusError = assignmentsError;
+      } else {
+        // Transform to weekly_focus structure with assign: prefix
+        focusData = (assignmentsData || []).map((item: any) => ({
+          id: `assign:${item.id}`,
+          action_id: item.action_id,
+          display_order: item.display_order,
+          self_select: item.self_select,
+          competency_id: item.competency_id,
+          competency_name: item.competencies?.name || 'Unknown',
+          pro_moves: { action_statement: item.pro_moves?.action_statement || '' },
+          competencies: {
+            name: item.competencies?.name || 'Unknown',
+            domains: {
+              domain_id: item.competencies?.domains?.domain_id || 0,
+              domain_name: item.competencies?.domains?.domain_name || 'Unknown',
+              color_hex: item.competencies?.domains?.color_hex || '#666666'
             }
-          };
+          }
+        }));
+
+        console.log(`📊 [Week.tsx V2] Loaded ${focusData.length} assignments from weekly_assignments`);
+      }
+    } else {
+      // ========== LEGACY PATH (default) ==========
+      console.log('📚 [Week.tsx] Using legacy weekly_plan/weekly_focus (V2 flag OFF)');
+      const orgId = staff.locations?.organization_id;
+      
+      if (orgId) {
+        // Calculate current Monday
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const thisMonday = new Date(now);
+        thisMonday.setDate(now.getDate() + daysToMonday);
+        thisMonday.setHours(0, 0, 0, 0);
+        const mondayStr = thisMonday.toISOString().split('T')[0];
+
+        console.log('Attempting weekly_plan query:', { orgId, roleId: staff.role_id, mondayStr });
+        
+        const { data: planData, error: planError } = await supabase
+          .from('weekly_plan')
+          .select(`
+            id,
+            display_order,
+            action_id,
+            competency_id,
+            self_select,
+            pro_moves!weekly_plan_action_id_fkey (
+              action_statement
+            ),
+            competencies!weekly_plan_competency_id_fkey (
+              competency_id,
+              name,
+              domain_id,
+              domains!competencies_domain_id_fkey (
+                domain_id,
+                domain_name,
+                color_hex
+              )
+            )
+          `)
+          .is('org_id', null)
+          .eq('role_id', staff.role_id)
+          .eq('week_start_date', mondayStr)
+          .eq('status', 'locked')
+          .order('display_order');
+
+        console.log('🔍 [Week.tsx] Weekly_plan query:', {
+          orgId: null,
+          roleId: staff.role_id,
+          mondayStr,
+          cycle,
+          planData,
+          planError
         });
-      } else if (cycle >= 4) {
-        // For Cycle 4+, if no weekly_plan data exists, don't fall back to weekly_focus
-        console.log('📊 No weekly_plan data for Cycle 4+ - showing no pro moves');
-        setWeeklyFocus([]);
-        setPageLoading(false);
-        setBannerReady(true);
-        return;
+
+        if (planData && planData.length > 0) {
+          console.log('📊 Using weekly_plan data source with direct joins');
+          
+          // Transform weekly_plan to weekly_focus structure
+          focusData = planData.map((item: any) => {
+            console.log('Transforming item:', {
+              id: item.id,
+              action_id: item.action_id,
+              competency_id: item.competency_id,
+              competencies: item.competencies
+            });
+            
+            return {
+              id: `plan:${item.id}`,
+              action_id: item.action_id,
+              display_order: item.display_order,
+              self_select: item.self_select,
+              competency_id: item.competency_id,
+              competency_name: item.competencies?.name || 'Unknown',
+              pro_moves: { action_statement: item.pro_moves?.action_statement || '' },
+              competencies: {
+                name: item.competencies?.name || 'Unknown',
+                domains: {
+                  domain_id: item.competencies?.domains?.domain_id || 0,
+                  domain_name: item.competencies?.domains?.domain_name || 'Unknown',
+                  color_hex: item.competencies?.domains?.color_hex || '#666666'
+                }
+              }
+            };
+          });
+        } else if (cycle >= 4) {
+          // For Cycle 4+, if no weekly_plan data exists, don't fall back to weekly_focus
+          console.log('📊 No weekly_plan data for Cycle 4+ - showing no pro moves');
+          setWeeklyFocus([]);
+          setPageLoading(false);
+          setBannerReady(true);
+          return;
+        }
+      }
+
+      // Fall back to weekly_focus only for Cycle 1-3
+      if (!focusData) {
+        console.log('📚 Using weekly_focus data source (fallback)');
+        const result = await supabase
+          .from('weekly_focus')
+          .select(`
+            id,
+            display_order,
+            self_select,
+            competency_id,
+            action_id,
+            pro_moves!weekly_focus_action_id_fkey ( action_statement ),
+            competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
+          `)
+          .eq('cycle', cycle)
+          .eq('week_in_cycle', weekInCycle)
+          .eq('role_id', staff.role_id)
+          .order('display_order');
+        
+        focusData = result.data;
+        focusError = result.error;
       }
     }
 
-    // Fall back to weekly_focus only for Cycle 1-3
-    if (!focusData) {
-      console.log('📚 Using weekly_focus data source (fallback)');
-      const result = await supabase
-        .from('weekly_focus')
-        .select(`
-          id,
-          display_order,
-          self_select,
-          competency_id,
-          action_id,
-          pro_moves!weekly_focus_action_id_fkey ( action_statement ),
-          competencies ( domains!competencies_domain_id_fkey ( domain_name ) )
-        `)
-        .eq('cycle', cycle)
-        .eq('week_in_cycle', weekInCycle)
-        .eq('role_id', staff.role_id)
-        .order('display_order');
-      
-      focusData = result.data;
-      focusError = result.error;
-    }
-
+    // ========== SHARED PROCESSING LOGIC ==========
     console.log('Focus data result:', { focusData, focusError });
 
     if (focusError) {

@@ -33,8 +33,6 @@ export default function Confidence() {
   // Fetch weekly assignments using the shared hook
   const { data: weeklyFocus = [], isLoading: assignmentsLoading } = useWeeklyAssignments({
     roleId: staff?.role_id,
-    cycle: 1,
-    weekInCycle: weekNum,
     enabled: !!staff && !staffLoading,
   });
 

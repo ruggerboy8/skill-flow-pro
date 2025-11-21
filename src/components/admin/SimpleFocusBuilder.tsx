@@ -25,6 +25,10 @@ interface SimpleFocusBuilderProps {
   roleFilter?: number;
 }
 
+/**
+ * DEPRECATED: This builder uses the legacy weekly_focus table.
+ * Use GlobalAssignmentBuilder or PlannerPage for new assignments.
+ */
 export function SimpleFocusBuilder({ roleFilter }: SimpleFocusBuilderProps) {
   const { toast } = useToast();
   
@@ -204,6 +208,25 @@ export function SimpleFocusBuilder({ roleFilter }: SimpleFocusBuilderProps) {
 
   return (
     <div className="space-y-4">
+      {/* Deprecation Notice */}
+      <Card className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-3">
+            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+              DEPRECATED
+            </Badge>
+            <div className="text-sm">
+              <p className="font-medium mb-1">This builder uses the legacy weekly_focus table.</p>
+              <p className="text-muted-foreground">
+                All assignment data has been migrated to weekly_assignments. 
+                This builder is kept for reference only and should not be used for new assignments.
+                Use the Global Planner or PlannerPage for new weekly assignments.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Week Selection Grid */}
       <CycleWeekGrid 
         onWeekSelect={handleWeekSelect}

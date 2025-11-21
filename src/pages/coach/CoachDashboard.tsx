@@ -96,8 +96,7 @@ export default function CoachDashboard() {
       filtered = filtered.filter(s =>
         s.staff_name.toLowerCase().includes(q) ||
         s.location_name.toLowerCase().includes(q) ||
-        s.role_name.toLowerCase().includes(q) ||
-        (s.email && s.email.toLowerCase().includes(q))
+        s.role_name.toLowerCase().includes(q)
       );
     }
 

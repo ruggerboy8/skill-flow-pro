@@ -70,7 +70,6 @@ export default function CoachDashboardV2() {
           status.location_name,
           status.role_name,
           status.organization_name,
-          status.email || '',
         ]
           .join(' ')
           .toLowerCase();
@@ -172,7 +171,7 @@ export default function CoachDashboardV2() {
           <AlertTitle>Unable to load staff coverage</AlertTitle>
           <AlertDescription className="flex items-center gap-2">
             There was a problem loading staff status data. Please try again.
-            <Button size="sm" onClick={reload}>
+            <Button size="sm" onClick={() => reload()}>
               Retry
             </Button>
           </AlertDescription>

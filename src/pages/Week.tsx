@@ -396,17 +396,29 @@ export default function Week() {
         .in('weekly_focus_id', allFocusIds),
       
       // Query 2: weekly_scores (CONSOLIDATED - fetch once with all fields)
-      v2Enabled
-        ? supabase
-            .from('weekly_scores')
-            .select('weekly_focus_id, assignment_id, confidence_score, performance_score, selected_action_id')
-            .eq('staff_id', staff.id)
-            .in('assignment_id', allFocusIds)
-        : supabase
-            .from('weekly_scores')
-            .select('weekly_focus_id, assignment_id, confidence_score, performance_score, selected_action_id')
-            .eq('staff_id', staff.id)
-            .in('weekly_focus_id', allFocusIds),
+      (async () => {
+        console.log('[Week] Score Query Debug:', {
+          v2Enabled,
+          staffId: staff.id,
+          allFocusIds,
+          queryField: v2Enabled ? 'assignment_id' : 'weekly_focus_id'
+        });
+        
+        const result = v2Enabled
+          ? await supabase
+              .from('weekly_scores')
+              .select('weekly_focus_id, assignment_id, confidence_score, performance_score, selected_action_id')
+              .eq('staff_id', staff.id)
+              .in('assignment_id', allFocusIds)
+          : await supabase
+              .from('weekly_scores')
+              .select('weekly_focus_id, assignment_id, confidence_score, performance_score, selected_action_id')
+              .eq('staff_id', staff.id)
+              .in('weekly_focus_id', allFocusIds);
+        
+        console.log('[Week] Score Query Result:', result);
+        return result;
+      })(),
       
       // Query 3: Carryover check
       supabase

@@ -52,147 +52,56 @@ export default function Review() {
   useEffect(() => {
     (async () => {
       if (!user) return;
-      // staff info
+      
+      // Get staff info
       const { data: staffRow } = await supabase
         .from("staff")
-        .select("id, role_id, locations(organization_id)")
+        .select("id, role_id")
         .eq("user_id", user.id)
         .maybeSingle();
-      if (!staffRow) return;
-      setStaff(staffRow);
-
-      // Try weekly_plan first (for orgs with sequencer)
-      const orgId = staffRow.locations?.organization_id;
-      let wf: any[] | null = null;
       
-      if (orgId) {
-        // Calculate current Monday
-        const now = new Date();
-        const dayOfWeek = now.getDay();
-        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-        const thisMonday = new Date(now);
-        thisMonday.setDate(now.getDate() + daysToMonday);
-        thisMonday.setHours(0, 0, 0, 0);
-        const mondayStr = thisMonday.toISOString().split('T')[0];
+      if (!staffRow) return;
+      setStaff(staffRow as any);
 
-        const { data: planData } = await supabase
-          .from('weekly_plan')
-          .select(`
-            id,
-            action_id,
-            display_order,
-            self_select,
-            pro_moves (
-              action_id,
-              action_statement,
-              competency_id,
-              competencies (
-                competency_id,
-                name,
-                domain_id,
-                domains!competencies_domain_id_fkey (
-                  domain_id,
-                  domain_name
-                )
-              )
-            )
-          `)
-          .is('org_id', null)
-          .eq('role_id', staffRow.role_id)
-          .eq('week_start_date', mondayStr)
-          .eq('status', 'locked')
-          .order('display_order');
+      // Calculate week_of from cycle/week params (approximate)
+      // This is a simplified calculation - in production you'd want proper cycle math
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const thisMonday = new Date(now);
+      thisMonday.setDate(now.getDate() + daysToMonday);
+      thisMonday.setHours(0, 0, 0, 0);
+      const weekStartStr = thisMonday.toISOString().split('T')[0];
 
-        if (planData && planData.length > 0) {
-          console.log('📊 [Review] Using weekly_plan data source');
-          wf = planData.map((item: any) => ({
-            id: `plan:${item.id}`,
-            action_id: item.action_id,
-            display_order: item.display_order,
-            self_select: item.self_select,
-            pro_moves: { action_statement: item.pro_moves?.action_statement },
-            competencies: {
-              domains: {
-                domain_name: item.pro_moves?.competencies?.domains?.domain_name
-              }
-            }
-          }));
-        }
-      }
-
-      // Fall back to weekly_focus if no weekly_plan data
-      if (!wf) {
-        console.log('📚 [Review] Using weekly_focus data source (fallback)');
-        const { data: focusData } = await supabase
-          .from("weekly_focus")
-          .select(`
-            id,
-            display_order,
-            action_id,
-            self_select,
-            pro_moves:action_id(action_statement),
-            competencies!inner(domains!competencies_domain_id_fkey!inner(domain_name))
-          `)
-          .eq("role_id", staffRow.role_id)
-          .eq("cycle", cycleNum)
-          .eq("week_in_cycle", weekNum)
-          .order("display_order");
-        
-        wf = focusData;
-      }
-
-      const focus: FocusRow[] =
-        (wf || []).map((w: any) => ({
-          id: w.id,
-          display_order: w.display_order,
-          action_id: w.action_id ?? null,
-          self_select: !!w.self_select,
-          site_action_statement: w.pro_moves?.action_statement ?? null,
-          domain_name: w.competencies?.domains?.domain_name ?? null,
-        })) ?? [];
-
-      // scores for this user + these focus ids
-      const focusIds = focus.map((f) => f.id);
-      const { data: scores } = await supabase
-        .from("weekly_scores")
-        .select("weekly_focus_id, confidence_score, performance_score, selected_action_id")
-        .eq("staff_id", staffRow.id)
-        .in("weekly_focus_id", focusIds);
-
-      const scoreByFocus: Record<string, ScoreRow> = {};
-      (scores || []).forEach((s: any) => (scoreByFocus[s.weekly_focus_id] = s));
-
-      // fetch selected pro-move texts for any self-selects
-      const selectedIds = Array.from(
-        new Set(
-          (scores || [])
-            .map((s: any) => s.selected_action_id)
-            .filter(Boolean)
-        )
-      ) as number[];
-      let selectedMap: Record<number, string> = {};
-      if (selectedIds.length) {
-        const { data: actions } = await supabase
-          .from("pro_moves")
-          .select("action_id, action_statement")
-          .in("action_id", selectedIds);
-        (actions || []).forEach((a) => (selectedMap[a.action_id] = a.action_statement));
-      }
-
-      // build display rows
-      const merged = focus.map((f) => {
-        const sc = scoreByFocus[f.id];
-        const pickedStatement =
-          f.self_select && sc?.selected_action_id
-            ? selectedMap[sc.selected_action_id] || "(selected move)"
-            : f.site_action_statement || "(site move)";
-        return {
-          ...f,
-          final_action_statement: pickedStatement,
-          confidence_score: sc?.confidence_score ?? null,
-          performance_score: sc?.performance_score ?? null,
-        };
+      // Use unified RPC to get assignments
+      const { data, error } = await supabase.rpc('get_staff_week_assignments', {
+        p_staff_id: staffRow.id,
+        p_role_id: staffRow.role_id,
+        p_week_start: weekStartStr
       });
+
+      if (error) {
+        console.error('[Review] RPC error:', error);
+        setLoading(false);
+        return;
+      }
+
+      // Parse JSONB response
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      const assignments = parsed?.assignments || [];
+
+      // Build display rows
+      const merged = assignments.map((row: any, idx: number) => ({
+        id: row.focus_id,
+        display_order: idx + 1,
+        action_id: row.action_id,
+        self_select: row.self_select,
+        site_action_statement: row.action_statement,
+        domain_name: row.domain_name,
+        final_action_statement: row.action_statement,
+        confidence_score: row.confidence_score,
+        performance_score: row.performance_score,
+      }));
 
       setRows(merged);
       setLoading(false);

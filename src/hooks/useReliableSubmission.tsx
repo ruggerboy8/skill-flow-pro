@@ -99,13 +99,14 @@ export function useReliableSubmission() {
     const enrichedUpdates = await Promise.all(updates.map(async (update) => {
       const focusId = update.weekly_focus_id;
       
-      // Validate focus ID format
+      // Validate focus ID format (supports plan:<id>, assign:<uuid>, or raw UUID)
       const isPlanId = /^plan:[0-9]+$/.test(focusId);
+      const isAssignId = /^assign:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(focusId);
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(focusId);
       
-      if (!isPlanId && !isUuid) {
+      if (!isPlanId && !isAssignId && !isUuid) {
         console.error('[Submission] Invalid focus ID format:', focusId);
-        throw new Error(`Invalid weekly_focus_id format: ${focusId}. Expected 'plan:<id>' or UUID.`);
+        throw new Error(`Invalid weekly_focus_id format: ${focusId}. Expected 'plan:<id>', 'assign:<uuid>', or UUID.`);
       }
       
       // Reject deprecated synthetic format (plan-{action}-{order})
@@ -130,6 +131,14 @@ export function useReliableSubmission() {
             .eq('id', planId)
             .single();
           weekOf = planData?.week_start_date || null;
+        } else if (isAssignId) {
+          const assignId = focusId.replace('assign:', '');
+          const { data: assignData } = await supabase
+            .from('weekly_assignments')
+            .select('week_start_date')
+            .eq('id', assignId)
+            .single();
+          weekOf = assignData?.week_start_date || null;
         } else {
           const { data: focusData } = await supabase
             .from('weekly_focus')
@@ -143,7 +152,13 @@ export function useReliableSubmission() {
       console.info('[Submission] Writing score with focus_id=%s conf=%s perf=%s week_of=%s', 
         focusId, update.confidence_score, update.performance_score, weekOf);
       
-      return { ...update, week_of: weekOf };
+      // Populate assignment_id for V2 weekly_assignments
+      const enriched: any = { ...update, week_of: weekOf };
+      if (isAssignId) {
+        enriched.assignment_id = focusId;
+      }
+      
+      return enriched;
     }));
 
     console.log(`[Submission] Writing ${enrichedUpdates.length} score updates`);

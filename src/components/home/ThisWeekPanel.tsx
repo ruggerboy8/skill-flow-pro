@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CT_TZ } from '@/lib/centralTime';
 import { getWeekAnchors } from '@/v2/time';
-import { isV2 } from '@/lib/featureFlags';
+import { isV2, useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 import { useNow } from '@/providers/NowProvider';
 import { getDomainColor } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
@@ -23,7 +23,8 @@ import { enforceWeeklyRolloverNow } from '@/v2/rollover';
 import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 
 interface WeeklyScore { 
-  weekly_focus_id: string; 
+  weekly_focus_id: string;
+  assignment_id?: string | null;
   confidence_score: number | null; 
   performance_score: number | null; 
 }
@@ -35,6 +36,7 @@ export default function ThisWeekPanel() {
   const navigate = useNavigate();
   const now = useNow();
   const { overrides } = useSim();
+  const v2Enabled = useWeeklyAssignmentsV2Enabled;
 
   const [weekContext, setWeekContext] = useState<StaffStatus | null>(null);
   const [locationWeekContext, setLocationWeekContext] = useState<LocationWeekContext | null>(null);
@@ -153,11 +155,19 @@ export default function ThisWeekPanel() {
       // Load weekly scores for the assignments
       if (assignments.length > 0) {
         const focusIds = assignments.map(a => a.weekly_focus_id);
-        const { data: scores } = await supabase
-          .from('weekly_scores')
-          .select('weekly_focus_id, confidence_score, performance_score')
-          .eq('staff_id', staff.id)
-          .in('weekly_focus_id', focusIds);
+        
+        // Query scores by assignment_id when V2 enabled, otherwise use weekly_focus_id
+        const { data: scores } = v2Enabled
+          ? await supabase
+              .from('weekly_scores')
+              .select('weekly_focus_id, assignment_id, confidence_score, performance_score')
+              .eq('staff_id', staff.id)
+              .in('assignment_id', focusIds)
+          : await supabase
+              .from('weekly_scores')
+              .select('weekly_focus_id, assignment_id, confidence_score, performance_score')
+              .eq('staff_id', staff.id)
+              .in('weekly_focus_id', focusIds);
         
         setWeeklyScores(scores || []);
       } else {
@@ -267,8 +277,10 @@ export default function ThisWeekPanel() {
             const bgColor = domainName ? getDomainColor(domainName) : undefined;
             const isUnchosen = assignment.type === 'selfSelect' && !assignment.action_statement;
             
-            // Find scores for this assignment
-            const scores = weeklyScores.find(s => s.weekly_focus_id === assignment.weekly_focus_id);
+            // Find scores for this assignment - match by assignment_id when V2 enabled
+            const scores = v2Enabled
+              ? weeklyScores.find(s => s.assignment_id === assignment.weekly_focus_id)
+              : weeklyScores.find(s => s.weekly_focus_id === assignment.weekly_focus_id);
             const resourceCount = assignment.pro_move_id ? (resourceCounts[assignment.pro_move_id] || 0) : 0;
 
             return (

@@ -11,7 +11,7 @@ import { FiltersBar, type FilterOption } from '@/components/coach/dashboard/Filt
 import { CoverageTable } from '@/components/coach/dashboard/CoverageTable';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { format, isValid, startOfWeek } from 'date-fns';
+import { format, isValid, startOfWeek, addDays } from 'date-fns';
 
 export default function CoachDashboard() {
   const navigate = useNavigate();
@@ -164,21 +164,30 @@ export default function CoachDashboard() {
           <CardTitle>Coach Dashboard</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 grid gap-2 sm:flex sm:items-center sm:justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Select a week to evaluate submissions.</p>
+              <p className="text-sm text-muted-foreground">Navigate weeks to evaluate submissions.</p>
               <p className="text-xs text-muted-foreground">Weeks start on Monday in each staff member's timezone.</p>
             </div>
-            <Input
-              type="date"
-              value={format(selectedWeek, 'yyyy-MM-dd')}
-              onChange={(e) => {
-                const next = new Date(e.target.value);
-                const normalized = isValid(next) ? startOfWeek(next, { weekStartsOn: 1 }) : startOfWeek(new Date(), { weekStartsOn: 1 });
-                setSelectedWeek(normalized);
-              }}
-              className="w-[180px]"
-            />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedWeek(addDays(selectedWeek, -7))}
+              >
+                ← Prev Week
+              </Button>
+              <div className="text-sm font-medium px-3 py-1 border rounded-md bg-muted/50">
+                {format(selectedWeek, 'MMM d, yyyy')}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedWeek(addDays(selectedWeek, 7))}
+              >
+                Next Week →
+              </Button>
+            </div>
           </div>
           <FiltersBar
             organization={filters.organization}

@@ -48,7 +48,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
       const { data, error } = await supabase.rpc('get_staff_submission_windows', {
         p_staff_id: staffId,
         p_since: cutoffDate,
-      } as any);
+      });
 
       console.debug('OnTimeRateWidget: submission windows', {
         staffId,
@@ -63,7 +63,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
       const now = new Date();
       const windows = data ?? [];
       const pastDueWindows = windows.filter((w: any) => new Date(w.due_at) <= now);
-      
+
       // Calculate stats
       const totalExpected = pastDueWindows.length;
       const onTime = pastDueWindows.filter((w: any) => w.status === 'on_time').length;

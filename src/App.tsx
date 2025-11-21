@@ -14,7 +14,7 @@ import Layout from "@/components/Layout";
 import Index from "@/pages/Index";
 import Welcome from "@/pages/Welcome";
 import Profile from "@/pages/Profile";
-import Week from "@/pages/Week";
+
 import WeekInfo from "@/pages/WeekInfo";
 import Confidence from "@/pages/Confidence";
 import ConfidenceWizard from "@/pages/ConfidenceWizard";
@@ -89,8 +89,6 @@ function AppRoutes() {
 
         <Route path="profile" element={<Profile />} />
         <Route path="reset-password" element={<ResetPassword />} />
-        <Route path="week" element={<Week />} />
-        <Route path="week/:weekId" element={<Week />} />
         <Route path="week-info/:cycle/:week" element={<WeekInfo />} />
         <Route path="confidence/:week" element={<Confidence />} />
         <Route path="confidence/:week/step/:n" element={<ConfidenceWizard />} />

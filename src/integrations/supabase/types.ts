@@ -1233,6 +1233,60 @@ export type Database = {
           },
         ]
       }
+      weekly_assignments: {
+        Row: {
+          action_id: number | null
+          competency_id: number | null
+          created_at: string
+          display_order: number
+          id: string
+          legacy_focus_id: string | null
+          location_id: string | null
+          org_id: string | null
+          role_id: number
+          self_select: boolean
+          source: string
+          status: string
+          superseded_at: string | null
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          action_id?: number | null
+          competency_id?: number | null
+          created_at?: string
+          display_order: number
+          id?: string
+          legacy_focus_id?: string | null
+          location_id?: string | null
+          org_id?: string | null
+          role_id: number
+          self_select?: boolean
+          source: string
+          status?: string
+          superseded_at?: string | null
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          action_id?: number | null
+          competency_id?: number | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          legacy_focus_id?: string | null
+          location_id?: string | null
+          org_id?: string | null
+          role_id?: number
+          self_select?: boolean
+          source?: string
+          status?: string
+          superseded_at?: string | null
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: []
+      }
       weekly_focus: {
         Row: {
           action_id: number | null
@@ -1405,6 +1459,7 @@ export type Database = {
       }
       weekly_scores: {
         Row: {
+          assignment_id: string | null
           confidence_date: string | null
           confidence_late: boolean | null
           confidence_score: number | null
@@ -1424,6 +1479,7 @@ export type Database = {
           weekly_focus_id: string | null
         }
         Insert: {
+          assignment_id?: string | null
           confidence_date?: string | null
           confidence_late?: boolean | null
           confidence_score?: number | null
@@ -1443,6 +1499,7 @@ export type Database = {
           weekly_focus_id?: string | null
         }
         Update: {
+          assignment_id?: string | null
           confidence_date?: string | null
           confidence_late?: boolean | null
           confidence_score?: number | null

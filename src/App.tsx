@@ -15,15 +15,11 @@ import Index from "@/pages/Index";
 import Welcome from "@/pages/Welcome";
 import Profile from "@/pages/Profile";
 
-import WeekInfo from "@/pages/WeekInfo";
 import Confidence from "@/pages/Confidence";
 import ConfidenceWizard from "@/pages/ConfidenceWizard";
 import Performance from "@/pages/Performance";
 import PerformanceWizard from "@/pages/PerformanceWizard";
 import Review from "@/pages/Review";
-import BackfillIntro from "@/pages/backfill/BackfillIntro";
-import BackfillWeek from "@/pages/backfill/BackfillWeek";
-import BackfillReview from "@/pages/backfill/BackfillReview";
 import CoachDashboard from "@/pages/coach/CoachDashboard";
 import CoachDetail from "@/pages/coach/CoachDetail";
 import { EvaluationHub } from "@/pages/coach/EvaluationHub";
@@ -77,7 +73,6 @@ function AppRoutes() {
         <Route index element={<Index />} />
         <Route path="welcome" element={<Welcome />} />
         <Route path="setup" element={<Setup />} />
-        <Route path="create-password" element={<SetupPassword />} />
         <Route path="setup-password" element={<SetupPassword />} />
 
         <Route path="stats" element={<StatsLayout />}>
@@ -89,15 +84,11 @@ function AppRoutes() {
 
         <Route path="profile" element={<Profile />} />
         <Route path="reset-password" element={<ResetPassword />} />
-        <Route path="week-info/:cycle/:week" element={<WeekInfo />} />
         <Route path="confidence/:week" element={<Confidence />} />
         <Route path="confidence/:week/step/:n" element={<ConfidenceWizard />} />
         <Route path="performance/:week" element={<Performance />} />
         <Route path="performance/:week/step/:n" element={<PerformanceWizard />} />
         <Route path="review/:cycle/:week" element={<Review />} />
-        <Route path="backfill" element={<BackfillIntro />} />
-        <Route path="backfill/:week" element={<BackfillWeek />} />
-        <Route path="backfill/review" element={<BackfillReview />} />
 
         <Route path="coach" element={<CoachLayout />}>
           <Route index element={<CoachDashboard />} />

@@ -518,15 +518,28 @@ export default function PerformanceWizard() {
 
     // Check if all performance scores are filled with valid values (1-4)
     const missingScores = existingScores.filter(score => {
-      const perfScore = performanceScores[score.weekly_focus_id];
+      // Find matching focus item by either assignment_id or weekly_focus_id
+      const focusItem = weeklyFocus.find(wf => 
+        wf.id === score.assignment_id || wf.id === score.weekly_focus_id
+      );
+      if (!focusItem) return true; // No matching focus = missing
+      
+      const perfScore = performanceScores[focusItem.id];
       return !perfScore || perfScore < 1 || perfScore > 4;
     });
     
     if (missingScores.length > 0) {
-      console.error('Missing or invalid performance scores:', missingScores.map(s => ({ 
-        focus_id: s.weekly_focus_id, 
-        score: performanceScores[s.weekly_focus_id] 
-      })));
+      console.error('Missing or invalid performance scores:', missingScores.map(s => {
+        const focusItem = weeklyFocus.find(wf => 
+          wf.id === s.assignment_id || wf.id === s.weekly_focus_id
+        );
+        return { 
+          focus_id: s.weekly_focus_id,
+          assignment_id: s.assignment_id,
+          matched_id: focusItem?.id,
+          score: focusItem ? performanceScores[focusItem.id] : undefined
+        };
+      }));
       toast({
         title: 'Error',
         description: 'Please provide performance scores for all items before submitting.',
@@ -554,17 +567,51 @@ export default function PerformanceWizard() {
     const { checkout_due } = getWeekAnchors(effectiveNow, timezone);
     const isLate = effectiveNow > checkout_due;
 
-    const updates = existingScores.map(score => ({
-      staff_id: staff.id,
-      weekly_focus_id: score.weekly_focus_id,
-      performance_score: performanceScores[score.weekly_focus_id], // Remove fallback - validation ensures this exists
-      performance_date: new Date().toISOString(),
-      performance_source: isRepair ? 'backfill' as const : 'live' as const,
-      performance_late: isLate,
-    }));
+    const updates = existingScores.map(score => {
+      // Find matching focus item by either assignment_id or weekly_focus_id
+      const focusItem = weeklyFocus.find(wf => 
+        wf.id === score.assignment_id || wf.id === score.weekly_focus_id
+      );
+      
+      return {
+        staff_id: staff.id,
+        weekly_focus_id: score.weekly_focus_id,
+        performance_score: focusItem ? performanceScores[focusItem.id] : undefined,
+        performance_date: new Date().toISOString(),
+        performance_source: isRepair ? 'backfill' as const : 'live' as const,
+        performance_late: isLate,
+      };
+    });
 
     // Collect action_ids for backlog resolution
     const actedOnIds = new Set<number>();
+    
+    // Extract raw IDs for querying
+    const rawIds = weeklyFocus.map(f => {
+      if (f.id.startsWith('assign:')) return f.id.replace('assign:', '');
+      if (f.id.startsWith('plan:')) return f.id.replace('plan:', '');
+      return f.id;
+    });
+    
+    // Query both tables to get action_ids
+    const { data: focusActionData } = await supabase
+      .from('weekly_focus')
+      .select('id, action_id, self_select')
+      .in('id', rawIds);
+      
+    const { data: assignActionData } = await supabase
+      .from('weekly_assignments')
+      .select('id, action_id, self_select')
+      .in('id', rawIds);
+    
+    // Build action map
+    const actionMap = new Map<string, { action_id: number | null, self_select: boolean }>();
+    (focusActionData || []).forEach(wf => {
+      actionMap.set(wf.id, { action_id: wf.action_id, self_select: wf.self_select });
+    });
+    (assignActionData || []).forEach(wa => {
+      actionMap.set(`assign:${wa.id}`, { action_id: wa.action_id, self_select: wa.self_select });
+    });
     
     for (const update of updates) {
       const score = existingScores.find(s => 
@@ -573,18 +620,14 @@ export default function PerformanceWizard() {
       if (score?.selected_action_id) {
         actedOnIds.add(score.selected_action_id);
       }
-      // For site moves, get the action_id from weekly_focus
+      // For site moves, get the action_id from the map
       const focusItem = weeklyFocus.find(wf => 
         wf.id === score?.assignment_id || wf.id === score?.weekly_focus_id
       );
       if (focusItem) {
-        const { data: focusData } = await supabase
-          .from('weekly_focus')
-          .select('action_id')
-          .eq('id', focusItem.id)
-          .maybeSingle();
-        if (focusData?.action_id) {
-          actedOnIds.add(focusData.action_id);
+        const actionData = actionMap.get(focusItem.id);
+        if (actionData?.action_id && !actionData.self_select) {
+          actedOnIds.add(actionData.action_id);
         }
       }
     }

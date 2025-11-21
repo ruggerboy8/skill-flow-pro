@@ -544,17 +544,19 @@ export async function computeWeekState(params: {
   // current staff id from userId
   const staffId = staff.id;
 
-  // Query scores against exactly these IDs (from assembleWeek)
+  // Query scores against exactly these IDs (check both assignment_id and weekly_focus_id)
   const { data: scores, error: scoresError } = await supabase
     .from('weekly_scores')
-    .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id')
+    .select('confidence_score, confidence_date, performance_score, performance_date, weekly_focus_id, assignment_id')
     .eq('staff_id', staffId)
-    .in('weekly_focus_id', allIds);
+    .or(allIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','));
 
   // P2 FIX: Check completion per required slot, not by totals
   const byId = new Map(allIds.map(id => [id, { conf: false, perf: false }]));
   for (const s of (scores ?? [])) {
-    const row = byId.get(s.weekly_focus_id);
+    // Match by either assignment_id or weekly_focus_id
+    const matchingId = allIds.find(id => id === s.assignment_id || id === s.weekly_focus_id);
+    const row = matchingId ? byId.get(matchingId) : null;
     if (!row) continue;
     if (s.confidence_score != null) row.conf = true;
     if (s.performance_score != null) row.perf = true;

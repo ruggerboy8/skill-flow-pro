@@ -12,6 +12,7 @@ import { StaffStatus } from '@/hooks/useCoachStaffStatuses';
 export interface CoverageTableProps {
   rows: StaffStatus[];
   loading: boolean;
+  weekOf?: Date;
   onNavigate: (staffId: string) => void;
   onSendReminder: (type: 'confidence' | 'performance') => void;
 }
@@ -40,23 +41,23 @@ function StatusCell({ submitted, type }: { submitted: boolean; type: string }) {
   );
 }
 
-export function CoverageTable({ rows, loading, onNavigate, onSendReminder }: CoverageTableProps) {
+export function CoverageTable({ rows, loading, weekOf, onNavigate, onSendReminder }: CoverageTableProps) {
   const sortedRows = useMemo(() => {
     return [...rows].sort((a, b) => {
-      const aMissingPerformance = a.perf_count < a.required_count;
-      const bMissingPerformance = b.perf_count < b.required_count;
+      const aMissingPerformance = a.perf_submitted_count < a.required_count;
+      const bMissingPerformance = b.perf_submitted_count < b.required_count;
       if (aMissingPerformance !== bMissingPerformance) {
         return aMissingPerformance ? -1 : 1;
       }
 
-      const aMissingConfidence = a.conf_count < a.required_count;
-      const bMissingConfidence = b.conf_count < b.required_count;
+      const aMissingConfidence = a.conf_submitted_count < a.required_count;
+      const bMissingConfidence = b.conf_submitted_count < b.required_count;
       if (aMissingConfidence !== bMissingConfidence) {
         return aMissingConfidence ? -1 : 1;
       }
 
-      const aMissingTotal = a.required_count - a.conf_count + (a.required_count - a.perf_count);
-      const bMissingTotal = b.required_count - b.conf_count + (b.required_count - b.perf_count);
+      const aMissingTotal = a.required_count - a.conf_submitted_count + (a.required_count - a.perf_submitted_count);
+      const bMissingTotal = b.required_count - b.conf_submitted_count + (b.required_count - b.perf_submitted_count);
       if (aMissingTotal !== bMissingTotal) {
         return bMissingTotal - aMissingTotal;
       }
@@ -65,9 +66,9 @@ export function CoverageTable({ rows, loading, onNavigate, onSendReminder }: Cov
     });
   }, [rows]);
 
-  const missingConfidence = useMemo(() => sortedRows.filter((row) => row.conf_count < row.required_count).length, [sortedRows]);
+  const missingConfidence = useMemo(() => sortedRows.filter((row) => row.conf_submitted_count < row.required_count).length, [sortedRows]);
   const missingPerformance = useMemo(
-    () => sortedRows.filter((row) => row.perf_count < row.required_count).length,
+    () => sortedRows.filter((row) => row.perf_submitted_count < row.required_count).length,
     [sortedRows]
   );
 
@@ -143,17 +144,20 @@ export function CoverageTable({ rows, loading, onNavigate, onSendReminder }: Cov
                   <TableCell>{row.organization_name}</TableCell>
                   <TableCell>{row.location_name}</TableCell>
                   <TableCell className="text-center">
-                    <StatusCell submitted={row.conf_count >= row.required_count} type="Confidence" />
+                    <StatusCell submitted={row.conf_submitted_count >= row.required_count} type="Confidence" />
                   </TableCell>
                   <TableCell className="text-center">
-                    <StatusCell submitted={row.perf_count >= row.required_count} type="Performance" />
+                    <StatusCell submitted={row.perf_submitted_count >= row.required_count} type="Performance" />
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {row.last_activity_at
-                      ? `${row.last_activity_kind === 'confidence' ? 'Confidence' : 'Performance'} · ${format(
-                          new Date(row.last_activity_at),
-                          'MMM d'
-                        )}`
+                    {row.last_conf_at || row.last_perf_at
+                      ? (() => {
+                          const confTime = row.last_conf_at ? new Date(row.last_conf_at).getTime() : 0;
+                          const perfTime = row.last_perf_at ? new Date(row.last_perf_at).getTime() : 0;
+                          const latest = confTime > perfTime ? row.last_conf_at : row.last_perf_at;
+                          const type = confTime > perfTime ? 'Conf' : 'Perf';
+                          return `${type} · ${format(new Date(latest!), 'MMM d')}`;
+                        })()
                       : '—'}
                   </TableCell>
                 </TableRow>

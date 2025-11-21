@@ -25,6 +25,7 @@ interface WeeklyFocus {
 
 interface WeeklyScore {
   weekly_focus_id: string;
+  assignment_id?: string | null;
   confidence_score: number | null;
   performance_score: number | null;
   selected_action_id?: number | null;
@@ -97,7 +98,7 @@ export default function Week() {
     // Query 2: Fetch ALL weekly_scores for this user matching any focus ID
     const { data: allScoresData, error: scoresError } = await supabase
       .from('weekly_scores')
-      .select('weekly_focus_id, confidence_score, performance_score')
+      .select('weekly_focus_id, assignment_id, confidence_score, performance_score')
       .eq('staff_id', s.id)
       .in('weekly_focus_id', allFocusIds);
 
@@ -397,9 +398,12 @@ export default function Week() {
       // Query 2: weekly_scores (CONSOLIDATED - fetch once with all fields)
       supabase
         .from('weekly_scores')
-        .select('weekly_focus_id, confidence_score, performance_score, selected_action_id')
+        .select('weekly_focus_id, assignment_id, confidence_score, performance_score, selected_action_id')
         .eq('staff_id', staff.id)
-        .in('weekly_focus_id', allFocusIds),
+        .or(v2Enabled 
+          ? `assignment_id.in.(${allFocusIds.map(id => `"${id}"`).join(',')})`
+          : `weekly_focus_id.in.(${allFocusIds.join(',')})`
+        ),
       
       // Query 3: Carryover check
       supabase
@@ -468,7 +472,9 @@ export default function Week() {
           selectedMove = userSelection.pro_moves as any;
         } else {
           // Fall back to selected_action_id from weekly_scores
-          const scoreRecord = scoresData?.find(s => s.weekly_focus_id === item.id);
+          const scoreRecord = v2Enabled
+            ? scoresData?.find(s => s.assignment_id === item.id)
+            : scoresData?.find(s => s.weekly_focus_id === item.id);
           if (scoreRecord?.selected_action_id) {
             selectedMove = actionProMovesData.find(pm => pm.action_id === scoreRecord.selected_action_id);
           }
@@ -539,8 +545,15 @@ export default function Week() {
   };
 
   // ---------- helpers / derived state ----------
-  const getScoreForFocus = (focusId: string) =>
-    weeklyScores.find(score => score.weekly_focus_id === focusId);
+  const getScoreForFocus = (focusId: string) => {
+    if (v2Enabled) {
+      // When V2 is enabled, focusId is in format "assign:UUID"
+      // Match by assignment_id field in scores
+      return weeklyScores.find(score => score.assignment_id === focusId);
+    }
+    // Legacy path: match by weekly_focus_id
+    return weeklyScores.find(score => score.weekly_focus_id === focusId);
+  };
 
   // Calculate week start date from cycle/week
   const getWeekLabel = () => {

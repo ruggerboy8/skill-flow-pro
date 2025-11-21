@@ -1,14 +1,14 @@
-import { Input } from '@/components/ui/input';
+import { useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
 
 export interface FilterOption {
-  value: string;
   label: string;
+  value: string;
 }
 
-interface FiltersBarProps {
+export interface FiltersBarProps {
   organization: string;
   location: string;
   role: string;
@@ -31,84 +31,79 @@ export function FiltersBar({
   onChange,
   onReset,
 }: FiltersBarProps) {
-  const hasActiveFilters = organization !== 'all' || location !== 'all' || role !== 'all' || search.trim() !== '';
+  const hasActiveFilters = useMemo(
+    () => organization !== 'all' || location !== 'all' || role !== 'all' || search.trim() !== '',
+    [organization, location, role, search]
+  );
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <label className="text-sm font-medium mb-2 block">Organization</label>
-          <Select
-            value={organization}
-            onValueChange={(val) => onChange({ organization: val, location, role, search })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {organizationOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium mb-2 block">Location</label>
-          <Select
-            value={location}
-            onValueChange={(val) => onChange({ organization, location: val, role, search })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {locationOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium mb-2 block">Role</label>
-          <Select
-            value={role}
-            onValueChange={(val) => onChange({ organization, location, role: val, search })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {roleOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium mb-2 block">Search</label>
-          <Input
-            placeholder="Search staff, location, role..."
-            value={search}
-            onChange={(e) => onChange({ organization, location, role, search: e.target.value })}
-          />
-        </div>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div>
+        <label className="mb-2 block text-sm font-medium">Organization</label>
+        <Select
+          value={organization}
+          onValueChange={(value) => onChange({ organization: value, location, role, search })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="All organizations" />
+          </SelectTrigger>
+          <SelectContent>
+            {organizationOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {hasActiveFilters && (
-        <Button variant="outline" size="sm" onClick={onReset}>
-          <X className="h-4 w-4 mr-2" />
-          Clear Filters
-        </Button>
-      )}
+      <div>
+        <label className="mb-2 block text-sm font-medium">Location</label>
+        <Select value={location} onValueChange={(value) => onChange({ organization, location: value, role, search })}>
+          <SelectTrigger>
+            <SelectValue placeholder="All locations" />
+          </SelectTrigger>
+          <SelectContent>
+            {locationOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium">Role</label>
+        <Select value={role} onValueChange={(value) => onChange({ organization, location, role: value, search })}>
+          <SelectTrigger>
+            <SelectValue placeholder="All roles" />
+          </SelectTrigger>
+          <SelectContent>
+            {roleOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium">Search</label>
+        <Input
+          placeholder="Search staff, location, or role"
+          value={search}
+          onChange={(event) => onChange({ organization, location, role, search: event.target.value })}
+        />
+        {hasActiveFilters && (
+          <div className="mt-2">
+            <Button size="sm" variant="outline" onClick={onReset}>
+              Clear filters
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

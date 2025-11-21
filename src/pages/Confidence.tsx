@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useWeeklyAssignments } from '@/hooks/useWeeklyAssignments';
 import { useToast } from '@/hooks/use-toast';
+import { useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,6 +26,7 @@ export default function Confidence() {
   const { data: staff, isLoading: staffLoading } = useStaffProfile();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const v2Enabled = useWeeklyAssignmentsV2Enabled;
 
   const weekNum = Number(week); // week param is now just "1", "2", etc.
 
@@ -75,11 +77,19 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
 
     // Load existing confidence scores for this week
     const focusIds = weeklyFocus.map((f) => f.id);
-    const { data: existing, error: existingError } = await supabase
-      .from('weekly_scores')
-      .select('weekly_focus_id, confidence_score, selected_action_id')
-      .eq('staff_id', staff.id)
-      .in('weekly_focus_id', focusIds);
+    
+    // Query scores by assignment_id when V2 enabled, otherwise use weekly_focus_id
+    const { data: existing, error: existingError } = v2Enabled
+      ? await supabase
+          .from('weekly_scores')
+          .select('weekly_focus_id, assignment_id, confidence_score, selected_action_id')
+          .eq('staff_id', staff.id)
+          .in('assignment_id', focusIds)
+      : await supabase
+          .from('weekly_scores')
+          .select('weekly_focus_id, assignment_id, confidence_score, selected_action_id')
+          .eq('staff_id', staff.id)
+          .in('weekly_focus_id', focusIds);
 
     if (existingError) {
       console.error('Existing scores error:', existingError);
@@ -89,10 +99,12 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     setSubmittedCount(submitted);
 
     // Pre-fill selected actions if previously chosen
+    // Use assignment_id for V2, weekly_focus_id for legacy
     const selectedActionsMap: { [key: string]: string | null } = {};
     existing?.forEach((r) => {
+      const key = v2Enabled ? (r.assignment_id || r.weekly_focus_id) : r.weekly_focus_id;
       if (r.selected_action_id) {
-        selectedActionsMap[r.weekly_focus_id] = r.selected_action_id.toString();
+        selectedActionsMap[key] = r.selected_action_id.toString();
       }
     });
     setSelectedActions(selectedActionsMap);
@@ -100,8 +112,9 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     // Pre-fill scores
     const scoresMap: { [key: string]: number } = {};
     existing?.forEach((r) => {
+      const key = v2Enabled ? (r.assignment_id || r.weekly_focus_id) : r.weekly_focus_id;
       if (r.confidence_score != null) {
-        scoresMap[r.weekly_focus_id] = r.confidence_score;
+        scoresMap[key] = r.confidence_score;
       }
     });
     setScores(scoresMap);
@@ -170,6 +183,12 @@ setSubmitting(true);
         weekly_focus_id: focus.id,
         confidence_score: scores[focus.id]
       };
+      
+      // Add assignment_id when V2 enabled
+      if (v2Enabled) {
+        base.assignment_id = focus.id;
+      }
+      
       if (focus.self_select && selectedActions[focus.id]) {
         base.selected_action_id = selectedActions[focus.id];
       }

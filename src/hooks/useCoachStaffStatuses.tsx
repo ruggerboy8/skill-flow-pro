@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface StaffStatus {
@@ -29,15 +29,13 @@ export interface StaffStatus {
 }
 
 export function useCoachStaffStatuses() {
-  const [statuses, setStatuses] = useState<StaffStatus[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
+  const query = useQuery<StaffStatus[]>({
+    queryKey: ['coach-staff-statuses'],
+    staleTime: 60 * 1000,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('Not authenticated');
@@ -58,26 +56,11 @@ export function useCoachStaffStatuses() {
         });
       }
 
-      // Fetch emails separately since RPC doesn't return them
-      const staffIds = (rpcData || []).map((s: any) => s.staff_id);
-      let emailMap = new Map<string, string>();
-      
-      if (staffIds.length > 0) {
-        const { data: staffData } = await supabase
-          .from('staff')
-          .select('id, email')
-          .in('id', staffIds);
-        
-        (staffData || []).forEach((s: any) => {
-          emailMap.set(s.id, s.email);
-        });
-      }
-
-      // Map RPC results to StaffStatus
+      // Map RPC results to StaffStatus (email will be undefined)
       const normalized: StaffStatus[] = (rpcData || []).map((row: any) => ({
         staff_id: row.staff_id,
         staff_name: row.staff_name,
-        email: emailMap.get(row.staff_id),
+        email: undefined,
         role_id: row.role_id,
         role_name: row.role_name,
         location_id: row.location_id,
@@ -101,18 +84,14 @@ export function useCoachStaffStatuses() {
         tz: row.tz,
       }));
 
-      setStatuses(normalized);
-    } catch (err) {
-      console.error('[useCoachStaffStatuses] Error:', err);
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
+      return normalized;
+    },
+  });
+
+  return {
+    statuses: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error as Error | null,
+    reload: query.refetch,
   };
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  return { statuses, loading, error, reload: load };
 }

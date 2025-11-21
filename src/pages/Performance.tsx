@@ -67,28 +67,26 @@ export default function Performance() {
 
     const focusIds = weeklyFocus.map(f => f.id);
     
-    // Query scores by assignment_id when V2 enabled, otherwise use weekly_focus_id
-    const { data: scoresData, error: scoresError } = v2Enabled
-      ? await supabase
-          .from('weekly_scores')
-          .select('id, weekly_focus_id, assignment_id, confidence_score, confidence_date')
-          .eq('staff_id', staff.id)
-          .in('assignment_id', focusIds)
-          .not('confidence_score', 'is', null)
-      : await supabase
-          .from('weekly_scores')
-          .select('id, weekly_focus_id, assignment_id, confidence_score, confidence_date')
-          .eq('staff_id', staff.id)
-          .in('weekly_focus_id', focusIds)
-          .not('confidence_score', 'is', null);
+    // Query scores by both assignment_id and weekly_focus_id to handle V2 + legacy fallback
+    const { data: scoresData, error: scoresError } = await supabase
+      .from('weekly_scores')
+      .select('id, weekly_focus_id, assignment_id, confidence_score, confidence_date')
+      .eq('staff_id', staff.id)
+      .or(focusIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','))
+      .not('confidence_score', 'is', null);
 
-    if (scoresError || !scoresData || scoresData.length !== weeklyFocus.length) {
+    // Check we have scores for all assignments
+    const matchedScores = scoresData?.filter(score =>
+      weeklyFocus.some(f => f.id === score.assignment_id || f.id === score.weekly_focus_id)
+    ) || [];
+    
+    if (scoresError || matchedScores.length !== weeklyFocus.length) {
       toast({ title: "Error", description: "Complete confidence ratings first (Monday)", variant: "destructive" });
       navigate('/week');
       return;
     }
 
-    setExistingScores(scoresData);
+    setExistingScores(matchedScores);
   };
 
   const handleScoreChange = (focusId: string, score: string) => {
@@ -107,10 +105,17 @@ export default function Performance() {
 
     setSubmitting(true);
 
-    const updates = existingScores.map(score => ({
-      id: score.id,
-      performance_score: performanceScores[v2Enabled ? (score.assignment_id || score.weekly_focus_id) : score.weekly_focus_id]
-    }));
+    const updates = existingScores.map(score => {
+      // Find matching focus by either assignment_id or weekly_focus_id
+      const matchingFocus = weeklyFocus.find(f => 
+        f.id === score.assignment_id || f.id === score.weekly_focus_id
+      );
+      
+      return {
+        id: score.id,
+        performance_score: matchingFocus ? performanceScores[matchingFocus.id] : undefined
+      };
+    });
 
     const { error } = await supabase
       .from('weekly_scores')
@@ -145,7 +150,7 @@ export default function Performance() {
 
   const getConfidenceScore = (focusId: string) => {
     const score = existingScores.find(s => 
-      v2Enabled ? (s.assignment_id === focusId || s.weekly_focus_id === focusId) : s.weekly_focus_id === focusId
+      s.assignment_id === focusId || s.weekly_focus_id === focusId
     );
     return score?.confidence_score || 0;
   };

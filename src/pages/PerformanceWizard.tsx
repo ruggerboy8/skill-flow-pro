@@ -59,6 +59,7 @@ interface WeeklyFocus {
 interface WeeklyScore {
   id: string;
   weekly_focus_id: string;
+  assignment_id?: string | null;
   confidence_score: number;
   confidence_date?: string | null;
   selected_action_id?: number | null;
@@ -370,16 +371,21 @@ export default function PerformanceWizard() {
 
     setAssignments(weekAssignments);
 
-    // Load existing confidence scores with selected action IDs
+    // Load existing confidence scores with selected action IDs (check both assignment_id and weekly_focus_id)
     const focusIds = weekAssignments.map(a => a.weekly_focus_id);
     const { data: scoresData, error: scoresError } = await supabase
       .from('weekly_scores')
-      .select('id, weekly_focus_id, confidence_score, confidence_date, selected_action_id')
+      .select('id, weekly_focus_id, assignment_id, confidence_score, confidence_date, selected_action_id')
       .eq('staff_id', staffData.id)
-      .in('weekly_focus_id', focusIds)
+      .or(focusIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','))
       .not('confidence_score', 'is', null);
+    
+    // Match scores by either assignment_id or weekly_focus_id
+    const matchedScores = scoresData?.filter(score =>
+      focusIds.some(id => id === score.assignment_id || id === score.weekly_focus_id)
+    ) || [];
 
-    if (scoresError || !scoresData || (scoresData.length !== weekAssignments.length && !isRepair)) {
+    if (scoresError || matchedScores.length !== weekAssignments.length && !isRepair) {
       if (isRepair) {
         toast({
           title: "Error",
@@ -389,10 +395,10 @@ export default function PerformanceWizard() {
         navigate(returnTo ? decodeURIComponent(returnTo) : '/');
       } else {
         // Redirect to confidence wizard to complete missing ratings
-        const missingCount = weekAssignments.length - (scoresData?.length || 0);
+        const missingCount = weekAssignments.length - matchedScores.length;
         
         // Find the first incomplete confidence item
-        const completedIds = new Set((scoresData || []).map(s => s.weekly_focus_id));
+        const completedIds = new Set(matchedScores.map(s => s.assignment_id || s.weekly_focus_id));
         const firstIncompleteIndex = weekAssignments.findIndex(
           assignment => !completedIds.has(assignment.weekly_focus_id)
         );
@@ -460,10 +466,10 @@ export default function PerformanceWizard() {
     });
 
     setWeeklyFocus(transformedFocusData);
-    setExistingScores(scoresData);
+    setExistingScores(matchedScores);
     
     // Determine carryover if confidence was submitted before this Monday
-    const carryover = (scoresData || []).some((s: any) => s.confidence_date && new Date(s.confidence_date) < mondayZ);
+    const carryover = matchedScores.some((s: any) => s.confidence_date && new Date(s.confidence_date) < mondayZ);
     setIsCarryoverWeek(carryover);
 
     setCurrentFocus(transformedFocusData[currentIndex]);
@@ -561,12 +567,16 @@ export default function PerformanceWizard() {
     const actedOnIds = new Set<number>();
     
     for (const update of updates) {
-      const score = existingScores.find(s => s.weekly_focus_id === update.weekly_focus_id);
+      const score = existingScores.find(s => 
+        s.assignment_id === update.weekly_focus_id || s.weekly_focus_id === update.weekly_focus_id
+      );
       if (score?.selected_action_id) {
         actedOnIds.add(score.selected_action_id);
       }
       // For site moves, get the action_id from weekly_focus
-      const focusItem = weeklyFocus.find(wf => wf.id === score?.weekly_focus_id);
+      const focusItem = weeklyFocus.find(wf => 
+        wf.id === score?.assignment_id || wf.id === score?.weekly_focus_id
+      );
       if (focusItem) {
         const { data: focusData } = await supabase
           .from('weekly_focus')
@@ -616,7 +626,9 @@ export default function PerformanceWizard() {
   };
 
   const getConfidenceScore = (focusId: string) => {
-    const score = existingScores.find(s => s.weekly_focus_id === focusId);
+    const score = existingScores.find(s => 
+      s.assignment_id === focusId || s.weekly_focus_id === focusId
+    );
     return score?.confidence_score || 0;
   };
 

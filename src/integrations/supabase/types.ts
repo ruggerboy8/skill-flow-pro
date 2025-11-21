@@ -1952,14 +1952,12 @@ export type Database = {
         }[]
       }
       get_calendar_week_status: {
-        Args: { p_role_id: number; p_staff_id: string }
+        Args: { p_location_id: string; p_role_id: number }
         Returns: {
-          conf_count: number
-          cycle: number
-          is_current_week: boolean
-          perf_count: number
-          source: string
-          total: number
+          conf_complete_count: number
+          cycle_number: number
+          perf_complete_count: number
+          total_staff: number
           week_in_cycle: number
           week_of: string
         }[]

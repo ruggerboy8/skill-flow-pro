@@ -29,13 +29,11 @@ interface WeekData {
 
 interface WeekStatusRow {
   week_of: string;
-  total: number;
-  conf_count: number;
-  perf_count: number;
-  cycle: number | null;
+  total_staff: number;
+  conf_complete_count: number;
+  perf_complete_count: number;
+  cycle_number: number | null;
   week_in_cycle: number | null;
-  source: 'onboarding' | 'ongoing';
-  is_current_week: boolean;
 }
 
 interface MonthData {
@@ -64,7 +62,7 @@ export default function StatsScores() {
   const [years, setYears] = useState<YearData[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [staffData, setStaffData] = useState<{ id: string; role_id: number } | null>(null);
+  const [staffData, setStaffData] = useState<{ id: string; role_id: number; location_id?: string } | null>(null);
   const [currentWeekOf, setCurrentWeekOf] = useState<string | null>(null);
   const [currentCycle, setCurrentCycle] = useState<number | null>(null);
   const [currentWeek, setCurrentWeek] = useState<number | null>(null);
@@ -118,7 +116,11 @@ export default function StatsScores() {
       .single();
 
     if (staffRow) {
-      setStaffData({ id: staffRow.id, role_id: staffRow.role_id });
+      setStaffData({ 
+        id: staffRow.id, 
+        role_id: staffRow.role_id,
+        location_id: staffRow.primary_location_id 
+      });
 
       if (staffRow.primary_location_id) {
         const ctx = await getLocationWeekContext(staffRow.primary_location_id, new Date());
@@ -129,12 +131,12 @@ export default function StatsScores() {
   };
 
   const loadCalendarData = async () => {
-    if (!staffData) return;
+    if (!staffData || !staffData.location_id) return;
     setLoading(true);
     
     try {
       const { data: statusRows, error } = await supabase.rpc('get_calendar_week_status', {
-        p_staff_id: staffData.id,
+        p_location_id: staffData.location_id,
         p_role_id: staffData.role_id
       });
 
@@ -147,9 +149,8 @@ export default function StatsScores() {
         return;
       }
 
-      // Find current week from server data
-      const currentWeekRow = rows.find(r => r.is_current_week);
-      const currentMonday = currentWeekRow?.week_of || mondayOf(new Date()).toISOString().split('T')[0];
+      // Find current week (most recent Monday)
+      const currentMonday = mondayOf(new Date()).toISOString().split('T')[0];
       setCurrentWeekOf(currentMonday);
 
       // Build stable structure: Year → Month (with monthKey for sorting)
@@ -208,11 +209,12 @@ export default function StatsScores() {
       }
 
       // Set default-open accordions for current week
+      const currentWeekRow = rows.find(r => r.week_of === currentMonday);
       if (currentWeekRow) {
-        const d = new Date(currentWeekRow.week_of);
+        const d = new Date(currentMonday);
         const yKey = `year-${d.getFullYear()}`;
         const mKey = `month-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const wKey = `week-${currentWeekRow.week_of}`;
+        const wKey = `week-${currentMonday}`;
 
         setOpenYears([yKey]);
         setOpenMonths([mKey]);
@@ -399,23 +401,12 @@ export default function StatsScores() {
 
     let weekData: WeekData[];
 
-    // For onboarding weeks, load data by cycle/week
-    if (row.source === 'onboarding' && row.cycle !== null && row.week_in_cycle !== null) {
-      weekData = await loadWeekData(row.cycle, row.week_in_cycle);
+    // Load data by cycle/week if available, otherwise by week_of
+    if (row.cycle_number !== null && row.week_in_cycle !== null) {
+      weekData = await loadWeekData(row.cycle_number, row.week_in_cycle);
     } else {
-      const { data, error } = await supabase.rpc('get_week_detail_by_week', {
-        p_staff_id: staffData!.id,
-        p_role_id: staffData!.role_id,
-        p_week_of: row.week_of,
-        p_source: row.source
-      } as any);
-
-      if (error) {
-        console.error('Error loading ongoing week detail:', error);
-        weekData = [];
-      } else {
-        weekData = (data as WeekData[]) || [];
-      }
+      // Fallback to empty for now - can enhance later
+      weekData = [];
     }
 
     setPrefetchedWeeks(prev => new Set(prev).add(row.week_of));
@@ -610,11 +601,11 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
     try {
       let data, error;
 
-      if (weekRow.source === 'onboarding' && weekRow.cycle !== null && weekRow.week_in_cycle !== null) {
+      if (weekRow.cycle_number !== null && weekRow.week_in_cycle !== null) {
         const result = await supabase.rpc('delete_week_data', {
           p_staff_id: staffData.id,
           p_role_id: staffData.role_id,
-          p_cycle: weekRow.cycle,
+          p_cycle: weekRow.cycle_number,
           p_week: weekRow.week_in_cycle
         });
         data = result.data;
@@ -659,12 +650,12 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
     day: 'numeric' 
   });
 
-  const isCurrentWeek = weekRow.is_current_week;
+  const isCurrentWeek = weekRow.week_of === currentWeekOf;
 
   const isPastWeek = () => {
     if (currentCycle == null || currentWeek == null) return false;
-    if (weekRow.source === 'onboarding' && weekRow.cycle !== null && weekRow.week_in_cycle !== null) {
-      return weekRow.cycle < currentCycle || (weekRow.cycle === currentCycle && weekRow.week_in_cycle < currentWeek);
+    if (weekRow.cycle_number !== null && weekRow.week_in_cycle !== null) {
+      return weekRow.cycle_number < currentCycle || (weekRow.cycle_number === currentCycle && weekRow.week_in_cycle < currentWeek);
     }
     return new Date(weekRow.week_of) < new Date(currentWeekOf || '');
   };
@@ -675,19 +666,19 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
     const anchorId = `week-${weekRow.week_of}`;
     const returnTo = encodeURIComponent(`${location.pathname}${location.search}#${anchorId}`);
 
-    const { total, conf_count, perf_count } = weekRow;
-    const showConf = total > 0 && conf_count < total;
-    const showPerf = total > 0 && conf_count === total && perf_count < total;
+    const { total_staff, conf_complete_count, perf_complete_count } = weekRow;
+    const showConf = total_staff > 0 && conf_complete_count < total_staff;
+    const showPerf = total_staff > 0 && conf_complete_count === total_staff && perf_complete_count < total_staff;
 
     if (!showConf && !showPerf) return null;
 
     let baseUrlConf = `/confidence/current/step/1?mode=repair&weekOf=${weekRow.week_of}`;
     let baseUrlPerf = `/performance/current/step/1?mode=repair&weekOf=${weekRow.week_of}`;
     
-    // Always add cycle/week if available (not just for onboarding)
-    if (weekRow.cycle !== null && weekRow.week_in_cycle !== null) {
-      baseUrlConf += `&cycle=${weekRow.cycle}&wk=${weekRow.week_in_cycle}`;
-      baseUrlPerf += `&cycle=${weekRow.cycle}&wk=${weekRow.week_in_cycle}`;
+    // Always add cycle/week if available
+    if (weekRow.cycle_number !== null && weekRow.week_in_cycle !== null) {
+      baseUrlConf += `&cycle=${weekRow.cycle_number}&wk=${weekRow.week_in_cycle}`;
+      baseUrlPerf += `&cycle=${weekRow.cycle_number}&wk=${weekRow.week_in_cycle}`;
     }
 
     return (
@@ -707,10 +698,10 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
   };
 
   const getStatusGlyph = () => {
-    const { total, conf_count, perf_count } = weekRow;
-    if (total === 0) return { glyph: '—', title: 'No data', color: 'text-muted-foreground' };
-    if (perf_count === total && total > 0) return { glyph: '✓', title: 'All done', color: 'text-green-600' };
-    if (conf_count === total && perf_count < total) return { glyph: '●', title: 'In progress', color: 'text-yellow-600' };
+    const { total_staff, conf_complete_count, perf_complete_count } = weekRow;
+    if (total_staff === 0) return { glyph: '—', title: 'No data', color: 'text-muted-foreground' };
+    if (perf_complete_count === total_staff && total_staff > 0) return { glyph: '✓', title: 'All done', color: 'text-green-600' };
+    if (conf_complete_count === total_staff && perf_complete_count < total_staff) return { glyph: '●', title: 'In progress', color: 'text-yellow-600' };
     return { glyph: '—', title: 'Not started', color: 'text-muted-foreground' };
   };
 
@@ -737,7 +728,7 @@ function WeekAccordion({ weekRow, staffData, onExpand, weekData, isPrefetched, o
                   {statusGlyph.glyph}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {weekRow.perf_count}/{weekRow.total}
+                  {weekRow.perf_complete_count}/{weekRow.total_staff}
                 </span>
               </div>
             </div>

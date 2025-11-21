@@ -32,13 +32,11 @@ interface WeekData {
 
 interface WeekStatusRow {
   week_of: string;
-  total: number;
-  conf_count: number;
-  perf_count: number;
-  cycle: number | null;
+  total_staff: number;
+  conf_complete_count: number;
+  perf_complete_count: number;
+  cycle_number: number | null;
   week_in_cycle: number | null;
-  source: 'onboarding' | 'ongoing';
-  is_current_week: boolean;
 }
 
 interface MonthData {
@@ -110,9 +108,14 @@ export default function CoachDetail() {
   };
 
   const loadCalendarData = async (staff: StaffInfo) => {
+    if (!staff.location_id) {
+      setYears([]);
+      return;
+    }
+    
     try {
       const { data: statusRows, error } = await supabase.rpc('get_calendar_week_status', {
-        p_staff_id: staff.id,
+        p_location_id: staff.location_id,
         p_role_id: staff.role_id
       });
 
@@ -256,7 +259,7 @@ export default function CoachDetail() {
     let weekData: WeekData[];
 
     // RPC handles both weekly_focus (cycles 1-3) and weekly_plan (cycles 4+)
-    weekData = await loadWeekData(row.cycle ?? 1, row.week_in_cycle ?? 1, row.week_of);
+    weekData = await loadWeekData(row.cycle_number ?? 1, row.week_in_cycle ?? 1, row.week_of);
 
     setPrefetchedWeeks(prev => new Set([...prev, row.week_of]));
 
@@ -307,11 +310,11 @@ export default function CoachDetail() {
   };
 
   const getStatusBadge = (weekRow: WeekStatusRow) => {
-    const { total, conf_count, perf_count } = weekRow;
-    if (total === 0) return <span className="text-xs text-muted-foreground">—</span>;
-    if (conf_count === 0) return <span className="text-xs text-muted-foreground">—</span>;
-    if (perf_count === total) return <Badge variant="outline" className="text-green-600 border-green-400">✓</Badge>;
-    if (conf_count === total && perf_count < total) return <Badge variant="outline" className="text-yellow-600 border-yellow-400">●</Badge>;
+    const { total_staff, conf_complete_count, perf_complete_count } = weekRow;
+    if (total_staff === 0) return <span className="text-xs text-muted-foreground">—</span>;
+    if (conf_complete_count === 0) return <span className="text-xs text-muted-foreground">—</span>;
+    if (perf_complete_count === total_staff) return <Badge variant="outline" className="text-green-600 border-green-400">✓</Badge>;
+    if (conf_complete_count === total_staff && perf_complete_count < total_staff) return <Badge variant="outline" className="text-yellow-600 border-yellow-400">●</Badge>;
     return <span className="text-xs text-muted-foreground">—</span>;
   };
 
@@ -438,19 +441,14 @@ export default function CoachDetail() {
                                         onClick={() => onWeekExpand(yearData.year, monthData.monthKey, weekRow)}
                                         className="hover:no-underline"
                                       >
-                                        <div className="flex items-center justify-between w-full">
-                                          <div className="flex items-center gap-3">
-                                            <span>Week of {weekLabel}</span>
-                                            {weekRow.is_current_week && (
-                                              <Badge variant="outline" className="text-xs">
-                                                Current Week
-                                              </Badge>
-                                            )}
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            {getStatusBadge(weekRow)}
-                                          </div>
-                                        </div>
+                                         <div className="flex items-center justify-between w-full">
+                                           <div className="flex items-center gap-3">
+                                             <span>Week of {weekLabel}</span>
+                                           </div>
+                                           <div className="flex items-center gap-2">
+                                             {getStatusBadge(weekRow)}
+                                           </div>
+                                         </div>
                                       </AccordionTrigger>
                                       <AccordionContent>
                                         {isPrefetched && weekData ? (

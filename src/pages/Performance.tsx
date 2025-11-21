@@ -9,12 +9,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useWeeklyAssignments } from '@/hooks/useWeeklyAssignments';
 import { useToast } from '@/hooks/use-toast';
+import { useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors } from '@/lib/centralTime';
 
 interface WeeklyScore {
   id: string;
   weekly_focus_id: string;
+  assignment_id?: string | null;
   confidence_score: number;
   confidence_date?: string | null;
 }
@@ -32,6 +34,7 @@ export default function Performance() {
   const navigate = useNavigate();
   const location = useLocation();
   const [showCarryoverBanner, setShowCarryoverBanner] = useState<boolean>(Boolean((location.state as any)?.carryover));
+  const v2Enabled = useWeeklyAssignmentsV2Enabled;
 
   const weekNum = Number(week); // week param is now just "1", "2", etc.
 
@@ -63,12 +66,21 @@ export default function Performance() {
     if (!staff || !user || weeklyFocus.length === 0) return;
 
     const focusIds = weeklyFocus.map(f => f.id);
-    const { data: scoresData, error: scoresError } = await supabase
-      .from('weekly_scores')
-      .select('id, weekly_focus_id, confidence_score, confidence_date')
-      .eq('staff_id', staff.id)
-      .in('weekly_focus_id', focusIds)
-      .not('confidence_score', 'is', null);
+    
+    // Query scores by assignment_id when V2 enabled, otherwise use weekly_focus_id
+    const { data: scoresData, error: scoresError } = v2Enabled
+      ? await supabase
+          .from('weekly_scores')
+          .select('id, weekly_focus_id, assignment_id, confidence_score, confidence_date')
+          .eq('staff_id', staff.id)
+          .in('assignment_id', focusIds)
+          .not('confidence_score', 'is', null)
+      : await supabase
+          .from('weekly_scores')
+          .select('id, weekly_focus_id, assignment_id, confidence_score, confidence_date')
+          .eq('staff_id', staff.id)
+          .in('weekly_focus_id', focusIds)
+          .not('confidence_score', 'is', null);
 
     if (scoresError || !scoresData || scoresData.length !== weeklyFocus.length) {
       toast({ title: "Error", description: "Complete confidence ratings first (Monday)", variant: "destructive" });
@@ -97,7 +109,7 @@ export default function Performance() {
 
     const updates = existingScores.map(score => ({
       id: score.id,
-      performance_score: performanceScores[score.weekly_focus_id]
+      performance_score: performanceScores[v2Enabled ? (score.assignment_id || score.weekly_focus_id) : score.weekly_focus_id]
     }));
 
     const { error } = await supabase
@@ -132,7 +144,9 @@ export default function Performance() {
   };
 
   const getConfidenceScore = (focusId: string) => {
-    const score = existingScores.find(s => s.weekly_focus_id === focusId);
+    const score = existingScores.find(s => 
+      v2Enabled ? (s.assignment_id === focusId || s.weekly_focus_id === focusId) : s.weekly_focus_id === focusId
+    );
     return score?.confidence_score || 0;
   };
 

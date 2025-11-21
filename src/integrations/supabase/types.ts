@@ -2235,29 +2235,21 @@ export type Database = {
       get_staff_statuses: {
         Args: { p_coach_user_id: string }
         Returns: {
-          active_monday: string
           backlog_count: number
-          checkin_due: string
-          checkout_due: string
-          checkout_open: string
-          conf_count: number
-          cycle_number: number
-          last_activity_at: string
-          last_activity_kind: string
+          conf_submitted_count: number
+          email: string
+          last_conf_at: string
+          last_perf_at: string
           location_id: string
           location_name: string
           organization_id: string
           organization_name: string
-          perf_count: number
-          phase: string
+          perf_submitted_count: number
           required_count: number
           role_id: number
           role_name: string
-          source_used: string
           staff_id: string
           staff_name: string
-          tz: string
-          week_in_cycle: number
         }[]
       }
       get_staff_submission_windows: {

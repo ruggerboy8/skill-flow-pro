@@ -421,11 +421,16 @@ export default function ConfidenceWizard() {
     const focusIds = transformedFocusData.map(f => f.id);
     const { data: scoresData } = await supabase
       .from('weekly_scores')
-      .select('weekly_focus_id, confidence_score, selected_action_id')
+      .select('weekly_focus_id, assignment_id, confidence_score, selected_action_id')
       .eq('staff_id', staffData.id)
-      .in('weekly_focus_id', focusIds);
+      .or(focusIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','));
 
-    const submittedCount = (scoresData || []).filter((s) => s.confidence_score !== null).length;
+    // Match scores by either assignment_id or weekly_focus_id
+    const matchedScores = scoresData?.filter(score =>
+      focusIds.some(id => id === score.assignment_id || id === score.weekly_focus_id)
+    ) || [];
+
+    const submittedCount = matchedScores.filter((s) => s.confidence_score !== null).length;
     const hasConfidenceReal = submittedCount === assignments.length;
     const hasConfidenceSimulated = overrides.enabled && overrides.forceHasConfidence !== null 
       ? overrides.forceHasConfidence 
@@ -433,39 +438,61 @@ export default function ConfidenceWizard() {
     setHasConfidence(hasConfidenceSimulated);
 
     const selectedByFocus: { [key: string]: string | null } = {};
-    (scoresData || []).forEach((r) => {
-      if (r.selected_action_id) selectedByFocus[r.weekly_focus_id] = String(r.selected_action_id);
+    matchedScores.forEach((r) => {
+      // Find matching focus by either assignment_id or weekly_focus_id
+      const matchingId = focusIds.find(id => id === r.assignment_id || id === r.weekly_focus_id);
+      if (matchingId && r.selected_action_id) {
+        selectedByFocus[matchingId] = String(r.selected_action_id);
+      }
     });
     setSelectedActions(selectedByFocus);
 
     // Load self-select metadata and competency names
-    const { data: meta } = await supabase
+    // Extract raw IDs (handle assign:, plan:, and raw UUID formats)
+    const rawFocusIds = focusIds.map(id => {
+      if (id.startsWith('assign:')) return id.replace('assign:', '');
+      if (id.startsWith('plan:')) return id.replace('plan:', '');
+      return id;
+    });
+    
+    // Try both weekly_focus and weekly_assignments for metadata
+    const { data: focusMeta } = await supabase
       .from('weekly_focus')
-      .select(`
-        id, 
-        self_select, 
-        competency_id,
-        competencies(name)
-      `)
-      .in('id', focusIds);
+      .select('id, self_select, competency_id, competencies(name)')
+      .in('id', rawFocusIds);
+      
+    const { data: assignMeta } = await supabase
+      .from('weekly_assignments')
+      .select('id, self_select, competency_id')
+      .in('id', rawFocusIds);
+    
     const selfSel: Record<string, boolean> = {};
     const compMap: Record<string, number | null> = {};
     const compNameMap: Record<string, string> = {};
-    (meta || []).forEach((m: any) => {
+    
+    // Process weekly_focus metadata
+    (focusMeta || []).forEach((m: any) => {
       selfSel[m.id] = !!m.self_select;
       compMap[m.id] = (m.competency_id ?? null) as number | null;
       if (m.competencies?.name) {
         compNameMap[m.id] = m.competencies.name;
       }
     });
+    
+    // Process weekly_assignments metadata
+    (assignMeta || []).forEach((m: any) => {
+      const prefixedId = `assign:${m.id}`;
+      selfSel[prefixedId] = !!m.self_select;
+      compMap[prefixedId] = (m.competency_id ?? null) as number | null;
+    });
+    
     setSelfSelectById(selfSel);
     setCompetencyById(compMap);
     setCompetencyNameById(compNameMap);
 
     // Fetch options for competencies
-    const compIds = Array.from(new Set((meta || [])
-      .map((m: any) => m.competency_id)
-      .filter((cid: any) => !!cid)));
+    const allCompIds = [...Object.values(compMap), ...(focusMeta || []).map((m: any) => m.competency_id)];
+    const compIds = Array.from(new Set(allCompIds.filter((cid: any) => !!cid)));
     if (compIds.length) {
       const { data: opts } = await supabase
         .from('pro_moves')
@@ -608,19 +635,41 @@ export default function ConfidenceWizard() {
       return base;
     });
 
-    // Get weekly_focus data to set site_action_id for site slots
-    const { data: weeklyFocusData } = await supabase
+    // Get weekly_focus/weekly_assignments data to set site_action_id for site slots
+    // Extract raw IDs again
+    const rawIds = weeklyFocus.map(f => {
+      if (f.id.startsWith('assign:')) return f.id.replace('assign:', '');
+      if (f.id.startsWith('plan:')) return f.id.replace('plan:', '');
+      return f.id;
+    });
+    
+    const { data: focusActionData } = await supabase
       .from('weekly_focus')
       .select('id, action_id, self_select')
-      .in('id', weeklyFocus.map(f => f.id));
+      .in('id', rawIds);
+      
+    const { data: assignActionData } = await supabase
+      .from('weekly_assignments')
+      .select('id, action_id, self_select')
+      .in('id', rawIds);
 
-    const focusMap = new Map(weeklyFocusData?.map(wf => [wf.id, wf]) || []);
+    const actionMap = new Map<string, { action_id: number | null, self_select: boolean }>();
+    
+    // Map weekly_focus data (raw IDs)
+    (focusActionData || []).forEach(wf => {
+      actionMap.set(wf.id, { action_id: wf.action_id, self_select: wf.self_select });
+    });
+    
+    // Map weekly_assignments data (with prefix)
+    (assignActionData || []).forEach(wa => {
+      actionMap.set(`assign:${wa.id}`, { action_id: wa.action_id, self_select: wa.self_select });
+    });
 
     // Update scoreInserts with site_action_id for site slots
     const finalScoreInserts = scoreInserts.map(insert => {
-      const focusData = focusMap.get(insert.weekly_focus_id);
-      if (focusData && !focusData.self_select && focusData.action_id) {
-        insert.site_action_id = focusData.action_id;
+      const actionData = actionMap.get(insert.weekly_focus_id);
+      if (actionData && !actionData.self_select && actionData.action_id) {
+        insert.site_action_id = actionData.action_id;
       }
       return insert;
     });

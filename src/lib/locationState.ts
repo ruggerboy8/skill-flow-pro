@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
+import { useWeeklyAssignmentsV2Enabled } from './featureFlags';
 
 export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'done' | 'missed_checkout' | 'no_assignments';
 
@@ -126,11 +127,11 @@ export async function assembleWeek(params: {
 }): Promise<any[]> {
   const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
-  // ----- GRADUATION CHECK: Cycle 4+ uses global weekly_plan -----
+  // ----- GRADUATION CHECK: Cycle 4+ uses global plan -----
   if (cycleNumber >= 4) {
     const { data: location } = await supabase
       .from('locations')
-      .select('timezone')
+      .select('timezone, organization_id')
       .eq('id', locationId)
       .maybeSingle();
 
@@ -143,7 +144,82 @@ export async function assembleWeek(params: {
     const anchors = getWeekAnchors(now, location.timezone);
     const mondayStr = formatInTimeZone(anchors.mondayZ, location.timezone, 'yyyy-MM-dd');
 
-    // Query global weekly_plan (org_id IS NULL)
+    // Check feature flag to determine data source
+    if (useWeeklyAssignmentsV2Enabled) {
+      console.info('🚀 [assembleWeek] Using weekly_assignments V2 (feature flag ON)');
+      
+      // Query weekly_assignments (global: org_id null OR matches location's org)
+      const { data: assignData, error: assignErr } = await supabase
+        .from('weekly_assignments')
+        .select('id, display_order, action_id, self_select')
+        .eq('source', 'global')
+        .eq('role_id', roleId)
+        .eq('week_start_date', mondayStr)
+        .eq('status', 'locked')
+        .or(`org_id.is.null,org_id.eq.${location.organization_id}`)
+        .order('display_order');
+
+      if (!assignErr && assignData && assignData.length > 0) {
+        console.info('[assembleWeek] ✅ Using weekly_assignments for Cycle 4+ role=%d week=%s (found %d locked rows)', 
+          roleId, mondayStr, assignData.length);
+        
+        // Fetch with joins
+        const { data: enrichedAssign, error: enrichErr } = await supabase
+          .from('weekly_assignments')
+          .select(`
+            id,
+            action_id,
+            display_order,
+            self_select,
+            pro_moves!weekly_assignments_action_id_fkey (
+              action_statement,
+              intervention_text,
+              competencies!fk_pro_moves_competency_id (
+                name,
+                domains!competencies_domain_id_fkey (
+                  domain_name
+                )
+              )
+            )
+          `)
+          .eq('source', 'global')
+          .eq('role_id', roleId)
+          .eq('week_start_date', mondayStr)
+          .eq('status', 'locked')
+          .or(`org_id.is.null,org_id.eq.${location.organization_id}`)
+          .order('display_order');
+
+        if (enrichErr || !enrichedAssign) {
+          console.error('[assembleWeek] Failed to fetch enriched assignments:', enrichErr);
+          return [];
+        }
+
+        const result: any[] = enrichedAssign.map((assign: any) => ({
+          weekly_focus_id: `assign:${assign.id}`,
+          type: 'site',
+          pro_move_id: assign.action_id,
+          action_statement: assign.pro_moves?.action_statement || 'Pro Move',
+          intervention_text: assign.pro_moves?.intervention_text || null,
+          competency_name: assign.pro_moves?.competencies?.name || 'General',
+          domain_name: assign.pro_moves?.competencies?.domains?.domain_name || 'General',
+          required: true,
+          locked: !!assign.action_id,
+          display_order: assign.display_order,
+          source: 'assignments',
+          weekLabel: `Week of ${mondayStr}`
+        }));
+        
+        console.info('[assembleWeek] Returning %d weekly_assignments', result.length);
+        return result;
+      } else {
+        console.warn('[assembleWeek] ❌ No weekly_assignments for Cycle 4+ (week %s, role %d) - found %d rows', 
+          mondayStr, roleId, assignData?.length || 0);
+        return [];
+      }
+    }
+
+    // Legacy path: weekly_plan
+    console.info('📚 [assembleWeek] Using legacy weekly_plan (V2 flag OFF)');
     const { data: planData, error: planErr } = await supabase
       .from('weekly_plan')
       .select('id, display_order, action_id, self_select')
@@ -152,6 +228,7 @@ export async function assembleWeek(params: {
       .eq('week_start_date', mondayStr)
       .eq('status', 'locked')
       .order('display_order');
+
 
     // Check if we have locked rows (at least 1)
     if (!planErr && planData && planData.length > 0) {
@@ -458,7 +535,10 @@ export async function computeWeekState(params: {
   const required = requiredIds.length;
 
   // Derive source + label for display
-  const dataSource = allIds.some(id => String(id).startsWith('plan:')) ? 'weekly_plan' : 'weekly_focus';
+  const dataSource = allIds.some(id => {
+    const idStr = String(id);
+    return idStr.startsWith('plan:') || idStr.startsWith('assign:');
+  }) ? 'weekly_plan' : 'weekly_focus';
   const weekLabel = assignments[0]?.weekLabel || `Cycle ${cycleNumber}, Week ${weekInCycle}`;
 
   // current staff id from userId

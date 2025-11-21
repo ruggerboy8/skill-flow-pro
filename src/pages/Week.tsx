@@ -396,14 +396,17 @@ export default function Week() {
         .in('weekly_focus_id', allFocusIds),
       
       // Query 2: weekly_scores (CONSOLIDATED - fetch once with all fields)
-      supabase
-        .from('weekly_scores')
-        .select('weekly_focus_id, assignment_id, confidence_score, performance_score, selected_action_id')
-        .eq('staff_id', staff.id)
-        .or(v2Enabled 
-          ? `assignment_id.in.(${allFocusIds.map(id => `"${id}"`).join(',')})`
-          : `weekly_focus_id.in.(${allFocusIds.join(',')})`
-        ),
+      v2Enabled
+        ? supabase
+            .from('weekly_scores')
+            .select('weekly_focus_id, assignment_id, confidence_score, performance_score, selected_action_id')
+            .eq('staff_id', staff.id)
+            .in('assignment_id', allFocusIds)
+        : supabase
+            .from('weekly_scores')
+            .select('weekly_focus_id, assignment_id, confidence_score, performance_score, selected_action_id')
+            .eq('staff_id', staff.id)
+            .in('weekly_focus_id', allFocusIds),
       
       // Query 3: Carryover check
       supabase

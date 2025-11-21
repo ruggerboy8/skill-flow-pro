@@ -148,7 +148,7 @@ export async function assembleWeek(params: {
     if (useWeeklyAssignmentsV2Enabled) {
       console.info('🚀 [assembleWeek] Using weekly_assignments V2 (feature flag ON)');
       
-      // Query weekly_assignments (global: org_id null OR matches location's org)
+      // Query weekly_assignments (global only: org_id null)
       const { data: assignData, error: assignErr } = await supabase
         .from('weekly_assignments')
         .select('id, display_order, action_id, self_select')
@@ -156,7 +156,7 @@ export async function assembleWeek(params: {
         .eq('role_id', roleId)
         .eq('week_start_date', mondayStr)
         .eq('status', 'locked')
-        .or(`org_id.is.null,org_id.eq.${location.organization_id}`)
+        .is('org_id', null)
         .order('display_order');
 
       if (!assignErr && assignData && assignData.length > 0) {
@@ -186,7 +186,7 @@ export async function assembleWeek(params: {
           .eq('role_id', roleId)
           .eq('week_start_date', mondayStr)
           .eq('status', 'locked')
-          .or(`org_id.is.null,org_id.eq.${location.organization_id}`)
+          .is('org_id', null)
           .order('display_order');
 
         if (enrichErr || !enrichedAssign) {

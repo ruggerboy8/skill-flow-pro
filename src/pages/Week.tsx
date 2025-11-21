@@ -197,9 +197,11 @@ export default function Week() {
             )
           )
         `)
+        .eq('source', 'global')
         .eq('role_id', staff.role_id)
         .eq('week_start_date', mondayStr)
         .eq('status', 'locked')
+        .is('org_id', null)
         .is('superseded_at', null)
         .order('display_order');
 

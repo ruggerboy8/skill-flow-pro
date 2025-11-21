@@ -90,9 +90,11 @@ export function useWeeklyAssignments({
               )
             )
           `)
+          .eq('source', 'global')
           .eq('role_id', roleId)
           .eq('week_start_date', mondayStr)
           .eq('status', 'locked')
+          .is('org_id', null)
           .is('superseded_at', null)
           .order('display_order');
 

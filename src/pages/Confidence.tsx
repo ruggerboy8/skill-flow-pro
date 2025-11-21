@@ -78,18 +78,12 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     // Load existing confidence scores for this week
     const focusIds = weeklyFocus.map((f) => f.id);
     
-    // Query scores by assignment_id when V2 enabled, otherwise use weekly_focus_id
-    const { data: existing, error: existingError } = v2Enabled
-      ? await supabase
-          .from('weekly_scores')
-          .select('weekly_focus_id, assignment_id, confidence_score, selected_action_id')
-          .eq('staff_id', staff.id)
-          .in('assignment_id', focusIds)
-      : await supabase
-          .from('weekly_scores')
-          .select('weekly_focus_id, assignment_id, confidence_score, selected_action_id')
-          .eq('staff_id', staff.id)
-          .in('weekly_focus_id', focusIds);
+    // Query scores by both assignment_id and weekly_focus_id to handle V2 + legacy fallback
+    const { data: existing, error: existingError } = await supabase
+      .from('weekly_scores')
+      .select('weekly_focus_id, assignment_id, confidence_score, selected_action_id')
+      .eq('staff_id', staff.id)
+      .or(focusIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','));
 
     if (existingError) {
       console.error('Existing scores error:', existingError);
@@ -98,25 +92,27 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     const submitted = existing?.filter((r) => r.confidence_score != null).length ?? 0;
     setSubmittedCount(submitted);
 
-    // Pre-fill selected actions if previously chosen
-    // Use assignment_id for V2, weekly_focus_id for legacy
+    // Pre-fill selected actions and scores by matching either assignment_id or weekly_focus_id
     const selectedActionsMap: { [key: string]: string | null } = {};
-    existing?.forEach((r) => {
-      const key = v2Enabled ? (r.assignment_id || r.weekly_focus_id) : r.weekly_focus_id;
-      if (r.selected_action_id) {
-        selectedActionsMap[key] = r.selected_action_id.toString();
-      }
-    });
-    setSelectedActions(selectedActionsMap);
-
-    // Pre-fill scores
     const scoresMap: { [key: string]: number } = {};
+    
     existing?.forEach((r) => {
-      const key = v2Enabled ? (r.assignment_id || r.weekly_focus_id) : r.weekly_focus_id;
-      if (r.confidence_score != null) {
-        scoresMap[key] = r.confidence_score;
+      // Find matching focus by either assignment_id or weekly_focus_id
+      const matchingFocus = weeklyFocus.find(f => 
+        f.id === r.assignment_id || f.id === r.weekly_focus_id
+      );
+      
+      if (matchingFocus) {
+        if (r.selected_action_id) {
+          selectedActionsMap[matchingFocus.id] = r.selected_action_id.toString();
+        }
+        if (r.confidence_score != null) {
+          scoresMap[matchingFocus.id] = r.confidence_score;
+        }
       }
     });
+    
+    setSelectedActions(selectedActionsMap);
     setScores(scoresMap);
 
     // Load pro-move options for self-select competencies

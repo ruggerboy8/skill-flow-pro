@@ -101,7 +101,7 @@ export default function CoachDashboardV2() {
 
   const handleSendReminder = async (type: 'confidence' | 'performance') => {
     const missingRows = filteredStatuses.filter((row) =>
-      type === 'confidence' ? row.conf_count < row.required_count : row.perf_count < row.required_count
+      type === 'confidence' ? row.conf_submitted_count < row.required_count : row.perf_submitted_count < row.required_count
     );
     if (missingRows.length === 0) return;
 

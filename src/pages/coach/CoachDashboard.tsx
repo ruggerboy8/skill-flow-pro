@@ -1,418 +1,228 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { CheckCircle, X } from 'lucide-react';
-import { format } from 'date-fns';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useCoachStaffStatuses, type StaffStatus } from '@/hooks/useCoachStaffStatuses';
+import { useAuth } from '@/hooks/useAuth';
 import ReminderComposer from '@/components/coach/ReminderComposer';
+import { supabase } from '@/integrations/supabase/client';
+import { FiltersBar, type FilterOption } from '@/components/coach/dashboard/FiltersBar';
+import { CoverageTable } from '@/components/coach/dashboard/CoverageTable';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { format, isValid, startOfWeek } from 'date-fns';
 
 export default function CoachDashboard() {
   const navigate = useNavigate();
+  const { user, isCoach, isLead, isSuperAdmin, roleLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, isCoach, isLead } = useAuth();
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Filter state - restore from URL params
-  const [selectedOrganization, setSelectedOrganization] = useState(searchParams.get('org') || 'all');
-  const [selectedLocation, setSelectedLocation] = useState(searchParams.get('loc') || 'all');
-  const [selectedRole, setSelectedRole] = useState(searchParams.get('role') || 'all');
-  const [search, setSearch] = useState(searchParams.get('q') || '');
+  const [filters, setFilters] = useState({
+    organization: searchParams.get('org') ?? 'all',
+    location: searchParams.get('loc') ?? 'all',
+    role: searchParams.get('role') ?? 'all',
+    search: searchParams.get('q') ?? '',
+  });
 
-  // Reminder modal state
+  const initialWeekParam = searchParams.get('week');
+  const initialWeek = useMemo(() => {
+    if (!initialWeekParam) return startOfWeek(new Date(), { weekStartsOn: 1 });
+    const parsed = new Date(initialWeekParam);
+    if (!isValid(parsed)) return startOfWeek(new Date(), { weekStartsOn: 1 });
+    return startOfWeek(parsed, { weekStartsOn: 1 });
+  }, [initialWeekParam]);
+
+  const [selectedWeek, setSelectedWeek] = useState<Date>(initialWeek);
+
+  const [debouncedSearch, setDebouncedSearch] = useState(filters.search);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [reminderType, setReminderType] = useState<'confidence' | 'performance'>('confidence');
   const [reminderRecipients, setReminderRecipients] = useState<any[]>([]);
 
-  // Load staff statuses via RPC
-  const { statuses, loading, reload } = useCoachStaffStatuses();
+  const { statuses, loading, error, reload } = useCoachStaffStatuses({
+    coachUserId: user?.id,
+    weekOf: selectedWeek,
+    enabled: !!user,
+  });
 
-  // Check super admin
+  // Role gate
   useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        const { data } = await supabase
-          .from('staff')
-          .select('is_super_admin')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        setIsSuperAdmin(Boolean((data as any)?.is_super_admin));
-      } catch {
-        // ignore
-      }
-    })();
-  }, [user]);
-
-  // Redirect if not authorized
-  useEffect(() => {
-    if (!loading && !(isCoach || isSuperAdmin || isLead)) {
+    if (roleLoading) return;
+    if (!(isCoach || isLead || isSuperAdmin)) {
       navigate('/');
     }
-  }, [isCoach, isSuperAdmin, isLead, loading, navigate]);
+  }, [isCoach, isLead, isSuperAdmin, roleLoading, navigate]);
 
-  // Unique filter options
-  const organizations = useMemo(() => {
-    return Array.from(new Set(statuses.map(s => s.organization_name))).sort();
-  }, [statuses]);
+  // Debounce search input for lighter filtering
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(filters.search), 250);
+    return () => clearTimeout(timeout);
+  }, [filters.search]);
 
-  const locations = useMemo(() => {
-    const filtered = selectedOrganization === 'all'
-      ? statuses
-      : statuses.filter(s => s.organization_name === selectedOrganization);
-    return Array.from(new Set(filtered.map(s => s.location_name))).sort();
-  }, [statuses, selectedOrganization]);
-
-  const roles = useMemo(() => {
-    return Array.from(new Set(statuses.map(s => s.role_name))).sort();
-  }, [statuses]);
-
-  // Apply filters
-  const filteredStatuses = useMemo(() => {
-    let filtered = [...statuses];
-
-    if (selectedOrganization !== 'all') {
-      filtered = filtered.filter(s => s.organization_name === selectedOrganization);
-    }
-
-    if (selectedLocation !== 'all') {
-      filtered = filtered.filter(s => s.location_name === selectedLocation);
-    }
-
-    if (selectedRole !== 'all') {
-      filtered = filtered.filter(s => s.role_name === selectedRole);
-    }
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(s =>
-        s.staff_name.toLowerCase().includes(q) ||
-        s.location_name.toLowerCase().includes(q) ||
-        s.role_name.toLowerCase().includes(q)
-      );
-    }
-
-    return filtered;
-  }, [statuses, selectedOrganization, selectedLocation, selectedRole, search]);
-
-  // Persist filters to URL
+  // Sync filters to query string
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    
-    if (selectedOrganization !== 'all') params.set('org', selectedOrganization);
-    else params.delete('org');
-    
-    if (selectedLocation !== 'all') params.set('loc', selectedLocation);
-    else params.delete('loc');
-    
-    if (selectedRole !== 'all') params.set('role', selectedRole);
-    else params.delete('role');
-    
-    if (search.trim()) params.set('q', search.trim());
-    else params.delete('q');
-
+    if (filters.organization !== 'all') params.set('org', filters.organization); else params.delete('org');
+    if (filters.location !== 'all') params.set('loc', filters.location); else params.delete('loc');
+    if (filters.role !== 'all') params.set('role', filters.role); else params.delete('role');
+    if (filters.search.trim()) params.set('q', filters.search.trim()); else params.delete('q');
+    if (selectedWeek) params.set('week', format(selectedWeek, 'yyyy-MM-dd')); else params.delete('week');
     setSearchParams(params, { replace: true });
-  }, [selectedOrganization, selectedLocation, selectedRole, search, setSearchParams]);
+  }, [filters, selectedWeek, searchParams, setSearchParams]);
 
-  // Clear filters
-  const clearFilters = () => {
-    setSelectedOrganization('all');
-    setSelectedLocation('all');
-    setSelectedRole('all');
-    setSearch('');
-  };
-
-  const hasActiveFilters = selectedOrganization !== 'all' || selectedLocation !== 'all' || selectedRole !== 'all' || search.trim() !== '';
-
-  // Coverage helpers - derive from RPC status data
-  const sortedRows = useMemo(() => {
-    const rows = filteredStatuses.map(status => ({
-      ...status,
-      conf_submitted: status.conf_count >= status.required_count,
-      perf_submitted: status.perf_count >= status.required_count,
-      conf_late: false,
-      perf_late: false,
-    }));
-
-    // Sort: missing both > missing conf > missing perf > complete, then A-Z by name
-    return rows.sort((a, b) => {
-      const aPriority = (!a.conf_submitted && !a.perf_submitted) ? 0
-        : !a.conf_submitted ? 1
-        : !a.perf_submitted ? 2
-        : 3;
-
-      const bPriority = (!b.conf_submitted && !b.perf_submitted) ? 0
-        : !b.conf_submitted ? 1
-        : !b.perf_submitted ? 2
-        : 3;
-
-      if (aPriority !== bPriority) return aPriority - bPriority;
-
-      return a.staff_name.localeCompare(b.staff_name);
+  const filteredStatuses = useMemo(() => {
+    return statuses.filter((status) => {
+      if (filters.organization !== 'all' && status.organization_name !== filters.organization) return false;
+      if (filters.location !== 'all' && status.location_name !== filters.location) return false;
+      if (filters.role !== 'all' && status.role_name !== filters.role) return false;
+      if (debouncedSearch.trim()) {
+        const term = debouncedSearch.toLowerCase();
+        const searchable = [status.staff_name, status.location_name, status.role_name, status.organization_name, status.email || '']
+          .join(' ')
+          .toLowerCase();
+        if (!searchable.includes(term)) return false;
+      }
+      return true;
     });
-  }, [filteredStatuses]);
+  }, [statuses, filters.organization, filters.location, filters.role, debouncedSearch]);
 
-  const missingConfCount = sortedRows.filter(r => !r.conf_submitted).length;
-  const missingPerfCount = sortedRows.filter(r => !r.perf_submitted).length;
+  const organizationOptions: FilterOption[] = useMemo(() => {
+    const unique = new Set(['all']);
+    statuses.forEach((row) => unique.add(row.organization_name));
+    return Array.from(unique).map((value) => ({ value, label: value === 'all' ? 'All organizations' : value }));
+  }, [statuses]);
 
-  // Open reminder modal for confidence
-  const openConfidenceReminder = async () => {
-    const missing = sortedRows.filter(r => !r.conf_submitted);
-    const staffIds = missing.map(r => r.staff_id);
-    
-    // Fetch user_id for each staff member
-    const { data: staffData } = await supabase
-      .from('staff')
-      .select('id, user_id')
-      .in('id', staffIds);
-    
-    const userIdMap = new Map((staffData || []).map((s: any) => [s.id, s.user_id]));
-    
-    const recipients = missing.map(r => ({
-      id: r.staff_id,
-      name: r.staff_name,
-      email: r.email || '',
-      role_id: r.role_id,
-      user_id: userIdMap.get(r.staff_id) || '',
-    }));
-    setReminderRecipients(recipients);
-    setReminderType('confidence');
-    setReminderOpen(true);
-  };
+  const locationOptions: FilterOption[] = useMemo(() => {
+    const unique = new Set(['all']);
+    statuses
+      .filter((row) => filters.organization === 'all' || row.organization_name === filters.organization)
+      .forEach((row) => unique.add(row.location_name));
+    return Array.from(unique).map((value) => ({ value, label: value === 'all' ? 'All locations' : value }));
+  }, [statuses, filters.organization]);
 
-  // Open reminder modal for performance
-  const openPerformanceReminder = async () => {
-    const missing = sortedRows.filter(r => !r.perf_submitted);
-    const staffIds = missing.map(r => r.staff_id);
-    
-    // Fetch user_id for each staff member
-    const { data: staffData } = await supabase
-      .from('staff')
-      .select('id, user_id')
-      .in('id', staffIds);
-    
-    const userIdMap = new Map((staffData || []).map((s: any) => [s.id, s.user_id]));
-    
-    const recipients = missing.map(r => ({
-      id: r.staff_id,
-      name: r.staff_name,
-      email: r.email || '',
-      role_id: r.role_id,
-      user_id: userIdMap.get(r.staff_id) || '',
-    }));
-    setReminderRecipients(recipients);
-    setReminderType('performance');
-    setReminderOpen(true);
-  };
+  const roleOptions: FilterOption[] = useMemo(() => {
+    const unique = new Set(['all']);
+    statuses.forEach((row) => unique.add(row.role_name));
+    return Array.from(unique).map((value) => ({ value, label: value === 'all' ? 'All roles' : value }));
+  }, [statuses]);
 
-  // Format last activity
-  const formatLastActivity = (row: StaffStatus) => {
-    if (row.last_activity_at && row.last_activity_kind) {
-      const date = format(new Date(row.last_activity_at), 'MMM d');
-      const type = row.last_activity_kind === 'confidence' ? 'Conf' : 'Perf';
-      return `${type} · ${date}`;
-    }
-    return '—';
-  };
-
-  // Status cell component
-  function StatusCell({ submitted, late, type }: { submitted: boolean; late: boolean; type: string }) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger>
-            <div className="flex items-center gap-2 justify-center">
-              {submitted ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <X className="h-5 w-5 text-red-600" />
-              )}
-              {late && <Badge variant="destructive" className="text-xs">Late</Badge>}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            {submitted ? `${type} submitted` : `${type} missing`}
-            {late && ' (late)'}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+  const handleSendReminder = async (type: 'confidence' | 'performance') => {
+    const missingRows = filteredStatuses.filter((row) =>
+      type === 'confidence'
+        ? row.required_count > 0 && row.conf_submitted_count < row.required_count
+        : row.required_count > 0 && row.perf_submitted_count < row.required_count
     );
-  }
+    if (missingRows.length === 0) return;
 
-  if (loading) {
+    const staffIds = missingRows.map((row) => row.staff_id);
+    const { data, error: staffError } = await supabase
+      .from('staff')
+      .select('id, user_id, email')
+      .in('id', staffIds);
+
+    if (staffError) {
+      console.error('Failed to load staff for reminders', staffError);
+      return;
+    }
+
+    const staffMap = new Map<string, { user_id: string; email: string | null }>();
+    (data || []).forEach((row) => {
+      staffMap.set(row.id, { user_id: row.user_id, email: row.email });
+    });
+
+    const recipients = missingRows.map((row) => ({
+      id: row.staff_id,
+      name: row.staff_name,
+      email: staffMap.get(row.staff_id)?.email || row.email || '',
+      role_id: row.role_id,
+      user_id: staffMap.get(row.staff_id)?.user_id || '',
+    }));
+
+    setReminderType(type);
+    setReminderRecipients(recipients);
+    setReminderOpen(true);
+  };
+
+  if (loading || roleLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        Loading coach dashboard…
       </div>
     );
   }
 
+  if (!(isCoach || isLead || isSuperAdmin)) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
-      {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <CardTitle>Coach Dashboard</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="mb-4 grid gap-2 sm:flex sm:items-center sm:justify-between">
             <div>
-              <label className="text-sm font-medium mb-2 block">Organization</label>
-              <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Organizations</SelectItem>
-                  {organizations.map(org => (
-                    <SelectItem key={org} value={org}>{org}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <p className="text-sm text-muted-foreground">Select a week to evaluate submissions.</p>
+              <p className="text-xs text-muted-foreground">Weeks start on Monday in each staff member's timezone.</p>
             </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Location</label>
-              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Locations</SelectItem>
-                  {locations.map(loc => (
-                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Role</label>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {roles.map(role => (
-                    <SelectItem key={role} value={role}>{role}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Search</label>
-              <Input
-                placeholder="Search staff, location, role..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
+            <Input
+              type="date"
+              value={format(selectedWeek, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                const next = new Date(e.target.value);
+                const normalized = isValid(next) ? startOfWeek(next, { weekStartsOn: 1 }) : startOfWeek(new Date(), { weekStartsOn: 1 });
+                setSelectedWeek(normalized);
+              }}
+              className="w-[180px]"
+            />
           </div>
-
-          {hasActiveFilters && (
-            <div className="mt-4">
-              <Button variant="outline" size="sm" onClick={clearFilters}>
-                Clear Filters
-              </Button>
-            </div>
-          )}
+          <FiltersBar
+            organization={filters.organization}
+            location={filters.location}
+            role={filters.role}
+            search={filters.search}
+            organizationOptions={organizationOptions}
+            locationOptions={locationOptions}
+            roleOptions={roleOptions}
+            onChange={setFilters}
+            onReset={() => setFilters({ organization: 'all', location: 'all', role: 'all', search: '' })}
+          />
         </CardContent>
       </Card>
 
-      {/* Staff Coverage */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Staff Coverage</CardTitle>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={missingConfCount === 0}
-                onClick={openConfidenceReminder}
-              >
-                Reminder: Confidence ({missingConfCount})
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={missingPerfCount === 0}
-                onClick={openPerformanceReminder}
-              >
-                Reminder: Performance ({missingPerfCount})
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredStatuses.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              No staff match the selected filters
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Last Activity</TableHead>
-                  <TableHead className="text-center">Confidence</TableHead>
-                  <TableHead className="text-center">Performance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedRows.map(row => (
-                  <TableRow
-                    key={row.staff_id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/coach/${row.staff_id}`)}
-                  >
-                    <TableCell className="font-medium">{row.staff_name}</TableCell>
-                    <TableCell>{row.role_name}</TableCell>
-                    <TableCell>{row.location_name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatLastActivity(row)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <StatusCell
-                        submitted={row.conf_submitted}
-                        late={row.conf_late}
-                        type="confidence"
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <StatusCell
-                        submitted={row.perf_submitted}
-                        late={row.perf_late}
-                        type="performance"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Unable to load staff coverage</AlertTitle>
+          <AlertDescription className="flex items-center gap-2">
+            There was a problem loading staff status data. Please try again.
+            <Button size="sm" onClick={() => reload()}>
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <CoverageTable
+          rows={filteredStatuses as StaffStatus[]}
+          loading={loading}
+          weekOf={selectedWeek}
+          onNavigate={(id) => navigate(`/coach/${id}`)}
+          onSendReminder={handleSendReminder}
+        />
+      )}
 
-      {/* Reminder Composer */}
       <ReminderComposer
         type={reminderType}
         recipients={reminderRecipients}
         open={reminderOpen}
-        onOpenChange={setReminderOpen}
+        onOpenChange={(open) => {
+          setReminderOpen(open);
+          if (!open) reload();
+        }}
       />
     </div>
   );

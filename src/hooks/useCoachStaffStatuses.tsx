@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -12,55 +13,86 @@ export interface StaffStatus {
   organization_id: string;
   organization_name: string;
   active_monday: string;
-  cycle_number: number;
-  week_in_cycle: number;
-  phase: string;
-  checkin_due: string;
-  checkout_open: string;
-  checkout_due: string;
   required_count: number;
-  conf_count: number;
-  perf_count: number;
+  conf_submitted_count: number;
+  conf_late_count: number;
+  perf_submitted_count: number;
+  perf_late_count: number;
   backlog_count: number;
-  last_activity_kind: string | null;
-  last_activity_at: string | null;
-  source_used: string;
+  last_conf_at: string | null;
+  last_perf_at: string | null;
   tz: string;
 }
 
-export function useCoachStaffStatuses() {
+export interface UseCoachStaffStatusesOptions {
+  coachUserId?: string | null;
+  weekOf?: Date | string;
+  enabled?: boolean;
+}
+
+export function useCoachStaffStatuses({
+  coachUserId,
+  weekOf,
+  enabled = true,
+}: UseCoachStaffStatusesOptions = {}) {
+  const serializedWeek = useMemo(() => {
+    if (!weekOf) return undefined;
+    const dateValue = typeof weekOf === 'string' ? new Date(weekOf) : weekOf;
+    if (Number.isNaN(dateValue.getTime())) return undefined;
+    return dateValue.toISOString().slice(0, 10); // YYYY-MM-DD
+  }, [weekOf]);
+
   const query = useQuery<StaffStatus[]>({
-    queryKey: ['coach-staff-statuses'],
+    queryKey: ['coach-staff-statuses', coachUserId, serializedWeek],
+    enabled: enabled && (coachUserId === undefined || !!coachUserId),
     staleTime: 60 * 1000,
-    refetchInterval: 30000,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const effectiveCoachId = coachUserId ?? user?.id;
+
+      if (!effectiveCoachId) {
         throw new Error('Not authenticated');
       }
 
+      const rpcArgs: { p_coach_user_id: string; p_week_start?: string } = {
+        p_coach_user_id: effectiveCoachId,
+      };
+
+      if (serializedWeek) {
+        rpcArgs.p_week_start = serializedWeek;
+      }
+
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_staff_statuses', { p_coach_user_id: user.id });
+        .rpc('get_staff_statuses', rpcArgs);
 
       if (rpcError) {
         console.error('[useCoachStaffStatuses] RPC error:', rpcError);
         throw rpcError;
       }
 
-      // Log warning if no data returned
-      if (!rpcData || rpcData.length === 0) {
-        console.warn('⚠️ get_staff_statuses returned no rows', {
-          message: 'Check RLS policies and coach scope configuration'
+      const staffIds = (rpcData || []).map((s: any) => s.staff_id);
+      const emailMap = new Map<string, string>();
+
+      if (staffIds.length > 0) {
+        const { data: staffData, error: staffError } = await supabase
+          .from('staff')
+          .select('id, email')
+          .in('id', staffIds);
+
+        if (staffError) {
+          console.error('[useCoachStaffStatuses] Staff email lookup error:', staffError);
+          throw staffError;
+        }
+
+        (staffData || []).forEach((s: any) => {
+          emailMap.set(s.id, s.email);
         });
       }
 
-      // Map RPC results to StaffStatus (email will be undefined)
-      const normalized: StaffStatus[] = (rpcData || []).map((row: any) => ({
+      return (rpcData || []).map((row: any) => ({
         staff_id: row.staff_id,
         staff_name: row.staff_name,
-        email: undefined,
+        email: emailMap.get(row.staff_id),
         role_id: row.role_id,
         role_name: row.role_name,
         location_id: row.location_id,
@@ -68,30 +100,23 @@ export function useCoachStaffStatuses() {
         organization_id: row.organization_id,
         organization_name: row.organization_name,
         active_monday: row.active_monday,
-        cycle_number: row.cycle_number,
-        week_in_cycle: row.week_in_cycle,
-        phase: row.phase,
-        checkin_due: row.checkin_due,
-        checkout_open: row.checkout_open,
-        checkout_due: row.checkout_due,
         required_count: row.required_count,
-        conf_count: row.conf_count,
-        perf_count: row.perf_count,
+        conf_submitted_count: row.conf_submitted_count,
+        conf_late_count: row.conf_late_count,
+        perf_submitted_count: row.perf_submitted_count,
+        perf_late_count: row.perf_late_count,
         backlog_count: row.backlog_count,
-        last_activity_kind: row.last_activity_kind,
-        last_activity_at: row.last_activity_at,
-        source_used: row.source_used,
+        last_conf_at: row.last_conf_at,
+        last_perf_at: row.last_perf_at,
         tz: row.tz,
       }));
-
-      return normalized;
     },
   });
 
   return {
     statuses: query.data ?? [],
     loading: query.isLoading,
-    error: query.error as Error | null,
+    error: (query.error as Error) ?? null,
     reload: query.refetch,
   };
 }

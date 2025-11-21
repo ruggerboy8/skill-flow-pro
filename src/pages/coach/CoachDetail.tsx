@@ -293,13 +293,29 @@ export default function CoachDetail() {
         ? { confidence_score: null, confidence_date: null, confidence_late: null }
         : { performance_score: null, performance_date: null, performance_late: null };
 
-      const { error } = await supabase
-        .from('weekly_scores')
-        .update(updateData)
-        .eq('staff_id', staffInfo.id)
-        .eq('weekly_focus_id', weeklyFocusId);
+      // Handle both assignment_id (V2) and weekly_focus_id (legacy) formats
+      const isAssignmentId = weeklyFocusId.startsWith('assign:');
+      
+      if (isAssignmentId) {
+        // V2 format - use assignment_id
+        const assignmentId = weeklyFocusId.replace('assign:', '');
+        const { error } = await supabase
+          .from('weekly_scores')
+          .update(updateData)
+          .eq('staff_id', staffInfo.id)
+          .eq('assignment_id', assignmentId);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // Legacy format - use weekly_focus_id (includes 'plan:' prefix)
+        const { error } = await supabase
+          .from('weekly_scores')
+          .update(updateData)
+          .eq('staff_id', staffInfo.id)
+          .eq('weekly_focus_id', weeklyFocusId);
+
+        if (error) throw error;
+      }
 
       // Reload calendar data to refresh
       await loadCalendarData(staffInfo);

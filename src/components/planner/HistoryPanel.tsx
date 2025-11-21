@@ -54,34 +54,84 @@ export function HistoryPanel({ roleId, roleName }: HistoryPanelProps) {
       const endDate = new Date(now);
       endDate.setMonth(endDate.getMonth() + 3 + monthOffset);
 
-      const { data, error } = await supabase
-        .from('weekly_plan')
-        .select(`
-          week_start_date,
-          status,
-          display_order,
-          action_id,
-          generated_by,
-          rank_version,
-          pro_moves:fk_weekly_plan_action_id!inner(
-            action_statement, 
-            competencies:fk_pro_moves_competency_id!inner(
-              domains:fk_competencies_domain_id!inner(domain_name)
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      // Fetch from all three sources
+      const [planData, focusData, assignmentsData] = await Promise.all([
+        // Weekly plan (cycles 4+)
+        supabase
+          .from('weekly_plan')
+          .select(`
+            week_start_date,
+            status,
+            display_order,
+            action_id,
+            generated_by,
+            rank_version,
+            pro_moves:fk_weekly_plan_action_id!inner(
+              action_statement, 
+              competencies:fk_pro_moves_competency_id!inner(
+                domains:fk_competencies_domain_id!inner(domain_name)
+              )
             )
-          )
-        `)
-        .is('org_id', null)
-        .eq('role_id', roleId)
-        .gte('week_start_date', startDate.toISOString().split('T')[0])
-        .lte('week_start_date', endDate.toISOString().split('T')[0])
-        .order('week_start_date', { ascending: false })
-        .order('display_order', { ascending: true });
+          `)
+          .is('org_id', null)
+          .eq('role_id', roleId)
+          .gte('week_start_date', startDateStr)
+          .lte('week_start_date', endDateStr)
+          .order('week_start_date', { ascending: false }),
+        
+        // Weekly focus (cycles 1-3)
+        supabase
+          .from('weekly_focus')
+          .select(`
+            week_start_date,
+            display_order,
+            action_id,
+            cycle,
+            week_in_cycle,
+            pro_moves:action_id!inner(
+              action_statement,
+              competencies:fk_pro_moves_competency_id!inner(
+                domains:fk_competencies_domain_id!inner(domain_name)
+              )
+            )
+          `)
+          .eq('role_id', roleId)
+          .gte('week_start_date', startDateStr)
+          .lte('week_start_date', endDateStr)
+          .order('week_start_date', { ascending: false }),
 
-      if (error) throw error;
+        // Weekly assignments (V2)
+        supabase
+          .from('weekly_assignments')
+          .select(`
+            week_start_date,
+            status,
+            display_order,
+            action_id,
+            source,
+            pro_moves:action_id!inner(
+              action_statement,
+              competencies:fk_pro_moves_competency_id!inner(
+                domains:fk_competencies_domain_id!inner(domain_name)
+              )
+            )
+          `)
+          .is('org_id', null)
+          .is('location_id', null)
+          .eq('role_id', roleId)
+          .gte('week_start_date', startDateStr)
+          .lte('week_start_date', endDateStr)
+          .order('week_start_date', { ascending: false })
+      ]);
 
-      // Group by week
+      // Group by week from all sources
       const grouped: Record<string, GroupedWeek> = {};
-      (data || []).forEach((row: any) => {
+
+      // Process weekly_plan
+      (planData.data || []).forEach((row: any) => {
         const weekStart = row.week_start_date;
         if (!grouped[weekStart]) {
           grouped[weekStart] = {
@@ -97,6 +147,49 @@ export function HistoryPanel({ roleId, roleName }: HistoryPanelProps) {
           domain: row.pro_moves.competencies.domains.domain_name,
           displayOrder: row.display_order,
         });
+      });
+
+      // Process weekly_focus
+      (focusData.data || []).forEach((row: any) => {
+        const weekStart = row.week_start_date;
+        if (!grouped[weekStart]) {
+          grouped[weekStart] = {
+            weekStart,
+            status: 'locked',
+            generatedBy: 'legacy',
+            rankVersion: null,
+            moves: [],
+          };
+        }
+        grouped[weekStart].moves.push({
+          name: row.pro_moves.action_statement,
+          domain: row.pro_moves.competencies.domains.domain_name,
+          displayOrder: row.display_order,
+        });
+      });
+
+      // Process weekly_assignments
+      (assignmentsData.data || []).forEach((row: any) => {
+        const weekStart = row.week_start_date;
+        if (!grouped[weekStart]) {
+          grouped[weekStart] = {
+            weekStart,
+            status: row.status,
+            generatedBy: row.source === 'global' ? 'sequencer' : row.source,
+            rankVersion: null,
+            moves: [],
+          };
+        }
+        grouped[weekStart].moves.push({
+          name: row.pro_moves.action_statement,
+          domain: row.pro_moves.competencies.domains.domain_name,
+          displayOrder: row.display_order,
+        });
+      });
+
+      // Sort moves within each week
+      Object.values(grouped).forEach(week => {
+        week.moves.sort((a, b) => a.displayOrder - b.displayOrder);
       });
 
       // Separate past and future

@@ -248,10 +248,24 @@ export type Database = {
             referencedColumns: ["domain_id"]
           },
           {
+            foreignKeyName: "competencies_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "view_weekly_scores_with_competency"
+            referencedColumns: ["domain_id"]
+          },
+          {
             foreignKeyName: "fk_competencies_domain_id"
             columns: ["domain_id"]
             isOneToOne: false
             referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
+          {
+            foreignKeyName: "fk_competencies_domain_id"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "view_weekly_scores_with_competency"
             referencedColumns: ["domain_id"]
           },
           {
@@ -334,6 +348,13 @@ export type Database = {
             columns: ["domain_id"]
             isOneToOne: false
             referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
+          {
+            foreignKeyName: "evaluation_items_domain_id_fk"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "view_weekly_scores_with_competency"
             referencedColumns: ["domain_id"]
           },
           {
@@ -1679,10 +1700,24 @@ export type Database = {
             referencedColumns: ["domain_id"]
           },
           {
+            foreignKeyName: "competencies_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "view_weekly_scores_with_competency"
+            referencedColumns: ["domain_id"]
+          },
+          {
             foreignKeyName: "fk_competencies_domain_id"
             columns: ["domain_id"]
             isOneToOne: false
             referencedRelation: "domains"
+            referencedColumns: ["domain_id"]
+          },
+          {
+            foreignKeyName: "fk_competencies_domain_id"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "view_weekly_scores_with_competency"
             referencedColumns: ["domain_id"]
           },
           {
@@ -1867,31 +1902,11 @@ export type Database = {
           primary_location_id: string | null
           role_id: number | null
           staff_id: string | null
+          week_of: string | null
           weekly_focus_id: string | null
           weekly_score_id: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "competencies_domain_id_fkey"
-            columns: ["domain_id"]
-            isOneToOne: false
-            referencedRelation: "domains"
-            referencedColumns: ["domain_id"]
-          },
-          {
-            foreignKeyName: "fk_competencies_domain_id"
-            columns: ["domain_id"]
-            isOneToOne: false
-            referencedRelation: "domains"
-            referencedColumns: ["domain_id"]
-          },
-          {
-            foreignKeyName: "fk_pro_moves_competency_id"
-            columns: ["competency_id"]
-            isOneToOne: false
-            referencedRelation: "competencies"
-            referencedColumns: ["competency_id"]
-          },
           {
             foreignKeyName: "locations_org_fkey"
             columns: ["organization_id"]

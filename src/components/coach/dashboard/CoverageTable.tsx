@@ -3,9 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { StaffStatus } from '@/hooks/useCoachStaffStatuses';
 
@@ -17,51 +15,66 @@ export interface CoverageTableProps {
   onSendReminder: (type: 'confidence' | 'performance') => void;
 }
 
-function StatusCell({ submitted, type }: { submitted: boolean; type: string }) {
+function StatusCell({ 
+  submittedCount, 
+  lateCount, 
+  requiredCount, 
+  type 
+}: { 
+  submittedCount: number; 
+  lateCount: number; 
+  requiredCount: number; 
+  type: string;
+}) {
+  const isMissing = submittedCount < requiredCount;
+  const isLate = !isMissing && lateCount > 0;
+  const isSubmitted = !isMissing && lateCount === 0;
+
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger>
-          <div className="flex items-center justify-center gap-2">
-            {submitted ? (
-              <CheckCircle className="h-5 w-5 text-green-600" />
-            ) : (
-              <X className="h-5 w-5 text-red-600" />
-            )}
-            {!submitted && (
-              <Badge variant="destructive" className="text-xs">
-                Missing
-              </Badge>
-            )}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>{submitted ? `${type} submitted` : `${type} missing`}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className="flex items-center justify-center">
+      {isMissing && (
+        <Badge variant="destructive" className="text-xs">
+          Missing
+        </Badge>
+      )}
+      {isLate && (
+        <Badge className="text-xs bg-yellow-500 hover:bg-yellow-600 text-white">
+          Late
+        </Badge>
+      )}
+      {isSubmitted && (
+        <Badge className="text-xs bg-green-600 hover:bg-green-700 text-white">
+          Submitted
+        </Badge>
+      )}
+    </div>
   );
 }
 
 export function CoverageTable({ rows, loading, weekOf, onNavigate, onSendReminder }: CoverageTableProps) {
   const sortedRows = useMemo(() => {
     return [...rows].sort((a, b) => {
-      const aMissingPerformance = a.perf_submitted_count < a.required_count;
-      const bMissingPerformance = b.perf_submitted_count < b.required_count;
-      if (aMissingPerformance !== bMissingPerformance) {
-        return aMissingPerformance ? -1 : 1;
+      // Sort by missing items first
+      const aMissingPerf = a.perf_submitted_count < a.required_count;
+      const bMissingPerf = b.perf_submitted_count < b.required_count;
+      if (aMissingPerf !== bMissingPerf) {
+        return aMissingPerf ? -1 : 1;
       }
 
-      const aMissingConfidence = a.conf_submitted_count < a.required_count;
-      const bMissingConfidence = b.conf_submitted_count < b.required_count;
-      if (aMissingConfidence !== bMissingConfidence) {
-        return aMissingConfidence ? -1 : 1;
+      const aMissingConf = a.conf_submitted_count < a.required_count;
+      const bMissingConf = b.conf_submitted_count < b.required_count;
+      if (aMissingConf !== bMissingConf) {
+        return aMissingConf ? -1 : 1;
       }
 
-      const aMissingTotal = a.required_count - a.conf_submitted_count + (a.required_count - a.perf_submitted_count);
-      const bMissingTotal = b.required_count - b.conf_submitted_count + (b.required_count - b.perf_submitted_count);
-      if (aMissingTotal !== bMissingTotal) {
-        return bMissingTotal - aMissingTotal;
+      // Then sort by late items
+      const aHasLate = a.perf_late_count > 0 || a.conf_late_count > 0;
+      const bHasLate = b.perf_late_count > 0 || b.conf_late_count > 0;
+      if (aHasLate !== bHasLate) {
+        return aHasLate ? -1 : 1;
       }
 
+      // Finally sort alphabetically by name
       return a.staff_name.localeCompare(b.staff_name);
     });
   }, [rows]);
@@ -93,7 +106,7 @@ export function CoverageTable({ rows, loading, weekOf, onNavigate, onSendReminde
           <div>
             <CardTitle>Staff Coverage</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Sorted by most critical missing submissions first.
+              Sorted by missing submissions, then late submissions.
             </p>
           </div>
           <div className="flex gap-2">
@@ -144,10 +157,20 @@ export function CoverageTable({ rows, loading, weekOf, onNavigate, onSendReminde
                   <TableCell>{row.organization_name}</TableCell>
                   <TableCell>{row.location_name}</TableCell>
                   <TableCell className="text-center">
-                    <StatusCell submitted={row.conf_submitted_count >= row.required_count} type="Confidence" />
+                    <StatusCell 
+                      submittedCount={row.conf_submitted_count} 
+                      lateCount={row.conf_late_count}
+                      requiredCount={row.required_count}
+                      type="Confidence" 
+                    />
                   </TableCell>
                   <TableCell className="text-center">
-                    <StatusCell submitted={row.perf_submitted_count >= row.required_count} type="Performance" />
+                    <StatusCell 
+                      submittedCount={row.perf_submitted_count} 
+                      lateCount={row.perf_late_count}
+                      requiredCount={row.required_count}
+                      type="Performance" 
+                    />
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {row.last_conf_at || row.last_perf_at

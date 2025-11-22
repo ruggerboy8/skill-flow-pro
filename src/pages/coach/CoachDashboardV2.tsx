@@ -9,12 +9,25 @@ import ReminderComposer from '@/components/coach/ReminderComposer';
 import { supabase } from '@/integrations/supabase/client';
 import { FiltersBar, type FilterOption } from '@/components/coach/dashboard/FiltersBar';
 import { CoverageTable } from '@/components/coach/dashboard/CoverageTable';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, startOfWeek, addDays, isValid } from 'date-fns';
 
 export default function CoachDashboardV2() {
   const navigate = useNavigate();
   const { isCoach, isLead, isSuperAdmin, roleLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Week state management
+  const getInitialWeek = (): Date => {
+    const weekParam = searchParams.get('week');
+    if (weekParam) {
+      const parsed = new Date(weekParam);
+      if (isValid(parsed)) return parsed;
+    }
+    return startOfWeek(new Date(), { weekStartsOn: 1 });
+  };
+
+  const [selectedWeek, setSelectedWeek] = useState<Date>(getInitialWeek());
 
   const [filters, setFilters] = useState({
     organization: searchParams.get('org') ?? 'all',
@@ -28,7 +41,9 @@ export default function CoachDashboardV2() {
   const [reminderType, setReminderType] = useState<'confidence' | 'performance'>('confidence');
   const [reminderRecipients, setReminderRecipients] = useState<any[]>([]);
 
-  const { statuses, loading, error, reload } = useCoachStaffStatuses();
+  const { statuses, loading, error, reload } = useCoachStaffStatuses({
+    weekOf: selectedWeek,
+  });
 
   // Role gate
   useEffect(() => {
@@ -44,7 +59,7 @@ export default function CoachDashboardV2() {
     return () => clearTimeout(timeout);
   }, [filters.search]);
 
-  // Sync filters to query string
+  // Sync filters and week to query string
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     if (filters.organization !== 'all') params.set('org', filters.organization);
@@ -55,8 +70,9 @@ export default function CoachDashboardV2() {
     else params.delete('role');
     if (filters.search.trim()) params.set('q', filters.search.trim());
     else params.delete('q');
+    params.set('week', format(selectedWeek, 'yyyy-MM-dd'));
     setSearchParams(params, { replace: true });
-  }, [filters, searchParams, setSearchParams]);
+  }, [filters, selectedWeek, searchParams, setSearchParams]);
 
   const filteredStatuses = useMemo(() => {
     return statuses.filter((status) => {
@@ -165,6 +181,40 @@ export default function CoachDashboardV2() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Week Selection</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedWeek(addDays(selectedWeek, -7))}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Prev Week
+            </Button>
+            <div className="text-center">
+              <p className="text-lg font-semibold">
+                Week of {format(selectedWeek, 'MMM d, yyyy')}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Weeks start on Monday
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedWeek(addDays(selectedWeek, 7))}
+            >
+              Next Week
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {error ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -180,6 +230,7 @@ export default function CoachDashboardV2() {
         <CoverageTable
           rows={filteredStatuses as StaffStatus[]}
           loading={loading}
+          weekOf={selectedWeek}
           onNavigate={(id) => navigate(`/coach/${id}`)}
           onSendReminder={handleSendReminder}
         />

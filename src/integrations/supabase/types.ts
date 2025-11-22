@@ -2239,7 +2239,6 @@ export type Database = {
           backlog_count: number
           conf_late_count: number
           conf_submitted_count: number
-          email: string
           last_conf_at: string
           last_perf_at: string
           location_id: string

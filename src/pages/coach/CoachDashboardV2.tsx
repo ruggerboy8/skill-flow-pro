@@ -1,9 +1,153 @@
+import { Button } from '@/components/ui/button';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { format } from 'date-fns';
+
 export default function CoachDashboardV2() {
+  const { data, loading, error, reload } = useStaffWeeklyScores();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <p className="text-destructive">Error loading staff data: {error.message}</p>
+        <Button onClick={reload} variant="outline">
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <p className="text-muted-foreground">
-        Clean slate - ready to build V2 piece by piece
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Coach Dashboard V2</h1>
+          <p className="text-muted-foreground">Phase 1: Raw data verification</p>
+        </div>
+        <Button onClick={reload} variant="outline" size="sm">
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Reload Data
+        </Button>
+      </div>
+
+      <div className="text-sm text-muted-foreground">
+        Showing {data.length} staff members
+      </div>
+
+      <Accordion type="single" collapsible className="space-y-2">
+        {data.map((item) => (
+          <AccordionItem key={item.staff.id} value={item.staff.id} className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex flex-col items-start gap-1 text-left">
+                <div className="font-semibold">{item.staff.name}</div>
+                <div className="text-sm text-muted-foreground">
+                  {item.staff.role_name} • {item.staff.location_name} • {item.staff.organization_name}
+                  <span className="ml-2">({item.scores.length} scores)</span>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              {item.scores.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">No scores recorded yet</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Week of</TableHead>
+                      <TableHead>Pro Move / Domain</TableHead>
+                      <TableHead>Confidence</TableHead>
+                      <TableHead>Performance</TableHead>
+                      <TableHead>Flags</TableHead>
+                      <TableHead>Source</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {item.scores.map((score) => (
+                      <TableRow key={score.score_id}>
+                        <TableCell className="font-mono text-sm">
+                          {score.week_of ? format(new Date(score.week_of), 'yyyy-MM-dd') : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-sm">{score.action_statement}</div>
+                            {score.domain_name && (
+                              <div className="text-xs text-muted-foreground">{score.domain_name}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {score.confidence_score !== null && (
+                              <div className="font-semibold">{score.confidence_score}</div>
+                            )}
+                            {score.confidence_date && (
+                              <div className="text-xs text-muted-foreground">
+                                {format(new Date(score.confidence_date), 'MMM d, h:mm a')}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {score.performance_score !== null && (
+                              <div className="font-semibold">{score.performance_score}</div>
+                            )}
+                            {score.performance_date && (
+                              <div className="text-xs text-muted-foreground">
+                                {format(new Date(score.performance_date), 'MMM d, h:mm a')}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1 text-xs">
+                            {score.confidence_late && (
+                              <span className="text-orange-600">Conf Late</span>
+                            )}
+                            {score.performance_late && (
+                              <span className="text-orange-600">Perf Late</span>
+                            )}
+                            {score.self_select && (
+                              <span className="text-blue-600">Self-Select</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          <div>C: {score.confidence_source}</div>
+                          <div>P: {score.performance_source}</div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
     </div>
   );
 }

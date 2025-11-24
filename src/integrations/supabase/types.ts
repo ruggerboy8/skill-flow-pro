@@ -2233,31 +2233,26 @@ export type Database = {
         }[]
       }
       get_staff_statuses: {
-        Args: { p_coach_user_id: string; p_now?: string }
+        Args: { p_coach_user_id: string; p_week_start?: string }
         Returns: {
           active_monday: string
           backlog_count: number
-          checkin_due: string
-          checkout_due: string
-          checkout_open: string
-          conf_count: number
-          cycle_number: number
-          last_activity_at: string
-          last_activity_kind: string
+          conf_late_count: number
+          conf_submitted_count: number
+          last_conf_at: string
+          last_perf_at: string
           location_id: string
           location_name: string
           organization_id: string
           organization_name: string
-          perf_count: number
-          phase: string
+          perf_late_count: number
+          perf_submitted_count: number
           required_count: number
           role_id: number
           role_name: string
-          source_used: string
           staff_id: string
           staff_name: string
           tz: string
-          week_in_cycle: number
         }[]
       }
       get_staff_submission_windows: {
@@ -2295,9 +2290,54 @@ export type Database = {
           staff_id: string
         }[]
       }
-      get_staff_week_assignments: {
-        Args: { p_role_id: number; p_staff_id: string; p_week_start: string }
-        Returns: Json
+      get_staff_week_assignments:
+        | {
+            Args: {
+              p_role_id: number
+              p_staff_id: string
+              p_week_start: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_role_id: number
+              p_staff_id: string
+              p_week_start: string
+            }
+            Returns: Json
+          }
+      get_staff_weekly_scores: {
+        Args: { p_coach_user_id: string }
+        Returns: {
+          action_id: number
+          action_statement: string
+          assignment_id: string
+          confidence_date: string
+          confidence_late: boolean
+          confidence_score: number
+          confidence_source: Database["public"]["Enums"]["score_source"]
+          display_order: number
+          domain_id: number
+          domain_name: string
+          location_id: string
+          location_name: string
+          organization_id: string
+          organization_name: string
+          performance_date: string
+          performance_late: boolean
+          performance_score: number
+          performance_source: Database["public"]["Enums"]["score_source"]
+          role_id: number
+          role_name: string
+          score_id: string
+          selected_action_id: number
+          self_select: boolean
+          staff_email: string
+          staff_id: string
+          staff_name: string
+          week_of: string
+        }[]
       }
       get_strengths_weaknesses: {
         Args: {

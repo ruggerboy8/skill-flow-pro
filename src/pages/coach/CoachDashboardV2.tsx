@@ -1,76 +1,268 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CheckCircle, X, ChevronDown, ChevronLeft, ChevronRight, CalendarIcon, RotateCw } from 'lucide-react';
+import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
-import { useStaffProfile } from '@/hooks/useStaffProfile';
-import { Loader2, RefreshCw, CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, addWeeks, startOfWeek } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
+import { StaffWeekSummary } from '@/types/coachV2';
+import ReminderComposer from '@/components/coach/ReminderComposer';
 
 export default function CoachDashboardV2() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const profileQuery = useStaffProfile({ redirectToSetup: false });
-  const [selectedWeek, setSelectedWeek] = useState<Date | undefined>(undefined);
-  
-  // Format as YYYY-MM-DD for the RPC (only if a week is selected)
-  const weekOfString = selectedWeek ? format(startOfWeek(selectedWeek, { weekStartsOn: 1 }), 'yyyy-MM-dd') : null;
-  
-  const { data, loading, error, reload } = useStaffWeeklyScores({ weekOf: weekOfString });
 
+  // Week selection
+  const [selectedWeek, setSelectedWeek] = useState<Date>(() => {
+    const weekParam = searchParams.get('week');
+    if (weekParam) {
+      return new Date(weekParam);
+    }
+    // Default to current Monday
+    const today = new Date();
+    const day = today.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff);
+  });
+
+  // Filter state - restore from URL params
+  const [selectedOrganization, setSelectedOrganization] = useState(searchParams.get('org') || 'all');
+  const [selectedLocation, setSelectedLocation] = useState(searchParams.get('loc') || 'all');
+  const [selectedRole, setSelectedRole] = useState(searchParams.get('role') || 'all');
+  const [search, setSearch] = useState(searchParams.get('q') || '');
+
+  // Reminder state
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderType, setReminderType] = useState<'confidence' | 'performance'>('confidence');
+  const [reminderRecipients, setReminderRecipients] = useState<any[]>([]);
+
+  // Expanded rows
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  // Format week for RPC
+  const weekOfString = format(selectedWeek, 'yyyy-MM-dd');
+
+  // Load data
+  const { rawData, summaries, loading, error, reload } = useStaffWeeklyScores({ 
+    weekOf: weekOfString 
+  });
+
+  // Week navigation
   const handlePreviousWeek = () => {
-    setSelectedWeek(prev => {
-      const base = prev || new Date();
-      return addWeeks(startOfWeek(base, { weekStartsOn: 1 }), -1);
-    });
+    const prev = new Date(selectedWeek);
+    prev.setDate(prev.getDate() - 7);
+    setSelectedWeek(prev);
   };
 
   const handleNextWeek = () => {
-    setSelectedWeek(prev => {
-      const base = prev || new Date();
-      return addWeeks(startOfWeek(base, { weekStartsOn: 1 }), 1);
+    const next = new Date(selectedWeek);
+    next.setDate(next.getDate() + 7);
+    setSelectedWeek(next);
+  };
+
+  // Persist week to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    params.set('week', format(selectedWeek, 'yyyy-MM-dd'));
+    setSearchParams(params, { replace: true });
+  }, [selectedWeek]);
+
+  // Unique filter options
+  const organizations = useMemo(() => {
+    return Array.from(new Set(summaries.map(s => s.organization_name))).sort();
+  }, [summaries]);
+
+  const locations = useMemo(() => {
+    const filtered = selectedOrganization === 'all'
+      ? summaries
+      : summaries.filter(s => s.organization_name === selectedOrganization);
+    return Array.from(new Set(filtered.map(s => s.location_name))).sort();
+  }, [summaries, selectedOrganization]);
+
+  const roles = useMemo(() => {
+    return Array.from(new Set(summaries.map(s => s.role_name))).sort();
+  }, [summaries]);
+
+  // Apply filters
+  const filteredSummaries = useMemo(() => {
+    let filtered = [...summaries];
+
+    if (selectedOrganization !== 'all') {
+      filtered = filtered.filter(s => s.organization_name === selectedOrganization);
+    }
+
+    if (selectedLocation !== 'all') {
+      filtered = filtered.filter(s => s.location_name === selectedLocation);
+    }
+
+    if (selectedRole !== 'all') {
+      filtered = filtered.filter(s => s.role_name === selectedRole);
+    }
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(s =>
+        s.staff_name.toLowerCase().includes(q) ||
+        s.staff_email.toLowerCase().includes(q)
+      );
+    }
+
+    return filtered;
+  }, [summaries, selectedOrganization, selectedLocation, selectedRole, search]);
+
+  // Sort: missing both → missing conf → missing perf → complete, then A-Z
+  const sortedRows = useMemo(() => {
+    return [...filteredSummaries].sort((a, b) => {
+      const aHasConf = a.conf_count === a.assignment_count;
+      const aHasPerf = a.perf_count === a.assignment_count;
+      const bHasConf = b.conf_count === b.assignment_count;
+      const bHasPerf = b.perf_count === b.assignment_count;
+
+      const aPriority = (!aHasConf && !aHasPerf) ? 0
+        : !aHasConf ? 1
+        : !aHasPerf ? 2
+        : 3;
+
+      const bPriority = (!bHasConf && !bHasPerf) ? 0
+        : !bHasConf ? 1
+        : !bHasPerf ? 2
+        : 3;
+
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return a.staff_name.localeCompare(b.staff_name);
+    });
+  }, [filteredSummaries]);
+
+  // Persist filters to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    
+    if (selectedOrganization !== 'all') params.set('org', selectedOrganization);
+    else params.delete('org');
+    
+    if (selectedLocation !== 'all') params.set('loc', selectedLocation);
+    else params.delete('loc');
+    
+    if (selectedRole !== 'all') params.set('role', selectedRole);
+    else params.delete('role');
+    
+    if (search.trim()) params.set('q', search.trim());
+    else params.delete('q');
+
+    setSearchParams(params, { replace: true });
+  }, [selectedOrganization, selectedLocation, selectedRole, search]);
+
+  // Clear filters
+  const clearFilters = () => {
+    setSelectedOrganization('all');
+    setSelectedLocation('all');
+    setSelectedRole('all');
+    setSearch('');
+  };
+
+  const hasActiveFilters = selectedOrganization !== 'all' || selectedLocation !== 'all' || selectedRole !== 'all' || search.trim() !== '';
+
+  // Missing counts for reminder buttons
+  const missingConfCount = sortedRows.filter(s => s.conf_count < s.assignment_count).length;
+  const missingPerfCount = sortedRows.filter(s => s.perf_count < s.assignment_count).length;
+
+  // Open reminder modals
+  const openConfidenceReminder = () => {
+    const missing = sortedRows.filter(s => s.conf_count < s.assignment_count);
+    const recipients = missing.map(s => ({
+      id: s.staff_id,
+      name: s.staff_name,
+      email: s.staff_email,
+      role_id: s.role_id,
+      user_id: s.user_id,
+    }));
+    setReminderRecipients(recipients);
+    setReminderType('confidence');
+    setReminderOpen(true);
+  };
+
+  const openPerformanceReminder = () => {
+    const missing = sortedRows.filter(s => s.perf_count < s.assignment_count);
+    const recipients = missing.map(s => ({
+      id: s.staff_id,
+      name: s.staff_name,
+      email: s.staff_email,
+      role_id: s.role_id,
+      user_id: s.user_id,
+    }));
+    setReminderRecipients(recipients);
+    setReminderType('performance');
+    setReminderOpen(true);
+  };
+
+  // Toggle row expansion
+  const toggleExpanded = (staffId: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(staffId)) {
+        next.delete(staffId);
+      } else {
+        next.add(staffId);
+      }
+      return next;
     });
   };
 
-  const displayWeek = selectedWeek 
-    ? format(startOfWeek(selectedWeek, { weekStartsOn: 1 }), 'MMM d, yyyy')
-    : 'Most Recent Week';
+  // Status cell component
+  function StatusCell({ hasAll, hasAnyLate, type }: { hasAll: boolean; hasAnyLate: boolean; type: string }) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <div className="flex items-center gap-2 justify-center">
+              {hasAll ? (
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <X className="h-5 w-5 text-red-600" />
+              )}
+              {hasAll && hasAnyLate && <Badge variant="destructive" className="text-xs">Late</Badge>}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            {hasAll ? `${type} complete` : `${type} incomplete`}
+            {hasAll && hasAnyLate && ' (some late)'}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Coach Dashboard</h1>
+        <div className="animate-pulse space-y-4">
+          <div className="h-32 bg-muted rounded" />
+          <div className="h-64 bg-muted rounded" />
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="space-y-4">
-        <p className="text-destructive">Error loading staff data: {error.message}</p>
-        <Button onClick={reload} variant="outline">
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Retry
-        </Button>
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Coach Dashboard</h1>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive">Error loading data: {error.message}</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -78,177 +270,249 @@ export default function CoachDashboardV2() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Coach Dashboard V2</h1>
-          <p className="text-muted-foreground">Phase 1: Raw data verification</p>
-        </div>
-        <Button onClick={reload} variant="outline" size="sm">
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Reload Data
+        <h1 className="text-3xl font-bold">Coach Dashboard</h1>
+        <Button variant="outline" size="sm" onClick={reload}>
+          <RotateCw className="h-4 w-4 mr-2" />
+          Reload
         </Button>
       </div>
 
-      <div className="flex items-center gap-2 p-4 bg-muted/50 rounded-lg">
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={handlePreviousWeek}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "justify-start text-left font-normal min-w-[200px]",
-                !selectedWeek && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {displayWeek}
+      {/* Week Picker */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Week Selection</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="sm" onClick={handlePreviousWeek}>
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={selectedWeek}
-              onSelect={(date) => {
-                if (date) {
-                  setSelectedWeek(startOfWeek(date, { weekStartsOn: 1 }));
-                }
-              }}
-              initialFocus
-              className="p-3 pointer-events-auto"
-            />
-          </PopoverContent>
-        </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-64">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(selectedWeek, 'MMM d, yyyy')} (Week of)
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={selectedWeek}
+                  onSelect={(date) => date && setSelectedWeek(date)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" size="sm" onClick={handleNextWeek}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={handleNextWeek}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Organization</label>
+              <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Organizations</SelectItem>
+                  {organizations.map(org => (
+                    <SelectItem key={org} value={org}>{org}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        {selectedWeek && (
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => setSelectedWeek(undefined)}
-          >
-            Reset to Latest
-          </Button>
-        )}
-      </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Location</label>
+              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {locations.map(loc => (
+                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      <div className="space-y-2 p-4 bg-muted/50 rounded-lg text-sm">
-        <div className="font-semibold">Debug Info:</div>
-        <div className="grid grid-cols-2 gap-2 text-muted-foreground">
-          <div>Your scope type:</div>
-          <div className="font-mono">{profileQuery.data?.coach_scope_type || 'null (super admin?)'}</div>
-          <div>Your scope ID:</div>
-          <div className="font-mono text-xs">{profileQuery.data?.coach_scope_id || 'null'}</div>
-          <div>Is super admin:</div>
-          <div>{profileQuery.data?.is_super_admin ? 'Yes' : 'No'}</div>
-          <div>Staff members visible:</div>
-          <div className="font-semibold">{data.length}</div>
-        </div>
-      </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Role</label>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {roles.map(role => (
+                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      <Accordion type="single" collapsible className="space-y-2">
-        {data.map((item) => (
-          <AccordionItem key={item.staff.id} value={item.staff.id} className="border rounded-lg px-4">
-            <AccordionTrigger className="hover:no-underline">
-              <div className="flex flex-col items-start gap-1 text-left">
-                <div className="font-semibold">{item.staff.name}</div>
-                <div className="text-sm text-muted-foreground">
-                  {item.staff.role_name} • {item.staff.location_name} • {item.staff.organization_name}
-                  <span className="ml-2">({item.scores.length} scores)</span>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              {item.scores.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">No scores recorded yet</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Week of</TableHead>
-                      <TableHead>Pro Move / Domain</TableHead>
-                      <TableHead>Confidence</TableHead>
-                      <TableHead>Performance</TableHead>
-                      <TableHead>Flags</TableHead>
-                      <TableHead>Source</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {item.scores.map((score) => (
-                      <TableRow key={score.score_id}>
-                        <TableCell className="font-mono text-sm">
-                          {score.week_of || 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="text-sm">{score.action_statement}</div>
-                            {score.domain_name && (
-                              <div className="text-xs text-muted-foreground">{score.domain_name}</div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Search</label>
+              <Input
+                placeholder="Search staff..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {hasActiveFilters && (
+            <div className="mt-4">
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Staff Coverage Table */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Staff Coverage ({sortedRows.length} staff)</CardTitle>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={missingConfCount === 0}
+                onClick={openConfidenceReminder}
+              >
+                Reminder: Confidence ({missingConfCount})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={missingPerfCount === 0}
+                onClick={openPerformanceReminder}
+              >
+                Reminder: Performance ({missingPerfCount})
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sortedRows.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No staff match the selected filters
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10"></TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead className="text-center">Assignments</TableHead>
+                  <TableHead className="text-center">Confidence</TableHead>
+                  <TableHead className="text-center">Performance</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedRows.map(row => {
+                  const isExpanded = expandedRows.has(row.staff_id);
+                  const hasAllConf = row.conf_count === row.assignment_count;
+                  const hasAllPerf = row.perf_count === row.assignment_count;
+                  
+                  return (
+                    <Collapsible key={row.staff_id} open={isExpanded} onOpenChange={() => toggleExpanded(row.staff_id)} asChild>
+                      <>
+                        <TableRow className="cursor-pointer hover:bg-muted/50">
+                          <TableCell>
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              </Button>
+                            </CollapsibleTrigger>
+                          </TableCell>
+                          <TableCell className="font-medium">{row.staff_name}</TableCell>
+                          <TableCell>{row.role_name}</TableCell>
+                          <TableCell>{row.location_name}</TableCell>
+                          <TableCell className="text-center">{row.assignment_count}</TableCell>
+                          <TableCell className="text-center">
+                            <StatusCell
+                              hasAll={hasAllConf}
+                              hasAnyLate={row.has_any_late}
+                              type="Confidence"
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <StatusCell
+                              hasAll={hasAllPerf}
+                              hasAnyLate={row.has_any_late}
+                              type="Performance"
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {row.is_complete ? (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800">Complete</Badge>
+                            ) : (
+                              <Badge variant="outline">Incomplete</Badge>
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            {score.confidence_score !== null && (
-                              <div className="font-semibold">{score.confidence_score}</div>
-                            )}
-                            {score.confidence_date && (
-                              <div className="text-xs text-muted-foreground">
-                                {format(new Date(score.confidence_date), 'MMM d, h:mm a')}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            {score.performance_score !== null && (
-                              <div className="font-semibold">{score.performance_score}</div>
-                            )}
-                            {score.performance_date && (
-                              <div className="text-xs text-muted-foreground">
-                                {format(new Date(score.performance_date), 'MMM d, h:mm a')}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1 text-xs">
-                            {score.confidence_late && (
-                              <span className="text-orange-600">Conf Late</span>
-                            )}
-                            {score.performance_late && (
-                              <span className="text-orange-600">Perf Late</span>
-                            )}
-                            {score.self_select && (
-                              <span className="text-blue-600">Self-Select</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          <div>C: {score.confidence_source}</div>
-                          <div>P: {score.performance_source}</div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="bg-muted/30">
+                              <CollapsibleContent>
+                                <div className="p-4 space-y-2">
+                                  <h4 className="font-semibold text-sm">Raw Scores Detail</h4>
+                                  <div className="text-xs space-y-1">
+                                    {row.scores.map((score, idx) => (
+                                      <div key={idx} className="grid grid-cols-6 gap-2 p-2 bg-background rounded border">
+                                        <div className="col-span-2">
+                                          <span className="font-medium">{score.action_statement}</span>
+                                          <span className="text-muted-foreground ml-2">({score.domain_name})</span>
+                                        </div>
+                                        <div>Conf: {score.confidence_score ?? '—'}</div>
+                                        <div>Perf: {score.performance_score ?? '—'}</div>
+                                        <div className="col-span-2 text-right text-muted-foreground">
+                                          {score.confidence_late && <Badge variant="destructive" className="text-xs mr-1">Conf Late</Badge>}
+                                          {score.performance_late && <Badge variant="destructive" className="text-xs">Perf Late</Badge>}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </CollapsibleContent>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    </Collapsible>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Reminder Composer */}
+      <ReminderComposer
+        type={reminderType}
+        recipients={reminderRecipients}
+        open={reminderOpen}
+        onOpenChange={setReminderOpen}
+      />
     </div>
   );
 }

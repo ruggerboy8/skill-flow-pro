@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { RawScoreRow, StaffWithScores } from '@/types/coachV2';
+import { RawScoreRow, StaffWeekSummary } from '@/types/coachV2';
+import { aggregateStaffWeekSummary } from '@/lib/coachUtils';
 
 interface UseStaffWeeklyScoresOptions {
   weekOf?: string | null;
 }
 
 export function useStaffWeeklyScores(options: UseStaffWeeklyScoresOptions = {}) {
-  const [data, setData] = useState<StaffWithScores[]>([]);
+  const [rawData, setRawData] = useState<RawScoreRow[]>([]);
+  const [summaries, setSummaries] = useState<StaffWeekSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const { weekOf } = options;
@@ -36,38 +38,14 @@ export function useStaffWeeklyScores(options: UseStaffWeeklyScoresOptions = {}) 
 
       if (!rpcData || rpcData.length === 0) {
         console.warn('⚠️ get_staff_weekly_scores returned no rows');
-        setData([]);
+        setRawData([]);
+        setSummaries([]);
         return;
       }
 
-      // Group scores by staff
-      const staffMap = new Map<string, StaffWithScores>();
-      
-      (rpcData as RawScoreRow[]).forEach((row) => {
-        if (!staffMap.has(row.staff_id)) {
-          staffMap.set(row.staff_id, {
-            staff: {
-              id: row.staff_id,
-              name: row.staff_name,
-              email: row.staff_email,
-              role_id: row.role_id,
-              role_name: row.role_name,
-              location_id: row.location_id,
-              location_name: row.location_name,
-              organization_id: row.organization_id,
-              organization_name: row.organization_name,
-            },
-            scores: [],
-          });
-        }
-        
-        // Only add scores that have data (some staff might have no scores yet)
-        if (row.score_id) {
-          staffMap.get(row.staff_id)!.scores.push(row);
-        }
-      });
-
-      setData(Array.from(staffMap.values()));
+      const rows = rpcData as RawScoreRow[];
+      setRawData(rows);
+      setSummaries(aggregateStaffWeekSummary(rows, weekOf || 'current'));
     } catch (err) {
       console.error('[useStaffWeeklyScores] Error:', err);
       setError(err as Error);
@@ -80,5 +58,5 @@ export function useStaffWeeklyScores(options: UseStaffWeeklyScoresOptions = {}) 
     load();
   }, [load]);
 
-  return { data, loading, error, reload: load };
+  return { rawData, summaries, loading, error, reload: load };
 }

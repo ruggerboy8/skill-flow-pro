@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Accordion,
@@ -13,16 +14,46 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
-import { Loader2, RefreshCw } from 'lucide-react';
-import { format } from 'date-fns';
+import { Loader2, RefreshCw, CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, addWeeks, startOfWeek } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 export default function CoachDashboardV2() {
   const { user } = useAuth();
   const profileQuery = useStaffProfile({ redirectToSetup: false });
-  const { data, loading, error, reload } = useStaffWeeklyScores();
+  const [selectedWeek, setSelectedWeek] = useState<Date | undefined>(undefined);
+  
+  // Format as YYYY-MM-DD for the RPC (only if a week is selected)
+  const weekOfString = selectedWeek ? format(startOfWeek(selectedWeek, { weekStartsOn: 1 }), 'yyyy-MM-dd') : null;
+  
+  const { data, loading, error, reload } = useStaffWeeklyScores({ weekOf: weekOfString });
+
+  const handlePreviousWeek = () => {
+    setSelectedWeek(prev => {
+      const base = prev || new Date();
+      return addWeeks(startOfWeek(base, { weekStartsOn: 1 }), -1);
+    });
+  };
+
+  const handleNextWeek = () => {
+    setSelectedWeek(prev => {
+      const base = prev || new Date();
+      return addWeeks(startOfWeek(base, { weekStartsOn: 1 }), 1);
+    });
+  };
+
+  const displayWeek = selectedWeek 
+    ? format(startOfWeek(selectedWeek, { weekStartsOn: 1 }), 'MMM d, yyyy')
+    : 'Most Recent Week';
 
   if (loading) {
     return (
@@ -55,6 +86,62 @@ export default function CoachDashboardV2() {
           <RefreshCw className="mr-2 h-4 w-4" />
           Reload Data
         </Button>
+      </div>
+
+      <div className="flex items-center gap-2 p-4 bg-muted/50 rounded-lg">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={handlePreviousWeek}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "justify-start text-left font-normal min-w-[200px]",
+                !selectedWeek && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {displayWeek}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selectedWeek}
+              onSelect={(date) => {
+                if (date) {
+                  setSelectedWeek(startOfWeek(date, { weekStartsOn: 1 }));
+                }
+              }}
+              initialFocus
+              className="p-3 pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
+
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={handleNextWeek}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+
+        {selectedWeek && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setSelectedWeek(undefined)}
+          >
+            Reset to Latest
+          </Button>
+        )}
       </div>
 
       <div className="space-y-2 p-4 bg-muted/50 rounded-lg text-sm">

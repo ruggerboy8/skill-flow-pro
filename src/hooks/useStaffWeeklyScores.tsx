@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RawScoreRow, StaffWithScores } from '@/types/coachV2';
 
-export function useStaffWeeklyScores() {
+interface UseStaffWeeklyScoresOptions {
+  weekOf?: string | null;
+}
+
+export function useStaffWeeklyScores(options: UseStaffWeeklyScoresOptions = {}) {
   const [data, setData] = useState<StaffWithScores[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const { weekOf } = options;
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -18,7 +23,10 @@ export function useStaffWeeklyScores() {
       }
 
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_staff_weekly_scores', { p_coach_user_id: user.id })
+        .rpc('get_staff_weekly_scores', { 
+          p_coach_user_id: user.id,
+          p_week_of: weekOf || null
+        })
         .limit(10000);
 
       if (rpcError) {
@@ -66,11 +74,11 @@ export function useStaffWeeklyScores() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [weekOf]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   return { data, loading, error, reload: load };
 }

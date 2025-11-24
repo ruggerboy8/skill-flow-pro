@@ -31,7 +31,8 @@ export default function CoachDashboardV2() {
   const getInitialWeek = (): string => {
     const weekParam = searchParams.get('week');
     if (weekParam) {
-      const parsed = parse(weekParam, 'yyyy-MM-dd', new Date());
+      // Parse as noon UTC to avoid timezone shifts
+      const parsed = new Date(weekParam + 'T12:00:00Z');
       if (!isNaN(parsed.getTime())) {
         // Normalize to Monday using getAnchors
         const { mondayZ } = getAnchors(parsed);
@@ -43,6 +44,18 @@ export default function CoachDashboardV2() {
   };
 
   const [selectedWeek, setSelectedWeek] = useState<string>(getInitialWeek());
+  
+  // Ensure selectedWeek is always Monday when it changes
+  useEffect(() => {
+    const parsed = new Date(selectedWeek + 'T12:00:00Z');
+    const { mondayZ } = getAnchors(parsed);
+    const normalizedMonday = format(mondayZ, 'yyyy-MM-dd');
+    
+    // Only update if it's not already Monday
+    if (normalizedMonday !== selectedWeek) {
+      setSelectedWeek(normalizedMonday);
+    }
+  }, [selectedWeek]);
 
   const [filters, setFilters] = useState({
     organization: searchParams.get('org') ?? 'all',
@@ -238,8 +251,9 @@ export default function CoachDashboardV2() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
-                  const { mondayZ } = getAnchors(addDays(parsed, -7));
+                  const currentMonday = new Date(selectedWeek + 'T12:00:00Z');
+                  const prevWeek = addDays(currentMonday, -7);
+                  const { mondayZ } = getAnchors(prevWeek);
                   setSelectedWeek(format(mondayZ, 'yyyy-MM-dd'));
                 }}
               >
@@ -248,7 +262,7 @@ export default function CoachDashboardV2() {
               </Button>
               <div className="text-center">
                 <p className="text-lg font-semibold">
-                  Week of {format(parse(selectedWeek, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy')}
+                  Week of {format(new Date(selectedWeek + 'T12:00:00Z'), 'MMM d, yyyy')}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Weeks start on Monday (Central Time)
@@ -258,8 +272,9 @@ export default function CoachDashboardV2() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
-                  const { mondayZ } = getAnchors(addDays(parsed, 7));
+                  const currentMonday = new Date(selectedWeek + 'T12:00:00Z');
+                  const nextWeek = addDays(currentMonday, 7);
+                  const { mondayZ } = getAnchors(nextWeek);
                   setSelectedWeek(format(mondayZ, 'yyyy-MM-dd'));
                 }}
               >

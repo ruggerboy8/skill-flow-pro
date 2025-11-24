@@ -260,13 +260,17 @@ export default function CoachDashboardV2() {
           </AlertDescription>
         </Alert>
       ) : (
-        <CoverageTable
-          rows={filteredStatuses as StaffStatus[]}
-          loading={loading}
-          weekOf={selectedWeek}
-          onNavigate={(id) => navigate(`/coach/${id}`)}
-          onSendReminder={handleSendReminder}
-        />
+          <CoverageTable
+            rows={filteredStatuses}
+            loading={loading}
+            weekOf={selectedWeek}
+            onNavigate={(id) => {
+              const params = new URLSearchParams(searchParams);
+              params.set('week', format(selectedWeek, 'yyyy-MM-dd'));
+              navigate(`/coach/${id}?${params.toString()}`);
+            }}
+            onSendReminder={handleSendReminder}
+          />
       )}
 
       <ReminderComposer

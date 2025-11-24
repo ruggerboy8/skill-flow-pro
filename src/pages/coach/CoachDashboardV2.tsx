@@ -33,6 +33,8 @@ export default function CoachDashboardV2() {
     organization: searchParams.get('org') ?? 'all',
     location: searchParams.get('loc') ?? 'all',
     role: searchParams.get('role') ?? 'all',
+    confidenceStatus: searchParams.get('conf') ?? 'all',
+    performanceStatus: searchParams.get('perf') ?? 'all',
     search: searchParams.get('q') ?? '',
   });
 
@@ -68,6 +70,10 @@ export default function CoachDashboardV2() {
     else params.delete('loc');
     if (filters.role !== 'all') params.set('role', filters.role);
     else params.delete('role');
+    if (filters.confidenceStatus !== 'all') params.set('conf', filters.confidenceStatus);
+    else params.delete('conf');
+    if (filters.performanceStatus !== 'all') params.set('perf', filters.performanceStatus);
+    else params.delete('perf');
     if (filters.search.trim()) params.set('q', filters.search.trim());
     else params.delete('q');
     params.set('week', format(selectedWeek, 'yyyy-MM-dd'));
@@ -79,6 +85,29 @@ export default function CoachDashboardV2() {
       if (filters.organization !== 'all' && status.organization_name !== filters.organization) return false;
       if (filters.location !== 'all' && status.location_name !== filters.location) return false;
       if (filters.role !== 'all' && status.role_name !== filters.role) return false;
+      
+      // Confidence status filter
+      if (filters.confidenceStatus !== 'all') {
+        const isMissing = status.conf_submitted_count < status.required_count;
+        const isLate = !isMissing && status.conf_late_count > 0;
+        const isSubmitted = !isMissing && status.conf_late_count === 0;
+        
+        if (filters.confidenceStatus === 'missing' && !isMissing) return false;
+        if (filters.confidenceStatus === 'late' && !isLate) return false;
+        if (filters.confidenceStatus === 'submitted' && !isSubmitted) return false;
+      }
+      
+      // Performance status filter
+      if (filters.performanceStatus !== 'all') {
+        const isMissing = status.perf_submitted_count < status.required_count;
+        const isLate = !isMissing && status.perf_late_count > 0;
+        const isSubmitted = !isMissing && status.perf_late_count === 0;
+        
+        if (filters.performanceStatus === 'missing' && !isMissing) return false;
+        if (filters.performanceStatus === 'late' && !isLate) return false;
+        if (filters.performanceStatus === 'submitted' && !isSubmitted) return false;
+      }
+      
       if (debouncedSearch.trim()) {
         const term = debouncedSearch.toLowerCase();
         const searchable = [
@@ -93,7 +122,7 @@ export default function CoachDashboardV2() {
       }
       return true;
     });
-  }, [statuses, filters.organization, filters.location, filters.role, debouncedSearch]);
+  }, [statuses, filters.organization, filters.location, filters.role, filters.confidenceStatus, filters.performanceStatus, debouncedSearch]);
 
   const organizationOptions: FilterOption[] = useMemo(() => {
     const unique = new Set(['all']);
@@ -171,12 +200,14 @@ export default function CoachDashboardV2() {
             organization={filters.organization}
             location={filters.location}
             role={filters.role}
+            confidenceStatus={filters.confidenceStatus}
+            performanceStatus={filters.performanceStatus}
             search={filters.search}
             organizationOptions={organizationOptions}
             locationOptions={locationOptions}
             roleOptions={roleOptions}
             onChange={setFilters}
-            onReset={() => setFilters({ organization: 'all', location: 'all', role: 'all', search: '' })}
+            onReset={() => setFilters({ organization: 'all', location: 'all', role: 'all', confidenceStatus: 'all', performanceStatus: 'all', search: '' })}
           />
         </CardContent>
       </Card>

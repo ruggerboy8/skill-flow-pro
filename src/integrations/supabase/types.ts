@@ -2337,6 +2337,7 @@ export type Database = {
               staff_email: string
               staff_id: string
               staff_name: string
+              user_id: string
               week_of: string
             }[]
           }

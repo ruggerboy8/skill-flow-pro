@@ -3,6 +3,7 @@ export interface RawScoreRow {
   staff_id: string;
   staff_name: string;
   staff_email: string;
+  user_id: string;
   role_id: number;
   role_name: string;
   location_id: string;
@@ -27,6 +28,27 @@ export interface RawScoreRow {
   domain_name: string | null;
   display_order: number | null;
   self_select: boolean | null;
+}
+
+// Phase 2: Per-staff aggregated status for the selected week
+export interface StaffWeekSummary {
+  staff_id: string;
+  staff_name: string;
+  staff_email: string;
+  user_id: string;
+  role_id: number;
+  role_name: string;
+  location_id: string;
+  location_name: string;
+  organization_id: string;
+  organization_name: string;
+  week_of: string;
+  assignment_count: number;
+  conf_count: number;
+  perf_count: number;
+  has_any_late: boolean;
+  is_complete: boolean;
+  scores: RawScoreRow[];
 }
 
 export interface StaffWithScores {

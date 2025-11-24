@@ -220,39 +220,53 @@ export default function CoachDashboardV2() {
           <CardTitle>Week Selection</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
-                const { mondayZ } = getAnchors(addDays(parsed, -7));
-                setSelectedWeek(format(mondayZ, 'yyyy-MM-dd'));
-              }}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Prev Week
-            </Button>
-            <div className="text-center">
-              <p className="text-lg font-semibold">
-                Week of {format(parse(selectedWeek, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy')}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Weeks start on Monday (Central Time)
-              </p>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-center">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const { mondayZ } = getAnchors(new Date());
+                  setSelectedWeek(format(mondayZ, 'yyyy-MM-dd'));
+                }}
+              >
+                Jump to Current Week
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
-                const { mondayZ } = getAnchors(addDays(parsed, 7));
-                setSelectedWeek(format(mondayZ, 'yyyy-MM-dd'));
-              }}
-            >
-              Next Week
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
+                  const { mondayZ } = getAnchors(addDays(parsed, -7));
+                  setSelectedWeek(format(mondayZ, 'yyyy-MM-dd'));
+                }}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Prev Week
+              </Button>
+              <div className="text-center">
+                <p className="text-lg font-semibold">
+                  Week of {format(parse(selectedWeek, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy')}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Weeks start on Monday (Central Time)
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
+                  const { mondayZ } = getAnchors(addDays(parsed, 7));
+                  setSelectedWeek(format(mondayZ, 'yyyy-MM-dd'));
+                }}
+              >
+                Next Week
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
           </div>
           
           <FiltersBar

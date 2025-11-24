@@ -107,15 +107,51 @@ export default function CoachDetailV2() {
     );
   }
 
-  if (error || !data) {
+  if (error) {
     return (
-      <Card>
-        <CardContent className="py-16 text-center">
-          <p className="text-destructive">
-            {error ? 'Error loading staff data' : 'Staff member not found'}
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={handleBackClick}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Staff List
+        </Button>
+        <Card>
+          <CardContent className="py-16 text-center space-y-4">
+            <p className="text-destructive font-semibold">
+              Error loading staff data
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {error instanceof Error ? error.message : 'An unexpected error occurred'}
+            </p>
+            <Button onClick={() => refetch()}>Try Again</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="space-y-4">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={handleBackClick}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Staff List
+        </Button>
+        <Card>
+          <CardContent className="py-16 text-center">
+            <p className="text-muted-foreground">
+              Staff member not found or you don't have permission to view this staff member.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 

@@ -21,11 +21,11 @@ export default function CoachDetailV2() {
   const [searchParams] = useSearchParams();
   const { isCoach, isLead, isSuperAdmin, loading: authLoading, user } = useAuth();
 
-  // Week state
+  // Week state - normalize to Monday using date-fns
   const getInitialWeek = () => {
     const weekParam = searchParams.get('week');
     if (weekParam) {
-      const parsed = new Date(weekParam);
+      const parsed = new Date(weekParam + 'T12:00:00');
       if (isValid(parsed)) return startOfWeek(parsed, { weekStartsOn: 1 });
     }
     return startOfWeek(new Date(), { weekStartsOn: 1 });

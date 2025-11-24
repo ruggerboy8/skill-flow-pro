@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
 export interface StaffDetailAssignment {
   id: string; // assignment_id with prefix
@@ -60,7 +61,7 @@ export function useStaffDetailWeek({
 }: UseStaffDetailWeekParams) {
   const weekStartDate = typeof weekStart === 'string' 
     ? weekStart 
-    : weekStart.toISOString().split('T')[0];
+    : format(weekStart, 'yyyy-MM-dd');
 
   return useQuery({
     queryKey: ['staff-detail-week', staffId, weekStartDate],

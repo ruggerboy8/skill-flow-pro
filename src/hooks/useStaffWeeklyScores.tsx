@@ -18,7 +18,8 @@ export function useStaffWeeklyScores() {
       }
 
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_staff_weekly_scores', { p_coach_user_id: user.id });
+        .rpc('get_staff_weekly_scores', { p_coach_user_id: user.id })
+        .limit(10000);
 
       if (rpcError) {
         console.error('[useStaffWeeklyScores] RPC error:', rpcError);

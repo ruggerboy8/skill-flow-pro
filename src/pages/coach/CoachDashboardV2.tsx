@@ -102,7 +102,7 @@ export default function CoachDashboardV2() {
                     {item.scores.map((score) => (
                       <TableRow key={score.score_id}>
                         <TableCell className="font-mono text-sm">
-                          {score.week_of ? format(new Date(score.week_of), 'yyyy-MM-dd') : 'N/A'}
+                          {score.week_of || 'N/A'}
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">

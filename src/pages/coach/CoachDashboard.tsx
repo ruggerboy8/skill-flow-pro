@@ -1,3 +1,12 @@
+/**
+ * @deprecated This is the LEGACY coach dashboard (V1)
+ * 
+ * Legacy route: /coach-v1
+ * Active route: /coach → CoachDashboardV2.tsx
+ * 
+ * This file is kept for historical purposes but should not be actively maintained.
+ * All new development should happen in CoachDashboardV2.tsx
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

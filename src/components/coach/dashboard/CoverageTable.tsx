@@ -26,6 +26,15 @@ function StatusCell({
   requiredCount: number; 
   type: string;
 }) {
+  // Handle case when there are no assignments
+  if (requiredCount === 0) {
+    return (
+      <div className="flex items-center justify-center text-muted-foreground text-xs">
+        —
+      </div>
+    );
+  }
+
   const isMissing = submittedCount < requiredCount;
   const isLate = !isMissing && lateCount > 0;
   const isSubmitted = !isMissing && lateCount === 0;

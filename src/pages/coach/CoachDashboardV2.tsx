@@ -24,7 +24,9 @@ export default function CoachDashboardV2() {
     if (weekParam) {
       const parsed = parse(weekParam, 'yyyy-MM-dd', new Date());
       if (!isNaN(parsed.getTime())) {
-        return weekParam;
+        // Normalize to Monday using getAnchors
+        const { mondayZ } = getAnchors(parsed);
+        return format(mondayZ, 'yyyy-MM-dd');
       }
     }
     const { mondayZ } = getAnchors(new Date());
@@ -215,7 +217,8 @@ export default function CoachDashboardV2() {
               size="sm"
               onClick={() => {
                 const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
-                setSelectedWeek(format(addDays(parsed, -7), 'yyyy-MM-dd'));
+                const { mondayZ } = getAnchors(addDays(parsed, -7));
+                setSelectedWeek(format(mondayZ, 'yyyy-MM-dd'));
               }}
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
@@ -234,7 +237,8 @@ export default function CoachDashboardV2() {
               size="sm"
               onClick={() => {
                 const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
-                setSelectedWeek(format(addDays(parsed, 7), 'yyyy-MM-dd'));
+                const { mondayZ } = getAnchors(addDays(parsed, 7));
+                setSelectedWeek(format(mondayZ, 'yyyy-MM-dd'));
               }}
             >
               Next Week

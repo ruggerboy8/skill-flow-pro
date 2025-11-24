@@ -1,3 +1,12 @@
+/**
+ * ACTIVE: This is the live coach dashboard
+ * 
+ * Route: /coach
+ * Database: Calls get_staff_statuses(p_coach_user_id uuid, p_week_start date) via useCoachStaffStatuses
+ * 
+ * This is the V2 implementation that handles weekly assignments (onboarding + global)
+ * with proper date normalization to Monday (Central Time).
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

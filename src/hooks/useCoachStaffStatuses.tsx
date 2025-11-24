@@ -1,3 +1,21 @@
+/**
+ * Coach Staff Statuses Hook
+ * 
+ * CRITICAL: This hook calls get_staff_statuses(p_coach_user_id uuid, p_week_start date)
+ * NOT the single-parameter version get_staff_statuses(p_week_start date) which has been removed.
+ * 
+ * The two-parameter version properly handles:
+ * - Date normalization to Monday (ISO week) for both provided and default dates
+ * - Assignment filtering for location-specific (onboarding), org-wide, and global assignments
+ * - Score joins with 'assign:' prefix handling
+ * - Coach scope visibility (organization, location, or all)
+ * - Aggregation of submission counts and late flags
+ * 
+ * Input date handling:
+ * - Accepts Date object or 'yyyy-MM-dd' string
+ * - Always normalizes to Monday using Central Time zone
+ * - Defaults to current week if not provided
+ */
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';

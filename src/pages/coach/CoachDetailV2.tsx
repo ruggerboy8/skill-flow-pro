@@ -1,3 +1,12 @@
+/**
+ * ACTIVE: This is the live coach detail view
+ * 
+ * Route: /coach/:staffId
+ * Database: Uses useStaffDetailWeek hook for fetching staff weekly data
+ * 
+ * This is the V2 implementation that handles weekly assignments with proper
+ * date normalization and unified assignment handling.
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

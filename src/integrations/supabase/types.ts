@@ -2053,6 +2053,29 @@ export type Database = {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json
       }
+      get_coach_roster_summary: {
+        Args: { p_coach_user_id: string; p_week_start?: string }
+        Returns: {
+          active_monday: string
+          backlog_count: number
+          conf_late_count: number
+          conf_submitted_count: number
+          last_conf_at: string
+          last_perf_at: string
+          location_id: string
+          location_name: string
+          organization_id: string
+          organization_name: string
+          perf_late_count: number
+          perf_submitted_count: number
+          required_count: number
+          role_id: number
+          role_name: string
+          staff_id: string
+          staff_name: string
+          tz: string
+        }[]
+      }
       get_consistency: {
         Args: { p_staff_id: string; p_tz?: string; p_weeks?: number }
         Returns: Json
@@ -2230,29 +2253,6 @@ export type Database = {
           n_items: number
           observer_avg: number
           self_avg: number
-        }[]
-      }
-      get_staff_statuses: {
-        Args: { p_coach_user_id: string; p_week_start?: string }
-        Returns: {
-          active_monday: string
-          backlog_count: number
-          conf_late_count: number
-          conf_submitted_count: number
-          last_conf_at: string
-          last_perf_at: string
-          location_id: string
-          location_name: string
-          organization_id: string
-          organization_name: string
-          perf_late_count: number
-          perf_submitted_count: number
-          required_count: number
-          role_id: number
-          role_name: string
-          staff_id: string
-          staff_name: string
-          tz: string
         }[]
       }
       get_staff_submission_windows: {

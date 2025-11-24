@@ -9,6 +9,9 @@ export interface StaffProfile {
   id: string;
   role_id: number | null;
   primary_location_id: string | null;
+  coach_scope_type: string | null;
+  coach_scope_id: string | null;
+  is_super_admin: boolean;
   locations: {
     organization_id: string;
     program_start_date: string;
@@ -38,6 +41,9 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           id,
           role_id,
           primary_location_id,
+          coach_scope_type,
+          coach_scope_id,
+          is_super_admin,
           locations (
             organization_id,
             program_start_date,

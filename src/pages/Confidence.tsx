@@ -188,10 +188,13 @@ setSubmitting(true);
       }
       return base;
     });
+    // Use assignment_id conflict when V2 enabled, otherwise weekly_focus_id
+    const conflictColumns = v2Enabled ? 'staff_id,assignment_id' : 'staff_id,weekly_focus_id';
+    
     const { error } = await supabase
       .from('weekly_scores')
       .upsert(scoreInserts, {
-        onConflict: 'staff_id,weekly_focus_id'
+        onConflict: conflictColumns
       });
 
     if (error) {

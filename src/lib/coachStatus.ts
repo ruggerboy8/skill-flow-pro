@@ -209,15 +209,15 @@ export async function computeStaffStatusNew(
 function getTooltipForState(state: WeekState, deadlineAt?: Date): string | undefined {
   switch (state) {
     case 'can_checkin':
-      return `Confidence due by Tuesday 12:00 PM`;
+      return `Confidence due by Tuesday 3:00 PM`;
     case 'missed_checkin':
-      return `Confidence was due by Tuesday 12:00 PM`;
+      return `Confidence was due by Tuesday 3:00 PM`;
     case 'wait_for_thu':
       return `Confidence submitted, performance opens Thursday`;
     case 'can_checkout':
-      return `Performance due by Friday 5:00 PM`;
+      return `Performance due by Friday 3:00 PM`;
     case 'missed_checkout':
-      return `Performance was due by Friday 5:00 PM`;
+      return `Performance was due by Friday 3:00 PM`;
     case 'done':
       return `Week completed successfully`;
     default:

@@ -10,24 +10,28 @@ import { supabase } from '@/integrations/supabase/client';
 import { FiltersBar, type FilterOption } from '@/components/coach/dashboard/FiltersBar';
 import { CoverageTable } from '@/components/coach/dashboard/CoverageTable';
 import { AlertCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfWeek, addDays, isValid } from 'date-fns';
+import { format, addDays, parse } from 'date-fns';
+import { getAnchors } from '@/lib/centralTime';
 
 export default function CoachDashboardV2() {
   const navigate = useNavigate();
   const { isCoach, isLead, isSuperAdmin, roleLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Week state management
-  const getInitialWeek = (): Date => {
+  // Week state management - use string format for CT-stable week IDs
+  const getInitialWeek = (): string => {
     const weekParam = searchParams.get('week');
     if (weekParam) {
-      const parsed = new Date(weekParam);
-      if (isValid(parsed)) return startOfWeek(parsed, { weekStartsOn: 1 });
+      const parsed = parse(weekParam, 'yyyy-MM-dd', new Date());
+      if (!isNaN(parsed.getTime())) {
+        return weekParam;
+      }
     }
-    return startOfWeek(new Date(), { weekStartsOn: 1 });
+    const { mondayZ } = getAnchors(new Date());
+    return format(mondayZ, 'yyyy-MM-dd');
   };
 
-  const [selectedWeek, setSelectedWeek] = useState<Date>(getInitialWeek());
+  const [selectedWeek, setSelectedWeek] = useState<string>(getInitialWeek());
 
   const [filters, setFilters] = useState({
     organization: searchParams.get('org') ?? 'all',
@@ -49,7 +53,7 @@ export default function CoachDashboardV2() {
 
   // Debug logging
   useEffect(() => {
-    console.log('[CoachDashboardV2] Selected week:', selectedWeek, 'Formatted:', format(selectedWeek, 'yyyy-MM-dd'));
+    console.log('[CoachDashboardV2] Selected week (string):', selectedWeek);
     console.log('[CoachDashboardV2] Statuses count:', statuses.length);
     if (statuses.length > 0) {
       console.log('[CoachDashboardV2] Sample status:', statuses[0]);
@@ -85,7 +89,7 @@ export default function CoachDashboardV2() {
     else params.delete('perf');
     if (filters.search.trim()) params.set('q', filters.search.trim());
     else params.delete('q');
-    params.set('week', format(selectedWeek, 'yyyy-MM-dd'));
+    params.set('week', selectedWeek);
     setSearchParams(params, { replace: true });
   }, [filters, selectedWeek, searchParams, setSearchParams]);
 
@@ -209,23 +213,29 @@ export default function CoachDashboardV2() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setSelectedWeek(addDays(selectedWeek, -7))}
+              onClick={() => {
+                const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
+                setSelectedWeek(format(addDays(parsed, -7), 'yyyy-MM-dd'));
+              }}
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
               Prev Week
             </Button>
             <div className="text-center">
               <p className="text-lg font-semibold">
-                Week of {format(selectedWeek, 'MMM d, yyyy')}
+                Week of {format(parse(selectedWeek, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy')}
               </p>
               <p className="text-sm text-muted-foreground">
-                Weeks start on Monday
+                Weeks start on Monday (Central Time)
               </p>
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setSelectedWeek(addDays(selectedWeek, 7))}
+              onClick={() => {
+                const parsed = parse(selectedWeek, 'yyyy-MM-dd', new Date());
+                setSelectedWeek(format(addDays(parsed, 7), 'yyyy-MM-dd'));
+              }}
             >
               Next Week
               <ChevronRight className="h-4 w-4 ml-1" />
@@ -263,10 +273,10 @@ export default function CoachDashboardV2() {
           <CoverageTable
             rows={filteredStatuses}
             loading={loading}
-            weekOf={selectedWeek}
+            weekOf={parse(selectedWeek, 'yyyy-MM-dd', new Date())}
             onNavigate={(id) => {
               const params = new URLSearchParams(searchParams);
-              params.set('week', format(selectedWeek, 'yyyy-MM-dd'));
+              params.set('week', selectedWeek);
               navigate(`/coach/${id}?${params.toString()}`);
             }}
             onSendReminder={handleSendReminder}

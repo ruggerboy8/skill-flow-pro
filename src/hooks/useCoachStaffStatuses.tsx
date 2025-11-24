@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfWeek, format } from 'date-fns';
+import { format } from 'date-fns';
+import { getAnchors, CT_TZ } from '@/lib/centralTime';
 
 export interface StaffStatus {
   staff_id: string;
@@ -38,10 +39,13 @@ export function useCoachStaffStatuses({
 }: UseCoachStaffStatusesOptions = {}) {
   const serializedWeek = useMemo(() => {
     if (!weekOf) return undefined;
-    const dateValue = typeof weekOf === 'string' ? new Date(weekOf) : weekOf;
-    if (Number.isNaN(dateValue.getTime())) return undefined;
-    const monday = startOfWeek(dateValue, { weekStartsOn: 1 });
-    return format(monday, 'yyyy-MM-dd'); // YYYY-MM-DD for the Monday
+    // If it's already a string in yyyy-MM-dd format, use it directly
+    if (typeof weekOf === 'string') {
+      return weekOf;
+    }
+    // Otherwise compute Monday in Central Time
+    const { mondayZ } = getAnchors(weekOf);
+    return format(mondayZ, 'yyyy-MM-dd');
   }, [weekOf]);
 
   const query = useQuery<StaffStatus[]>({

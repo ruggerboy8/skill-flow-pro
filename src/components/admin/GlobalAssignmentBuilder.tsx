@@ -74,21 +74,10 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // First get the assignments
+      const { data: assignments, error: assignError } = await supabase
         .from('weekly_assignments')
-        .select(`
-          id,
-          action_id,
-          competency_id,
-          self_select,
-          display_order,
-          pro_moves!weekly_assignments_action_id_fkey (
-            action_statement
-          ),
-          competencies!weekly_assignments_competency_id_fkey (
-            name
-          )
-        `)
+        .select('id, action_id, competency_id, self_select, display_order')
         .eq('role_id', selectedRole)
         .eq('week_start_date', weekStartDate)
         .eq('source', 'global')
@@ -98,14 +87,54 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
         .is('superseded_at', null)
         .order('display_order');
 
-      if (error) throw error;
+      if (assignError) throw assignError;
 
-      const loadedSlots: Slot[] = (data || []).map((item, index) => ({
+      if (!assignments || assignments.length === 0) {
+        setSlots([]);
+        return;
+      }
+
+      // Get action details for non-self-select slots
+      const actionIds = assignments
+        .filter(a => !a.self_select && a.action_id)
+        .map(a => a.action_id!);
+      
+      let actionMap = new Map<number, string>();
+      if (actionIds.length > 0) {
+        const { data: moves } = await supabase
+          .from('pro_moves')
+          .select('action_id, action_statement')
+          .in('action_id', actionIds);
+        
+        (moves || []).forEach(m => {
+          actionMap.set(m.action_id, m.action_statement || '');
+        });
+      }
+
+      // Get competency details for self-select slots
+      const competencyIds = assignments
+        .filter(a => a.competency_id)
+        .map(a => a.competency_id!);
+      
+      let competencyMap = new Map<number, string>();
+      if (competencyIds.length > 0) {
+        const { data: comps } = await supabase
+          .from('competencies')
+          .select('competency_id, name')
+          .in('competency_id', competencyIds);
+        
+        (comps || []).forEach(c => {
+          competencyMap.set(c.competency_id, c.name || '');
+        });
+      }
+
+      // Build slots
+      const loadedSlots: Slot[] = assignments.map((item, index) => ({
         id: item.self_select ? `self-select-${index}` : `pro-move-${item.action_id}`,
         action_id: item.action_id || undefined,
-        action_statement: item.self_select ? undefined : (item.pro_moves as any)?.action_statement,
+        action_statement: item.action_id ? actionMap.get(item.action_id) : undefined,
         competency_id: item.competency_id || undefined,
-        competency_name: (item.competencies as any)?.name,
+        competency_name: item.competency_id ? competencyMap.get(item.competency_id) : undefined,
         self_select: item.self_select
       }));
 

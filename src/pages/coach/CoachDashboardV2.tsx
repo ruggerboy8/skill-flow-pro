@@ -14,10 +14,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
+import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function CoachDashboardV2() {
+  const { user } = useAuth();
+  const profileQuery = useStaffProfile({ redirectToSetup: false });
   const { data, loading, error, reload } = useStaffWeeklyScores();
 
   if (loading) {
@@ -53,8 +57,18 @@ export default function CoachDashboardV2() {
         </Button>
       </div>
 
-      <div className="text-sm text-muted-foreground">
-        Showing {data.length} staff members
+      <div className="space-y-2 p-4 bg-muted/50 rounded-lg text-sm">
+        <div className="font-semibold">Debug Info:</div>
+        <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+          <div>Your scope type:</div>
+          <div className="font-mono">{profileQuery.data?.coach_scope_type || 'null (super admin?)'}</div>
+          <div>Your scope ID:</div>
+          <div className="font-mono text-xs">{profileQuery.data?.coach_scope_id || 'null'}</div>
+          <div>Is super admin:</div>
+          <div>{profileQuery.data?.is_super_admin ? 'Yes' : 'No'}</div>
+          <div>Staff members visible:</div>
+          <div className="font-semibold">{data.length}</div>
+        </div>
       </div>
 
       <Accordion type="single" collapsible className="space-y-2">

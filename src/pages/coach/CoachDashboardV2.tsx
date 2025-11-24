@@ -10,7 +10,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CheckCircle, X, ChevronDown, ChevronLeft, ChevronRight, CalendarIcon, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, CalendarIcon, RotateCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
@@ -218,27 +218,26 @@ export default function CoachDashboardV2() {
     });
   };
 
-  // Status cell component
-  function StatusCell({ hasAll, hasAnyLate, type }: { hasAll: boolean; hasAnyLate: boolean; type: string }) {
+  // Status pill component - returns colored badge
+  function StatusPill({ hasAll, hasAnyLate }: { hasAll: boolean; hasAnyLate: boolean }) {
+    if (!hasAll) {
+      return (
+        <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
+          Missing
+        </Badge>
+      );
+    }
+    if (hasAnyLate) {
+      return (
+        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+          Late
+        </Badge>
+      );
+    }
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger>
-            <div className="flex items-center gap-2 justify-center">
-              {hasAll ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <X className="h-5 w-5 text-red-600" />
-              )}
-              {hasAll && hasAnyLate && <Badge variant="destructive" className="text-xs">Late</Badge>}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            {hasAll ? `${type} complete` : `${type} incomplete`}
-            {hasAll && hasAnyLate && ' (some late)'}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+        Complete
+      </Badge>
     );
   }
 
@@ -298,7 +297,15 @@ export default function CoachDashboardV2() {
                 <Calendar
                   mode="single"
                   selected={selectedWeek}
-                  onSelect={(date) => date && setSelectedWeek(date)}
+                  onSelect={(date) => {
+                    if (date) {
+                      // Normalize to Monday of the selected week
+                      const day = date.getDay();
+                      const diff = day === 0 ? -6 : 1 - day;
+                      const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() + diff);
+                      setSelectedWeek(monday);
+                    }
+                  }}
                   initialFocus
                 />
               </PopoverContent>
@@ -423,7 +430,6 @@ export default function CoachDashboardV2() {
                   <TableHead className="text-center">Assignments</TableHead>
                   <TableHead className="text-center">Confidence</TableHead>
                   <TableHead className="text-center">Performance</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -448,25 +454,16 @@ export default function CoachDashboardV2() {
                           <TableCell>{row.location_name}</TableCell>
                           <TableCell className="text-center">{row.assignment_count}</TableCell>
                           <TableCell className="text-center">
-                            <StatusCell
+                            <StatusPill
                               hasAll={hasAllConf}
-                              hasAnyLate={row.has_any_late}
-                              type="Confidence"
+                              hasAnyLate={row.scores.some(s => s.confidence_late)}
                             />
                           </TableCell>
                           <TableCell className="text-center">
-                            <StatusCell
+                            <StatusPill
                               hasAll={hasAllPerf}
-                              hasAnyLate={row.has_any_late}
-                              type="Performance"
+                              hasAnyLate={row.scores.some(s => s.performance_late)}
                             />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {row.is_complete ? (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800">Complete</Badge>
-                            ) : (
-                              <Badge variant="outline">Incomplete</Badge>
-                            )}
                           </TableCell>
                         </TableRow>
                         {isExpanded && (

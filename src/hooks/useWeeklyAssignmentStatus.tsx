@@ -54,7 +54,7 @@ export interface UseWeeklyAssignmentStatusParams {
  * 
  * Replaces:
  * - assembleCurrentWeek + computeWeekState (staff-facing)
- * - get_staff_statuses partial logic (coach dashboard)
+ * - get_coach_roster_summary partial logic (coach dashboard)
  * - previous loadWeekData logic (coach detail)
  */
 export function useWeeklyAssignmentStatus({

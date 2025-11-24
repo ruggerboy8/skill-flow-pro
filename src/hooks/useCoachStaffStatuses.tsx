@@ -44,7 +44,7 @@ export function useCoachStaffStatuses() {
       }
 
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_staff_statuses', { p_coach_user_id: user.id });
+        .rpc('get_coach_roster_summary', { p_coach_user_id: user.id });
 
       if (rpcError) {
         console.error('[useCoachStaffStatuses] RPC error:', rpcError);
@@ -53,7 +53,7 @@ export function useCoachStaffStatuses() {
 
       // Log warning if no data returned
       if (!rpcData || rpcData.length === 0) {
-        console.warn('⚠️ get_staff_statuses returned no rows', {
+        console.warn('⚠️ get_coach_roster_summary returned no rows', {
           message: 'Check RLS policies and coach scope configuration'
         });
       }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 
 type ScoreUpdate = {
   staff_id: string;
@@ -45,6 +46,7 @@ const JITTER = 300;
 
 export function useReliableSubmission() {
   const { user } = useAuth();
+  const v2Enabled = useWeeklyAssignmentsV2Enabled;
   const STORAGE_KEY = user ? `pending_submissions:${user.id}` : 'pending_submissions:anon';
   const [pending, setPending] = useState<SubmissionItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -162,10 +164,19 @@ export function useReliableSubmission() {
     }));
 
     console.log(`[Submission] Writing ${enrichedUpdates.length} score updates`);
+    
+    // Determine conflict strategy based on whether we have assignment_id
+    const hasAssignmentId = enrichedUpdates.some(u => u.assignment_id);
+    const conflictColumns = (v2Enabled && hasAssignmentId) 
+      ? 'staff_id,assignment_id' 
+      : 'staff_id,weekly_focus_id';
+    
+    console.log(`[Submission] Using conflict columns: ${conflictColumns}`);
+    
     const { error } = await supabase
       .from('weekly_scores')
       .upsert(enrichedUpdates, {
-        onConflict: 'staff_id,weekly_focus_id',
+        onConflict: conflictColumns,
         ignoreDuplicates: false,
       });
     

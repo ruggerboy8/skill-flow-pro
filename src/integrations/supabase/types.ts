@@ -2317,7 +2317,7 @@ export type Database = {
               confidence_date: string
               confidence_late: boolean
               confidence_score: number
-              confidence_source: Database["public"]["Enums"]["score_source"]
+              confidence_source: string
               display_order: number
               domain_id: number
               domain_name: string
@@ -2328,7 +2328,7 @@ export type Database = {
               performance_date: string
               performance_late: boolean
               performance_score: number
-              performance_source: Database["public"]["Enums"]["score_source"]
+              performance_source: string
               role_id: number
               role_name: string
               score_id: string

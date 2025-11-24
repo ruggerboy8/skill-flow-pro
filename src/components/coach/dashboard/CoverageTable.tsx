@@ -105,11 +105,8 @@ export function CoverageTable({ rows, loading, weekOf, onNavigate, onSendReminde
         <div className="flex items-center justify-between gap-4">
           <div>
             <CardTitle>
-              Staff Coverage{weekOf ? ` - Week of ${format(weekOf, 'MMM d, yyyy')}` : ''}
+              Staff Coverage{weekOf ? ` - ${format(weekOf, 'MMM d, yyyy')}` : ''}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Sorted by missing submissions, then late submissions.
-            </p>
           </div>
           <div className="flex gap-2">
             <Button

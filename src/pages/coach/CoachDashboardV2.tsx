@@ -22,7 +22,7 @@ export default function CoachDashboardV2() {
     const weekParam = searchParams.get('week');
     if (weekParam) {
       const parsed = new Date(weekParam);
-      if (isValid(parsed)) return parsed;
+      if (isValid(parsed)) return startOfWeek(parsed, { weekStartsOn: 1 });
     }
     return startOfWeek(new Date(), { weekStartsOn: 1 });
   };
@@ -46,6 +46,15 @@ export default function CoachDashboardV2() {
   const { statuses, loading, error, reload } = useCoachStaffStatuses({
     weekOf: selectedWeek,
   });
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[CoachDashboardV2] Selected week:', selectedWeek, 'Formatted:', format(selectedWeek, 'yyyy-MM-dd'));
+    console.log('[CoachDashboardV2] Statuses count:', statuses.length);
+    if (statuses.length > 0) {
+      console.log('[CoachDashboardV2] Sample status:', statuses[0]);
+    }
+  }, [selectedWeek, statuses]);
 
   // Role gate
   useEffect(() => {
@@ -193,30 +202,9 @@ export default function CoachDashboardV2() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FiltersBar
-            organization={filters.organization}
-            location={filters.location}
-            role={filters.role}
-            confidenceStatus={filters.confidenceStatus}
-            performanceStatus={filters.performanceStatus}
-            search={filters.search}
-            organizationOptions={organizationOptions}
-            locationOptions={locationOptions}
-            roleOptions={roleOptions}
-            onChange={setFilters}
-            onReset={() => setFilters({ organization: 'all', location: 'all', role: 'all', confidenceStatus: 'all', performanceStatus: 'all', search: '' })}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Week Selection</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <Button
               variant="outline"
@@ -243,6 +231,20 @@ export default function CoachDashboardV2() {
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
+          
+          <FiltersBar
+            organization={filters.organization}
+            location={filters.location}
+            role={filters.role}
+            confidenceStatus={filters.confidenceStatus}
+            performanceStatus={filters.performanceStatus}
+            search={filters.search}
+            organizationOptions={organizationOptions}
+            locationOptions={locationOptions}
+            roleOptions={roleOptions}
+            onChange={setFilters}
+            onReset={() => setFilters({ organization: 'all', location: 'all', role: 'all', confidenceStatus: 'all', performanceStatus: 'all', search: '' })}
+          />
         </CardContent>
       </Card>
 

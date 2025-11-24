@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { startOfWeek, format } from 'date-fns';
 
 export interface StaffStatus {
   staff_id: string;
@@ -39,7 +40,8 @@ export function useCoachStaffStatuses({
     if (!weekOf) return undefined;
     const dateValue = typeof weekOf === 'string' ? new Date(weekOf) : weekOf;
     if (Number.isNaN(dateValue.getTime())) return undefined;
-    return dateValue.toISOString().slice(0, 10); // YYYY-MM-DD
+    const monday = startOfWeek(dateValue, { weekStartsOn: 1 });
+    return format(monday, 'yyyy-MM-dd'); // YYYY-MM-DD for the Monday
   }, [weekOf]);
 
   const query = useQuery<StaffStatus[]>({

@@ -8,9 +8,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChevronDown, ChevronLeft, ChevronRight, CalendarIcon, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
@@ -276,7 +274,7 @@ export default function CoachDashboardV2() {
         </Button>
       </div>
 
-      {/* Week Picker */}
+      {/* Week Navigation */}
       <Card>
         <CardHeader>
           <CardTitle>Week Selection</CardTitle>
@@ -285,32 +283,15 @@ export default function CoachDashboardV2() {
           <div className="flex items-center gap-4">
             <Button variant="outline" size="sm" onClick={handlePreviousWeek}>
               <ChevronLeft className="h-4 w-4" />
+              Previous Week
             </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-64">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(selectedWeek, 'MMM d, yyyy')} (Week of)
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={selectedWeek}
-                  onSelect={(date) => {
-                    if (date) {
-                      // Normalize to Monday of the selected week
-                      const day = date.getDay();
-                      const diff = day === 0 ? -6 : 1 - day;
-                      const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() + diff);
-                      setSelectedWeek(monday);
-                    }
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="text-center flex-1">
+              <div className="font-semibold text-lg">
+                Week of {format(selectedWeek, 'MMM d, yyyy')}
+              </div>
+            </div>
             <Button variant="outline" size="sm" onClick={handleNextWeek}>
+              Next Week
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

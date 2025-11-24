@@ -636,6 +636,36 @@ export type Database = {
         }
         Relationships: []
       }
+      orphaned_scores_log: {
+        Row: {
+          action_id: number | null
+          assignment_id: string | null
+          logged_at: string | null
+          reason: string | null
+          score_id: string | null
+          staff_id: string | null
+          week_of: string | null
+        }
+        Insert: {
+          action_id?: number | null
+          assignment_id?: string | null
+          logged_at?: string | null
+          reason?: string | null
+          score_id?: string | null
+          staff_id?: string | null
+          week_of?: string | null
+        }
+        Update: {
+          action_id?: number | null
+          assignment_id?: string | null
+          logged_at?: string | null
+          reason?: string | null
+          score_id?: string | null
+          staff_id?: string | null
+          week_of?: string | null
+        }
+        Relationships: []
+      }
       pro_move_resources: {
         Row: {
           action_id: number
@@ -1584,6 +1614,73 @@ export type Database = {
             referencedColumns: ["staff_id"]
           },
         ]
+      }
+      weekly_scores_backup_20241124: {
+        Row: {
+          assignment_id: string | null
+          confidence_date: string | null
+          confidence_late: boolean | null
+          confidence_score: number | null
+          confidence_source: Database["public"]["Enums"]["score_source"] | null
+          created_at: string | null
+          entered_by: string | null
+          id: string | null
+          performance_date: string | null
+          performance_late: boolean | null
+          performance_score: number | null
+          performance_source: Database["public"]["Enums"]["score_source"] | null
+          selected_action_id: number | null
+          site_action_id: number | null
+          staff_id: string | null
+          updated_at: string | null
+          week_of: string | null
+          weekly_focus_id: string | null
+        }
+        Insert: {
+          assignment_id?: string | null
+          confidence_date?: string | null
+          confidence_late?: boolean | null
+          confidence_score?: number | null
+          confidence_source?: Database["public"]["Enums"]["score_source"] | null
+          created_at?: string | null
+          entered_by?: string | null
+          id?: string | null
+          performance_date?: string | null
+          performance_late?: boolean | null
+          performance_score?: number | null
+          performance_source?:
+            | Database["public"]["Enums"]["score_source"]
+            | null
+          selected_action_id?: number | null
+          site_action_id?: number | null
+          staff_id?: string | null
+          updated_at?: string | null
+          week_of?: string | null
+          weekly_focus_id?: string | null
+        }
+        Update: {
+          assignment_id?: string | null
+          confidence_date?: string | null
+          confidence_late?: boolean | null
+          confidence_score?: number | null
+          confidence_source?: Database["public"]["Enums"]["score_source"] | null
+          created_at?: string | null
+          entered_by?: string | null
+          id?: string | null
+          performance_date?: string | null
+          performance_late?: boolean | null
+          performance_score?: number | null
+          performance_source?:
+            | Database["public"]["Enums"]["score_source"]
+            | null
+          selected_action_id?: number | null
+          site_action_id?: number | null
+          staff_id?: string | null
+          updated_at?: string | null
+          week_of?: string | null
+          weekly_focus_id?: string | null
+        }
+        Relationships: []
       }
       weekly_self_select: {
         Row: {

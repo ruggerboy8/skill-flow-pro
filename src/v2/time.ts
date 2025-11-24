@@ -31,9 +31,9 @@ export function getWeekAnchors(now: Date, tz: string): V2Anchors {
   return {
     mondayZ,
     checkin_open: z(mondayZ, '00:00:00', tz),
-    checkin_due: z(addDays(mondayZ, 1), '15:00:00', tz),         // Tue 15:00 (3pm)
+    checkin_due: z(addDays(mondayZ, 1), '12:00:00', tz),         // Tue 12:00
     checkout_open: z(addDays(mondayZ, 3), '00:01:00', tz),       // Thu 00:01
-    checkout_due: z(addDays(mondayZ, 4), '15:00:00', tz),        // Fri 15:00 (3pm)
+    checkout_due: z(addDays(mondayZ, 4), '17:00:00', tz),        // Fri 17:00
     week_end: z(addDays(mondayZ, 6), '23:59:59', tz),            // Sun 23:59:59
   };
 }

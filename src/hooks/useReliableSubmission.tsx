@@ -120,16 +120,33 @@ export function useReliableSubmission() {
         console.warn('[Submission] Attempting to upsert record with both scores null:', update);
       }
       
-      // Populate week_of based on current date (when submission happens)
-      // This ensures scores are always associated with the week they were actually submitted
+      // Populate week_of if missing
       let weekOf = update.week_of;
       if (!weekOf) {
-        const now = new Date();
-        const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday wraps to -6
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - daysFromMonday);
-        weekOf = monday.toISOString().split('T')[0]; // YYYY-MM-DD format
+        if (isPlanId) {
+          const planId = parseInt(focusId.replace('plan:', ''), 10);
+          const { data: planData } = await supabase
+            .from('weekly_plan')
+            .select('week_start_date')
+            .eq('id', planId)
+            .single();
+          weekOf = planData?.week_start_date || null;
+        } else if (isAssignId) {
+          const assignId = focusId.replace('assign:', '');
+          const { data: assignData } = await supabase
+            .from('weekly_assignments')
+            .select('week_start_date')
+            .eq('id', assignId)
+            .single();
+          weekOf = assignData?.week_start_date || null;
+        } else {
+          const { data: focusData } = await supabase
+            .from('weekly_focus')
+            .select('week_start_date')
+            .eq('id', focusId)
+            .single();
+          weekOf = focusData?.week_start_date || null;
+        }
       }
       
       console.info('[Submission] Writing score with focus_id=%s conf=%s perf=%s week_of=%s', 

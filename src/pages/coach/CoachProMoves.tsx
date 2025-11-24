@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 export default function CoachProMoves() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, isCoach, isLead } = useAuth();
+  const { isCoach, isLead } = useAuth();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Filter state - restore from URL params
@@ -33,10 +33,7 @@ export default function CoachProMoves() {
   const [drillItem, setDrillItem] = useState<SpotlightItem | null>(null);
 
   // Load staff statuses via RPC
-  const { statuses, loading } = useCoachStaffStatuses({
-    coachUserId: user?.id,
-    enabled: !!user,
-  });
+  const { statuses, loading } = useCoachStaffStatuses();
 
   // Redirect if not authorized
   useEffect(() => {
@@ -82,7 +79,8 @@ export default function CoachProMoves() {
       filtered = filtered.filter(s =>
         s.staff_name.toLowerCase().includes(q) ||
         s.location_name.toLowerCase().includes(q) ||
-        s.role_name.toLowerCase().includes(q)
+        s.role_name.toLowerCase().includes(q) ||
+        (s.email && s.email.toLowerCase().includes(q))
       );
     }
 

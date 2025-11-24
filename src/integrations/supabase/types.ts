@@ -2233,26 +2233,31 @@ export type Database = {
         }[]
       }
       get_staff_statuses: {
-        Args: { p_coach_user_id: string; p_week_start?: string }
+        Args: { p_coach_user_id: string; p_now?: string }
         Returns: {
           active_monday: string
           backlog_count: number
-          conf_late_count: number
-          conf_submitted_count: number
-          last_conf_at: string
-          last_perf_at: string
+          checkin_due: string
+          checkout_due: string
+          checkout_open: string
+          conf_count: number
+          cycle_number: number
+          last_activity_at: string
+          last_activity_kind: string
           location_id: string
           location_name: string
           organization_id: string
           organization_name: string
-          perf_late_count: number
-          perf_submitted_count: number
+          perf_count: number
+          phase: string
           required_count: number
           role_id: number
           role_name: string
+          source_used: string
           staff_id: string
           staff_name: string
           tz: string
+          week_in_cycle: number
         }[]
       }
       get_staff_submission_windows: {
@@ -2290,23 +2295,10 @@ export type Database = {
           staff_id: string
         }[]
       }
-      get_staff_week_assignments:
-        | {
-            Args: {
-              p_role_id: number
-              p_staff_id: string
-              p_week_start: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_role_id: number
-              p_staff_id: string
-              p_week_start: string
-            }
-            Returns: Json
-          }
+      get_staff_week_assignments: {
+        Args: { p_role_id: number; p_staff_id: string; p_week_start: string }
+        Returns: Json
+      }
       get_strengths_weaknesses: {
         Args: {
           p_end?: string

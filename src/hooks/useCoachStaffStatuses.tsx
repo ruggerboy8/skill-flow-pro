@@ -1,26 +1,5 @@
-/**
- * Coach Staff Statuses Hook
- * 
- * CRITICAL: This hook calls get_staff_statuses(p_coach_user_id uuid, p_week_start date)
- * NOT the single-parameter version get_staff_statuses(p_week_start date) which has been removed.
- * 
- * The two-parameter version properly handles:
- * - Date normalization to Monday (ISO week) for both provided and default dates
- * - Assignment filtering for location-specific (onboarding), org-wide, and global assignments
- * - Score joins with 'assign:' prefix handling
- * - Coach scope visibility (organization, location, or all)
- * - Aggregation of submission counts and late flags
- * 
- * Input date handling:
- * - Accepts Date object or 'yyyy-MM-dd' string
- * - Always normalizes to Monday using Central Time zone
- * - Defaults to current week if not provided
- */
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
-import { getAnchors, CT_TZ } from '@/lib/centralTime';
 
 export interface StaffStatus {
   staff_id: string;
@@ -33,87 +12,69 @@ export interface StaffStatus {
   organization_id: string;
   organization_name: string;
   active_monday: string;
+  cycle_number: number;
+  week_in_cycle: number;
+  phase: string;
+  checkin_due: string;
+  checkout_open: string;
+  checkout_due: string;
   required_count: number;
-  conf_submitted_count: number;
-  conf_late_count: number;
-  perf_submitted_count: number;
-  perf_late_count: number;
+  conf_count: number;
+  perf_count: number;
   backlog_count: number;
-  last_conf_at: string | null;
-  last_perf_at: string | null;
+  last_activity_kind: string | null;
+  last_activity_at: string | null;
+  source_used: string;
   tz: string;
 }
 
-export interface UseCoachStaffStatusesOptions {
-  coachUserId?: string | null;
-  weekOf?: Date | string;
-  enabled?: boolean;
-}
+export function useCoachStaffStatuses() {
+  const [statuses, setStatuses] = useState<StaffStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-export function useCoachStaffStatuses({
-  coachUserId,
-  weekOf,
-  enabled = true,
-}: UseCoachStaffStatusesOptions = {}) {
-  const serializedWeek = useMemo(() => {
-    if (!weekOf) return undefined;
-    // If it's already a string in yyyy-MM-dd format, use it directly
-    if (typeof weekOf === 'string') {
-      return weekOf;
-    }
-    // Otherwise compute Monday in Central Time
-    const { mondayZ } = getAnchors(weekOf);
-    return format(mondayZ, 'yyyy-MM-dd');
-  }, [weekOf]);
+  const load = async () => {
+    setLoading(true);
+    setError(null);
 
-  const query = useQuery<StaffStatus[]>({
-    queryKey: ['coach-staff-statuses', coachUserId, serializedWeek],
-    enabled: enabled && (coachUserId === undefined || !!coachUserId),
-    staleTime: 60 * 1000,
-    queryFn: async () => {
+    try {
       const { data: { user } } = await supabase.auth.getUser();
-      const effectiveCoachId = coachUserId ?? user?.id;
-
-      if (!effectiveCoachId) {
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
-      const rpcArgs: { p_coach_user_id: string; p_week_start?: string } = {
-        p_coach_user_id: effectiveCoachId,
-      };
-
-      if (serializedWeek) {
-        rpcArgs.p_week_start = serializedWeek;
-      }
-
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_staff_statuses', rpcArgs);
+        .rpc('get_staff_statuses', { p_coach_user_id: user.id });
 
       if (rpcError) {
         console.error('[useCoachStaffStatuses] RPC error:', rpcError);
         throw rpcError;
       }
 
-      const staffIds = (rpcData || []).map((s: any) => s.staff_id);
-      const emailMap = new Map<string, string>();
+      // Log warning if no data returned
+      if (!rpcData || rpcData.length === 0) {
+        console.warn('⚠️ get_staff_statuses returned no rows', {
+          message: 'Check RLS policies and coach scope configuration'
+        });
+      }
 
+      // Fetch emails separately since RPC doesn't return them
+      const staffIds = (rpcData || []).map((s: any) => s.staff_id);
+      let emailMap = new Map<string, string>();
+      
       if (staffIds.length > 0) {
-        const { data: staffData, error: staffError } = await supabase
+        const { data: staffData } = await supabase
           .from('staff')
           .select('id, email')
           .in('id', staffIds);
-
-        if (staffError) {
-          console.error('[useCoachStaffStatuses] Staff email lookup error:', staffError);
-          throw staffError;
-        }
-
+        
         (staffData || []).forEach((s: any) => {
           emailMap.set(s.id, s.email);
         });
       }
 
-      return (rpcData || []).map((row: any) => ({
+      // Map RPC results to StaffStatus
+      const normalized: StaffStatus[] = (rpcData || []).map((row: any) => ({
         staff_id: row.staff_id,
         staff_name: row.staff_name,
         email: emailMap.get(row.staff_id),
@@ -124,23 +85,34 @@ export function useCoachStaffStatuses({
         organization_id: row.organization_id,
         organization_name: row.organization_name,
         active_monday: row.active_monday,
+        cycle_number: row.cycle_number,
+        week_in_cycle: row.week_in_cycle,
+        phase: row.phase,
+        checkin_due: row.checkin_due,
+        checkout_open: row.checkout_open,
+        checkout_due: row.checkout_due,
         required_count: row.required_count,
-        conf_submitted_count: row.conf_submitted_count,
-        conf_late_count: row.conf_late_count,
-        perf_submitted_count: row.perf_submitted_count,
-        perf_late_count: row.perf_late_count,
+        conf_count: row.conf_count,
+        perf_count: row.perf_count,
         backlog_count: row.backlog_count,
-        last_conf_at: row.last_conf_at,
-        last_perf_at: row.last_perf_at,
+        last_activity_kind: row.last_activity_kind,
+        last_activity_at: row.last_activity_at,
+        source_used: row.source_used,
         tz: row.tz,
       }));
-    },
-  });
 
-  return {
-    statuses: query.data ?? [],
-    loading: query.isLoading,
-    error: (query.error as Error) ?? null,
-    reload: query.refetch,
+      setStatuses(normalized);
+    } catch (err) {
+      console.error('[useCoachStaffStatuses] Error:', err);
+      setError(err as Error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return { statuses, loading, error, reload: load };
 }

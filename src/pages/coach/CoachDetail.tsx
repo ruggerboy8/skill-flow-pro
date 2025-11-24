@@ -1,12 +1,3 @@
-/**
- * @deprecated This is the LEGACY coach detail view (V1)
- * 
- * Legacy route: /coach-v1/:staffId
- * Active route: /coach/:staffId → CoachDetailV2.tsx
- * 
- * This file is kept for historical purposes but should not be actively maintained.
- * All new development should happen in CoachDetailV2.tsx
- */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';

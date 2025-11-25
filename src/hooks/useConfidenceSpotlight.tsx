@@ -2,7 +2,20 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { subWeeks, format, addDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
-import type { RosterStaff } from './useCoachRosterCoverage';
+
+export interface RosterStaff {
+  staff_id: string;
+  staff_name: string;
+  email: string;
+  role_id: number;
+  role_name: string;
+  location_id: string;
+  location_name: string;
+  organization_id: string;
+  organization_name: string;
+  tz: string;
+  week_of: string;
+}
 
 export interface SpotlightItem {
   action_id: number;

@@ -20,14 +20,8 @@ import ConfidenceWizard from "@/pages/ConfidenceWizard";
 import Performance from "@/pages/Performance";
 import PerformanceWizard from "@/pages/PerformanceWizard";
 import Review from "@/pages/Review";
-// V1 Coach Pages (legacy)
-import CoachDashboardV1 from "@/pages/coach/CoachDashboard";
-import CoachDetailV1 from "@/pages/coach/CoachDetail";
-import { EvaluationHub as EvaluationHubV1 } from "@/pages/coach/EvaluationHub";
-import CoachLayoutV1 from "@/pages/coach/CoachLayout";
-import CoachProMovesV1 from "@/pages/coach/CoachProMoves";
 
-// V2 Coach Pages (new)
+// Coach Pages
 import CoachLayoutV2 from "@/pages/coach/CoachLayoutV2";
 import CoachDashboardV2 from "@/pages/coach/CoachDashboardV2";
 import StaffDetailV2 from "@/pages/coach/StaffDetailV2";
@@ -96,19 +90,11 @@ function AppRoutes() {
         <Route path="performance/:week/step/:n" element={<PerformanceWizard />} />
         <Route path="review/:cycle/:week" element={<Review />} />
 
-        {/* Coach V2 - New clean implementation */}
+        {/* Coach Routes */}
         <Route path="coach" element={<CoachLayoutV2 />}>
           <Route index element={<CoachDashboardV2 />} />
           <Route path=":staffId" element={<StaffDetailV2 />} />
         </Route>
-
-        {/* Coach V1 - Legacy routes preserved */}
-        <Route path="coach-v1" element={<CoachLayoutV1 />}>
-          <Route index element={<CoachDashboardV1 />} />
-          <Route path="promoves" element={<CoachProMovesV1 />} />
-        </Route>
-        <Route path="coach-v1/:staffId" element={<CoachDetailV1 />} />
-        <Route path="coach-v1/:staffId/eval/:evalId" element={<EvaluationHubV1 />} />
 
         <Route path="admin" element={<AdminPage />} />
         <Route path="admin/eval-results" element={<EvalResults />} />

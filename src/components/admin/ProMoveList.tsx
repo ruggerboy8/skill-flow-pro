@@ -423,21 +423,18 @@ export function ProMoveList({
                       </Tooltip>
                     </TooltipProvider>
 
-                    {status.linkCount > 0 && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-50 text-gray-600 border border-gray-100">
-                              <LinkIcon className="w-3 h-3 mr-0.5" />
-                              <span className="text-[10px] font-bold">{status.linkCount}</span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{status.linkCount} additional link{status.linkCount !== 1 ? 's' : ''}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-full border ${status.linkCount > 0 ? 'bg-blue-50 text-blue-600 border-blue-100' : 'text-muted-foreground/20 border-transparent'}`}>
+                            <LinkIcon className="w-4 h-4" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{status.linkCount > 0 ? `${status.linkCount} link${status.linkCount !== 1 ? 's' : ''} attached` : 'No links'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </TableCell>
 

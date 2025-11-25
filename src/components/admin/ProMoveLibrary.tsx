@@ -35,6 +35,7 @@ export function ProMoveLibrary() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [sortBy, setSortBy] = useState<'domain' | 'competency' | 'updated'>('updated');
+  const [resourceFilter, setResourceFilter] = useState<string>('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingProMove, setEditingProMove] = useState<any>(null);
@@ -256,7 +257,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-muted/50 rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 bg-muted/50 rounded-lg">
         <div className="space-y-2">
           <Label>Role</Label>
           <Select value={selectedRole} onValueChange={setSelectedRole}>
@@ -321,6 +322,23 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
         </div>
 
         <div className="space-y-2">
+          <Label>Resources</Label>
+          <Select value={resourceFilter} onValueChange={setResourceFilter}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="has_materials">Has Materials</SelectItem>
+              <SelectItem value="missing_video">Missing Video</SelectItem>
+              <SelectItem value="missing_script">Missing Script</SelectItem>
+              <SelectItem value="missing_audio">Missing Audio</SelectItem>
+              <SelectItem value="incomplete">Incomplete</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <Label>Status</Label>
           <div className="flex items-center space-x-2 pt-2">
             <Switch
@@ -341,6 +359,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
           competencyFilter={selectedCompetency}
           searchTerm={searchTerm}
           activeOnly={showActiveOnly}
+          resourceFilter={resourceFilter}
           sortBy={sortBy}
           onEdit={handleEditProMove}
         />

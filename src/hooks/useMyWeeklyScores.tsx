@@ -1,46 +1,36 @@
-/**
- * @deprecated This hook uses a deprecated RPC. Use useMyWeeklyScores for individual user data instead.
- */
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RawScoreRow, StaffWeekSummary } from '@/types/coachV2';
 
-interface UseStaffAllWeeklyScoresOptions {
-  staffId: string | undefined;
+interface UseMyWeeklyScoresOptions {
+  weekOf?: string | null;
 }
 
-export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions) {
+export function useMyWeeklyScores(options: UseMyWeeklyScoresOptions = {}) {
   const [rawData, setRawData] = useState<RawScoreRow[]>([]);
   const [weekSummaries, setWeekSummaries] = useState<Map<string, StaffWeekSummary>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { staffId } = options;
+  const { weekOf } = options;
 
   const load = useCallback(async () => {
-    if (!staffId) {
-      setRawData([]);
-      setWeekSummaries(new Map());
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_staff_all_weekly_scores_deprecated' as any, { 
-          p_staff_id: staffId
+        .rpc('get_my_weekly_scores', { 
+          p_week_of: weekOf || null
         })
         .limit(10000);
 
       if (rpcError) {
-        console.error('[useStaffAllWeeklyScores] RPC error:', rpcError);
+        console.error('[useMyWeeklyScores] RPC error:', rpcError);
         throw rpcError;
       }
 
       if (!rpcData || !Array.isArray(rpcData) || rpcData.length === 0) {
-        console.warn('⚠️ get_staff_all_weekly_scores_deprecated returned no rows for staffId:', staffId);
+        console.warn('⚠️ get_my_weekly_scores returned no rows');
         setRawData([]);
         setWeekSummaries(new Map());
         return;
@@ -103,12 +93,12 @@ export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions)
 
       setWeekSummaries(weekMap);
     } catch (err) {
-      console.error('[useStaffAllWeeklyScores] Error:', err);
+      console.error('[useMyWeeklyScores] Error:', err);
       setError(err as Error);
     } finally {
       setLoading(false);
     }
-  }, [staffId]);
+  }, [weekOf]);
 
   useEffect(() => {
     load();

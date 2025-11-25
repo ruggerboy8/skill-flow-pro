@@ -2286,6 +2286,40 @@ export type Database = {
           material_count: number
         }[]
       }
+      get_my_weekly_scores: {
+        Args: { p_week_of?: string }
+        Returns: {
+          action_id: number
+          action_statement: string
+          assignment_id: string
+          confidence_date: string
+          confidence_late: boolean
+          confidence_score: number
+          confidence_source: string
+          display_order: number
+          domain_id: number
+          domain_name: string
+          is_week_exempt: boolean
+          location_id: string
+          location_name: string
+          organization_id: string
+          organization_name: string
+          performance_date: string
+          performance_late: boolean
+          performance_score: number
+          performance_source: string
+          role_id: number
+          role_name: string
+          score_id: string
+          selected_action_id: number
+          self_select: boolean
+          staff_email: string
+          staff_id: string
+          staff_name: string
+          user_id: string
+          week_of: string
+        }[]
+      }
       get_performance_trend: {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json
@@ -2327,7 +2361,7 @@ export type Database = {
           url: string
         }[]
       }
-      get_staff_all_weekly_scores: {
+      get_staff_all_weekly_scores_deprecated: {
         Args: { p_staff_id: string }
         Returns: {
           action_id: number

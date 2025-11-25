@@ -129,15 +129,20 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
       }
 
       // Build slots
-      const loadedSlots: Slot[] = assignments.map((item, index) => ({
-        id: item.self_select ? `self-select-${index}` : `pro-move-${item.action_id}`,
-        action_id: item.action_id || undefined,
-        action_statement: item.action_id ? actionMap.get(item.action_id) : undefined,
-        competency_id: item.competency_id || undefined,
-        competency_name: item.competency_id ? competencyMap.get(item.competency_id) : undefined,
-        self_select: item.self_select
-      }));
+      const loadedSlots: Slot[] = assignments.map((item, index) => {
+        const slot = {
+          id: item.self_select ? `self-select-${index}` : `pro-move-${item.action_id}`,
+          action_id: item.action_id || undefined,
+          action_statement: item.action_id ? actionMap.get(item.action_id) : undefined,
+          competency_id: item.competency_id || undefined,
+          competency_name: item.competency_id ? competencyMap.get(item.competency_id) : undefined,
+          self_select: item.self_select
+        };
+        console.log('🔍 Loaded slot:', slot);
+        return slot;
+      });
 
+      console.log('📦 All slots loaded:', loadedSlots);
       setSlots(loadedSlots);
     } catch (error) {
       console.error('Error loading existing week:', error);

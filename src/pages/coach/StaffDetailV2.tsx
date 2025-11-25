@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 import { QuarterlyEvalsTab } from '@/components/coach/QuarterlyEvalsTab';
 import { RawScoreRow } from '@/types/coachV2';
+import { getDomainColor } from '@/lib/domainColors';
+import ConfPerfDelta from '@/components/ConfPerfDelta';
 
 export default function StaffDetailV2() {
   const { staffId } = useParams<{ staffId: string }>();
@@ -37,13 +39,16 @@ export default function StaffDetailV2() {
     };
   }, [weekSummaries]);
 
-  // Group weeks by year/month for accordion
+  // Group weeks by year/month for accordion (filter out future weeks)
   const groupedWeeks = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    
     const groups = new Map<string, Array<[string, typeof weekSummaries extends Map<string, infer T> ? T : never]>>();
     
-    const sortedEntries = Array.from(weekSummaries.entries()).sort((a, b) => 
-      new Date(b[0]).getTime() - new Date(a[0]).getTime()
-    );
+    const sortedEntries = Array.from(weekSummaries.entries())
+      .filter(([weekOf]) => new Date(weekOf) <= now)
+      .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
 
     sortedEntries.forEach(([weekOf, summary]) => {
       const date = parseISO(weekOf);
@@ -64,7 +69,10 @@ export default function StaffDetailV2() {
   }, [weekSummaries]);
 
   // Status pill component
-  function StatusPill({ hasAll, hasAnyLate }: { hasAll: boolean; hasAnyLate: boolean }) {
+  function StatusPill({ hasAll, hasAnyLate, isExempt }: { hasAll: boolean; hasAnyLate: boolean; isExempt?: boolean }) {
+    if (isExempt) {
+      return <span className="text-muted-foreground">—</span>;
+    }
     if (!hasAll) {
       return (
         <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
@@ -192,6 +200,7 @@ export default function StaffDetailV2() {
                                   <StatusPill
                                     hasAll={hasAllConf}
                                     hasAnyLate={summary.scores.some(s => s.confidence_late)}
+                                    isExempt={isExempt}
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -199,76 +208,51 @@ export default function StaffDetailV2() {
                                   <StatusPill
                                     hasAll={hasAllPerf}
                                     hasAnyLate={summary.scores.some(s => s.performance_late)}
+                                    isExempt={isExempt}
                                   />
                                 </div>
                               </div>
                             </div>
                           </AccordionTrigger>
                           <AccordionContent>
-                            <div className="space-y-3 pt-2">
+                            <div className="space-y-2 pt-2">
                               {summary.scores
                                 .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
                                 .map((score, idx) => (
                                   <div
                                     key={`${score.assignment_id}-${idx}`}
-                                    className="border rounded-lg p-4 space-y-2"
+                                    className="flex items-center gap-3 p-3 rounded-lg border"
+                                    style={{
+                                      backgroundColor: score.domain_name
+                                        ? `hsl(${getDomainColor(score.domain_name).match(/hsl\((.+)\)/)?.[1]} / 0.3)`
+                                        : undefined,
+                                    }}
                                   >
-                                    <div className="flex items-start justify-between">
-                                      <div className="space-y-1">
-                                        <div className="font-medium">{score.action_statement}</div>
-                                        <div className="text-sm text-muted-foreground">
-                                          {score.domain_name}
-                                        </div>
-                                      </div>
-                                      {score.self_select && (
-                                        <Badge variant="outline">Self-Select</Badge>
-                                      )}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4 pt-2">
-                                      <div>
-                                        <div className="text-sm font-medium mb-1">Confidence</div>
-                                        {score.confidence_score !== null ? (
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-2xl font-bold">
-                                              {score.confidence_score}
-                                            </span>
-                                            {score.confidence_late && (
-                                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                                                Late
-                                              </Badge>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          <span className="text-muted-foreground">Not submitted</span>
-                                        )}
-                                        {score.confidence_date && (
-                                          <div className="text-xs text-muted-foreground mt-1">
-                                            {format(new Date(score.confidence_date), 'MMM d, h:mm a')}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div>
-                                        <div className="text-sm font-medium mb-1">Performance</div>
-                                        {score.performance_score !== null ? (
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-2xl font-bold">
-                                              {score.performance_score}
-                                            </span>
-                                            {score.performance_late && (
-                                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                                                Late
-                                              </Badge>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          <span className="text-muted-foreground">Not submitted</span>
-                                        )}
-                                        {score.performance_date && (
-                                          <div className="text-xs text-muted-foreground mt-1">
-                                            {format(new Date(score.performance_date), 'MMM d, h:mm a')}
-                                          </div>
-                                        )}
-                                      </div>
+                                    {score.domain_name && (
+                                      <Badge
+                                        variant="outline"
+                                        className="shrink-0"
+                                        style={{
+                                          backgroundColor: getDomainColor(score.domain_name),
+                                          borderColor: getDomainColor(score.domain_name),
+                                        }}
+                                      >
+                                        {score.domain_name}
+                                      </Badge>
+                                    )}
+                                    <p className="flex-1 text-sm">
+                                      {score.action_statement}
+                                    </p>
+                                    {score.self_select && (
+                                      <Badge variant="secondary" className="shrink-0 text-xs">
+                                        Self-Select
+                                      </Badge>
+                                    )}
+                                    <div className="shrink-0">
+                                      <ConfPerfDelta
+                                        confidence={score.confidence_score}
+                                        performance={score.performance_score}
+                                      />
                                     </div>
                                   </div>
                                 ))}

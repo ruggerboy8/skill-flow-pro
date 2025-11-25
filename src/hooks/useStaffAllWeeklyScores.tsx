@@ -36,14 +36,22 @@ export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions)
         throw rpcError;
       }
 
+      console.log('[useStaffAllWeeklyScores] RPC response:', {
+        staffId,
+        dataLength: rpcData?.length || 0,
+        isArray: Array.isArray(rpcData),
+        firstRow: rpcData?.[0]
+      });
+
       if (!rpcData || !Array.isArray(rpcData) || rpcData.length === 0) {
-        console.warn('⚠️ get_staff_all_weekly_scores returned no rows');
+        console.warn('⚠️ get_staff_all_weekly_scores returned no rows for staffId:', staffId);
         setRawData([]);
         setWeekSummaries(new Map());
         return;
       }
 
       const rows = rpcData as (RawScoreRow & { is_week_exempt: boolean })[];
+      console.log('[useStaffAllWeeklyScores] Processing rows:', rows.length);
       setRawData(rows);
 
       // Group by week
@@ -98,6 +106,10 @@ export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions)
           !summary.has_any_late;
       });
 
+      console.log('[useStaffAllWeeklyScores] Week summaries created:', {
+        weekCount: weekMap.size,
+        weeks: Array.from(weekMap.keys())
+      });
       setWeekSummaries(weekMap);
     } catch (err) {
       console.error('[useStaffAllWeeklyScores] Error:', err);

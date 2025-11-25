@@ -277,131 +277,39 @@ export default function CoachDashboardV2() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <h1 className="text-3xl font-bold">Coach Dashboard</h1>
+
+      {/* Week Navigation - Compact inline */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Coach Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={handlePreviousWeek}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="font-semibold">
+            Week of {format(selectedWeek, 'MMM d, yyyy')}
+          </div>
+          <Button variant="outline" size="sm" onClick={handleNextWeek}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          {isWeekExempt && (
+            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
+              <CalendarOff className="h-3 w-3 mr-1" />
+              Exempt Week
+            </Badge>
+          )}
+        </div>
         <Button variant="outline" size="sm" onClick={reload}>
           <RotateCw className="h-4 w-4 mr-2" />
           Reload
         </Button>
       </div>
 
-      {/* Week Navigation */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Week Selection</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={handlePreviousWeek}>
-              <ChevronLeft className="h-4 w-4" />
-              Previous Week
-            </Button>
-            <div className="text-center flex-1">
-              <div className="font-semibold text-lg">
-                Week of {format(selectedWeek, 'MMM d, yyyy')}
-              </div>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleNextWeek}>
-              Next Week
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Exempt Week Banner */}
-      {isWeekExempt && (
-        <Card className="bg-amber-50 border-amber-200">
-          <CardContent className="py-6 text-center">
-            <CalendarOff className="h-8 w-8 mx-auto mb-3 text-amber-600" />
-            <p className="font-semibold text-amber-900 mb-1">
-              Week of {format(selectedWeek, 'MMM d')} is Exempt
-            </p>
-            <p className="text-sm text-amber-700">
-              No submissions required from staff this week
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Organization</label>
-              <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Organizations</SelectItem>
-                  {organizations.map(org => (
-                    <SelectItem key={org} value={org}>{org}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Location</label>
-              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Locations</SelectItem>
-                  {locations.map(loc => (
-                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Role</label>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {roles.map(role => (
-                    <SelectItem key={role} value={role}>{role}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Search</label>
-              <Input
-                placeholder="Search staff..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {hasActiveFilters && (
-            <div className="mt-4">
-              <Button variant="outline" size="sm" onClick={clearFilters}>
-                Clear Filters
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Staff Coverage Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Staff Coverage ({sortedRows.length} staff)</CardTitle>
+            <CardTitle>{sortedRows.length} Staff</CardTitle>
             <div className="flex gap-2">
               <Button
                 variant="outline"

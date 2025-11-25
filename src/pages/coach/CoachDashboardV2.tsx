@@ -305,6 +305,58 @@ export default function CoachDashboardV2() {
         </Button>
       </div>
 
+      {/* Filter controls */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Organization" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Organizations</SelectItem>
+            {organizations.map(org => (
+              <SelectItem key={org} value={org}>{org}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Location" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {locations.map(loc => (
+              <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedRole} onValueChange={setSelectedRole}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            {roles.map(role => (
+              <SelectItem key={role} value={role}>{role}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Input
+          placeholder="Search by name or email..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-[240px]"
+        />
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            Clear
+          </Button>
+        )}
+      </div>
+
       {/* Staff Coverage Table */}
       <Card>
         <CardHeader>

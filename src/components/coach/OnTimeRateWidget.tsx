@@ -19,7 +19,6 @@ interface SubmissionStats {
   onTimeRate: number;
   late: number;
   missing: number;
-  pending: number;
 }
 
 export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
@@ -135,16 +134,6 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
       const onTime = confOnTime + perfOnTime;
       const late = completed - onTime;
       const missing = totalExpected - completed;
-      
-      const pendingWindows = windows.filter((w: any) => w.status === 'pending');
-      const pendingWeekMetrics = new Map<string, Set<string>>();
-      pendingWindows.forEach((w: any) => {
-        if (!pendingWeekMetrics.has(w.week_of)) {
-          pendingWeekMetrics.set(w.week_of, new Set());
-        }
-        pendingWeekMetrics.get(w.week_of)!.add(w.metric);
-      });
-      const pending = Array.from(pendingWeekMetrics.values()).reduce((sum, metrics) => sum + metrics.size, 0);
 
       const completionRate = totalExpected > 0 ? (completed / totalExpected) * 100 : 0;
       const onTimeRate = completed > 0 ? (onTime / completed) * 100 : 0;
@@ -156,8 +145,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
         onTimeSubmissions: onTime,
         onTimeRate,
         late,
-        missing,
-        pending
+        missing
       });
     } catch (error) {
       console.error('Error loading on-time stats:', error);
@@ -168,8 +156,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
         onTimeSubmissions: 0, 
         onTimeRate: 0, 
         late: 0, 
-        missing: 0, 
-        pending: 0 
+        missing: 0
       });
     } finally {
       setLoading(false);
@@ -249,7 +236,6 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
                 <span className="text-sm text-muted-foreground">
                   {stats.completedSubmissions} of {stats.totalSubmissions} completed
                   {stats.missing > 0 && `, ${stats.missing} missing`}
-                  {stats.pending > 0 && `, ${stats.pending} pending`}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">

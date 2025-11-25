@@ -19,14 +19,11 @@ function stripMarkdownToText(md: string): string {
     .trim();
 }
 
-// Map voice names to Hume voice IDs
+// Map voice names to Hume voice IDs (only include valid UUIDs)
+// If a voice isn't in this map, the code will fall back to using the name directly
 const VOICE_ID_MAP: Record<string, string> = {
-  'Ava Song': 'ava-song-id', // Replace with actual ID from Hume
-  'Kora': 'kora-id', // Replace with actual ID from Hume
-  'Dacher': 'dacher-id', // Replace with actual ID from Hume
-  'Stella': 'stella-id', // Replace with actual ID from Hume
-  'Whimsy': 'whimsy-id', // Replace with actual ID from Hume
   'Jessica': '03012e0c-8b7e-4c9d-9579-04bea0a56674'
+  // Add more voice IDs here when you have valid UUIDs from Hume
 };
 
 // Compute SHA-256 hash of text for integrity checking

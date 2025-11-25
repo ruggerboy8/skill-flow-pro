@@ -30,6 +30,7 @@ interface ProMove {
   action_statement: string;
   description?: string;
   resources_url?: string;
+  intervention_text?: string;
   role_id?: number;
   competency_id?: number;
   role_name?: string;
@@ -51,7 +52,9 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
     role_id: '',
     competency_id: '',
     action_statement: '',
-    resources_url: ''
+    description: '',
+    resources_url: '',
+    intervention_text: ''
   });
   const [filteredCompetencies, setFilteredCompetencies] = useState<Competency[]>(competencies);
 
@@ -61,7 +64,9 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
         role_id: proMove.role_id?.toString() || '',
         competency_id: proMove.competency_id?.toString() || '',
         action_statement: proMove.action_statement || '',
-        resources_url: proMove.resources_url || ''
+        description: proMove.description || '',
+        resources_url: proMove.resources_url || '',
+        intervention_text: proMove.intervention_text || ''
       });
     } else if (selectedRole && selectedRole !== 'all') {
       // Pre-select role when adding new pro-move with role filter
@@ -162,7 +167,9 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
         role_id: parseInt(formData.role_id),
         competency_id: parseInt(formData.competency_id),
         action_statement: formData.action_statement.trim(),
+        description: formData.description.trim() || null,
         resources_url: formData.resources_url.trim() || null,
+        intervention_text: formData.intervention_text.trim() || null,
         active: true
       };
 
@@ -273,6 +280,30 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
               onChange={(e) => setFormData({ ...formData, action_statement: e.target.value })}
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              placeholder="Why this matters..."
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">Shown to learners as "Why this matters"</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="intervention">Intervention Text</Label>
+            <Textarea
+              id="intervention"
+              placeholder="Guidance for coaching interventions..."
+              value={formData.intervention_text}
+              onChange={(e) => setFormData({ ...formData, intervention_text: e.target.value })}
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">Used for coaching and performance interventions</p>
           </div>
 
           <div className="space-y-2">

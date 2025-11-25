@@ -3,9 +3,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Edit, Eye, EyeOff, Trash2, GraduationCap } from 'lucide-react';
+import { 
+  Edit, 
+  Eye, 
+  EyeOff, 
+  Trash2, 
+  GraduationCap, 
+  Video, 
+  FileText, 
+  Volume2, 
+  Link as LinkIcon,
+  Play
+} from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { LearningDrawer } from './LearningDrawer';
+import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
@@ -27,6 +39,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ProMove {
   action_id: number;
@@ -42,11 +55,19 @@ interface ProMove {
   domain_name: string;
 }
 
+interface ResourceStatus {
+  hasVideo: boolean;
+  hasScript: boolean;
+  hasAudio: boolean;
+  linkCount: number;
+}
+
 interface ProMoveListProps {
   roleFilter: string;
   competencyFilter: string;
   searchTerm: string;
   activeOnly: boolean;
+  resourceFilter?: string;
   sortBy: 'domain' | 'competency' | 'updated';
   onEdit: (proMove: ProMove) => void;
 }
@@ -56,14 +77,16 @@ export function ProMoveList({
   competencyFilter, 
   searchTerm, 
   activeOnly,
+  resourceFilter = 'all',
   sortBy, 
   onEdit 
 }: ProMoveListProps) {
   const { toast } = useToast();
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
   const [loading, setLoading] = useState(true);
-  const [materialsCount, setMaterialsCount] = useState<Map<number, number>>(new Map());
+  const [resourceStatus, setResourceStatus] = useState<Map<number, ResourceStatus>>(new Map());
   const [learningDrawerOpen, setLearningDrawerOpen] = useState(false);
+  const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
   const [selectedProMove, setSelectedProMove] = useState<ProMove | null>(null);
 
   useEffect(() => {
@@ -71,7 +94,6 @@ export function ProMoveList({
   }, [roleFilter, competencyFilter, searchTerm, activeOnly, sortBy]);
 
   const loadProMoves = async () => {
-    console.log('=== LOADING PRO MOVES ===', { roleFilter, competencyFilter, searchTerm, activeOnly });
     setLoading(true);
     try {
       let query = supabase
@@ -106,11 +128,10 @@ export function ProMoveList({
       }
 
       const { data, error } = await query;
-      console.log('=== PRO MOVES QUERY RESULT ===', { data, error });
 
       if (error) throw error;
 
-      // Get role and competency names separately to avoid join issues
+      // Get role and competency names separately
       const roleIds = [...new Set(data?.map(item => item.role_id).filter(Boolean))];
       const competencyIds = [...new Set(data?.map(item => item.competency_id).filter(Boolean))];
       
@@ -157,21 +178,34 @@ export function ProMoveList({
         formattedData.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       }
       
-      console.log('=== FORMATTED PRO MOVES ===', formattedData);
       setProMoves(formattedData);
       
-      // Fetch materials count for all loaded pro-moves
+      // Fetch specific resource types for all loaded pro-moves
       if (formattedData.length > 0) {
         const actionIds = formattedData.map(pm => pm.action_id);
-        const { data: countsData } = await supabase.rpc('get_materials_count', {
-          p_action_ids: actionIds
-        });
+        const { data: resourcesData } = await supabase
+          .from('pro_move_resources')
+          .select('action_id, type')
+          .in('action_id', actionIds)
+          .eq('status', 'active');
         
-        const countsMap = new Map<number, number>();
-        countsData?.forEach(({ action_id, material_count }) => {
-          countsMap.set(action_id, material_count);
+        const statusMap = new Map<number, ResourceStatus>();
+        
+        // Initialize all with empty status
+        actionIds.forEach(id => {
+          statusMap.set(id, { hasVideo: false, hasScript: false, hasAudio: false, linkCount: 0 });
         });
-        setMaterialsCount(countsMap);
+
+        // Fill in actual data
+        resourcesData?.forEach(r => {
+          const current = statusMap.get(r.action_id)!;
+          if (r.type === 'video') current.hasVideo = true;
+          if (r.type === 'script') current.hasScript = true;
+          if (r.type === 'audio') current.hasAudio = true;
+          if (r.type === 'link') current.linkCount++;
+        });
+
+        setResourceStatus(statusMap);
       }
     } catch (error) {
       toast({
@@ -185,6 +219,27 @@ export function ProMoveList({
   };
 
   const { sortedData, sortConfig, handleSort } = useTableSort(proMoves);
+
+  // Apply resource filter
+  const filteredData = sortedData.filter(proMove => {
+    const status = resourceStatus.get(proMove.action_id);
+    if (!status) return true;
+
+    switch (resourceFilter) {
+      case 'has_materials':
+        return status.hasVideo || status.hasScript || status.hasAudio || status.linkCount > 0;
+      case 'missing_video':
+        return !status.hasVideo;
+      case 'missing_script':
+        return !status.hasScript;
+      case 'missing_audio':
+        return !status.hasAudio;
+      case 'incomplete':
+        return !status.hasVideo || !status.hasScript || !status.hasAudio;
+      default:
+        return true;
+    }
+  });
 
   const toggleActive = async (proMove: ProMove) => {
     try {
@@ -218,12 +273,11 @@ export function ProMoveList({
         .eq('action_id', proMove.action_id);
 
       if (error) {
-        // Check if it's a foreign key constraint violation
         if (error.message.includes('violates foreign key constraint') || 
             error.message.includes('weekly_focus_action_id_fkey')) {
           toast({
             title: "Cannot Delete Pro-Move",
-            description: "This pro-move is currently assigned in weekly focus schedules and cannot be deleted. Please retire it instead.",
+            description: "This pro-move is currently assigned in weekly focus schedules. Please retire it instead.",
             variant: "destructive"
           });
           return;
@@ -255,16 +309,20 @@ export function ProMoveList({
     setLearningDrawerOpen(true);
   };
 
-  const handleLearningDrawerClose = () => {
-    setLearningDrawerOpen(false);
-    setSelectedProMove(null);
+  const openPreviewDrawer = (proMove: ProMove) => {
+    setSelectedProMove(proMove);
+    setPreviewDrawerOpen(true);
   };
 
-  const handleResourcesChange = (actionId: number, summary: { video: boolean; script: boolean; links: number; total: number }) => {
-    // Update materials count for this specific action without reloading the list
-    setMaterialsCount((prev) => {
+  const handleResourcesChange = (actionId: number, summary: { video: boolean; script: boolean; links: number; total: number; audio?: boolean }) => {
+    setResourceStatus((prev) => {
       const updated = new Map(prev);
-      updated.set(actionId, summary.total);
+      updated.set(actionId, {
+        hasVideo: summary.video,
+        hasScript: summary.script,
+        hasAudio: !!summary.audio,
+        linkCount: summary.links
+      });
       return updated;
     });
   };
@@ -273,7 +331,7 @@ export function ProMoveList({
     return <div className="text-center py-8">Loading pro-moves...</div>;
   }
 
-  if (sortedData.length === 0) {
+  if (filteredData.length === 0) {
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">No pro-moves found matching your criteria.</p>
@@ -286,160 +344,222 @@ export function ProMoveList({
       <Table>
         <TableHeader>
           <TableRow>
-            <SortableTableHead sortKey="action_statement" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+            <SortableTableHead sortKey="action_statement" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-[40%]">
               Pro-Move
             </SortableTableHead>
-            <SortableTableHead sortKey="role_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-              Role
-            </SortableTableHead>
-            <SortableTableHead sortKey="domain_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-              Domain
-            </SortableTableHead>
-            <SortableTableHead sortKey="competency_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-              Competency
-            </SortableTableHead>
-            <SortableTableHead sortKey="updated_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+            <TableHead className="w-[25%]">Context</TableHead>
+            <TableHead className="w-[15%]">Materials</TableHead>
+            <SortableTableHead sortKey="updated_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-[10%]">
               Updated
             </SortableTableHead>
-            <TableHead>
-              <div className="flex items-center gap-1">
-                <GraduationCap className="h-4 w-4" />
-                <span>Materials</span>
-              </div>
-            </TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-right w-[10%]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedData.map((proMove) => (
-            <TableRow key={proMove.action_id}>
-              <TableCell className="max-w-md">
-                <div className="font-medium">{proMove.action_statement}</div>
-                {proMove.resources_url && (
-                  <div className="text-sm text-blue-600 mt-1">
-                    <a href={proMove.resources_url} target="_blank" rel="noopener noreferrer">
-                      Resource Link
-                    </a>
+          {filteredData.map((proMove) => {
+            const status = resourceStatus.get(proMove.action_id) || { hasVideo: false, hasScript: false, hasAudio: false, linkCount: 0 };
+            
+            return (
+              <TableRow key={proMove.action_id} className={!proMove.active ? 'opacity-60 bg-muted/50' : ''}>
+                <TableCell className="max-w-md align-top">
+                  <div className="font-medium">{proMove.action_statement}</div>
+                  {!proMove.active && (
+                    <Badge variant="secondary" className="mt-1 text-[10px] h-5">Retired</Badge>
+                  )}
+                </TableCell>
+                
+                {/* Condensed Context Column */}
+                <TableCell className="align-top">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {proMove.role_name}
+                      </Badge>
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <div 
+                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: getDomainColor(proMove.domain_name) }}
+                        />
+                        <span>{proMove.domain_name}</span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground font-medium pl-1">
+                      {proMove.competency_name}
+                    </div>
                   </div>
-                )}
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline">{proMove.role_name}</Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: getDomainColor(proMove.domain_name) }}
-                  />
-                  <span className="font-medium">{proMove.domain_name}</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: getDomainColor(proMove.domain_name) }}
-                  />
-                  <Badge variant="secondary">{proMove.competency_name}</Badge>
-                </div>
-              </TableCell>
-              <TableCell>{formatDate(proMove.updated_at)}</TableCell>
-              <TableCell>
-                {materialsCount.get(proMove.action_id) ? (
-                  <Badge variant="secondary" className="gap-1">
-                    <GraduationCap className="h-3 w-3" />
-                    {materialsCount.get(proMove.action_id)}
-                  </Badge>
-                ) : (
-                  <span className="text-muted-foreground text-sm">—</span>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openLearningDrawer(proMove)}
-                    title="Learning Materials"
-                  >
-                    <GraduationCap className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onEdit(proMove)}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        {proMove.active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          {proMove.active ? 'Retire Pro-Move?' : 'Restore Pro-Move?'}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {proMove.active 
-                            ? "Retiring a Pro-Move hides it from selection going forward. Historical records are preserved."
-                            : "Restoring a Pro-Move will make it available for selection again."
-                          }
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => toggleActive(proMove)}>
-                          {proMove.active ? 'Retire' : 'Restore'}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                </TableCell>
 
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Pro-Move?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently delete the pro-move and all associated data. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={() => deleteProMove(proMove)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+                {/* Enhanced Materials Column */}
+                <TableCell className="align-top">
+                  <div className="flex items-center gap-3 pt-1">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-full border ${status.hasVideo ? 'bg-blue-50 text-blue-600 border-blue-100' : 'text-muted-foreground/20 border-transparent'}`}>
+                            <Video className="w-4 h-4" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{status.hasVideo ? 'Video attached' : 'No video'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-full border ${status.hasScript ? 'bg-green-50 text-green-600 border-green-100' : 'text-muted-foreground/20 border-transparent'}`}>
+                            <FileText className="w-4 h-4" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{status.hasScript ? 'Script attached' : 'No script'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-full border ${status.hasAudio ? 'bg-purple-50 text-purple-600 border-purple-100' : 'text-muted-foreground/20 border-transparent'}`}>
+                            <Volume2 className="w-4 h-4" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{status.hasAudio ? 'Audio attached' : 'No audio'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    {status.linkCount > 0 && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-50 text-gray-600 border border-gray-100">
+                              <LinkIcon className="w-3 h-3 mr-0.5" />
+                              <span className="text-[10px] font-bold">{status.linkCount}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{status.linkCount} additional link{status.linkCount !== 1 ? 's' : ''}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
+                </TableCell>
+
+                <TableCell className="text-sm text-muted-foreground align-top pt-3">
+                  {formatDate(proMove.updated_at)}
+                </TableCell>
+
+                <TableCell className="text-right align-top">
+                  <div className="flex gap-1 justify-end">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openPreviewDrawer(proMove)}
+                      title="Preview as Learner"
+                    >
+                      <Play className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openLearningDrawer(proMove)}
+                      title="Manage Learning Materials"
+                    >
+                      <GraduationCap className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => onEdit(proMove)}
+                      title="Edit Pro-Move"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" title={proMove.active ? 'Retire' : 'Restore'}>
+                          {proMove.active ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            {proMove.active ? 'Retire Pro-Move?' : 'Restore Pro-Move?'}
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {proMove.active 
+                              ? "Retiring a Pro-Move hides it from selection going forward. Historical records are preserved."
+                              : "Restoring a Pro-Move will make it available for selection again."
+                            }
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => toggleActive(proMove)}>
+                            {proMove.active ? 'Retire' : 'Restore'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" title="Delete Permanently">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Pro-Move?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete the pro-move and all associated data. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => deleteProMove(proMove)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
 
       {selectedProMove && (
-        <LearningDrawer
-          actionId={selectedProMove.action_id}
-          proMoveTitle={selectedProMove.action_statement}
-          domainName={selectedProMove.domain_name}
-          open={learningDrawerOpen}
-          onOpenChange={setLearningDrawerOpen}
-          onResourcesChange={(summary) => handleResourcesChange(selectedProMove.action_id, summary)}
-        />
+        <>
+          <LearningDrawer
+            actionId={selectedProMove.action_id}
+            proMoveTitle={selectedProMove.action_statement}
+            domainName={selectedProMove.domain_name}
+            open={learningDrawerOpen}
+            onOpenChange={setLearningDrawerOpen}
+            onResourcesChange={(summary) => handleResourcesChange(selectedProMove.action_id, summary)}
+          />
+          <LearnerLearnDrawer
+            actionId={selectedProMove.action_id}
+            proMoveTitle={selectedProMove.action_statement}
+            domainName={selectedProMove.domain_name}
+            open={previewDrawerOpen}
+            onOpenChange={setPreviewDrawerOpen}
+          />
+        </>
       )}
     </div>
   );

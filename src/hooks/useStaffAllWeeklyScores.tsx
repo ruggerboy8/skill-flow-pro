@@ -1,13 +1,40 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { RawScoreRow, StaffWeekSummary } from '@/types/coachV2';
+import { StaffWeekSummary } from '@/types/coachV2';
+
+// Type matching get_staff_all_weekly_scores RPC output
+interface StaffWeeklyScore {
+  staff_id: string;
+  staff_name: string;
+  staff_email: string;
+  user_id: string;
+  role_id: number;
+  role_name: string;
+  location_id: string;
+  location_name: string;
+  organization_id: string;
+  organization_name: string;
+  week_of: string;
+  action_id: number;
+  action_statement: string;
+  domain_id: number;
+  domain_name: string;
+  confidence_score: number | null;
+  performance_score: number | null;
+  confidence_date: string | null;
+  performance_date: string | null;
+  confidence_late: boolean | null;
+  performance_late: boolean | null;
+  is_self_select: boolean;
+  display_order: number;
+}
 
 interface UseStaffAllWeeklyScoresOptions {
   staffId: string | undefined;
 }
 
 export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions) {
-  const [rawData, setRawData] = useState<RawScoreRow[]>([]);
+  const [rawData, setRawData] = useState<StaffWeeklyScore[]>([]);
   const [weekSummaries, setWeekSummaries] = useState<Map<string, StaffWeekSummary>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -43,7 +70,7 @@ export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions)
         return;
       }
 
-      const rows = rpcData as (RawScoreRow & { is_week_exempt: boolean })[];
+      const rows = rpcData as StaffWeeklyScore[];
       setRawData(rows);
 
       // Group by week
@@ -75,7 +102,7 @@ export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions)
 
         const summary = weekMap.get(weekKey)!;
         summary.assignment_count++;
-        summary.scores.push(row);
+        summary.scores.push(row as any); // Type compatibility - RPC output differs from RawScoreRow
 
         if (row.confidence_score !== null) {
           summary.conf_count++;

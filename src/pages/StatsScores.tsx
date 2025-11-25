@@ -56,11 +56,21 @@ export default function StatsScores() {
       .single();
 
     if (staffRow) {
+      console.log('[StatsScores] Staff ID loaded:', staffRow.id);
       setStaffId(staffRow.id);
+    } else {
+      console.warn('[StatsScores] No staff record found for user:', user?.id);
     }
   };
 
   const { weekSummaries, loading } = useStaffAllWeeklyScores({ staffId: staffId || undefined });
+
+  console.log('[StatsScores] Hook state:', {
+    loading,
+    weekSummariesSize: weekSummaries.size,
+    weekSummariesKeys: Array.from(weekSummaries.keys()),
+    staffId
+  });
 
   // Helper to get Monday of current week
   const mondayOf = (d: Date = new Date()): Date => {
@@ -121,6 +131,12 @@ export default function StatsScores() {
         months: Array.from(monthMap.values()).sort((a, b) => b.monthKey.localeCompare(a.monthKey)),
       }))
       .sort((a, b) => b.year - a.year);
+
+    console.log('[StatsScores] Grouped data computed:', {
+      totalYears: years.length,
+      totalWeeks: sortedEntries.length,
+      yearsArray: years.map(y => ({ year: y.year, monthCount: y.months.length }))
+    });
 
     return years;
   }, [weekSummaries]);

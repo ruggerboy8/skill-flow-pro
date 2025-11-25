@@ -6,12 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { format, parseISO } from 'date-fns';
-import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
+import { useMyWeeklyScores } from '@/hooks/useMyWeeklyScores';
 import { RawScoreRow } from '@/types/coachV2';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { CalendarOff } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 
 interface MonthGroup {
   monthKey: string;
@@ -29,7 +28,6 @@ interface YearGroup {
 }
 
 export default function StatsScores() {
-  const [staffId, setStaffId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [currentWeekOf, setCurrentWeekOf] = useState<string | null>(null);
   
@@ -38,39 +36,7 @@ export default function StatsScores() {
   const [openMonths, setOpenMonths] = useState<string[]>([]);
   const [openWeeks, setOpenWeeks] = useState<string[]>([]);
   
-  const { user } = useAuth();
-
-  useEffect(() => {
-    if (user) {
-      loadStaffId();
-    }
-  }, [user]);
-
-  const loadStaffId = async () => {
-    if (!user) return;
-
-    const { data: staffRow } = await supabase
-      .from('staff')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (staffRow) {
-      console.log('[StatsScores] Staff ID loaded:', staffRow.id);
-      setStaffId(staffRow.id);
-    } else {
-      console.warn('[StatsScores] No staff record found for user:', user?.id);
-    }
-  };
-
-  const { weekSummaries, loading } = useStaffAllWeeklyScores({ staffId: staffId || undefined });
-
-  console.log('[StatsScores] Hook state:', {
-    loading,
-    weekSummariesSize: weekSummaries.size,
-    weekSummariesKeys: Array.from(weekSummaries.keys()),
-    staffId
-  });
+  const { weekSummaries, loading } = useMyWeeklyScores({ weekOf: null });
 
   // Helper to get Monday of current week
   const mondayOf = (d: Date = new Date()): Date => {
@@ -131,12 +97,6 @@ export default function StatsScores() {
         months: Array.from(monthMap.values()).sort((a, b) => b.monthKey.localeCompare(a.monthKey)),
       }))
       .sort((a, b) => b.year - a.year);
-
-    console.log('[StatsScores] Grouped data computed:', {
-      totalYears: years.length,
-      totalWeeks: sortedEntries.length,
-      yearsArray: years.map(y => ({ year: y.year, monthCount: y.months.length }))
-    });
 
     return years;
   }, [weekSummaries]);

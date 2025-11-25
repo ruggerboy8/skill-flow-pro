@@ -12,12 +12,10 @@ import {
   Video, 
   FileText, 
   Volume2, 
-  Link as LinkIcon,
-  Play
+  Link as LinkIcon
 } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { LearningDrawer } from './LearningDrawer';
-import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
@@ -86,7 +84,6 @@ export function ProMoveList({
   const [loading, setLoading] = useState(true);
   const [resourceStatus, setResourceStatus] = useState<Map<number, ResourceStatus>>(new Map());
   const [learningDrawerOpen, setLearningDrawerOpen] = useState(false);
-  const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
   const [selectedProMove, setSelectedProMove] = useState<ProMove | null>(null);
 
   useEffect(() => {
@@ -309,11 +306,6 @@ export function ProMoveList({
     setLearningDrawerOpen(true);
   };
 
-  const openPreviewDrawer = (proMove: ProMove) => {
-    setSelectedProMove(proMove);
-    setPreviewDrawerOpen(true);
-  };
-
   const handleResourcesChange = (actionId: number, summary: { video: boolean; script: boolean; links: number; total: number; audio?: boolean }) => {
     setResourceStatus((prev) => {
       const updated = new Map(prev);
@@ -459,15 +451,6 @@ export function ProMoveList({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={() => openPreviewDrawer(proMove)}
-                      title="Preview as Learner"
-                    >
-                      <Play className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
                       onClick={() => openLearningDrawer(proMove)}
                       title="Manage Learning Materials"
                     >
@@ -543,23 +526,14 @@ export function ProMoveList({
       </Table>
 
       {selectedProMove && (
-        <>
-          <LearningDrawer
-            actionId={selectedProMove.action_id}
-            proMoveTitle={selectedProMove.action_statement}
-            domainName={selectedProMove.domain_name}
-            open={learningDrawerOpen}
-            onOpenChange={setLearningDrawerOpen}
-            onResourcesChange={(summary) => handleResourcesChange(selectedProMove.action_id, summary)}
-          />
-          <LearnerLearnDrawer
-            actionId={selectedProMove.action_id}
-            proMoveTitle={selectedProMove.action_statement}
-            domainName={selectedProMove.domain_name}
-            open={previewDrawerOpen}
-            onOpenChange={setPreviewDrawerOpen}
-          />
-        </>
+        <LearningDrawer
+          actionId={selectedProMove.action_id}
+          proMoveTitle={selectedProMove.action_statement}
+          domainName={selectedProMove.domain_name}
+          open={learningDrawerOpen}
+          onOpenChange={setLearningDrawerOpen}
+          onResourcesChange={(summary) => handleResourcesChange(selectedProMove.action_id, summary)}
+        />
       )}
     </div>
   );

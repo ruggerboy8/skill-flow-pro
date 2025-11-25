@@ -178,9 +178,10 @@ export function WeekBuilderPanel({
         const meta = await fetchProMoveMetaByIds(Array.from(allActionIds));
         weeks.forEach(week => {
           week.slots.forEach(slot => {
-            if (slot.actionId && meta[slot.actionId]) {
-              slot.actionStatement = meta[slot.actionId].action_statement || '';
-              slot.domainName = meta[slot.actionId].domain_name || '';
+            if (slot.actionId && meta.has(slot.actionId)) {
+              const moveData = meta.get(slot.actionId);
+              slot.actionStatement = moveData?.statement || '';
+              slot.domainName = moveData?.domain || '';
             }
           });
         });

@@ -14,23 +14,18 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { StaffWeekSummary } from '@/types/coachV2';
 import ReminderComposer from '@/components/coach/ReminderComposer';
+import { getChicagoMonday } from '@/lib/plannerUtils';
 
 export default function CoachDashboardV2() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
-  // Week selection
+  // Week selection - always normalize to Monday
   const [selectedWeek, setSelectedWeek] = useState<Date>(() => {
     const weekParam = searchParams.get('week');
-    if (weekParam) {
-      return new Date(weekParam);
-    }
-    // Default to current Monday
-    const today = new Date();
-    const day = today.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff);
+    const mondayStr = weekParam ? getChicagoMonday(weekParam) : getChicagoMonday(new Date());
+    return new Date(mondayStr + 'T12:00:00');
   });
 
   // Filter state - restore from URL params

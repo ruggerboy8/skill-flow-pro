@@ -192,11 +192,11 @@ serve(async (req) => {
       return { status: 'ok', n2w, recentMeans };
     };
 
-    // 2. Fetch confidence history (lookback weeks) - handle both weekly_focus and weekly_plan
+    // 2. Fetch confidence history (lookback weeks) - handle weekly_focus, weekly_plan, and weekly_assignments
     // Note: We explicitly select columns to avoid PostgREST auto-join attempts
     const { data: confData, error: confError } = await supabase
       .from('weekly_scores')
-      .select('confidence_score, confidence_date, weekly_focus_id')
+      .select('confidence_score, confidence_date, weekly_focus_id, assignment_id')
       .not('confidence_score', 'is', null)
       .gte('confidence_date', cutoffLookback.toISOString());
 
@@ -204,18 +204,24 @@ serve(async (req) => {
 
     logs.push(`Fetched ${confData?.length || 0} confidence scores`);
 
-    // Parse weekly_focus_id to get action_id (handles both UUID and plan:XXX formats)
+    // Parse weekly_focus_id and assignment_id to get action_id
     const focusIdToActionId = new Map<string, number>();
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     
-    // Collect all unique focus IDs
+    // Collect all unique focus IDs and assignment IDs
     const allFocusIds = [...new Set(confData?.map((r: any) => r.weekly_focus_id).filter(Boolean))];
+    const allAssignmentIds = [...new Set(confData?.map((r: any) => r.assignment_id).filter(Boolean))];
     
-    // Split into UUID and plan:XXX formats
+    // Split focus IDs into UUID and plan:XXX formats
     const uuidIds = allFocusIds.filter(id => uuidPattern.test(id));
     const planIds = allFocusIds
       .filter(id => id.startsWith('plan:'))
       .map(id => id.replace('plan:', ''));
+
+    // Split assignment IDs into assign:XXX format
+    const assignIds = allAssignmentIds
+      .filter(id => id.startsWith('assign:'))
+      .map(id => id.replace('assign:', ''));
 
     // Batch fetch action_ids from weekly_focus (Cycles 1-3)
     if (uuidIds.length > 0) {
@@ -245,10 +251,26 @@ serve(async (req) => {
       logs.push(`Mapped ${planRows?.length || 0} weekly_plan IDs to action_ids`);
     }
 
+    // Batch fetch action_ids from weekly_assignments (V2)
+    if (assignIds.length > 0) {
+      const { data: assignRows } = await supabase
+        .from('weekly_assignments')
+        .select('id, action_id')
+        .eq('role_id', body.roleId)
+        .in('id', assignIds);
+      
+      assignRows?.forEach((row: any) => {
+        if (row.action_id) focusIdToActionId.set(`assign:${row.id}`, row.action_id);
+      });
+      logs.push(`Mapped ${assignRows?.length || 0} weekly_assignments IDs to action_ids`);
+    }
+
     // Group by pro_move and week
     const confidenceMap = new Map<string, { sum: number; count: number }>();
     confData?.forEach((row: any) => {
-      const actionId = focusIdToActionId.get(row.weekly_focus_id);
+      // Try assignment_id first (V2), then fall back to weekly_focus_id (V1)
+      const lookupKey = row.assignment_id || row.weekly_focus_id;
+      const actionId = focusIdToActionId.get(lookupKey);
       if (!actionId) return; // Skip if we couldn't map to action_id
       
       const weekStart = new Date(row.confidence_date);
@@ -276,7 +298,8 @@ serve(async (req) => {
     // Track individual low-confidence counts (scores ≤ 2 on 1-10 scale)
     const individualLowCounts = new Map<number, { lowCount: number; totalCount: number }>();
     confData?.forEach((row: any) => {
-      const actionId = focusIdToActionId.get(row.weekly_focus_id);
+      const lookupKey = row.assignment_id || row.weekly_focus_id;
+      const actionId = focusIdToActionId.get(lookupKey);
       if (!actionId) return;
       
       const existing = individualLowCounts.get(actionId) || { lowCount: 0, totalCount: 0 };
@@ -301,7 +324,7 @@ serve(async (req) => {
 
     logs.push(`Found ${evals.length} eval scores`);
 
-    // 4. Fetch last selected - handle both weekly_focus and weekly_plan
+    // 4. Fetch last selected - handle weekly_focus, weekly_plan, and weekly_assignments
     // For weekly_focus: use week_start_date if available
     const { data: lastSelectedFocus, error: lsFocusError } = await supabase
       .from('weekly_focus')
@@ -325,6 +348,17 @@ serve(async (req) => {
 
     if (lsPlanError) throw lsPlanError;
 
+    // For weekly_assignments: use week_start_date (V2)
+    const { data: lastSelectedAssign, error: lsAssignError } = await supabase
+      .from('weekly_assignments')
+      .select('action_id, week_start_date')
+      .eq('role_id', body.roleId)
+      .not('action_id', 'is', null)
+      .not('week_start_date', 'is', null)
+      .order('week_start_date', { ascending: false });
+
+    if (lsAssignError) throw lsAssignError;
+
     // Merge and deduplicate (keep most recent per action_id)
     const lastSelectedMap = new Map<number, string>();
     
@@ -343,12 +377,20 @@ serve(async (req) => {
       }
     });
 
+    // Add from assignments (may override if more recent)
+    lastSelectedAssign?.forEach((row: any) => {
+      const existing = lastSelectedMap.get(row.action_id);
+      if (!existing || row.week_start_date > existing) {
+        lastSelectedMap.set(row.action_id, row.week_start_date);
+      }
+    });
+
     const lastSelected = Array.from(lastSelectedMap.entries()).map(([proMoveId, weekStart]) => ({
       proMoveId,
       weekStart,
     }));
 
-    logs.push(`Last selected records: focus=${lastSelectedFocus?.length || 0}, plan=${lastSelectedPlan?.length || 0}, total=${lastSelected.length}`);
+    logs.push(`Last selected records: focus=${lastSelectedFocus?.length || 0}, plan=${lastSelectedPlan?.length || 0}, assign=${lastSelectedAssign?.length || 0}, total=${lastSelected.length}`);
     
     // 6. Fetch rank snapshots for retest boost detection
     const { data: snapshotData, error: snapshotError } = await supabase
@@ -391,7 +433,7 @@ serve(async (req) => {
     const movesWithConf = new Set(confidenceHistory.map(c => c.proMoveId));
     logs.push(`Moves with confidence data: ${movesWithConf.size}/${eligible.length}`);
 
-    // 5. Fetch domain coverage (last 8 weeks) - handle both weekly_focus and weekly_plan
+    // 5. Fetch domain coverage (last 8 weeks) - handle weekly_focus, weekly_plan, and weekly_assignments
     // From weekly_focus
     const { data: domainCoverageFocus, error: dcFocusError } = await supabase
       .from('weekly_focus')
@@ -415,10 +457,22 @@ serve(async (req) => {
 
     if (dcPlanError) throw dcPlanError;
 
-    // Merge both sources
+    // From weekly_assignments (V2)
+    const { data: domainCoverageAssign, error: dcAssignError } = await supabase
+      .from('weekly_assignments')
+      .select('action_id, week_start_date')
+      .eq('role_id', body.roleId)
+      .not('action_id', 'is', null)
+      .not('week_start_date', 'is', null)
+      .gte('week_start_date', cutoff8w.toISOString().split('T')[0]);
+
+    if (dcAssignError) throw dcAssignError;
+
+    // Merge all sources
     const allCoverageData = [
       ...(domainCoverageFocus || []),
-      ...(domainCoveragePlan || [])
+      ...(domainCoveragePlan || []),
+      ...(domainCoverageAssign || [])
     ];
 
     const domainCoverageMap = new Map<number, Set<string>>();
@@ -436,7 +490,7 @@ serve(async (req) => {
       appearances: weeks.size,
     }));
 
-    logs.push(`Domain coverage: ${domainCoverage.length} domains tracked (${domainCoverageFocus?.length || 0} focus + ${domainCoveragePlan?.length || 0} plan)`);
+    logs.push(`Domain coverage: ${domainCoverage.length} domains tracked (${domainCoverageFocus?.length || 0} focus + ${domainCoveragePlan?.length || 0} plan + ${domainCoverageAssign?.length || 0} assign)`);
 
     // Add sample move logging
     if (eligible.length > 0) {

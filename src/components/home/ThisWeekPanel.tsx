@@ -148,7 +148,17 @@ export default function ThisWeekPanel() {
       } else {
         const { getWeekAnchors: v1GetWeekAnchors } = await import('@/lib/centralTime');
         const { mondayZ } = v1GetWeekAnchors(effectiveNow, CT_TZ);
+        const mondayStr = formatInTimeZone(mondayZ, CT_TZ, 'yyyy-MM-dd');
         setWeekOfDate(formatInTimeZone(mondayZ, CT_TZ, 'MMM d, yyyy'));
+        
+        // Check if this week is exempt
+        const { data: excused } = await supabase
+          .from('excused_weeks')
+          .select('reason')
+          .eq('week_start_date', mondayStr)
+          .maybeSingle();
+        
+        setIsExempt(!!excused);
       }
       
       // Compute current week state with simulation overrides (location-based unified)

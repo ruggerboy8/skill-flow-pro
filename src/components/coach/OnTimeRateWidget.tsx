@@ -64,12 +64,56 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
       const windows = data ?? [];
       const pastDueWindows = windows.filter((w: any) => new Date(w.due_at) <= now);
 
-      // Calculate stats
-      const totalExpected = pastDueWindows.length;
-      const onTime = pastDueWindows.filter((w: any) => w.status === 'on_time').length;
-      const late = pastDueWindows.filter((w: any) => w.status === 'late' || w.submitted_late).length;
-      const missing = pastDueWindows.filter((w: any) => w.status === 'missing').length;
-      const pending = windows.filter((w: any) => w.status === 'pending').length;
+      // Group by week_of and metric
+      const weekMetricMap = new Map<string, { conf_all_on_time: boolean, perf_all_on_time: boolean, conf_exists: boolean, perf_exists: boolean }>();
+      
+      pastDueWindows.forEach((w: any) => {
+        const key = w.week_of;
+        if (!weekMetricMap.has(key)) {
+          weekMetricMap.set(key, { conf_all_on_time: true, perf_all_on_time: true, conf_exists: false, perf_exists: false });
+        }
+        const weekData = weekMetricMap.get(key)!;
+        
+        if (w.metric === 'confidence') {
+          weekData.conf_exists = true;
+          if (w.status !== 'on_time') {
+            weekData.conf_all_on_time = false;
+          }
+        } else if (w.metric === 'performance') {
+          weekData.perf_exists = true;
+          if (w.status !== 'on_time') {
+            weekData.perf_all_on_time = false;
+          }
+        }
+      });
+
+      // Calculate week-level stats
+      let confOnTime = 0, confTotal = 0, perfOnTime = 0, perfTotal = 0;
+      weekMetricMap.forEach((weekData) => {
+        if (weekData.conf_exists) {
+          confTotal++;
+          if (weekData.conf_all_on_time) confOnTime++;
+        }
+        if (weekData.perf_exists) {
+          perfTotal++;
+          if (weekData.perf_all_on_time) perfOnTime++;
+        }
+      });
+
+      const totalExpected = confTotal + perfTotal;
+      const onTime = confOnTime + perfOnTime;
+      const late = (confTotal - confOnTime) + (perfTotal - perfOnTime);
+      const missing = late; // For simplicity, treat all non-on-time as "missing" in this context
+      
+      const pendingWindows = windows.filter((w: any) => w.status === 'pending');
+      const pendingWeekMetrics = new Map<string, Set<string>>();
+      pendingWindows.forEach((w: any) => {
+        if (!pendingWeekMetrics.has(w.week_of)) {
+          pendingWeekMetrics.set(w.week_of, new Set());
+        }
+        pendingWeekMetrics.get(w.week_of)!.add(w.metric);
+      });
+      const pending = Array.from(pendingWeekMetrics.values()).reduce((sum, metrics) => sum + metrics.size, 0);
 
       const rate = totalExpected > 0 ? (onTime / totalExpected) * 100 : 0;
 

@@ -435,7 +435,6 @@ export default function CoachDashboardV2() {
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead className="text-center">Assignments</TableHead>
                   <TableHead className="text-center">Confidence</TableHead>
                   <TableHead className="text-center">Performance</TableHead>
                 </TableRow>
@@ -449,8 +448,11 @@ export default function CoachDashboardV2() {
                   return (
                     <Collapsible key={row.staff_id} open={isExpanded} onOpenChange={() => toggleExpanded(row.staff_id)} asChild>
                       <>
-                        <TableRow className="cursor-pointer hover:bg-muted/50">
-                          <TableCell>
+                        <TableRow 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate(`/coach/${row.staff_id}?week=${weekOfString}`)}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <CollapsibleTrigger asChild>
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                                 <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -460,7 +462,6 @@ export default function CoachDashboardV2() {
                           <TableCell className="font-medium">{row.staff_name}</TableCell>
                           <TableCell>{row.role_name}</TableCell>
                           <TableCell>{row.location_name}</TableCell>
-                          <TableCell className="text-center">{row.assignment_count}</TableCell>
                           <TableCell className="text-center">
                             <StatusPill
                               hasAll={hasAllConf}
@@ -476,7 +477,7 @@ export default function CoachDashboardV2() {
                         </TableRow>
                         {isExpanded && (
                           <TableRow>
-                            <TableCell colSpan={8} className="bg-muted/30">
+                            <TableCell colSpan={7} className="bg-muted/30">
                               <CollapsibleContent>
                                 <div className="p-4 space-y-2">
                                   <h4 className="font-semibold text-sm">Raw Scores Detail</h4>

@@ -30,6 +30,7 @@ import CoachProMovesV1 from "@/pages/coach/CoachProMoves";
 // V2 Coach Pages (new)
 import CoachLayoutV2 from "@/pages/coach/CoachLayoutV2";
 import CoachDashboardV2 from "@/pages/coach/CoachDashboardV2";
+import StaffDetailV2 from "@/pages/coach/StaffDetailV2";
 import AdminPage from "@/pages/AdminPage";
 import EvalResults from "@/pages/admin/EvalResults";
 import EvaluationViewer from "@/pages/EvaluationViewer";
@@ -98,6 +99,7 @@ function AppRoutes() {
         {/* Coach V2 - New clean implementation */}
         <Route path="coach" element={<CoachLayoutV2 />}>
           <Route index element={<CoachDashboardV2 />} />
+          <Route path=":staffId" element={<StaffDetailV2 />} />
         </Route>
 
         {/* Coach V1 - Legacy routes preserved */}

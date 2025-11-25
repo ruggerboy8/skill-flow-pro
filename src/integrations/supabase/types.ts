@@ -2361,7 +2361,7 @@ export type Database = {
           url: string
         }[]
       }
-      get_staff_all_weekly_scores_deprecated: {
+      get_staff_all_weekly_scores: {
         Args: { p_staff_id: string }
         Returns: {
           action_id: number

@@ -1,6 +1,3 @@
-/**
- * @deprecated This hook uses a deprecated RPC. Use useMyWeeklyScores for individual user data instead.
- */
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RawScoreRow, StaffWeekSummary } from '@/types/coachV2';
@@ -29,7 +26,7 @@ export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions)
 
     try {
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_staff_all_weekly_scores_deprecated' as any, { 
+        .rpc('get_staff_all_weekly_scores', { 
           p_staff_id: staffId
         })
         .limit(10000);
@@ -40,7 +37,7 @@ export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions)
       }
 
       if (!rpcData || !Array.isArray(rpcData) || rpcData.length === 0) {
-        console.warn('⚠️ get_staff_all_weekly_scores_deprecated returned no rows for staffId:', staffId);
+        console.warn('⚠️ get_staff_all_weekly_scores returned no rows for staffId:', staffId);
         setRawData([]);
         setWeekSummaries(new Map());
         return;

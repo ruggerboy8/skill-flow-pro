@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { GraduationCap, Video, FileText, Link as LinkIcon, Plus, Trash2, Volume2, Loader2 } from 'lucide-react';
+import { GraduationCap, Video, FileText, Link as LinkIcon, Plus, Trash2, Volume2, Loader2, Play } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
+import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -95,6 +96,7 @@ export function LearningDrawer({
   const [videoError, setVideoError] = useState<string>();
   const [initialSnap, setInitialSnap] = useState<string>('');
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [previewDrawerOpen, setPreviewDrawerOpen] = useState(false);
   
   // Audio state machine
   type AudioState = 'empty' | 'draft' | 'saved';
@@ -1028,20 +1030,30 @@ export function LearningDrawer({
           </div>
         )}
 
-        <SheetFooter className="flex-row justify-end gap-2">
-          <Button onClick={() => onOpenChange(false)} variant="outline" disabled={isSaving}>
-            Close
+        <SheetFooter className="flex-row justify-between gap-2">
+          <Button 
+            onClick={() => setPreviewDrawerOpen(true)} 
+            variant="outline"
+            disabled={isSaving}
+          >
+            <Play className="h-4 w-4 mr-2" />
+            Preview as Learner
           </Button>
-          <Button onClick={saveAll} disabled={isSaving || !isDirty}>
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save'
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => onOpenChange(false)} variant="outline" disabled={isSaving}>
+              Close
+            </Button>
+            <Button onClick={saveAll} disabled={isSaving || !isDirty}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </div>
         </SheetFooter>
       </SheetContent>
     </Sheet>
@@ -1067,6 +1079,14 @@ export function LearningDrawer({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <LearnerLearnDrawer
+      open={previewDrawerOpen}
+      onOpenChange={setPreviewDrawerOpen}
+      actionId={actionId}
+      proMoveTitle={proMoveTitle}
+      domainName={domainName}
+    />
   </>
   );
 }

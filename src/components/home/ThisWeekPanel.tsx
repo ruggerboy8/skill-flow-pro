@@ -16,7 +16,7 @@ import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
 import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap, CalendarOff } from 'lucide-react';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { buildWeekBanner } from '@/v2/weekCta';
 import { enforceWeeklyRolloverNow } from '@/v2/rollover';
@@ -48,6 +48,7 @@ export default function ThisWeekPanel() {
   const [learnDrawerOpen, setLearnDrawerOpen] = useState(false);
   const [selectedLearnAssignment, setSelectedLearnAssignment] = useState<WeekAssignment | null>(null);
   const [resourceCounts, setResourceCounts] = useState<Record<number, number>>({});
+  const [isExempt, setIsExempt] = useState(false);
 
   // Load dev tools conditionally
   useEffect(() => {
@@ -133,7 +134,17 @@ export default function ThisWeekPanel() {
       // Calculate week of date using location timezone
       if (isV2) {
         const locationAnchors = await getWeekAnchors(effectiveNow, locationTimeContext.timezone);
+        const mondayStr = formatInTimeZone(locationAnchors.mondayZ, locationTimeContext.timezone, 'yyyy-MM-dd');
         setWeekOfDate(formatInTimeZone(locationAnchors.mondayZ, locationTimeContext.timezone, 'MMM d, yyyy'));
+        
+        // Check if this week is exempt
+        const { data: excused } = await supabase
+          .from('excused_weeks')
+          .select('reason')
+          .eq('week_start_date', mondayStr)
+          .maybeSingle();
+        
+        setIsExempt(!!excused);
       } else {
         const { getWeekAnchors: v1GetWeekAnchors } = await import('@/lib/centralTime');
         const { mondayZ } = v1GetWeekAnchors(effectiveNow, CT_TZ);
@@ -198,6 +209,25 @@ export default function ThisWeekPanel() {
         </CardHeader>
         <CardContent>
           <div className="h-24 rounded-md bg-muted animate-pulse" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show exempt week message
+  if (isExempt) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>This Week's Pro Moves</CardTitle>
+          <CardDescription>Week of {weekOfDate}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border bg-amber-50 border-amber-200 p-6 text-center">
+            <CalendarOff className="h-10 w-10 mx-auto mb-3 text-amber-600" />
+            <p className="font-semibold text-amber-900 mb-1">No Submissions Required This Week</p>
+            <p className="text-sm text-amber-700">This week has been marked as exempt by your administrator.</p>
+          </div>
         </CardContent>
       </Card>
     );

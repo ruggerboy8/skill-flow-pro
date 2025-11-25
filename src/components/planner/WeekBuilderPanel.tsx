@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2, Unlock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2, Unlock, CalendarOff } from 'lucide-react';
 import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
 import { fetchProMoveMetaByIds } from '@/lib/proMoves';
@@ -62,6 +62,7 @@ export function WeekBuilderPanel({
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [slotToUnlock, setSlotToUnlock] = useState<{ weekStart: string; displayOrder: number; planId: number | string | null } | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [excusedWeeks, setExcusedWeeks] = useState<Set<string>>(new Set());
 
   const currentMonday = normalizeToPlannerWeek(new Date());
 
@@ -274,6 +275,13 @@ export function WeekBuilderPanel({
       setWeeks(weeks);
     }
 
+    // Load excused weeks
+    const { data: excusedData } = await supabase
+      .from('excused_weeks')
+      .select('week_start_date')
+      .in('week_start_date', mondays);
+    setExcusedWeeks(new Set(excusedData?.map(e => e.week_start_date) || []));
+
     setLoading(false);
   };
 
@@ -327,6 +335,35 @@ export function WeekBuilderPanel({
     d.setDate(1);
     d.setMonth(d.getMonth() + 1);
     setSelectedMonday(getFirstMondayOfMonth(d.toISOString().split('T')[0]));
+  };
+
+  const handleToggleExempt = async (weekStart: string, exempt: boolean) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      if (exempt) {
+        const { error } = await supabase.from('excused_weeks').insert({
+          week_start_date: weekStart,
+          reason: 'Week exempted by admin',
+          created_by: user.id
+        });
+        if (error) throw error;
+        toast({ title: 'Week Exempted', description: 'This week is now marked as exempt' });
+      } else {
+        const { error } = await supabase.from('excused_weeks').delete()
+          .eq('week_start_date', weekStart);
+        if (error) throw error;
+        toast({ title: 'Exemption Removed', description: 'This week is no longer exempt' });
+      }
+      await loadWeeks(selectedMonday);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleSelectProMove = async (actionId: number, weekStart?: string, displayOrder?: number) => {
@@ -803,25 +840,44 @@ export function WeekBuilderPanel({
             <div className={`grid ${showTwoWeeks ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
               {weeks.map((week) => {
               const isPastWeek = week.weekStart < currentMonday;
+              const isExempt = excusedWeeks.has(week.weekStart);
               
               return (
-              <Card key={week.weekStart} className="border-primary/20">
+              <Card key={week.weekStart} className={`border-primary/20 ${isExempt ? 'bg-amber-50 border-amber-200' : ''}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base font-bold">
                       Week of {formatDate(week.weekStart)}
                     </CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setWeekToDelete(week.weekStart);
-                        setDeleteWeekDialogOpen(true);
-                      }}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {isExempt && (
+                        <Badge variant="secondary" className="bg-amber-200 text-amber-900">
+                          Exempt
+                        </Badge>
+                      )}
+                      {isSuperAdmin && (
+                        <Button
+                          variant={isExempt ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleToggleExempt(week.weekStart, !isExempt)}
+                          className={isExempt ? "bg-amber-600 hover:bg-amber-700" : ""}
+                        >
+                          <CalendarOff className="h-4 w-4 mr-1" />
+                          {isExempt ? 'Remove Exempt' : 'Mark Exempt'}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setWeekToDelete(week.weekStart);
+                          setDeleteWeekDialogOpen(true);
+                        }}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">

@@ -8,8 +8,9 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, RotateCw, CalendarOff } from 'lucide-react';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { StaffWeekSummary } from '@/types/coachV2';
@@ -41,6 +42,9 @@ export default function CoachDashboardV2() {
 
   // Expanded rows
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  
+  // Exempt week check
+  const [isWeekExempt, setIsWeekExempt] = useState(false);
 
   // Format week for RPC
   const weekOfString = format(selectedWeek, 'yyyy-MM-dd');
@@ -69,6 +73,19 @@ export default function CoachDashboardV2() {
     params.set('week', format(selectedWeek, 'yyyy-MM-dd'));
     setSearchParams(params, { replace: true });
   }, [selectedWeek]);
+  
+  // Check if week is exempt
+  useEffect(() => {
+    const checkExempt = async () => {
+      const { data } = await supabase
+        .from('excused_weeks')
+        .select('reason')
+        .eq('week_start_date', weekOfString)
+        .maybeSingle();
+      setIsWeekExempt(!!data);
+    };
+    checkExempt();
+  }, [weekOfString]);
 
   // Unique filter options
   const organizations = useMemo(() => {
@@ -292,6 +309,21 @@ export default function CoachDashboardV2() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Exempt Week Banner */}
+      {isWeekExempt && (
+        <Card className="bg-amber-50 border-amber-200">
+          <CardContent className="py-6 text-center">
+            <CalendarOff className="h-8 w-8 mx-auto mb-3 text-amber-600" />
+            <p className="font-semibold text-amber-900 mb-1">
+              Week of {format(selectedWeek, 'MMM d')} is Exempt
+            </p>
+            <p className="text-sm text-amber-700">
+              No submissions required from staff this week
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>

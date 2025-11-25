@@ -436,6 +436,27 @@ export type Database = {
           },
         ]
       }
+      excused_weeks: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          reason: string | null
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          reason?: string | null
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          reason?: string | null
+          week_start_date?: string
+        }
+        Relationships: []
+      }
       learning_resources_legacy: {
         Row: {
           body_md: string | null

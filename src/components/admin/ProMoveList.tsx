@@ -339,7 +339,7 @@ export function ProMoveList({
             <SortableTableHead sortKey="action_statement" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-[40%]">
               Pro-Move
             </SortableTableHead>
-            <TableHead className="w-[25%]">Context</TableHead>
+            <TableHead className="w-[25%]">Details</TableHead>
             <TableHead className="w-[15%]">Materials</TableHead>
             <SortableTableHead sortKey="updated_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-[10%]">
               Updated
@@ -381,9 +381,9 @@ export function ProMoveList({
                   </div>
                 </TableCell>
 
-                {/* Enhanced Materials Column */}
-                <TableCell className="align-top">
-                  <div className="flex items-center gap-3 pt-1">
+                {/* Materials Column */}
+                <TableCell className="align-top pl-2">
+                  <div className="flex items-center gap-2 pt-1">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>

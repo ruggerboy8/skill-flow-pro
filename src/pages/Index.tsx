@@ -2,6 +2,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import ThisWeekPanel from '@/components/home/ThisWeekPanel';
 import { RecentWinBanner } from '@/components/home/RecentWinBanner';
+import { ChristmasWelcome } from '@/components/home/ChristmasWelcome';
 import { SimFloatingButton } from '@/devtools/SimConsole';
 
 export default function Index() {
@@ -16,6 +17,8 @@ export default function Index() {
         </div>
 
         <RecentWinBanner />
+
+        <ChristmasWelcome />
 
         <ThisWeekPanel />
         

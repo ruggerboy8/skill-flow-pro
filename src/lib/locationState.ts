@@ -296,30 +296,53 @@ export async function assembleWeek(params: {
     }
   }
 
-  // ----- CYCLES 1-3: Use static weekly_focus -----
-  console.info('[assembleWeek] Using weekly_focus for Cycles 1-3: cycle=%d week=%d role=%d', 
-    cycleNumber, weekInCycle, roleId);
+  // ----- CYCLES 1-3: Use weekly_assignments with source='onboarding' -----
+  console.info('[assembleWeek] Using weekly_assignments for Cycles 1-3: cycle=%d week=%d role=%d location=%s', 
+    cycleNumber, weekInCycle, roleId, locationId);
 
-  const { data: weeklyFocus } = await supabase
-    .from('weekly_focus')
+  // Calculate week_start_date from location's program start + cycle/week offset
+  const { data: location } = await supabase
+    .from('locations')
+    .select('program_start_date, cycle_length_weeks')
+    .eq('id', locationId)
+    .maybeSingle();
+
+  if (!location) {
+    console.error('[assembleWeek] Location not found:', locationId);
+    return [];
+  }
+
+  const programStart = new Date(location.program_start_date);
+  const cycleLength = location.cycle_length_weeks;
+  const weekOffset = (cycleNumber - 1) * cycleLength + (weekInCycle - 1);
+  const weekStartDate = new Date(programStart);
+  weekStartDate.setDate(weekStartDate.getDate() + weekOffset * 7);
+  const weekStartStr = weekStartDate.toISOString().split('T')[0];
+
+  console.info('[assembleWeek] Calculated week_start_date:', weekStartStr);
+
+  const { data: weeklyAssignments } = await supabase
+    .from('weekly_assignments')
     .select('id, display_order, self_select, action_id, competency_id')
     .eq('role_id', roleId)
-    .eq('cycle', cycleNumber)
-    .eq('week_in_cycle', weekInCycle)
+    .eq('location_id', locationId)
+    .eq('week_start_date', weekStartStr)
+    .eq('source', 'onboarding')
+    .eq('status', 'locked')
     .order('display_order');
 
-  if (!weeklyFocus || weeklyFocus.length === 0) return [];
+  if (!weeklyAssignments || weeklyAssignments.length === 0) return [];
 
   const isFoundation = cycleNumber === 1;
 
   // 2) Build set of "already assigned" action_ids (site moves first)
   const assignedActionIds = new Set<number>();
-  const siteFocus = weeklyFocus.filter(wf => !wf.self_select && wf.action_id);
-  if (siteFocus.length) {
+  const siteAssignments = weeklyAssignments.filter(wa => !wa.self_select && wa.action_id);
+  if (siteAssignments.length) {
     const { data: siteMoves } = await supabase
       .from('pro_moves')
       .select('action_id')
-      .in('action_id', siteFocus.map(wf => wf.action_id as number));
+      .in('action_id', siteAssignments.map(wa => wa.action_id as number));
     (siteMoves || []).forEach(m => assignedActionIds.add(m.action_id));
   }
 
@@ -373,18 +396,18 @@ export async function assembleWeek(params: {
   const result: any[] = [];
 
   // 4) Build assignments slot by slot (dedup against assignedActionIds)
-  for (const wf of weeklyFocus) {
-    if (!wf.self_select) {
+  for (const wa of weeklyAssignments) {
+    if (!wa.self_select) {
       // SITE move
-      if (wf.action_id) {
-        const info = await hydrateAction(wf.action_id);
+      if (wa.action_id) {
+        const info = await hydrateAction(wa.action_id);
         result.push({
-          weekly_focus_id: wf.id,
+          weekly_focus_id: `assign:${wa.id}`,
           type: 'site',
           ...info,
           required: true,
           locked: true,
-          display_order: wf.display_order
+          display_order: wa.display_order
         });
         if (info.pro_move_id) assignedActionIds.add(info.pro_move_id);
       }
@@ -395,13 +418,13 @@ export async function assembleWeek(params: {
     if (isFoundation) {
       // Foundation = force site moves only; treat as "choose later"
       result.push({
-        weekly_focus_id: wf.id,
+        weekly_focus_id: `assign:${wa.id}`,
         type: 'selfSelect',
         action_statement: 'Choose a pro-move',
         domain_name: 'General',
         required: false,
         locked: false,
-        display_order: wf.display_order
+        display_order: wa.display_order
       });
       continue;
     }
@@ -418,24 +441,23 @@ export async function assembleWeek(params: {
     if (usedBacklog) {
       const info = await hydrateAction(usedBacklog.action_id);
       result.push({
-        weekly_focus_id: wf.id,
+        weekly_focus_id: `assign:${wa.id}`,
         type: 'backlog',
         backlog_id: usedBacklog.id,
         ...info,
         required: false,
-        locked: true,            // locked: no dropdown
-        display_order: wf.display_order
+        locked: true,
+        display_order: wa.display_order
       });
       if (info.pro_move_id) assignedActionIds.add(info.pro_move_id);
     } else {
       // No eligible backlog -> normal self-select
-      // Optional: look up competency/domain for nicer badge (same as your current code)
       let domainName = 'General';
-      if (wf.competency_id) {
+      if (wa.competency_id) {
         const { data: comp } = await supabase
           .from('competencies')
           .select('name, domain_id')
-          .eq('competency_id', wf.competency_id)
+          .eq('competency_id', wa.competency_id)
           .maybeSingle();
         if (comp?.domain_id) {
           const { data: d } = await supabase
@@ -447,13 +469,13 @@ export async function assembleWeek(params: {
         }
       }
       result.push({
-        weekly_focus_id: wf.id,
+        weekly_focus_id: `assign:${wa.id}`,
         type: 'selfSelect',
         action_statement: 'Choose a pro-move',
         domain_name: domainName,
         required: false,
         locked: false,
-        display_order: wf.display_order
+        display_order: wa.display_order
       });
     }
   }

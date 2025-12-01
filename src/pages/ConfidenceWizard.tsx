@@ -773,7 +773,7 @@ export default function ConfidenceWizard() {
       <div className="max-w-md mx-auto space-y-4">
         <Card style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}>
           {/* Submission Status Indicator */}
-          {pendingCount > 0 && (
+          {submitting && (
             <div className="absolute top-2 right-2 z-10">
               <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
                 <Loader2 className="h-3 w-3 animate-spin" />

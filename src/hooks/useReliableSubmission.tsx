@@ -59,7 +59,14 @@ export function useReliableSubmission() {
     const raw = localStorage.getItem(STORAGE_KEY);
     try {
       const parsed = raw ? (JSON.parse(raw) as SubmissionItem[]) : [];
-      setPending(parsed.filter(p => p.userId === user?.id)); // safety
+      // Filter out stale submissions (older than 24 hours)
+      const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+      const now = Date.now();
+      const filtered = parsed.filter(p => 
+        p.userId === user?.id && 
+        (now - p.lastAttempt) < MAX_AGE_MS
+      );
+      setPending(filtered);
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -339,7 +346,10 @@ export function useReliableSubmission() {
 
       const ok = await attempt({ ...current, attempts: current.attempts + 1, lastAttempt: now });
       if (ok) {
-        toast({ title: 'Saved', description: `Your ${current.data.kind} scores are saved.` });
+        toast({ 
+          title: 'Recovered submission', 
+          description: `Previously pending ${current.data.kind} scores have been saved.` 
+        });
       }
       // small pause
       await new Promise(r => setTimeout(r, 120));

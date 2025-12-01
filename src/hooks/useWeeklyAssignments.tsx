@@ -14,6 +14,7 @@ export interface WeeklyAssignment {
 
 interface UseWeeklyAssignmentsParams {
   roleId: number | null | undefined;
+  cycleNumber?: number; // Optional: blocks global assignments for onboarding cycles
   enabled?: boolean;
 }
 
@@ -23,13 +24,20 @@ interface UseWeeklyAssignmentsParams {
  */
 export function useWeeklyAssignments({
   roleId,
+  cycleNumber,
   enabled = true,
 }: UseWeeklyAssignmentsParams) {
   return useQuery({
-    queryKey: ['weekly-assignments', roleId],
+    queryKey: ['weekly-assignments', roleId, cycleNumber],
     queryFn: async () => {
       if (!roleId) {
         throw new Error('Role ID is required');
+      }
+
+      // Safety check: Don't return global assignments for onboarding cycles (1-3)
+      if (cycleNumber !== undefined && cycleNumber < 4) {
+        console.warn('[useWeeklyAssignments] Blocked for onboarding cycle:', cycleNumber);
+        return [];
       }
 
       // Calculate current Monday

@@ -10,7 +10,20 @@ import { useMyWeeklyScores } from '@/hooks/useMyWeeklyScores';
 import { RawScoreRow } from '@/types/coachV2';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
-import { CalendarOff } from 'lucide-react';
+import { CalendarOff, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface MonthGroup {
   monthKey: string;
@@ -36,7 +49,28 @@ export default function StatsScores() {
   const [openMonths, setOpenMonths] = useState<string[]>([]);
   const [openWeeks, setOpenWeeks] = useState<string[]>([]);
   
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingWeek, setDeletingWeek] = useState<string | null>(null);
+  const [staffId, setStaffId] = useState<string | null>(null);
+  
+  const { user, isSuperAdmin } = useAuth();
   const { weekSummaries, loading } = useMyWeeklyScores({ weekOf: null });
+  const queryClient = useQueryClient();
+
+  // Fetch staff id for delete operation
+  useEffect(() => {
+    async function fetchStaffId() {
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data) setStaffId(data.id);
+    }
+    fetchStaffId();
+  }, [user?.id]);
 
   // Helper to get Monday of current week
   const mondayOf = (d: Date = new Date()): Date => {
@@ -141,6 +175,46 @@ export default function StatsScores() {
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }, 100);
+  };
+
+  const handleDeleteWeek = async () => {
+    if (!deletingWeek || !staffId) return;
+
+    try {
+      const { error } = await supabase
+        .from('weekly_scores')
+        .delete()
+        .eq('staff_id', staffId)
+        .eq('week_of', deletingWeek);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Scores deleted',
+        description: `All scores for week of ${format(parseISO(deletingWeek), 'MMM d, yyyy')} have been deleted.`,
+      });
+
+      // Invalidate and refetch scores
+      queryClient.invalidateQueries({ queryKey: ['weekly-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['my-weekly-scores'] });
+
+    } catch (error) {
+      console.error('Error deleting scores:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete scores. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingWeek(null);
+    }
+  };
+
+  const openDeleteDialog = (weekOf: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent accordion toggle
+    setDeletingWeek(weekOf);
+    setDeleteDialogOpen(true);
   };
 
   // Status pill component
@@ -267,18 +341,30 @@ export default function StatsScores() {
                                       </Badge>
                                     )}
                                   </div>
-                                  {!isExempt && (
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground">Confidence:</span>
-                                        <StatusPill hasAll={hasAllConf} hasAnyLate={summary.has_any_late} />
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground">Performance:</span>
-                                        <StatusPill hasAll={hasAllPerf} hasAnyLate={summary.has_any_late} />
-                                      </div>
-                                    </div>
-                                  )}
+                                  <div className="flex items-center gap-3">
+                                    {!isExempt && (
+                                      <>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-muted-foreground">Confidence:</span>
+                                          <StatusPill hasAll={hasAllConf} hasAnyLate={summary.has_any_late} />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-muted-foreground">Performance:</span>
+                                          <StatusPill hasAll={hasAllPerf} hasAnyLate={summary.has_any_late} />
+                                        </div>
+                                      </>
+                                    )}
+                                    {isSuperAdmin && scores.length > 0 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={(e) => openDeleteDialog(weekOf, e)}
+                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               </AccordionTrigger>
                               
@@ -330,6 +416,29 @@ export default function StatsScores() {
           </AccordionItem>
         ))}
       </Accordion>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete scores for this week?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete both confidence and performance scores for the week of{' '}
+              <strong>{deletingWeek && format(parseISO(deletingWeek), 'MMM d, yyyy')}</strong>.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteWeek}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -84,9 +84,11 @@ function AppRoutes() {
 
         <Route path="profile" element={<Profile />} />
         <Route path="reset-password" element={<ResetPassword />} />
-        <Route path="confidence/:week" element={<Confidence />} />
+        
+        {/* Redirect legacy pages to wizard versions */}
+        <Route path="confidence/:week" element={<Navigate to="/confidence/:week/step/1" replace />} />
         <Route path="confidence/:week/step/:n" element={<ConfidenceWizard />} />
-        <Route path="performance/:week" element={<Performance />} />
+        <Route path="performance/:week" element={<Navigate to="/performance/:week/step/1" replace />} />
         <Route path="performance/:week/step/:n" element={<PerformanceWizard />} />
         <Route path="review/:cycle/:week" element={<Review />} />
 

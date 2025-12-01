@@ -66,17 +66,20 @@ export default function Performance() {
     const focusIds = weeklyFocus.map(f => f.id);
     
     // Query scores by both assignment_id and weekly_focus_id to handle V2 + legacy fallback
+    // Note: assignment_id is stored with 'assign:' prefix in V2
     const { data: scoresData, error: scoresError } = await supabase
       .from('weekly_scores')
       .select('id, weekly_focus_id, assignment_id, confidence_score, confidence_date')
       .eq('staff_id', staff.id)
-      .or(focusIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','))
+      .or(focusIds.map(id => `assignment_id.eq.assign:${id},weekly_focus_id.eq.${id}`).join(','))
       .not('confidence_score', 'is', null);
 
     // Check we have scores for all assignments
-    const matchedScores = scoresData?.filter(score =>
-      weeklyFocus.some(f => f.id === score.assignment_id || f.id === score.weekly_focus_id)
-    ) || [];
+    // Note: strip 'assign:' prefix when matching assignment_id
+    const matchedScores = scoresData?.filter(score => {
+      const assignIdWithoutPrefix = score.assignment_id?.replace('assign:', '');
+      return weeklyFocus.some(f => f.id === assignIdWithoutPrefix || f.id === score.weekly_focus_id);
+    }) || [];
     
     if (scoresError || matchedScores.length !== weeklyFocus.length) {
       toast({ title: "Error", description: "Complete confidence ratings first (Monday)", variant: "destructive" });
@@ -104,9 +107,10 @@ export default function Performance() {
     setSubmitting(true);
 
     const updates = existingScores.map(score => {
-      // Find matching focus by either assignment_id or weekly_focus_id
+      // Find matching focus by either assignment_id (strip 'assign:' prefix) or weekly_focus_id
+      const assignIdWithoutPrefix = score.assignment_id?.replace('assign:', '');
       const matchingFocus = weeklyFocus.find(f => 
-        f.id === score.assignment_id || f.id === score.weekly_focus_id
+        f.id === assignIdWithoutPrefix || f.id === score.weekly_focus_id
       );
       
       return {
@@ -147,9 +151,10 @@ export default function Performance() {
   };
 
   const getConfidenceScore = (focusId: string) => {
-    const score = existingScores.find(s => 
-      s.assignment_id === focusId || s.weekly_focus_id === focusId
-    );
+    const score = existingScores.find(s => {
+      const assignIdWithoutPrefix = s.assignment_id?.replace('assign:', '');
+      return assignIdWithoutPrefix === focusId || s.weekly_focus_id === focusId;
+    });
     return score?.confidence_score || 0;
   };
 

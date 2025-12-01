@@ -77,11 +77,12 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     const focusIds = weeklyFocus.map((f) => f.id);
     
     // Query scores by both assignment_id and weekly_focus_id to handle V2 + legacy fallback
+    // Note: assignment_id is stored with 'assign:' prefix in V2
     const { data: existing, error: existingError } = await supabase
       .from('weekly_scores')
       .select('weekly_focus_id, assignment_id, confidence_score, selected_action_id')
       .eq('staff_id', staff.id)
-      .or(focusIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','));
+      .or(focusIds.map(id => `assignment_id.eq.assign:${id},weekly_focus_id.eq.${id}`).join(','));
 
     if (existingError) {
       console.error('Existing scores error:', existingError);
@@ -95,9 +96,10 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     const scoresMap: { [key: string]: number } = {};
     
     existing?.forEach((r) => {
-      // Find matching focus by either assignment_id or weekly_focus_id
+      // Find matching focus by either assignment_id (strip 'assign:' prefix) or weekly_focus_id
+      const assignIdWithoutPrefix = r.assignment_id?.replace('assign:', '');
       const matchingFocus = weeklyFocus.find(f => 
-        f.id === r.assignment_id || f.id === r.weekly_focus_id
+        f.id === assignIdWithoutPrefix || f.id === r.weekly_focus_id
       );
       
       if (matchingFocus) {
@@ -178,9 +180,9 @@ setSubmitting(true);
         confidence_score: scores[focus.id]
       };
       
-      // Add assignment_id when V2 enabled
+      // Add assignment_id with 'assign:' prefix when V2 enabled
       if (v2Enabled) {
-        base.assignment_id = focus.id;
+        base.assignment_id = `assign:${focus.id}`;
       }
       
       if (focus.self_select && selectedActions[focus.id]) {

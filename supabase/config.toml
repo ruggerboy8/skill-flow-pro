@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.sequencer-health]
 verify_jwt = false
+
+[functions.sync-onboarding-assignments]
+verify_jwt = false

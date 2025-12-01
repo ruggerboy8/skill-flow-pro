@@ -128,6 +128,8 @@ export async function assembleWeek(params: {
   const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
   // ----- GRADUATION CHECK: Cycle 4+ uses global plan -----
+  console.info(`[assembleWeek] cycle=${cycleNumber}, week=${weekInCycle}, using ${cycleNumber >= 4 ? 'weekly_assignments/weekly_plan' : 'weekly_focus'}`);
+  
   if (cycleNumber >= 4) {
     const { data: location } = await supabase
       .from('locations')

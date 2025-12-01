@@ -93,20 +93,22 @@ Deno.serve(async (req) => {
 
     if (body.action === 'saveWeek') {
       const { roleId, weekStartDate, picks, updaterUserId } = body
-      const upserted: Array<{ id: number, displayOrder: number, actionId: number | null }> = []
-      const skippedLocked: Array<{ id: number, displayOrder: number, actionId: number | null }> = []
-      const deleted: Array<{ id: number, displayOrder: number }> = []
+      const upserted: Array<{ id: string, displayOrder: number, actionId: number | null }> = []
+      const skippedLocked: Array<{ id: string, displayOrder: number, actionId: number | null }> = []
+      const deleted: Array<{ id: string, displayOrder: number }> = []
 
       // Process each slot
       for (const pick of picks) {
-        // Check if row exists
+        // Check if row exists in weekly_assignments (V2)
         const { data: existing } = await supabase
-          .from('weekly_plan')
+          .from('weekly_assignments')
           .select('id, action_id')
-          .eq('org_id', null)
+          .is('org_id', null)
+          .is('location_id', null)
           .eq('role_id', roleId)
           .eq('week_start_date', weekStartDate)
           .eq('display_order', pick.displayOrder)
+          .is('superseded_at', null)
           .maybeSingle()
 
         if (existing) {
@@ -114,7 +116,7 @@ Deno.serve(async (req) => {
           const { count } = await supabase
             .from('weekly_scores')
             .select('*', { count: 'exact', head: true })
-            .eq('weekly_focus_id', `plan:${existing.id}`)
+            .eq('assignment_id', `assign:${existing.id}`)
 
           if (count && count > 0) {
             // Slot is locked
@@ -129,7 +131,7 @@ Deno.serve(async (req) => {
           // If actionId is null, delete the row
           if (pick.actionId === null || pick.actionId === 0) {
             const { error: deleteError } = await supabase
-              .from('weekly_plan')
+              .from('weekly_assignments')
               .delete()
               .eq('id', existing.id)
 
@@ -148,15 +150,11 @@ Deno.serve(async (req) => {
             
             // Update existing row
             const { error: updateError } = await supabase
-              .from('weekly_plan')
+              .from('weekly_assignments')
               .update({
                 action_id: pick.actionId,
                 competency_id: competencyId,
-                generated_by: pick.generatedBy,
-                updated_by: updaterUserId,
                 updated_at: new Date().toISOString(),
-                rank_snapshot: pick.rankSnapshot || null,
-                rank_version: pick.rankSnapshot?.version || null,
               })
               .eq('id', existing.id)
 
@@ -177,20 +175,18 @@ Deno.serve(async (req) => {
           
           // Insert new row only if actionId is not null/0
           const { data: inserted, error: insertError } = await supabase
-            .from('weekly_plan')
+            .from('weekly_assignments')
             .insert({
               org_id: null,
+              location_id: null,
               role_id: roleId,
               week_start_date: weekStartDate,
               display_order: pick.displayOrder,
               action_id: pick.actionId,
               competency_id: competencyId,
-              generated_by: pick.generatedBy,
-              updated_by: updaterUserId,
+              source: 'admin',
               status: 'locked',
               self_select: false,
-              rank_snapshot: pick.rankSnapshot || null,
-              rank_version: pick.rankSnapshot?.version || null,
             })
             .select('id')
             .single()

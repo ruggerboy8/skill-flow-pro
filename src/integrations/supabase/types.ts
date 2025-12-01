@@ -2295,9 +2295,6 @@ export type Database = {
           confidence_date: string
           confidence_late: boolean
           confidence_score: number
-          confidence_source: string
-          display_order: number
-          domain_id: number
           domain_name: string
           location_id: string
           location_name: string
@@ -2306,17 +2303,13 @@ export type Database = {
           performance_date: string
           performance_late: boolean
           performance_score: number
-          performance_source: string
           role_id: number
           role_name: string
-          score_id: string
-          selected_action_id: number
           self_select: boolean
-          staff_email: string
           staff_id: string
           staff_name: string
-          user_id: string
           week_of: string
+          weekly_focus_id: string
         }[]
       }
       get_performance_trend: {
@@ -2369,9 +2362,6 @@ export type Database = {
           confidence_date: string
           confidence_late: boolean
           confidence_score: number
-          confidence_source: string
-          display_order: number
-          domain_id: number
           domain_name: string
           location_id: string
           location_name: string
@@ -2380,17 +2370,13 @@ export type Database = {
           performance_date: string
           performance_late: boolean
           performance_score: number
-          performance_source: string
           role_id: number
           role_name: string
-          score_id: string
-          selected_action_id: number
           self_select: boolean
-          staff_email: string
           staff_id: string
           staff_name: string
-          user_id: string
           week_of: string
+          weekly_focus_id: string
         }[]
       }
       get_staff_domain_avgs: {
@@ -2501,9 +2487,6 @@ export type Database = {
               confidence_date: string
               confidence_late: boolean
               confidence_score: number
-              confidence_source: string
-              display_order: number
-              domain_id: number
               domain_name: string
               location_id: string
               location_name: string
@@ -2512,17 +2495,13 @@ export type Database = {
               performance_date: string
               performance_late: boolean
               performance_score: number
-              performance_source: string
               role_id: number
               role_name: string
-              score_id: string
-              selected_action_id: number
               self_select: boolean
-              staff_email: string
               staff_id: string
               staff_name: string
-              user_id: string
               week_of: string
+              weekly_focus_id: string
             }[]
           }
         | {

@@ -11,4 +11,4 @@ export const isV2 =
  * DEFAULT: false (legacy behavior maintained until Phase 3 cutover)
  */
 export const useWeeklyAssignmentsV2Enabled = 
-  (import.meta.env.VITE_USE_WEEKLY_ASSIGNMENTS?.toLowerCase?.() === 'true') || false;
+  (import.meta.env.VITE_USE_WEEKLY_ASSIGNMENTS?.toLowerCase?.() === 'true') || true;

@@ -176,18 +176,17 @@ export default function PerformanceWizard() {
         const isOnboarding = targetCycle <= 3;
         
         if (isOnboarding) {
-          // Query weekly_focus for cycles 1-3
-          const { data: focusData } = await supabase
-            .from('weekly_focus')
+          // Query weekly_assignments for cycles 1-3
+          const { data: assignData } = await supabase
+            .from('weekly_assignments')
             .select(`
               id,
               display_order,
               competency_id,
               self_select,
-              cycle,
-              week_in_cycle,
               action_id,
-              pro_moves!weekly_focus_action_id_fkey ( 
+              week_start_date,
+              pro_moves!weekly_assignments_action_id_fkey ( 
                 action_statement,
                 competencies ( 
                   name,
@@ -200,13 +199,15 @@ export default function PerformanceWizard() {
               )
             `)
             .eq('role_id', staffData.role_id)
-            .eq('cycle', targetCycle)
-            .eq('week_in_cycle', targetWeek)
+            .eq('location_id', staffData.primary_location_id)
+            .eq('week_start_date', weekOf)
+            .eq('source', 'onboarding')
+            .eq('status', 'locked')
             .order('display_order');
 
-          console.log('Repair query result (focus):', { focusData });
+          console.log('Repair query result (assignments):', { assignData });
 
-          weekAssignments = (focusData || []).map((item: any) => {
+          weekAssignments = (assignData || []).map((item: any) => {
             let domainName = 'Unknown';
             if (item.pro_moves?.competencies?.domains?.domain_name) {
               domainName = item.pro_moves.competencies.domains.domain_name;
@@ -215,7 +216,7 @@ export default function PerformanceWizard() {
             }
 
             return {
-              weekly_focus_id: item.id,
+              weekly_focus_id: `assign:${item.id}`,
               type: item.self_select ? 'self_select' : 'site',
               display_order: item.display_order,
               action_statement: item.pro_moves?.action_statement || '',

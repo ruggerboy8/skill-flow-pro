@@ -6,8 +6,6 @@ import { StaffWeekSummary } from '@/types/coachV2';
 interface StaffWeeklyScore {
   staff_id: string;
   staff_name: string;
-  staff_email: string;
-  user_id: string;
   role_id: number;
   role_name: string;
   location_id: string;
@@ -17,16 +15,16 @@ interface StaffWeeklyScore {
   week_of: string;
   action_id: number;
   action_statement: string;
-  domain_id: number;
   domain_name: string;
-  confidence_score: number | null;
-  performance_score: number | null;
-  confidence_date: string | null;
-  performance_date: string | null;
-  confidence_late: boolean | null;
-  performance_late: boolean | null;
+  assignment_id: string | null;
+  weekly_focus_id: string | null;
   self_select: boolean;
-  display_order: number;
+  confidence_score: number | null;
+  confidence_date: string | null;
+  confidence_late: boolean | null;
+  performance_score: number | null;
+  performance_date: string | null;
+  performance_late: boolean | null;
 }
 
 interface UseStaffAllWeeklyScoresOptions {
@@ -82,8 +80,8 @@ export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions)
           weekMap.set(weekKey, {
             staff_id: row.staff_id,
             staff_name: row.staff_name,
-            staff_email: row.staff_email,
-            user_id: row.user_id,
+            staff_email: '', // Not returned by new RPC
+            user_id: '', // Not returned by new RPC
             role_id: row.role_id,
             role_name: row.role_name,
             location_id: row.location_id,

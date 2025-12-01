@@ -1,13 +1,38 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { RawScoreRow, StaffWeekSummary } from '@/types/coachV2';
+import { StaffWeekSummary } from '@/types/coachV2';
+
+// Type matching get_my_weekly_scores RPC output
+interface MyWeeklyScore {
+  staff_id: string;
+  staff_name: string;
+  role_id: number;
+  role_name: string;
+  location_id: string;
+  location_name: string;
+  organization_id: string;
+  organization_name: string;
+  week_of: string;
+  action_id: number;
+  action_statement: string;
+  domain_name: string;
+  assignment_id: string | null;
+  weekly_focus_id: string | null;
+  self_select: boolean;
+  confidence_score: number | null;
+  confidence_date: string | null;
+  confidence_late: boolean | null;
+  performance_score: number | null;
+  performance_date: string | null;
+  performance_late: boolean | null;
+}
 
 interface UseMyWeeklyScoresOptions {
   weekOf?: string | null;
 }
 
 export function useMyWeeklyScores(options: UseMyWeeklyScoresOptions = {}) {
-  const [rawData, setRawData] = useState<RawScoreRow[]>([]);
+  const [rawData, setRawData] = useState<MyWeeklyScore[]>([]);
   const [weekSummaries, setWeekSummaries] = useState<Map<string, StaffWeekSummary>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -36,7 +61,7 @@ export function useMyWeeklyScores(options: UseMyWeeklyScoresOptions = {}) {
         return;
       }
 
-      const rows = rpcData as (RawScoreRow & { is_week_exempt: boolean })[];
+      const rows = rpcData as MyWeeklyScore[];
       setRawData(rows);
 
       // Group by week
@@ -48,8 +73,8 @@ export function useMyWeeklyScores(options: UseMyWeeklyScoresOptions = {}) {
           weekMap.set(weekKey, {
             staff_id: row.staff_id,
             staff_name: row.staff_name,
-            staff_email: row.staff_email,
-            user_id: row.user_id,
+            staff_email: '', // Not returned by new RPC
+            user_id: '', // Not returned by new RPC
             role_id: row.role_id,
             role_name: row.role_name,
             location_id: row.location_id,
@@ -68,7 +93,7 @@ export function useMyWeeklyScores(options: UseMyWeeklyScoresOptions = {}) {
 
         const summary = weekMap.get(weekKey)!;
         summary.assignment_count++;
-        summary.scores.push(row);
+        summary.scores.push(row as any);
 
         if (row.confidence_score !== null) {
           summary.conf_count++;

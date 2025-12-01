@@ -25,7 +25,7 @@ interface StaffWeeklyScore {
   performance_date: string | null;
   confidence_late: boolean | null;
   performance_late: boolean | null;
-  is_self_select: boolean;
+  self_select: boolean;
   display_order: number;
 }
 

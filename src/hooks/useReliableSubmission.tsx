@@ -165,11 +165,11 @@ export function useReliableSubmission() {
 
     console.log(`[Submission] Writing ${enrichedUpdates.length} score updates`);
     
-    // Determine conflict strategy based on whether we have assignment_id
-    const hasAssignmentId = enrichedUpdates.some(u => u.assignment_id);
-    const conflictColumns = (v2Enabled && hasAssignmentId) 
-      ? 'staff_id,assignment_id' 
-      : 'staff_id,weekly_focus_id';
+    // Always use staff_id,weekly_focus_id for conflict resolution since:
+    // 1. There's a proper unique constraint on these columns that works with ON CONFLICT
+    // 2. For V2 records, weekly_focus_id contains the 'assign:xxx' identifier
+    // 3. The partial index on assignment_id doesn't support ON CONFLICT in PostgreSQL
+    const conflictColumns = 'staff_id,weekly_focus_id';
     
     console.log(`[Submission] Using conflict columns: ${conflictColumns}`);
     

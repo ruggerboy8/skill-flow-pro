@@ -9,11 +9,6 @@ interface ProMoveRowProps {
 export function ProMoveRow({ move }: ProMoveRowProps) {
   const badges = getBadges(move);
   const primaryReason = formatPrimaryReason(move);
-  
-  const needScore = move.finalScore;
-  const colorClass = needScore >= 75 ? 'text-destructive' : 
-                    needScore >= 50 ? 'text-orange-500' :
-                    needScore >= 25 ? 'text-yellow-600' : 'text-green-600';
 
   return (
     <div
@@ -24,11 +19,6 @@ export function ProMoveRow({ move }: ProMoveRowProps) {
       }}
       className="p-3 border-b hover:bg-muted/50 cursor-move transition-colors flex items-center gap-3"
     >
-      {/* Score */}
-      <span className={`text-lg font-bold ${colorClass} shrink-0 w-12 text-right`}>
-        {needScore}
-      </span>
-
       {/* Content */}
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center gap-2">

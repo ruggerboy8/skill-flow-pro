@@ -12,11 +12,6 @@ export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
   const badges = getBadges(move);
   const primaryReason = formatPrimaryReason(move);
   const domainHsl = getDomainColor(move.domainName);
-  
-  const needScore = move.finalScore;
-  const colorClass = needScore >= 75 ? 'text-destructive' : 
-                    needScore >= 50 ? 'text-orange-500' :
-                    needScore >= 25 ? 'text-yellow-600' : 'text-green-600';
 
   return (
     <div
@@ -27,7 +22,7 @@ export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
       }}
       className="p-4 border rounded-lg hover:bg-muted/50 cursor-move transition-colors space-y-3"
     >
-      {/* Header with score badge */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-sm leading-tight mb-1">{move.name}</h4>
@@ -52,11 +47,6 @@ export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
             )}
           </div>
         </div>
-        <span 
-          className={`text-2xl font-bold shrink-0 ${colorClass}`}
-        >
-          {needScore}
-        </span>
       </div>
 
       {/* Primary reason */}

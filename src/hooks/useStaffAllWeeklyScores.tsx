@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { StaffWeekSummary } from '@/types/coachV2';
 
-// Type matching get_staff_all_weekly_scores RPC output
+// Type matching get_staff_all_weekly_scores RPC output (Nov 25 working version)
 interface StaffWeeklyScore {
   staff_id: string;
   staff_name: string;
+  staff_email: string;
+  user_id: string;
   role_id: number;
   role_name: string;
   location_id: string;
@@ -15,16 +17,16 @@ interface StaffWeeklyScore {
   week_of: string;
   action_id: number;
   action_statement: string;
+  domain_id: number | null;
   domain_name: string;
-  assignment_id: string | null;
-  weekly_focus_id: string | null;
-  self_select: boolean;
   confidence_score: number | null;
-  confidence_date: string | null;
-  confidence_late: boolean | null;
   performance_score: number | null;
+  confidence_date: string | null;
   performance_date: string | null;
+  confidence_late: boolean | null;
   performance_late: boolean | null;
+  is_self_select: boolean;
+  display_order: number;
 }
 
 interface UseStaffAllWeeklyScoresOptions {
@@ -80,8 +82,8 @@ export function useStaffAllWeeklyScores(options: UseStaffAllWeeklyScoresOptions)
           weekMap.set(weekKey, {
             staff_id: row.staff_id,
             staff_name: row.staff_name,
-            staff_email: '', // Not returned by new RPC
-            user_id: '', // Not returned by new RPC
+            staff_email: row.staff_email,
+            user_id: row.user_id,
             role_id: row.role_id,
             role_name: row.role_name,
             location_id: row.location_id,

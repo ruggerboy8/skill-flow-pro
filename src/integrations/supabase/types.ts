@@ -2094,6 +2094,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_fix_backfill_week_of: {
+        Args: never
+        Returns: {
+          sample_staff: string
+          updated_count: number
+        }[]
+      }
       backfill_historical_score_timestamps: {
         Args: {
           p_jitter_minutes?: number

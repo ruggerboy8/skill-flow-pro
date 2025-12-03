@@ -431,11 +431,8 @@ serve(async (req) => {
       // EB smoothed mean
       smoothedConf = (config.ebPrior * config.ebK + sampleMean * totalN) / (config.ebK + totalN);
       
-      // Get most recent avg for UI (convert 0-1 back to 1-4 scale)
-      const mostRecent = confData.sort((a, b) => 
-        new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime()
-      )[0];
-      avgConfLast = mostRecent ? mostRecent.avg * 3 + 1 : null; // Convert 0-1 to 1-4 scale
+      // Use full lookback window average for UI (convert 0-1 back to 1-4 scale)
+      avgConfLast = sampleMean * 3 + 1; // Convert 0-1 to 1-4 scale
       
       // Calculate low-tail rate using individual confidence scores
       const individualCounts = individualLowCounts.get(move.id) || { lowCount: 0, totalCount: 0 };

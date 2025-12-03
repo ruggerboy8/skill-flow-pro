@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
               display_order: pick.displayOrder,
               action_id: pick.actionId,
               competency_id: competencyId,
-              source: 'admin',
+              source: 'global',
               status: 'locked',
               self_select: false,
             })

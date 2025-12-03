@@ -2358,11 +2358,13 @@ export type Database = {
         Returns: {
           action_id: number
           action_statement: string
-          assignment_id: string
           confidence_date: string
           confidence_late: boolean
           confidence_score: number
+          display_order: number
+          domain_id: number
           domain_name: string
+          is_self_select: boolean
           location_id: string
           location_name: string
           organization_id: string
@@ -2372,11 +2374,11 @@ export type Database = {
           performance_score: number
           role_id: number
           role_name: string
-          self_select: boolean
+          staff_email: string
           staff_id: string
           staff_name: string
+          user_id: string
           week_of: string
-          weekly_focus_id: string
         }[]
       }
       get_staff_domain_avgs: {

@@ -411,6 +411,16 @@ serve(async (req: Request) => {
           updates.hire_date = hire_date;
         }
         
+        // Sync scope to staff table for RPC compatibility (get_coach_roster_summary uses staff.coach_scope_*)
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant") && 
+            coach_scope_type && coach_scope_ids && coach_scope_ids.length > 0) {
+          // Map 'org' -> 'organization' for consistency with RPC expectations
+          updates.coach_scope_type = coach_scope_type === 'org' ? 'organization' : 'location';
+          // Store the first scope ID (primary scope for RPCs)
+          updates.coach_scope_id = coach_scope_ids[0];
+          console.log(`Syncing scope to staff table: type=${updates.coach_scope_type}, id=${updates.coach_scope_id}`);
+        }
+        
         const { data: updatedStaff, error: updateErr } = await admin
           .from("staff")
           .update(updates)

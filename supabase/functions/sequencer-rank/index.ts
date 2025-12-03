@@ -284,7 +284,10 @@ serve(async (req) => {
     });
 
     const confidenceHistory = Array.from(confidenceMap.entries()).map(([key, val]) => {
-      const [proMoveId, weekStart] = key.split('-');
+      // Split only on first dash to preserve date format (e.g., "4-2025-10-27")
+      const dashIndex = key.indexOf('-');
+      const proMoveId = key.substring(0, dashIndex);
+      const weekStart = key.substring(dashIndex + 1);
       return {
         proMoveId: Number(proMoveId),
         weekStart,

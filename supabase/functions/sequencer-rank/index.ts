@@ -12,11 +12,6 @@ const MIN_SAMPLES = 12; // Minimum staff-weeks to trust signals
 const BETA_PRIOR_A = 3; // Beta prior for low-rate EB
 const BETA_PRIOR_B = 3;
 
-// Retest constants
-const RETEST_WINDOW_MIN = 2; // weeks
-const RETEST_WINDOW_MAX = 4; // weeks
-const RETEST_BOOST = 0.10;
-
 // Recency constants
 const RECENCY_HORIZON = 16; // Fixed horizon
 const TRICKLE_LONG = 24; // Long-tail bonus threshold
@@ -104,7 +99,7 @@ serve(async (req) => {
     };
 
     const logs: string[] = [];
-    const rankVersion = 'v4.0-collective';
+    const rankVersion = 'v4.1-unified'; // Updated version after unification
     const rulesApplied: string[] = [
       `cooldown=${config.cooldownWeeks}w`,
       `minDistinctDomains=${config.diversityMinDomainsPerWeek}`,
@@ -205,6 +200,7 @@ serve(async (req) => {
     logs.push(`Fetched ${confData?.length || 0} confidence scores`);
 
     // Parse weekly_focus_id and assignment_id to get action_id
+    // NOTE: We KEEP this ID mapping logic for the 186 legacy scores still linked via weekly_focus_id
     const focusIdToActionId = new Map<string, number>();
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     
@@ -223,7 +219,7 @@ serve(async (req) => {
       .filter(id => id.startsWith('assign:'))
       .map(id => id.replace('assign:', ''));
 
-    // Batch fetch action_ids from weekly_focus (Cycles 1-3)
+    // Batch fetch action_ids from weekly_focus (Cycles 1-3) - for SCORE resolution only
     if (uuidIds.length > 0) {
       const { data: focusRows } = await supabase
         .from('weekly_focus')
@@ -234,10 +230,10 @@ serve(async (req) => {
       focusRows?.forEach((row: any) => {
         if (row.action_id) focusIdToActionId.set(row.id, row.action_id);
       });
-      logs.push(`Mapped ${focusRows?.length || 0} weekly_focus IDs to action_ids`);
+      logs.push(`Mapped ${focusRows?.length || 0} weekly_focus IDs to action_ids (for score resolution)`);
     }
 
-    // Batch fetch action_ids from weekly_plan (Cycle 4+)
+    // Batch fetch action_ids from weekly_plan (Cycle 4+) - for SCORE resolution only
     if (planIds.length > 0) {
       const { data: planRows } = await supabase
         .from('weekly_plan')
@@ -248,10 +244,10 @@ serve(async (req) => {
       planRows?.forEach((row: any) => {
         if (row.action_id) focusIdToActionId.set(`plan:${row.id}`, row.action_id);
       });
-      logs.push(`Mapped ${planRows?.length || 0} weekly_plan IDs to action_ids`);
+      logs.push(`Mapped ${planRows?.length || 0} weekly_plan IDs to action_ids (for score resolution)`);
     }
 
-    // Batch fetch action_ids from weekly_assignments (V2)
+    // Batch fetch action_ids from weekly_assignments (V2) - for SCORE resolution only
     if (assignIds.length > 0) {
       const { data: assignRows } = await supabase
         .from('weekly_assignments')
@@ -262,7 +258,7 @@ serve(async (req) => {
       assignRows?.forEach((row: any) => {
         if (row.action_id) focusIdToActionId.set(`assign:${row.id}`, row.action_id);
       });
-      logs.push(`Mapped ${assignRows?.length || 0} weekly_assignments IDs to action_ids`);
+      logs.push(`Mapped ${assignRows?.length || 0} weekly_assignments IDs to action_ids (for score resolution)`);
     }
 
     // Group by pro_move and week
@@ -278,7 +274,8 @@ serve(async (req) => {
       const key = `${actionId}-${weekStart.toISOString().split('T')[0]}`;
       const existing = confidenceMap.get(key) || { sum: 0, count: 0 };
       confidenceMap.set(key, {
-        sum: existing.sum + row.confidence_score / 4.0,
+        // PHASE 1 FIX: Correct confidence normalization (1→0%, 2→33%, 3→67%, 4→100%)
+        sum: existing.sum + (row.confidence_score - 1) / 3.0,
         count: existing.count + 1,
       });
     });
@@ -298,7 +295,7 @@ serve(async (req) => {
 
     logs.push(`Collected ${confidenceHistory.length} confidence data points`);
 
-    // Track individual low-confidence counts (scores ≤ 2 on 1-10 scale)
+    // Track individual low-confidence counts (scores ≤ 2 on 1-4 scale)
     const individualLowCounts = new Map<number, { lowCount: number; totalCount: number }>();
     confData?.forEach((row: any) => {
       const lookupKey = row.assignment_id || row.weekly_focus_id;
@@ -327,31 +324,7 @@ serve(async (req) => {
 
     logs.push(`Found ${evals.length} eval scores`);
 
-    // 4. Fetch last selected - handle weekly_focus, weekly_plan, and weekly_assignments
-    // For weekly_focus: use week_start_date if available
-    const { data: lastSelectedFocus, error: lsFocusError } = await supabase
-      .from('weekly_focus')
-      .select('action_id, week_start_date')
-      .eq('role_id', body.roleId)
-      .not('action_id', 'is', null)
-      .not('week_start_date', 'is', null)
-      .order('week_start_date', { ascending: false });
-
-    if (lsFocusError) throw lsFocusError;
-
-    // For weekly_plan: use week_start_date (global plans)
-    const { data: lastSelectedPlan, error: lsPlanError } = await supabase
-      .from('weekly_plan')
-      .select('action_id, week_start_date')
-      .eq('role_id', body.roleId)
-      .is('org_id', null)
-      .not('action_id', 'is', null)
-      .not('week_start_date', 'is', null)
-      .order('week_start_date', { ascending: false });
-
-    if (lsPlanError) throw lsPlanError;
-
-    // For weekly_assignments: use week_start_date (V2)
+    // 4. Fetch last selected - UNIFIED: only query weekly_assignments (single source of truth)
     const { data: lastSelectedAssign, error: lsAssignError } = await supabase
       .from('weekly_assignments')
       .select('action_id, week_start_date')
@@ -362,28 +335,10 @@ serve(async (req) => {
 
     if (lsAssignError) throw lsAssignError;
 
-    // Merge and deduplicate (keep most recent per action_id)
+    // Build map from unified source (keep most recent per action_id)
     const lastSelectedMap = new Map<number, string>();
-    
-    // Add from focus first
-    lastSelectedFocus?.forEach((row: any) => {
-      if (!lastSelectedMap.has(row.action_id)) {
-        lastSelectedMap.set(row.action_id, row.week_start_date);
-      }
-    });
-
-    // Add from plan (may override if more recent)
-    lastSelectedPlan?.forEach((row: any) => {
-      const existing = lastSelectedMap.get(row.action_id);
-      if (!existing || row.week_start_date > existing) {
-        lastSelectedMap.set(row.action_id, row.week_start_date);
-      }
-    });
-
-    // Add from assignments (may override if more recent)
     lastSelectedAssign?.forEach((row: any) => {
-      const existing = lastSelectedMap.get(row.action_id);
-      if (!existing || row.week_start_date > existing) {
+      if (!lastSelectedMap.has(row.action_id)) {
         lastSelectedMap.set(row.action_id, row.week_start_date);
       }
     });
@@ -393,39 +348,7 @@ serve(async (req) => {
       weekStart,
     }));
 
-    logs.push(`Last selected records: focus=${lastSelectedFocus?.length || 0}, plan=${lastSelectedPlan?.length || 0}, assign=${lastSelectedAssign?.length || 0}, total=${lastSelected.length}`);
-    
-    // 6. Fetch rank snapshots for retest boost detection
-    const { data: snapshotData, error: snapshotError } = await supabase
-      .from('weekly_plan')
-      .select('action_id, week_start_date, rank_snapshot')
-      .eq('role_id', body.roleId)
-      .is('org_id', null)
-      .not('action_id', 'is', null)
-      .not('rank_snapshot', 'is', null)
-      .order('week_start_date', { ascending: false })
-      .limit(100);
-
-    if (snapshotError) console.warn('Snapshot fetch failed:', snapshotError);
-
-    // Build map: action_id -> most recent selection with snapshot
-    const retestMap = new Map<number, { weekStart: string; wasLowConf: boolean }>();
-    snapshotData?.forEach((row: any) => {
-      if (retestMap.has(row.action_id)) return; // Keep first (most recent)
-      
-      const snapshot = row.rank_snapshot;
-      // Check for low_conf_trigger tag OR infer from C value
-      const wasLowConf = 
-        snapshot?.reason_tags?.includes('low_conf_trigger') ||
-        (snapshot?.parts?.C >= 0.60);
-      
-      retestMap.set(row.action_id, {
-        weekStart: row.week_start_date,
-        wasLowConf
-      });
-    });
-
-    logs.push(`Retest map: ${retestMap.size} moves with selection history`);
+    logs.push(`Last selected records: ${lastSelectedAssign?.length || 0} from weekly_assignments, ${lastSelected.length} unique moves`);
     
     // Log never-seen moves
     const neverSeen = eligible.filter(m => !lastSelected.some(ls => ls.proMoveId === m.id));
@@ -436,31 +359,7 @@ serve(async (req) => {
     const movesWithConf = new Set(confidenceHistory.map(c => c.proMoveId));
     logs.push(`Moves with confidence data: ${movesWithConf.size}/${eligible.length}`);
 
-    // 5. Fetch domain coverage (last 8 weeks) - handle weekly_focus, weekly_plan, and weekly_assignments
-    // From weekly_focus
-    const { data: domainCoverageFocus, error: dcFocusError } = await supabase
-      .from('weekly_focus')
-      .select('action_id, week_start_date')
-      .eq('role_id', body.roleId)
-      .not('action_id', 'is', null)
-      .not('week_start_date', 'is', null)
-      .gte('week_start_date', cutoff8w.toISOString().split('T')[0]);
-
-    if (dcFocusError) throw dcFocusError;
-
-    // From weekly_plan (global)
-    const { data: domainCoveragePlan, error: dcPlanError } = await supabase
-      .from('weekly_plan')
-      .select('action_id, week_start_date')
-      .eq('role_id', body.roleId)
-      .is('org_id', null)
-      .not('action_id', 'is', null)
-      .not('week_start_date', 'is', null)
-      .gte('week_start_date', cutoff8w.toISOString().split('T')[0]);
-
-    if (dcPlanError) throw dcPlanError;
-
-    // From weekly_assignments (V2)
+    // 5. Fetch domain coverage (last 8 weeks) - UNIFIED: only query weekly_assignments
     const { data: domainCoverageAssign, error: dcAssignError } = await supabase
       .from('weekly_assignments')
       .select('action_id, week_start_date')
@@ -471,15 +370,8 @@ serve(async (req) => {
 
     if (dcAssignError) throw dcAssignError;
 
-    // Merge all sources
-    const allCoverageData = [
-      ...(domainCoverageFocus || []),
-      ...(domainCoveragePlan || []),
-      ...(domainCoverageAssign || [])
-    ];
-
     const domainCoverageMap = new Map<number, Set<string>>();
-    allCoverageData.forEach((row: any) => {
+    domainCoverageAssign?.forEach((row: any) => {
       const move = eligible.find(m => m.id === row.action_id);
       if (move) {
         const weeks = domainCoverageMap.get(move.domainId) || new Set();
@@ -493,7 +385,7 @@ serve(async (req) => {
       appearances: weeks.size,
     }));
 
-    logs.push(`Domain coverage: ${domainCoverage.length} domains tracked (${domainCoverageFocus?.length || 0} focus + ${domainCoveragePlan?.length || 0} plan + ${domainCoverageAssign?.length || 0} assign)`);
+    logs.push(`Domain coverage: ${domainCoverage.length} domains tracked (${domainCoverageAssign?.length || 0} records from weekly_assignments)`);
 
     // Add sample move logging
     if (eligible.length > 0) {
@@ -523,21 +415,27 @@ serve(async (req) => {
     let lowConfShare: number | null = null;
 
     if (confData.length > 0) {
-      // Calculate mean with existing EB
+      // PHASE 1 FIX: Add safety guard for trimming to prevent NaN
       const trimCount = Math.floor(confData.length * config.trimPct);
+      // Safety: ensure at least 1 element remains after trimming
+      const safeTrimCount = Math.min(trimCount, Math.floor((confData.length - 1) / 2));
       const sorted = confData.map(d => d.avg).sort((a, b) => a - b);
-      const trimmed = sorted.slice(trimCount, sorted.length - trimCount);
-      const sampleMean = trimmed.reduce((sum, v) => sum + v, 0) / trimmed.length;
+      const trimmed = sorted.slice(safeTrimCount, sorted.length - safeTrimCount);
+      
+      // Fallback if trimmed is empty (shouldn't happen with safeTrimCount, but guard anyway)
+      const sampleMean = trimmed.length > 0 
+        ? trimmed.reduce((sum, v) => sum + v, 0) / trimmed.length
+        : sorted.reduce((sum, v) => sum + v, 0) / sorted.length;
       const totalN = confData.reduce((sum, d) => sum + d.n, 0);
       
       // EB smoothed mean
       smoothedConf = (config.ebPrior * config.ebK + sampleMean * totalN) / (config.ebK + totalN);
       
-      // Get most recent avg for UI (1-4 scale: avg * 10 / 10 * 4 = avg * 4)
+      // Get most recent avg for UI (convert 0-1 back to 1-4 scale)
       const mostRecent = confData.sort((a, b) => 
         new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime()
       )[0];
-      avgConfLast = mostRecent ? mostRecent.avg * 4 : null; // Convert 0-1 to 1-4 scale
+      avgConfLast = mostRecent ? mostRecent.avg * 3 + 1 : null; // Convert 0-1 to 1-4 scale
       
       // Calculate low-tail rate using individual confidence scores
       const individualCounts = individualLowCounts.get(move.id) || { lowCount: 0, totalCount: 0 };
@@ -575,10 +473,8 @@ serve(async (req) => {
     const R_long = Math.min(weeksSince / TRICKLE_LONG, 1) * TRICKLE_WEIGHT;
     R = Math.min(R + R_long, 1); // Cap at 1
 
-    // Check if retest is due
-    const retestInfo = retestMap.get(move.id);
-    const retestDue = retestInfo && retestInfo.wasLowConf && 
-      weeksSince >= RETEST_WINDOW_MIN && weeksSince <= RETEST_WINDOW_MAX;
+    // PHASE 2: Retest logic removed - hardcode to disabled
+    const retestDue = false;
 
       // E (Eval) - Deficit with capped contribution
       const evalRecord = evals.find(e => e.competencyId === move.competencyId);
@@ -591,19 +487,15 @@ serve(async (req) => {
       const appearances = domainRecord ? domainRecord.appearances : 0;
       const D = 1 - Math.min(appearances / 8, 1);
 
-    // T (Retest Boost) - verify improvement after low-conf selection
-    let T = 0;
-    if (retestDue) {
-      T = RETEST_BOOST;
-    }
+    // T (Retest Boost) - PHASE 2: Hardcoded to 0 (logic removed)
+    const T = 0;
 
     // Determine primary reason (server-side)
     let primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE' = 'TIE';
     let primaryReasonValue: number | null = null;
 
-    if (retestDue) {
-      primaryReasonCode = 'RETEST';
-    } else if (lowConfShare !== null && lowConfShare >= LOW_CONF_THRESHOLD) {
+    // PHASE 2: Removed RETEST check since retestDue is always false
+    if (lowConfShare !== null && lowConfShare >= LOW_CONF_THRESHOLD) {
       primaryReasonCode = 'LOW_CONF';
       primaryReasonValue = lowConfShare;
     } else if (weeksSince === 999) {
@@ -627,7 +519,7 @@ serve(async (req) => {
 
     return { 
       C, R, E: E_raw, D, eContrib, final, drivers, weeksSince, T,
-      lowConfShare, avgConfLast, retestDue: retestDue || false,
+      lowConfShare, avgConfLast, retestDue,
       primaryReasonCode, primaryReasonValue
     };
     };
@@ -698,350 +590,160 @@ serve(async (req) => {
     previewDate.setDate(previewDate.getDate() + 7);
     const previewDateStr = previewDate.toISOString().split('T')[0];
 
-    const advancedLastSelected = [
-      ...lastSelected.filter(ls => !nextPicks.find(p => p.id === ls.proMoveId)),
-      ...nextPicks.map(p => ({ proMoveId: p.id, weekStart: effectiveDate })),
-    ];
+    // Clone and advance lastSelected for preview
+    const advancedLastSelected = lastSelected
+      .filter(ls => !nextPicks.find(p => p.id === ls.proMoveId))
+      .concat(nextPicks.map(p => ({ proMoveId: p.id, weekStart: effectiveDate })));
 
-    const scoredPreview = eligible.map(move => {
-      const ls = advancedLastSelected.find(l => l.proMoveId === move.id);
-      const weeksSince = ls
-        ? Math.floor((new Date(previewDateStr).getTime() - new Date(ls.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000))
+    // Score all moves for preview
+    const scoreWithAdvanced = (move: any) => {
+      const advancedRecord = advancedLastSelected.find(ls => ls.proMoveId === move.id);
+      const weeksSince = advancedRecord
+        ? Math.floor((new Date(previewDateStr).getTime() - new Date(advancedRecord.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000))
         : 999;
-      
-      // Recompute with advanced lastSelected
-      const confData = confidenceHistory.filter(h => h.proMoveId === move.id);
-      let smoothedConf = config.ebPrior;
-      if (confData.length > 0) {
-        const trimCount = Math.floor(confData.length * config.trimPct);
-        const sorted = confData.map(d => d.avg).sort((a, b) => a - b);
-        const trimmed = sorted.slice(trimCount, sorted.length - trimCount);
-        const sampleMean = trimmed.reduce((sum, v) => sum + v, 0) / trimmed.length;
-        const totalN = confData.reduce((sum, d) => sum + d.n, 0);
-        smoothedConf = (config.ebPrior * config.ebK + sampleMean * totalN) / (config.ebK + totalN);
-      }
-      const C = 1 - smoothedConf;
 
+      const base = scoreCandidate(move, previewDateStr);
+      
+      // Recalculate R with advanced state
       const horizon = config.recencyHorizonWeeks === 0 ? 12 : config.recencyHorizonWeeks;
       const cooldown = config.cooldownWeeks;
-      const R = weeksSince <= cooldown ? 0
-              : weeksSince >= horizon  ? 1
-              : (weeksSince - cooldown) / (horizon - cooldown);
+      let R = weeksSince <= cooldown ? 0
+            : weeksSince >= horizon  ? 1
+            : (weeksSince - cooldown) / (horizon - cooldown);
+      const R_long = Math.min(weeksSince / TRICKLE_LONG, 1) * TRICKLE_WEIGHT;
+      R = Math.min(R + R_long, 1);
 
-      const evalRecord = evals.find(e => e.competencyId === move.competencyId);
-      const evalScore01 = evalRecord?.score;
-      const E_raw = evalScore01 == null ? 0 : Math.max(0, 1 - evalScore01);
-      const eContrib = Math.min(E_raw * weights.E, config.evalCap);
+      const final = (base.C * weights.C) + (R * weights.R) + (base.D * weights.D) + base.eContrib + base.T;
+      
+      return { ...base, R, final, weeksSince };
+    };
 
-      const domainRecord = domainCoverage.find(dc => dc.domainId === move.domainId);
-      const appearances = domainRecord ? domainRecord.appearances : 0;
-      const D = 1 - Math.min(appearances / 8, 1);
-
-      // T (Retest Boost) - check if retest is due in preview
-      const retestInfo = retestMap.get(move.id);
-      const retestDue = retestInfo && retestInfo.wasLowConf && 
-        weeksSince >= RETEST_WINDOW_MIN && weeksSince <= RETEST_WINDOW_MAX;
-      const T = retestDue ? RETEST_BOOST : 0;
-
-      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib + T;
-
-      const components = [
-        { key: 'C', value: C * weights.C },
-        { key: 'R', value: R * weights.R },
-        { key: 'E', value: eContrib },
-        { key: 'D', value: D * weights.D },
-        { key: 'T', value: T },
-      ];
-      components.sort((a, b) => b.value - a.value);
-      const drivers = components.slice(0, 2).map(c => c.key);
-
-      return { ...move, C, R, E: E_raw, D, eContrib, final, drivers, weeksSince, T, retestDue };
-    });
-
-    scoredPreview.sort((a, b) => {
+    const previewScored = eligible.map(move => ({ ...move, ...scoreWithAdvanced(move) }));
+    previewScored.sort((a, b) => {
       if (Math.abs(b.final - a.final) >= 0.0001) return b.final - a.final;
-      if (Math.abs(b.eContrib - a.eContrib) >= 0.0001) return b.eContrib - a.eContrib;
-      const cA = a.C * weights.C;
-      const cB = b.C * weights.C;
-      if (Math.abs(cB - cA) >= 0.0001) return cB - cA;
+      if ((b.lowConfShare || 0) !== (a.lowConfShare || 0)) return (b.lowConfShare || 0) - (a.lowConfShare || 0);
       if (a.weeksSince !== b.weeksSince) return b.weeksSince - a.weeksSince;
       return a.id - b.id;
     });
 
-    const eligiblePreview = scoredPreview.filter(m => m.weeksSince >= config.cooldownWeeks);
+    const previewEligible = previewScored.filter(m => m.weeksSince >= config.cooldownWeeks);
     const previewPicks = [];
-    const usedDomainsPreview = new Set<number>();
+    const previewUsedDomains = new Set<number>();
 
-    if (eligiblePreview.length > 0) {
-      previewPicks.push(eligiblePreview[0]);
-      usedDomainsPreview.add(eligiblePreview[0].domainId);
+    if (previewEligible.length > 0) {
+      previewPicks.push(previewEligible[0]);
+      previewUsedDomains.add(previewEligible[0].domainId);
     }
 
-    for (let i = 1; i < eligiblePreview.length && previewPicks.length < 3; i++) {
-      const candidate = eligiblePreview[i];
-      if (usedDomainsPreview.size < config.diversityMinDomainsPerWeek && usedDomainsPreview.has(candidate.domainId)) {
+    for (let i = 1; i < previewEligible.length && previewPicks.length < 6; i++) {
+      const candidate = previewEligible[i];
+      if (previewUsedDomains.size < config.diversityMinDomainsPerWeek && previewUsedDomains.has(candidate.domainId)) {
         continue;
       }
       previewPicks.push(candidate);
-      usedDomainsPreview.add(candidate.domainId);
+      previewUsedDomains.add(candidate.domainId);
     }
 
-    if (previewPicks.length < 3) {
-      logs.push('Relaxing diversity constraint for Preview');
-      for (let i = 1; i < eligiblePreview.length && previewPicks.length < 3; i++) {
-        if (!previewPicks.find(p => p.id === eligiblePreview[i].id)) {
-          previewPicks.push(eligiblePreview[i]);
+    if (previewPicks.length < 6) {
+      for (let i = 1; i < previewEligible.length && previewPicks.length < 6; i++) {
+        if (!previewPicks.find(p => p.id === previewEligible[i].id)) {
+          previewPicks.push(previewEligible[i]);
         }
       }
     }
 
-    // Format response with CLC detection + new UI fields
-    const formatRow = (pick: any, refDate: string) => {
-      const ls = lastSelected.find(l => l.proMoveId === pick.id);
-      const moveConfData = confidenceHistory.filter(h => h.proMoveId === pick.id);
-      const confidenceN = moveConfData.reduce((sum, h) => sum + h.n, 0);
-      
-      // Get last 2 completed weeks before refDate for CLC detection
-      const refDateObj = new Date(refDate);
-      const recentWeeks = moveConfData
-        .filter(h => new Date(h.weekStart) < refDateObj)
-        .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime())
-        .slice(0, 2);
-      
-      const classification = classifyConfidence(1 - pick.C, recentWeeks);
-      
-      // Generate reason tags
-      const reason_tags: string[] = [];
-      if (pick.C >= 0.60) reason_tags.push('low_conf_trigger');
-      if (pick.T > 0) reason_tags.push('retest_window');
-      if (pick.weeksSince === 999) reason_tags.push('never_practiced');
-      if (pick.R >= 0.8) reason_tags.push('long_unseen');
+    logs.push(`Completed ranking: Next ${nextPicks.length} picks, Preview ${previewPicks.length} picks`);
 
-      // Determine primary reason (for UI display)
-      let primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE' = 'TIE';
-      let primaryReasonValue: number | null = null;
-      
-      if (pick.retestDue) {
-        primaryReasonCode = 'RETEST';
-      } else if ((pick.lowConfShare || 0) >= LOW_CONF_THRESHOLD) {
-        primaryReasonCode = 'LOW_CONF';
-        primaryReasonValue = pick.lowConfShare;
-      } else if (pick.weeksSince === 999) {
-        primaryReasonCode = 'NEVER';
-      } else if (pick.weeksSince >= STALE_WEEKS) {
-        primaryReasonCode = 'STALE';
-        primaryReasonValue = pick.weeksSince;
-      }
-
-      // Domain color HSL
-      const domainColors: Record<string, string> = {
-        'Clinical': '214, 78%, 52%',
-        'Clerical': '155, 70%, 45%',
-        'Cultural': '280, 65%, 60%',
-        'Case Acceptance': '25, 85%, 55%',
-      };
-      const domainColorHsl = domainColors[pick.domainName] || '0, 0%, 50%';
-
-      return {
-        proMoveId: pick.id,
-        name: pick.name,
-        domainId: pick.domainId,
-        domainName: pick.domainName,
-        domainColorHsl,
-        parts: { C: pick.C, R: pick.R, E: pick.E, D: pick.D, T: pick.T || 0 },
-        evalContrib: pick.eContrib,
-        finalScore: Math.round(pick.final * 100), // Scale to 0-100
-        drivers: pick.drivers,
-        lastSeen: ls ? new Date(ls.weekStart).toLocaleDateString('en-US') : undefined,
-        weeksSinceSeen: pick.weeksSince,
-        lastPracticedWeeks: pick.weeksSince,
-        confidenceN,
-        status: classification.status,
-        severity: classification.severity,
-        n2w: classification.n2w,
-        recentMeans: classification.recentMeans,
-        reason_tags,
-        lowConfShare: pick.lowConfShare,
-        avgConfLast: pick.avgConfLast,
-        retestDue: pick.retestDue || false,
-        primaryReasonCode,
-        primaryReasonValue,
-      };
-    };
-
-    const next = nextPicks.map(p => formatRow(p, effectiveDate));
-    const preview = previewPicks.map(p => {
-      const ls = advancedLastSelected.find(l => l.proMoveId === p.id);
-      const moveConfData = confidenceHistory.filter(h => h.proMoveId === p.id);
-      const confidenceN = moveConfData.reduce((sum, h) => sum + h.n, 0);
-      const ws = ls ? Math.floor((new Date(previewDateStr).getTime() - new Date(ls.weekStart).getTime()) / (7 * 24 * 60 * 60 * 1000)) : 999;
-      
-      // Get last 2 completed weeks before preview date for CLC detection
-      const previewDateObj = new Date(previewDateStr);
-      const recentWeeks = moveConfData
-        .filter(h => new Date(h.weekStart) < previewDateObj)
-        .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime())
-        .slice(0, 2);
-      
-      const classification = classifyConfidence(1 - p.C, recentWeeks);
-      
-      // Generate reason tags
-      const reason_tags: string[] = [];
-      if (p.C >= 0.60) reason_tags.push('low_conf_trigger');
-      if (p.T > 0) reason_tags.push('retest_window');
-      if (ws === 999) reason_tags.push('never_practiced');
-      if (p.R >= 0.8) reason_tags.push('long_unseen');
-      
-      return {
-        proMoveId: p.id,
-        name: p.name,
-        domainId: p.domainId,
-        domainName: p.domainName,
-        parts: { C: p.C, R: p.R, E: p.E, D: p.D, T: p.T || 0 },
-        finalScore: p.final,
-        drivers: p.drivers,
-        lastSeen: ls ? new Date(ls.weekStart).toLocaleDateString('en-US') : undefined,
-        weeksSinceSeen: ws,
-        confidenceN,
-        status: classification.status,
-        severity: classification.severity,
-        n2w: classification.n2w,
-        recentMeans: classification.recentMeans,
-        reason_tags,
-      };
-    });
-
-    const ranked = scored.map(p => formatRow(p, effectiveDate));
-    
-    // Log any critical detections
-    const criticalMoves = [...next, ...preview].filter(r => r.status === 'critical');
-    if (criticalMoves.length > 0) {
-      logs.push(`⚠️ ${criticalMoves.length} CRITICAL low-confidence moves detected`);
-      criticalMoves.forEach(m => {
-        logs.push(`  • ${m.name}: confEB=${(1-m.parts.C).toFixed(2)}, n2w=${m.n2w}, severity=${m.severity?.toFixed(2)}`);
-      });
-    }
-
-    // Format top 6 for planner UI
-    const top6 = nextPicks.map((pick, idx) => {
-      const formatted = formatRow(pick, effectiveDate);
-      
-      // Build competency tag
-      const competencies = competencyMap.get(pick.competencyId);
-      const competencyTag = `${formatted.domainName.split('.')[1] || 'UNK'}.${pick.competencyId}`;
-      
-      // Build reason summary
-      const reasons = [];
-      if (formatted.parts.C > 0.3) reasons.push(`low avg confidence`);
-      if (formatted.weeksSinceSeen === 999) reasons.push(`never practiced`);
-      else if (formatted.weeksSinceSeen > 4) reasons.push(`not practiced in ${formatted.weeksSinceSeen} weeks`);
-      if (pick.eContrib > 0.05) reasons.push(`eval gap (${competencyTag})`);
-      if (formatted.parts.D > 0.1) reasons.push(`underrepresented domain`);
-      const reasonSummary = reasons.join('; ') || 'Balanced priority';
-      
-      return {
-        proMoveId: formatted.proMoveId,
-        name: formatted.name,
-        domain: formatted.domainName,
-        competencyTag,
-        score: formatted.finalScore,
-        breakdown: {
-          C: formatted.parts.C * weights.C,
-          R: formatted.parts.R * weights.R,
-          E: pick.eContrib,
-          D: formatted.parts.D * weights.D,
-        },
-        lastSeenWeeksAgo: formatted.weeksSinceSeen < 999 ? formatted.weeksSinceSeen : null,
-        cooldownOk: formatted.weeksSinceSeen >= config.cooldownWeeks,
-        cooldownReason: formatted.weeksSinceSeen < config.cooldownWeeks 
-          ? `Used ${config.cooldownWeeks - formatted.weeksSinceSeen}w ago` 
-          : null,
-        reasonSummary,
-        confStatus: formatted.status,
-        confSeverity: formatted.severity,
-      };
-    });
-
-    // Format all ranked moves (for scrollable list)
-    const allRanked = scored.map((pick) => {
-      const formatted = formatRow(pick, effectiveDate);
-      
-      // Build competency tag
-      const competencies = competencyMap.get(pick.competencyId);
-      const competencyTag = `${formatted.domainName.split('.')[1] || 'UNK'}.${pick.competencyId}`;
-      
-      // Build reason summary
-      const reasons = [];
-      if (formatted.parts.C > 0.3) reasons.push(`low avg confidence`);
-      if (formatted.weeksSinceSeen === 999) reasons.push(`never practiced`);
-      else if (formatted.weeksSinceSeen > 4) reasons.push(`not practiced in ${formatted.weeksSinceSeen} weeks`);
-      if (pick.eContrib > 0.05) reasons.push(`eval gap (${competencyTag})`);
-      if (formatted.parts.D > 0.1) reasons.push(`underrepresented domain`);
-      const reasonSummary = reasons.join('; ') || 'Balanced priority';
-      
-      return {
-        proMoveId: formatted.proMoveId,
-        name: formatted.name,
-        domain: formatted.domainName,
-        competencyTag,
-        score: formatted.finalScore,
-        breakdown: {
-          C: formatted.parts.C * weights.C,
-          R: formatted.parts.R * weights.R,
-          E: pick.eContrib,
-          D: formatted.parts.D * weights.D,
-        },
-        lastSeenWeeksAgo: formatted.weeksSinceSeen < 999 ? formatted.weeksSinceSeen : null,
-        cooldownOk: formatted.weeksSinceSeen >= config.cooldownWeeks,
-        cooldownReason: formatted.weeksSinceSeen < config.cooldownWeeks 
-          ? `Used ${config.cooldownWeeks - formatted.weeksSinceSeen}w ago` 
-          : null,
-        reasonSummary,
-        confStatus: formatted.status,
-        confSeverity: formatted.severity,
-      };
+    // Format response (new planner format)
+    const formatRow = (m: any, rank: number) => ({
+      rank,
+      proMoveId: m.id,
+      name: m.name,
+      domainId: m.domainId,
+      domainName: m.domainName,
+      parts: {
+        C: m.C,
+        R: m.R,
+        E: m.E,
+        D: m.D,
+        T: m.T,
+      },
+      finalScore: m.final,
+      drivers: m.drivers,
+      lastSeen: lastSelected.find(ls => ls.proMoveId === m.id)?.weekStart || null,
+      weeksSinceSeen: m.weeksSince,
+      confidenceN: confidenceHistory.filter(h => h.proMoveId === m.id).reduce((sum, h) => sum + h.n, 0),
+      status: classifyConfidence(m.C, confidenceHistory.filter(h => h.proMoveId === m.id)).status,
+      lowConfShare: m.lowConfShare,
+      avgConfLast: m.avgConfLast,
+      lastPracticedWeeks: m.weeksSince,
+      retestDue: m.retestDue,
+      primaryReasonCode: m.primaryReasonCode,
+      primaryReasonValue: m.primaryReasonValue,
     });
 
     // New planner response format
     const plannerResponse = {
-      roleId: body.roleId,
-      asOfWeek: effectiveDate,
-      preset,
-      weights,
-      rankVersion,
-      poolSize: eligible.length,
-      rulesApplied,
-      relaxedConstraintNote,
-      top6,
-      allRanked,
-    };
-
-    // Legacy response format (for backward compatibility)
-    const legacyResponse = {
-      ranked,
-      generatedAt: new Date().toISOString(),
-      roleId: body.roleId,
-      preset,
-      // Include legacy fields for backward compatibility
-      timezone,
-      weekStartNext: new Date(effectiveDateObj).toLocaleDateString('en-US'),
-      weekStartPreview: new Date(previewDate).toLocaleDateString('en-US'),
-      next,
-      preview,
+      meta: {
+        rankVersion,
+        asOfWeek: effectiveDate,
+        roleId: body.roleId,
+        preset,
+        rulesApplied,
+        relaxedConstraintNote,
+      },
+      next: nextPicks.map((m, i) => formatRow(m, i + 1)),
+      preview: previewPicks.map((m, i) => formatRow(m, i + 1)),
+      full: scored.slice(0, 50).map((m, i) => formatRow(m, i + 1)),
       logs,
     };
 
-    // Return planner format if asOfWeek is provided, otherwise legacy
-    const response = body.asOfWeek ? plannerResponse : legacyResponse;
+    // Legacy response format for backward compatibility
+    const legacyResponse = {
+      ranked: scored.map((m, i) => ({
+        rank: i + 1,
+        proMoveId: m.id,
+        name: m.name,
+        domainId: m.domainId,
+        domainName: m.domainName,
+        parts: { C: m.C, R: m.R, E: m.E, D: m.D, T: m.T },
+        finalScore: m.final,
+        drivers: m.drivers,
+        lastSeen: lastSelected.find(ls => ls.proMoveId === m.id)?.weekStart || null,
+        weeksSinceSeen: m.weeksSince,
+        confidenceN: confidenceHistory.filter(h => h.proMoveId === m.id).reduce((sum, h) => sum + h.n, 0),
+        status: classifyConfidence(m.C, confidenceHistory.filter(h => h.proMoveId === m.id)).status,
+        lowConfShare: m.lowConfShare,
+        avgConfLast: m.avgConfLast,
+        lastPracticedWeeks: m.weeksSince,
+        retestDue: m.retestDue,
+        primaryReasonCode: m.primaryReasonCode,
+        primaryReasonValue: m.primaryReasonValue,
+      })),
+      next: nextPicks.map((m, i) => formatRow(m, i + 1)),
+      preview: previewPicks.map((m, i) => formatRow(m, i + 1)),
+      logs,
+      meta: {
+        rankVersion,
+        asOfWeek: effectiveDate,
+        roleId: body.roleId,
+        preset,
+        rulesApplied,
+        relaxedConstraintNote,
+      },
+    };
 
-    return new Response(JSON.stringify(response), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Return combined response (supports both new and legacy consumers)
+    return new Response(
+      JSON.stringify({ ...legacyResponse, ...plannerResponse }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
   } catch (error) {
-    console.error('Error in sequencer-rank:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('Error:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });

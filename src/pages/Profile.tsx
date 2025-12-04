@@ -79,8 +79,6 @@ export default function Profile() {
         .from('staff')
         .update({
           name: profile.name,
-          organization: profile.organization,
-          location: profile.location
         })
         .eq('user_id', user.id);
 
@@ -191,11 +189,11 @@ export default function Profile() {
               <Input
                 id="organization"
                 value={profile.organization || ''}
-                onChange={(e) => setProfile({ ...profile, organization: e.target.value })}
-                disabled={!editMode}
-                placeholder="Your organization"
+                disabled
+                className="bg-muted"
               />
             </div>
+            <p className="text-xs text-muted-foreground">Contact your manager to change organization</p>
           </div>
 
           <div className="space-y-2">
@@ -205,11 +203,11 @@ export default function Profile() {
               <Input
                 id="location"
                 value={profile.location || ''}
-                onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-                disabled={!editMode}
-                placeholder="Your primary location"
+                disabled
+                className="bg-muted"
               />
             </div>
+            <p className="text-xs text-muted-foreground">Contact your manager to change location</p>
           </div>
 
           {profile.role_name && (

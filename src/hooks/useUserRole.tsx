@@ -14,6 +14,7 @@ export function useUserRole() {
       isParticipant: false,
       isLead: false,
       managedLocationIds: [] as string[],
+      managedOrgIds: [] as string[],
       homeRoute: '/',
       showRegionalDashboard: false,
       canAccessAdmin: false,
@@ -22,7 +23,8 @@ export function useUserRole() {
 
   // Derive persona from coach_scopes
   const scopes = staff.coach_scopes || [];
-  const hasOrgScope = scopes.some(s => s.scope_type === 'org');
+  const orgScopes = scopes.filter(s => s.scope_type === 'org');
+  const hasOrgScope = orgScopes.length > 0;
   const locationScopes = scopes.filter(s => s.scope_type === 'location');
   const locationScopeCount = locationScopes.length;
 
@@ -37,6 +39,9 @@ export function useUserRole() {
 
   // Get list of managed location IDs (for filtering data)
   const managedLocationIds = locationScopes.map(s => s.scope_id);
+  
+  // Get list of managed org IDs (for org-level filtering)
+  const managedOrgIds = orgScopes.map(s => s.scope_id);
 
   // Determine if this user should see the regional dashboard
   // Non-participants who are coaches/regional managers
@@ -55,6 +60,7 @@ export function useUserRole() {
     isParticipant,
     isLead,
     managedLocationIds,
+    managedOrgIds,
     homeRoute: isParticipant ? '/' : '/dashboard',
     showRegionalDashboard,
     canAccessAdmin,

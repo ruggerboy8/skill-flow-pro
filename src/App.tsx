@@ -40,6 +40,7 @@ import StatsLayout from "@/pages/StatsLayout";
 import AtAGlance from "@/pages/stats/AtAGlance";
 import StatsScores from "@/pages/StatsScores";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
+import LocationDetail from "@/pages/dashboard/LocationDetail";
 
 // App routes with pre-routing checks for public pages
 function AppRoutes() {
@@ -100,6 +101,9 @@ function AppRoutes() {
           <Route path=":staffId" element={<StaffDetailV2 />} />
           <Route path=":staffId/eval/:evalId" element={<EvaluationHub />} />
         </Route>
+
+        {/* Dashboard Routes */}
+        <Route path="dashboard/location/:locationId" element={<LocationDetail />} />
 
         <Route path="admin" element={<AdminPage />} />
         <Route path="admin/eval-results" element={<EvalResults />} />

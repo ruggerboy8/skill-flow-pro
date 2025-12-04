@@ -39,7 +39,7 @@ export function LocationHealthCard({ stats }: LocationHealthCardProps) {
         "cursor-pointer hover:shadow-md transition-all border-2",
         getStatusClasses(stats.submissionRate)
       )}
-      onClick={() => navigate(`/coach?loc=${encodeURIComponent(stats.name)}`)}
+      onClick={() => navigate(`/dashboard/location/${stats.id}`)}
     >
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">

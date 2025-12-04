@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { useUserRole } from '@/hooks/useUserRole';
 import { LocationHealthCard, LocationStats } from '@/components/dashboard/LocationHealthCard';
@@ -6,12 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertCircle, TrendingUp } from 'lucide-react';
-import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { getWeekAnchors, nowUtc, CT_TZ } from '@/lib/centralTime';
+import { getSubmissionGates, calculateMissingCounts } from '@/lib/submissionStatus';
 
 export default function RegionalDashboard() {
+  const navigate = useNavigate();
   const { managedLocationIds, managedOrgIds, isSuperAdmin } = useUserRole();
   const [now, setNow] = useState(nowUtc());
 
@@ -50,25 +52,15 @@ export default function RegionalDashboard() {
       byLocation.get(s.location_id)!.push(s);
     });
 
-    // Time-based "missing" logic
-    const isPastConfidenceDeadline = now >= anchors.confidence_deadline;
-    const isPerformanceOpen = now >= anchors.checkout_open;
-
-    // Calculate stats per location
+    // Calculate stats per location using shared utils
+    const gates = getSubmissionGates(now, anchors);
+    
     const stats: LocationStats[] = Array.from(byLocation.entries()).map(([locId, staff]) => {
       const totalSlots = staff.reduce((sum, s) => sum + s.assignment_count, 0);
       const completedSlots = staff.reduce((sum, s) => sum + Math.min(s.conf_count, s.perf_count), 0);
       const submissionRate = totalSlots > 0 ? (completedSlots / totalSlots) * 100 : 0;
       
-      // Count STAFF members missing confidence (only after Tue deadline)
-      const missingConfCount = isPastConfidenceDeadline 
-        ? staff.filter(s => s.conf_count < s.assignment_count).length 
-        : 0;
-      
-      // Count STAFF members missing performance (only after Thu open)
-      const missingPerfCount = isPerformanceOpen 
-        ? staff.filter(s => s.perf_count < s.assignment_count).length 
-        : 0;
+      const { missingConfCount, missingPerfCount } = calculateMissingCounts(staff, gates);
       
       return {
         id: locId,

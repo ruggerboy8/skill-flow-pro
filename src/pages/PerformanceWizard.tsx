@@ -39,9 +39,11 @@ interface Assignment {
 interface Staff {
   id: string;
   role_id: number;
+  primary_location_id?: string;
   locations?: {
     program_start_date?: string;
     cycle_length_weeks?: number;
+    timezone?: string;
   };
 }
 
@@ -131,15 +133,32 @@ export default function PerformanceWizard() {
     }
   }, [user, n]);
 
-  // Removed time gating - allow access anytime
+  // Time gate: Block performance access until Thursday 00:01 (except repair mode)
+  useEffect(() => {
+    // Skip time gate for repair mode (backfilling past data)
+    if (isRepair) return;
+    
+    // Skip if staff not loaded yet
+    if (!staff?.locations?.timezone) return;
+    
+    const { checkout_open } = getWeekAnchors(effectiveNow, staff.locations.timezone);
+    
+    if (effectiveNow < checkout_open) {
+      toast({
+        title: "Not Open Yet",
+        description: "Performance ratings open on Thursday.",
+      });
+      navigate('/');
+    }
+  }, [effectiveNow, staff, isRepair, navigate, toast]);
 
   const loadData = async () => {
     if (!user) return;
 
-    // Load staff profile with location info
+    // Load staff profile with location info (including timezone for time gating)
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
-      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks)')
+      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks, timezone)')
       .eq('user_id', user.id)
       .maybeSingle();
 

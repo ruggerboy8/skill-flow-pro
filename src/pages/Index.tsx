@@ -22,7 +22,15 @@ export default function Index() {
 
         <ThisWeekPanel />
         
-        {/* Future space for notes, learning resources, etc. */}
+        {/* Deadline disclaimer */}
+        <div className="mt-4 rounded-lg border border-border bg-muted/50 p-4 text-center">
+          <p className="text-sm text-muted-foreground">
+            ProMove scores are due on the same day as your Check In/Out meeting.
+          </p>
+          <p className="text-xs text-muted-foreground/80 mt-1">
+            Scores submitted any other time are marked late.
+          </p>
+        </div>
       </div>
       
       <SimFloatingButton isAdmin={user?.email === 'johno@reallygoodconsulting.org' || user?.email === 'ryanjoberly@gmail.com'} />

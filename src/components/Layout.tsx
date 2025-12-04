@@ -10,7 +10,7 @@ import { Home, BarChart3, User, Settings, Users, TrendingUp, Shield } from 'luci
 // Server-side backfill detection via RPC
 
 export default function Layout() {
-  const { user, signOut, isCoach, isSuperAdmin, isLead, roleLoading, refreshRoles } = useAuth();
+  const { user, signOut, isCoach, isSuperAdmin, isOrgAdmin, isLead, roleLoading, refreshRoles } = useAuth();
   const location = useLocation();
   const { toast } = useToast();
 
@@ -27,14 +27,17 @@ export default function Layout() {
     }
   });
 
+  // Can access admin = super admin OR org admin
+  const canAccessAdmin = isSuperAdmin || isOrgAdmin;
+
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Stats', href: '/stats', icon: BarChart3 },
     // Backfill nav removed - keeping function for individual score backfill only
-    ...(isCoach || isSuperAdmin || isLead ? [
+    ...(isCoach || isSuperAdmin || isOrgAdmin || isLead ? [
       { name: 'Coach', href: '/coach', icon: Users },
     ] : []),
-    ...(isSuperAdmin ? [
+    ...(canAccessAdmin ? [
       { name: 'Builder', href: '/builder', icon: Settings },
       { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Eval Results', href: '/admin/eval-results', icon: TrendingUp }

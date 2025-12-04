@@ -13,6 +13,7 @@ export interface StaffProfile {
   coach_scope_type: string | null;
   coach_scope_id: string | null;
   is_super_admin: boolean;
+  is_org_admin: boolean;
   is_participant: boolean;
   is_coach: boolean;
   is_lead: boolean;
@@ -57,6 +58,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           coach_scope_type,
           coach_scope_id,
           is_super_admin,
+          is_org_admin,
           is_participant,
           is_coach,
           is_lead,

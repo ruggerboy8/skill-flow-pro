@@ -1073,6 +1073,7 @@ export type Database = {
           id: string
           is_coach: boolean
           is_lead: boolean
+          is_org_admin: boolean
           is_participant: boolean
           is_super_admin: boolean
           location: string | null
@@ -1095,6 +1096,7 @@ export type Database = {
           id?: string
           is_coach?: boolean
           is_lead?: boolean
+          is_org_admin?: boolean
           is_participant?: boolean
           is_super_admin?: boolean
           location?: string | null
@@ -1117,6 +1119,7 @@ export type Database = {
           id?: string
           is_coach?: boolean
           is_lead?: boolean
+          is_org_admin?: boolean
           is_participant?: boolean
           is_super_admin?: boolean
           location?: string | null
@@ -2616,6 +2619,7 @@ export type Database = {
           performance_score: number
         }[]
       }
+      is_admin: { Args: { check_user_id: string }; Returns: boolean }
       is_coach_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_eligible_for_pro_moves: {
         Args: {

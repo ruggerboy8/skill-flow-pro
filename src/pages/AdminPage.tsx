@@ -20,7 +20,7 @@ export default function AdminPage() {
   const activeTab = searchParams.get("tab") || "users";
 
   useEffect(() => {
-    const checkSuperAdminStatus = async () => {
+    const checkAdminStatus = async () => {
       if (!user) {
         navigate("/");
         return;
@@ -29,25 +29,26 @@ export default function AdminPage() {
       try {
         const { data: staffData, error } = await supabase
           .from("staff")
-          .select("is_super_admin")
+          .select("is_super_admin, is_org_admin")
           .eq("user_id", user.id)
           .single();
 
-        if (error || !staffData?.is_super_admin) {
+        // Allow access if user is super admin OR org admin
+        if (error || (!staffData?.is_super_admin && !staffData?.is_org_admin)) {
           navigate("/");
           return;
         }
 
         setIsSuperAdmin(true);
       } catch (error) {
-        console.error("Error checking super admin status:", error);
+        console.error("Error checking admin status:", error);
         navigate("/");
       } finally {
         setLoading(false);
       }
     };
 
-    checkSuperAdminStatus();
+    checkAdminStatus();
   }, [user, navigate]);
 
   const handleTabChange = (value: string) => {

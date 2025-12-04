@@ -47,7 +47,7 @@ serve(async (req: Request) => {
 
   const { data: me, error: meErr } = await caller
     .from("staff")
-    .select("is_super_admin, user_id, name")
+    .select("is_super_admin, is_org_admin, user_id, name")
     .eq("user_id", authUser.user.id)
     .maybeSingle();
 
@@ -63,9 +63,10 @@ serve(async (req: Request) => {
     return json({ error: "No staff record found for this user" }, 403);
   }
   
-  if (!me.is_super_admin) {
-    console.log("User is not super admin:", me);
-    return json({ error: "Forbidden: Super admin required" }, 403);
+  // Allow access for super admin OR org admin
+  if (!me.is_super_admin && !me.is_org_admin) {
+    console.log("User is not an admin:", me);
+    return json({ error: "Forbidden: Admin access required" }, 403);
   }
 
   const payload = await safeJson(req);
@@ -92,7 +93,7 @@ serve(async (req: Request) => {
 
         let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_coach,is_lead,is_participant,coach_scope_type,coach_scope_id,roles(role_name),locations(name,organization_id)", {
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,coach_scope_type,coach_scope_id,roles(role_name),locations(name,organization_id)", {
             count: "exact",
           })
           .order("name", { ascending: true });
@@ -187,6 +188,7 @@ serve(async (req: Request) => {
             location_name: s.locations?.name ?? null,
             organization_id: s.locations?.organization_id ?? null,
             is_super_admin: s.is_super_admin ?? false,
+            is_org_admin: s.is_org_admin ?? false,
             is_coach: s.is_coach ?? false,
             is_lead: s.is_lead ?? false,
             is_participant: s.is_participant ?? true,
@@ -308,8 +310,8 @@ serve(async (req: Request) => {
         if (fetchErr) throw fetchErr;
         if (!currentStaff) return json({ error: "Staff not found" }, 404);
         
-        // Validate scope requirements for lead, coach, and coach_participant
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant") && (!coach_scope_type || !coach_scope_ids || !Array.isArray(coach_scope_ids) || coach_scope_ids.length === 0)) {
+        // Validate scope requirements for lead, coach, coach_participant, and regional_manager
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") && (!coach_scope_type || !coach_scope_ids || !Array.isArray(coach_scope_ids) || coach_scope_ids.length === 0)) {
           return json({ error: "Scope type and at least one scope ID are required for this action." }, 422);
         }
         
@@ -332,6 +334,7 @@ serve(async (req: Request) => {
             is_participant: true,
             is_lead: false,
             is_coach: false,
+            is_org_admin: false,
             is_super_admin: false,
             coach_scope_type: null,
             coach_scope_id: null,
@@ -341,6 +344,7 @@ serve(async (req: Request) => {
             is_participant: true,
             is_lead: true,
             is_coach: false,
+            is_org_admin: false,
             is_super_admin: false,
             coach_scope_type: null,
             coach_scope_id: null,
@@ -350,6 +354,7 @@ serve(async (req: Request) => {
             is_participant: false,
             is_lead: false,
             is_coach: true,
+            is_org_admin: false,
             is_super_admin: false,
             coach_scope_type: null,
             coach_scope_id: null,
@@ -359,15 +364,27 @@ serve(async (req: Request) => {
             is_participant: true,
             is_lead: false,
             is_coach: true,
+            is_org_admin: false,
             is_super_admin: false,
             coach_scope_type: null,
             coach_scope_id: null,
             home_route: '/coach',
           },
+          regional_manager: {
+            is_participant: false,
+            is_lead: false,
+            is_coach: true,
+            is_org_admin: true,
+            is_super_admin: false,
+            coach_scope_type: null,
+            coach_scope_id: null,
+            home_route: '/dashboard',
+          },
           super_admin: {
             is_participant: false,
             is_lead: false,
             is_coach: false,
+            is_org_admin: false,
             is_super_admin: true,
             coach_scope_type: null,
             coach_scope_id: null,
@@ -418,7 +435,7 @@ serve(async (req: Request) => {
         }
         
         // Sync scope to staff table for RPC compatibility (get_coach_roster_summary uses staff.coach_scope_*)
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant") && 
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") && 
             coach_scope_type && coach_scope_ids && coach_scope_ids.length > 0) {
           // Map 'org' -> 'organization' for consistency with RPC expectations
           updates.coach_scope_type = coach_scope_type === 'org' ? 'organization' : 'location';
@@ -447,7 +464,7 @@ serve(async (req: Request) => {
         }
         
         // Handle coach_scopes junction table
-        if (preset === "lead" || preset === "coach" || preset === "coach_participant") {
+        if (preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") {
           // Delete existing scopes
           const { error: deleteErr } = await admin
             .from("coach_scopes")

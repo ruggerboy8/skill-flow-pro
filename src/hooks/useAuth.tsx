@@ -11,6 +11,7 @@ interface AuthContextType {
   needsProfileSetup: boolean;
   isCoach: boolean;
   isSuperAdmin: boolean;
+  isOrgAdmin: boolean;
   isParticipant: boolean;
   isLead: boolean;
   signInWithOtp: (email: string) => Promise<{ error: any }>;
@@ -32,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [isCoach, setIsCoach] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isOrgAdmin, setIsOrgAdmin] = useState(false);
   const [isParticipant, setIsParticipant] = useState(true);
   const [isLead, setIsLead] = useState(false);
 
@@ -41,13 +43,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data } = await supabase
           .from('staff')
-          .select('is_coach, is_super_admin, is_participant, is_lead, name, role_id, primary_location_id')
+          .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead, name, role_id, primary_location_id')
           .eq('user_id', userId)
           .single();
         
         if (data) {
-          setIsCoach(data.is_coach || data.is_super_admin);
+          setIsCoach(data.is_coach || data.is_super_admin || data.is_org_admin);
           setIsSuperAdmin(data.is_super_admin);
+          setIsOrgAdmin(data.is_org_admin || false);
           setIsParticipant(data.is_participant);
           setIsLead(data.is_lead || false);
           // Check if profile is complete
@@ -57,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setNeedsProfileSetup(true);
           setIsCoach(false);
           setIsSuperAdmin(false);
+          setIsOrgAdmin(false);
           setIsParticipant(true);
           setIsLead(false);
         }
@@ -88,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setNeedsProfileSetup(false);
           setIsCoach(false);
           setIsSuperAdmin(false);
+          setIsOrgAdmin(false);
           setIsParticipant(true);
           setIsLead(false);
         }
@@ -117,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setNeedsProfileSetup(false);
         setIsCoach(false);
         setIsSuperAdmin(false);
+        setIsOrgAdmin(false);
         setIsParticipant(true);
         setIsLead(false);
       }
@@ -184,13 +190,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await supabase
         .from('staff')
-        .select('is_coach, is_super_admin, is_participant, is_lead, name, role_id, primary_location_id')
+        .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead, name, role_id, primary_location_id')
         .eq('user_id', user.id)
         .single();
       
       if (data) {
-        setIsCoach(data.is_coach || data.is_super_admin);
+        setIsCoach(data.is_coach || data.is_super_admin || data.is_org_admin);
         setIsSuperAdmin(data.is_super_admin);
+        setIsOrgAdmin(data.is_org_admin || false);
         setIsParticipant(data.is_participant);
         setIsLead(data.is_lead || false);
         setNeedsProfileSetup(false);
@@ -198,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setNeedsProfileSetup(true);
         setIsCoach(false);
         setIsSuperAdmin(false);
+        setIsOrgAdmin(false);
         setIsParticipant(true);
         setIsLead(false);
       }
@@ -218,6 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       needsProfileSetup,
       isCoach,
       isSuperAdmin,
+      isOrgAdmin,
       isParticipant,
       isLead,
       signInWithOtp,

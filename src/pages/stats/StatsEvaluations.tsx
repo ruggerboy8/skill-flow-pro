@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
 import { useNavigate } from 'react-router-dom';
@@ -24,26 +24,21 @@ type EvalRow = {
 };
 
 export default function StatsEvaluations() {
-  const { user } = useAuth();
+  // Use staff profile which respects masquerade/simulation
+  const { data: staffProfile, isLoading: profileLoading } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [evals, setEvals] = useState<EvalRow[]>([]);
 
   useEffect(() => {
-    if (!user) return;
+    if (profileLoading) return;
+    if (!staffProfile?.id) { setLoading(false); return; }
+    
     (async () => {
       try {
-        // get staff id
-        const { data: staff } = await supabase
-          .from('staff')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (!staff) { setLoading(false); return; }
-
         // RPC with p_only_submitted = true to get submitted evaluations only
         const { data } = await supabase.rpc('get_evaluations_summary', { 
-          p_staff_id: staff.id,
+          p_staff_id: staffProfile.id,
           p_only_submitted: true 
         });
 
@@ -67,7 +62,7 @@ export default function StatsEvaluations() {
               label: `${header} • ${when}`,
               status: 'submitted', // Only submitted evaluations now
               domains: [],
-              staff_id: staff.id
+              staff_id: staffProfile.id
             });
           }
           map.get(r.eval_id)!.domains.push({
@@ -87,7 +82,7 @@ export default function StatsEvaluations() {
         setLoading(false);
       }
     })();
-  }, [user]);
+  }, [staffProfile?.id, profileLoading]);
 
   if (loading) {
     return (

@@ -29,6 +29,7 @@ interface MyWeeklyScore {
 
 interface UseMyWeeklyScoresOptions {
   weekOf?: string | null;
+  staffId?: string | null; // Optional staff ID for simulation/masquerade
 }
 
 export function useMyWeeklyScores(options: UseMyWeeklyScoresOptions = {}) {
@@ -36,18 +37,21 @@ export function useMyWeeklyScores(options: UseMyWeeklyScoresOptions = {}) {
   const [weekSummaries, setWeekSummaries] = useState<Map<string, StaffWeekSummary>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { weekOf } = options;
+  const { weekOf, staffId } = options;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_my_weekly_scores', { 
-          p_week_of: weekOf || null
-        })
-        .limit(10000);
+      // If staffId is provided, use get_staff_all_weekly_scores RPC instead
+      const { data: rpcData, error: rpcError } = staffId
+        ? await supabase
+            .rpc('get_staff_all_weekly_scores', { p_staff_id: staffId })
+            .limit(10000)
+        : await supabase
+            .rpc('get_my_weekly_scores', { p_week_of: weekOf || null })
+            .limit(10000);
 
       if (rpcError) {
         console.error('[useMyWeeklyScores] RPC error:', rpcError);
@@ -123,7 +127,7 @@ export function useMyWeeklyScores(options: UseMyWeeklyScoresOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [weekOf]);
+  }, [weekOf, staffId]);
 
   useEffect(() => {
     load();

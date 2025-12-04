@@ -618,8 +618,8 @@ export async function computeWeekState(params: {
       ? (latestConf.at > latestPerf.at ? latestConf : latestPerf)
       : (latestConf ?? latestPerf);
 
-  // Get backlog count with simulation support
-  const backlogResult = await getOpenBacklogCountV2(staffId, simOverrides);
+  // Get backlog count
+  const backlogResult = await getOpenBacklogCountV2(staffId);
   const backlogCount = backlogResult.count;
 
   // Check for selection pending

@@ -62,29 +62,29 @@ export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSki
 
   function SkillGapCard({ gap }: { gap: SkillGap }) {
     const domainColor = getDomainColor(gap.domain_name);
-    const truncatedStatement = gap.action_statement?.length > 80 
-      ? gap.action_statement.substring(0, 80) + '...'
-      : gap.action_statement;
 
     return (
-      <div className="p-3 border rounded-lg bg-card space-y-2">
+      <div 
+        className="p-3 border rounded-lg space-y-2"
+        style={{ 
+          backgroundColor: `${domainColor}15`,
+          borderColor: `${domainColor}40`
+        }}
+      >
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium leading-tight flex-1">{truncatedStatement}</p>
+          <p className="text-sm font-medium leading-tight flex-1">{gap.action_statement}</p>
           <Badge 
             variant="outline" 
-            className={getConfidenceColor(gap.avg_confidence)}
+            className={`shrink-0 ${getConfidenceColor(gap.avg_confidence)}`}
           >
             {gap.avg_confidence.toFixed(1)} / 4
           </Badge>
         </div>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <Badge 
-            variant="outline" 
-            className="text-xs"
+            className="text-xs text-white"
             style={{ 
-              backgroundColor: `${domainColor}20`,
-              borderColor: domainColor,
-              color: domainColor 
+              backgroundColor: domainColor,
             }}
           >
             {gap.domain_name}

@@ -102,11 +102,11 @@ export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSki
     );
   }
 
-  function GapList({ items }: { items: SkillGap[] }) {
+  function GapList({ items, roleName }: { items: SkillGap[], roleName?: string }) {
     if (items.length === 0) {
       return (
         <p className="text-sm text-muted-foreground text-center py-4">
-          No skill data available for this period
+          {roleName ? `No ${roleName} data at this location` : 'No skill data available'}
         </p>
       );
     }
@@ -162,10 +162,10 @@ export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSki
             <TabsTrigger value="rda" className="flex-1">RDA</TabsTrigger>
           </TabsList>
           <TabsContent value="dfi" className="mt-3">
-            <GapList items={dfiGaps} />
+            <GapList items={dfiGaps} roleName="DFI" />
           </TabsContent>
           <TabsContent value="rda" className="mt-3">
-            <GapList items={rdaGaps} />
+            <GapList items={rdaGaps} roleName="RDA" />
           </TabsContent>
         </Tabs>
       </CardContent>

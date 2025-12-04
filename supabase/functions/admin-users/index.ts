@@ -292,7 +292,7 @@ serve(async (req: Request) => {
       }
 
       case "role_preset": {
-        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date } = payload ?? {};
+        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date, name, email } = payload ?? {};
         
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
@@ -410,6 +410,12 @@ serve(async (req: Request) => {
         if (hire_date !== undefined) {
           updates.hire_date = hire_date;
         }
+        if (name) {
+          updates.name = name;
+        }
+        if (email) {
+          updates.email = email;
+        }
         
         // Sync scope to staff table for RPC compatibility (get_coach_roster_summary uses staff.coach_scope_*)
         if ((preset === "lead" || preset === "coach" || preset === "coach_participant") && 
@@ -429,6 +435,16 @@ serve(async (req: Request) => {
           .maybeSingle();
         
         if (updateErr) throw updateErr;
+        
+        // Update auth email if changed
+        if (email && email !== currentStaff.email) {
+          console.log(`Updating auth email for user ${user_id} to ${email}`);
+          const { error: authUpdateErr } = await admin.auth.admin.updateUserById(user_id, { email });
+          if (authUpdateErr) {
+            console.warn("Failed to update auth email:", authUpdateErr);
+            // Don't throw - staff record was updated, just log the auth update failure
+          }
+        }
         
         // Handle coach_scopes junction table
         if (preset === "lead" || preset === "coach" || preset === "coach_participant") {

@@ -56,9 +56,15 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const [scopeType, setScopeType] = useState<'org' | 'location'>('org');
   const [scopeIds, setScopeIds] = useState<string[]>([]);
   const [hireDate, setHireDate] = useState<string>('');
+  const [editName, setEditName] = useState<string>('');
+  const [editEmail, setEditEmail] = useState<string>('');
 
   useEffect(() => {
     if (user && open) {
+      // Initialize editable fields
+      setEditName(user.name || '');
+      setEditEmail(user.email || '');
+      
       // Determine current action from flags
       if (user.is_super_admin) {
         setSelectedAction('super_admin');
@@ -108,6 +114,8 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         user_id: user.user_id,
         preset: selectedAction,
         hire_date: hireDate || null,
+        name: editName.trim() || null,
+        email: editEmail.trim() || null,
       };
       
       if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant') {
@@ -213,12 +221,35 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             <div className="flex items-center gap-2">
               {getCurrentStatusBadge()}
             </div>
-            <div className="text-sm space-y-1">
-              <p className="text-muted-foreground">{user.email || "No email"}</p>
-              {getScopeText() && (
-                <p className="text-xs text-muted-foreground">{getScopeText()}</p>
-              )}
-            </div>
+            {getScopeText() && (
+              <p className="text-xs text-muted-foreground">{getScopeText()}</p>
+            )}
+          </div>
+
+          {/* Name */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-name">Name</Label>
+            <Input
+              id="edit-name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="User's full name"
+            />
+          </div>
+
+          {/* Email */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-email">Email</Label>
+            <Input
+              id="edit-email"
+              type="email"
+              value={editEmail}
+              onChange={(e) => setEditEmail(e.target.value)}
+              placeholder="user@example.com"
+            />
+            <p className="text-xs text-muted-foreground">
+              Changing email will update both the staff record and auth account
+            </p>
           </div>
 
           {/* Hire Date */}

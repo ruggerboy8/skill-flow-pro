@@ -46,9 +46,27 @@ export function calculateLocationStats(
   avgPerformance: number;
 } {
   const staffCount = staff.length;
-  const totalSlots = staff.reduce((sum, s) => sum + s.assignment_count, 0);
-  const completedSlots = staff.reduce((sum, s) => sum + Math.min(s.conf_count, s.perf_count), 0);
-  const submissionRate = totalSlots > 0 ? (completedSlots / totalSlots) * 100 : 0;
+  
+  // Time-gated submission rate calculation
+  // Before Thursday: only count confidence (X conf submitted / X slots)
+  // After Thursday: count both (X conf + X perf submitted / 2X slots)
+  let totalRequired = 0;
+  let totalSubmitted = 0;
+  
+  staff.forEach(s => {
+    // Confidence is always counted once it's past the deadline
+    if (gates.isPastConfidenceDeadline) {
+      totalRequired += s.assignment_count;
+      totalSubmitted += s.conf_count;
+    }
+    // Performance only counted after Thursday
+    if (gates.isPerformanceOpen) {
+      totalRequired += s.assignment_count;
+      totalSubmitted += s.perf_count;
+    }
+  });
+  // If nothing is due yet, show 100% (everyone on track)
+  const submissionRate = totalRequired > 0 ? (totalSubmitted / totalRequired) * 100 : 100;
   
   const { missingConfCount, missingPerfCount } = calculateMissingCounts(staff, gates);
   

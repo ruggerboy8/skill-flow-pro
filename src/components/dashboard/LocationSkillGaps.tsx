@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
 
@@ -18,22 +19,27 @@ interface SkillGap {
 
 interface LocationSkillGapsProps {
   locationId: string;
-  lookbackWeeks?: number;
 }
 
-export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSkillGapsProps) {
+type LookbackOption = '3' | '6' | 'all';
+
+export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
   const [gaps, setGaps] = useState<SkillGap[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lookback, setLookback] = useState<LookbackOption>('6');
 
   useEffect(() => {
     async function fetchGaps() {
       setLoading(true);
       setError(null);
       
+      // Convert lookback option to weeks (52 * 5 = 260 weeks ≈ 5 years for "all time")
+      const weeks = lookback === 'all' ? 260 : parseInt(lookback);
+      
       const { data, error: err } = await supabase.rpc('get_location_skill_gaps', {
         p_location_id: locationId,
-        p_lookback_weeks: lookbackWeeks,
+        p_lookback_weeks: weeks,
         p_limit_per_role: 3,
       });
 
@@ -49,10 +55,12 @@ export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSki
     if (locationId) {
       fetchGaps();
     }
-  }, [locationId, lookbackWeeks]);
+  }, [locationId, lookback]);
 
   const dfiGaps = gaps.filter(g => g.role_name === 'DFI');
   const rdaGaps = gaps.filter(g => g.role_name === 'RDA');
+
+  const lookbackLabel = lookback === 'all' ? 'all time' : `${lookback} weeks`;
 
   function getConfidenceColor(avg: number): string {
     if (avg < 2.0) return 'bg-red-100 text-red-800 border-red-200';
@@ -150,10 +158,31 @@ export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSki
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Priority Focus Areas</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Lowest confidence skills over {lookbackWeeks} weeks
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">Priority Focus Areas</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Lowest confidence skills over {lookbackLabel}
+            </p>
+          </div>
+          <ToggleGroup 
+            type="single" 
+            value={lookback} 
+            onValueChange={(v) => v && setLookback(v as LookbackOption)}
+            size="sm"
+            className="gap-0"
+          >
+            <ToggleGroupItem value="3" className="text-xs px-2 h-7 rounded-r-none">
+              3 wks
+            </ToggleGroupItem>
+            <ToggleGroupItem value="6" className="text-xs px-2 h-7 rounded-none border-x-0">
+              6 wks
+            </ToggleGroupItem>
+            <ToggleGroupItem value="all" className="text-xs px-2 h-7 rounded-l-none">
+              All
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="dfi">

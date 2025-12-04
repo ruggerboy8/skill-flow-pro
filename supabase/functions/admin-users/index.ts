@@ -437,8 +437,8 @@ serve(async (req: Request) => {
         // Sync scope to staff table for RPC compatibility (get_coach_roster_summary uses staff.coach_scope_*)
         if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") && 
             coach_scope_type && coach_scope_ids && coach_scope_ids.length > 0) {
-          // Map 'org' -> 'organization' for consistency with RPC expectations
-          updates.coach_scope_type = coach_scope_type === 'org' ? 'organization' : 'location';
+          // Keep scope_type as 'org' or 'location' - must match staff_coach_scope_type_check constraint
+          updates.coach_scope_type = coach_scope_type;
           // Store the first scope ID (primary scope for RPCs)
           updates.coach_scope_id = coach_scope_ids[0];
           console.log(`Syncing scope to staff table: type=${updates.coach_scope_type}, id=${updates.coach_scope_id}`);

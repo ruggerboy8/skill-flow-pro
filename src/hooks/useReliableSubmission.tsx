@@ -104,6 +104,39 @@ export function useReliableSubmission() {
   const writeWeeklyScores = async (updates: ScoreUpdate[]) => {
     if (!updates?.length) return;
     
+    // Extract assignment IDs that need validation
+    const assignmentIds = updates
+      .map(u => u.weekly_focus_id)
+      .filter(id => /^assign:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+      .map(id => id.replace('assign:', ''));
+    
+    // Validate assignment IDs exist and are not superseded (prevents stale session submissions)
+    if (assignmentIds.length > 0) {
+      const { data: validAssignments, error: validationError } = await supabase
+        .from('weekly_assignments')
+        .select('id')
+        .in('id', assignmentIds)
+        .is('superseded_at', null);
+      
+      if (validationError) {
+        console.error('[Submission] Error validating assignments:', validationError);
+        throw validationError;
+      }
+      
+      const validIds = new Set(validAssignments?.map(a => a.id) || []);
+      const invalidIds = assignmentIds.filter(id => !validIds.has(id));
+      
+      if (invalidIds.length > 0) {
+        console.error('[Submission] Stale assignment IDs detected:', invalidIds);
+        toast({
+          title: 'Session expired',
+          description: 'Your session is stale. Please refresh the page and try again.',
+          variant: 'destructive',
+        });
+        throw new Error('STALE_SESSION: Assignment IDs are no longer valid. Please refresh the page.');
+      }
+    }
+    
     // Validate and enrich updates before sending
     const enrichedUpdates = await Promise.all(updates.map(async (update) => {
       const focusId = update.weekly_focus_id;

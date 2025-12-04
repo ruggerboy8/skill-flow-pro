@@ -11,6 +11,7 @@ import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
 import { useAuth } from '@/hooks/useAuth';
 import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 import { QuarterlyEvalsTab } from '@/components/coach/QuarterlyEvalsTab';
+import { StaffPriorityFocusTab } from '@/components/coach/StaffPriorityFocusTab';
 import { RawScoreRow } from '@/types/coachV2';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
@@ -22,7 +23,7 @@ export default function StaffDetailV2() {
   const { user } = useAuth();
   const selectedWeek = searchParams.get('week');
 
-  const { weekSummaries, loading, error } = useStaffAllWeeklyScores({ staffId });
+  const { rawData, weekSummaries, loading, error } = useStaffAllWeeklyScores({ staffId });
 
   // Get staff info from first available summary
   const staffInfo = useMemo(() => {
@@ -156,6 +157,7 @@ export default function StaffDetailV2() {
       <Tabs defaultValue="history" className="space-y-6">
         <TabsList>
           <TabsTrigger value="history">Performance History</TabsTrigger>
+          <TabsTrigger value="focus">Priority Focus</TabsTrigger>
           <TabsTrigger value="evaluations">Quarterly Evaluations</TabsTrigger>
         </TabsList>
 
@@ -266,6 +268,10 @@ export default function StaffDetailV2() {
               </Card>
             ))
           )}
+        </TabsContent>
+
+        <TabsContent value="focus">
+          <StaffPriorityFocusTab rawData={rawData} />
         </TabsContent>
 
         <TabsContent value="evaluations">

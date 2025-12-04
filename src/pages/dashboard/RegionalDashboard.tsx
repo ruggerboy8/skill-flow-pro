@@ -7,8 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertCircle, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { StaffWeekSummary } from '@/types/coachV2';
-import { getWeekAnchors, nowUtc } from '@/lib/centralTime';
+import { getWeekAnchors, nowUtc, CT_TZ } from '@/lib/centralTime';
 
 export default function RegionalDashboard() {
   const { managedLocationIds, managedOrgIds, isSuperAdmin } = useUserRole();
@@ -22,7 +23,10 @@ export default function RegionalDashboard() {
   
   // Use Central Time anchors for the correct "Week Of" date
   const anchors = useMemo(() => getWeekAnchors(now), [now]);
-  const weekOf = format(anchors.mondayZ, 'yyyy-MM-dd');
+  const weekOf = formatInTimeZone(anchors.mondayZ, CT_TZ, 'yyyy-MM-dd');
+  
+  // Debug: log what we're getting
+  console.log('[RegionalDashboard] weekOf:', weekOf, 'managedOrgIds:', managedOrgIds, 'managedLocationIds:', managedLocationIds);
   
   // Reuse existing hook - no new RPC needed
   const { summaries, loading, error } = useStaffWeeklyScores({ weekOf });
@@ -30,6 +34,8 @@ export default function RegionalDashboard() {
   // Aggregate by location client-side
   const { locationStats, totals } = useMemo(() => {
     const byLocation = new Map<string, StaffWeekSummary[]>();
+    
+    console.log('[RegionalDashboard] summaries:', summaries.length, 'isSuperAdmin:', isSuperAdmin, 'managedOrgIds:', managedOrgIds, 'managedLocationIds:', managedLocationIds);
     
     summaries.forEach(s => {
       // Only super admins get truly unrestricted access
@@ -39,6 +45,7 @@ export default function RegionalDashboard() {
         const hasLocationAccess = managedLocationIds.includes(s.location_id);
         
         if (!hasOrgAccess && !hasLocationAccess) {
+          console.log('[RegionalDashboard] Filtered out:', s.staff_name, 'org:', s.organization_id, 'loc:', s.location_id);
           return; // Filter out
         }
       }
@@ -48,6 +55,8 @@ export default function RegionalDashboard() {
       }
       byLocation.get(s.location_id)!.push(s);
     });
+    
+    console.log('[RegionalDashboard] Locations after filter:', byLocation.size);
 
     // Time-based "missing" logic
     const isPastConfidenceDeadline = now >= anchors.confidence_deadline;
@@ -141,7 +150,7 @@ export default function RegionalDashboard() {
           <div>
             <h1 className="text-2xl font-bold">Regional Command Center</h1>
             <p className="text-muted-foreground text-sm">
-              Week of {format(anchors.mondayZ, 'MMM d, yyyy')}
+              Week of {formatInTimeZone(anchors.mondayZ, CT_TZ, 'MMM d, yyyy')}
             </p>
           </div>
           <Badge variant="outline" className="text-sm">

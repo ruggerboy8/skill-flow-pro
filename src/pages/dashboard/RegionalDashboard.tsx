@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { useUserRole } from '@/hooks/useUserRole';
 import { LocationHealthCard, LocationStats } from '@/components/dashboard/LocationHealthCard';
@@ -6,14 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertCircle, TrendingUp } from 'lucide-react';
-import { format, startOfWeek } from 'date-fns';
+import { format } from 'date-fns';
 import { StaffWeekSummary } from '@/types/coachV2';
+import { getWeekAnchors, nowUtc } from '@/lib/centralTime';
 
 export default function RegionalDashboard() {
-  const { managedLocationIds, isOrgAdmin, isSuperAdmin } = useUserRole();
+  const { managedLocationIds, managedOrgIds, isSuperAdmin } = useUserRole();
+  const [now, setNow] = useState(nowUtc());
+
+  // Keep time updated for live dashboard feel
+  useEffect(() => {
+    const interval = setInterval(() => setNow(nowUtc()), 60000);
+    return () => clearInterval(interval);
+  }, []);
   
-  // Get current week's Monday
-  const weekOf = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  // Use Central Time anchors for the correct "Week Of" date
+  const anchors = useMemo(() => getWeekAnchors(now), [now]);
+  const weekOf = format(anchors.mondayZ, 'yyyy-MM-dd');
   
   // Reuse existing hook - no new RPC needed
   const { summaries, loading, error } = useStaffWeeklyScores({ weekOf });
@@ -23,10 +32,15 @@ export default function RegionalDashboard() {
     const byLocation = new Map<string, StaffWeekSummary[]>();
     
     summaries.forEach(s => {
-      // Filter by managed locations (unless org admin or super admin)
-      const hasFullAccess = isOrgAdmin || isSuperAdmin;
-      if (!hasFullAccess && managedLocationIds.length > 0 && !managedLocationIds.includes(s.location_id)) {
-        return;
+      // Only super admins get truly unrestricted access
+      if (!isSuperAdmin) {
+        // Check if user has access via org scope OR location scope
+        const hasOrgAccess = managedOrgIds.includes(s.organization_id);
+        const hasLocationAccess = managedLocationIds.includes(s.location_id);
+        
+        if (!hasOrgAccess && !hasLocationAccess) {
+          return; // Filter out
+        }
       }
       
       if (!byLocation.has(s.location_id)) {
@@ -35,23 +49,37 @@ export default function RegionalDashboard() {
       byLocation.get(s.location_id)!.push(s);
     });
 
+    // Time-based "missing" logic
+    const isPastConfidenceDeadline = now >= anchors.confidence_deadline;
+    const isPerformanceOpen = now >= anchors.checkout_open;
+
     // Calculate stats per location
     const stats: LocationStats[] = Array.from(byLocation.entries()).map(([locId, staff]) => {
       const totalSlots = staff.reduce((sum, s) => sum + s.assignment_count, 0);
       const completedSlots = staff.reduce((sum, s) => sum + Math.min(s.conf_count, s.perf_count), 0);
       const submissionRate = totalSlots > 0 ? (completedSlots / totalSlots) * 100 : 0;
       
-      const confScores = staff.flatMap(s => s.scores.filter(sc => sc.confidence_score !== null).map(sc => sc.confidence_score!));
-      const perfScores = staff.flatMap(s => s.scores.filter(sc => sc.performance_score !== null).map(sc => sc.performance_score!));
+      // Count STAFF members missing items based on current time window
+      const staffMissingCount = staff.filter(s => {
+        // Grace period: nothing is "missing" yet
+        if (!isPastConfidenceDeadline) return false;
+
+        const missingConf = s.conf_count < s.assignment_count;
+        
+        // Before Thursday, only confidence matters
+        if (!isPerformanceOpen) return missingConf;
+
+        // After Thursday, check both
+        const missingPerf = s.perf_count < s.assignment_count;
+        return missingConf || missingPerf;
+      }).length;
       
       return {
         id: locId,
         name: staff[0]?.location_name || 'Unknown',
         staffCount: staff.length,
         submissionRate,
-        missingCount: staff.filter(s => !s.is_complete).length,
-        avgConfidence: confScores.length > 0 ? confScores.reduce((a, b) => a + b, 0) / confScores.length : 0,
-        avgPerformance: perfScores.length > 0 ? perfScores.reduce((a, b) => a + b, 0) / perfScores.length : 0,
+        missingCount: staffMissingCount,
       };
     });
 
@@ -69,7 +97,7 @@ export default function RegionalDashboard() {
       locationStats: stats, 
       totals: { totalStaff, totalMissing, avgRate, locationCount: stats.length }
     };
-  }, [summaries, managedLocationIds, isOrgAdmin, isSuperAdmin]);
+  }, [summaries, managedLocationIds, managedOrgIds, isSuperAdmin, now, anchors]);
 
   if (loading) {
     return (
@@ -113,7 +141,7 @@ export default function RegionalDashboard() {
           <div>
             <h1 className="text-2xl font-bold">Regional Command Center</h1>
             <p className="text-muted-foreground text-sm">
-              Week of {format(new Date(weekOf), 'MMM d, yyyy')}
+              Week of {format(anchors.mondayZ, 'MMM d, yyyy')}
             </p>
           </div>
           <Badge variant="outline" className="text-sm">
@@ -139,11 +167,14 @@ export default function RegionalDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
-                Missing Submissions
+                Staff Missing Actions
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-destructive">{totals.totalMissing}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Based on current deadlines
+              </p>
             </CardContent>
           </Card>
 

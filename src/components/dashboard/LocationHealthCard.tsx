@@ -9,9 +9,7 @@ export interface LocationStats {
   name: string;
   staffCount: number;
   submissionRate: number; // 0-100 (conf+perf complete %)
-  missingCount: number;   // staff with incomplete submissions
-  avgConfidence: number;
-  avgPerformance: number;
+  missingCount: number;   // number of staff with incomplete submissions (time-gated)
 }
 
 interface LocationHealthCardProps {
@@ -61,22 +59,12 @@ export function LocationHealthCard({ stats }: LocationHealthCardProps) {
           {stats.missingCount > 0 ? (
             <Badge variant="destructive" className="gap-1">
               <AlertCircle className="h-3 w-3" />
-              {stats.missingCount} Missing
+              {stats.missingCount} Staff Missing
             </Badge>
           ) : (
             <Badge variant="secondary" className="bg-primary/10 text-primary gap-1">
               <CheckCircle2 className="h-3 w-3" />
-              All In
-            </Badge>
-          )}
-          {stats.avgConfidence > 0 && (
-            <Badge variant="outline" className="bg-background">
-              Conf: {stats.avgConfidence.toFixed(1)}
-            </Badge>
-          )}
-          {stats.avgPerformance > 0 && (
-            <Badge variant="outline" className="bg-background">
-              Perf: {stats.avgPerformance.toFixed(1)}
+              On Track
             </Badge>
           )}
         </div>

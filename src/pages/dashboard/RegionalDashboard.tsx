@@ -25,17 +25,12 @@ export default function RegionalDashboard() {
   const anchors = useMemo(() => getWeekAnchors(now), [now]);
   const weekOf = formatInTimeZone(anchors.mondayZ, CT_TZ, 'yyyy-MM-dd');
   
-  // Debug: log what we're getting
-  console.log('[RegionalDashboard] weekOf:', weekOf, 'managedOrgIds:', managedOrgIds, 'managedLocationIds:', managedLocationIds);
-  
   // Reuse existing hook - no new RPC needed
   const { summaries, loading, error } = useStaffWeeklyScores({ weekOf });
 
   // Aggregate by location client-side
   const { locationStats, totals } = useMemo(() => {
     const byLocation = new Map<string, StaffWeekSummary[]>();
-    
-    console.log('[RegionalDashboard] summaries:', summaries.length, 'isSuperAdmin:', isSuperAdmin, 'managedOrgIds:', managedOrgIds, 'managedLocationIds:', managedLocationIds);
     
     summaries.forEach(s => {
       // Only super admins get truly unrestricted access
@@ -45,7 +40,6 @@ export default function RegionalDashboard() {
         const hasLocationAccess = managedLocationIds.includes(s.location_id);
         
         if (!hasOrgAccess && !hasLocationAccess) {
-          console.log('[RegionalDashboard] Filtered out:', s.staff_name, 'org:', s.organization_id, 'loc:', s.location_id);
           return; // Filter out
         }
       }
@@ -55,8 +49,6 @@ export default function RegionalDashboard() {
       }
       byLocation.get(s.location_id)!.push(s);
     });
-    
-    console.log('[RegionalDashboard] Locations after filter:', byLocation.size);
 
     // Time-based "missing" logic
     const isPastConfidenceDeadline = now >= anchors.confidence_deadline;
@@ -68,27 +60,23 @@ export default function RegionalDashboard() {
       const completedSlots = staff.reduce((sum, s) => sum + Math.min(s.conf_count, s.perf_count), 0);
       const submissionRate = totalSlots > 0 ? (completedSlots / totalSlots) * 100 : 0;
       
-      // Count STAFF members missing items based on current time window
-      const staffMissingCount = staff.filter(s => {
-        // Grace period: nothing is "missing" yet
-        if (!isPastConfidenceDeadline) return false;
-
-        const missingConf = s.conf_count < s.assignment_count;
-        
-        // Before Thursday, only confidence matters
-        if (!isPerformanceOpen) return missingConf;
-
-        // After Thursday, check both
-        const missingPerf = s.perf_count < s.assignment_count;
-        return missingConf || missingPerf;
-      }).length;
+      // Count STAFF members missing confidence (only after Tue deadline)
+      const missingConfCount = isPastConfidenceDeadline 
+        ? staff.filter(s => s.conf_count < s.assignment_count).length 
+        : 0;
+      
+      // Count STAFF members missing performance (only after Thu open)
+      const missingPerfCount = isPerformanceOpen 
+        ? staff.filter(s => s.perf_count < s.assignment_count).length 
+        : 0;
       
       return {
         id: locId,
         name: staff[0]?.location_name || 'Unknown',
         staffCount: staff.length,
         submissionRate,
-        missingCount: staffMissingCount,
+        missingConfCount,
+        missingPerfCount,
       };
     });
 
@@ -97,14 +85,15 @@ export default function RegionalDashboard() {
 
     // Calculate totals
     const totalStaff = stats.reduce((sum, s) => sum + s.staffCount, 0);
-    const totalMissing = stats.reduce((sum, s) => sum + s.missingCount, 0);
+    const totalMissingConf = stats.reduce((sum, s) => sum + s.missingConfCount, 0);
+    const totalMissingPerf = stats.reduce((sum, s) => sum + s.missingPerfCount, 0);
     const avgRate = stats.length > 0 
       ? stats.reduce((sum, s) => sum + s.submissionRate, 0) / stats.length 
       : 0;
 
     return { 
       locationStats: stats, 
-      totals: { totalStaff, totalMissing, avgRate, locationCount: stats.length }
+      totals: { totalStaff, totalMissingConf, totalMissingPerf, avgRate, locationCount: stats.length }
     };
   }, [summaries, managedLocationIds, managedOrgIds, isSuperAdmin, now, anchors]);
 
@@ -176,14 +165,20 @@ export default function RegionalDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
-                Staff Missing Actions
+                Missing Submissions
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-destructive">{totals.totalMissing}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Based on current deadlines
-              </p>
+              <div className="flex gap-4">
+                <div>
+                  <div className="text-2xl font-bold text-destructive">{totals.totalMissingConf}</div>
+                  <p className="text-xs text-muted-foreground">Confidence</p>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-warning">{totals.totalMissingPerf}</div>
+                  <p className="text-xs text-muted-foreground">Performance</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

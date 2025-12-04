@@ -10,7 +10,7 @@ import { Users, AlertCircle, TrendingUp } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { getWeekAnchors, nowUtc, CT_TZ } from '@/lib/centralTime';
-import { getSubmissionGates, calculateMissingCounts } from '@/lib/submissionStatus';
+import { getSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
 
 export default function RegionalDashboard() {
   const navigate = useNavigate();
@@ -56,19 +56,15 @@ export default function RegionalDashboard() {
     const gates = getSubmissionGates(now, anchors);
     
     const stats: LocationStats[] = Array.from(byLocation.entries()).map(([locId, staff]) => {
-      const totalSlots = staff.reduce((sum, s) => sum + s.assignment_count, 0);
-      const completedSlots = staff.reduce((sum, s) => sum + Math.min(s.conf_count, s.perf_count), 0);
-      const submissionRate = totalSlots > 0 ? (completedSlots / totalSlots) * 100 : 0;
-      
-      const { missingConfCount, missingPerfCount } = calculateMissingCounts(staff, gates);
+      const locStats = calculateLocationStats(staff, gates);
       
       return {
         id: locId,
         name: staff[0]?.location_name || 'Unknown',
-        staffCount: staff.length,
-        submissionRate,
-        missingConfCount,
-        missingPerfCount,
+        staffCount: locStats.staffCount,
+        submissionRate: locStats.submissionRate,
+        missingConfCount: locStats.missingConfCount,
+        missingPerfCount: locStats.missingPerfCount,
       };
     });
 

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -18,8 +17,9 @@ export default function StatsLayout() {
       <h1 className="text-2xl md:text-3xl font-bold">Your Stats</h1>
       
       <Tabs value={currentTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="glance">At-a-Glance</TabsTrigger>
+          <TabsTrigger value="focus">Priority Focus</TabsTrigger>
           <TabsTrigger value="scores">Weekly Scores</TabsTrigger>
           <TabsTrigger value="evaluations">Evaluations</TabsTrigger>
         </TabsList>

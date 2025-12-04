@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useSim } from '@/devtools/SimProvider';
 import { format, parseISO } from 'date-fns';
 import { useMyWeeklyScores } from '@/hooks/useMyWeeklyScores';
 import { RawScoreRow } from '@/types/coachV2';
@@ -52,25 +54,21 @@ export default function StatsScores() {
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingWeek, setDeletingWeek] = useState<string | null>(null);
-  const [staffId, setStaffId] = useState<string | null>(null);
   
-  const { user, isSuperAdmin } = useAuth();
-  const { weekSummaries, loading } = useMyWeeklyScores({ weekOf: null });
+  const { isSuperAdmin } = useAuth();
+  const { overrides } = useSim();
+  const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  
+  // Use simulated staff ID when masquerading
+  const isMasquerading = overrides.enabled && overrides.masqueradeStaffId;
+  const staffId = staffProfile?.id || null;
+  
+  // Pass staffId to hook when masquerading to fetch that user's data
+  const { weekSummaries, loading } = useMyWeeklyScores({ 
+    weekOf: null,
+    staffId: isMasquerading ? staffId : undefined
+  });
   const queryClient = useQueryClient();
-
-  // Fetch staff id for delete operation
-  useEffect(() => {
-    async function fetchStaffId() {
-      if (!user?.id) return;
-      const { data } = await supabase
-        .from('staff')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (data) setStaffId(data.id);
-    }
-    fetchStaffId();
-  }, [user?.id]);
 
   // Helper to get Monday of current week
   const mondayOf = (d: Date = new Date()): Date => {

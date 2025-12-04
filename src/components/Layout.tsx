@@ -5,12 +5,23 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoleRefresh } from '@/hooks/useRoleRefresh';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { Home, BarChart3, User, Settings, Users, TrendingUp, Shield } from 'lucide-react';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
-  const { user, signOut, isCoach, isSuperAdmin, isOrgAdmin, isLead, roleLoading, refreshRoles } = useAuth();
+  const { user, signOut, isCoach: authIsCoach, isSuperAdmin: authIsSuperAdmin, isOrgAdmin: authIsOrgAdmin, isLead: authIsLead, roleLoading, refreshRoles } = useAuth();
+  const { overrides } = useSim();
+  const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  
+  // When masquerading, use the simulated user's roles; otherwise use auth roles
+  const isMasquerading = overrides.enabled && overrides.masqueradeStaffId;
+  const isCoach = isMasquerading ? (staffProfile?.is_coach || staffProfile?.is_super_admin || staffProfile?.is_org_admin || false) : authIsCoach;
+  const isSuperAdmin = isMasquerading ? (staffProfile?.is_super_admin || false) : authIsSuperAdmin;
+  const isOrgAdmin = isMasquerading ? (staffProfile?.is_org_admin || false) : authIsOrgAdmin;
+  const isLead = isMasquerading ? (staffProfile?.is_lead || false) : authIsLead;
   const location = useLocation();
   const { toast } = useToast();
 

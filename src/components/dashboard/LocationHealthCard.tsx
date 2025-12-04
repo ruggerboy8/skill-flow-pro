@@ -50,8 +50,13 @@ export function LocationHealthCard({ stats }: LocationHealthCardProps) {
               {stats.staffCount} Active Staff
             </div>
           </div>
-          <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
-            {Math.round(stats.submissionRate)}%
+          <div className="text-right">
+            <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
+              {Math.round(stats.submissionRate)}%
+            </div>
+            <div className="text-[10px] text-muted-foreground leading-tight">
+              Submitted
+            </div>
           </div>
         </div>
       </CardHeader>

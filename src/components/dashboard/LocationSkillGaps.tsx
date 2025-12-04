@@ -60,6 +60,13 @@ export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSki
     return 'bg-green-100 text-green-800 border-green-200';
   }
 
+  function hexToRgba(hex: string, alpha: number): string {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
   function SkillGapCard({ gap }: { gap: SkillGap }) {
     const domainColor = getDomainColor(gap.domain_name);
 
@@ -67,8 +74,8 @@ export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSki
       <div 
         className="p-3 border rounded-lg space-y-2"
         style={{ 
-          backgroundColor: `${domainColor}15`,
-          borderColor: `${domainColor}40`
+          backgroundColor: hexToRgba(domainColor, 0.1),
+          borderColor: hexToRgba(domainColor, 0.3)
         }}
       >
         <div className="flex items-start justify-between gap-2">
@@ -140,12 +147,6 @@ export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSki
     );
   }
 
-  // If only one role has data, don't show tabs
-  const hasOnlyDfi = dfiGaps.length > 0 && rdaGaps.length === 0;
-  const hasOnlyRda = rdaGaps.length > 0 && dfiGaps.length === 0;
-  const hasBoth = dfiGaps.length > 0 && rdaGaps.length > 0;
-  const hasNone = dfiGaps.length === 0 && rdaGaps.length === 0;
-
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -155,27 +156,18 @@ export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSki
         </p>
       </CardHeader>
       <CardContent>
-        {hasNone && (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No skill data available for this period
-          </p>
-        )}
-        {hasOnlyDfi && <GapList items={dfiGaps} />}
-        {hasOnlyRda && <GapList items={rdaGaps} />}
-        {hasBoth && (
-          <Tabs defaultValue="dfi">
-            <TabsList className="w-full">
-              <TabsTrigger value="dfi" className="flex-1">DFI</TabsTrigger>
-              <TabsTrigger value="rda" className="flex-1">RDA</TabsTrigger>
-            </TabsList>
-            <TabsContent value="dfi" className="mt-3">
-              <GapList items={dfiGaps} />
-            </TabsContent>
-            <TabsContent value="rda" className="mt-3">
-              <GapList items={rdaGaps} />
-            </TabsContent>
-          </Tabs>
-        )}
+        <Tabs defaultValue="dfi">
+          <TabsList className="w-full">
+            <TabsTrigger value="dfi" className="flex-1">DFI</TabsTrigger>
+            <TabsTrigger value="rda" className="flex-1">RDA</TabsTrigger>
+          </TabsList>
+          <TabsContent value="dfi" className="mt-3">
+            <GapList items={dfiGaps} />
+          </TabsContent>
+          <TabsContent value="rda" className="mt-3">
+            <GapList items={rdaGaps} />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

@@ -32,7 +32,10 @@ export default function Layout() {
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
-    { name: 'Stats', href: '/stats', icon: BarChart3 },
+    // Stats hidden for regional admins (org admins) - they use coach/admin tools
+    ...(!isOrgAdmin ? [
+      { name: 'Stats', href: '/stats', icon: BarChart3 },
+    ] : []),
     // Backfill nav removed - keeping function for individual score backfill only
     ...(isCoach || isSuperAdmin || isOrgAdmin || isLead ? [
       { name: 'Coach', href: '/coach', icon: Users },

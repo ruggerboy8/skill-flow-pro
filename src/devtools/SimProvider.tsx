@@ -3,11 +3,7 @@ import React, { createContext, useContext, ReactNode, useState, useEffect } from
 export interface SimOverrides {
   enabled: boolean;
   nowISO?: string;
-  forceHasConfidence?: boolean | null;
-  forceHasPerformance?: boolean | null;
-  forceBacklogCount?: number | null;
-  forceBackfillComplete?: boolean | null;
-  forceNewUser?: boolean | null;
+  masqueradeStaffId?: string | null;
 }
 
 interface SimContextValue {
@@ -24,11 +20,7 @@ const STORAGE_KEY = 'simtools-overrides';
 const defaultOverrides: SimOverrides = {
   enabled: false,
   nowISO: undefined,
-  forceHasConfidence: null,
-  forceHasPerformance: null,
-  forceBacklogCount: null,
-  forceBackfillComplete: null,
-  forceNewUser: null,
+  masqueradeStaffId: null,
 };
 
 interface SimProviderProps {
@@ -75,7 +67,13 @@ export function SimProvider({ children }: SimProviderProps) {
 export function useSim(): SimContextValue {
   const context = useContext(SimContext);
   if (!context) {
-    throw new Error('useSim must be used within a SimProvider');
+    // Return safe defaults if used outside provider (e.g., during SSR or before provider mounts)
+    return {
+      overrides: defaultOverrides,
+      updateOverrides: () => {},
+      simulatedTime: undefined,
+      resetSimulation: () => {},
+    };
   }
   return context;
 }

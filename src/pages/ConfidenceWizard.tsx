@@ -433,10 +433,7 @@ export default function ConfidenceWizard() {
 
     const submittedCount = matchedScores.filter((s) => s.confidence_score !== null).length;
     const hasConfidenceReal = submittedCount === assignments.length;
-    const hasConfidenceSimulated = overrides.enabled && overrides.forceHasConfidence !== null 
-      ? overrides.forceHasConfidence 
-      : hasConfidenceReal;
-    setHasConfidence(hasConfidenceSimulated);
+    setHasConfidence(hasConfidenceReal);
 
     const selectedByFocus: { [key: string]: string | null } = {};
     matchedScores.forEach((r) => {

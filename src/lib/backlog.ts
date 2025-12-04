@@ -1,6 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getAnchors, nowUtc } from "@/lib/centralTime";
-import { SimOverrides } from '@/devtools/SimProvider';
 
 // Updated backlog interfaces for v2
 export interface BacklogItemV2 {
@@ -110,26 +109,11 @@ export async function populateBacklogV2ForMissedWeek(
   }
 }
 
-// Get open backlog count v2 (with simulation override)
+// Get open backlog count v2
 export async function getOpenBacklogCountV2(
-  staffId: string,
-  simOverrides?: SimOverrides
+  staffId: string
 ): Promise<{ count: number; items: any[] }> {
-  // If simulation is active and backlog count is forced
-  if (simOverrides?.enabled && simOverrides.forceBacklogCount !== null) {
-    const count = simOverrides.forceBacklogCount;
-    // Generate synthetic backlog items for UI rendering
-    const items = Array.from({ length: count }, (_, i) => ({
-      id: `__sim_${i}`,
-      __sim: true, // Mark as simulated
-      action_id: i + 1,
-      resolved_on: null,
-      action_statement: `Simulated Backlog Item ${i + 1}`,
-    }));
-    return { count, items };
-  }
-
-  // Otherwise, get real backlog data from v2
+  // Get real backlog data from v2
   const { data: backlog } = await supabase
     .from('user_backlog_v2')
     .select('*')

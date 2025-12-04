@@ -1,14 +1,40 @@
 import { useAuth } from '@/hooks/useAuth';
-import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useUserRole } from '@/hooks/useUserRole';
 import ThisWeekPanel from '@/components/home/ThisWeekPanel';
 import { RecentWinBanner } from '@/components/home/RecentWinBanner';
 import { ChristmasWelcome } from '@/components/home/ChristmasWelcome';
 import { SimFloatingButton } from '@/devtools/SimConsole';
+import { Skeleton } from '@/components/ui/skeleton';
+import RegionalDashboard from '@/pages/dashboard/RegionalDashboard';
 
 export default function Index() {
   const { user } = useAuth();
-  const { data: staff } = useStaffProfile();
+  const { isParticipant, showRegionalDashboard, isLoading } = useUserRole();
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-4">
+        <div className="max-w-4xl mx-auto space-y-4">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-48" />
+          <Skeleton className="h-32" />
+        </div>
+      </div>
+    );
+  }
+
+  // Non-participants (coaches/regional managers) → Command Center
+  if (showRegionalDashboard) {
+    return (
+      <>
+        <RegionalDashboard />
+        <SimFloatingButton isAdmin={user?.email === 'johno@reallygoodconsulting.org' || user?.email === 'ryanjoberly@gmail.com'} />
+      </>
+    );
+  }
+
+  // Participants → Standard experience
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto">

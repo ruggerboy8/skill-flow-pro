@@ -10,7 +10,9 @@ import { useSim } from './SimProvider';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { addDays } from 'date-fns';
 import { CT_TZ, getWeekAnchors } from '@/lib/centralTime';
-import { X, Settings } from 'lucide-react';
+import { X, Settings, User } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 // Helper function (same as in centralTime.ts)
 function ctUtcForTz(dayRefUtc: Date, timeHHMMSS: string, tz: string): Date {
@@ -26,9 +28,51 @@ interface SimConsoleProps {
 export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
   const { overrides, updateOverrides, resetSimulation } = useSim();
   const [customDateTime, setCustomDateTime] = useState('');
+  const [staffSearch, setStaffSearch] = useState('');
+
+  // Fetch staff list for masquerade dropdown
+  const { data: staffList } = useQuery({
+    queryKey: ['sim-staff-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('id, name, email, is_participant, is_coach, is_super_admin')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: overrides.enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Filter staff by search
+  const filteredStaff = useMemo(() => {
+    if (!staffList) return [];
+    if (!staffSearch) return staffList.slice(0, 20); // Show first 20 if no search
+    const searchLower = staffSearch.toLowerCase();
+    return staffList
+      .filter(s => 
+        s.name.toLowerCase().includes(searchLower) || 
+        s.email.toLowerCase().includes(searchLower)
+      )
+      .slice(0, 20);
+  }, [staffList, staffSearch]);
+
+  // Get persona label for a staff member
+  const getPersonaLabel = (s: { is_participant: boolean; is_coach: boolean; is_super_admin: boolean }) => {
+    if (s.is_super_admin) return 'Super Admin';
+    if (s.is_coach && !s.is_participant) return 'Coach';
+    if (s.is_coach && s.is_participant) return 'Participant + Coach';
+    return 'Participant';
+  };
+
+  // Get selected staff name
+  const selectedStaff = useMemo(() => {
+    if (!overrides.masqueradeStaffId || !staffList) return null;
+    return staffList.find(s => s.id === overrides.masqueradeStaffId);
+  }, [overrides.masqueradeStaffId, staffList]);
 
   // Generate presets for the current week in Central Time
-  // This MUST be called before any conditional returns to avoid hook order issues
   const presets = useMemo(() => {
     const { mondayZ } = getWeekAnchors(new Date(), CT_TZ);
     return [
@@ -70,6 +114,7 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
       updateOverrides({ nowISO: date.toISOString() });
     }
   };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -95,6 +140,55 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
 
           {overrides.enabled && (
             <>
+              {/* User Masquerade */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  View As User
+                </Label>
+                {selectedStaff && (
+                  <div className="flex items-center justify-between p-2 bg-muted rounded-md">
+                    <div>
+                      <div className="font-medium text-sm">{selectedStaff.name}</div>
+                      <div className="text-xs text-muted-foreground">{getPersonaLabel(selectedStaff)}</div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => updateOverrides({ masqueradeStaffId: null })}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                <Input
+                  placeholder="Search staff by name or email..."
+                  value={staffSearch}
+                  onChange={(e) => setStaffSearch(e.target.value)}
+                  className="text-sm"
+                />
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {filteredStaff.map(staff => (
+                    <button
+                      key={staff.id}
+                      onClick={() => {
+                        updateOverrides({ masqueradeStaffId: staff.id });
+                        setStaffSearch('');
+                      }}
+                      className={`w-full text-left p-2 rounded-md text-sm hover:bg-muted transition-colors ${
+                        overrides.masqueradeStaffId === staff.id ? 'bg-primary/10 border border-primary/30' : ''
+                      }`}
+                    >
+                      <div className="font-medium">{staff.name}</div>
+                      <div className="text-xs text-muted-foreground flex justify-between">
+                        <span>{staff.email}</span>
+                        <span>{getPersonaLabel(staff)}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Time Travel */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">Time Travel</Label>
@@ -114,39 +208,6 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
                   ))}
                 </div>
 
-                {/* Quick scenario buttons */}
-                <div className="space-y-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      updateOverrides({ 
-                        forceNewUser: true,
-                        forceBackfillComplete: false,
-                        forceBacklogCount: 0
-                      });
-                    }}
-                    className="w-full text-xs"
-                  >
-                    New User (Backfill Needed)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // Clear backfill localStorage
-                      localStorage.removeItem('backfillProgress');
-                      updateOverrides({ 
-                        forceNewUser: false,
-                        forceBackfillComplete: false
-                      });
-                    }}
-                    className="w-full text-xs"
-                  >
-                    Clear Backfill Progress
-                  </Button>
-                </div>
-
                 <div className="flex gap-2">
                   <Input
                     type="datetime-local"
@@ -156,134 +217,17 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
                   />
                   <Button size="sm" onClick={handleCustomDateTime}>Set</Button>
                 </div>
-              </div>
 
-              {/* Score Overrides */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Score Overrides</Label>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="force-confidence" className="text-sm">Force Has Confidence</Label>
-                    <Select
-                      value={overrides.forceHasConfidence === null ? 'auto' : String(overrides.forceHasConfidence)}
-                      onValueChange={(value) => 
-                        updateOverrides({ 
-                          forceHasConfidence: value === 'auto' ? null : value === 'true' 
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-20">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="force-performance" className="text-sm">Force Has Performance</Label>
-                    <Select
-                      value={overrides.forceHasPerformance === null ? 'auto' : String(overrides.forceHasPerformance)}
-                      onValueChange={(value) => 
-                        updateOverrides({ 
-                          forceHasPerformance: value === 'auto' ? null : value === 'true' 
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-20">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Backlog Override */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Backlog Override</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    max="10"
-                    placeholder="Auto"
-                    value={overrides.forceBacklogCount ?? ''}
-                    onChange={(e) => 
-                      updateOverrides({ 
-                        forceBacklogCount: e.target.value ? Number(e.target.value) : null 
-                      })
-                    }
-                    className="w-20"
-                  />
-                  <Label className="text-sm text-muted-foreground">items</Label>
-                </div>
-              </div>
-
-              {/* User State Overrides */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">User State</Label>
-                <div className="text-xs text-muted-foreground mb-2">
-                  To simulate incomplete backfill: Set "Force New User" = Yes + "Force Backfill Complete" = No
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Force New User</Label>
-                    <Select
-                      value={overrides.forceNewUser === null ? 'auto' : String(overrides.forceNewUser)}
-                      onValueChange={(value) => 
-                        updateOverrides({ 
-                          forceNewUser: value === 'auto' ? null : value === 'true' 
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-20">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Yes = No database scores (backfill needed) • No = Has database scores (no backfill)
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Force Backfill Complete</Label>
-                    <Select
-                      value={overrides.forceBackfillComplete === null ? 'auto' : String(overrides.forceBackfillComplete)}
-                      onValueChange={(value) => 
-                        updateOverrides({ 
-                          forceBackfillComplete: value === 'auto' ? null : value === 'true' 
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-20">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto</SelectItem>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Only applies when backfill is needed. Yes = Complete • No = Incomplete
-                  </div>
-                </div>
+                {overrides.nowISO && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => updateOverrides({ nowISO: undefined })}
+                    className="w-full text-xs"
+                  >
+                    Reset to Real Time
+                  </Button>
+                )}
               </div>
             </>
           )}
@@ -314,20 +258,8 @@ export function SimBanner() {
       <div className="text-center text-sm font-medium">
         <Badge variant="secondary" className="mr-2">SIMULATION ACTIVE</Badge>
         Time: {currentTime}
-        {overrides.forceHasConfidence !== null && (
-          <span className="mx-2">• Confidence: {overrides.forceHasConfidence ? 'ON' : 'OFF'}</span>
-        )}
-        {overrides.forceHasPerformance !== null && (
-          <span className="mx-2">• Performance: {overrides.forceHasPerformance ? 'ON' : 'OFF'}</span>
-        )}
-        {overrides.forceBacklogCount !== null && (
-          <span className="mx-2">• Backlog: {overrides.forceBacklogCount}</span>
-        )}
-        {overrides.forceNewUser !== null && (
-          <span className="mx-2">• New User: {overrides.forceNewUser ? 'ON' : 'OFF'}</span>
-        )}
-        {overrides.forceBackfillComplete !== null && (
-          <span className="mx-2">• Backfill: {overrides.forceBackfillComplete ? 'DONE' : 'PENDING'}</span>
+        {overrides.masqueradeStaffId && (
+          <span className="mx-2">• Viewing as another user</span>
         )}
       </div>
     </div>
@@ -342,7 +274,6 @@ export function SimFloatingButton({ isAdmin }: SimFloatingButtonProps) {
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
 
   // Only show if admin and dev tools enabled
-  // Note: isAdmin should be checked for specific email in parent component
   if (!isAdmin || import.meta.env.VITE_ENABLE_SIMTOOLS !== 'true') {
     return null;
   }

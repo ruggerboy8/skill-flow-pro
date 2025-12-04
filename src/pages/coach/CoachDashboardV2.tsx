@@ -17,7 +17,17 @@ import { StaffWeekSummary } from '@/types/coachV2';
 import ReminderComposer from '@/components/coach/ReminderComposer';
 import { getChicagoMonday } from '@/lib/plannerUtils';
 
-export default function CoachDashboardV2() {
+interface CoachDashboardProps {
+  forcedLocationId?: string;        // Locks to specific location by UUID
+  hideHeader?: boolean;             // Hides "Coach Dashboard" h1
+  hideOrgLocationFilters?: boolean; // Hides org/location dropdowns
+}
+
+export default function CoachDashboardV2({ 
+  forcedLocationId, 
+  hideHeader = false, 
+  hideOrgLocationFilters = false 
+}: CoachDashboardProps = {}) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
@@ -107,12 +117,17 @@ export default function CoachDashboardV2() {
   const filteredSummaries = useMemo(() => {
     let filtered = [...summaries];
 
-    if (selectedOrganization !== 'all') {
-      filtered = filtered.filter(s => s.organization_name === selectedOrganization);
-    }
+    // If forcedLocationId is set, filter by location_id directly
+    if (forcedLocationId) {
+      filtered = filtered.filter(s => s.location_id === forcedLocationId);
+    } else {
+      if (selectedOrganization !== 'all') {
+        filtered = filtered.filter(s => s.organization_name === selectedOrganization);
+      }
 
-    if (selectedLocation !== 'all') {
-      filtered = filtered.filter(s => s.location_name === selectedLocation);
+      if (selectedLocation !== 'all') {
+        filtered = filtered.filter(s => s.location_name === selectedLocation);
+      }
     }
 
     if (selectedRole !== 'all') {
@@ -128,7 +143,7 @@ export default function CoachDashboardV2() {
     }
 
     return filtered;
-  }, [summaries, selectedOrganization, selectedLocation, selectedRole, search]);
+  }, [summaries, selectedOrganization, selectedLocation, selectedRole, search, forcedLocationId]);
 
   // Sort: missing both → missing conf → missing perf → complete, then A-Z
   const sortedRows = useMemo(() => {
@@ -278,7 +293,7 @@ export default function CoachDashboardV2() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl font-bold">Coach Dashboard</h1>
+      {!hideHeader && <h1 className="text-3xl font-bold">Coach Dashboard</h1>}
 
       {/* Week Navigation - Compact inline */}
       <div className="flex items-center justify-between">
@@ -307,29 +322,33 @@ export default function CoachDashboardV2() {
 
       {/* Filter controls */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Organization" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Organizations</SelectItem>
-            {organizations.map(org => (
-              <SelectItem key={org} value={org}>{org}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!hideOrgLocationFilters && (
+          <>
+            <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Organization" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Organizations</SelectItem>
+                {organizations.map(org => (
+                  <SelectItem key={org} value={org}>{org}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Location" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Locations</SelectItem>
-            {locations.map(loc => (
-              <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map(loc => (
+                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
 
         <Select value={selectedRole} onValueChange={setSelectedRole}>
           <SelectTrigger className="w-[200px]">
@@ -350,7 +369,7 @@ export default function CoachDashboardV2() {
           className="w-[240px]"
         />
 
-        {hasActiveFilters && (
+        {hasActiveFilters && !forcedLocationId && (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             Clear
           </Button>

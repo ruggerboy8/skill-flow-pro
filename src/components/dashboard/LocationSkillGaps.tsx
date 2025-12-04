@@ -1,0 +1,182 @@
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
+import { getDomainColor } from '@/lib/domainColors';
+
+interface SkillGap {
+  action_id: number;
+  action_statement: string;
+  role_id: number;
+  role_name: string;
+  domain_name: string;
+  avg_confidence: number;
+  staff_count: number;
+}
+
+interface LocationSkillGapsProps {
+  locationId: string;
+  lookbackWeeks?: number;
+}
+
+export function LocationSkillGaps({ locationId, lookbackWeeks = 6 }: LocationSkillGapsProps) {
+  const [gaps, setGaps] = useState<SkillGap[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchGaps() {
+      setLoading(true);
+      setError(null);
+      
+      const { data, error: err } = await supabase.rpc('get_location_skill_gaps', {
+        p_location_id: locationId,
+        p_lookback_weeks: lookbackWeeks,
+        p_limit_per_role: 3,
+      });
+
+      if (err) {
+        console.error('Error fetching skill gaps:', err);
+        setError(err.message);
+      } else {
+        setGaps(data || []);
+      }
+      setLoading(false);
+    }
+
+    if (locationId) {
+      fetchGaps();
+    }
+  }, [locationId, lookbackWeeks]);
+
+  const dfiGaps = gaps.filter(g => g.role_name === 'DFI');
+  const rdaGaps = gaps.filter(g => g.role_name === 'RDA');
+
+  function getConfidenceColor(avg: number): string {
+    if (avg < 2.0) return 'bg-red-100 text-red-800 border-red-200';
+    if (avg < 3.0) return 'bg-amber-100 text-amber-800 border-amber-200';
+    return 'bg-green-100 text-green-800 border-green-200';
+  }
+
+  function SkillGapCard({ gap }: { gap: SkillGap }) {
+    const domainColor = getDomainColor(gap.domain_name);
+    const truncatedStatement = gap.action_statement?.length > 80 
+      ? gap.action_statement.substring(0, 80) + '...'
+      : gap.action_statement;
+
+    return (
+      <div className="p-3 border rounded-lg bg-card space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium leading-tight flex-1">{truncatedStatement}</p>
+          <Badge 
+            variant="outline" 
+            className={getConfidenceColor(gap.avg_confidence)}
+          >
+            {gap.avg_confidence.toFixed(1)} / 4
+          </Badge>
+        </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <Badge 
+            variant="outline" 
+            className="text-xs"
+            style={{ 
+              backgroundColor: `${domainColor}20`,
+              borderColor: domainColor,
+              color: domainColor 
+            }}
+          >
+            {gap.domain_name}
+          </Badge>
+          <span>{gap.staff_count} staff rated</span>
+        </div>
+      </div>
+    );
+  }
+
+  function GapList({ items }: { items: SkillGap[] }) {
+    if (items.length === 0) {
+      return (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          No skill data available for this period
+        </p>
+      );
+    }
+    return (
+      <div className="space-y-2">
+        {items.map((gap) => (
+          <SkillGapCard key={`${gap.action_id}-${gap.role_id}`} gap={gap} />
+        ))}
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Priority Focus Areas</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Priority Focus Areas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-destructive">Error loading skill gaps</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // If only one role has data, don't show tabs
+  const hasOnlyDfi = dfiGaps.length > 0 && rdaGaps.length === 0;
+  const hasOnlyRda = rdaGaps.length > 0 && dfiGaps.length === 0;
+  const hasBoth = dfiGaps.length > 0 && rdaGaps.length > 0;
+  const hasNone = dfiGaps.length === 0 && rdaGaps.length === 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Priority Focus Areas</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Lowest confidence skills over {lookbackWeeks} weeks
+        </p>
+      </CardHeader>
+      <CardContent>
+        {hasNone && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No skill data available for this period
+          </p>
+        )}
+        {hasOnlyDfi && <GapList items={dfiGaps} />}
+        {hasOnlyRda && <GapList items={rdaGaps} />}
+        {hasBoth && (
+          <Tabs defaultValue="dfi">
+            <TabsList className="w-full">
+              <TabsTrigger value="dfi" className="flex-1">DFI</TabsTrigger>
+              <TabsTrigger value="rda" className="flex-1">RDA</TabsTrigger>
+            </TabsList>
+            <TabsContent value="dfi" className="mt-3">
+              <GapList items={dfiGaps} />
+            </TabsContent>
+            <TabsContent value="rda" className="mt-3">
+              <GapList items={rdaGaps} />
+            </TabsContent>
+          </Tabs>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

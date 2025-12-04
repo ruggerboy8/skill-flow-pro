@@ -2289,6 +2289,22 @@ export type Database = {
           staff_name: string
         }[]
       }
+      get_location_skill_gaps: {
+        Args: {
+          p_limit_per_role?: number
+          p_location_id: string
+          p_lookback_weeks?: number
+        }
+        Returns: {
+          action_id: number
+          action_statement: string
+          avg_confidence: number
+          domain_name: string
+          role_id: number
+          role_name: string
+          staff_count: number
+        }[]
+      }
       get_materials_count: {
         Args: { p_action_ids: number[] }
         Returns: {

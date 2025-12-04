@@ -571,11 +571,63 @@ serve(async (req: Request) => {
         const { user_id } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
 
-        // Delete staff first; FK CASCADEs handle dependents if set up
-        await admin.from("staff").delete().eq("user_id", user_id);
+        // First, get the staff record to find the staff_id
+        const { data: staffRecord, error: staffLookupErr } = await admin
+          .from("staff")
+          .select("id")
+          .eq("user_id", user_id)
+          .maybeSingle();
 
+        if (staffLookupErr) {
+          console.error("Error looking up staff:", staffLookupErr);
+          throw new Error(`Failed to lookup staff: ${staffLookupErr.message}`);
+        }
+
+        if (staffRecord) {
+          const staffId = staffRecord.id;
+          console.log(`Deleting user ${user_id} with staff_id ${staffId}`);
+
+          // Delete all dependent records before deleting staff
+          // Order matters due to FK constraints
+          const deletions = [
+            admin.from("weekly_scores").delete().eq("staff_id", staffId),
+            admin.from("weekly_self_select").delete().eq("user_id", staffId),
+            admin.from("user_backlog").delete().eq("user_id", staffId),
+            admin.from("user_backlog_v2").delete().eq("staff_id", staffId),
+            admin.from("coach_scopes").delete().eq("staff_id", staffId),
+            admin.from("manager_priorities").delete().eq("coach_staff_id", staffId),
+            admin.from("resource_events").delete().eq("staff_id", staffId),
+            admin.from("reminder_log").delete().eq("target_user_id", staffId),
+            admin.from("reminder_log").delete().eq("sender_user_id", staffId),
+            // evaluation_items cascade from evaluations
+            admin.from("evaluations").delete().eq("staff_id", staffId),
+            admin.from("evaluations").delete().eq("evaluator_id", staffId),
+            // admin_audit - set changed_by to null or skip (keeping audit trail)
+          ];
+
+          const results = await Promise.allSettled(deletions);
+          results.forEach((r, i) => {
+            if (r.status === "rejected") {
+              console.warn(`Deletion ${i} failed:`, r.reason);
+            }
+          });
+
+          // Now delete staff record
+          const { error: staffDelErr } = await admin.from("staff").delete().eq("id", staffId);
+          if (staffDelErr) {
+            console.error("Error deleting staff:", staffDelErr);
+            throw new Error(`Failed to delete staff: ${staffDelErr.message}`);
+          }
+        } else {
+          console.log(`No staff record found for user_id ${user_id}, proceeding to delete auth user`);
+        }
+
+        // Finally delete auth user
         const { error: delErr } = await admin.auth.admin.deleteUser(user_id);
-        if (delErr) throw delErr;
+        if (delErr) {
+          console.error("Error deleting auth user:", delErr);
+          throw delErr;
+        }
 
         return json({ ok: true });
       }

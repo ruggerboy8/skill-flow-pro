@@ -2505,104 +2505,39 @@ export type Database = {
             }
             Returns: Json
           }
-      get_staff_weekly_scores:
-        | {
-            Args: { p_coach_user_id: string; p_week_of?: string }
-            Returns: {
-              action_id: number
-              action_statement: string
-              assignment_id: string
-              confidence_date: string
-              confidence_late: boolean
-              confidence_score: number
-              confidence_source: string
-              display_order: number
-              domain_id: number
-              domain_name: string
-              location_id: string
-              location_name: string
-              organization_id: string
-              organization_name: string
-              performance_date: string
-              performance_late: boolean
-              performance_score: number
-              performance_source: string
-              role_id: number
-              role_name: string
-              score_id: string
-              selected_action_id: number
-              self_select: boolean
-              staff_email: string
-              staff_id: string
-              staff_name: string
-              user_id: string
-              week_of: string
-            }[]
-          }
-        | {
-            Args: { p_coach_user_id: string; p_week_of?: string }
-            Returns: {
-              action_id: number
-              action_statement: string
-              assignment_id: string
-              confidence_date: string
-              confidence_late: boolean
-              confidence_score: number
-              confidence_source: Database["public"]["Enums"]["score_source"]
-              display_order: number
-              domain_id: number
-              domain_name: string
-              location_id: string
-              location_name: string
-              organization_id: string
-              organization_name: string
-              performance_date: string
-              performance_late: boolean
-              performance_score: number
-              performance_source: Database["public"]["Enums"]["score_source"]
-              role_id: number
-              role_name: string
-              score_id: string
-              selected_action_id: number
-              self_select: boolean
-              staff_email: string
-              staff_id: string
-              staff_name: string
-              week_of: string
-            }[]
-          }
-        | {
-            Args: { p_coach_user_id: string }
-            Returns: {
-              action_id: number
-              action_statement: string
-              assignment_id: string
-              confidence_date: string
-              confidence_late: boolean
-              confidence_score: number
-              confidence_source: Database["public"]["Enums"]["score_source"]
-              display_order: number
-              domain_id: number
-              domain_name: string
-              location_id: string
-              location_name: string
-              organization_id: string
-              organization_name: string
-              performance_date: string
-              performance_late: boolean
-              performance_score: number
-              performance_source: Database["public"]["Enums"]["score_source"]
-              role_id: number
-              role_name: string
-              score_id: string
-              selected_action_id: number
-              self_select: boolean
-              staff_email: string
-              staff_id: string
-              staff_name: string
-              week_of: string
-            }[]
-          }
+      get_staff_weekly_scores: {
+        Args: { p_coach_user_id: string; p_week_of?: string }
+        Returns: {
+          action_id: number
+          action_statement: string
+          assignment_id: string
+          confidence_date: string
+          confidence_late: boolean
+          confidence_score: number
+          confidence_source: Database["public"]["Enums"]["score_source"]
+          display_order: number
+          domain_id: number
+          domain_name: string
+          location_id: string
+          location_name: string
+          organization_id: string
+          organization_name: string
+          performance_date: string
+          performance_late: boolean
+          performance_score: number
+          performance_source: Database["public"]["Enums"]["score_source"]
+          role_id: number
+          role_name: string
+          score_id: string
+          selected_action_id: number
+          self_select: boolean
+          staff_email: string
+          staff_id: string
+          staff_name: string
+          user_id: string
+          week_of: string
+        }[]
+      }
       get_strengths_weaknesses: {
         Args: {
           p_end?: string

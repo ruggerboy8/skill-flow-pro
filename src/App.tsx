@@ -43,6 +43,10 @@ import StatsScores from "@/pages/StatsScores";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
 
+// My Role pages
+import MyRoleLayout from "@/pages/my-role/MyRoleLayout";
+import RoleRadar from "@/components/my-role/RoleRadar";
+
 // App routes with pre-routing checks for public pages
 function AppRoutes() {
   const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
@@ -84,6 +88,15 @@ function AppRoutes() {
           <Route path="glance" element={<AtAGlance />} />
           <Route path="focus" element={<StatsPriorityFocus />} />
           <Route path="scores" element={<StatsScores />} />
+          <Route path="evaluations" element={<StatsEvaluations />} />
+        </Route>
+
+        {/* My Role - new professional guidebook */}
+        <Route path="my-role" element={<MyRoleLayout />}>
+          <Route index element={<RoleRadar />} />
+          <Route path="overview" element={<RoleRadar />} />
+          <Route path="focus" element={<StatsPriorityFocus />} />
+          <Route path="history" element={<StatsScores />} />
           <Route path="evaluations" element={<StatsEvaluations />} />
         </Route>
 

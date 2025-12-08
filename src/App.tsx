@@ -46,6 +46,7 @@ import LocationDetail from "@/pages/dashboard/LocationDetail";
 // My Role pages
 import MyRoleLayout from "@/pages/my-role/MyRoleLayout";
 import RoleRadar from "@/components/my-role/RoleRadar";
+import DomainDetail from "@/pages/my-role/DomainDetail";
 
 // App routes with pre-routing checks for public pages
 function AppRoutes() {
@@ -99,6 +100,9 @@ function AppRoutes() {
           <Route path="history" element={<StatsScores />} />
           <Route path="evaluations" element={<StatsEvaluations />} />
         </Route>
+        
+        {/* My Role - Domain Detail (Full Page Takeover - No Tabs) */}
+        <Route path="my-role/domain/:domainSlug" element={<DomainDetail />} />
 
         <Route path="profile" element={<Profile />} />
         <Route path="reset-password" element={<ResetPassword />} />

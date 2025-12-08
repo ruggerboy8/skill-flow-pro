@@ -63,51 +63,86 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
     reader.readAsText(file);
   };
 
-  // Proper CSV parsing function that handles quoted fields
-  const parseCSVLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = '';
+  // Parse entire CSV text handling multi-line quoted fields
+  const parseCSVText = (text: string): string[][] => {
+    const rows: string[][] = [];
+    let currentRow: string[] = [];
+    let currentField = '';
     let inQuotes = false;
     let i = 0;
     
-    while (i < line.length) {
-      const char = line[i];
-      const nextChar = line[i + 1];
+    while (i < text.length) {
+      const char = text[i];
+      const nextChar = text[i + 1];
       
       if (char === '"') {
-        if (inQuotes && nextChar === '"') {
-          // Escaped quote
-          current += '"';
+        if (!inQuotes) {
+          // Start of quoted field
+          inQuotes = true;
+          i++;
+        } else if (nextChar === '"') {
+          // Escaped quote inside quoted field
+          currentField += '"';
           i += 2;
         } else {
-          // Toggle quote state
-          inQuotes = !inQuotes;
+          // End of quoted field
+          inQuotes = false;
           i++;
         }
       } else if (char === ',' && !inQuotes) {
         // Field separator
-        result.push(current.trim());
-        current = '';
+        currentRow.push(currentField.trim());
+        currentField = '';
+        i++;
+      } else if ((char === '\n' || (char === '\r' && nextChar === '\n')) && !inQuotes) {
+        // Row separator (not inside quotes)
+        currentRow.push(currentField.trim());
+        currentField = '';
+        
+        // Skip comment rows and empty rows
+        if (currentRow.length > 0 && currentRow.some(f => f) && !currentRow[0].startsWith('#')) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        
+        // Handle \r\n
+        i += (char === '\r' && nextChar === '\n') ? 2 : 1;
+      } else if (char === '\r' && !inQuotes) {
+        // Standalone \r as row separator
+        currentRow.push(currentField.trim());
+        currentField = '';
+        if (currentRow.length > 0 && currentRow.some(f => f) && !currentRow[0].startsWith('#')) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
         i++;
       } else {
-        current += char;
+        currentField += char;
         i++;
       }
     }
     
-    // Add the last field
-    result.push(current.trim());
-    return result;
+    // Don't forget the last field/row
+    if (currentField || currentRow.length > 0) {
+      currentRow.push(currentField.trim());
+      if (currentRow.length > 0 && currentRow.some(f => f) && !currentRow[0].startsWith('#')) {
+        rows.push(currentRow);
+      }
+    }
+    
+    return rows;
   };
 
   const parseCSV = async (text: string) => {
-    const lines = text.split('\n').filter(line => line.trim() && !line.startsWith('#'));
-    const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, ''));
+    const rows = parseCSVText(text);
+    if (rows.length === 0) return;
+    
+    const headers = rows[0].map(h => h.replace(/^"|"$/g, ''));
     
     const parsed: ParsedRow[] = [];
     
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g, ''));
+    for (let i = 1; i < rows.length; i++) {
+      const values = rows[i].map(v => v.replace(/^"|"$/g, ''));
       const rowData: any = {};
       
       headers.forEach((header, index) => {

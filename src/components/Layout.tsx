@@ -8,7 +8,7 @@ import { useRoleRefresh } from '@/hooks/useRoleRefresh';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
-import { Home, BarChart3, User, Settings, Users, TrendingUp, Shield } from 'lucide-react';
+import { Home, BarChart3, User, Settings, Users, TrendingUp, Shield, BookOpen } from 'lucide-react';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -43,8 +43,9 @@ export default function Layout() {
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
-    // Stats hidden for regional admins (org admins) - they use coach/admin tools
+    // My Role & Stats hidden for regional admins (org admins) - they use coach/admin tools
     ...(!isOrgAdmin ? [
+      { name: 'My Role', href: '/my-role', icon: BookOpen },
       { name: 'Stats', href: '/stats', icon: BarChart3 },
     ] : []),
     // Backfill nav removed - keeping function for individual score backfill only

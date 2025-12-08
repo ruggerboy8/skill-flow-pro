@@ -218,6 +218,7 @@ export type Database = {
           name: string | null
           role_id: number | null
           status: string | null
+          tagline: string | null
         }
         Insert: {
           code?: string | null
@@ -228,6 +229,7 @@ export type Database = {
           name?: string | null
           role_id?: number | null
           status?: string | null
+          tagline?: string | null
         }
         Update: {
           code?: string | null
@@ -238,6 +240,7 @@ export type Database = {
           name?: string | null
           role_id?: number | null
           status?: string | null
+          tagline?: string | null
         }
         Relationships: [
           {

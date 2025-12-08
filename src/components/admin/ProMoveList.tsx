@@ -65,7 +65,7 @@ interface ProMoveListProps {
   competencyFilter: string;
   searchTerm: string;
   activeOnly: boolean;
-  resourceFilter?: string;
+  resourceFilters?: string[];
   sortBy: 'domain' | 'competency' | 'updated';
   onEdit: (proMove: ProMove) => void;
 }
@@ -75,7 +75,7 @@ export function ProMoveList({
   competencyFilter, 
   searchTerm, 
   activeOnly,
-  resourceFilter = 'all',
+  resourceFilters = [],
   sortBy, 
   onEdit 
 }: ProMoveListProps) {
@@ -217,25 +217,32 @@ export function ProMoveList({
 
   const { sortedData, sortConfig, handleSort } = useTableSort(proMoves);
 
-  // Apply resource filter
+  // Apply resource filters (multi-select with AND logic)
   const filteredData = sortedData.filter(proMove => {
+    if (resourceFilters.length === 0) return true;
+    
     const status = resourceStatus.get(proMove.action_id);
     if (!status) return true;
 
-    switch (resourceFilter) {
-      case 'has_materials':
-        return status.hasVideo || status.hasScript || status.hasAudio || status.linkCount > 0;
-      case 'missing_video':
-        return !status.hasVideo;
-      case 'missing_script':
-        return !status.hasScript;
-      case 'missing_audio':
-        return !status.hasAudio;
-      case 'incomplete':
-        return !status.hasVideo || !status.hasScript || !status.hasAudio;
-      default:
-        return true;
-    }
+    // All selected filters must match (AND logic)
+    return resourceFilters.every(filter => {
+      switch (filter) {
+        case 'has_script':
+          return status.hasScript;
+        case 'has_video':
+          return status.hasVideo;
+        case 'has_audio':
+          return status.hasAudio;
+        case 'missing_video':
+          return !status.hasVideo;
+        case 'missing_script':
+          return !status.hasScript;
+        case 'missing_audio':
+          return !status.hasAudio;
+        default:
+          return true;
+      }
+    });
   });
 
   const toggleActive = async (proMove: ProMove) => {

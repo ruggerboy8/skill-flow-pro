@@ -64,12 +64,14 @@ export default function CompetencyAccordion({
       {/* Collapsed Header */}
       <div className="p-4 md:p-5 flex items-center gap-4">
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground truncate">
-            {subtitle || title}
+          <p className="font-bold text-foreground truncate">
+            {title}
           </p>
-          <p className="text-sm text-muted-foreground truncate mt-0.5">
-            {subtitle ? title : ''}
-          </p>
+          {subtitle && (
+            <p className="text-sm text-muted-foreground truncate mt-0.5">
+              {subtitle}
+            </p>
+          )}
         </div>
 
         <Badge variant="outline" className={cn('shrink-0', badge.className)}>

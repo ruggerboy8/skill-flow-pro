@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Download, ArrowUpDown } from 'lucide-react';
+import { Plus, Upload, Download, Filter, ChevronDown } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 
 import { ProMoveList } from '@/components/admin/ProMoveList';
@@ -35,7 +37,7 @@ export function ProMoveLibrary() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [sortBy, setSortBy] = useState<'domain' | 'competency' | 'updated'>('updated');
-  const [resourceFilter, setResourceFilter] = useState<string>('all');
+  const [resourceFilters, setResourceFilters] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingProMove, setEditingProMove] = useState<any>(null);
@@ -323,19 +325,75 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
 
         <div className="space-y-2">
           <Label>Resources</Label>
-          <Select value={resourceFilter} onValueChange={setResourceFilter}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-background z-50">
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="has_materials">Has Materials</SelectItem>
-              <SelectItem value="missing_video">Missing Video</SelectItem>
-              <SelectItem value="missing_script">Missing Script</SelectItem>
-              <SelectItem value="missing_audio">Missing Audio</SelectItem>
-              <SelectItem value="incomplete">Incomplete</SelectItem>
-            </SelectContent>
-          </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-between">
+                <span className="flex items-center gap-2">
+                  <Filter className="w-4 h-4" />
+                  {resourceFilters.length === 0 ? 'All' : `${resourceFilters.length} filter${resourceFilters.length > 1 ? 's' : ''}`}
+                </span>
+                <ChevronDown className="w-4 h-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-3" align="start">
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Has Resource</p>
+                {[
+                  { value: 'has_script', label: 'Has Script' },
+                  { value: 'has_video', label: 'Has Video' },
+                  { value: 'has_audio', label: 'Has Audio' },
+                ].map(option => (
+                  <div key={option.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={option.value}
+                      checked={resourceFilters.includes(option.value)}
+                      onCheckedChange={(checked) => {
+                        setResourceFilters(prev => 
+                          checked 
+                            ? [...prev, option.value]
+                            : prev.filter(f => f !== option.value)
+                        );
+                      }}
+                    />
+                    <label htmlFor={option.value} className="text-sm cursor-pointer">{option.label}</label>
+                  </div>
+                ))}
+                <div className="border-t pt-3 mt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Missing Resource</p>
+                  {[
+                    { value: 'missing_script', label: 'Missing Script' },
+                    { value: 'missing_video', label: 'Missing Video' },
+                    { value: 'missing_audio', label: 'Missing Audio' },
+                  ].map(option => (
+                    <div key={option.value} className="flex items-center space-x-2 mt-2">
+                      <Checkbox
+                        id={option.value}
+                        checked={resourceFilters.includes(option.value)}
+                        onCheckedChange={(checked) => {
+                          setResourceFilters(prev => 
+                            checked 
+                              ? [...prev, option.value]
+                              : prev.filter(f => f !== option.value)
+                          );
+                        }}
+                      />
+                      <label htmlFor={option.value} className="text-sm cursor-pointer">{option.label}</label>
+                    </div>
+                  ))}
+                </div>
+                {resourceFilters.length > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full mt-2"
+                    onClick={() => setResourceFilters([])}
+                  >
+                    Clear filters
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-2">
@@ -359,7 +417,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
           competencyFilter={selectedCompetency}
           searchTerm={searchTerm}
           activeOnly={showActiveOnly}
-          resourceFilter={resourceFilter}
+          resourceFilters={resourceFilters}
           sortBy={sortBy}
           onEdit={handleEditProMove}
         />

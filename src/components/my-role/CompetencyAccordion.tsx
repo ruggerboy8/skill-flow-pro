@@ -1,15 +1,17 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, Sparkles, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ProMoveRow } from './ProMoveRow';
+import type { ProMoveDetail } from '@/hooks/useDomainDetail';
 
 interface CompetencyAccordionProps {
   title: string;
   subtitle: string | null;
   description: string | null;
   score: number | null;
-  proMoveCount: number;
-  domainColor: string; // HSL raw string
+  proMoves: ProMoveDetail[];
+  domainColor: string;
 }
 
 function getScoreBadge(score: number | null) {
@@ -19,21 +21,22 @@ function getScoreBadge(score: number | null) {
       className: 'bg-muted text-muted-foreground border-muted-foreground/20'
     };
   }
-  if (score >= 4) {
+  if (score === 4) {
     return {
       label: 'Mastery',
-      className: 'bg-amber-100 text-amber-800 border-amber-300'
+      className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
     };
   }
-  if (score >= 3) {
+  if (score === 3) {
     return {
       label: 'Proficient',
-      className: 'bg-blue-100 text-blue-800 border-blue-300'
+      className: 'bg-blue-500/10 text-blue-600 border-blue-500/30'
     };
   }
+  // score 1-2
   return {
     label: 'Building',
-    className: 'bg-orange-100 text-orange-800 border-orange-300'
+    className: 'bg-amber-500/10 text-amber-600 border-amber-500/30'
   };
 }
 
@@ -42,7 +45,7 @@ export default function CompetencyAccordion({
   subtitle,
   description,
   score,
-  proMoveCount,
+  proMoves,
   domainColor
 }: CompetencyAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -51,15 +54,12 @@ export default function CompetencyAccordion({
   return (
     <div
       className={cn(
-        'rounded-xl border-2 transition-all duration-200 cursor-pointer',
-        'hover:scale-[1.01] hover:shadow-md',
-        isOpen ? 'shadow-md' : 'shadow-sm'
+        'rounded-xl border transition-all duration-300 overflow-hidden',
+        isOpen
+          ? 'bg-card shadow-md border-border'
+          : 'bg-card/50 hover:bg-card/80 border-transparent hover:border-border/50 cursor-pointer'
       )}
-      style={{
-        backgroundColor: isOpen ? `hsl(${domainColor} / 0.05)` : 'hsl(var(--card))',
-        borderColor: isOpen ? `hsl(${domainColor} / 0.4)` : 'hsl(var(--border))'
-      }}
-      onClick={() => setIsOpen(!isOpen)}
+      onClick={() => !isOpen && setIsOpen(true)}
     >
       {/* Collapsed Header */}
       <div className="p-4 md:p-5 flex items-center gap-4">
@@ -75,45 +75,59 @@ export default function CompetencyAccordion({
         </div>
 
         <Badge variant="outline" className={cn('shrink-0', badge.className)}>
-          {score !== null && (
-            <Sparkles className="w-3 h-3 mr-1" />
-          )}
           {badge.label}
         </Badge>
 
-        <ChevronDown 
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
           className={cn(
-            'w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0',
+            'p-1.5 rounded-full transition-all duration-300 shrink-0',
+            'hover:bg-muted/80',
             isOpen && 'rotate-180'
-          )} 
-        />
+          )}
+          aria-label={isOpen ? 'Collapse' : 'Expand'}
+        >
+          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+        </button>
       </div>
 
       {/* Expanded Content */}
       <div
         className={cn(
           'overflow-hidden transition-all duration-300',
-          isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+          isOpen ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
         )}
       >
-        <div className="px-4 md:px-5 pb-4 md:pb-5 pt-0 space-y-4">
+        <div
+          className="px-4 md:px-5 pb-5 pt-2 border-t"
+          style={{ borderColor: `hsl(${domainColor} / 0.2)` }}
+        >
+          {/* Description */}
           {description && (
-            <p className="text-sm text-foreground/80 leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               {description}
             </p>
           )}
 
-          {proMoveCount > 0 && (
-            <div 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg"
-              style={{ backgroundColor: `hsl(${domainColor} / 0.1)` }}
-            >
-              <BookOpen className="w-4 h-4" style={{ color: `hsl(${domainColor})` }} />
-              <span style={{ color: `hsl(${domainColor})` }}>
-                {proMoveCount} Pro Move{proMoveCount !== 1 ? 's' : ''} available
-              </span>
+          {/* Skills Menu */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Skills in this area
+            </h4>
+            <div className="grid gap-1">
+              {proMoves.map(move => (
+                <ProMoveRow key={move.action_id} move={move} />
+              ))}
             </div>
-          )}
+            {proMoves.length === 0 && (
+              <p className="text-sm text-muted-foreground italic">
+                No specific skills defined
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

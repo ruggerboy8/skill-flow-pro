@@ -214,6 +214,7 @@ export type Database = {
           competency_id: number
           description: string | null
           domain_id: number | null
+          friendly_description: string | null
           interview_prompt: string | null
           name: string | null
           role_id: number | null
@@ -225,6 +226,7 @@ export type Database = {
           competency_id: number
           description?: string | null
           domain_id?: number | null
+          friendly_description?: string | null
           interview_prompt?: string | null
           name?: string | null
           role_id?: number | null
@@ -236,6 +238,7 @@ export type Database = {
           competency_id?: number
           description?: string | null
           domain_id?: number | null
+          friendly_description?: string | null
           interview_prompt?: string | null
           name?: string | null
           role_id?: number | null

@@ -47,7 +47,7 @@ export function useDomainDetail(domainSlug: string) {
       // 1. Fetch competencies for this domain and role
       const { data: competencies, error: compError } = await supabase
         .from('competencies')
-        .select('competency_id, code, name, tagline, description')
+        .select('competency_id, code, name, tagline, friendly_description')
         .eq('domain_id', domainId)
         .eq('role_id', staffProfile.role_id)
         .eq('status', 'Active')
@@ -164,7 +164,7 @@ export function useDomainDetail(domainSlug: string) {
         code: c.code || '',
         title: c.name || '',
         subtitle: c.tagline,
-        description: c.description,
+        description: (c as any).friendly_description || null,
         observerScore: competencyScores.get(c.competency_id) ?? null,
         proMoves: proMovesByCompetency.get(c.competency_id) || []
       }));

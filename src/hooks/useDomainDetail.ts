@@ -2,6 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDomainIdFromSlug, getDomainNameFromSlug } from '@/lib/domainUtils';
+import { format, parseISO } from 'date-fns';
+
+export interface ProMoveDetail {
+  action_id: number;
+  action_statement: string;
+  lastPracticed: string | null; // Formatted date string or null
+  avgConfidence: number | null; // 1-4 scale average or null
+}
 
 export interface CompetencyDetail {
   competency_id: number;
@@ -10,7 +18,7 @@ export interface CompetencyDetail {
   subtitle: string | null;
   description: string | null;
   observerScore: number | null;
-  proMoveCount: number;
+  proMoves: ProMoveDetail[];
 }
 
 export interface DomainDetailData {
@@ -57,7 +65,6 @@ export function useDomainDetail(domainSlug: string) {
       const competencyScores = new Map<number, number>();
       if (evalData && evalData.length > 0) {
         // Get the most recent evaluation
-        const evalIds = [...new Set(evalData.map(r => r.eval_id))];
         let mostRecentEvalId: string | null = null;
         let mostRecentDate: Date | null = null;
 
@@ -86,27 +93,72 @@ export function useDomainDetail(domainSlug: string) {
         }
       }
 
-      // 3. Get pro move counts per competency
+      // 3. Fetch all pro moves for this domain's competencies
       const compIds = (competencies || []).map(c => c.competency_id);
-      const proMoveCounts = new Map<number, number>();
+      const proMovesByCompetency = new Map<number, ProMoveDetail[]>();
 
       if (compIds.length > 0) {
-        const { data: proMoves } = await supabase
+        const { data: allProMoves } = await supabase
           .from('pro_moves')
-          .select('competency_id')
+          .select('action_id, action_statement, competency_id')
           .in('competency_id', compIds)
           .eq('active', true);
 
-        if (proMoves) {
-          for (const pm of proMoves) {
-            if (pm.competency_id) {
-              proMoveCounts.set(pm.competency_id, (proMoveCounts.get(pm.competency_id) || 0) + 1);
+        // 4. Fetch user's weekly scores history (all-time)
+        const { data: userScores } = await supabase
+          .from('weekly_scores')
+          .select('confidence_score, week_of, site_action_id, selected_action_id')
+          .eq('staff_id', staffProfile.id)
+          .not('confidence_score', 'is', null);
+
+        // 5. Calculate stats for each pro move
+        if (allProMoves) {
+          for (const pm of allProMoves) {
+            if (!pm.competency_id) continue;
+
+            // Find matching scores for this pro move
+            const matchingScores = (userScores || []).filter(
+              s => s.site_action_id === pm.action_id || s.selected_action_id === pm.action_id
+            );
+
+            let lastPracticed: string | null = null;
+            let avgConfidence: number | null = null;
+
+            if (matchingScores.length > 0) {
+              // Calculate average confidence
+              const confScores = matchingScores
+                .map(s => s.confidence_score)
+                .filter((s): s is number => s !== null);
+              
+              if (confScores.length > 0) {
+                avgConfidence = confScores.reduce((a, b) => a + b, 0) / confScores.length;
+              }
+
+              // Find most recent week_of
+              const sortedByDate = matchingScores
+                .filter(s => s.week_of)
+                .sort((a, b) => new Date(b.week_of!).getTime() - new Date(a.week_of!).getTime());
+              
+              if (sortedByDate.length > 0 && sortedByDate[0].week_of) {
+                lastPracticed = format(parseISO(sortedByDate[0].week_of), 'MMM d, yyyy');
+              }
             }
+
+            const proMoveDetail: ProMoveDetail = {
+              action_id: pm.action_id,
+              action_statement: pm.action_statement || '',
+              lastPracticed,
+              avgConfidence
+            };
+
+            const existing = proMovesByCompetency.get(pm.competency_id) || [];
+            existing.push(proMoveDetail);
+            proMovesByCompetency.set(pm.competency_id, existing);
           }
         }
       }
 
-      // 4. Build the competency details
+      // 6. Build the competency details
       const competencyDetails: CompetencyDetail[] = (competencies || []).map(c => ({
         competency_id: c.competency_id,
         code: c.code || '',
@@ -114,10 +166,10 @@ export function useDomainDetail(domainSlug: string) {
         subtitle: c.tagline,
         description: c.description,
         observerScore: competencyScores.get(c.competency_id) ?? null,
-        proMoveCount: proMoveCounts.get(c.competency_id) || 0
+        proMoves: proMovesByCompetency.get(c.competency_id) || []
       }));
 
-      // 5. Calculate average score for the domain
+      // 7. Calculate average score for the domain
       const scores = competencyDetails.map(c => c.observerScore).filter((s): s is number => s !== null);
       const averageScore = scores.length > 0 
         ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10

@@ -137,7 +137,7 @@ export default function DomainDetail() {
                   subtitle={comp.subtitle}
                   description={comp.description}
                   score={comp.observerScore}
-                  proMoveCount={comp.proMoveCount}
+                  proMoves={comp.proMoves}
                   domainColor={richColor}
                 />
               </div>

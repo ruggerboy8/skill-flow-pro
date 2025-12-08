@@ -64,7 +64,7 @@ interface LearningDrawerProps {
   domainName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onResourcesChange?: (summary: { video: boolean; script: boolean; links: number; total: number }) => void;
+  onResourcesChange?: (summary: { video: boolean; script: boolean; links: number; total: number; audio?: boolean }) => void;
 }
 
 interface LinkResource {
@@ -229,13 +229,15 @@ export function LearningDrawer({
   }
 
   function emitSummary(overrides?: { video?: boolean; script?: boolean; links?: number; audio?: boolean }) {
+    const hasAudio = overrides?.audio ?? !!audioResourceId;
     const summary = {
       video: overrides?.video ?? !!videoResourceId,
       script: overrides?.script ?? !!scriptResourceId,
       links: overrides?.links ?? links.length,
+      audio: hasAudio,
       total: 0,
     };
-    summary.total = (summary.video ? 1 : 0) + (summary.script ? 1 : 0) + summary.links + (overrides?.audio ?? !!audioResourceId ? 1 : 0);
+    summary.total = (summary.video ? 1 : 0) + (summary.script ? 1 : 0) + summary.links + (hasAudio ? 1 : 0);
     onResourcesChange?.(summary);
   }
 

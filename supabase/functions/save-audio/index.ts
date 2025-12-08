@@ -118,7 +118,7 @@ serve(async (req) => {
       .from('pro-move-audio')
       .upload(filename, audioBuf, { 
         contentType: 'audio/wav',
-        upsert: false  // Don't overwrite, each version is unique
+        upsert: true  // Allow overwrite in case of retry after partial failure
       });
 
     if (uploadError) {

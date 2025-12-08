@@ -74,10 +74,15 @@ export async function createDraftEvaluation({
     };
   }
 
-  // Get competencies for the role
+  // Get competencies for the role with domain info
   const { data: competencies, error: competenciesError } = await supabase
     .from('competencies')
-    .select('competency_id, name')
+    .select(`
+      competency_id, 
+      name,
+      domain_id,
+      domains!competencies_domain_id_fkey(domain_name)
+    `)
     .eq('role_id', roleId);
 
   if (competenciesError) {
@@ -110,11 +115,13 @@ export async function createDraftEvaluation({
     throw new Error(`Failed to create evaluation: ${evalError.message}`);
   }
 
-  // Create evaluation items
+  // Create evaluation items with domain data
   const itemsData = competencies.map(comp => ({
     evaluation_id: evaluation.id,
     competency_id: comp.competency_id,
-    competency_name_snapshot: comp.name || `Competency ${comp.competency_id}`
+    competency_name_snapshot: comp.name || `Competency ${comp.competency_id}`,
+    domain_id: comp.domain_id,
+    domain_name: (comp.domains as { domain_name: string } | null)?.domain_name || null
   }));
 
   const { data: items, error: itemsError } = await supabase

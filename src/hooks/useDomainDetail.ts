@@ -42,7 +42,7 @@ export function useDomainDetail(domainSlug: string) {
         .select('competency_id, code, name, tagline, description')
         .eq('domain_id', domainId)
         .eq('role_id', staffProfile.role_id)
-        .eq('status', 'active')
+        .eq('status', 'Active')
         .order('competency_id');
 
       if (compError) throw compError;

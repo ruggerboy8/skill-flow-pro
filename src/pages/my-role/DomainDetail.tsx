@@ -96,13 +96,33 @@ export default function DomainDetail() {
 
             {/* Score Badge */}
             {!isLoading && (
-              <Badge className={cn('px-4 py-2 text-sm font-medium shrink-0', avgBadge.className)}>
-                <BadgeIcon className="w-4 h-4 mr-2" />
-                {avgBadge.label}
-                {data?.averageScore !== null && (
-                  <span className="ml-2 font-bold">{data.averageScore}</span>
+              <div className="flex flex-col items-end gap-1.5">
+                <Badge className={cn('px-4 py-2 text-sm font-medium shrink-0', avgBadge.className)}>
+                  <BadgeIcon className="w-4 h-4 mr-2" />
+                  {avgBadge.label}
+                  {data?.averageScore !== null && (
+                    <span className="ml-2 font-bold">{data.averageScore}</span>
+                  )}
+                </Badge>
+
+                {/* Evaluation Context Line */}
+                {data?.lastEvaluated && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-foreground/60 font-medium">
+                      Assessed {new Date(data.lastEvaluated).toLocaleDateString(undefined, { 
+                        month: 'short', day: 'numeric', year: 'numeric' 
+                      })}
+                    </span>
+                    <Button 
+                      variant="link" 
+                      className="h-auto p-0 text-[10px] text-primary/80"
+                      onClick={() => navigate('/stats/evaluations')}
+                    >
+                      (View Report)
+                    </Button>
+                  </div>
                 )}
-              </Badge>
+              </div>
             )}
           </div>
         </div>

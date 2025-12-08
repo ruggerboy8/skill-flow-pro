@@ -26,6 +26,7 @@ export interface DomainDetailData {
   domainId: number;
   competencies: CompetencyDetail[];
   averageScore: number | null;
+  lastEvaluated: Date | null;
 }
 
 export function useDomainDetail(domainSlug: string) {
@@ -41,7 +42,7 @@ export function useDomainDetail(domainSlug: string) {
     queryKey: ['domain-detail', domainSlug, staffProfile?.id, staffProfile?.role_id],
     queryFn: async (): Promise<DomainDetailData> => {
       if (!staffProfile?.id || !staffProfile?.role_id || !domainId) {
-        return { domainName, domainId: domainId || 0, competencies: [], averageScore: null };
+        return { domainName, domainId: domainId || 0, competencies: [], averageScore: null, lastEvaluated: null };
       }
 
       // 1. Fetch competencies for this domain and role
@@ -63,10 +64,11 @@ export function useDomainDetail(domainSlug: string) {
 
       // Find the most recent evaluation and extract scores by competency
       const competencyScores = new Map<number, number>();
+      let mostRecentDate: Date | null = null;
+      
       if (evalData && evalData.length > 0) {
         // Get the most recent evaluation
         let mostRecentEvalId: string | null = null;
-        let mostRecentDate: Date | null = null;
 
         for (const row of evalData) {
           const dt = new Date(row.submitted_at);
@@ -179,7 +181,8 @@ export function useDomainDetail(domainSlug: string) {
         domainName,
         domainId: domainId || 0,
         competencies: competencyDetails,
-        averageScore
+        averageScore,
+        lastEvaluated: mostRecentDate
       };
     },
     enabled: !profileLoading && !!staffProfile?.id && !!domainId

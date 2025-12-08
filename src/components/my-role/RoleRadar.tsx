@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainSlug } from '@/lib/domainUtils';
 import { ROLE_CONTENT, DOMAIN_ORDER, type RoleType } from '@/lib/content/roleDefinitions';
-import { Star } from 'lucide-react';
+import { Star, ChevronRight } from 'lucide-react';
 
 interface DomainScore {
   domain_name: string;
@@ -13,6 +15,7 @@ interface DomainScore {
 }
 
 export default function RoleRadar() {
+  const navigate = useNavigate();
   const { data: staffProfile, isLoading: profileLoading } = useStaffProfile({ 
     redirectToSetup: false, 
     showErrorToast: false 
@@ -103,8 +106,10 @@ export default function RoleRadar() {
         return (
           <div
             key={domain}
+            onClick={() => navigate(`/my-role/domain/${getDomainSlug(domain)}`)}
             className={`
-              relative rounded-2xl border-2 p-6 transition-all
+              relative rounded-2xl border-2 p-6 transition-all cursor-pointer
+              hover:scale-[1.02] hover:shadow-lg
               ${isScored 
                 ? 'shadow-sm' 
                 : 'border-dashed border-muted-foreground/20 bg-muted/5'
@@ -144,6 +149,12 @@ export default function RoleRadar() {
             <p className="mt-3 text-xs italic text-muted-foreground leading-relaxed">
               {content.valueProp}
             </p>
+
+            {/* Click Hint */}
+            <div className="absolute bottom-4 right-4 flex items-center gap-1 text-xs text-muted-foreground">
+              <span>Explore</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
           </div>
         );
       })}

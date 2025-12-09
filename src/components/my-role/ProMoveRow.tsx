@@ -5,13 +5,17 @@ import type { ProMoveDetail } from '@/hooks/useDomainDetail';
 
 interface ProMoveRowProps {
   move: ProMoveDetail;
+  onClick?: () => void;
 }
 
-export function ProMoveRow({ move }: ProMoveRowProps) {
+export function ProMoveRow({ move, onClick }: ProMoveRowProps) {
   const hasHistory = !!move.lastPracticed;
 
   return (
-    <div className="group flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3 rounded-lg border border-transparent hover:bg-muted/50 hover:border-border/50 transition-all">
+    <div 
+      onClick={onClick}
+      className="group flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3 rounded-lg border border-transparent hover:bg-muted/50 hover:border-border/50 transition-all cursor-pointer"
+    >
       {/* Content */}
       <div className="flex-1 space-y-1.5">
         <p className="text-sm font-medium leading-relaxed text-foreground/90">

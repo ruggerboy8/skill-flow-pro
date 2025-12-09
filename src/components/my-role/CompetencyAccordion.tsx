@@ -13,6 +13,7 @@ interface CompetencyAccordionProps {
   score: number | null;
   proMoves: ProMoveDetail[];
   domainColor: string;
+  onSelectMove?: (move: ProMoveDetail) => void;
 }
 
 function getScoreBadge(score: number | null) {
@@ -34,7 +35,8 @@ export default function CompetencyAccordion({
   description,
   score,
   proMoves,
-  domainColor
+  domainColor,
+  onSelectMove
 }: CompetencyAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const badge = getScoreBadge(score);
@@ -101,7 +103,11 @@ export default function CompetencyAccordion({
               </h4>
               <div className="grid gap-1">
                 {proMoves.map((move) => (
-                  <ProMoveRow key={move.action_id} move={move} />
+                  <ProMoveRow 
+                    key={move.action_id} 
+                    move={move} 
+                    onClick={() => onSelectMove?.(move)}
+                  />
                 ))}
               </div>
             </div>

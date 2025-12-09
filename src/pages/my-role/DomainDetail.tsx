@@ -1,13 +1,15 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Sparkles, Trophy, TrendingUp } from 'lucide-react';
-import { useDomainDetail } from '@/hooks/useDomainDetail';
+import { useDomainDetail, type ProMoveDetail } from '@/hooks/useDomainDetail';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
 import { ROLE_CONTENT, type RoleType } from '@/lib/content/roleDefinitions';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import CompetencyAccordion from '@/components/my-role/CompetencyAccordion';
+import { ProMoveDrawer } from '@/components/my-role/ProMoveDrawer';
 import { cn } from '@/lib/utils';
 
 function getAverageBadge(score: number | null) {
@@ -27,6 +29,7 @@ export default function DomainDetail() {
   const { domainSlug = '' } = useParams<{ domainSlug: string }>();
   const navigate = useNavigate();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  const [selectedMove, setSelectedMove] = useState<ProMoveDetail | null>(null);
   
   const { data, isLoading, error } = useDomainDetail(domainSlug);
 
@@ -159,12 +162,21 @@ export default function DomainDetail() {
                   score={comp.observerScore}
                   proMoves={comp.proMoves}
                   domainColor={richColor}
+                  onSelectMove={(move) => setSelectedMove(move)}
                 />
               </div>
             ))
           )}
         </div>
       </div>
+
+      {/* Study Drawer */}
+      <ProMoveDrawer 
+        open={!!selectedMove}
+        onOpenChange={(open) => !open && setSelectedMove(null)}
+        move={selectedMove}
+        domainName={data?.domainName || ''}
+      />
     </div>
   );
 }

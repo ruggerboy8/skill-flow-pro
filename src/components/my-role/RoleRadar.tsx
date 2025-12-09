@@ -108,7 +108,7 @@ export default function RoleRadar() {
             key={domain}
             onClick={() => navigate(`/my-role/domain/${getDomainSlug(domain)}`)}
             className={`
-              relative rounded-2xl border-2 p-6 transition-all cursor-pointer
+              relative rounded-2xl border-2 p-4 md:p-6 transition-all cursor-pointer
               hover:scale-[1.02] hover:shadow-lg
               ${isScored 
                 ? 'shadow-sm' 
@@ -121,23 +121,25 @@ export default function RoleRadar() {
             } : {}}
           >
             {/* Header */}
-            <div className="flex justify-between items-start gap-3">
-              <h3 className="text-xl font-bold text-foreground">{domain}</h3>
-              {isScored ? (
-                <Badge 
-                  className="bg-white/60 backdrop-blur text-foreground shadow-sm border-0 flex items-center gap-1"
-                >
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span className="font-semibold">{score.toFixed(1)}</span>
-                </Badge>
-              ) : (
-                <Badge 
-                  variant="outline" 
-                  className="opacity-60 font-normal"
-                >
-                  Exploration Mode
-                </Badge>
-              )}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-3">
+              <h3 className="text-lg md:text-xl font-bold text-foreground">{domain}</h3>
+              <div className="self-start sm:self-auto">
+                {isScored ? (
+                  <Badge 
+                    className="bg-white/60 backdrop-blur text-foreground shadow-sm border-0 flex items-center gap-1"
+                  >
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    <span className="font-semibold">{score.toFixed(1)}</span>
+                  </Badge>
+                ) : (
+                  <Badge 
+                    variant="outline" 
+                    className="opacity-60 font-normal"
+                  >
+                    Exploration Mode
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {/* Description */}

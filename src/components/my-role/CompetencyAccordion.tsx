@@ -55,29 +55,33 @@ export default function CompetencyAccordion({
       }}
     >
       <CollapsibleTrigger asChild>
-        <div className="flex items-center gap-4 p-4 md:p-5 cursor-pointer w-full text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 md:p-5 cursor-pointer w-full text-left">
+          {/* Text Group - Expands */}
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-foreground leading-tight truncate">
-              {title}
+            <p className="font-semibold text-foreground leading-tight text-base">
+              {subtitle || title}
             </p>
             {subtitle && (
-              <p className="text-xs md:text-sm text-muted-foreground mt-1 truncate">
-                {subtitle}
+              <p className="text-xs text-muted-foreground mt-1">
+                {title}
               </p>
             )}
           </div>
 
-          <Badge variant="outline" className={cn('shrink-0 h-6', badge.className)}>
-            {score !== null && <Sparkles className="w-3 h-3 mr-1" />}
-            {badge.label}
-          </Badge>
+          {/* Meta Group - Badge + Chevron stay together */}
+          <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+            <Badge variant="outline" className={cn('shrink-0 h-6', badge.className)}>
+              {score !== null && <Sparkles className="w-3 h-3 mr-1" />}
+              {badge.label}
+            </Badge>
 
-          <ChevronDown
-            className={cn(
-              'w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0',
-              isOpen && 'rotate-180'
-            )}
-          />
+            <ChevronDown
+              className={cn(
+                'w-5 h-5 text-muted-foreground transition-transform duration-200 shrink-0',
+                isOpen && 'rotate-180'
+              )}
+            />
+          </div>
         </div>
       </CollapsibleTrigger>
 

@@ -113,7 +113,7 @@ export function ProMoveDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-[540px] p-0 flex flex-col gap-0 border-l-0 sm:border-l">
+      <SheetContent className="w-full sm:max-w-[540px] h-[100dvh] p-0 flex flex-col gap-0 border-l-0 sm:border-l">
         {/* Header */}
         <SheetHeader 
           className="px-6 py-6 text-left border-b"
@@ -167,7 +167,7 @@ export function ProMoveDrawer({
                   <section>
                     <SectionHeader icon={MessageCircle} title="Suggested Verbiage" />
                     <div 
-                      className="text-base leading-relaxed p-5 rounded-2xl border-2 border-dashed"
+                      className="text-base md:text-lg leading-relaxed p-4 md:p-5 rounded-2xl border-2 border-dashed"
                       style={{ 
                         backgroundColor: `hsl(${richColor} / 0.03)`,
                         borderColor: `hsl(${richColor} / 0.2)` 

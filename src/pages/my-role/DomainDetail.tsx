@@ -54,8 +54,8 @@ export default function DomainDetail() {
   return (
     <div className="min-h-screen">
       {/* Hero Header */}
-      <div 
-        className="px-4 py-8 md:px-6 md:py-12"
+        <div 
+        className="px-4 py-6 md:px-6 md:py-12"
         style={{
           background: `linear-gradient(to bottom right, hsl(${richColor} / 0.15), transparent)`
         }}
@@ -83,7 +83,7 @@ export default function DomainDetail() {
               ) : (
                 <>
                   <h1 
-                    className="text-3xl md:text-4xl font-bold"
+                    className="text-2xl md:text-4xl font-bold"
                     style={{ color: `hsl(${richColor})` }}
                   >
                     {data?.domainName}
@@ -99,7 +99,7 @@ export default function DomainDetail() {
 
             {/* Score Badge */}
             {!isLoading && (
-              <div className="flex flex-col items-end gap-1.5">
+              <div className="flex flex-col items-start md:items-end gap-1.5 mt-2 md:mt-0">
                 <Badge className={cn('px-4 py-2 text-sm font-medium shrink-0', avgBadge.className)}>
                   <BadgeIcon className="w-4 h-4 mr-2" />
                   {avgBadge.label}

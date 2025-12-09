@@ -767,7 +767,7 @@ export default function ConfidenceWizard() {
   const isLastItem = currentIndex === weeklyFocus.length - 1;
 
   return (
-    <div className="min-h-screen p-2 sm:p-4 bg-background">
+    <div className="min-h-[100dvh] p-2 sm:p-4 pb-24 bg-background">
       <div className="max-w-md mx-auto space-y-4">
         <Card style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}>
           {/* Submission Status Indicator */}
@@ -861,24 +861,28 @@ export default function ConfidenceWizard() {
               onChange={handleScoreChange}
             />
 
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => currentIndex > 0 ? handleBack() : navigate('/')}
-                className="flex-1"
-              >
-                {currentIndex > 0 ? 'Back' : 'Home'}
-              </Button>
-              <Button 
-                onClick={handleNext}
-                disabled={!canProceed || submitting}
-                className="flex-1"
-              >
-                {submitting ? 'Saving...' : isLastItem ? (isRepair ? 'Backfill' : 'Submit') : 'Next'}
-              </Button>
-            </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Sticky Footer Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur border-t z-50">
+        <div className="max-w-md mx-auto flex gap-3">
+          <Button 
+            variant="outline" 
+            onClick={() => currentIndex > 0 ? handleBack() : navigate('/')}
+            className="flex-1"
+          >
+            {currentIndex > 0 ? 'Back' : 'Home'}
+          </Button>
+          <Button 
+            onClick={handleNext}
+            disabled={!canProceed || submitting}
+            className="flex-[2]"
+          >
+            {submitting ? 'Saving...' : isLastItem ? (isRepair ? 'Backfill' : 'Submit') : 'Next'}
+          </Button>
+        </div>
       </div>
 
       {/* Smart Friction: Intervention Modal */}

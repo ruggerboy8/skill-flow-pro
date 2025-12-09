@@ -67,14 +67,14 @@ export function AppSidebar({ navigation, backfillMissingCount = 0 }: AppSidebarP
                 
                 return (
                   <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton asChild>
+                    <SidebarMenuButton asChild tooltip={item.name}>
                       <NavLink 
                         to={item.href} 
                         end 
                         className={`relative ${getNavCls(item.href)} ${needsHighlight ? 'animate-pulse' : ''}`}
                       >
-                        <Icon className="h-4 w-4" />
-                        {!isCollapsed && <span>{item.name}</span>}
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className={isCollapsed ? 'sr-only' : ''}>{item.name}</span>
                         {needsHighlight && (
                           <div className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full animate-ping" />
                         )}

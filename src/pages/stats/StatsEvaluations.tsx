@@ -120,10 +120,10 @@ export default function StatsEvaluations() {
         </CardHeader>
         <CardContent className="space-y-3">
           {latest.domains.map(d => (
-            <div key={d.domain_name} className="flex items-center gap-3 p-2 rounded-md ring-1 ring-border/50"
+            <div key={d.domain_name} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 rounded-md ring-1 ring-border/50"
                  style={{ backgroundColor: getDomainColor(d.domain_name) }}>
-              <span className="text-sm font-medium text-slate-900 w-32">{d.domain_name}</span>
-              <div className="flex items-center gap-4 text-sm">
+              <span className="text-sm font-medium text-slate-900 sm:w-32 shrink-0">{d.domain_name}</span>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm">
                 <span><strong>Self:</strong> {r1(d.avg_self) ?? '—'}</span>
                 <span><strong>Observer:</strong> {r1(d.avg_observer) ?? '—'}</span>
                 {d.avg_self != null && d.avg_observer != null && (
@@ -158,16 +158,17 @@ export default function StatsEvaluations() {
           </CardHeader>
           <CardContent className="space-y-3">
             {evals.filter(e => e.eval_id !== latest.eval_id).map(e => (
-              <div key={e.eval_id} className="p-3 rounded-md border flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="font-medium">{e.label}</div>
-                  <div className="text-xs text-muted-foreground">
+              <div key={e.eval_id} className="p-3 rounded-md border flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                <div className="space-y-1 min-w-0">
+                  <div className="font-medium text-sm sm:text-base">{e.label}</div>
+                  <div className="text-xs text-muted-foreground line-clamp-2 sm:line-clamp-1">
                     {e.domains.map(d => d.domain_name).join(' • ')}
                   </div>
                 </div>
                 <Button 
                   variant="outline" 
                   size="sm" 
+                  className="shrink-0 self-end sm:self-auto"
                   onClick={() => navigate(`/evaluation/${e.eval_id}`)}
                 >
                   View

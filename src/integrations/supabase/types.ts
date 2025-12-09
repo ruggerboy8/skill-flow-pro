@@ -2645,11 +2645,11 @@ export type Database = {
       retime_backfill_cycle:
         | {
             Args: { p_cycle: number; p_role_id: number; p_staff_id: string }
-            Returns: undefined
+            Returns: string
           }
         | {
             Args: { p_cycle: number; p_role_id: number; p_staff_id: string }
-            Returns: string
+            Returns: undefined
           }
       rewrite_backfill_week: {
         Args: {

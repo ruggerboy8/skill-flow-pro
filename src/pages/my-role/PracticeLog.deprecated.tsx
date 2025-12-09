@@ -1,11 +1,16 @@
+/**
+ * @deprecated December 2024 - Replaced by mobile-optimized PracticeLog.tsx (formerly PracticeLogV2)
+ * Uses ScoreHistoryV2 with card-based layout, stacked week headers, and rich domain colors.
+ * This file is archived for reference only.
+ */
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
 import { Skeleton } from '@/components/ui/skeleton';
 import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 import { StaffPriorityFocusTab } from '@/components/coach/StaffPriorityFocusTab';
-import ScoreHistoryV2 from '@/components/my-role/ScoreHistoryV2';
+import StatsScores from '@/pages/StatsScores';
 
-export default function PracticeLogV2() {
+export default function PracticeLog() {
   const { data: staffProfile, isLoading: profileLoading } = useStaffProfile({ 
     redirectToSetup: false, 
     showErrorToast: false 
@@ -15,7 +20,7 @@ export default function PracticeLogV2() {
 
   if (profileLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-48 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -28,7 +33,7 @@ export default function PracticeLogV2() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* On-Time Submissions Widget */}
       <OnTimeRateWidget staffId={staffProfile.id} />
       
@@ -39,8 +44,11 @@ export default function PracticeLogV2() {
         <StaffPriorityFocusTab rawData={rawData} />
       )}
       
-      {/* Score History V2 */}
-      <ScoreHistoryV2 />
+      {/* Score History */}
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold px-1">Score History</h3>
+        <StatsScores />
+      </div>
     </div>
   );
 }

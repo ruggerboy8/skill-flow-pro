@@ -47,7 +47,6 @@ import LocationDetail from "@/pages/dashboard/LocationDetail";
 import MyRoleLayout from "@/pages/my-role/MyRoleLayout";
 import RoleRadar from "@/components/my-role/RoleRadar";
 import PracticeLog from "@/pages/my-role/PracticeLog";
-import PracticeLogV2 from "@/pages/my-role/PracticeLogV2";
 import DomainDetail from "@/pages/my-role/DomainDetail";
 
 // App routes with pre-routing checks for public pages
@@ -99,7 +98,6 @@ function AppRoutes() {
           <Route index element={<RoleRadar />} />
           <Route path="overview" element={<RoleRadar />} />
           <Route path="practice-log" element={<PracticeLog />} />
-          <Route path="practice-log-v2" element={<PracticeLogV2 />} />
           <Route path="evaluations" element={<StatsEvaluations />} />
           {/* Legacy redirects for old tab routes */}
           <Route path="focus" element={<PracticeLog />} />

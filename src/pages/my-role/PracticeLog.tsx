@@ -3,7 +3,7 @@ import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
 import { Skeleton } from '@/components/ui/skeleton';
 import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 import { StaffPriorityFocusTab } from '@/components/coach/StaffPriorityFocusTab';
-import StatsScores from '@/pages/StatsScores';
+import ScoreHistoryV2 from '@/components/my-role/ScoreHistoryV2';
 
 export default function PracticeLog() {
   const { data: staffProfile, isLoading: profileLoading } = useStaffProfile({ 
@@ -15,7 +15,7 @@ export default function PracticeLog() {
 
   if (profileLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-48 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -28,7 +28,7 @@ export default function PracticeLog() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* On-Time Submissions Widget */}
       <OnTimeRateWidget staffId={staffProfile.id} />
       
@@ -39,11 +39,8 @@ export default function PracticeLog() {
         <StaffPriorityFocusTab rawData={rawData} />
       )}
       
-      {/* Score History */}
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold px-1">Score History</h3>
-        <StatsScores />
-      </div>
+      {/* Score History V2 */}
+      <ScoreHistoryV2 />
     </div>
   );
 }

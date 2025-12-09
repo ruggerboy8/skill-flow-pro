@@ -14,7 +14,7 @@ export default function MyRoleLayout() {
   // Extract the tab from the pathname
   const pathParts = location.pathname.split('/');
   const lastPart = pathParts[pathParts.length - 1];
-  const currentTab = ['overview', 'practice-log', 'practice-log-v2', 'evaluations'].includes(lastPart) 
+  const currentTab = ['overview', 'practice-log', 'evaluations'].includes(lastPart) 
     ? lastPart 
     : 'overview';
   
@@ -50,10 +50,9 @@ export default function MyRoleLayout() {
       </div>
       
       <Tabs value={currentTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="practice-log">Practice Log</TabsTrigger>
-          <TabsTrigger value="practice-log-v2" className="text-xs sm:text-sm">V2</TabsTrigger>
           <TabsTrigger value="evaluations">Evaluations</TabsTrigger>
         </TabsList>
         

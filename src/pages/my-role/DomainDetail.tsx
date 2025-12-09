@@ -116,7 +116,7 @@ export default function DomainDetail() {
                     <Button 
                       variant="link" 
                       className="h-auto p-0 text-[10px] text-primary/80"
-                      onClick={() => navigate('/stats/evaluations')}
+                      onClick={() => navigate('/my-role/evaluations')}
                     >
                       (View Report)
                     </Button>

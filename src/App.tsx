@@ -46,6 +46,7 @@ import LocationDetail from "@/pages/dashboard/LocationDetail";
 // My Role pages
 import MyRoleLayout from "@/pages/my-role/MyRoleLayout";
 import RoleRadar from "@/components/my-role/RoleRadar";
+import PracticeLog from "@/pages/my-role/PracticeLog";
 import DomainDetail from "@/pages/my-role/DomainDetail";
 
 // App routes with pre-routing checks for public pages
@@ -96,9 +97,11 @@ function AppRoutes() {
         <Route path="my-role" element={<MyRoleLayout />}>
           <Route index element={<RoleRadar />} />
           <Route path="overview" element={<RoleRadar />} />
-          <Route path="focus" element={<StatsPriorityFocus />} />
-          <Route path="history" element={<StatsScores />} />
+          <Route path="practice-log" element={<PracticeLog />} />
           <Route path="evaluations" element={<StatsEvaluations />} />
+          {/* Legacy redirects for old tab routes */}
+          <Route path="focus" element={<PracticeLog />} />
+          <Route path="history" element={<PracticeLog />} />
         </Route>
         
         {/* My Role - Domain Detail (Full Page Takeover - No Tabs) */}

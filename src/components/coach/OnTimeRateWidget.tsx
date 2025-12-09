@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
 import { Clock, CheckCircle2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -196,29 +196,23 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
             <CheckCircle2 className="w-5 h-5" />
             Submission Tracking
           </CardTitle>
-          <div className="flex gap-2">
-            <Button
-              variant={filter === '3weeks' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter('3weeks')}
-            >
-              Last 3 Weeks
-            </Button>
-            <Button
-              variant={filter === '6weeks' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter('6weeks')}
-            >
-              Last 6 Weeks
-            </Button>
-            <Button
-              variant={filter === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter('all')}
-            >
-              All Time
-            </Button>
-          </div>
+          <ToggleGroup 
+            type="single" 
+            value={filter} 
+            onValueChange={(v) => v && setFilter(v as TimeFilter)}
+            size="sm"
+            className="gap-0"
+          >
+            <ToggleGroupItem value="3weeks" className="text-xs px-2 h-7 rounded-r-none">
+              3 wks
+            </ToggleGroupItem>
+            <ToggleGroupItem value="6weeks" className="text-xs px-2 h-7 rounded-none border-x-0">
+              6 wks
+            </ToggleGroupItem>
+            <ToggleGroupItem value="all" className="text-xs px-2 h-7 rounded-l-none">
+              All
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
       </CardHeader>
       <CardContent>

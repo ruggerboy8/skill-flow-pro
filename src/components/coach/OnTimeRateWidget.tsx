@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
-import { Clock, CheckCircle2 } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface OnTimeRateWidgetProps {
@@ -179,7 +179,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Submission Tracking</CardTitle>
+          <CardTitle className="text-base font-semibold">Submission Tracking</CardTitle>
         </CardHeader>
         <CardContent>
           <Skeleton className="h-20 w-full" />
@@ -192,8 +192,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5" />
+          <CardTitle className="text-base font-semibold">
             Submission Tracking
           </CardTitle>
           <ToggleGroup 
@@ -225,12 +224,9 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
               <div className="text-xs text-muted-foreground mt-1">Completion</div>
             </div>
             <div className="flex-1 space-y-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-                <span className="text-sm text-muted-foreground">
-                  {stats.completedSubmissions} of {stats.totalSubmissions} completed
-                  {stats.missing > 0 && `, ${stats.missing} missing`}
-                </span>
+              <div className="text-sm text-muted-foreground">
+                {stats.completedSubmissions} of {stats.totalSubmissions} completed
+                {stats.missing > 0 && `, ${stats.missing} missing`}
               </div>
               <div className="w-full bg-muted rounded-full h-2">
                 <div

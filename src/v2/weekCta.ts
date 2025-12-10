@@ -33,9 +33,10 @@ export function buildWeekBanner(args: {
       };
 
     case 'wait_for_thu':
+      // TEMPORARILY DISABLED TIME GATING - showing CTA even before Thursday
       return {
-        message: `✅ Confidence submitted! Come back on Thursday to rate your performance.`,
-        // NO CTA - intentionally omitted to prevent early access before Thursday
+        message: `✅ Confidence submitted! You can now rate your performance.`,
+        cta: { label: 'Rate Performance', to: '/performance/current/step/1' }
       };
 
     case 'can_checkout':

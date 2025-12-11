@@ -59,11 +59,11 @@ export default function CompetencyAccordion({
           {/* Text Group - Expands */}
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground leading-tight text-base">
-              {subtitle || title}
+              {title}
             </p>
             {subtitle && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {title}
+              <p className="text-sm text-muted-foreground mt-1 italic">
+                {subtitle}
               </p>
             )}
           </div>

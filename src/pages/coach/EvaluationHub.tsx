@@ -41,6 +41,7 @@ import {
 } from '@/lib/evaluations';
 import { ProMovesAccordion } from '@/components/coach/ProMovesAccordion';
 import { SummaryTab } from '@/components/coach/SummaryTab';
+import { useAudioRecording } from '@/hooks/useAudioRecording';
 
 const SCORE_OPTIONS = [
   { value: 1, label: '1 - Needs Development', color: 'bg-red-100 text-red-800 border-red-200' },
@@ -80,6 +81,9 @@ export function EvaluationHub() {
   } | null>(null);
   const [summaryFeedback, setSummaryFeedback] = useState<string | null>(null);
   const [summaryRawTranscript, setSummaryRawTranscript] = useState<string | null>(null);
+
+  // Audio recording state - lifted here so it persists across tab switches
+  const { state: recordingState, controls: recordingControls } = useAudioRecording();
 
   useEffect(() => {
     if (evalId) {
@@ -1013,7 +1017,15 @@ export function EvaluationHub() {
         <TabsList className="mb-6">
           <TabsTrigger value="observation">Observation</TabsTrigger>
           <TabsTrigger value="self-assessment">Self-Assessment</TabsTrigger>
-          <TabsTrigger value="summary">Summary</TabsTrigger>
+          <TabsTrigger value="summary" className="flex items-center gap-2">
+            Summary
+            {recordingState.isRecording && (
+              <span className={cn(
+                "w-2 h-2 rounded-full",
+                recordingState.isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"
+              )} />
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="observation">
@@ -1230,6 +1242,8 @@ export function EvaluationHub() {
             isReadOnly={isReadOnly}
             onFeedbackChange={handleSummaryFeedbackChange}
             onTranscriptChange={handleSummaryTranscriptChange}
+            recordingState={recordingState}
+            recordingControls={recordingControls}
           />
         </TabsContent>
       </Tabs>

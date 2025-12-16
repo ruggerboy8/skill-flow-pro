@@ -2,19 +2,30 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Play, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { AudioRecordingState, AudioRecordingControls } from '@/hooks/useAudioRecording';
 
 interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob) => void;
   disabled?: boolean;
   className?: string;
+  // External state management (optional - for persistence across tab switches)
+  externalState?: AudioRecordingState;
+  externalControls?: AudioRecordingControls;
 }
 
-export function AudioRecorder({ onRecordingComplete, disabled, className }: AudioRecorderProps) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+export function AudioRecorder({ 
+  onRecordingComplete, 
+  disabled, 
+  className,
+  externalState,
+  externalControls,
+}: AudioRecorderProps) {
+  // Internal state (used when no external state provided)
+  const [internalIsRecording, setInternalIsRecording] = useState(false);
+  const [internalIsPaused, setInternalIsPaused] = useState(false);
+  const [internalRecordingTime, setInternalRecordingTime] = useState(0);
+  const [internalAudioBlob, setInternalAudioBlob] = useState<Blob | null>(null);
+  const [internalAudioUrl, setInternalAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -22,14 +33,26 @@ export function AudioRecorder({ onRecordingComplete, disabled, className }: Audi
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Use external state if provided, otherwise internal
+  const isRecording = externalState?.isRecording ?? internalIsRecording;
+  const isPaused = externalState?.isPaused ?? internalIsPaused;
+  const recordingTime = externalState?.recordingTime ?? internalRecordingTime;
+  const audioBlob = externalState?.audioBlob ?? internalAudioBlob;
+  const audioUrl = externalState?.audioUrl ?? internalAudioUrl;
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (internalAudioUrl) URL.revokeObjectURL(internalAudioUrl);
     };
-  }, [audioUrl]);
+  }, [internalAudioUrl]);
 
   const startRecording = async () => {
+    if (externalControls) {
+      await externalControls.startRecording();
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
@@ -45,22 +68,19 @@ export function AudioRecorder({ onRecordingComplete, disabled, className }: Audi
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(blob);
+        setInternalAudioBlob(blob);
         const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-        
-        // Stop all tracks
+        setInternalAudioUrl(url);
         stream.getTracks().forEach(track => track.stop());
       };
 
-      mediaRecorder.start(1000); // Collect data every second
-      setIsRecording(true);
-      setIsPaused(false);
-      setRecordingTime(0);
+      mediaRecorder.start(1000);
+      setInternalIsRecording(true);
+      setInternalIsPaused(false);
+      setInternalRecordingTime(0);
       
-      // Start timer
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setInternalRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -68,10 +88,15 @@ export function AudioRecorder({ onRecordingComplete, disabled, className }: Audi
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (externalControls) {
+      externalControls.stopRecording();
+      return;
+    }
+
+    if (mediaRecorderRef.current && internalIsRecording) {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsPaused(false);
+      setInternalIsRecording(false);
+      setInternalIsPaused(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -80,19 +105,22 @@ export function AudioRecorder({ onRecordingComplete, disabled, className }: Audi
   };
 
   const togglePause = () => {
-    if (!mediaRecorderRef.current || !isRecording) return;
+    if (externalControls) {
+      externalControls.togglePause();
+      return;
+    }
+
+    if (!mediaRecorderRef.current || !internalIsRecording) return;
     
-    if (isPaused) {
+    if (internalIsPaused) {
       mediaRecorderRef.current.resume();
-      setIsPaused(false);
-      // Resume timer
+      setInternalIsPaused(false);
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setInternalRecordingTime(prev => prev + 1);
       }, 1000);
     } else {
       mediaRecorderRef.current.pause();
-      setIsPaused(true);
-      // Pause timer
+      setInternalIsPaused(true);
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -119,12 +147,17 @@ export function AudioRecorder({ onRecordingComplete, disabled, className }: Audi
   };
 
   const resetRecording = () => {
-    setAudioBlob(null);
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null);
+    if (externalControls) {
+      externalControls.resetRecording();
+      return;
     }
-    setRecordingTime(0);
+
+    setInternalAudioBlob(null);
+    if (internalAudioUrl) {
+      URL.revokeObjectURL(internalAudioUrl);
+      setInternalAudioUrl(null);
+    }
+    setInternalRecordingTime(0);
     setIsPlaying(false);
   };
 

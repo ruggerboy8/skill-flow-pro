@@ -50,24 +50,27 @@ export async function createDraftEvaluation({
   evaluatorId: string;
   observedAt?: Date;
 }): Promise<{ evaluation: Evaluation; items: EvaluationItem[] }> {
-  // Check if draft already exists (idempotent)
-  let query = supabase
+  // Check if evaluation already exists (draft or submitted) - unique constraint on (staff_id, program_year, quarter, type)
+  let existingQuery = supabase
     .from('evaluations')
     .select('*, evaluation_items(*)')
     .eq('staff_id', staffId)
     .eq('program_year', programYear)
-    .eq('type', type)
-    .eq('status', 'draft');
+    .eq('type', type);
 
   if (quarter) {
-    query = query.eq('quarter', quarter);
+    existingQuery = existingQuery.eq('quarter', quarter);
   } else {
-    query = query.is('quarter', null);
+    existingQuery = existingQuery.is('quarter', null);
   }
 
-  const { data: existingEval } = await query.maybeSingle();
+  const { data: existingEval } = await existingQuery.maybeSingle();
 
   if (existingEval) {
+    if (existingEval.status === 'submitted') {
+      throw new Error(`A ${type} evaluation for ${quarter || 'this period'} ${programYear} has already been submitted. You cannot create a duplicate.`);
+    }
+    // Return existing draft
     return {
       evaluation: existingEval,
       items: existingEval.evaluation_items || []

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getEvaluation } from '@/lib/evaluations';
@@ -200,6 +200,28 @@ export default function EvaluationViewer() {
           </p>
         </div>
       </div>
+
+      {/* Overall Feedback Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Overall Feedback
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {(evaluation as any).summary_feedback ? (
+            <div 
+              className="prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: (evaluation as any).summary_feedback }}
+            />
+          ) : (
+            <p className="text-muted-foreground italic">
+              No overall feedback was provided for this evaluation.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Domain Sections */}
       <div className="space-y-6">

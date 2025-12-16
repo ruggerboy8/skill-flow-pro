@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import type { AudioRecordingState, AudioRecordingControls } from '@/hooks/useAudioRecording';
 
 interface SummaryTabProps {
   evalId: string;
@@ -17,6 +18,9 @@ interface SummaryTabProps {
   isReadOnly: boolean;
   onFeedbackChange: (feedback: string) => void;
   onTranscriptChange: (transcript: string) => void;
+  // Optional external recording state for persistence across tabs
+  recordingState?: AudioRecordingState;
+  recordingControls?: AudioRecordingControls;
 }
 
 export function SummaryTab({
@@ -27,6 +31,8 @@ export function SummaryTab({
   isReadOnly,
   onFeedbackChange,
   onTranscriptChange,
+  recordingState,
+  recordingControls,
 }: SummaryTabProps) {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -83,6 +89,11 @@ export function SummaryTab({
       setLocalFeedback(formattedFeedback);
       onFeedbackChange(formattedFeedback);
 
+      // Reset recording state after successful processing
+      if (recordingControls) {
+        recordingControls.resetRecording();
+      }
+
       toast({
         title: 'Success',
         description: 'Audio transcribed and formatted successfully',
@@ -124,6 +135,9 @@ export function SummaryTab({
     'list', 'bullet'
   ];
 
+  // Check if recording is in progress (for showing indicator on other tabs)
+  const isRecordingInProgress = recordingState?.isRecording || false;
+
   return (
     <div className="space-y-6">
       {/* Audio Recording Section */}
@@ -133,6 +147,12 @@ export function SummaryTab({
             <CardTitle className="text-lg flex items-center gap-2">
               <Mic className="w-5 h-5" />
               Record Overall Feedback
+              {isRecordingInProgress && (
+                <span className="ml-2 flex items-center gap-1 text-sm font-normal text-red-500">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  Recording in progress
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -153,6 +173,8 @@ export function SummaryTab({
               <AudioRecorder
                 onRecordingComplete={handleRecordingComplete}
                 disabled={isProcessing}
+                externalState={recordingState}
+                externalControls={recordingControls}
               />
             )}
           </CardContent>

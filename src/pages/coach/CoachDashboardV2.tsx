@@ -1,14 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronLeft, ChevronRight, RotateCw, CalendarOff } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, RotateCw, CalendarOff, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +15,7 @@ import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { StaffWeekSummary } from '@/types/coachV2';
 import ReminderComposer from '@/components/coach/ReminderComposer';
 import { getChicagoMonday } from '@/lib/plannerUtils';
+import { MultiSelect } from '@/components/ui/multi-select';
 
 interface CoachDashboardProps {
   forcedLocationId?: string;        // Locks to specific location by UUID
@@ -39,10 +39,19 @@ export default function CoachDashboardV2({
     return new Date(mondayStr + 'T12:00:00');
   });
 
-  // Filter state - restore from URL params
-  const [selectedOrganization, setSelectedOrganization] = useState(searchParams.get('org') || 'all');
-  const [selectedLocation, setSelectedLocation] = useState(searchParams.get('loc') || 'all');
-  const [selectedRole, setSelectedRole] = useState(searchParams.get('role') || 'all');
+  // Filter state - multi-select arrays, restore from URL params
+  const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>(() => {
+    const orgParam = searchParams.get('org');
+    return orgParam ? orgParam.split(',').filter(Boolean) : [];
+  });
+  const [selectedLocations, setSelectedLocations] = useState<string[]>(() => {
+    const locParam = searchParams.get('loc');
+    return locParam ? locParam.split(',').filter(Boolean) : [];
+  });
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(() => {
+    const roleParam = searchParams.get('role');
+    return roleParam ? roleParam.split(',').filter(Boolean) : [];
+  });
   const [search, setSearch] = useState(searchParams.get('q') || '');
 
   // Reminder state
@@ -98,19 +107,22 @@ export default function CoachDashboardV2({
   }, [weekOfString]);
 
   // Unique filter options
-  const organizations = useMemo(() => {
-    return Array.from(new Set(summaries.map(s => s.organization_name))).sort();
+  const organizationOptions = useMemo(() => {
+    const orgs = Array.from(new Set(summaries.map(s => s.organization_name))).sort();
+    return orgs.map(org => ({ value: org, label: org }));
   }, [summaries]);
 
-  const locations = useMemo(() => {
-    const filtered = selectedOrganization === 'all'
+  const locationOptions = useMemo(() => {
+    const filtered = selectedOrganizations.length === 0
       ? summaries
-      : summaries.filter(s => s.organization_name === selectedOrganization);
-    return Array.from(new Set(filtered.map(s => s.location_name))).sort();
-  }, [summaries, selectedOrganization]);
+      : summaries.filter(s => selectedOrganizations.includes(s.organization_name));
+    const locs = Array.from(new Set(filtered.map(s => s.location_name))).sort();
+    return locs.map(loc => ({ value: loc, label: loc }));
+  }, [summaries, selectedOrganizations]);
 
-  const roles = useMemo(() => {
-    return Array.from(new Set(summaries.map(s => s.role_name))).sort();
+  const roleOptions = useMemo(() => {
+    const roles = Array.from(new Set(summaries.map(s => s.role_name))).sort();
+    return roles.map(role => ({ value: role, label: role }));
   }, [summaries]);
 
   // Apply filters
@@ -121,17 +133,17 @@ export default function CoachDashboardV2({
     if (forcedLocationId) {
       filtered = filtered.filter(s => s.location_id === forcedLocationId);
     } else {
-      if (selectedOrganization !== 'all') {
-        filtered = filtered.filter(s => s.organization_name === selectedOrganization);
+      if (selectedOrganizations.length > 0) {
+        filtered = filtered.filter(s => selectedOrganizations.includes(s.organization_name));
       }
 
-      if (selectedLocation !== 'all') {
-        filtered = filtered.filter(s => s.location_name === selectedLocation);
+      if (selectedLocations.length > 0) {
+        filtered = filtered.filter(s => selectedLocations.includes(s.location_name));
       }
     }
 
-    if (selectedRole !== 'all') {
-      filtered = filtered.filter(s => s.role_name === selectedRole);
+    if (selectedRoles.length > 0) {
+      filtered = filtered.filter(s => selectedRoles.includes(s.role_name));
     }
 
     if (search.trim()) {
@@ -143,7 +155,7 @@ export default function CoachDashboardV2({
     }
 
     return filtered;
-  }, [summaries, selectedOrganization, selectedLocation, selectedRole, search, forcedLocationId]);
+  }, [summaries, selectedOrganizations, selectedLocations, selectedRoles, search, forcedLocationId]);
 
   // Sort: missing both → missing conf → missing perf → complete, then A-Z
   const sortedRows = useMemo(() => {
@@ -172,30 +184,30 @@ export default function CoachDashboardV2({
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     
-    if (selectedOrganization !== 'all') params.set('org', selectedOrganization);
+    if (selectedOrganizations.length > 0) params.set('org', selectedOrganizations.join(','));
     else params.delete('org');
     
-    if (selectedLocation !== 'all') params.set('loc', selectedLocation);
+    if (selectedLocations.length > 0) params.set('loc', selectedLocations.join(','));
     else params.delete('loc');
     
-    if (selectedRole !== 'all') params.set('role', selectedRole);
+    if (selectedRoles.length > 0) params.set('role', selectedRoles.join(','));
     else params.delete('role');
     
     if (search.trim()) params.set('q', search.trim());
     else params.delete('q');
 
     setSearchParams(params, { replace: true });
-  }, [selectedOrganization, selectedLocation, selectedRole, search]);
+  }, [selectedOrganizations, selectedLocations, selectedRoles, search]);
 
   // Clear filters
   const clearFilters = () => {
-    setSelectedOrganization('all');
-    setSelectedLocation('all');
-    setSelectedRole('all');
+    setSelectedOrganizations([]);
+    setSelectedLocations([]);
+    setSelectedRoles([]);
     setSearch('');
   };
 
-  const hasActiveFilters = selectedOrganization !== 'all' || selectedLocation !== 'all' || selectedRole !== 'all' || search.trim() !== '';
+  const hasActiveFilters = selectedOrganizations.length > 0 || selectedLocations.length > 0 || selectedRoles.length > 0 || search.trim() !== '';
 
   // Missing counts for reminder buttons
   const missingConfCount = sortedRows.filter(s => s.conf_count < s.assignment_count).length;
@@ -324,43 +336,34 @@ export default function CoachDashboardV2({
       <div className="flex items-center gap-3 flex-wrap">
         {!hideOrgLocationFilters && (
           <>
-            <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Organization" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Organizations</SelectItem>
-                {organizations.map(org => (
-                  <SelectItem key={org} value={org}>{org}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={organizationOptions}
+              selected={selectedOrganizations}
+              onChange={setSelectedOrganizations}
+              placeholder="All Organizations"
+              searchPlaceholder="Search orgs..."
+              className="min-w-[200px]"
+            />
 
-            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
-                {locations.map(loc => (
-                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={locationOptions}
+              selected={selectedLocations}
+              onChange={setSelectedLocations}
+              placeholder="All Locations"
+              searchPlaceholder="Search locations..."
+              className="min-w-[200px]"
+            />
           </>
         )}
 
-        <Select value={selectedRole} onValueChange={setSelectedRole}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            {roles.map(role => (
-              <SelectItem key={role} value={role}>{role}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MultiSelect
+          options={roleOptions}
+          selected={selectedRoles}
+          onChange={setSelectedRoles}
+          placeholder="All Roles"
+          searchPlaceholder="Search roles..."
+          className="min-w-[160px]"
+        />
 
         <Input
           placeholder="Search by name or email..."
@@ -370,8 +373,14 @@ export default function CoachDashboardV2({
         />
 
         {hasActiveFilters && !forcedLocationId && (
-          <Button variant="ghost" size="sm" onClick={clearFilters}>
-            Clear
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={clearFilters}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear Filters
           </Button>
         )}
       </div>

@@ -146,7 +146,7 @@ export function SummaryTab({
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Mic className="w-5 h-5" />
-              Record Overall Feedback
+              Add Your Voice & Context
               {isRecordingInProgress && (
                 <span className="ml-2 flex items-center gap-1 text-sm font-normal text-red-500">
                   <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -157,9 +157,29 @@ export function SummaryTab({
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Record your overall feedback about this staff member. The audio will be transcribed 
-              and formatted into a professional feedback document that you can review and edit.
+              You've already captured the specific data points. This recording is your chance to provide 
+              the "Why" and the "How." Don't worry about being polished—just speak naturally. Our system 
+              will clean up the grammar and format it professionally for you.
             </p>
+            
+            <div className="mb-4 space-y-3">
+              <p className="text-sm font-medium">What to cover:</p>
+              <ul className="text-sm text-muted-foreground space-y-1.5 list-disc list-inside ml-2">
+                <li><strong>The "Big Picture":</strong> How are they doing generally? (e.g., "You bring such a great energy to the front desk.")</li>
+                <li><strong>Nuance on the Scores:</strong> If you gave a lower score, explain the specific behavior you want to see change. If you gave a high score, mention a specific example of when they nailed it.</li>
+                <li><strong>Encouragement:</strong> End with a forward-looking statement about their future in the practice.</li>
+              </ul>
+            </div>
+            
+            <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm font-medium mb-2">Stuck? Try these sentence starters:</p>
+              <ul className="text-sm text-muted-foreground space-y-1 italic">
+                <li>"I want to highlight how well you handled..."</li>
+                <li>"Regarding the [Clinical/Clerical] score, what I really meant was..."</li>
+                <li>"A specific example of where I see room for growth is..."</li>
+                <li>"Overall, I really appreciate that you..."</li>
+              </ul>
+            </div>
             
             {isProcessing ? (
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">

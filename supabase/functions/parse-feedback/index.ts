@@ -35,6 +35,12 @@ serve(async (req) => {
 
 Your task is to take raw evaluator feedback (often from a transcribed audio recording) and format it into a clear, professional, staff-facing feedback document.
 
+OUTPUT FORMAT: You MUST output valid HTML that can be rendered in a rich text editor. Use these HTML tags:
+- <p> for paragraphs
+- <strong> for emphasis
+- <ul> and <li> for bullet lists
+- <h3> for section headers if organizing into sections
+
 Guidelines:
 - Use a friendly but professional tone
 - Organize the feedback clearly with appropriate sections if natural (e.g., strengths, areas for growth, recommendations)
@@ -45,7 +51,8 @@ Guidelines:
 - Address the staff member directly using "you" language
 - Focus on actionable, constructive feedback
 
-Do NOT add information that wasn't in the original transcript. Only clean up and format what was said.`;
+Do NOT add information that wasn't in the original transcript. Only clean up and format what was said.
+Do NOT wrap your response in markdown code blocks. Output raw HTML only.`;
 
     const userPrompt = `Please format this evaluator feedback${staffName ? ` for ${staffName}` : ''} into a professional staff-facing document:
 

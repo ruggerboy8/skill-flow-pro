@@ -837,135 +837,6 @@ export function EvaluationHub() {
         </div>
       </div>
 
-      {/* Audio Recording Section */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Mic className="w-5 h-5" />
-            Self-Evaluation Interview Recording
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {currentRecording ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FileAudio className="w-8 h-8 text-primary" />
-                  <div>
-                    <p className="font-medium">{currentRecording.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatFileSize(currentRecording.size)} • 
-                      Uploaded {format(new Date(currentRecording.uploaded_at), 'MMM d, yyyy')}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleDownloadRecording}
-                  >
-                    <Download className="w-4 h-4 mr-1" />
-                    Download
-                  </Button>
-                  {!isReadOnly && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="destructive">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Recording</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure? This will permanently delete the audio recording.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleDeleteRecording}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {!selectedFile ? (
-                <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                  <input
-                    type="file"
-                    accept=".mp3,.wav,.m4a,.ogg,.webm,audio/*"
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    disabled={isReadOnly}
-                    className="hidden"
-                    id="audio-upload"
-                  />
-                  <label
-                    htmlFor="audio-upload"
-                    className={cn(
-                      "cursor-pointer flex flex-col items-center gap-2",
-                      isReadOnly && "cursor-not-allowed opacity-60"
-                    )}
-                  >
-                    <Upload className="w-8 h-8 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Click to upload audio recording
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      MP3, WAV, M4A, OGG, or WebM (max 100MB)
-                    </p>
-                  </label>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <FileAudio className="w-6 h-6" />
-                      <div>
-                        <p className="font-medium">{selectedFile.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatFileSize(selectedFile.size)}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setSelectedFile(null)}
-                      disabled={isUploading}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <Button
-                    onClick={handleFileUpload}
-                    disabled={isUploading || isReadOnly}
-                    className="w-full"
-                  >
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Recording
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Progress & Submit Bar */}
       {!isReadOnly && (
@@ -1115,6 +986,136 @@ export function EvaluationHub() {
         </TabsContent>
 
         <TabsContent value="self-assessment">
+          {/* Self-Evaluation Interview Recording */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Mic className="w-5 h-5" />
+                Self-Evaluation Interview Recording
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {currentRecording ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileAudio className="w-8 h-8 text-primary" />
+                      <div>
+                        <p className="font-medium">{currentRecording.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatFileSize(currentRecording.size)} • 
+                          Uploaded {format(new Date(currentRecording.uploaded_at), 'MMM d, yyyy')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDownloadRecording}
+                      >
+                        <Download className="w-4 h-4 mr-1" />
+                        Download
+                      </Button>
+                      {!isReadOnly && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="destructive">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Recording</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure? This will permanently delete the audio recording.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleDeleteRecording}>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {!selectedFile ? (
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                      <input
+                        type="file"
+                        accept=".mp3,.wav,.m4a,.ogg,.webm,audio/*"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        disabled={isReadOnly}
+                        className="hidden"
+                        id="audio-upload"
+                      />
+                      <label
+                        htmlFor="audio-upload"
+                        className={cn(
+                          "cursor-pointer flex flex-col items-center gap-2",
+                          isReadOnly && "cursor-not-allowed opacity-60"
+                        )}
+                      >
+                        <Upload className="w-8 h-8 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          Click to upload audio recording
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          MP3, WAV, M4A, OGG, or WebM (max 100MB)
+                        </p>
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <FileAudio className="w-6 h-6" />
+                          <div>
+                            <p className="font-medium">{selectedFile.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatFileSize(selectedFile.size)}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setSelectedFile(null)}
+                          disabled={isUploading}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <Button
+                        onClick={handleFileUpload}
+                        disabled={isUploading || isReadOnly}
+                        className="w-full"
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload Recording
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {currentItem && (
             <Card>
               <CardHeader>

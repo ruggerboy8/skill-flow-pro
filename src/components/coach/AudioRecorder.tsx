@@ -179,86 +179,93 @@ export function AudioRecorder({
         />
       )}
 
-      <div className="flex items-center gap-3">
-        {!audioBlob ? (
-          <>
-            {/* Recording controls */}
-            {!isRecording ? (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          {!audioBlob ? (
+            <>
+              {/* Recording controls */}
+              {!isRecording ? (
+                <Button
+                  onClick={startRecording}
+                  disabled={disabled}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Mic className="w-4 h-4 text-red-500" />
+                  Start Recording
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    onClick={togglePause}
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                  >
+                    {isPaused ? (
+                      <Mic className="w-4 h-4 text-red-500" />
+                    ) : (
+                      <Pause className="w-4 h-4" />
+                    )}
+                  </Button>
+                  <Button
+                    onClick={stopRecording}
+                    variant="destructive"
+                    size="icon"
+                    className="shrink-0"
+                  >
+                    <Square className="w-4 h-4" />
+                  </Button>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className={cn(
+                      "w-2 h-2 rounded-full",
+                      isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"
+                    )} />
+                    {isPaused ? "Paused" : "Recording"}: {formatTime(recordingTime)}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Playback controls */}
               <Button
-                onClick={startRecording}
-                disabled={disabled}
+                onClick={togglePlayback}
                 variant="outline"
+                size="icon"
+                className="shrink-0"
+              >
+                {isPlaying ? (
+                  <Pause className="w-4 h-4" />
+                ) : (
+                  <Play className="w-4 h-4" />
+                )}
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                {formatTime(recordingTime)} recorded
+              </div>
+              <Button
+                onClick={resetRecording}
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+              >
+                Re-record
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={disabled}
                 className="gap-2"
               >
-                <Mic className="w-4 h-4 text-red-500" />
-                Start Recording
+                Transcribe & Format
               </Button>
-            ) : (
-              <>
-                <Button
-                  onClick={togglePause}
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0"
-                >
-                  {isPaused ? (
-                    <Mic className="w-4 h-4 text-red-500" />
-                  ) : (
-                    <Pause className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button
-                  onClick={stopRecording}
-                  variant="destructive"
-                  size="icon"
-                  className="shrink-0"
-                >
-                  <Square className="w-4 h-4" />
-                </Button>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className={cn(
-                    "w-2 h-2 rounded-full",
-                    isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"
-                  )} />
-                  {isPaused ? "Paused" : "Recording"}: {formatTime(recordingTime)}
-                </div>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            {/* Playback controls */}
-            <Button
-              onClick={togglePlayback}
-              variant="outline"
-              size="icon"
-              className="shrink-0"
-            >
-              {isPlaying ? (
-                <Pause className="w-4 h-4" />
-              ) : (
-                <Play className="w-4 h-4" />
-              )}
-            </Button>
-            <div className="text-sm text-muted-foreground">
-              {formatTime(recordingTime)} recorded
-            </div>
-            <Button
-              onClick={resetRecording}
-              variant="ghost"
-              size="sm"
-              className="text-xs"
-            >
-              Re-record
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={disabled}
-              className="gap-2"
-            >
-              Transcribe & Format
-            </Button>
-          </>
+            </>
+          )}
+        </div>
+        {!audioBlob && !isRecording && (
+          <p className="text-xs text-muted-foreground">
+            You can pause and resume your recording at any time.
+          </p>
         )}
       </div>
     </div>

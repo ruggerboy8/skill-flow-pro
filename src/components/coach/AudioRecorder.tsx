@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, Square, Play, Pause, Loader2 } from 'lucide-react';
+import { Mic, Square, Play, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AudioRecorderProps {
@@ -79,6 +79,27 @@ export function AudioRecorder({ onRecordingComplete, disabled, className }: Audi
     }
   };
 
+  const togglePause = () => {
+    if (!mediaRecorderRef.current || !isRecording) return;
+    
+    if (isPaused) {
+      mediaRecorderRef.current.resume();
+      setIsPaused(false);
+      // Resume timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      mediaRecorderRef.current.pause();
+      setIsPaused(true);
+      // Pause timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  };
+
   const togglePlayback = () => {
     if (!audioRef.current || !audioUrl) return;
     
@@ -142,16 +163,31 @@ export function AudioRecorder({ onRecordingComplete, disabled, className }: Audi
             ) : (
               <>
                 <Button
+                  onClick={togglePause}
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                >
+                  {isPaused ? (
+                    <Mic className="w-4 h-4 text-red-500" />
+                  ) : (
+                    <Pause className="w-4 h-4" />
+                  )}
+                </Button>
+                <Button
                   onClick={stopRecording}
                   variant="destructive"
-                  className="gap-2"
+                  size="icon"
+                  className="shrink-0"
                 >
                   <Square className="w-4 h-4" />
-                  Stop
                 </Button>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  Recording: {formatTime(recordingTime)}
+                  <span className={cn(
+                    "w-2 h-2 rounded-full",
+                    isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"
+                  )} />
+                  {isPaused ? "Paused" : "Recording"}: {formatTime(recordingTime)}
                 </div>
               </>
             )}

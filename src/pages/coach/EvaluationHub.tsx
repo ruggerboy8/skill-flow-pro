@@ -36,8 +36,11 @@ import {
   deleteEvaluation,
   isEvaluationComplete,
   updateEvaluationMetadata,
+  updateSummaryFeedback,
   type EvaluationWithItems
 } from '@/lib/evaluations';
+import { ProMovesAccordion } from '@/components/coach/ProMovesAccordion';
+import { SummaryTab } from '@/components/coach/SummaryTab';
 
 const SCORE_OPTIONS = [
   { value: 1, label: '1 - Needs Development', color: 'bg-red-100 text-red-800 border-red-200' },
@@ -75,6 +78,8 @@ export function EvaluationHub() {
     size: number;
     uploaded_at: string;
   } | null>(null);
+  const [summaryFeedback, setSummaryFeedback] = useState<string | null>(null);
+  const [summaryRawTranscript, setSummaryRawTranscript] = useState<string | null>(null);
 
   useEffect(() => {
     if (evalId) {
@@ -140,6 +145,10 @@ export function EvaluationHub() {
       setEditType(data.type);
       setEditQuarter(data.quarter);
       setEditDate(data.observed_at ? new Date(data.observed_at) : undefined);
+
+      // Initialize summary fields
+      setSummaryFeedback((data as any).summary_feedback || null);
+      setSummaryRawTranscript((data as any).summary_raw_transcript || null);
 
       // Load audio recording if exists
       if (data.audio_recording_path) {
@@ -483,6 +492,32 @@ export function EvaluationHub() {
     // Clear pending caches
     setPendingObserverNotes({});
     setPendingSelfNotes({});
+  };
+
+  // Summary feedback handlers
+  const handleSummaryFeedbackChange = async (feedback: string) => {
+    if (!evalId) return;
+    try {
+      await updateSummaryFeedback(evalId, { summary_feedback: feedback });
+      setSummaryFeedback(feedback);
+    } catch (error) {
+      console.error('Failed to save summary feedback:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save feedback",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSummaryTranscriptChange = async (transcript: string) => {
+    if (!evalId) return;
+    try {
+      await updateSummaryFeedback(evalId, { summary_raw_transcript: transcript });
+      setSummaryRawTranscript(transcript);
+    } catch (error) {
+      console.error('Failed to save transcript:', error);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -978,6 +1013,7 @@ export function EvaluationHub() {
         <TabsList className="mb-6">
           <TabsTrigger value="observation">Observation</TabsTrigger>
           <TabsTrigger value="self-assessment">Self-Assessment</TabsTrigger>
+          <TabsTrigger value="summary">Summary</TabsTrigger>
         </TabsList>
 
         <TabsContent value="observation">
@@ -988,7 +1024,7 @@ export function EvaluationHub() {
             <CardContent className="space-y-6">
               {evaluation.items.map((item) => (
                 <div key={item.competency_id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-3 mb-1">
                     <h4 className="font-medium">{item.competency_name_snapshot}</h4>
                     {item.domain_name && (
                       <Badge 
@@ -1004,11 +1040,19 @@ export function EvaluationHub() {
                     )}
                   </div>
                   
+                  {(item as any).tagline && (
+                    <p className="text-sm text-muted-foreground italic -mt-2 mb-2">
+                      "{(item as any).tagline}"
+                    </p>
+                  )}
+                  
                   {item.competency_description && (
-                    <p className="text-sm text-muted-foreground italic">
+                    <p className="text-sm text-muted-foreground">
                       {item.competency_description}
                     </p>
                   )}
+
+                  <ProMovesAccordion competencyId={item.competency_id} />
                   
                   {/* Score Pills */}
                   <div className="flex space-x-2">
@@ -1089,7 +1133,7 @@ export function EvaluationHub() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-3 mb-1">
                     <h4 className="font-medium text-lg">{currentItem.competency_name_snapshot}</h4>
                     {currentItem.domain_name && (
                       <Badge 
@@ -1105,11 +1149,19 @@ export function EvaluationHub() {
                     )}
                   </div>
                   
+                  {(currentItem as any).tagline && (
+                    <p className="text-sm text-muted-foreground italic mb-2">
+                      "{(currentItem as any).tagline}"
+                    </p>
+                  )}
+                  
                   {currentItem.competency_description && (
-                    <p className="text-sm text-muted-foreground italic mb-4">
+                    <p className="text-sm text-muted-foreground mb-3">
                       {currentItem.competency_description}
                     </p>
                   )}
+
+                  <ProMovesAccordion competencyId={currentItem.competency_id} className="mb-4" />
                   
                   <p className="text-muted-foreground mb-4">
                     <strong>Interview Prompt:</strong> {currentItem.interview_prompt || 'No interview prompt available for this competency.'}
@@ -1167,6 +1219,18 @@ export function EvaluationHub() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="summary">
+          <SummaryTab
+            evalId={evalId!}
+            staffName={staffName}
+            summaryFeedback={summaryFeedback}
+            summaryRawTranscript={summaryRawTranscript}
+            isReadOnly={isReadOnly}
+            onFeedbackChange={handleSummaryFeedbackChange}
+            onTranscriptChange={handleSummaryTranscriptChange}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -10,6 +10,7 @@ export interface EvaluationWithItems extends Evaluation {
     competency_description?: string;
     interview_prompt?: string;
     domain_name?: string;
+    tagline?: string;
   })[];
 }
 
@@ -194,14 +195,15 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
     };
   }
 
-  // Use a simple query to get competency details
+  // Use a simple query to get competency details including tagline
   const { data: competencies, error: competencyError } = await supabase
     .from('competencies')
     .select(`
       competency_id,
       description,
       interview_prompt,
-      domain_id
+      domain_id,
+      tagline
     `)
     .in('competency_id', competencyIds);
 
@@ -234,7 +236,8 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
       competencyMap.set(comp.competency_id, {
         description: comp.description,
         interview_prompt: comp.interview_prompt,
-        domain_name: domainMap.get(comp.domain_id) || ''
+        domain_name: domainMap.get(comp.domain_id) || '',
+        tagline: comp.tagline || ''
       });
     });
   }
@@ -246,7 +249,8 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
       ...item,
       competency_description: competency?.description || '',
       interview_prompt: competency?.interview_prompt || '',
-      domain_name: competency?.domain_name || ''
+      domain_name: competency?.domain_name || '',
+      tagline: competency?.tagline || ''
     };
   });
 
@@ -348,6 +352,23 @@ export async function updateEvaluationMetadata(
 
   if (error) {
     throw new Error(`Failed to update evaluation metadata: ${error.message}`);
+  }
+}
+
+/**
+ * Update summary feedback and raw transcript
+ */
+export async function updateSummaryFeedback(
+  evalId: string,
+  data: { summary_feedback?: string; summary_raw_transcript?: string }
+) {
+  const { error } = await supabase
+    .from('evaluations')
+    .update(data)
+    .eq('id', evalId);
+
+  if (error) {
+    throw new Error(`Failed to update summary feedback: ${error.message}`);
   }
 }
 

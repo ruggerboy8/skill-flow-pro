@@ -392,6 +392,8 @@ export type Database = {
           role_id: number
           staff_id: string
           status: string
+          summary_feedback: string | null
+          summary_raw_transcript: string | null
           type: string
           updated_at: string
         }
@@ -407,6 +409,8 @@ export type Database = {
           role_id: number
           staff_id: string
           status?: string
+          summary_feedback?: string | null
+          summary_raw_transcript?: string | null
           type?: string
           updated_at?: string
         }
@@ -422,6 +426,8 @@ export type Database = {
           role_id?: number
           staff_id?: string
           status?: string
+          summary_feedback?: string | null
+          summary_raw_transcript?: string | null
           type?: string
           updated_at?: string
         }

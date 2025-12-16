@@ -31,7 +31,7 @@ export function getAnchors(now: Date = nowUtc()) {
   const mondayZ = addDays(todayMidnightCtUtc, -(isoDow - 1));
 
   const monCheckInZ = ctUtcFor(mondayZ, '09:00:00');           // Mon 09:00 CT
-  const tueDueZ     = ctUtcFor(addDays(mondayZ, 1), '12:00:00'); // Tue 12:00 CT
+  const tueDueZ     = ctUtcFor(addDays(mondayZ, 1), '14:00:00'); // Tue 14:00 CT (2pm)
   const thuStartZ   = ctUtcFor(addDays(mondayZ, 3), '00:00:00'); // Thu 00:00 CT
   const friStartZ   = ctUtcFor(addDays(mondayZ, 4), '00:00:00'); // Fri 00:00 CT
   const sunEndZ     = ctUtcFor(addDays(mondayZ, 6), '23:59:59'); // Sun 23:59:59 CT
@@ -50,7 +50,7 @@ export function getWeekAnchors(now: Date = nowUtc(), tz: string = CT_TZ) {
   const mondayZ = addDays(todayMidnightUtc, -(isoDow - 1));
 
   const checkin_open = ctUtcForTz(mondayZ, '00:00:00', tz);           // Mon 00:00 TZ
-  const confidence_deadline = ctUtcForTz(addDays(mondayZ, 1), '12:00:00', tz); // Tue 12:00 TZ
+  const confidence_deadline = ctUtcForTz(addDays(mondayZ, 1), '14:00:00', tz); // Tue 14:00 TZ (2pm)
   const checkout_open = ctUtcForTz(addDays(mondayZ, 3), '00:01:00', tz); // Thu 00:01 TZ
   const performance_deadline = ctUtcForTz(addDays(mondayZ, 4), '17:00:00', tz); // Fri 17:00 TZ
   const week_end = ctUtcForTz(addDays(mondayZ, 6), '23:59:59', tz); // Sun 23:59:59 TZ

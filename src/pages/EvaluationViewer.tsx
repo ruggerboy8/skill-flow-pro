@@ -283,9 +283,8 @@ export default function EvaluationViewer() {
   // Get insights perspectives
   const extractedInsights = evaluation.extracted_insights;
   const observerPerspective = extractedInsights?.observer || null;
-  const selfAssessmentPerspective = extractedInsights?.self_assessment || 
-    (extractedInsights ? getLegacyAsSelfAssessment(extractedInsights) : null);
-  const hasAnyInsights = observerPerspective || selfAssessmentPerspective || (evaluation as any).summary_feedback;
+  // Self-assessment insights are internal only - not shown to staff
+  const hasAnyInsights = observerPerspective || (evaluation as any).summary_feedback;
 
   return (
     <div className="space-y-6">
@@ -460,48 +459,13 @@ export default function EvaluationViewer() {
                 </Card>
               )}
 
-              {/* Side-by-Side Perspectives */}
-              {(observerPerspective || selfAssessmentPerspective) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Analysis</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Observer Perspective */}
-                      <div className="space-y-4">
-                        {observerPerspective ? (
-                          <PerspectiveCard 
-                            title="Coach Observations" 
-                            icon={Eye}
-                            perspective={observerPerspective}
-                          />
-                        ) : (
-                          <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg text-muted-foreground">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                            <p className="text-sm">No coach observation insights available.</p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Self-Assessment Perspective */}
-                      <div className="space-y-4">
-                        {selfAssessmentPerspective ? (
-                          <PerspectiveCard 
-                            title="Self-Assessment" 
-                            icon={User}
-                            perspective={selfAssessmentPerspective}
-                          />
-                        ) : (
-                          <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg text-muted-foreground">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                            <p className="text-sm">No self-assessment insights available.</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              {/* Coach Observations Only */}
+              {observerPerspective && (
+                <PerspectiveCard 
+                  title="Coach Observations" 
+                  icon={Eye}
+                  perspective={observerPerspective}
+                />
               )}
             </>
           ) : (

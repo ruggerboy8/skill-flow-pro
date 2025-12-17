@@ -15,7 +15,7 @@ export default function AdminBuilder() {
   console.log("=== NEW ADMINBUILDER LOADING ===");
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,14 +32,14 @@ export default function AdminBuilder() {
     try {
       const { data: staffData } = await supabase
         .from("staff")
-        .select("is_super_admin, primary_location_id")
+        .select("is_super_admin, is_org_admin, primary_location_id")
         .eq("user_id", user.id)
         .single();
 
-      setIsSuperAdmin(staffData?.is_super_admin || false);
-      console.log("=== ADMIN STATUS RESULT ===", staffData?.is_super_admin);
+      setIsAdmin(staffData?.is_super_admin || staffData?.is_org_admin || false);
+      console.log("=== ADMIN STATUS RESULT ===", staffData?.is_super_admin, staffData?.is_org_admin);
     } catch (error) {
-      setIsSuperAdmin(false);
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -54,8 +54,8 @@ export default function AdminBuilder() {
     );
   }
 
-  if (!user || !isSuperAdmin) {
-    console.log("=== ACCESS DENIED ===", { user: !!user, isSuperAdmin });
+  if (!user || !isAdmin) {
+    console.log("=== ACCESS DENIED ===", { user: !!user, isAdmin });
     return <Navigate to="/" replace />;
   }
 

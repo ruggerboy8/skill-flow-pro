@@ -3,15 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, Eye, User, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getEvaluation } from '@/lib/evaluations';
-import { getDomainColor } from '@/lib/domainColors';
-import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
-import type { EvaluationWithItems } from '@/lib/evaluations';
+import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainOrderIndex } from '@/lib/domainUtils';
+import type { EvaluationWithItems, ExtractedInsights, InsightsPerspective, DomainInsight } from '@/lib/evaluations';
 
 const SCORE_PILLS = [
   { v: 1, cls: 'bg-red-100 text-red-800 border-red-200' },
@@ -45,6 +46,108 @@ type GroupedItem = {
   observer_note: string | null;
 };
 
+// Helper to get legacy structure as self_assessment perspective
+function getLegacyAsSelfAssessment(insights: ExtractedInsights): InsightsPerspective | null {
+  if (insights.evaluation_summary_html && insights.domain_insights) {
+    return {
+      summary_html: insights.evaluation_summary_html,
+      domain_insights: insights.domain_insights
+    };
+  }
+  return null;
+}
+
+function PerspectiveCard({ 
+  title, 
+  icon: Icon, 
+  perspective 
+}: { 
+  title: string; 
+  icon: React.ElementType;
+  perspective: InsightsPerspective;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+        <Icon className="w-4 h-4" />
+        {title}
+      </div>
+      
+      {/* Summary */}
+      {perspective.summary_html && (
+        <div 
+          className="prose prose-sm max-w-none text-sm"
+          dangerouslySetInnerHTML={{ __html: perspective.summary_html }}
+        />
+      )}
+      
+      {/* Domain Insights */}
+      {perspective.domain_insights && perspective.domain_insights.length > 0 && (
+        <div className="space-y-3">
+          {perspective.domain_insights.map((insight, idx) => {
+            const bgColor = getDomainColorRaw(insight.domain);
+            const accentColor = getDomainColorRichRaw(insight.domain);
+            
+            return (
+              <div 
+                key={idx}
+                className="p-3 rounded-lg border"
+                style={{ 
+                  backgroundColor: `hsl(${bgColor})`,
+                  borderColor: `hsl(${accentColor} / 0.3)`
+                }}
+              >
+                <Badge 
+                  className="mb-2"
+                  style={{ 
+                    backgroundColor: `hsl(${accentColor} / 0.15)`,
+                    color: `hsl(${accentColor})`,
+                    borderColor: `hsl(${accentColor} / 0.3)`
+                  }}
+                >
+                  {insight.domain}
+                </Badge>
+                
+                {insight.strengths && insight.strengths.length > 0 && (
+                  <div className="mb-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                      Strengths
+                    </p>
+                    <ul className="text-sm space-y-0.5">
+                      {insight.strengths.map((s, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span style={{ color: `hsl(${accentColor})` }}>✓</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {insight.growth_areas && insight.growth_areas.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                      Growth Opportunities
+                    </p>
+                    <ul className="text-sm space-y-0.5">
+                      {insight.growth_areas.map((g, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span style={{ color: `hsl(${accentColor})` }}>→</span>
+                          <span>{g}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EvaluationViewer() {
   const { evalId } = useParams<{ evalId: string }>();
   const navigate = useNavigate();
@@ -54,6 +157,7 @@ export default function EvaluationViewer() {
   const [staffName, setStaffName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [backUrl, setBackUrl] = useState('/stats/evaluations');
+  const [activeTab, setActiveTab] = useState('scores');
 
   useEffect(() => {
     if (!user || !evalId) return;
@@ -176,6 +280,13 @@ export default function EvaluationViewer() {
   const observerScored = evaluation.items.filter(item => item.observer_score != null).length;
   const selfScored = evaluation.items.filter(item => item.self_score != null).length;
 
+  // Get insights perspectives
+  const extractedInsights = evaluation.extracted_insights;
+  const observerPerspective = extractedInsights?.observer || null;
+  const selfAssessmentPerspective = extractedInsights?.self_assessment || 
+    (extractedInsights ? getLegacyAsSelfAssessment(extractedInsights) : null);
+  const hasAnyInsights = observerPerspective || selfAssessmentPerspective || (evaluation as any).summary_feedback;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -201,148 +312,210 @@ export default function EvaluationViewer() {
         </div>
       </div>
 
-      {/* Overall Feedback Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Overall Feedback
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {(evaluation as any).summary_feedback ? (
-            <div 
-              className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: (evaluation as any).summary_feedback }}
-            />
-          ) : (
-            <p className="text-muted-foreground italic">
-              No overall feedback was provided for this evaluation.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabbed Interface */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="scores">Your Scores</TabsTrigger>
+          <TabsTrigger value="insights">Insights</TabsTrigger>
+        </TabsList>
 
-      {/* Domain Sections */}
-      <div className="space-y-6">
-        {sortedDomains.map(domainName => {
-          const domainItems = groupedByDomain[domainName];
-          
-          // Calculate domain averages
-          const avgObserver = avg(domainItems.map(item => item.observer_score));
-          const avgSelf = avg(domainItems.map(item => item.self_score));
-          
-          // Collect notes for this domain
-          const notes: RolledNote[] = domainItems.flatMap(item => {
-            const out: RolledNote[] = [];
-            if (item.observer_note) {
-              out.push({ 
-                source: 'Observer', 
-                competency: item.competency_name_snapshot, 
-                competency_id: item.competency_id,
-                text: item.observer_note 
-              });
-            }
-            if (item.self_note) {
-              out.push({ 
-                source: 'Self', 
-                competency: item.competency_name_snapshot, 
-                competency_id: item.competency_id,
-                text: item.self_note 
-              });
-            }
-            return out;
-          });
+        {/* Scores Tab */}
+        <TabsContent value="scores" className="space-y-6">
+          {sortedDomains.map(domainName => {
+            const domainItems = groupedByDomain[domainName];
+            
+            // Calculate domain averages
+            const avgObserver = avg(domainItems.map(item => item.observer_score));
+            const avgSelf = avg(domainItems.map(item => item.self_score));
+            
+            // Collect notes for this domain
+            const notes: RolledNote[] = domainItems.flatMap(item => {
+              const out: RolledNote[] = [];
+              if (item.observer_note) {
+                out.push({ 
+                  source: 'Observer', 
+                  competency: item.competency_name_snapshot, 
+                  competency_id: item.competency_id,
+                  text: item.observer_note 
+                });
+              }
+              if (item.self_note) {
+                out.push({ 
+                  source: 'Self', 
+                  competency: item.competency_name_snapshot, 
+                  competency_id: item.competency_id,
+                  text: item.self_note 
+                });
+              }
+              return out;
+            });
 
-          // Sort notes: Observer notes first (by competency_id), then Self notes (by competency_id)
-          notes.sort((a, b) => {
-            // First sort by source (Observer before Self)
-            if (a.source !== b.source) {
-              return a.source === 'Observer' ? -1 : 1;
-            }
-            // Then sort by competency_id within the same source
-            return a.competency_id - b.competency_id;
-          });
+            // Sort notes: Observer notes first (by competency_id), then Self notes (by competency_id)
+            notes.sort((a, b) => {
+              if (a.source !== b.source) {
+                return a.source === 'Observer' ? -1 : 1;
+              }
+              return a.competency_id - b.competency_id;
+            });
 
-          return (
-            <Card key={domainName} className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span
-                    className="px-2 py-0.5 rounded text-xs"
-                    style={{ backgroundColor: getDomainColor(domainName), color: '#000' }}
-                  >
-                    {domainName}
-                  </span>
-                  <span>{domainName}</span>
-                </CardTitle>
-              </CardHeader>
+            return (
+              <Card key={domainName}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <span
+                      className="px-2 py-0.5 rounded text-xs"
+                      style={{ backgroundColor: getDomainColor(domainName), color: '#000' }}
+                    >
+                      {domainName}
+                    </span>
+                    <span>{domainName}</span>
+                  </CardTitle>
+                </CardHeader>
 
-              <CardContent className="space-y-3">
-                {/* Header row */}
-                <div className="grid grid-cols-12 text-xs text-muted-foreground">
-                  <div className="col-span-7">Competency</div>
-                  <div className="col-span-2 text-center">Observer</div>
-                  <div className="col-span-3 text-center">Self</div>
-                </div>
+                <CardContent className="space-y-3">
+                  {/* Header row */}
+                  <div className="grid grid-cols-12 text-xs text-muted-foreground">
+                    <div className="col-span-7">Competency</div>
+                    <div className="col-span-2 text-center">Observer</div>
+                    <div className="col-span-3 text-center">Self</div>
+                  </div>
 
-                {/* Competency rows */}
-                <div className="space-y-2">
-                  {domainItems.map(item => (
-                    <div key={item.competency_id} className="grid grid-cols-12 items-center py-2 border-b last:border-0">
-                      <div className="col-span-7">
-                        <div className="text-sm font-medium">{item.competency_name_snapshot}</div>
-                        {item.competency_description_snapshot && (
-                          <div className="text-xs text-muted-foreground italic">{item.competency_description_snapshot}</div>
+                  {/* Competency rows */}
+                  <div className="space-y-2">
+                    {domainItems.map(item => (
+                      <div key={item.competency_id} className="grid grid-cols-12 items-center py-2 border-b last:border-0">
+                        <div className="col-span-7">
+                          <div className="text-sm font-medium">{item.competency_name_snapshot}</div>
+                          {item.competency_description_snapshot && (
+                            <div className="text-xs text-muted-foreground italic">{item.competency_description_snapshot}</div>
+                          )}
+                        </div>
+                        <div className="col-span-2 flex justify-center">
+                          <ReadOnlyScore value={item.observer_score} />
+                        </div>
+                        <div className="col-span-3 flex justify-center">
+                          <ReadOnlyScore value={item.self_score} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Averages row */}
+                  <div className="grid grid-cols-12 items-center pt-2 border-t">
+                    <div className="col-span-7 text-sm font-medium">Averages</div>
+                    <div className="col-span-2 text-center text-sm">{avgObserver ?? '—'}</div>
+                    <div className="col-span-3 text-center text-sm">{avgSelf ?? '—'}</div>
+                  </div>
+
+                  {/* Notes accordion */}
+                  {notes.length > 0 && (
+                    <div className="pt-2">
+                      <Accordion type="single" collapsible>
+                        <AccordionItem value="notes">
+                          <AccordionTrigger className="text-sm">Notes ({notes.length})</AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-3">
+                              {notes.map((note, idx) => (
+                                <div key={idx} className="text-sm">
+                                  <span className={`inline-block px-2 py-0.5 mr-2 rounded text-xs ${
+                                    note.source === 'Observer' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'
+                                  }`}>
+                                    {note.source}
+                                  </span>
+                                  <span className="font-medium">{note.competency}: </span>
+                                  <span className="text-muted-foreground">{note.text}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </TabsContent>
+
+        {/* Insights Tab */}
+        <TabsContent value="insights" className="space-y-6">
+          {hasAnyInsights ? (
+            <>
+              {/* Legacy summary feedback display */}
+              {(evaluation as any).summary_feedback && !observerPerspective && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      Overall Feedback
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div 
+                      className="prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: (evaluation as any).summary_feedback }}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Side-by-Side Perspectives */}
+              {(observerPerspective || selfAssessmentPerspective) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Observer Perspective */}
+                      <div className="space-y-4">
+                        {observerPerspective ? (
+                          <PerspectiveCard 
+                            title="Coach Observations" 
+                            icon={Eye}
+                            perspective={observerPerspective}
+                          />
+                        ) : (
+                          <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg text-muted-foreground">
+                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                            <p className="text-sm">No coach observation insights available.</p>
+                          </div>
                         )}
                       </div>
-                      <div className="col-span-2 flex justify-center">
-                        <ReadOnlyScore value={item.observer_score} />
-                      </div>
-                      <div className="col-span-3 flex justify-center">
-                        <ReadOnlyScore value={item.self_score} />
+                      
+                      {/* Self-Assessment Perspective */}
+                      <div className="space-y-4">
+                        {selfAssessmentPerspective ? (
+                          <PerspectiveCard 
+                            title="Self-Assessment" 
+                            icon={User}
+                            perspective={selfAssessmentPerspective}
+                          />
+                        ) : (
+                          <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg text-muted-foreground">
+                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                            <p className="text-sm">No self-assessment insights available.</p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                {/* Averages row */}
-                <div className="grid grid-cols-12 items-center pt-2 border-t">
-                  <div className="col-span-7 text-sm font-medium">Averages</div>
-                  <div className="col-span-2 text-center text-sm">{avgObserver ?? '—'}</div>
-                  <div className="col-span-3 text-center text-sm">{avgSelf ?? '—'}</div>
-                </div>
-
-                {/* Notes accordion */}
-                {notes.length > 0 && (
-                  <div className="pt-2">
-                    <Accordion type="single" collapsible>
-                      <AccordionItem value="notes">
-                        <AccordionTrigger className="text-sm">Notes ({notes.length})</AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-3">
-                            {notes.map((note, idx) => (
-                              <div key={idx} className="text-sm">
-                                <span className={`inline-block px-2 py-0.5 mr-2 rounded text-xs ${
-                                  note.source === 'Observer' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'
-                                }`}>
-                                  {note.source}
-                                </span>
-                                <span className="font-medium">{note.competency}: </span>
-                                <span className="text-muted-foreground">{note.text}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </div>
-                )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <AlertCircle className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-muted-foreground">
+                  No insights are available for this evaluation.
+                </p>
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

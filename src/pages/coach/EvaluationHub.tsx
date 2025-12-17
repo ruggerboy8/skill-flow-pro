@@ -990,12 +990,16 @@ export function EvaluationHub() {
             <ObservationRecorder
               evalId={evalId!}
               staffName={staffName}
-              onFeedbackGenerated={(feedback, transcript) => {
+              onFeedbackGenerated={(feedback, transcript, insights) => {
                 handleSummaryFeedbackChange(feedback);
                 handleSummaryTranscriptChange(transcript);
+                if (insights) {
+                  setEvaluation(prev => prev ? { ...prev, extracted_insights: { ...prev.extracted_insights, observer: insights } } : prev);
+                }
               }}
               recordingState={recordingState}
               recordingControls={recordingControls}
+              currentInsights={evaluation?.extracted_insights}
             />
           )}
           

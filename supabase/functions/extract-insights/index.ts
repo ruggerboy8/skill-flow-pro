@@ -19,7 +19,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { transcript, staffName } = await req.json();
+    const { transcript, staffName, source = 'interview' } = await req.json();
     
     if (!transcript) {
       console.error('[extract-insights] No transcript provided');
@@ -29,9 +29,40 @@ serve(async (req) => {
       );
     }
 
-    console.log('[extract-insights] Processing transcript, length:', transcript.length);
+    console.log('[extract-insights] Processing transcript, source:', source, 'length:', transcript.length);
 
-    const systemPrompt = `# Role & Objective
+    // Different prompts based on source
+    const systemPrompt = source === 'observation' 
+      ? `# Role & Objective
+You are an expert Dental Leadership Coach analyzing a coach's recorded observations about a staff member. Your goal is to extract structured, actionable insights from the coach's verbal feedback.
+
+# Input Context
+The input is a transcript of a coach's spoken observations where:
+- The coach shares their overall impressions of the staff member
+- The coach discusses specific behaviors and performance observations
+- Comments relate to domains: Clinical, Clerical, Cultural, and Case Acceptance
+
+# Output Requirements
+You must call the extract_insights function with structured data. Follow these guidelines:
+
+1. **summary_html**: Write a 3-5 sentence professional paragraph summarizing:
+   - The coach's overall assessment of the staff member
+   - Key themes from the observations
+   - The coach's tone (supportive, concerned, encouraging, etc.)
+   Format as HTML (use <p>, <strong> tags as needed).
+
+2. **domain_insights**: For each domain mentioned, identify:
+   - Domain name (must be exactly: "Clinical", "Clerical", "Cultural", or "Case Acceptance")
+   - Strengths the coach identified
+   - Growth areas the coach noted (reframe as "Growth Opportunities")
+   Only include domains that were actually discussed.
+
+# Critical Rules
+- Only extract what was actually said—do not invent content
+- Use supportive, coaching-oriented language
+- Reframe any criticism as growth opportunities
+- Map insights to the correct domains based on context`
+      : `# Role & Objective
 You are an expert Dental Leadership Coach analyzing a self-evaluation interview transcript. Your goal is to extract structured, actionable insights from the conversation between an evaluator and a staff member.
 
 # Input Context
@@ -43,7 +74,7 @@ The input is a diarized transcript of an interview where:
 # Output Requirements
 You must call the extract_insights function with structured data. Follow these guidelines:
 
-1. **evaluation_summary_html**: Write a 3-5 sentence professional paragraph summarizing:
+1. **summary_html**: Write a 3-5 sentence professional paragraph summarizing:
    - The staff member's level of self-awareness
    - Their receptiveness to feedback
    - Key themes from their self-reflection
@@ -55,19 +86,18 @@ You must call the extract_insights function with structured data. Follow these g
    - Growth areas they identified or were coached on
    Only include domains that were actually discussed.
 
-3. **tactical_growth_plan**: Extract 2-4 forward-looking coaching goals:
-   - Title: Brief action-oriented title
-   - Domain: Which domain this relates to
-   - Observation: What was noticed or discussed
-   - Suggested action: Concrete next step for improvement
-
 # Critical Rules
 - Only extract what was actually said—do not invent content
 - Use supportive, coaching-oriented language
-- Map insights to the correct domains based on context
-- Keep tactical goals specific and actionable`;
+- Map insights to the correct domains based on context`;
 
-    const userPrompt = `Please analyze this self-evaluation interview transcript${staffName ? ` for ${staffName}` : ''} and extract structured insights:
+    const userPrompt = source === 'observation'
+      ? `Please analyze this coach's observation recording${staffName ? ` about ${staffName}` : ''} and extract structured insights:
+
+---
+${transcript}
+---`
+      : `Please analyze this self-evaluation interview transcript${staffName ? ` for ${staffName}` : ''} and extract structured insights:
 
 ---
 ${transcript}
@@ -92,13 +122,13 @@ ${transcript}
             type: 'function',
             function: {
               name: 'extract_insights',
-              description: 'Extract structured insights from the interview transcript',
+              description: 'Extract structured insights from the transcript',
               parameters: {
                 type: 'object',
                 properties: {
-                  evaluation_summary_html: {
+                  summary_html: {
                     type: 'string',
-                    description: '3-5 sentence HTML paragraph summarizing staff self-awareness and receptiveness'
+                    description: '3-5 sentence HTML paragraph summarizing the key observations or self-assessment'
                   },
                   domain_insights: {
                     type: 'array',
@@ -118,43 +148,16 @@ ${transcript}
                         growth_areas: {
                           type: 'array',
                           items: { type: 'string' },
-                          description: 'Areas for growth identified in this domain'
+                          description: 'Growth opportunities identified in this domain'
                         }
                       },
                       required: ['domain', 'strengths', 'growth_areas'],
                       additionalProperties: false
                     },
                     description: 'Insights organized by domain'
-                  },
-                  tactical_growth_plan: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        title: {
-                          type: 'string',
-                          description: 'Brief action-oriented title for this goal'
-                        },
-                        domain: {
-                          type: 'string',
-                          description: 'Which domain this relates to'
-                        },
-                        observation: {
-                          type: 'string',
-                          description: 'What was noticed or discussed'
-                        },
-                        suggested_action: {
-                          type: 'string',
-                          description: 'Concrete next step for improvement'
-                        }
-                      },
-                      required: ['title', 'domain', 'observation', 'suggested_action'],
-                      additionalProperties: false
-                    },
-                    description: '2-4 forward-looking coaching goals'
                   }
                 },
-                required: ['evaluation_summary_html', 'domain_insights', 'tactical_growth_plan'],
+                required: ['summary_html', 'domain_insights'],
                 additionalProperties: false
               }
             }
@@ -212,9 +215,9 @@ ${transcript}
     }
     
     console.log('[extract-insights] Extraction successful:', {
-      summaryLength: insights.evaluation_summary_html?.length,
-      domainCount: insights.domain_insights?.length,
-      goalCount: insights.tactical_growth_plan?.length
+      source,
+      summaryLength: insights.summary_html?.length,
+      domainCount: insights.domain_insights?.length
     });
 
     return new Response(

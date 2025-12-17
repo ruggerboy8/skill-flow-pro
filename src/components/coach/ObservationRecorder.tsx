@@ -4,14 +4,17 @@ import { Loader2, Mic } from 'lucide-react';
 import { AudioRecorder } from './AudioRecorder';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { updateExtractedInsights } from '@/lib/evaluations';
 import type { AudioRecordingState, AudioRecordingControls } from '@/hooks/useAudioRecording';
+import type { ExtractedInsights, InsightsPerspective } from '@/lib/evaluations';
 
 interface ObservationRecorderProps {
   evalId: string;
   staffName: string;
-  onFeedbackGenerated: (feedback: string, transcript: string) => void;
+  onFeedbackGenerated: (feedback: string, transcript: string, insights?: InsightsPerspective) => void;
   recordingState: AudioRecordingState;
   recordingControls: AudioRecordingControls;
+  currentInsights?: ExtractedInsights | null;
 }
 
 export function ObservationRecorder({
@@ -20,6 +23,7 @@ export function ObservationRecorder({
   onFeedbackGenerated,
   recordingState,
   recordingControls,
+  currentInsights,
 }: ObservationRecorderProps) {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -47,31 +51,40 @@ export function ObservationRecorder({
         throw new Error('No transcript returned');
       }
 
-      // Step 2: Format the transcript using Lovable AI
-      setProcessingStep('Formatting feedback...');
+      // Step 2: Extract insights using extract-insights with source='observation'
+      setProcessingStep('Extracting insights...');
 
-      const parseResponse = await supabase.functions.invoke('parse-feedback', {
-        body: { transcript, staffName },
+      const extractResponse = await supabase.functions.invoke('extract-insights', {
+        body: { transcript, staffName, source: 'observation' },
       });
 
-      if (parseResponse.error) {
-        throw new Error(parseResponse.error.message || 'Formatting failed');
+      if (extractResponse.error) {
+        throw new Error(extractResponse.error.message || 'Insight extraction failed');
       }
 
-      const formattedFeedback = parseResponse.data?.formattedFeedback;
-      if (!formattedFeedback) {
-        throw new Error('No formatted feedback returned');
+      const insights = extractResponse.data?.insights as InsightsPerspective;
+      if (!insights) {
+        throw new Error('No insights returned');
       }
 
-      // Pass both up to parent
-      onFeedbackGenerated(formattedFeedback, transcript);
+      // Step 3: Save to database - merge with existing insights
+      const updatedInsights: ExtractedInsights = {
+        ...currentInsights,
+        observer: insights
+      };
+      
+      await updateExtractedInsights(evalId, updatedInsights);
+
+      // Pass feedback and insights up to parent
+      // Use summary_html as the formatted feedback for backwards compatibility
+      onFeedbackGenerated(insights.summary_html || '', transcript, insights);
 
       // Reset recording state after successful processing
       recordingControls.resetRecording();
 
       toast({
         title: 'Success',
-        description: 'Audio transcribed and formatted successfully',
+        description: 'Observations transcribed and analyzed successfully',
       });
     } catch (error) {
       console.error('[ObservationRecorder] Processing error:', error);
@@ -105,7 +118,7 @@ export function ObservationRecorder({
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4">
           After completing your competency scores below, record your overall thoughts. Speak naturally—our system 
-          will clean up the grammar and format it professionally.
+          will analyze your feedback and organize it by domain.
         </p>
         
         <div className="mb-4 space-y-3">

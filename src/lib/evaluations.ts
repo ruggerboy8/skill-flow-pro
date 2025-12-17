@@ -12,17 +12,19 @@ export interface DomainInsight {
   growth_areas: string[];
 }
 
-export interface GrowthPlanItem {
-  title: string;
-  domain: string;
-  observation: string;
-  suggested_action: string;
+// Unified insights structure with both perspectives
+export interface InsightsPerspective {
+  summary_html: string;
+  domain_insights: DomainInsight[];
 }
 
 export interface ExtractedInsights {
-  evaluation_summary_html: string;
-  domain_insights: DomainInsight[];
-  tactical_growth_plan: GrowthPlanItem[];
+  observer?: InsightsPerspective;
+  self_assessment?: InsightsPerspective;
+  // Legacy fields for backwards compatibility
+  evaluation_summary_html?: string;
+  domain_insights?: DomainInsight[];
+  tactical_growth_plan?: any[];
 }
 
 export interface EvaluationWithItems extends Omit<Evaluation, 'extracted_insights'> {
@@ -477,7 +479,7 @@ export function isEvaluationComplete(evaluation: EvaluationWithItems): {
 }
 
 /**
- * Update extracted insights from interview analysis
+ * Update extracted insights from AI analysis
  */
 export async function updateExtractedInsights(
   evalId: string,
@@ -498,40 +500,41 @@ export async function updateExtractedInsights(
  */
 export function getQuarterWindow(now: Date, timezone: string): QuarterWindow {
   // Create date in the given timezone
-  const nowInTz = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
-  const year = nowInTz.getFullYear();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric'
+  });
   
-  // Quarter boundaries (start of each quarter)
-  const quarterBoundaries = [
-    { date: new Date(year, 0, 1), quarter: 'Q1' as const }, // Jan 1
-    { date: new Date(year, 3, 1), quarter: 'Q2' as const }, // Apr 1
-    { date: new Date(year, 6, 1), quarter: 'Q3' as const }, // Jul 1
-    { date: new Date(year, 9, 1), quarter: 'Q4' as const }, // Oct 1
-    { date: new Date(year + 1, 0, 1), quarter: 'Q1' as const }, // Next year Q1
-  ];
-
-  // Find the nearest boundary
-  let nearestBoundary = quarterBoundaries[0];
-  let minDistance = Math.abs(nowInTz.getTime() - quarterBoundaries[0].date.getTime());
-
-  for (const boundary of quarterBoundaries) {
-    const distance = Math.abs(nowInTz.getTime() - boundary.date.getTime());
-    if (distance < minDistance) {
-      minDistance = distance;
-      nearestBoundary = boundary;
-    }
+  const parts = formatter.formatToParts(now);
+  const month = parseInt(parts.find(p => p.type === 'month')?.value || '1');
+  const day = parseInt(parts.find(p => p.type === 'day')?.value || '1');
+  const year = parseInt(parts.find(p => p.type === 'year')?.value || '2025');
+  
+  // Determine quarter based on month
+  let targetQuarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  let targetYear = year;
+  
+  if (month >= 1 && month <= 3) {
+    targetQuarter = 'Q1';
+  } else if (month >= 4 && month <= 6) {
+    targetQuarter = 'Q2';
+  } else if (month >= 7 && month <= 9) {
+    targetQuarter = 'Q3';
+  } else {
+    targetQuarter = 'Q4';
   }
-
-  // Check if within ±1.5 weeks (11 days)
-  const elevenDays = 11 * 24 * 60 * 60 * 1000;
-  const isInWindow = minDistance <= elevenDays;
-
-  // Determine target year - if the nearest boundary is next year's Q1, use next year
-  const targetYear = nearestBoundary.date.getFullYear();
-
+  
+  // Check if we're in a window (last 2 weeks of quarter or first 2 weeks of next)
+  const quarterEndMonth = { Q1: 3, Q2: 6, Q3: 9, Q4: 12 }[targetQuarter];
+  const isLastTwoWeeks = month === quarterEndMonth && day >= 15;
+  const quarterStartMonth = { Q1: 1, Q2: 4, Q3: 7, Q4: 10 }[targetQuarter];
+  const isFirstTwoWeeks = month === quarterStartMonth && day <= 14;
+  
   return {
-    isInWindow,
-    targetQuarter: nearestBoundary.quarter,
+    isInWindow: isLastTwoWeeks || isFirstTwoWeeks,
+    targetQuarter,
     targetYear
   };
 }

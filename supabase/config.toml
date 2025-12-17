@@ -24,12 +24,6 @@ verify_jwt = false
 [functions.transcribe-audio]
 verify_jwt = true
 
-[functions.parse-feedback]
-verify_jwt = true
-
-[functions.parse-interview]
-verify_jwt = true
-
 [functions.extract-insights]
 verify_jwt = true
 

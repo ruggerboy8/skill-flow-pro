@@ -546,7 +546,9 @@ export function EvaluationHub() {
       
       // Step 2: Send to transcribe-audio edge function
       const formData = new FormData();
-      formData.append('audio', audioData, 'audio.webm');
+      // Use correct filename with original extension for Whisper API
+      const originalFilename = evaluation.audio_recording_path.split('/').pop() || 'audio.m4a';
+      formData.append('audio', audioData, originalFilename);
       
       const { data: transcribeData, error: transcribeError } = await supabase.functions.invoke('transcribe-audio', {
         body: formData,

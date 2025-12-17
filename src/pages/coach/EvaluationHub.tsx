@@ -1291,20 +1291,29 @@ export function EvaluationHub() {
                   )}
                   
                   {/* Extract Insights Button - appears after transcript exists */}
-                  {interviewTranscript && !isReadOnly && !evaluation?.extracted_insights && (
+                  {interviewTranscript && !isReadOnly && (
                     <Button
                       onClick={async () => {
                         try {
                           setIsParsing(true);
                           const { data, error } = await supabase.functions.invoke('extract-insights', {
-                            body: { transcript: interviewTranscript, staffName },
+                            body: { transcript: interviewTranscript, staffName, source: 'interview' },
                           });
                           if (error) throw error;
                           if (data?.insights) {
                             const { updateExtractedInsights } = await import('@/lib/evaluations');
-                            await updateExtractedInsights(evalId!, data.insights);
-                            setEvaluation(prev => prev ? { ...prev, extracted_insights: data.insights } : prev);
-                            toast({ title: 'Success', description: 'Insights extracted successfully' });
+                            // Save under self_assessment key
+                            const currentInsights = (evaluation?.extracted_insights as any) || {};
+                            const updatedInsights = {
+                              ...currentInsights,
+                              self_assessment: {
+                                summary_html: data.insights.summary_html,
+                                domain_insights: data.insights.domain_insights
+                              }
+                            };
+                            await updateExtractedInsights(evalId!, updatedInsights);
+                            setEvaluation(prev => prev ? { ...prev, extracted_insights: updatedInsights } : prev);
+                            toast({ title: 'Success', description: 'Self-assessment insights extracted' });
                           }
                         } catch (err) {
                           console.error('Extract insights failed:', err);
@@ -1314,13 +1323,18 @@ export function EvaluationHub() {
                         }
                       }}
                       disabled={isParsing}
-                      variant="secondary"
+                      variant={(evaluation?.extracted_insights as any)?.self_assessment ? "outline" : "secondary"}
                       className="w-full"
                     >
                       {isParsing ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           Extracting insights...
+                        </>
+                      ) : (evaluation?.extracted_insights as any)?.self_assessment ? (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Regenerate Self-Assessment Insights
                         </>
                       ) : (
                         <>

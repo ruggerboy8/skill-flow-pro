@@ -373,6 +373,23 @@ export async function updateSummaryFeedback(
 }
 
 /**
+ * Update the interview transcript from audio transcription
+ */
+export async function updateInterviewTranscript(
+  evalId: string,
+  interviewTranscript: string
+) {
+  const { error } = await supabase
+    .from('evaluations')
+    .update({ interview_transcript: interviewTranscript })
+    .eq('id', evalId);
+
+  if (error) {
+    throw new Error(`Failed to update interview transcript: ${error.message}`);
+  }
+}
+
+/**
  * Submit an evaluation (mark as completed)
  */
 export async function submitEvaluation(evalId: string) {

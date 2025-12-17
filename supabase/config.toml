@@ -26,3 +26,12 @@ verify_jwt = true
 
 [functions.parse-feedback]
 verify_jwt = true
+
+[functions.parse-interview]
+verify_jwt = true
+
+[functions.admin-users]
+verify_jwt = true
+
+[functions.planner-upsert]
+verify_jwt = true

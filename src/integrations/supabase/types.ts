@@ -385,6 +385,7 @@ export type Database = {
           created_at: string
           evaluator_id: string
           id: string
+          interview_transcript: string | null
           location_id: string
           observed_at: string | null
           program_year: number
@@ -402,6 +403,7 @@ export type Database = {
           created_at?: string
           evaluator_id: string
           id?: string
+          interview_transcript?: string | null
           location_id: string
           observed_at?: string | null
           program_year: number
@@ -419,6 +421,7 @@ export type Database = {
           created_at?: string
           evaluator_id?: string
           id?: string
+          interview_transcript?: string | null
           location_id?: string
           observed_at?: string | null
           program_year?: number

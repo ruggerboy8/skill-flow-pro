@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
@@ -86,6 +86,7 @@ export function EvaluationHub() {
   const [interviewTranscript, setInterviewTranscript] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
 
   // Audio recording state - lifted here so it persists across tab switches
   const { state: recordingState, controls: recordingControls } = useAudioRecording();
@@ -1343,17 +1344,26 @@ export function EvaluationHub() {
             </CardContent>
           </Card>
 
-          {/* Interview Transcript - Shows after transcription */}
-          {(interviewTranscript || currentRecording) && (
+          {/* Interview Transcript - Shows after transcription, collapsible */}
+          {interviewTranscript && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Interview Transcript
+              <CardHeader 
+                className="cursor-pointer select-none"
+                onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
+              >
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Interview Transcript
+                  </div>
+                  <ChevronRight className={cn(
+                    "w-5 h-5 transition-transform",
+                    isTranscriptExpanded && "rotate-90"
+                  )} />
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                {interviewTranscript ? (
+              {isTranscriptExpanded && (
+                <CardContent>
                   <div className="space-y-3">
                     <ReactQuill
                       theme="snow"
@@ -1375,12 +1385,8 @@ export function EvaluationHub() {
                       </p>
                     )}
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    Upload and transcribe the interview recording to see the transcript here.
-                  </p>
-                )}
-              </CardContent>
+                </CardContent>
+              )}
             </Card>
           )}
         </TabsContent>

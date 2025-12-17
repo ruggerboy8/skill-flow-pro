@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
@@ -37,11 +37,13 @@ import {
   isEvaluationComplete,
   updateEvaluationMetadata,
   updateSummaryFeedback,
+  updateInterviewTranscript,
   type EvaluationWithItems
 } from '@/lib/evaluations';
 import { ProMovesAccordion } from '@/components/coach/ProMovesAccordion';
 import { SummaryTab } from '@/components/coach/SummaryTab';
 import { useAudioRecording } from '@/hooks/useAudioRecording';
+import ReactQuill from 'react-quill';
 
 const SCORE_OPTIONS = [
   { value: 1, label: '1 - Needs Development', color: 'bg-red-100 text-red-800 border-red-200' },
@@ -81,6 +83,9 @@ export function EvaluationHub() {
   } | null>(null);
   const [summaryFeedback, setSummaryFeedback] = useState<string | null>(null);
   const [summaryRawTranscript, setSummaryRawTranscript] = useState<string | null>(null);
+  const [interviewTranscript, setInterviewTranscript] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
 
   // Audio recording state - lifted here so it persists across tab switches
   const { state: recordingState, controls: recordingControls } = useAudioRecording();
@@ -153,6 +158,7 @@ export function EvaluationHub() {
       // Initialize summary fields
       setSummaryFeedback((data as any).summary_feedback || null);
       setSummaryRawTranscript((data as any).summary_raw_transcript || null);
+      setInterviewTranscript((data as any).interview_transcript || null);
 
       // Load audio recording if exists
       if (data.audio_recording_path) {
@@ -521,6 +527,81 @@ export function EvaluationHub() {
       setSummaryRawTranscript(transcript);
     } catch (error) {
       console.error('Failed to save transcript:', error);
+    }
+  };
+
+  // Interview transcription handlers
+  const handleTranscribeAndParse = async () => {
+    if (!evaluation?.audio_recording_path || !evalId) return;
+    
+    try {
+      setIsTranscribing(true);
+      
+      // Step 1: Download the audio file
+      const { data: audioData, error: downloadError } = await supabase.storage
+        .from('evaluation-recordings')
+        .download(evaluation.audio_recording_path);
+      
+      if (downloadError) throw downloadError;
+      
+      // Step 2: Send to transcribe-audio edge function
+      const formData = new FormData();
+      formData.append('audio', audioData, 'audio.webm');
+      
+      const { data: transcribeData, error: transcribeError } = await supabase.functions.invoke('transcribe-audio', {
+        body: formData,
+      });
+      
+      if (transcribeError) throw transcribeError;
+      
+      const rawTranscript = transcribeData?.transcript;
+      if (!rawTranscript) {
+        throw new Error('No transcript returned from transcription');
+      }
+      
+      setIsTranscribing(false);
+      setIsParsing(true);
+      
+      // Step 3: Parse the transcript to identify speakers
+      const { data: parseData, error: parseError } = await supabase.functions.invoke('parse-interview', {
+        body: { transcript: rawTranscript },
+      });
+      
+      if (parseError) throw parseError;
+      
+      const parsedTranscript = parseData?.parsedTranscript;
+      if (!parsedTranscript) {
+        throw new Error('No parsed transcript returned');
+      }
+      
+      // Step 4: Save to database
+      await updateInterviewTranscript(evalId, parsedTranscript);
+      setInterviewTranscript(parsedTranscript);
+      
+      toast({
+        title: "Success",
+        description: "Interview transcribed and formatted successfully"
+      });
+    } catch (error) {
+      console.error('Transcription/parsing failed:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to transcribe interview",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTranscribing(false);
+      setIsParsing(false);
+    }
+  };
+
+  const handleInterviewTranscriptChange = async (value: string) => {
+    if (!evalId) return;
+    setInterviewTranscript(value);
+    try {
+      await updateInterviewTranscript(evalId, value);
+    } catch (error) {
+      console.error('Failed to save interview transcript:', error);
     }
   };
 
@@ -986,138 +1067,9 @@ export function EvaluationHub() {
         </TabsContent>
 
         <TabsContent value="self-assessment">
-          {/* Self-Evaluation Interview Recording */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Mic className="w-5 h-5" />
-                Self-Evaluation Interview Recording
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {currentRecording ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <FileAudio className="w-8 h-8 text-primary" />
-                      <div>
-                        <p className="font-medium">{currentRecording.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatFileSize(currentRecording.size)} • 
-                          Uploaded {format(new Date(currentRecording.uploaded_at), 'MMM d, yyyy')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleDownloadRecording}
-                      >
-                        <Download className="w-4 h-4 mr-1" />
-                        Download
-                      </Button>
-                      {!isReadOnly && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="destructive">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Recording</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure? This will permanently delete the audio recording.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={handleDeleteRecording}>
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {!selectedFile ? (
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                      <input
-                        type="file"
-                        accept=".mp3,.wav,.m4a,.ogg,.webm,audio/*"
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                        disabled={isReadOnly}
-                        className="hidden"
-                        id="audio-upload"
-                      />
-                      <label
-                        htmlFor="audio-upload"
-                        className={cn(
-                          "cursor-pointer flex flex-col items-center gap-2",
-                          isReadOnly && "cursor-not-allowed opacity-60"
-                        )}
-                      >
-                        <Upload className="w-8 h-8 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          Click to upload audio recording
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          MP3, WAV, M4A, OGG, or WebM (max 100MB)
-                        </p>
-                      </label>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <FileAudio className="w-6 h-6" />
-                          <div>
-                            <p className="font-medium">{selectedFile.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formatFileSize(selectedFile.size)}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setSelectedFile(null)}
-                          disabled={isUploading}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <Button
-                        onClick={handleFileUpload}
-                        disabled={isUploading || isReadOnly}
-                        className="w-full"
-                      >
-                        {isUploading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="w-4 h-4 mr-2" />
-                            Upload Recording
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
+          {/* Self-Assessment Competencies Card - Now First */}
           {currentItem && (
-            <Card>
+            <Card className="mb-6">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Self-Assessment ({currentSelfIndex + 1} of {sortedItems.length})</CardTitle>
@@ -1229,6 +1181,203 @@ export function EvaluationHub() {
                      Add Note
                    </Button>
                  )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Self-Evaluation Interview Recording - Now Below Competencies */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Mic className="w-5 h-5" />
+                Self-Evaluation Interview Recording
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {currentRecording ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileAudio className="w-8 h-8 text-primary" />
+                      <div>
+                        <p className="font-medium">{currentRecording.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatFileSize(currentRecording.size)} • 
+                          Uploaded {format(new Date(currentRecording.uploaded_at), 'MMM d, yyyy')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDownloadRecording}
+                      >
+                        <Download className="w-4 h-4 mr-1" />
+                        Download
+                      </Button>
+                      {!isReadOnly && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="destructive">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Recording</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure? This will permanently delete the audio recording.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleDeleteRecording}>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Transcribe Button - Only show when audio exists and not read-only */}
+                  {!isReadOnly && !interviewTranscript && (
+                    <Button
+                      onClick={handleTranscribeAndParse}
+                      disabled={isTranscribing || isParsing}
+                      className="w-full"
+                    >
+                      {isTranscribing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Transcribing audio...
+                        </>
+                      ) : isParsing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Identifying speakers...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4 mr-2" />
+                          Transcribe Interview
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {!selectedFile ? (
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                      <input
+                        type="file"
+                        accept=".mp3,.wav,.m4a,.ogg,.webm,audio/*"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        disabled={isReadOnly}
+                        className="hidden"
+                        id="audio-upload"
+                      />
+                      <label
+                        htmlFor="audio-upload"
+                        className={cn(
+                          "cursor-pointer flex flex-col items-center gap-2",
+                          isReadOnly && "cursor-not-allowed opacity-60"
+                        )}
+                      >
+                        <Upload className="w-8 h-8 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          Click to upload audio recording
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          MP3, WAV, M4A, OGG, or WebM (max 100MB)
+                        </p>
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <FileAudio className="w-6 h-6" />
+                          <div>
+                            <p className="font-medium">{selectedFile.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatFileSize(selectedFile.size)}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setSelectedFile(null)}
+                          disabled={isUploading}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <Button
+                        onClick={handleFileUpload}
+                        disabled={isUploading || isReadOnly}
+                        className="w-full"
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload Recording
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Interview Transcript - Shows after transcription */}
+          {(interviewTranscript || currentRecording) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Interview Transcript
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {interviewTranscript ? (
+                  <div className="space-y-3">
+                    <ReactQuill
+                      theme="snow"
+                      value={interviewTranscript}
+                      onChange={handleInterviewTranscriptChange}
+                      readOnly={isReadOnly}
+                      className="bg-background"
+                      modules={{
+                        toolbar: isReadOnly ? false : [
+                          ['bold', 'italic'],
+                          [{ 'list': 'bullet' }],
+                          ['clean']
+                        ]
+                      }}
+                    />
+                    {!isReadOnly && (
+                      <p className="text-xs text-muted-foreground">
+                        You can edit the transcript above to correct any transcription errors.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Upload and transcribe the interview recording to see the transcript here.
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}

@@ -30,6 +30,9 @@ verify_jwt = true
 [functions.parse-interview]
 verify_jwt = true
 
+[functions.extract-insights]
+verify_jwt = true
+
 [functions.admin-users]
 verify_jwt = true
 

@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText } from 'lucide-react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
@@ -42,6 +42,7 @@ import {
 } from '@/lib/evaluations';
 import { ProMovesAccordion } from '@/components/coach/ProMovesAccordion';
 import { SummaryTab } from '@/components/coach/SummaryTab';
+import { ObservationRecorder } from '@/components/coach/ObservationRecorder';
 import { useAudioRecording } from '@/hooks/useAudioRecording';
 import ReactQuill from 'react-quill';
 
@@ -984,6 +985,20 @@ export function EvaluationHub() {
         </TabsList>
 
         <TabsContent value="observation">
+          {/* Observation Recorder at TOP */}
+          {!isReadOnly && (
+            <ObservationRecorder
+              evalId={evalId!}
+              staffName={staffName}
+              onFeedbackGenerated={(feedback, transcript) => {
+                handleSummaryFeedbackChange(feedback);
+                handleSummaryTranscriptChange(transcript);
+              }}
+              recordingState={recordingState}
+              recordingControls={recordingControls}
+            />
+          )}
+          
           <Card>
             <CardHeader>
               <CardTitle>Observation Scores & Notes</CardTitle>
@@ -1270,6 +1285,47 @@ export function EvaluationHub() {
                       )}
                     </Button>
                   )}
+                  
+                  {/* Extract Insights Button - appears after transcript exists */}
+                  {interviewTranscript && !isReadOnly && !evaluation?.extracted_insights && (
+                    <Button
+                      onClick={async () => {
+                        try {
+                          setIsParsing(true);
+                          const { data, error } = await supabase.functions.invoke('extract-insights', {
+                            body: { transcript: interviewTranscript, staffName },
+                          });
+                          if (error) throw error;
+                          if (data?.insights) {
+                            const { updateExtractedInsights } = await import('@/lib/evaluations');
+                            await updateExtractedInsights(evalId!, data.insights);
+                            setEvaluation(prev => prev ? { ...prev, extracted_insights: data.insights } : prev);
+                            toast({ title: 'Success', description: 'Insights extracted successfully' });
+                          }
+                        } catch (err) {
+                          console.error('Extract insights failed:', err);
+                          toast({ title: 'Error', description: 'Failed to extract insights', variant: 'destructive' });
+                        } finally {
+                          setIsParsing(false);
+                        }
+                      }}
+                      disabled={isParsing}
+                      variant="secondary"
+                      className="w-full"
+                    >
+                      {isParsing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Extracting insights...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Extract Insights
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1393,15 +1449,8 @@ export function EvaluationHub() {
 
         <TabsContent value="summary">
           <SummaryTab
-            evalId={evalId!}
-            staffName={staffName}
             summaryFeedback={summaryFeedback}
-            summaryRawTranscript={summaryRawTranscript}
-            isReadOnly={isReadOnly}
-            onFeedbackChange={handleSummaryFeedbackChange}
-            onTranscriptChange={handleSummaryTranscriptChange}
-            recordingState={recordingState}
-            recordingControls={recordingControls}
+            extractedInsights={evaluation?.extracted_insights || null}
           />
         </TabsContent>
       </Tabs>

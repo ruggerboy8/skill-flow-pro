@@ -5,13 +5,34 @@ type Evaluation = Database['public']['Tables']['evaluations']['Row'];
 type EvaluationInsert = Database['public']['Tables']['evaluations']['Insert'];
 type EvaluationItem = Database['public']['Tables']['evaluation_items']['Row'];
 
-export interface EvaluationWithItems extends Evaluation {
+// Types for extracted insights from AI analysis
+export interface DomainInsight {
+  domain: 'Clinical' | 'Clerical' | 'Cultural' | 'Case Acceptance';
+  strengths: string[];
+  growth_areas: string[];
+}
+
+export interface GrowthPlanItem {
+  title: string;
+  domain: string;
+  observation: string;
+  suggested_action: string;
+}
+
+export interface ExtractedInsights {
+  evaluation_summary_html: string;
+  domain_insights: DomainInsight[];
+  tactical_growth_plan: GrowthPlanItem[];
+}
+
+export interface EvaluationWithItems extends Omit<Evaluation, 'extracted_insights'> {
   items: (EvaluationItem & {
     competency_description?: string;
     interview_prompt?: string;
     domain_name?: string;
     tagline?: string;
   })[];
+  extracted_insights?: ExtractedInsights | null;
 }
 
 export interface QuarterWindow {
@@ -191,8 +212,11 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
   if (competencyIds.length === 0) {
     return {
       ...data,
-      items: []
-    };
+      items: [],
+      extracted_insights: data.extracted_insights 
+        ? (data.extracted_insights as unknown as ExtractedInsights)
+        : null
+    } as EvaluationWithItems;
   }
 
   // Use a simple query to get competency details including tagline
@@ -256,10 +280,16 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
 
   console.log('Transformed evaluation items:', transformedItems.slice(0, 2)); // Debug log
 
+  // Parse extracted_insights from JSON if present
+  const extractedInsights = data.extracted_insights 
+    ? (data.extracted_insights as unknown as ExtractedInsights)
+    : null;
+
   return {
     ...data,
-    items: transformedItems
-  };
+    items: transformedItems,
+    extracted_insights: extractedInsights
+  } as EvaluationWithItems;
 }
 
 /**
@@ -444,6 +474,23 @@ export function isEvaluationComplete(evaluation: EvaluationWithItems): {
     selfComplete,
     canSubmit: observerComplete && selfComplete
   };
+}
+
+/**
+ * Update extracted insights from interview analysis
+ */
+export async function updateExtractedInsights(
+  evalId: string,
+  insights: ExtractedInsights
+) {
+  const { error } = await supabase
+    .from('evaluations')
+    .update({ extracted_insights: insights as unknown as Database['public']['Tables']['evaluations']['Update']['extracted_insights'] })
+    .eq('id', evalId);
+
+  if (error) {
+    throw new Error(`Failed to update extracted insights: ${error.message}`);
+  }
 }
 
 /**

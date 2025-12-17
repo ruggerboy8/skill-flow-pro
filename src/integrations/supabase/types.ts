@@ -384,6 +384,7 @@ export type Database = {
           audio_recording_path: string | null
           created_at: string
           evaluator_id: string
+          extracted_insights: Json | null
           id: string
           interview_transcript: string | null
           location_id: string
@@ -402,6 +403,7 @@ export type Database = {
           audio_recording_path?: string | null
           created_at?: string
           evaluator_id: string
+          extracted_insights?: Json | null
           id?: string
           interview_transcript?: string | null
           location_id: string
@@ -420,6 +422,7 @@ export type Database = {
           audio_recording_path?: string | null
           created_at?: string
           evaluator_id?: string
+          extracted_insights?: Json | null
           id?: string
           interview_transcript?: string | null
           location_id?: string

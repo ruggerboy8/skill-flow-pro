@@ -239,10 +239,10 @@ export default function EvaluationViewer() {
           <Button 
             variant="outline" 
             className="mt-4"
-            onClick={() => navigate(backUrl)}
+            onClick={() => navigate(-1)}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Evaluations
+            Back
           </Button>
         </CardContent>
       </Card>
@@ -293,7 +293,7 @@ export default function EvaluationViewer() {
         <Button 
           variant="outline" 
           size="sm"
-          onClick={() => navigate(backUrl)}
+          onClick={() => navigate(-1)}
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back

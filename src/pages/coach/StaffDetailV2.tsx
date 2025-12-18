@@ -98,9 +98,9 @@ export default function StaffDetailV2() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate(-1)}>
+        <Button variant="ghost" onClick={() => navigate('/coach')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          Back to Dashboard
         </Button>
         <div className="animate-pulse space-y-4">
           <div className="h-32 bg-muted rounded" />
@@ -113,9 +113,9 @@ export default function StaffDetailV2() {
   if (error || !staffInfo) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate(-1)}>
+        <Button variant="ghost" onClick={() => navigate('/coach')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          Back to Dashboard
         </Button>
         <Card>
           <CardContent className="pt-6">
@@ -134,7 +134,7 @@ export default function StaffDetailV2() {
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/coach')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
             </Button>

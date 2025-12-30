@@ -732,10 +732,10 @@ export default function PerformanceWizard() {
             className={cn(
               "h-2 rounded-full transition-all duration-300",
               idx === currentIndex 
-                ? "w-6 bg-white" 
+                ? "w-6 bg-foreground" 
                 : idx < currentIndex 
-                  ? "w-2 bg-white/80" 
-                  : "w-2 bg-white/30"
+                  ? "w-2 bg-foreground/60" 
+                  : "w-2 bg-foreground/30"
             )}
           />
         ))}
@@ -795,8 +795,8 @@ export default function PerformanceWizard() {
       {/* Question & Scale */}
       <div className="px-4 max-w-md mx-auto mt-8 space-y-6">
         <div className="text-center">
-          <p className="text-base font-medium text-white mb-1">How did you do?</p>
-          <p className="text-sm text-white/70">How often did you actually do this action this week?</p>
+          <p className="text-base font-medium text-foreground mb-1">How did you do?</p>
+          <p className="text-sm text-muted-foreground">How often did you actually do this action this week?</p>
         </div>
         <NumberScale
           value={performanceScores[currentFocus.id] || null}

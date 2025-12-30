@@ -761,7 +761,7 @@ export default function PerformanceWizard() {
             style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}
           >
             <span 
-              className="text-[10px] font-bold tracking-wider uppercase text-white/90 whitespace-nowrap"
+              className="text-[10px] font-bold tracking-wider uppercase text-white drop-shadow-sm whitespace-nowrap"
               style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
             >
               {currentFocus.domain_name}

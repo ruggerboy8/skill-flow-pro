@@ -304,29 +304,19 @@ export default function ThisWeekPanel() {
   // Show normal view with pro moves and banner
   return (
     <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 dark:md:border-slate-700/40 md:shadow-glass md:rounded-xl overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 md:px-6 md:py-4 md:border-b md:border-border/50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-lg">This Week's Focus</h3>
-            <p className="text-sm text-muted-foreground">Week of {weekOfDate}</p>
-          </div>
-          {locationWeekContext && (
-            <Badge variant="outline" className="text-xs">
-              Cycle {locationWeekContext.cycleNumber} • Week {locationWeekContext.weekInCycle}
-            </Badge>
-          )}
-        </div>
+      {/* Header - Centered */}
+      <div className="px-4 py-3 md:px-6 md:py-4 md:border-b md:border-border/50 text-center">
+        <h3 className="font-semibold text-lg">ProMoves</h3>
+        <p className="text-sm text-muted-foreground">Week of {weekOfDate}</p>
       </div>
 
       {/* Content */}
       <div className="p-4 md:p-6 space-y-3">
-        {/* Pro Moves list - Glass Rows with Indicator */}
+        {/* Pro Moves list - Spine Layout */}
         {displayAssignments.map((assignment) => {
           const domainName = assignment.domain_name;
           const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
           
-          // Find scores for this assignment
           const scores = weeklyScores.find(s => 
             s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
           );
@@ -358,61 +348,49 @@ export default function ThisWeekPanel() {
                 }
               }}
             >
-              {/* Colored indicator bar */}
+              {/* THE SPINE: Vertical Domain Label */}
               <div 
-                className="w-1 shrink-0" 
-                style={{ backgroundColor: domainColor }} 
-              />
+                className="w-8 shrink-0 flex items-center justify-center"
+                style={{ backgroundColor: domainColor }}
+              >
+                <span 
+                  className="text-[10px] font-bold tracking-widest uppercase text-white/90"
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                >
+                  {domainName}
+                </span>
+              </div>
               
-              {/* Content Wrapper: Stacked on Mobile, Row on Desktop */}
+              {/* Content Area */}
               <div className="flex-1 p-3 md:p-4">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                  
-                  {/* Left Side: Badges + Text */}
-                  <div className="flex-1 min-w-0">
-                    {/* Domain & Learn badges */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      {domainName && (
-                        <Badge 
-                          variant="secondary" 
-                          className="text-[10px] font-bold tracking-wider uppercase bg-white/80 dark:bg-slate-700/80 text-foreground/80 border-0"
-                        >
-                          {domainName}
-                        </Badge>
-                      )}
-                      {resourceCount > 0 && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 gap-1 text-[10px] text-primary/80 hover:text-primary hover:bg-primary/5 rounded-full"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedLearnAssignment(assignment);
-                            setLearnDrawerOpen(true);
-                          }}
-                        >
-                          <GraduationCap className="h-3.5 w-3.5" />
-                          Learn
-                        </Button>
-                      )}
-                    </div>
-                    
-                    {/* Action statement */}
-                    <p className="text-sm font-medium leading-relaxed text-foreground/90">
-                      {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
-                    </p>
-                  </div>
+                {/* Top Row: Text + Learn Icon */}
+                <div className="flex items-start gap-2">
+                  <p className="flex-1 text-sm font-medium leading-relaxed text-foreground/90">
+                    {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
+                  </p>
 
-                  {/* Right Side (Desktop) / Bottom (Mobile): Scores + Chevron */}
-                  <div className="flex items-center justify-between md:justify-end gap-2 shrink-0 mt-2 md:mt-0 md:pl-4 md:border-l border-white/20 dark:border-slate-700/30">
-                    <ConfPerfDelta 
-                      confidence={scores?.confidence_score} 
-                      performance={scores?.performance_score} 
-                    />
-                    {resourceCount > 0 && (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
+                  {/* Learn Icon - Only appears if resources exist */}
+                  {resourceCount > 0 && (
+                    <button
+                      className="p-1.5 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLearnAssignment(assignment);
+                        setLearnDrawerOpen(true);
+                      }}
+                      aria-label="View learning materials"
+                    >
+                      <GraduationCap className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Bottom Row: Scores */}
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
+                  <ConfPerfDelta 
+                    confidence={scores?.confidence_score} 
+                    performance={scores?.performance_score} 
+                  />
                 </div>
               </div>
             </div>

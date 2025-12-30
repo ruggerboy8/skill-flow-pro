@@ -349,36 +349,18 @@ export default function ThisWeekPanel() {
                 }
               }}
             >
-              {/* THE SPINE: Vertical Domain Label + Learn Icon at Top */}
+              {/* THE SPINE: Vertical Domain Label */}
               <div 
-                className="w-8 shrink-0 flex flex-col items-center"
+                className="w-8 shrink-0 flex flex-col items-center justify-center"
                 style={{ backgroundColor: domainColor }}
               >
-                {/* Learn Icon at top of spine */}
-                {resourceCount > 0 && (
-                  <button
-                    className="p-1.5 mt-1 rounded-full transition-colors shrink-0"
-                    style={{ color: domainColorRich }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedLearnAssignment(assignment);
-                      setLearnDrawerOpen(true);
-                    }}
-                    aria-label="View learning materials"
-                  >
-                    <GraduationCap className="h-4 w-4" />
-                  </button>
-                )}
-                
                 {/* Vertical domain text */}
-                <div className="flex-1 flex items-center justify-center">
-                  <span 
-                    className="text-[10px] font-bold tracking-widest uppercase"
-                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
-                  >
-                    {domainName}
-                  </span>
-                </div>
+                <span 
+                  className="text-[10px] font-bold tracking-widest uppercase"
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
+                >
+                  {domainName}
+                </span>
               </div>
               
               {/* Content Area */}
@@ -388,12 +370,29 @@ export default function ThisWeekPanel() {
                   {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
                 </p>
 
-                {/* Bottom Row: Scores */}
+                {/* Bottom Row: Scores + Learn Button */}
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
                   <ConfPerfDelta 
                     confidence={scores?.confidence_score} 
                     performance={scores?.performance_score} 
                   />
+                  
+                  {/* Learn button with chevron */}
+                  {resourceCount > 0 && (
+                    <button
+                      className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors hover:bg-muted"
+                      style={{ color: domainColorRich }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLearnAssignment(assignment);
+                        setLearnDrawerOpen(true);
+                      }}
+                      aria-label="View learning materials"
+                    >
+                      <GraduationCap className="h-4 w-4" />
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

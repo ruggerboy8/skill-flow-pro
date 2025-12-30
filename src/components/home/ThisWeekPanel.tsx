@@ -12,7 +12,7 @@ import { CT_TZ } from '@/lib/centralTime';
 import { getWeekAnchors } from '@/v2/time';
 import { isV2, useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 import { useNow } from '@/providers/NowProvider';
-import { getDomainColorRich } from '@/lib/domainColors';
+import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
 import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
@@ -315,7 +315,8 @@ export default function ThisWeekPanel() {
         {/* Pro Moves list - Spine Layout */}
         {displayAssignments.map((assignment) => {
           const domainName = assignment.domain_name;
-          const domainColor = domainName ? getDomainColorRich(domainName) : 'hsl(var(--primary))';
+          const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
+          const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
           
           const scores = weeklyScores.find(s => 
             s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
@@ -356,7 +357,8 @@ export default function ThisWeekPanel() {
                 {/* Learn Icon at top of spine */}
                 {resourceCount > 0 && (
                   <button
-                    className="p-1.5 mt-1 rounded-full text-white hover:bg-white/20 transition-colors shrink-0"
+                    className="p-1.5 mt-1 rounded-full transition-colors shrink-0"
+                    style={{ color: domainColorRich }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedLearnAssignment(assignment);
@@ -371,8 +373,8 @@ export default function ThisWeekPanel() {
                 {/* Vertical domain text */}
                 <div className="flex-1 flex items-center justify-center">
                   <span 
-                    className="text-[10px] font-bold tracking-widest uppercase text-white drop-shadow-sm"
-                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                    className="text-[10px] font-bold tracking-widest uppercase"
+                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
                   >
                     {domainName}
                   </span>

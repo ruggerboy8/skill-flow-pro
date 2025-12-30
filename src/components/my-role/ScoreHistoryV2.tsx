@@ -10,7 +10,7 @@ import { useSim } from '@/devtools/SimProvider';
 import { format, parseISO } from 'date-fns';
 import { useMyWeeklyScores } from '@/hooks/useMyWeeklyScores';
 import { RawScoreRow } from '@/types/coachV2';
-import { getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainColorRich } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { Trash2, Tag, History } from 'lucide-react';
 import {
@@ -187,7 +187,7 @@ export default function ScoreHistoryV2() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="border-0 md:border rounded-none md:rounded-xl shadow-none md:shadow-sm bg-transparent md:bg-card">
         <CardContent className="py-12">
           <div className="flex items-center justify-center text-muted-foreground">Loading scores...</div>
         </CardContent>
@@ -197,7 +197,7 @@ export default function ScoreHistoryV2() {
 
   if (groupedData.length === 0) {
     return (
-      <Card>
+      <Card className="border-0 md:border rounded-none md:rounded-xl shadow-none md:shadow-sm bg-transparent md:bg-card">
         <CardContent className="py-12 text-center">
           <p className="text-muted-foreground">No score data available yet.</p>
         </CardContent>
@@ -206,8 +206,8 @@ export default function ScoreHistoryV2() {
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <Card className="border-0 md:border rounded-none md:rounded-xl shadow-none md:shadow-sm bg-transparent md:bg-card">
+      <CardHeader className="pb-3 px-0 md:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <History className="w-5 h-5" />
@@ -237,7 +237,7 @@ export default function ScoreHistoryV2() {
         </div>
       </CardHeader>
       
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 px-0 md:px-6">
         <Accordion type="multiple" value={openYears} onValueChange={setOpenYears} className="space-y-3">
           {filteredYears.map((yearData) => (
             <AccordionItem key={yearData.year} value={`year-${yearData.year}`} className="border rounded-lg bg-muted/30">
@@ -314,45 +314,50 @@ export default function ScoreHistoryV2() {
                                   {scores.length > 0 ? (
                                     <div className="space-y-2 pt-2">
                                       {scores.map((score, index) => {
-                                        const richColor = getDomainColorRichRaw(score.domain_name || 'General');
+                                        const domainColor = getDomainColorRich(score.domain_name || 'General');
                                         return (
                                           <div 
                                             key={index} 
-                                            className="flex flex-col gap-2 p-2 md:p-3 rounded-lg border border-border/50 bg-muted/20"
+                                            className="flex overflow-hidden rounded-lg border border-border/50 bg-muted/20"
                                           >
-                                            {/* Row 1: Domain & Score Delta */}
-                                            <div className="flex items-start justify-between gap-2">
-                                              <div className="flex items-center gap-2 flex-wrap">
-                                                <Badge 
-                                                  variant="outline"
-                                                  className="text-[10px] font-medium border-0 px-1.5 h-5"
-                                                  style={{ 
-                                                    backgroundColor: `hsl(${richColor} / 0.15)`, 
-                                                    color: `hsl(${richColor})` 
-                                                  }}
-                                                >
-                                                  {score.domain_name || 'General'}
-                                                </Badge>
-                                                {score.self_select && (
-                                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                    <Tag className="w-3 h-3" />
-                                                    <span>Self-Select</span>
-                                                  </div>
-                                                )}
+                                            {/* Mini Spine */}
+                                            <div 
+                                              className="w-1.5 flex-shrink-0 rounded-l-lg"
+                                              style={{ backgroundColor: domainColor }}
+                                            />
+                                            
+                                            {/* Content */}
+                                            <div className="flex-1 p-2 md:p-3 min-w-0">
+                                              {/* Row 1: Domain & Score Delta */}
+                                              <div className="flex items-start justify-between gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                  <span 
+                                                    className="text-[10px] font-semibold uppercase"
+                                                    style={{ color: domainColor }}
+                                                  >
+                                                    {score.domain_name || 'General'}
+                                                  </span>
+                                                  {score.self_select && (
+                                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                      <Tag className="w-3 h-3" />
+                                                      <span>Self-Select</span>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                                
+                                                <div className="scale-90 origin-right shrink-0">
+                                                  <ConfPerfDelta 
+                                                    confidence={score.confidence_score} 
+                                                    performance={score.performance_score} 
+                                                  />
+                                                </div>
                                               </div>
-                                              
-                                              <div className="scale-90 origin-right shrink-0">
-                                                <ConfPerfDelta 
-                                                  confidence={score.confidence_score} 
-                                                  performance={score.performance_score} 
-                                                />
-                                              </div>
-                                            </div>
 
-                                            {/* Row 2: Action Statement */}
-                                            <span className="text-sm leading-snug text-foreground/90">
-                                              {score.action_statement || 'Pro Move'}
-                                            </span>
+                                              {/* Row 2: Action Statement */}
+                                              <p className="text-sm leading-snug text-foreground/90 mt-1">
+                                                {score.action_statement || 'Pro Move'}
+                                              </p>
+                                            </div>
                                           </div>
                                         );
                                       })}

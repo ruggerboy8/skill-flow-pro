@@ -4,10 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { supabase } from '@/integrations/supabase/client';
-import { getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainColorRich, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { ROLE_CONTENT, DOMAIN_ORDER, type RoleType } from '@/lib/content/roleDefinitions';
-import { Star, ChevronRight } from 'lucide-react';
+import { Star, ChevronRight, Compass } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface DomainScore {
   domain_name: string;
@@ -89,7 +90,7 @@ export default function RoleRadar() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[1, 2, 3, 4].map(i => (
-          <Skeleton key={i} className="h-48 rounded-2xl" />
+          <Skeleton key={i} className="h-48 rounded-3xl bg-white/40 dark:bg-slate-800/40" />
         ))}
       </div>
     );
@@ -102,60 +103,75 @@ export default function RoleRadar() {
         const score = domainScores.get(domain);
         const isScored = score != null && score > 0;
         const richColor = getDomainColorRichRaw(domain);
+        const domainColorRich = getDomainColorRich(domain);
 
         return (
           <div
             key={domain}
             onClick={() => navigate(`/my-role/domain/${getDomainSlug(domain)}`)}
-            className={`
-              relative rounded-2xl border-2 p-4 md:p-6 transition-all cursor-pointer
-              hover:scale-[1.02] hover:shadow-lg
-              ${isScored 
-                ? 'shadow-sm' 
-                : 'border-dashed border-muted-foreground/20 bg-muted/5'
-              }
-            `}
-            style={isScored ? {
-              backgroundColor: `hsl(${richColor} / 0.08)`,
-              borderColor: `hsl(${richColor} / 0.3)`
-            } : {}}
+            className={cn(
+              "group relative overflow-hidden rounded-3xl border p-5 md:p-6 transition-all duration-300 cursor-pointer",
+              "hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]",
+              isScored 
+                ? "bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-white/40 dark:border-slate-700/40 shadow-sm" 
+                : "bg-muted/10 border-dashed border-muted-foreground/20"
+            )}
           >
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-3">
-              <h3 className="text-lg md:text-xl font-bold text-foreground">{domain}</h3>
-              <div className="self-start sm:self-auto">
-                {isScored ? (
-                  <Badge 
-                    className="bg-white/60 backdrop-blur text-foreground shadow-sm border-0 flex items-center gap-1"
-                  >
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <span className="font-semibold">{score.toFixed(1)}</span>
-                  </Badge>
-                ) : (
-                  <Badge 
-                    variant="outline" 
-                    className="opacity-60 font-normal"
-                  >
-                    Exploration Mode
-                  </Badge>
-                )}
+            {/* Mini-Spine Accent Bar */}
+            <div 
+              className="absolute left-0 top-4 bottom-4 w-1.5 rounded-full"
+              style={{ backgroundColor: domainColorRich }}
+            />
+
+            {/* Gradient overlay for scored cards */}
+            {isScored && (
+              <div 
+                className="absolute inset-0 opacity-10 pointer-events-none"
+                style={{
+                  background: `linear-gradient(135deg, hsl(${richColor}) 0%, transparent 60%)`
+                }}
+              />
+            )}
+
+            <div className="relative pl-4">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-3">
+                <h3 className="text-lg md:text-xl font-bold text-foreground">{domain}</h3>
+                <div className="self-start sm:self-auto">
+                  {isScored ? (
+                    <Badge 
+                      className="bg-white/80 dark:bg-slate-800/80 backdrop-blur text-foreground shadow-sm border-0 flex items-center gap-1"
+                    >
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span className="font-semibold">{score.toFixed(1)}</span>
+                    </Badge>
+                  ) : (
+                    <Badge 
+                      variant="outline" 
+                      className="opacity-70 font-normal flex items-center gap-1"
+                    >
+                      <Compass className="w-3 h-3" />
+                      Explore
+                    </Badge>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Description */}
-            <p className="mt-4 text-sm leading-relaxed text-foreground/90">
-              {content.description}
-            </p>
+              {/* Description */}
+              <p className="mt-4 text-sm leading-relaxed text-foreground/90">
+                {content.description}
+              </p>
 
-            {/* Value Prop - styled distinctly */}
-            <p className="mt-3 text-xs italic text-muted-foreground leading-relaxed">
-              {content.valueProp}
-            </p>
+              {/* Value Prop - styled distinctly */}
+              <p className="mt-3 text-xs italic text-muted-foreground leading-relaxed">
+                "{content.valueProp}"
+              </p>
 
-            {/* Click Hint */}
-            <div className="absolute bottom-4 right-4 flex items-center gap-1 text-xs text-muted-foreground">
-              <span>Explore</span>
-              <ChevronRight className="w-4 h-4" />
+              {/* Click Hint */}
+              <div className="absolute bottom-0 right-0 flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                <span>View Competencies</span>
+                <ChevronRight className="w-4 h-4" />
+              </div>
             </div>
           </div>
         );

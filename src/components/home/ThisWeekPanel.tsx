@@ -356,7 +356,7 @@ export default function ThisWeekPanel() {
                 {/* Learn Icon at top of spine */}
                 {resourceCount > 0 && (
                   <button
-                    className="p-1.5 mt-1 rounded-full text-white/80 hover:text-white hover:bg-white/20 transition-colors shrink-0"
+                    className="p-1.5 mt-1 rounded-full text-white hover:bg-white/20 transition-colors shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedLearnAssignment(assignment);
@@ -371,7 +371,7 @@ export default function ThisWeekPanel() {
                 {/* Vertical domain text */}
                 <div className="flex-1 flex items-center justify-center">
                   <span 
-                    className="text-[10px] font-bold tracking-widest uppercase text-white/90"
+                    className="text-[10px] font-bold tracking-widest uppercase text-white drop-shadow-sm"
                     style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
                   >
                     {domainName}

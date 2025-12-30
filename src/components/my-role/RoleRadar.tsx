@@ -162,10 +162,6 @@ export default function RoleRadar() {
                 {content.description}
               </p>
 
-              {/* Value Prop - styled distinctly */}
-              <p className="mt-3 text-xs italic text-muted-foreground leading-relaxed">
-                "{content.valueProp}"
-              </p>
 
               {/* Click Hint */}
               <div className="absolute bottom-0 right-0 flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground transition-colors">

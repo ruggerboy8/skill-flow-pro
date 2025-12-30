@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { supabase } from '@/integrations/supabase/client';
-import { getDomainColorRich, getDomainColorRichRaw } from '@/lib/domainColors';
+import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { ROLE_CONTENT, DOMAIN_ORDER, type RoleType } from '@/lib/content/roleDefinitions';
 import { ChevronRight, Compass } from 'lucide-react';
@@ -95,79 +95,78 @@ export default function RoleRadar() {
     );
   }
 
+  const hasAnyScores = domainScores.size > 0;
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-      {DOMAIN_ORDER.map(domain => {
-        const content = roleContent[domain];
-        const score = domainScores.get(domain);
-        const isScored = score != null && score > 0;
-        const richColor = getDomainColorRichRaw(domain);
-        const domainColorRich = getDomainColorRich(domain);
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        {DOMAIN_ORDER.map(domain => {
+          const content = roleContent[domain];
+          const score = domainScores.get(domain);
+          const isScored = score != null && score > 0;
+          const domainColor = getDomainColor(domain);
+          const domainColorRich = `hsl(${getDomainColorRichRaw(domain)})`;
 
-        return (
-          <div
-            key={domain}
-            onClick={() => navigate(`/my-role/domain/${getDomainSlug(domain)}`)}
-            className={cn(
-              "group relative overflow-hidden rounded-3xl border transition-all duration-300 cursor-pointer flex",
-              "hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]",
-              isScored 
-                ? "bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-white/40 dark:border-slate-700/40 shadow-sm" 
-                : "bg-muted/10 border-dashed border-muted-foreground/20"
-            )}
-          >
-            {/* Vertical Spine with Domain Label */}
-            <div 
-              className="flex-shrink-0 w-8 flex items-center justify-center rounded-l-3xl"
-              style={{ backgroundColor: domainColorRich }}
+          return (
+            <div
+              key={domain}
+              onClick={() => navigate(`/my-role/domain/${getDomainSlug(domain)}`)}
+              className={cn(
+                "group relative overflow-hidden rounded-xl border transition-all duration-300 cursor-pointer flex",
+                "hover:shadow-md hover:scale-[1.01] active:scale-[0.99]",
+                "bg-white dark:bg-slate-800 border-border/50 dark:border-slate-700/50 shadow-sm"
+              )}
             >
-              <span 
-                className="text-white font-bold text-xs tracking-widest uppercase whitespace-nowrap"
-                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-              >
-                {domain}
-              </span>
-            </div>
-
-            {/* Gradient overlay for scored cards */}
-            {isScored && (
+              {/* THE SPINE: Vertical Domain Label - matches ThisWeekPanel */}
               <div 
-                className="absolute inset-0 opacity-10 pointer-events-none"
-                style={{
-                  background: `linear-gradient(135deg, hsl(${richColor}) 0%, transparent 60%)`
-                }}
-              />
-            )}
-
-            {/* Main Content */}
-            <div className="relative flex-1 p-4 flex items-center gap-3">
-              {/* Description */}
-              <p className="flex-1 text-sm leading-relaxed text-foreground/90">
-                {content.description}
-              </p>
-
-              {/* Score Square */}
-              <div 
-                className={cn(
-                  "flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border",
-                  isScored 
-                    ? "bg-white/60 dark:bg-slate-800/60 border-border/50" 
-                    : "bg-muted/30 border-dashed border-muted-foreground/30"
-                )}
+                className="w-8 shrink-0 flex flex-col items-center justify-center"
+                style={{ backgroundColor: domainColor }}
               >
-                {isScored ? (
-                  <span className="text-lg font-bold text-foreground">{score.toFixed(1)}</span>
-                ) : (
-                  <Compass className="w-4 h-4 text-muted-foreground" />
-                )}
+                <span 
+                  className="text-[10px] font-bold tracking-widest uppercase"
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
+                >
+                  {domain}
+                </span>
               </div>
 
-              {/* Chevron */}
-              <ChevronRight className="flex-shrink-0 w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              {/* Main Content */}
+              <div className="flex-1 p-3 md:p-4 flex items-center gap-3">
+                {/* Description */}
+                <p className="flex-1 text-sm leading-relaxed text-foreground/90">
+                  {content.description}
+                </p>
+
+                {/* Score Square */}
+                <div 
+                  className={cn(
+                    "flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border",
+                    isScored 
+                      ? "bg-muted/30 border-border/50" 
+                      : "bg-muted/20 border-dashed border-muted-foreground/30"
+                  )}
+                >
+                  {isScored ? (
+                    <span className="text-lg font-bold text-foreground">{score.toFixed(1)}</span>
+                  ) : (
+                    <Compass className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </div>
+
+                {/* Chevron */}
+                <ChevronRight className="flex-shrink-0 w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {/* Footnote */}
+      {hasAnyScores && (
+        <p className="text-xs text-muted-foreground text-center">
+          * Domain averages from most recent evaluation
+        </p>
+      )}
     </div>
   );
 }

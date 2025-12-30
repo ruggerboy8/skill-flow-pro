@@ -52,7 +52,6 @@ function StatusPill({ hasAll, hasAnyLate, isExempt }: { hasAll: boolean; hasAnyL
 export default function ScoreHistoryV2() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [currentWeekOf, setCurrentWeekOf] = useState<string | null>(null);
-  const [openYears, setOpenYears] = useState<string[]>([]);
   const [openMonths, setOpenMonths] = useState<string[]>([]);
   const [openWeeks, setOpenWeeks] = useState<string[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -132,12 +131,9 @@ export default function ScoreHistoryV2() {
   useEffect(() => {
     if (groupedData.length > 0 && currentWeekOf) {
       const currentDate = parseISO(currentWeekOf);
-      const currentYear = currentDate.getFullYear();
       const currentMonthKey = format(currentDate, 'yyyy-MM');
-      const yKey = `year-${currentYear}`;
       const mKey = `month-${currentMonthKey}`;
       const wKey = `week-${currentWeekOf}`;
-      setOpenYears([yKey]);
       setOpenMonths([mKey]);
       setOpenWeeks([wKey]);
     }
@@ -148,10 +144,8 @@ export default function ScoreHistoryV2() {
   const jumpToCurrentWeek = () => {
     if (!currentWeekOf) return;
     const d = parseISO(currentWeekOf);
-    const yKey = `year-${d.getFullYear()}`;
     const mKey = `month-${format(d, 'yyyy-MM')}`;
     const wKey = `week-${currentWeekOf}`;
-    setOpenYears([yKey]);
     setOpenMonths([mKey]);
     setOpenWeeks([wKey]);
     setTimeout(() => {
@@ -238,146 +232,148 @@ export default function ScoreHistoryV2() {
       </CardHeader>
       
       <CardContent className="pt-0 px-0 md:px-6">
-        <Accordion type="multiple" value={openYears} onValueChange={setOpenYears} className="space-y-3">
+        <div className="space-y-1">
           {filteredYears.map((yearData) => (
-            <AccordionItem key={yearData.year} value={`year-${yearData.year}`} className="border rounded-lg bg-muted/30">
-              <AccordionTrigger className="px-3 md:px-4 py-2 hover:no-underline">
-                <h3 className="text-base font-bold">{yearData.year}</h3>
-              </AccordionTrigger>
+            <div key={yearData.year} className="relative">
+              {/* Sticky Year Header */}
+              <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50 py-2 px-1 -mx-1">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {yearData.year}
+                </span>
+              </div>
               
-              <AccordionContent className="px-2 md:px-3 pb-2 pt-0">
-                <Accordion type="multiple" value={openMonths} onValueChange={setOpenMonths} className="space-y-2">
-                  {yearData.months.map((monthData) => (
-                    <AccordionItem key={monthData.monthKey} value={`month-${monthData.monthKey}`} className="border rounded-lg bg-background/50">
-                      <AccordionTrigger className="px-2 md:px-3 py-2 text-sm hover:no-underline">
-                        <span className="font-semibold text-muted-foreground">{monthData.monthLabel}</span>
-                      </AccordionTrigger>
-                      
-                      <AccordionContent className="px-1 md:px-2 pb-2 pt-0">
-                        <Accordion type="multiple" value={openWeeks} onValueChange={setOpenWeeks} className="space-y-2 pt-1">
-                          {monthData.weeks.map(({ weekOf, summary, scores }) => {
-                            const isExempt = scores.length > 0 && (scores[0] as any).is_week_exempt;
-                            const hasAllConf = summary.conf_count === summary.assignment_count;
-                            const hasAllPerf = summary.perf_count === summary.assignment_count;
-                            const isCurrentWeek = weekOf === currentWeekOf;
-                            const weekLabel = format(parseISO(weekOf), 'MMM d');
+              {/* Month Accordions */}
+              <Accordion type="multiple" value={openMonths} onValueChange={setOpenMonths} className="space-y-2 pt-2">
+                {yearData.months.map((monthData) => (
+                  <AccordionItem key={monthData.monthKey} value={`month-${monthData.monthKey}`} className="border-0 rounded-lg">
+                    <AccordionTrigger className="px-2 py-2 text-sm hover:no-underline hover:bg-muted/50 rounded-lg -mx-1 px-3">
+                      <span className="font-semibold">{format(parseISO(monthData.monthKey + '-01'), 'MMMM')}</span>
+                    </AccordionTrigger>
+                    
+                    <AccordionContent className="pb-2 pt-1">
+                      <Accordion type="multiple" value={openWeeks} onValueChange={setOpenWeeks} className="space-y-2">
+                        {monthData.weeks.map(({ weekOf, summary, scores }) => {
+                          const isExempt = scores.length > 0 && (scores[0] as any).is_week_exempt;
+                          const hasAllConf = summary.conf_count === summary.assignment_count;
+                          const hasAllPerf = summary.perf_count === summary.assignment_count;
+                          const isCurrentWeek = weekOf === currentWeekOf;
+                          const weekLabel = format(parseISO(weekOf), 'MMM d');
 
-                            return (
-                              <AccordionItem 
-                                key={weekOf} 
-                                value={`week-${weekOf}`} 
-                                className="border rounded-lg bg-card shadow-sm" 
-                                id={`week-${weekOf}`}
-                              >
-                                <AccordionTrigger className="px-2 md:px-3 py-2 text-sm hover:no-underline">
-                                  <div className="flex flex-col gap-1.5 w-full text-left">
-                                    {/* Top Row: Date & Main Badges */}
-                                    <div className="flex items-center justify-between w-full pr-2">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-bold text-sm">Week of {weekLabel}</span>
-                                        {isCurrentWeek && (
-                                          <Badge variant="default" className="text-[10px] h-5 px-1.5">Current</Badge>
-                                        )}
-                                        {isExempt && (
-                                          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-[10px] h-5 px-1.5">Exempt</Badge>
-                                        )}
-                                      </div>
-                                      {isSuperAdmin && scores.length > 0 && (
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          className="h-6 w-6 text-muted-foreground hover:text-destructive" 
-                                          onClick={(e) => openDeleteDialog(weekOf, e)}
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
+                          return (
+                            <AccordionItem 
+                              key={weekOf} 
+                              value={`week-${weekOf}`} 
+                              className="border rounded-lg bg-card shadow-sm" 
+                              id={`week-${weekOf}`}
+                            >
+                              <AccordionTrigger className="px-2 md:px-3 py-2 text-sm hover:no-underline">
+                                <div className="flex flex-col gap-1.5 w-full text-left">
+                                  {/* Top Row: Date & Main Badges */}
+                                  <div className="flex items-center justify-between w-full pr-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-bold text-sm">Week of {weekLabel}</span>
+                                      {isCurrentWeek && (
+                                        <Badge variant="default" className="text-[10px] h-5 px-1.5">Current</Badge>
+                                      )}
+                                      {isExempt && (
+                                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-[10px] h-5 px-1.5">Exempt</Badge>
                                       )}
                                     </div>
-
-                                    {/* Bottom Row: Status Summary */}
-                                    {!isExempt && (
-                                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                        <div className="flex items-center gap-1.5">
-                                          <span>Conf:</span>
-                                          <StatusPill hasAll={hasAllConf} hasAnyLate={summary.has_any_late} />
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <span>Perf:</span>
-                                          <StatusPill hasAll={hasAllPerf} hasAnyLate={summary.has_any_late} />
-                                        </div>
-                                      </div>
+                                    {isSuperAdmin && scores.length > 0 && (
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-6 w-6 text-muted-foreground hover:text-destructive" 
+                                        onClick={(e) => openDeleteDialog(weekOf, e)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
                                     )}
                                   </div>
-                                </AccordionTrigger>
-                                
-                                <AccordionContent className="px-2 md:px-3 pb-3 pt-1 border-t">
-                                  {scores.length > 0 ? (
-                                    <div className="space-y-2 pt-2">
-                                      {scores.map((score, index) => {
-                                        const domainColor = getDomainColorRich(score.domain_name || 'General');
-                                        return (
-                                          <div 
-                                            key={index} 
-                                            className="flex overflow-hidden rounded-lg border border-border/50 bg-muted/20"
-                                          >
-                                            {/* Mini Spine */}
-                                            <div 
-                                              className="w-1.5 flex-shrink-0 rounded-l-lg"
-                                              style={{ backgroundColor: domainColor }}
-                                            />
-                                            
-                                            {/* Content */}
-                                            <div className="flex-1 p-2 md:p-3 min-w-0">
-                                              {/* Row 1: Domain & Score Delta */}
-                                              <div className="flex items-start justify-between gap-2">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                  <span 
-                                                    className="text-[10px] font-semibold uppercase"
-                                                    style={{ color: domainColor }}
-                                                  >
-                                                    {score.domain_name || 'General'}
-                                                  </span>
-                                                  {score.self_select && (
-                                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                      <Tag className="w-3 h-3" />
-                                                      <span>Self-Select</span>
-                                                    </div>
-                                                  )}
-                                                </div>
-                                                
-                                                <div className="scale-90 origin-right shrink-0">
-                                                  <ConfPerfDelta 
-                                                    confidence={score.confidence_score} 
-                                                    performance={score.performance_score} 
-                                                  />
-                                                </div>
-                                              </div>
 
-                                              {/* Row 2: Action Statement */}
-                                              <p className="text-sm leading-snug text-foreground/90 mt-1">
-                                                {score.action_statement || 'Pro Move'}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
+                                  {/* Bottom Row: Status Summary */}
+                                  {!isExempt && (
+                                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                      <div className="flex items-center gap-1.5">
+                                        <span>Conf:</span>
+                                        <StatusPill hasAll={hasAllConf} hasAnyLate={summary.has_any_late} />
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <span>Perf:</span>
+                                        <StatusPill hasAll={hasAllPerf} hasAnyLate={summary.has_any_late} />
+                                      </div>
                                     </div>
-                                  ) : (
-                                    <p className="text-muted-foreground py-4 text-sm text-center italic">No scores recorded.</p>
                                   )}
-                                </AccordionContent>
-                              </AccordionItem>
-                            );
-                          })}
-                        </Accordion>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </AccordionContent>
-            </AccordionItem>
+                                </div>
+                              </AccordionTrigger>
+                              
+                              <AccordionContent className="px-2 md:px-3 pb-3 pt-1 border-t">
+                                {scores.length > 0 ? (
+                                  <div className="space-y-2 pt-2">
+                                    {scores.map((score, index) => {
+                                      const domainColor = getDomainColorRich(score.domain_name || 'General');
+                                      return (
+                                        <div 
+                                          key={index} 
+                                          className="flex overflow-hidden rounded-lg border border-border/50 bg-muted/20"
+                                        >
+                                          {/* Mini Spine */}
+                                          <div 
+                                            className="w-1.5 flex-shrink-0 rounded-l-lg"
+                                            style={{ backgroundColor: domainColor }}
+                                          />
+                                          
+                                          {/* Content */}
+                                          <div className="flex-1 p-2 md:p-3 min-w-0">
+                                            {/* Row 1: Domain & Score Delta */}
+                                            <div className="flex items-start justify-between gap-2">
+                                              <div className="flex items-center gap-2 flex-wrap">
+                                                <span 
+                                                  className="text-[10px] font-semibold uppercase"
+                                                  style={{ color: domainColor }}
+                                                >
+                                                  {score.domain_name || 'General'}
+                                                </span>
+                                                {score.self_select && (
+                                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                    <Tag className="w-3 h-3" />
+                                                    <span>Self-Select</span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                              
+                                              <div className="scale-90 origin-right shrink-0">
+                                                <ConfPerfDelta 
+                                                  confidence={score.confidence_score} 
+                                                  performance={score.performance_score} 
+                                                />
+                                              </div>
+                                            </div>
+
+                                            {/* Row 2: Action Statement */}
+                                            <p className="text-sm leading-snug text-foreground/90 mt-1">
+                                              {score.action_statement || 'Pro Move'}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <p className="text-muted-foreground py-4 text-sm text-center italic">No scores recorded.</p>
+                                )}
+                              </AccordionContent>
+                            </AccordionItem>
+                          );
+                        })}
+                      </Accordion>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
           ))}
-        </Accordion>
+        </div>
       </CardContent>
 
       {/* Delete Dialog */}

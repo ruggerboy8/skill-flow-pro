@@ -380,8 +380,7 @@ export default function ThisWeekPanel() {
                   {/* Learn button with chevron */}
                   {resourceCount > 0 && (
                     <button
-                      className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors hover:bg-muted"
-                      style={{ color: domainColorRich }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedLearnAssignment(assignment);

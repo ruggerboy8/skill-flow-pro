@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColorRich, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { ROLE_CONTENT, DOMAIN_ORDER, type RoleType } from '@/lib/content/roleDefinitions';
-import { Star, ChevronRight, Compass } from 'lucide-react';
+import { ChevronRight, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DomainScore {
@@ -119,7 +118,7 @@ export default function RoleRadar() {
           >
             {/* Vertical Spine with Domain Label */}
             <div 
-              className="flex-shrink-0 w-10 flex items-center justify-center rounded-l-3xl"
+              className="flex-shrink-0 w-8 flex items-center justify-center rounded-l-3xl"
               style={{ backgroundColor: domainColorRich }}
             >
               <span 
@@ -141,38 +140,30 @@ export default function RoleRadar() {
             )}
 
             {/* Main Content */}
-            <div className="relative flex-1 p-5 md:p-6 flex items-center">
-              <div className="flex-1">
-                {/* Score Badge */}
-                <div className="mb-2">
-                  {isScored ? (
-                    <Badge 
-                      className="bg-white/80 dark:bg-slate-800/80 backdrop-blur text-foreground shadow-sm border-0 flex items-center gap-1 w-fit"
-                    >
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <span className="font-semibold">{score.toFixed(1)}</span>
-                    </Badge>
-                  ) : (
-                    <Badge 
-                      variant="outline" 
-                      className="opacity-70 font-normal flex items-center gap-1 w-fit"
-                    >
-                      <Compass className="w-3 h-3" />
-                      Explore
-                    </Badge>
-                  )}
-                </div>
+            <div className="relative flex-1 p-4 flex items-center gap-3">
+              {/* Description */}
+              <p className="flex-1 text-sm leading-relaxed text-foreground/90">
+                {content.description}
+              </p>
 
-                {/* Description */}
-                <p className="text-sm leading-relaxed text-foreground/90">
-                  {content.description}
-                </p>
+              {/* Score Square */}
+              <div 
+                className={cn(
+                  "flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border",
+                  isScored 
+                    ? "bg-white/60 dark:bg-slate-800/60 border-border/50" 
+                    : "bg-muted/30 border-dashed border-muted-foreground/30"
+                )}
+              >
+                {isScored ? (
+                  <span className="text-lg font-bold text-foreground">{score.toFixed(1)}</span>
+                ) : (
+                  <Compass className="w-4 h-4 text-muted-foreground" />
+                )}
               </div>
 
-              {/* Chevron - centered on right */}
-              <div className="flex-shrink-0 ml-4 flex items-center justify-center">
-                <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-              </div>
+              {/* Chevron */}
+              <ChevronRight className="flex-shrink-0 w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
             </div>
           </div>
         );

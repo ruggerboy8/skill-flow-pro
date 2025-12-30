@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
@@ -17,12 +16,11 @@ import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
 import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
-import { GraduationCap, CalendarOff, ChevronRight } from 'lucide-react';
+import { GraduationCap, CalendarOff } from 'lucide-react';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { buildWeekBanner } from '@/v2/weekCta';
 import { enforceWeeklyRolloverNow } from '@/v2/rollover';
 import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
-import { cn } from '@/lib/utils';
 
 interface WeeklyScore { 
   weekly_focus_id: string;
@@ -214,57 +212,56 @@ export default function ThisWeekPanel() {
   // Show loading state (but allow non-participants through even without weekContext)
   if (loading || !staff || (!weekContext && isParticipant)) {
     return (
-      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
-        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
-          <Skeleton className="h-6 w-40 mb-2" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-        <div className="p-4 md:p-6 space-y-3">
-          <Skeleton className="h-20 rounded-xl" />
-          <Skeleton className="h-20 rounded-xl" />
-        </div>
-      </div>
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>This Week&apos;s Pro Moves</CardTitle>
+          <CardDescription>Loading…</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-24 rounded-md bg-muted animate-pulse" />
+        </CardContent>
+      </Card>
     );
   }
 
   // Show exempt week message
   if (isExempt) {
     return (
-      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
-        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
-          <h3 className="font-semibold text-lg">This Week's Pro Moves</h3>
-          <p className="text-sm text-muted-foreground">Week of {weekOfDate}</p>
-        </div>
-        <div className="p-4 md:p-6">
-          <div className="rounded-xl border bg-amber-50 border-amber-200 p-6 text-center">
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>This Week's Pro Moves</CardTitle>
+          <CardDescription>Week of {weekOfDate}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border bg-amber-50 border-amber-200 p-6 text-center">
             <CalendarOff className="h-10 w-10 mx-auto mb-3 text-amber-600" />
             <p className="font-semibold text-amber-900 mb-1">No Submissions Required This Week</p>
             <p className="text-sm text-amber-700">This week has been marked as exempt by your administrator.</p>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     );
   }
 
   // Show Coach/Admin CTA for non-participants
   if (!isParticipant) {
     return (
-      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
-        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
-          <h3 className="font-semibold text-lg">You're set up as a Coach/Admin</h3>
-        </div>
-        <div className="p-4 md:p-6 space-y-4">
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>You&apos;re set up as a Coach/Admin</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Participant tasks aren't assigned to your account.
+            Participant tasks aren&apos;t assigned to your account.
           </p>
           <Button 
-            className="w-full rounded-full" 
+            className="w-full" 
             onClick={() => navigate('/coach')}
           >
             Go to Coach Dashboard
           </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -276,111 +273,84 @@ export default function ThisWeekPanel() {
   // Show empty state when no pro moves found (or no site moves for missed states)
   if (displayAssignments.length === 0) {
     return (
-      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
-        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-lg">This Week's Focus</h3>
-              <p className="text-sm text-muted-foreground">Week of {weekOfDate}</p>
-            </div>
-            {locationWeekContext && (
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>This Week's Pro Moves</CardTitle>
+          <CardDescription>Week of {weekOfDate}</CardDescription>
+          {locationWeekContext && (
+            <div className="flex items-center gap-2 mt-2">
               <Badge variant="outline" className="text-xs">
-                Cycle {locationWeekContext.cycleNumber} • Week {locationWeekContext.weekInCycle}
+                Cycle {locationWeekContext.cycleNumber}, Week {locationWeekContext.weekInCycle}
               </Badge>
-            )}
-          </div>
-        </div>
-        <div className="p-4 md:p-6">
-          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-white/30 text-center">
-            <p className="text-sm font-medium text-foreground">
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-md border bg-muted p-3">
+            <div className="font-medium text-sm text-foreground text-center">
               No Pro Moves configured for this week. Please contact your administrator.
-            </p>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     );
   }
 
   // Show normal view with pro moves and banner
   return (
-    <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-lg">This Week's Focus</h3>
-            <p className="text-sm text-muted-foreground">Week of {weekOfDate}</p>
-          </div>
-          {locationWeekContext && (
-            <Badge variant="outline" className="text-xs">
-              Cycle {locationWeekContext.cycleNumber} • Week {locationWeekContext.weekInCycle}
-            </Badge>
-          )}
-        </div>
-      </div>
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-2">
+        <CardTitle>This Week's Pro Moves</CardTitle>
+        <CardDescription>Week of {weekOfDate}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Pro Moves list */}
+        <div className="space-y-3">
+          {displayAssignments.map((assignment, index) => {
+            const domainName = assignment.domain_name;
+            const bgColor = domainName ? getDomainColor(domainName) : undefined;
+            const isUnchosen = assignment.type === 'selfSelect' && !assignment.action_statement;
+            
+            // Find scores for this assignment - match by either assignment_id or weekly_focus_id
+            const scores = weeklyScores.find(s => 
+              s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
+            );
+            const resourceCount = assignment.pro_move_id ? (resourceCounts[assignment.pro_move_id] || 0) : 0;
 
-      {/* Content */}
-      <div className="p-4 md:p-6 space-y-3">
-        {/* Pro Moves list - Glass Rows with Indicator */}
-        {displayAssignments.map((assignment) => {
-          const domainName = assignment.domain_name;
-          const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
-          
-          // Find scores for this assignment
-          const scores = weeklyScores.find(s => 
-            s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
-          );
-          const resourceCount = assignment.pro_move_id ? (resourceCounts[assignment.pro_move_id] || 0) : 0;
+            return (
+              <div key={assignment.weekly_focus_id} className="rounded-lg p-4 border min-h-[52px]" style={bgColor ? { backgroundColor: bgColor } : undefined}>
+                <div className="flex items-center gap-2 mb-2">
+                  {domainName && (
+                    <Badge variant="secondary" className="text-xs font-semibold bg-white/80 text-gray-900" aria-label={`Domain: ${domainName}`}> 
+                      {domainName}
+                    </Badge>
+                  )}
+                  
+                  {/* Learn Button - positioned after domain */}
+                  {resourceCount > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 gap-1.5 bg-white/80"
+                      onClick={() => {
+                        setSelectedLearnAssignment(assignment);
+                        setLearnDrawerOpen(true);
+                      }}
+                      aria-label={`Learn: ${assignment.action_statement}`}
+                    >
+                      <GraduationCap className="h-3 w-3" />
+                      <span className="text-xs">Learn</span>
+                    </Button>
+                  )}
+                </div>
 
-          return (
-            <div 
-              key={assignment.weekly_focus_id} 
-              className="relative flex bg-white/60 backdrop-blur-sm rounded-xl overflow-hidden border border-white/30"
-            >
-              {/* Colored indicator bar */}
-              <div 
-                className="w-1 shrink-0" 
-                style={{ backgroundColor: domainColor }} 
-              />
-              
-              {/* Content */}
-              <div className="flex-1 p-3 md:p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    {/* Domain & Learn badges */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      {domainName && (
-                        <Badge 
-                          variant="secondary" 
-                          className="text-xs font-semibold bg-white/80 text-foreground"
-                        >
-                          {domainName}
-                        </Badge>
-                      )}
-                      {resourceCount > 0 && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-5 px-1.5 gap-1 text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => {
-                            setSelectedLearnAssignment(assignment);
-                            setLearnDrawerOpen(true);
-                          }}
-                        >
-                          <GraduationCap className="h-3 w-3" />
-                          Learn
-                        </Button>
-                      )}
-                    </div>
-                    
-                    {/* Action statement */}
-                    <p className="text-sm font-medium leading-snug">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-2 flex-1">
+                    <p className="text-sm font-medium">
                       {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
                     </p>
                   </div>
-
-                  {/* Score/Delta */}
-                  <div className="shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <ConfPerfDelta 
                       confidence={scores?.confidence_score} 
                       performance={scores?.performance_score} 
@@ -388,31 +358,27 @@ export default function ThisWeekPanel() {
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
 
-        {/* Floating CTA Banner */}
-        {banner.message && (
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-white/40 mt-4">
-            <p className="text-sm font-medium text-center mb-3 text-foreground">
-              {banner.message}
-            </p>
-            {banner.cta && (
-              <Button
-                className="w-full rounded-full shadow-lg"
-                onClick={() => navigate(banner.cta!.to)}
-              >
-                {banner.cta.label}
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            )}
-          </div>
-        )}
+        {/* Dynamic banner message */}
+        <div className="rounded-md border bg-muted p-3">
+          <div className="font-medium text-sm text-foreground text-center">{banner.message}</div>
+          {banner.cta && (
+            <Button
+              className="w-full h-12 mt-2"
+              onClick={() => navigate(banner.cta!.to)}
+              aria-label="Next action"
+            >
+              {banner.cta.label}
+            </Button>
+          )}
+        </div>
 
-        {/* Simulation status */}
+        {/* Simulation status below CTA when active */}
         {SimBannerComponent && <SimBannerComponent />}
-      </div>
+      </CardContent>
 
       {selectedLearnAssignment && selectedLearnAssignment.pro_move_id && (
         <LearnerLearnDrawer
@@ -423,6 +389,6 @@ export default function ThisWeekPanel() {
           domainName={selectedLearnAssignment.domain_name || 'General'}
         />
       )}
-    </div>
+    </Card>
   );
 }

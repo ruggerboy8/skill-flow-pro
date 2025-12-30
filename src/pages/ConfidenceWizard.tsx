@@ -784,10 +784,10 @@ export default function ConfidenceWizard() {
             className={cn(
               "h-2 rounded-full transition-all duration-300",
               idx === currentIndex 
-                ? "w-6 bg-white" 
+                ? "w-6 bg-foreground" 
                 : idx < currentIndex 
-                  ? "w-2 bg-white/80" 
-                  : "w-2 bg-white/30"
+                  ? "w-2 bg-foreground/60" 
+                  : "w-2 bg-foreground/30"
             )}
           />
         ))}
@@ -882,8 +882,8 @@ export default function ConfidenceWizard() {
       {/* Question & Scale */}
       <div className="px-4 max-w-md mx-auto mt-8 space-y-6">
         <div className="text-center">
-          <p className="text-base font-medium text-white mb-1">How confident are you?</p>
-          <p className="text-sm text-white/70">That you'll do this 100% this week</p>
+          <p className="text-base font-medium text-foreground mb-1">How confident are you?</p>
+          <p className="text-sm text-muted-foreground">That you'll do this 100% this week</p>
         </div>
         <NumberScale
           value={scores[currentFocus.id] || null}

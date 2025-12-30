@@ -1,15 +1,14 @@
 // Updated Confidence Wizard to use progress-based approach instead of ISO week
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
-import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { getAnchors } from '@/lib/centralTime';
 import { format } from 'date-fns';
 import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
@@ -18,7 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
 import { useReliableSubmission } from '@/hooks/useReliableSubmission';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -767,152 +767,207 @@ export default function ConfidenceWizard() {
   const isLastItem = currentIndex === weeklyFocus.length - 1;
 
   return (
-    <div className="min-h-[100dvh] p-2 sm:p-4 pb-24 bg-background">
-      <div className="max-w-md mx-auto space-y-4">
-        <Card style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}>
-          {/* Submission Status Indicator */}
-          {submitting && (
-            <div className="absolute top-2 right-2 z-10">
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Saving...
-              </Badge>
-            </div>
-          )}
-          <CardHeader>
-            <div className="flex items-center justify-center">
-              <Badge variant="outline" className="bg-white/80 text-gray-900">
-                {currentIndex + 1} / {weeklyFocus.length}
-              </Badge>
-            </div>
-            <CardTitle className="text-center text-gray-900">
-              {isRepair ? `Backfill Confidence - ${currentFocus.week_label || `Cycle ${currentFocus.cycle}, Week ${currentFocus.week_in_cycle}`}` : 'Rate Your Confidence'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6 p-3 sm:p-6">
-            <div className="p-3 sm:p-4 bg-white/80 rounded-lg">
-              <div className="flex gap-2 mb-2">
-                <Badge 
-                  variant="secondary" 
-                  className="text-xs font-semibold bg-white text-gray-900"
-                >
-                  {currentFocus.domain_name}
-                </Badge>
-                {selfSelectById[currentFocus.id] && competencyNameById[currentFocus.id] && (
-                  <Badge 
-                    variant="outline" 
-                    className="text-xs font-semibold bg-white text-gray-700"
-                  >
-                    {competencyNameById[currentFocus.id]}
-                  </Badge>
-                )}
-              </div>
-              
-              {selfSelectById[currentFocus.id] ? (
-                <div className="space-y-3">
-                  <Label htmlFor="pro-move-select" className="text-sm font-medium text-gray-900">
-                    Choose the Pro Move you'd like to focus on this week.
-                  </Label>
-                  <Select
-                    value={selectedActions[currentFocus.id] || ""}
-                    onValueChange={(value) => {
-                      console.log(`Selection changed for focus ${currentFocus.id}: ${value}`);
-                      setSelectedActions(prev => ({
-                        ...prev,
-                        [currentFocus.id]: value
-                      }));
-                    }}
-                  >
-                    <SelectTrigger id="pro-move-select" className="w-full">
-                      <SelectValue placeholder="Choose a Pro Move..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border shadow-lg z-50">
-                      {competencyById[currentFocus.id] && 
-                       optionsByCompetency[competencyById[currentFocus.id]]?.map((option) => (
-                        <SelectItem 
-                          key={option.action_id} 
-                          value={option.action_id}
-                          className="cursor-pointer hover:bg-gray-100"
-                        >
-                          {option.action_statement}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selfSelectById[currentFocus.id] && !hasRequiredSelection && (
-                    <p className="text-sm text-red-600 mt-1">
-                      Please select a Pro Move to continue.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-lg md:text-xl font-medium leading-relaxed text-slate-800 tracking-tight">{currentFocus.action_statement}</p>
-              )}
-            </div>
+    <div className="min-h-[100dvh] pb-24 bg-background">
+      {/* Environmental Gradient */}
+      <div 
+        className="fixed inset-0 -z-10 transition-colors duration-500"
+        style={{ 
+          background: `linear-gradient(to bottom, ${getDomainColor(currentFocus.domain_name)}, ${getDomainColor(currentFocus.domain_name)}40)` 
+        }}
+      />
 
-            <div className="text-center">
-              <p className="text-sm font-medium text-gray-800 mb-4">
-                How confident are you that you'll do this 100% this week?
-              </p>
-            </div>
-
-            <NumberScale
-              value={scores[currentFocus.id] || null}
-              onChange={handleScoreChange}
-            />
-
-          </CardContent>
-        </Card>
+      {/* Progress Dots */}
+      <div className="flex justify-center gap-2 py-6">
+        {weeklyFocus.map((_, idx) => (
+          <div 
+            key={idx}
+            className={cn(
+              "h-2 rounded-full transition-all duration-300",
+              idx === currentIndex 
+                ? "w-6 bg-white" 
+                : idx < currentIndex 
+                  ? "w-2 bg-white/80" 
+                  : "w-2 bg-white/30"
+            )}
+          />
+        ))}
       </div>
 
-      {/* Sticky Footer Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur border-t z-50">
+      {/* Main Content Area */}
+      <div className="px-2 sm:px-4 max-w-md mx-auto">
+        {/* Submitting Indicator */}
+        {submitting && (
+          <div className="flex justify-center mb-4">
+            <Badge variant="secondary" className="bg-white/90 text-foreground flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Saving...
+            </Badge>
+          </div>
+        )}
+
+        {/* Spine Card */}
+        <div className="flex rounded-2xl overflow-hidden shadow-2xl border border-white/20">
+          {/* THE SPINE */}
+          <div 
+            className="w-8 shrink-0 flex items-center justify-center"
+            style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}
+          >
+            <span 
+              className="text-[10px] font-bold tracking-wider uppercase text-white/90 whitespace-nowrap"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+            >
+              {currentFocus.domain_name}
+            </span>
+          </div>
+
+          {/* Content Area */}
+          <div className="flex-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm p-4 sm:p-6 space-y-4">
+            {/* Competency Pill (if self-select) */}
+            {selfSelectById[currentFocus.id] && competencyNameById[currentFocus.id] && (
+              <Badge variant="outline" className="text-xs font-semibold bg-muted/50">
+                {competencyNameById[currentFocus.id]}
+              </Badge>
+            )}
+
+            {/* Self-Select Dropdown OR Hero Text */}
+            {selfSelectById[currentFocus.id] ? (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-foreground">
+                  Select your Pro Move:
+                </Label>
+                <Select
+                  value={selectedActions[currentFocus.id] || ""}
+                  onValueChange={(value) => {
+                    console.log(`Selection changed for focus ${currentFocus.id}: ${value}`);
+                    setSelectedActions(prev => ({
+                      ...prev,
+                      [currentFocus.id]: value
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="w-full bg-white dark:bg-slate-700">
+                    <SelectValue placeholder="Choose a Pro Move..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-slate-800 border shadow-lg z-50">
+                    {competencyById[currentFocus.id] && 
+                     optionsByCompetency[competencyById[currentFocus.id]]?.map((option) => (
+                      <SelectItem key={option.action_id} value={option.action_id}>
+                        {option.action_statement}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!hasRequiredSelection && (
+                  <p className="text-sm text-destructive">Please select a Pro Move to continue.</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xl md:text-2xl font-semibold leading-relaxed text-foreground tracking-tight">
+                {currentFocus.action_statement}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Repair Mode Indicator */}
+        {isRepair && (
+          <div className="mt-4 text-center">
+            <Badge variant="outline" className="text-xs bg-white/80">
+              Backfilling: {currentFocus.week_label || `Cycle ${currentFocus.cycle}, Week ${currentFocus.week_in_cycle}`}
+            </Badge>
+          </div>
+        )}
+      </div>
+
+      {/* Question & Scale */}
+      <div className="px-4 max-w-md mx-auto mt-8 space-y-6">
+        <div className="text-center">
+          <p className="text-base font-medium text-white mb-1">How confident are you?</p>
+          <p className="text-sm text-white/70">That you'll do this 100% this week</p>
+        </div>
+        <NumberScale
+          value={scores[currentFocus.id] || null}
+          onChange={handleScoreChange}
+        />
+      </div>
+
+      {/* Sticky Footer */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-white/40 dark:border-slate-700/40 z-50">
         <div className="max-w-md mx-auto flex gap-3">
           <Button 
             variant="outline" 
             onClick={() => currentIndex > 0 ? handleBack() : navigate('/')}
-            className="flex-1"
+            className="flex-1 rounded-full"
           >
+            <ChevronLeft className="h-4 w-4 mr-1" />
             {currentIndex > 0 ? 'Back' : 'Home'}
           </Button>
           <Button 
             onClick={handleNext}
             disabled={!canProceed || submitting}
-            className="flex-[2]"
+            className="flex-[2] rounded-full"
           >
-            {submitting ? 'Saving...' : isLastItem ? (isRepair ? 'Backfill' : 'Submit') : 'Next'}
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : isLastItem ? (
+              <>
+                {isRepair ? 'Backfill' : 'Submit'}
+                <Check className="h-4 w-4 ml-1" />
+              </>
+            ) : (
+              <>
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </>
+            )}
           </Button>
         </div>
       </div>
 
       {/* Smart Friction: Intervention Modal */}
       <AlertDialog open={showIntervention} onOpenChange={setShowIntervention}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-600" />
-              <AlertDialogTitle>Unsure? That's okay.</AlertDialogTitle>
-            </div>
-            <AlertDialogDescription className="text-base pt-2">
-              {/* THE DATABASE DRIVEN CONTENT */}
-              <div className="mt-4 mb-4 p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-r-md shadow-sm">
-                <div className="flex gap-3">
-                  <span className="text-2xl select-none">💡</span>
-                  <p className="text-sm font-medium text-slate-700 leading-relaxed">
-                    "{currentFocus?.intervention_text || "Make it a point to ask a Lead or your Manager about this today."}"
-                  </p>
+        <AlertDialogContent className="sm:rounded-2xl overflow-hidden p-0 max-w-sm">
+          {/* Domain Color Accent Bar */}
+          <div 
+            className="h-2 w-full"
+            style={{ backgroundColor: getDomainColor(currentFocus?.domain_name || '') }}
+          />
+          
+          <div className="p-6 space-y-4">
+            <AlertDialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <AlertDialogTitle className="text-lg">Unsure? That's okay.</AlertDialogTitle>
+              </div>
+            </AlertDialogHeader>
+            
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="p-4 bg-muted/50 rounded-xl border border-border/50">
+                  <div className="flex gap-3">
+                    <span className="text-xl select-none shrink-0">💡</span>
+                    <p className="text-sm font-medium text-foreground leading-relaxed">
+                      "{currentFocus?.intervention_text || "Make it a point to ask a Lead or your Manager about this today."}"
+                    </p>
+                  </div>
                 </div>
               </div>
             </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => {
-              setShowIntervention(false);
-              proceed();
-            }}>
-              Will do
-            </AlertDialogAction>
-          </AlertDialogFooter>
+            
+            <AlertDialogFooter>
+              <AlertDialogAction 
+                onClick={() => { setShowIntervention(false); proceed(); }}
+                className="w-full rounded-full"
+              >
+                Will do
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </div>

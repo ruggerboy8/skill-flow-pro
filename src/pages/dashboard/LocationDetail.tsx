@@ -51,6 +51,7 @@ export default function LocationDetail() {
       submissionRate: stats.submissionRate,
       missingConfCount: stats.missingConfCount,
       missingPerfCount: stats.missingPerfCount,
+      pendingConfCount: stats.pendingConfCount,
     };
 
     return { locationStaff: staff, locationStats, locationName: name };

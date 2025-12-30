@@ -70,22 +70,7 @@ export default {
 				slatebrand: {
 					400: '#949aa1',
 					600: '#515458'
-				},
-				// Domain colors mapped for utilities (bg-domain-planning, etc.)
-				domain: {
-					planning: 'hsl(var(--domain-planning))',
-					environment: 'hsl(var(--domain-environment))',
-					interactions: 'hsl(var(--domain-interactions))',
-					'learning-experiences': 'hsl(var(--domain-learning-experiences))'
 				}
-			},
-			// Glassmorphism utilities
-			boxShadow: {
-				glass: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
-				'glass-hover': '0 8px 32px 0 rgba(31, 38, 135, 0.15)'
-			},
-			backgroundImage: {
-				'glass-gradient': 'linear-gradient(135deg, rgba(255, 255, 255, 0.80) 0%, rgba(255, 255, 255, 0.40) 100%)'
 			},
 			fontFamily: {
 				sans: ['"Biondi Sans"', 'ui-sans-serif', 'system-ui']

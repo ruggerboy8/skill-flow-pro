@@ -364,16 +364,18 @@ export default function ThisWeekPanel() {
                 style={{ backgroundColor: domainColor }} 
               />
               
-              {/* Content */}
+              {/* Content Wrapper: Stacked on Mobile, Row on Desktop */}
               <div className="flex-1 p-3 md:p-4">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                  
+                  {/* Left Side: Badges + Text */}
                   <div className="flex-1 min-w-0">
                     {/* Domain & Learn badges */}
                     <div className="flex items-center gap-2 mb-1.5">
                       {domainName && (
                         <Badge 
                           variant="secondary" 
-                          className="text-xs font-semibold bg-white/80 dark:bg-slate-700/80 text-foreground"
+                          className="text-[10px] font-bold tracking-wider uppercase bg-white/80 dark:bg-slate-700/80 text-foreground/80 border-0"
                         >
                           {domainName}
                         </Badge>
@@ -382,7 +384,7 @@ export default function ThisWeekPanel() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 px-2 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                          className="h-7 px-2 gap-1 text-[10px] text-primary/80 hover:text-primary hover:bg-primary/5 rounded-full"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedLearnAssignment(assignment);
@@ -396,13 +398,13 @@ export default function ThisWeekPanel() {
                     </div>
                     
                     {/* Action statement */}
-                    <p className="text-sm font-medium leading-snug">
+                    <p className="text-sm font-medium leading-relaxed text-foreground/90">
                       {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
                     </p>
                   </div>
 
-                  {/* Score/Delta + Chevron */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  {/* Right Side (Desktop) / Bottom (Mobile): Scores + Chevron */}
+                  <div className="flex items-center justify-between md:justify-end gap-2 shrink-0 mt-2 md:mt-0 md:pl-4 md:border-l border-white/20 dark:border-slate-700/30">
                     <ConfPerfDelta 
                       confidence={scores?.confidence_score} 
                       performance={scores?.performance_score} 

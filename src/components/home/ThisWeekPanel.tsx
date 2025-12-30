@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
@@ -214,8 +214,8 @@ export default function ThisWeekPanel() {
   // Show loading state (but allow non-participants through even without weekContext)
   if (loading || !staff || (!weekContext && isParticipant)) {
     return (
-      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
-        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
+      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 dark:md:border-slate-700/40 md:shadow-glass md:rounded-xl overflow-hidden">
+        <div className="px-4 py-3 md:px-6 md:py-4 md:border-b md:border-border/50">
           <Skeleton className="h-6 w-40 mb-2" />
           <Skeleton className="h-4 w-24" />
         </div>
@@ -230,8 +230,8 @@ export default function ThisWeekPanel() {
   // Show exempt week message
   if (isExempt) {
     return (
-      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
-        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
+      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 dark:md:border-slate-700/40 md:shadow-glass md:rounded-xl overflow-hidden">
+        <div className="px-4 py-3 md:px-6 md:py-4 md:border-b md:border-border/50">
           <h3 className="font-semibold text-lg">This Week's Pro Moves</h3>
           <p className="text-sm text-muted-foreground">Week of {weekOfDate}</p>
         </div>
@@ -249,8 +249,8 @@ export default function ThisWeekPanel() {
   // Show Coach/Admin CTA for non-participants
   if (!isParticipant) {
     return (
-      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
-        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
+      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 dark:md:border-slate-700/40 md:shadow-glass md:rounded-xl overflow-hidden">
+        <div className="px-4 py-3 md:px-6 md:py-4 md:border-b md:border-border/50">
           <h3 className="font-semibold text-lg">You're set up as a Coach/Admin</h3>
         </div>
         <div className="p-4 md:p-6 space-y-4">
@@ -276,8 +276,8 @@ export default function ThisWeekPanel() {
   // Show empty state when no pro moves found (or no site moves for missed states)
   if (displayAssignments.length === 0) {
     return (
-      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
-        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
+      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 dark:md:border-slate-700/40 md:shadow-glass md:rounded-xl overflow-hidden">
+        <div className="px-4 py-3 md:px-6 md:py-4 md:border-b md:border-border/50">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-lg">This Week's Focus</h3>
@@ -303,9 +303,9 @@ export default function ThisWeekPanel() {
 
   // Show normal view with pro moves and banner
   return (
-    <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 md:shadow-glass md:rounded-xl overflow-hidden">
+    <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 dark:md:border-slate-700/40 md:shadow-glass md:rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 md:px-6 md:py-4 border-b border-border/50">
+      <div className="px-4 py-3 md:px-6 md:py-4 md:border-b md:border-border/50">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-lg">This Week's Focus</h3>
@@ -335,7 +335,28 @@ export default function ThisWeekPanel() {
           return (
             <div 
               key={assignment.weekly_focus_id} 
-              className="relative flex bg-white/60 backdrop-blur-sm rounded-xl overflow-hidden border border-white/30"
+              className={cn(
+                "relative flex bg-white/80 md:bg-white/40 md:hover:bg-white/60",
+                "dark:bg-slate-800/80 dark:md:bg-slate-800/40 dark:md:hover:bg-slate-800/60",
+                "backdrop-blur-sm rounded-xl overflow-hidden",
+                "border border-white/30 dark:border-slate-700/30",
+                "transition-colors",
+                resourceCount > 0 && "cursor-pointer active:scale-[0.99]"
+              )}
+              onClick={() => {
+                if (resourceCount > 0) {
+                  setSelectedLearnAssignment(assignment);
+                  setLearnDrawerOpen(true);
+                }
+              }}
+              role={resourceCount > 0 ? "button" : undefined}
+              tabIndex={resourceCount > 0 ? 0 : undefined}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && resourceCount > 0) {
+                  setSelectedLearnAssignment(assignment);
+                  setLearnDrawerOpen(true);
+                }
+              }}
             >
               {/* Colored indicator bar */}
               <div 
@@ -352,7 +373,7 @@ export default function ThisWeekPanel() {
                       {domainName && (
                         <Badge 
                           variant="secondary" 
-                          className="text-xs font-semibold bg-white/80 text-foreground"
+                          className="text-xs font-semibold bg-white/80 dark:bg-slate-700/80 text-foreground"
                         >
                           {domainName}
                         </Badge>
@@ -361,13 +382,14 @@ export default function ThisWeekPanel() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-5 px-1.5 gap-1 text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => {
+                          className="h-7 px-2 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedLearnAssignment(assignment);
                             setLearnDrawerOpen(true);
                           }}
                         >
-                          <GraduationCap className="h-3 w-3" />
+                          <GraduationCap className="h-3.5 w-3.5" />
                           Learn
                         </Button>
                       )}
@@ -379,12 +401,15 @@ export default function ThisWeekPanel() {
                     </p>
                   </div>
 
-                  {/* Score/Delta */}
-                  <div className="shrink-0">
+                  {/* Score/Delta + Chevron */}
+                  <div className="flex items-center gap-1 shrink-0">
                     <ConfPerfDelta 
                       confidence={scores?.confidence_score} 
                       performance={scores?.performance_score} 
                     />
+                    {resourceCount > 0 && (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
                   </div>
                 </div>
               </div>
@@ -394,7 +419,7 @@ export default function ThisWeekPanel() {
 
         {/* Floating CTA Banner */}
         {banner.message && (
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-white/40 mt-4">
+          <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-slate-700/40 mt-4">
             <p className="text-sm font-medium text-center mb-3 text-foreground">
               {banner.message}
             </p>

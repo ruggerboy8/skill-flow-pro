@@ -110,18 +110,25 @@ export default function RoleRadar() {
             key={domain}
             onClick={() => navigate(`/my-role/domain/${getDomainSlug(domain)}`)}
             className={cn(
-              "group relative overflow-hidden rounded-3xl border p-5 md:p-6 transition-all duration-300 cursor-pointer",
+              "group relative overflow-hidden rounded-3xl border transition-all duration-300 cursor-pointer flex",
               "hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]",
               isScored 
                 ? "bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-white/40 dark:border-slate-700/40 shadow-sm" 
                 : "bg-muted/10 border-dashed border-muted-foreground/20"
             )}
           >
-            {/* Mini-Spine Accent Bar */}
+            {/* Vertical Spine with Domain Label */}
             <div 
-              className="absolute left-0 top-4 bottom-4 w-1.5 rounded-full"
+              className="flex-shrink-0 w-10 flex items-center justify-center rounded-l-3xl"
               style={{ backgroundColor: domainColorRich }}
-            />
+            >
+              <span 
+                className="text-white font-bold text-xs tracking-widest uppercase whitespace-nowrap"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+              >
+                {domain}
+              </span>
+            </div>
 
             {/* Gradient overlay for scored cards */}
             {isScored && (
@@ -133,14 +140,14 @@ export default function RoleRadar() {
               />
             )}
 
-            <div className="relative pl-4">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-3">
-                <h3 className="text-lg md:text-xl font-bold text-foreground">{domain}</h3>
-                <div className="self-start sm:self-auto">
+            {/* Main Content */}
+            <div className="relative flex-1 p-5 md:p-6 flex items-center">
+              <div className="flex-1">
+                {/* Score Badge */}
+                <div className="mb-2">
                   {isScored ? (
                     <Badge 
-                      className="bg-white/80 dark:bg-slate-800/80 backdrop-blur text-foreground shadow-sm border-0 flex items-center gap-1"
+                      className="bg-white/80 dark:bg-slate-800/80 backdrop-blur text-foreground shadow-sm border-0 flex items-center gap-1 w-fit"
                     >
                       <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                       <span className="font-semibold">{score.toFixed(1)}</span>
@@ -148,24 +155,23 @@ export default function RoleRadar() {
                   ) : (
                     <Badge 
                       variant="outline" 
-                      className="opacity-70 font-normal flex items-center gap-1"
+                      className="opacity-70 font-normal flex items-center gap-1 w-fit"
                     >
                       <Compass className="w-3 h-3" />
                       Explore
                     </Badge>
                   )}
                 </div>
+
+                {/* Description */}
+                <p className="text-sm leading-relaxed text-foreground/90">
+                  {content.description}
+                </p>
               </div>
 
-              {/* Description */}
-              <p className="mt-4 mb-6 text-sm leading-relaxed text-foreground/90">
-                {content.description}
-              </p>
-
-              {/* Click Hint */}
-              <div className="absolute bottom-0 right-0 flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-                <span>View Competencies</span>
-                <ChevronRight className="w-4 h-4" />
+              {/* Chevron - centered on right */}
+              <div className="flex-shrink-0 ml-4 flex items-center justify-center">
+                <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
               </div>
             </div>
           </div>

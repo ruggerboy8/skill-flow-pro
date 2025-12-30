@@ -348,42 +348,43 @@ export default function ThisWeekPanel() {
                 }
               }}
             >
-              {/* THE SPINE: Vertical Domain Label */}
+              {/* THE SPINE: Vertical Domain Label + Learn Icon at Top */}
               <div 
-                className="w-8 shrink-0 flex items-center justify-center"
+                className="w-8 shrink-0 flex flex-col items-center"
                 style={{ backgroundColor: domainColor }}
               >
-                <span 
-                  className="text-[10px] font-bold tracking-widest uppercase text-white/90"
-                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                >
-                  {domainName}
-                </span>
+                {/* Learn Icon at top of spine */}
+                {resourceCount > 0 && (
+                  <button
+                    className="p-1.5 mt-1 rounded-full text-white/80 hover:text-white hover:bg-white/20 transition-colors shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedLearnAssignment(assignment);
+                      setLearnDrawerOpen(true);
+                    }}
+                    aria-label="View learning materials"
+                  >
+                    <GraduationCap className="h-4 w-4" />
+                  </button>
+                )}
+                
+                {/* Vertical domain text */}
+                <div className="flex-1 flex items-center justify-center">
+                  <span 
+                    className="text-[10px] font-bold tracking-widest uppercase text-white/90"
+                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                  >
+                    {domainName}
+                  </span>
+                </div>
               </div>
               
               {/* Content Area */}
               <div className="flex-1 p-3 md:p-4">
-                {/* Top Row: Text + Learn Icon */}
-                <div className="flex items-start gap-2">
-                  <p className="flex-1 text-sm font-medium leading-relaxed text-foreground/90">
-                    {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
-                  </p>
-
-                  {/* Learn Icon - Only appears if resources exist */}
-                  {resourceCount > 0 && (
-                    <button
-                      className="p-1.5 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedLearnAssignment(assignment);
-                        setLearnDrawerOpen(true);
-                      }}
-                      aria-label="View learning materials"
-                    >
-                      <GraduationCap className="h-5 w-5" />
-                    </button>
-                  )}
-                </div>
+                {/* Pro Move Text - Full Width */}
+                <p className="text-sm font-medium leading-relaxed text-foreground/90">
+                  {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
+                </p>
 
                 {/* Bottom Row: Scores */}
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">

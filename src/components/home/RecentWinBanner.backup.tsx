@@ -121,9 +121,9 @@ export function RecentWinBanner() {
   };
 
   return (
-    <div className="mb-4 md:mb-6 animate-in slide-in-from-top-2 duration-500 fade-in">
-      <Card className={`relative shadow-sm overflow-hidden rounded-none border-x-0 md:rounded-xl md:border ${theme.cardBorder}`}>
-        <CardContent className="p-3 md:p-4">
+    <div className="mb-6 animate-in slide-in-from-top-2 duration-500 fade-in">
+      <Card className={`relative border shadow-sm overflow-hidden ${theme.cardBorder}`}>
+        <CardContent className="p-4">
           
           {/* 1. Header Row: Icon | Headline | Badge */}
           <div className="flex items-start gap-3 mb-3">

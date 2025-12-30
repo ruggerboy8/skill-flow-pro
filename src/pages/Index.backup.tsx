@@ -36,10 +36,10 @@ export default function Index() {
 
   // Participants → Standard experience
   return (
-    <div className="min-h-screen bg-background px-0 py-2 md:p-4">
-      <div className="max-w-4xl mx-auto px-4 md:px-0">
-        <div className="flex justify-between items-center mb-4 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold">ProMoves Progress</h1>
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">ProMoves Progress</h1>
         </div>
 
         <RecentWinBanner />
@@ -49,7 +49,7 @@ export default function Index() {
         <ThisWeekPanel />
         
         {/* Deadline disclaimer */}
-        <div className="mt-3 md:mt-4 rounded-none md:rounded-lg border-y md:border border-border bg-muted/50 p-3 md:p-4 text-center">
+        <div className="mt-4 rounded-lg border border-border bg-muted/50 p-4 text-center">
           <p className="text-sm text-muted-foreground">
             ProMove scores are due on the same day as your Check In/Out meeting.
           </p>

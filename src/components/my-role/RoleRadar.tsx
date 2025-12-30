@@ -158,10 +158,9 @@ export default function RoleRadar() {
               </div>
 
               {/* Description */}
-              <p className="mt-4 text-sm leading-relaxed text-foreground/90">
+              <p className="mt-4 mb-6 text-sm leading-relaxed text-foreground/90">
                 {content.description}
               </p>
-
 
               {/* Click Hint */}
               <div className="absolute bottom-0 right-0 flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground transition-colors">

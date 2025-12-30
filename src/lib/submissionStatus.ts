@@ -42,33 +42,41 @@ export function calculateLocationStats(
   submissionRate: number;
   missingConfCount: number;
   missingPerfCount: number;
+  pendingConfCount: number;
   avgConfidence: number;
   avgPerformance: number;
 } {
   const staffCount = staff.length;
   
-  // Time-gated submission rate calculation
-  // Before Thursday: only count confidence (X conf submitted / X slots)
-  // After Thursday: count both (X conf + X perf submitted / 2X slots)
+  // Calculate submission rate based on what's currently expected
+  // Before Tuesday deadline: show confidence completion progress (not gated)
+  // After Thursday: include both confidence and performance
   let totalRequired = 0;
   let totalSubmitted = 0;
   
+  // Always track confidence progress (this is the current week's main task)
   staff.forEach(s => {
-    // Confidence is always counted once it's past the deadline
-    if (gates.isPastConfidenceDeadline) {
-      totalRequired += s.assignment_count;
-      totalSubmitted += s.conf_count;
-    }
-    // Performance only counted after Thursday
-    if (gates.isPerformanceOpen) {
+    totalRequired += s.assignment_count;
+    totalSubmitted += s.conf_count;
+  });
+  
+  // After Thursday, also track performance
+  if (gates.isPerformanceOpen) {
+    staff.forEach(s => {
       totalRequired += s.assignment_count;
       totalSubmitted += s.perf_count;
-    }
-  });
-  // If nothing is due yet, show 100% (everyone on track)
+    });
+  }
+  
   const submissionRate = totalRequired > 0 ? (totalSubmitted / totalRequired) * 100 : 100;
   
+  // "Missing" counts are for LATE submissions (past deadline)
   const { missingConfCount, missingPerfCount } = calculateMissingCounts(staff, gates);
+  
+  // "Pending" count is for not-yet-submitted but not yet late (before deadline)
+  const pendingConfCount = !gates.isPastConfidenceDeadline 
+    ? staff.filter(s => s.conf_count < s.assignment_count).length 
+    : 0;
   
   // Calculate averages from scores
   let totalConf = 0;
@@ -97,6 +105,7 @@ export function calculateLocationStats(
     submissionRate,
     missingConfCount,
     missingPerfCount,
+    pendingConfCount,
     avgConfidence,
     avgPerformance,
   };

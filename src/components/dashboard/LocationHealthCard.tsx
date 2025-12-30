@@ -9,8 +9,9 @@ export interface LocationStats {
   name: string;
   staffCount: number;
   submissionRate: number;      // 0-100 (conf+perf complete %)
-  missingConfCount: number;    // staff missing confidence (after Tue deadline)
-  missingPerfCount: number;    // staff missing performance (after Thu open)
+  missingConfCount: number;    // staff missing confidence (after Tue deadline - LATE)
+  missingPerfCount: number;    // staff missing performance (after Thu open - LATE)
+  pendingConfCount?: number;   // staff not yet submitted but before deadline
 }
 
 interface LocationHealthCardProps {
@@ -65,7 +66,13 @@ export function LocationHealthCard({ stats }: LocationHealthCardProps) {
           {stats.missingConfCount > 0 && (
             <Badge variant="destructive" className="gap-1">
               <AlertCircle className="h-3 w-3" />
-              {stats.missingConfCount} Missing Conf
+              {stats.missingConfCount} Late Conf
+            </Badge>
+          )}
+          {(stats.pendingConfCount ?? 0) > 0 && (
+            <Badge variant="outline" className="border-primary text-primary gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {stats.pendingConfCount} Pending Conf
             </Badge>
           )}
           {stats.missingPerfCount > 0 && (
@@ -74,7 +81,7 @@ export function LocationHealthCard({ stats }: LocationHealthCardProps) {
               {stats.missingPerfCount} Missing Perf
             </Badge>
           )}
-          {stats.missingConfCount === 0 && stats.missingPerfCount === 0 && (
+          {stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 && stats.missingPerfCount === 0 && (
             <Badge variant="secondary" className="bg-primary/10 text-primary gap-1">
               <CheckCircle2 className="h-3 w-3" />
               On Track

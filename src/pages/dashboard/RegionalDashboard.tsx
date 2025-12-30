@@ -65,6 +65,7 @@ export default function RegionalDashboard() {
         submissionRate: locStats.submissionRate,
         missingConfCount: locStats.missingConfCount,
         missingPerfCount: locStats.missingPerfCount,
+        pendingConfCount: locStats.pendingConfCount,
       };
     });
 
@@ -75,13 +76,14 @@ export default function RegionalDashboard() {
     const totalStaff = stats.reduce((sum, s) => sum + s.staffCount, 0);
     const totalMissingConf = stats.reduce((sum, s) => sum + s.missingConfCount, 0);
     const totalMissingPerf = stats.reduce((sum, s) => sum + s.missingPerfCount, 0);
+    const totalPendingConf = stats.reduce((sum, s) => sum + (s.pendingConfCount ?? 0), 0);
     const avgRate = stats.length > 0 
       ? stats.reduce((sum, s) => sum + s.submissionRate, 0) / stats.length 
       : 0;
 
     return { 
       locationStats: stats, 
-      totals: { totalStaff, totalMissingConf, totalMissingPerf, avgRate, locationCount: stats.length }
+      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalPendingConf, avgRate, locationCount: stats.length }
     };
   }, [summaries, managedLocationIds, managedOrgIds, isSuperAdmin, now, anchors]);
 
@@ -153,19 +155,32 @@ export default function RegionalDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
-                Missing Submissions
+                Submissions Status
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex gap-4">
-                <div>
-                  <div className="text-2xl font-bold text-destructive">{totals.totalMissingConf}</div>
-                  <p className="text-xs text-muted-foreground">Confidence</p>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-warning">{totals.totalMissingPerf}</div>
-                  <p className="text-xs text-muted-foreground">Performance</p>
-                </div>
+                {totals.totalMissingConf > 0 && (
+                  <div>
+                    <div className="text-2xl font-bold text-destructive">{totals.totalMissingConf}</div>
+                    <p className="text-xs text-muted-foreground">Late Conf</p>
+                  </div>
+                )}
+                {totals.totalPendingConf > 0 && (
+                  <div>
+                    <div className="text-2xl font-bold text-primary">{totals.totalPendingConf}</div>
+                    <p className="text-xs text-muted-foreground">Pending Conf</p>
+                  </div>
+                )}
+                {totals.totalMissingPerf > 0 && (
+                  <div>
+                    <div className="text-2xl font-bold text-warning">{totals.totalMissingPerf}</div>
+                    <p className="text-xs text-muted-foreground">Missing Perf</p>
+                  </div>
+                )}
+                {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 && (
+                  <div className="text-sm text-muted-foreground">All on track!</div>
+                )}
               </div>
             </CardContent>
           </Card>

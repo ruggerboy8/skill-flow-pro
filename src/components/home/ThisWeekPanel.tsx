@@ -12,7 +12,7 @@ import { CT_TZ } from '@/lib/centralTime';
 import { getWeekAnchors } from '@/v2/time';
 import { isV2, useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 import { useNow } from '@/providers/NowProvider';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainColorRich } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
 import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
@@ -315,7 +315,7 @@ export default function ThisWeekPanel() {
         {/* Pro Moves list - Spine Layout */}
         {displayAssignments.map((assignment) => {
           const domainName = assignment.domain_name;
-          const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
+          const domainColor = domainName ? getDomainColorRich(domainName) : 'hsl(var(--primary))';
           
           const scores = weeklyScores.find(s => 
             s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
@@ -326,12 +326,12 @@ export default function ThisWeekPanel() {
             <div 
               key={assignment.weekly_focus_id} 
               className={cn(
-                "relative flex bg-white/80 md:bg-white/40 md:hover:bg-white/60",
-                "dark:bg-slate-800/80 dark:md:bg-slate-800/40 dark:md:hover:bg-slate-800/60",
+                "relative flex bg-white dark:bg-slate-800",
                 "backdrop-blur-sm rounded-xl overflow-hidden",
-                "border border-white/30 dark:border-slate-700/30",
+                "border border-border/50 dark:border-slate-700/50",
+                "shadow-sm",
                 "transition-colors",
-                resourceCount > 0 && "cursor-pointer active:scale-[0.99]"
+                resourceCount > 0 && "cursor-pointer hover:shadow-md active:scale-[0.99]"
               )}
               onClick={() => {
                 if (resourceCount > 0) {

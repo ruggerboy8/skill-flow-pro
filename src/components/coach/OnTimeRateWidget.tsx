@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
-import { Clock } from 'lucide-react';
+import { Clock, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface OnTimeRateWidgetProps {
   staffId: string;
@@ -163,100 +163,91 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
     }
   };
 
-  const getRateColor = (rate: number) => {
-    if (rate >= 90) return 'text-green-600';
-    if (rate >= 75) return 'text-yellow-600';
-    return 'text-red-600';
+  const getHealthColor = (rate: number) => {
+    if (rate >= 90) return 'text-emerald-600 dark:text-emerald-400';
+    if (rate >= 75) return 'text-amber-600 dark:text-amber-400';
+    return 'text-rose-600 dark:text-rose-400';
   };
 
-  const getRateBgColor = (rate: number) => {
-    if (rate >= 90) return 'bg-green-50 dark:bg-green-950/20';
-    if (rate >= 75) return 'bg-yellow-50 dark:bg-yellow-950/20';
-    return 'bg-red-50 dark:bg-red-950/20';
+  const getHealthBg = (rate: number) => {
+    if (rate >= 90) return 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/50 dark:border-emerald-800/50';
+    if (rate >= 75) return 'bg-amber-50 dark:bg-amber-950/30 border-amber-200/50 dark:border-amber-800/50';
+    return 'bg-rose-50 dark:bg-rose-950/30 border-rose-200/50 dark:border-rose-800/50';
   };
 
   if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Submission Tracking</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-20 w-full" />
-        </CardContent>
-      </Card>
-    );
+    return <Skeleton className="h-24 w-full rounded-2xl bg-white/40 dark:bg-slate-800/40" />;
   }
 
+  const rate = stats?.completionRate || 0;
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold">
-            Submission Tracking
-          </CardTitle>
-          <ToggleGroup 
-            type="single" 
-            value={filter} 
-            onValueChange={(v) => v && setFilter(v as TimeFilter)}
-            size="sm"
-            className="gap-0"
-          >
-            <ToggleGroupItem value="3weeks" className="text-xs px-2 h-7 rounded-r-none">
-              3 wks
-            </ToggleGroupItem>
-            <ToggleGroupItem value="6weeks" className="text-xs px-2 h-7 rounded-none border-x-0">
-              6 wks
-            </ToggleGroupItem>
-            <ToggleGroupItem value="all" className="text-xs px-2 h-7 rounded-l-none">
-              All
-            </ToggleGroupItem>
-          </ToggleGroup>
+    <div className={cn(
+      "rounded-2xl border p-4 backdrop-blur-sm transition-all",
+      getHealthBg(rate)
+    )}>
+      {/* Header Row */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "flex items-center justify-center w-10 h-10 rounded-full",
+            rate >= 90 ? "bg-emerald-100 dark:bg-emerald-900/50" : 
+            rate >= 75 ? "bg-amber-100 dark:bg-amber-900/50" : 
+            "bg-rose-100 dark:bg-rose-900/50"
+          )}>
+            <TrendingUp className={cn("w-5 h-5", getHealthColor(rate))} />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">Completion Rate</p>
+            <div className="flex items-baseline gap-2">
+              <span className={cn("text-2xl font-bold", getHealthColor(rate))}>
+                {stats?.completionRate.toFixed(0)}%
+              </span>
+              <span className="text-xs text-muted-foreground">
+                ({stats?.completedSubmissions}/{stats?.totalSubmissions})
+              </span>
+            </div>
+          </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        {stats && stats.totalSubmissions > 0 ? (
-          <div className="flex items-center gap-6">
-            <div className={`rounded-lg p-6 ${getRateBgColor(stats.completionRate)}`}>
-              <div className={`text-4xl font-bold ${getRateColor(stats.completionRate)}`}>
-                {stats.completionRate.toFixed(0)}%
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">Completion</div>
-            </div>
-            <div className="flex-1 space-y-3">
-              <div className="text-sm text-muted-foreground">
-                {stats.completedSubmissions} of {stats.totalSubmissions} completed
-                {stats.missing > 0 && `, ${stats.missing} missing`}
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all ${
-                    stats.completionRate >= 90
-                      ? 'bg-green-600'
-                      : stats.completionRate >= 75
-                      ? 'bg-yellow-600'
-                      : 'bg-red-600'
-                  }`}
-                  style={{ width: `${stats.completionRate}%` }}
-                />
-              </div>
-              {stats.completedSubmissions > 0 && (
-                <div className="flex items-center gap-2 pt-2 border-t border-border">
-                  <Clock className="w-4 h-4 text-blue-600" />
-                  <span className="text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground">{stats.onTimeRate.toFixed(0)}%</span> on time ({stats.onTimeSubmissions} of {stats.completedSubmissions})
-                    {stats.late > 0 && `, ${stats.late} late`}
-                  </span>
-                </div>
-              )}
-            </div>
+
+        <ToggleGroup 
+          type="single" 
+          value={filter} 
+          onValueChange={(v) => v && setFilter(v as TimeFilter)} 
+          size="sm"
+          className="bg-white/50 dark:bg-slate-800/50 p-1 rounded-lg border border-border/30"
+        >
+          <ToggleGroupItem value="3weeks" className="text-xs px-2 h-6 rounded-md">3w</ToggleGroupItem>
+          <ToggleGroupItem value="6weeks" className="text-xs px-2 h-6 rounded-md">6w</ToggleGroupItem>
+          <ToggleGroupItem value="all" className="text-xs px-2 h-6 rounded-md">All</ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+
+      {/* Stats Row */}
+      {stats && stats.totalSubmissions > 0 && (
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/30">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="w-3.5 h-3.5 text-blue-500" />
+            <span>On Time: <span className="font-semibold text-foreground">{stats.onTimeRate.toFixed(0)}%</span></span>
           </div>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            No submissions found for this time period.
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          {stats.late > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+              <span>Late: <span className="font-semibold text-foreground">{stats.late}</span></span>
+            </div>
+          )}
+          {stats.missing > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CheckCircle2 className="w-3.5 h-3.5 text-rose-500" />
+              <span>Missing: <span className="font-semibold text-foreground">{stats.missing}</span></span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {stats && stats.totalSubmissions === 0 && (
+        <p className="text-xs text-muted-foreground mt-2">No submissions found for this period.</p>
+      )}
+    </div>
   );
 }

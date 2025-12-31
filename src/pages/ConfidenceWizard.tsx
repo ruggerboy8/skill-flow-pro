@@ -708,33 +708,30 @@ export default function ConfidenceWizard() {
         title: isRepair ? "Confidence backfilled" : "Confidence saved",
         description: isRepair ? "Scores updated for past week." : "Great! Come back later to rate your performance."
       });
-      
-      // Navigate based on mode and return path
-      if (isRepair && returnTo) {
-        const dest = decodeURIComponent(returnTo);
-        console.log('Navigating back to:', dest);
-        setTimeout(() => {
-          navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
-        }, 150);
-      } else if (returnTo && !isRepair) {
-        // If we have a return path (e.g., came from performance wizard), go back there
-        const dest = decodeURIComponent(returnTo);
-        console.log('Returning to performance wizard:', dest);
-        setTimeout(() => {
-          navigate(dest, { replace: true });
-        }, 150);
-      } else {
-        navigate('/');
-      }
     } else {
-      console.error('Submission failed');
-      toast({
-        title: 'Error',
-        description: 'Failed to save confidence scores. Please try again.',
-        variant: 'destructive'
-      });
+      // Don't show error toast - useReliableSubmission handles retries in background
+      // and already shows "Saving..." toast. Data will eventually be saved.
+      console.log('Immediate submission failed, retries queued in background');
     }
+    
     setSubmitting(false);
+    
+    // Always navigate - data will be saved via background retries if immediate attempt failed
+    if (isRepair && returnTo) {
+      const dest = decodeURIComponent(returnTo);
+      console.log('Navigating back to:', dest);
+      setTimeout(() => {
+        navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
+      }, 150);
+    } else if (returnTo && !isRepair) {
+      const dest = decodeURIComponent(returnTo);
+      console.log('Returning to performance wizard:', dest);
+      setTimeout(() => {
+        navigate(dest, { replace: true });
+      }, 150);
+    } else {
+      navigate('/');
+    }
   };
 
   const handleScoreChange = (score: number) => {

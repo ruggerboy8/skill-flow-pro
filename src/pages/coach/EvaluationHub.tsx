@@ -88,6 +88,7 @@ export function EvaluationHub() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
+  const [draftObservationAudioPath, setDraftObservationAudioPath] = useState<string | null>(null);
 
   // Audio recording state - lifted here so it persists across tab switches
   const { state: recordingState, controls: recordingControls } = useAudioRecording();
@@ -98,31 +99,26 @@ export function EvaluationHub() {
     }
   }, [evalId]);
 
-  // Initialize note visibility for read-only mode when evaluation loads
+  // Initialize note visibility when evaluation loads - show notes that have content
   useEffect(() => {
     if (evaluation) {
-      const mode = searchParams.get('mode');
-      const isReadOnlyMode = evaluation.status === 'submitted' && mode === 'view';
-      
-      if (isReadOnlyMode) {
-        // Show observer notes that have content
-        const observerNotesToShow: Record<number, boolean> = {};
-        evaluation.items.forEach(item => {
-          if (item.observer_note && item.observer_note.trim()) {
-            observerNotesToShow[item.competency_id] = true;
-          }
-        });
-        setShowObserverNotes(observerNotesToShow);
-
-        // Show self note if it has content (check current index)
-        const sortedItems = evaluation.items.sort((a, b) => a.competency_id - b.competency_id);
-        const currentItem = sortedItems[currentSelfIndex];
-        if (currentItem && currentItem.self_note && currentItem.self_note.trim()) {
-          setShowSelfNote(true);
+      // Show observer notes that have content (for both draft and submitted)
+      const observerNotesToShow: Record<number, boolean> = {};
+      evaluation.items.forEach(item => {
+        if (item.observer_note && item.observer_note.trim()) {
+          observerNotesToShow[item.competency_id] = true;
         }
+      });
+      setShowObserverNotes(observerNotesToShow);
+
+      // Show self note if it has content (check current index)
+      const sortedItems = evaluation.items.sort((a, b) => a.competency_id - b.competency_id);
+      const currentItem = sortedItems[currentSelfIndex];
+      if (currentItem && currentItem.self_note && currentItem.self_note.trim()) {
+        setShowSelfNote(true);
       }
     }
-  }, [evaluation, searchParams, currentSelfIndex]);
+  }, [evaluation, currentSelfIndex]);
 
   const loadEvaluation = async () => {
     if (!evalId) return;
@@ -161,6 +157,7 @@ export function EvaluationHub() {
       setSummaryFeedback((data as any).summary_feedback || null);
       setSummaryRawTranscript((data as any).summary_raw_transcript || null);
       setInterviewTranscript((data as any).interview_transcript || null);
+      setDraftObservationAudioPath((data as any).draft_observation_audio_path || null);
 
       // Load audio recording if exists
       if (data.audio_recording_path) {
@@ -529,6 +526,33 @@ export function EvaluationHub() {
       setSummaryRawTranscript(transcript);
     } catch (error) {
       console.error('Failed to save transcript:', error);
+    }
+  };
+
+  // Draft observation audio handlers
+  const handleDraftAudioSaved = async (path: string) => {
+    if (!evalId) return;
+    try {
+      await supabase
+        .from('evaluations')
+        .update({ draft_observation_audio_path: path })
+        .eq('id', evalId);
+      setDraftObservationAudioPath(path);
+    } catch (error) {
+      console.error('Failed to save draft audio path:', error);
+    }
+  };
+
+  const handleDraftAudioCleared = async () => {
+    if (!evalId) return;
+    try {
+      await supabase
+        .from('evaluations')
+        .update({ draft_observation_audio_path: null })
+        .eq('id', evalId);
+      setDraftObservationAudioPath(null);
+    } catch (error) {
+      console.error('Failed to clear draft audio path:', error);
     }
   };
 
@@ -1000,6 +1024,9 @@ export function EvaluationHub() {
               recordingState={recordingState}
               recordingControls={recordingControls}
               currentInsights={evaluation?.extracted_insights}
+              draftAudioPath={draftObservationAudioPath}
+              onDraftAudioSaved={handleDraftAudioSaved}
+              onDraftAudioCleared={handleDraftAudioCleared}
             />
           )}
           

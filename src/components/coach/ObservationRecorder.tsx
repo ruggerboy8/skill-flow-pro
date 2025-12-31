@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Mic } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Mic, Play, Pause, RotateCcw } from 'lucide-react';
 import { AudioRecorder } from './AudioRecorder';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +16,9 @@ interface ObservationRecorderProps {
   recordingState: AudioRecordingState;
   recordingControls: AudioRecordingControls;
   currentInsights?: ExtractedInsights | null;
+  draftAudioPath?: string | null;
+  onDraftAudioSaved?: (path: string) => void;
+  onDraftAudioCleared?: () => void;
 }
 
 export function ObservationRecorder({
@@ -24,10 +28,107 @@ export function ObservationRecorder({
   recordingState,
   recordingControls,
   currentInsights,
+  draftAudioPath,
+  onDraftAudioSaved,
+  onDraftAudioCleared,
 }: ObservationRecorderProps) {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState<string>('');
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  
+  // For restored draft audio playback
+  const [restoredAudioUrl, setRestoredAudioUrl] = useState<string | null>(null);
+  const [restoredAudioBlob, setRestoredAudioBlob] = useState<Blob | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [isPlayingRestored, setIsPlayingRestored] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Load draft audio on mount if path exists
+  useEffect(() => {
+    if (draftAudioPath && !restoredAudioUrl && !recordingState.audioBlob) {
+      loadDraftAudio(draftAudioPath);
+    }
+  }, [draftAudioPath]);
+
+  // Auto-save audio blob to storage when recording stops
+  useEffect(() => {
+    if (recordingState.audioBlob && !recordingState.isRecording && !isSavingDraft) {
+      saveDraftAudio(recordingState.audioBlob);
+    }
+  }, [recordingState.audioBlob, recordingState.isRecording]);
+
+  // Cleanup audio URL on unmount
+  useEffect(() => {
+    return () => {
+      if (restoredAudioUrl) {
+        URL.revokeObjectURL(restoredAudioUrl);
+      }
+    };
+  }, [restoredAudioUrl]);
+
+  const loadDraftAudio = async (path: string) => {
+    setIsLoadingDraft(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('evaluation-recordings')
+        .download(path);
+      
+      if (error) throw error;
+      
+      const url = URL.createObjectURL(data);
+      setRestoredAudioUrl(url);
+      setRestoredAudioBlob(data);
+      
+      console.log('[ObservationRecorder] Draft audio loaded from:', path);
+    } catch (error) {
+      console.error('[ObservationRecorder] Failed to load draft audio:', error);
+      // Don't show error toast - the file might have been deleted
+    } finally {
+      setIsLoadingDraft(false);
+    }
+  };
+
+  const saveDraftAudio = async (blob: Blob) => {
+    setIsSavingDraft(true);
+    try {
+      const fileName = `${evalId}/draft-observation-${Date.now()}.webm`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('evaluation-recordings')
+        .upload(fileName, blob, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Notify parent to update database
+      onDraftAudioSaved?.(fileName);
+      
+      console.log('[ObservationRecorder] Draft audio saved to:', fileName);
+    } catch (error) {
+      console.error('[ObservationRecorder] Failed to save draft audio:', error);
+      toast({
+        title: 'Warning',
+        description: 'Could not auto-save recording. Please process it before leaving.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const deleteDraftAudio = async (path: string) => {
+    try {
+      await supabase.storage
+        .from('evaluation-recordings')
+        .remove([path]);
+      console.log('[ObservationRecorder] Draft audio deleted:', path);
+    } catch (error) {
+      console.error('[ObservationRecorder] Failed to delete draft audio:', error);
+    }
+  };
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
     setIsProcessing(true);
@@ -75,12 +176,25 @@ export function ObservationRecorder({
       
       await updateExtractedInsights(evalId, updatedInsights);
 
+      // Step 4: Delete draft audio after successful processing
+      if (draftAudioPath) {
+        await deleteDraftAudio(draftAudioPath);
+        onDraftAudioCleared?.();
+      }
+
       // Pass feedback and insights up to parent
       // Use summary_html as the formatted feedback for backwards compatibility
       onFeedbackGenerated(insights.summary_html || '', transcript, insights);
 
       // Reset recording state after successful processing
       recordingControls.resetRecording();
+      
+      // Clear restored audio state
+      if (restoredAudioUrl) {
+        URL.revokeObjectURL(restoredAudioUrl);
+        setRestoredAudioUrl(null);
+        setRestoredAudioBlob(null);
+      }
 
       toast({
         title: 'Success',
@@ -99,7 +213,37 @@ export function ObservationRecorder({
     }
   };
 
+  const handleProcessRestoredAudio = () => {
+    if (restoredAudioBlob) {
+      handleRecordingComplete(restoredAudioBlob);
+    }
+  };
+
+  const handleDiscardRestoredAudio = async () => {
+    if (draftAudioPath) {
+      await deleteDraftAudio(draftAudioPath);
+      onDraftAudioCleared?.();
+    }
+    if (restoredAudioUrl) {
+      URL.revokeObjectURL(restoredAudioUrl);
+    }
+    setRestoredAudioUrl(null);
+    setRestoredAudioBlob(null);
+  };
+
+  const toggleRestoredPlayback = () => {
+    if (!audioRef.current) return;
+    
+    if (isPlayingRestored) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlayingRestored(!isPlayingRestored);
+  };
+
   const isRecordingInProgress = recordingState?.isRecording || false;
+  const hasRestoredAudio = !!restoredAudioUrl && !recordingState.audioBlob;
 
   return (
     <Card className="mb-6">
@@ -111,6 +255,12 @@ export function ObservationRecorder({
             <span className="ml-2 flex items-center gap-1 text-sm font-normal text-red-500">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               Recording in progress
+            </span>
+          )}
+          {isSavingDraft && (
+            <span className="ml-2 flex items-center gap-1 text-sm font-normal text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Saving...
             </span>
           )}
         </CardTitle>
@@ -139,8 +289,66 @@ export function ObservationRecorder({
             <li>"Overall, I really appreciate that you..."</li>
           </ul>
         </div>
-        
-        {isProcessing ? (
+
+        {isLoadingDraft ? (
+          <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading saved recording...</p>
+          </div>
+        ) : hasRestoredAudio ? (
+          <div className="space-y-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Mic className="w-4 h-4 text-amber-600" />
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Previously recorded observation found
+              </p>
+            </div>
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              You have an unprocessed recording from a previous session. You can review and submit it, or discard and start fresh.
+            </p>
+            
+            <audio 
+              ref={audioRef}
+              src={restoredAudioUrl}
+              onEnded={() => setIsPlayingRestored(false)}
+              className="hidden"
+            />
+            
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleRestoredPlayback}
+              >
+                {isPlayingRestored ? (
+                  <><Pause className="w-4 h-4 mr-1" /> Pause</>
+                ) : (
+                  <><Play className="w-4 h-4 mr-1" /> Play</>
+                )}
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleProcessRestoredAudio}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> {processingStep}</>
+                ) : (
+                  'Transcribe & Format'
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDiscardRestoredAudio}
+                disabled={isProcessing}
+              >
+                <RotateCcw className="w-4 h-4 mr-1" /> Start Fresh
+              </Button>
+            </div>
+          </div>
+        ) : isProcessing ? (
           <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <div>

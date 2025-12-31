@@ -311,7 +311,7 @@ export default function ThisWeekPanel() {
       </div>
 
       {/* Content */}
-      <div className="p-4 md:p-6 space-y-3">
+      <div className="px-2.5 py-3 md:p-6 space-y-3">
         {/* Pro Moves list - Spine Layout */}
         {displayAssignments.map((assignment) => {
           const domainName = assignment.domain_name;

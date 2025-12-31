@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import alcanLogo from '@/assets/alcan-logo.png';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -89,8 +90,15 @@ export default function Layout() {
           <AppSidebar navigation={navigation} />
           
           <div className="flex-1 flex flex-col min-w-0">
-            <header className="h-16 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 sticky top-0 z-10">
+            <header className="h-16 flex items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 sticky top-0 z-10">
               <SidebarTrigger />
+              
+              {/* Centered ALCAN logo */}
+              <div className="absolute left-1/2 -translate-x-1/2">
+                <img src={alcanLogo} alt="ALCAN" className="h-6 dark:invert" />
+              </div>
+              
+              <div className="flex-1" />
               
               <div className="flex items-center gap-2">
                 {/* Sim console trigger - only for admins with dev tools enabled */}

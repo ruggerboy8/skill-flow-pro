@@ -52,8 +52,7 @@ export function AppSidebar({ navigation, backfillMissingCount = 0 }: AppSidebarP
     >
       <SidebarContent>
         <div className="flex items-center gap-2 p-4 border-b">
-          <img src="/brand/alcan-logo.svg" alt="Alcan" className="h-6" />
-          {!isCollapsed && <span className="font-bold text-xl tracking-wide">ProMoves</span>}
+          <span className="font-bold text-xl tracking-wide">ProMoves</span>
         </div>
         
         <SidebarGroup>

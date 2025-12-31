@@ -283,8 +283,9 @@ export default function EvaluationViewer() {
   // Get insights perspectives
   const extractedInsights = evaluation.extracted_insights;
   const observerPerspective = extractedInsights?.observer || null;
-  // Self-assessment insights are internal only - not shown to staff
-  const hasAnyInsights = observerPerspective || (evaluation as any).summary_feedback;
+  // Check for self-assessment insights - either in unified structure or legacy format
+  const selfAssessmentPerspective = extractedInsights?.self_assessment || getLegacyAsSelfAssessment(extractedInsights || {});
+  const hasAnyInsights = observerPerspective || selfAssessmentPerspective || (evaluation as any).summary_feedback;
 
   return (
     <div className="space-y-6">
@@ -459,13 +460,32 @@ export default function EvaluationViewer() {
                 </Card>
               )}
 
-              {/* Coach Observations Only */}
+              {/* Coach Observations */}
               {observerPerspective && (
                 <PerspectiveCard 
                   title="Coach Observations" 
                   icon={Eye}
                   perspective={observerPerspective}
                 />
+              )}
+
+              {/* Self-Assessment Insights */}
+              {selfAssessmentPerspective && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <User className="w-5 h-5" />
+                      Self-Assessment Insights
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <PerspectiveCard 
+                      title="" 
+                      icon={User}
+                      perspective={selfAssessmentPerspective}
+                    />
+                  </CardContent>
+                </Card>
               )}
             </>
           ) : (

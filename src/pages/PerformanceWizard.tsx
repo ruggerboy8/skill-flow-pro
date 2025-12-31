@@ -133,7 +133,7 @@ export default function PerformanceWizard() {
     }
   }, [user, n]);
 
-  // Time gate: Block performance access until Thursday 00:01 (except repair mode)
+  // Time gate: Block performance access until Thursday 00:01 (except repair mode or if disabled)
   useEffect(() => {
     // Skip time gate for repair mode (backfilling past data)
     if (isRepair) return;
@@ -141,15 +141,34 @@ export default function PerformanceWizard() {
     // Skip if staff not loaded yet
     if (!staff?.locations?.timezone) return;
     
-    const { checkout_open } = getWeekAnchors(effectiveNow, staff.locations.timezone);
+    const checkTimeGate = async () => {
+      // Check if time gate is disabled via admin settings
+      const { data } = await supabase
+        .from('app_kv')
+        .select('value')
+        .eq('key', 'global:performance_time_gate_enabled')
+        .maybeSingle();
+      
+      // Default to enabled if no setting exists
+      const isTimeGateEnabled = (data?.value as { enabled?: boolean } | null)?.enabled !== false;
+      
+      if (!isTimeGateEnabled) {
+        console.log('Performance time gate is disabled via admin settings');
+        return; // Skip time gate check
+      }
+      
+      const { checkout_open } = getWeekAnchors(effectiveNow, staff.locations!.timezone!);
+      
+      if (effectiveNow < checkout_open) {
+        toast({
+          title: "Not Open Yet",
+          description: "Performance ratings open on Thursday.",
+        });
+        navigate('/');
+      }
+    };
     
-    if (effectiveNow < checkout_open) {
-      toast({
-        title: "Not Open Yet",
-        description: "Performance ratings open on Thursday.",
-      });
-      navigate('/');
-    }
+    checkTimeGate();
   }, [effectiveNow, staff, isRepair, navigate, toast]);
 
   const loadData = async () => {

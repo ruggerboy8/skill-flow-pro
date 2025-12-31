@@ -4,10 +4,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, MapPin, Building } from "lucide-react";
+import { Shield, Users, MapPin, Building, Settings } from "lucide-react";
 import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
 import { AdminLocationsTab } from "@/components/admin/AdminLocationsTab";
 import { AdminOrganizationsTab } from "@/components/admin/AdminOrganizationsTab";
+import { AdminGlobalSettingsTab } from "@/components/admin/AdminGlobalSettingsTab";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminPage() {
@@ -99,7 +100,7 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+        <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
           <TabsTrigger value="users" className="flex items-center space-x-2">
             <Users className="h-4 w-4" />
             <span>Users</span>
@@ -111,6 +112,10 @@ export default function AdminPage() {
           <TabsTrigger value="organizations" className="flex items-center space-x-2">
             <Building className="h-4 w-4" />
             <span>Organizations</span>
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center space-x-2">
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
           </TabsTrigger>
         </TabsList>
 
@@ -124,6 +129,10 @@ export default function AdminPage() {
 
         <TabsContent value="organizations">
           <AdminOrganizationsTab />
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <AdminGlobalSettingsTab />
         </TabsContent>
       </Tabs>
     </div>

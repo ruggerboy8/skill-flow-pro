@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { GraduationCap, Video, FileText, Link as LinkIcon, X, Volume2 } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { GraduationCap, Video, MessageCircle, Link as LinkIcon, PlayCircle, Clock, CheckCircle2 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
-import { getDomainColor, getDomainColorRaw } from "@/lib/domainColors";
+import { getDomainColorRichRaw } from "@/lib/domainColors";
 import { extractYouTubeId } from "@/lib/youtubeHelpers";
 
 interface LearnerLearnDrawerProps {
@@ -14,6 +15,8 @@ interface LearnerLearnDrawerProps {
   actionId: number;
   proMoveTitle: string;
   domainName: string;
+  lastPracticed?: string | null;
+  avgConfidence?: number | null;
 }
 
 interface Resource {
@@ -32,6 +35,8 @@ export function LearnerLearnDrawer({
   actionId,
   proMoveTitle,
   domainName,
+  lastPracticed,
+  avgConfidence,
 }: LearnerLearnDrawerProps) {
   const [loading, setLoading] = useState(true);
   const [description, setDescription] = useState("");
@@ -39,6 +44,8 @@ export function LearnerLearnDrawer({
   const [scriptResource, setScriptResource] = useState<Resource | null>(null);
   const [audioResource, setAudioResource] = useState<Resource | null>(null);
   const [linkResources, setLinkResources] = useState<Resource[]>([]);
+
+  const richColor = getDomainColorRichRaw(domainName);
 
   useEffect(() => {
     if (!open || !actionId) return;
@@ -91,11 +98,6 @@ export function LearnerLearnDrawer({
       setLinkResources(links);
     } catch (error) {
       console.error("Error loading learning resources:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load learning resources",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -109,160 +111,178 @@ export function LearnerLearnDrawer({
   const hasAudio = Boolean(audioResource?.url);
   const hasVideo = Boolean(videoId);
   const hasLinks = linkResources.length > 0;
+  const hasContent = hasDescription || hasScript || hasAudio || hasVideo || hasLinks;
+
+  // Section header helper matching ProMoveDrawer
+  const SectionHeader = ({ icon: Icon, title }: { icon: React.ElementType; title: string }) => (
+    <div className="flex items-center gap-2 mb-3 mt-6">
+      <div 
+        className="p-1.5 rounded-md" 
+        style={{ backgroundColor: `hsl(${richColor} / 0.1)` }}
+      >
+        <Icon className="h-4 w-4" style={{ color: `hsl(${richColor})` }} />
+      </div>
+      <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h3>
+    </div>
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-[600px] overflow-y-auto overflow-x-hidden">
-        <SheetHeader>
-          <div className="flex items-center gap-2">
-            <GraduationCap className="h-5 w-5 text-primary" />
-            <SheetTitle>Learning Materials</SheetTitle>
-          </div>
-          <div className="space-y-2 pt-3">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-1">Pro Move</p>
-              <p className="text-sm font-medium leading-snug">{proMoveTitle}</p>
-            </div>
-            <Badge
-              variant="secondary"
-              style={{
-                backgroundColor: `hsl(${getDomainColorRaw(domainName)} / 0.2)`,
-                color: getDomainColor(domainName),
-                borderColor: getDomainColor(domainName),
+      <SheetContent className="w-full sm:max-w-[540px] h-[100dvh] p-0 flex flex-col gap-0 border-l-0 sm:border-l">
+        {/* Header with domain color background */}
+        <SheetHeader 
+          className="px-6 py-6 text-left border-b"
+          style={{ backgroundColor: `hsl(${richColor} / 0.08)` }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Badge 
+              variant="outline" 
+              className="bg-background/50 backdrop-blur text-xs font-normal"
+              style={{ 
+                color: `hsl(${richColor})`,
+                borderColor: `hsl(${richColor} / 0.3)`
               }}
-              className="border"
             >
               {domainName}
             </Badge>
           </div>
+          <SheetTitle className="text-xl md:text-2xl font-bold leading-tight">
+            {proMoveTitle}
+          </SheetTitle>
+          <SheetDescription className="text-xs text-muted-foreground flex items-center gap-1">
+            <GraduationCap className="w-3 h-3" />
+            Study Mode
+          </SheetDescription>
         </SheetHeader>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : (
-          <div className="space-y-6 py-6">
-            {/* 1. Why this matters (Description) */}
-            {hasDescription && (
-              <section className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  <h3 id="why-matters" className="font-medium">
-                    Why this matters
-                  </h3>
-                </div>
-                <div className="text-sm text-muted-foreground whitespace-pre-wrap" aria-labelledby="why-matters">
-                  {description}
-                </div>
-              </section>
-            )}
-
-            {/* Divider after description if more sections follow */}
-            {hasDescription && (hasScript || hasAudio || hasVideo || hasLinks) && <div className="border-t" />}
-
-            {/* 2. Try saying it like this (Script) */}
-            {hasScript && (
-              <section className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  <h3 id="try-saying" className="font-medium">
-                    Try saying it like this
-                  </h3>
-                </div>
-                <p className="text-xs text-muted-foreground italic">Use this wording or make it your own.</p>
-                <div
-                  className="text-sm whitespace-pre-wrap leading-relaxed bg-muted/30 p-4 rounded-lg border"
-                  aria-labelledby="try-saying"
-                >
-                  {scriptResource!.content_md}
-                </div>
-              </section>
-            )}
-
-            {/* Divider after script if more sections follow */}
-            {(hasDescription || hasScript) && (hasAudio || hasVideo || hasLinks) && <div className="border-t" />}
-
-            {/* 3. Listen (Audio) */}
-            {hasAudio && (
-              <section className="space-y-2 pb-2">
-                <div className="flex items-center gap-2">
-                  <Volume2 className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  <h3 className="font-medium">Listen</h3>
-                </div>
-                <p className="text-xs text-muted-foreground italic">Hear an example.</p>
-                <audio
-                  controls
-                  preload="metadata"
-                  src={audioResource!.url!}
-                  className="w-full"
-                  aria-label="Sample script audio"
-                />
-              </section>
-            )}
-
-            {/* Divider after audio if more sections follow */}
-            {(hasDescription || hasScript || hasAudio) && (hasVideo || hasLinks) && <div className="border-t" />}
-
-            {/* 4. Video */}
-            {hasVideo && (
-              <section className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Video className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  <h3 className="font-medium">Video</h3>
-                </div>
-                <div className="relative w-full aspect-video">
-                  <iframe
-                    className="absolute inset-0 w-full h-full rounded-lg"
-                    src={`https://www.youtube.com/embed/${videoId}`}
-                    title="Learning video"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                </div>
-              </section>
-            )}
-
-            {/* Divider after video if links follow */}
-            {(hasDescription || hasScript || hasAudio || hasVideo) && hasLinks && <div className="border-t" />}
-
-            {/* 5. Additional Links */}
-            {hasLinks && (
-              <section className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <LinkIcon className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  <h3 className="font-medium">Additional Links</h3>
-                </div>
-                <div className="space-y-2">
-                  {linkResources.map((link) => (
-                    <Button key={link.id} variant="outline" className="w-full justify-start p-3 h-auto" asChild>
-                      <a href={link.url || "#"} target="_blank" rel="noopener noreferrer">
-                        <div className="flex items-center gap-2 w-full min-w-0">
-                          <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                          <div className="min-w-0 text-left flex-1">
-                            {link.title && <p className="font-medium text-sm truncate">{link.title}</p>}
-                            <p className="text-xs text-muted-foreground truncate">{link.url}</p>
-                          </div>
-                        </div>
-                      </a>
-                    </Button>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Empty state */}
-            {!hasDescription && !hasScript && !hasAudio && !hasVideo && !hasLinks && (
+        <ScrollArea className="flex-1 px-6">
+          <div className="py-6 space-y-1">
+            {loading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-24 w-full mt-6" />
+              </div>
+            ) : !hasContent ? (
               <div className="text-center py-12 text-muted-foreground">
                 <GraduationCap className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">No learning materials available yet.</p>
               </div>
+            ) : (
+              <>
+                {/* Description (The Why) */}
+                {hasDescription && (
+                  <div className="text-sm text-muted-foreground leading-relaxed">
+                    {description}
+                  </div>
+                )}
+
+                {/* Script */}
+                {hasScript && (
+                  <section>
+                    <SectionHeader icon={MessageCircle} title="Suggested Verbiage" />
+                    <div 
+                      className="text-base md:text-lg leading-relaxed p-4 md:p-5 rounded-2xl border-2 border-dashed"
+                      style={{ 
+                        backgroundColor: `hsl(${richColor} / 0.03)`,
+                        borderColor: `hsl(${richColor} / 0.2)` 
+                      }}
+                    >
+                      "{scriptResource!.content_md}"
+                    </div>
+                  </section>
+                )}
+
+                {/* Audio */}
+                {hasAudio && (
+                  <section>
+                    <SectionHeader icon={PlayCircle} title="Listen" />
+                    <div className="p-1 rounded-full border bg-muted/20">
+                      <audio 
+                        controls 
+                        src={audioResource!.url!} 
+                        className="w-full h-10" 
+                        style={{ borderRadius: "9999px" }} 
+                      />
+                    </div>
+                  </section>
+                )}
+
+                {/* Video */}
+                {hasVideo && (
+                  <section>
+                    <SectionHeader icon={Video} title="Watch" />
+                    <div className="relative w-full aspect-video rounded-xl overflow-hidden border bg-black shadow-sm">
+                      <iframe
+                        className="absolute inset-0 w-full h-full"
+                        src={`https://www.youtube.com/embed/${videoId}`}
+                        title="Learning video"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  </section>
+                )}
+
+                {/* Additional Links */}
+                {hasLinks && (
+                  <section>
+                    <SectionHeader icon={LinkIcon} title="Resources" />
+                    <div className="space-y-2">
+                      {linkResources.map(link => (
+                        <Button 
+                          key={link.id} 
+                          variant="outline" 
+                          className="w-full justify-start" 
+                          asChild
+                        >
+                          <a href={link.url || '#'} target="_blank" rel="noreferrer">
+                            <LinkIcon className="mr-2 h-4 w-4" /> 
+                            {link.title || 'View Resource'}
+                          </a>
+                        </Button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* User Stats Footer */}
+                <div className="pt-8 mt-8 border-t">
+                  <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-4">
+                    Your History
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 rounded-lg border bg-muted/10 text-center">
+                      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground mb-1">
+                        <Clock className="w-3 h-3" /> Last Practiced
+                      </div>
+                      <p className="font-semibold text-sm">
+                        {lastPracticed 
+                          ? new Date(lastPracticed).toLocaleDateString() 
+                          : "Not yet"}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg border bg-muted/10 text-center">
+                      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground mb-1">
+                        <CheckCircle2 className="w-3 h-3" /> Avg Confidence
+                      </div>
+                      <p className="font-semibold text-sm">
+                        {avgConfidence 
+                          ? `${avgConfidence.toFixed(1)} / 4` 
+                          : "-"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
-        )}
+        </ScrollArea>
 
-        <div className="flex justify-end pt-4 border-t">
-          <Button onClick={() => onOpenChange(false)} variant="outline">
+        <div className="p-4 border-t bg-background">
+          <Button onClick={() => onOpenChange(false)} className="w-full" variant="outline">
             Close
           </Button>
         </div>

@@ -1,8 +1,6 @@
-import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import ThisWeekPanel from '@/components/home/ThisWeekPanel';
 import { RecentWinBanner } from '@/components/home/RecentWinBanner';
-import { ChristmasWelcome } from '@/components/home/ChristmasWelcome';
 import { Skeleton } from '@/components/ui/skeleton';
 import RegionalDashboard from '@/pages/dashboard/RegionalDashboard';
 
@@ -31,8 +29,6 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background px-0 py-2 md:p-4">
       <div className="max-w-4xl mx-auto px-4 md:px-0 space-y-4">
-        <ChristmasWelcome />
-
         <RecentWinBanner />
 
         <ThisWeekPanel />

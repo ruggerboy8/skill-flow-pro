@@ -420,15 +420,24 @@ export default function ThisWeekPanel() {
         {SimBannerComponent && <SimBannerComponent />}
       </div>
 
-      {selectedLearnAssignment && selectedLearnAssignment.pro_move_id && (
-        <LearnerLearnDrawer
-          open={learnDrawerOpen}
-          onOpenChange={setLearnDrawerOpen}
-          actionId={selectedLearnAssignment.pro_move_id}
-          proMoveTitle={selectedLearnAssignment.action_statement || 'Pro Move'}
-          domainName={selectedLearnAssignment.domain_name || 'General'}
-        />
-      )}
+      {selectedLearnAssignment && selectedLearnAssignment.pro_move_id && (() => {
+        // Find score data for selected assignment to pass history
+        const selectedScores = weeklyScores.find(s => 
+          s.assignment_id === selectedLearnAssignment.weekly_focus_id || 
+          s.weekly_focus_id === selectedLearnAssignment.weekly_focus_id
+        );
+        return (
+          <LearnerLearnDrawer
+            open={learnDrawerOpen}
+            onOpenChange={setLearnDrawerOpen}
+            actionId={selectedLearnAssignment.pro_move_id}
+            proMoveTitle={selectedLearnAssignment.action_statement || 'Pro Move'}
+            domainName={selectedLearnAssignment.domain_name || 'General'}
+            lastPracticed={selectedScores?.confidence_score != null ? weekOfDate : null}
+            avgConfidence={selectedScores?.confidence_score}
+          />
+        );
+      })()}
     </div>
   );
 }

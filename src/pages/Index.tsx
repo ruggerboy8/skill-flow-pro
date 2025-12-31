@@ -3,12 +3,10 @@ import { useUserRole } from '@/hooks/useUserRole';
 import ThisWeekPanel from '@/components/home/ThisWeekPanel';
 import { RecentWinBanner } from '@/components/home/RecentWinBanner';
 import { ChristmasWelcome } from '@/components/home/ChristmasWelcome';
-import { SimFloatingButton } from '@/devtools/SimConsole';
 import { Skeleton } from '@/components/ui/skeleton';
 import RegionalDashboard from '@/pages/dashboard/RegionalDashboard';
 
 export default function Index() {
-  const { user } = useAuth();
   const { isParticipant, showRegionalDashboard, isLoading } = useUserRole();
 
   // Show loading state
@@ -26,12 +24,7 @@ export default function Index() {
 
   // Non-participants (coaches/regional managers) → Command Center
   if (showRegionalDashboard) {
-    return (
-      <>
-        <RegionalDashboard />
-        <SimFloatingButton isAdmin={user?.email === 'johno@reallygoodconsulting.org' || user?.email === 'ryanjoberly@gmail.com'} />
-      </>
-    );
+    return <RegionalDashboard />;
   }
 
   // Participants → Standard experience
@@ -54,8 +47,6 @@ export default function Index() {
           </p>
         </div>
       </div>
-      
-      <SimFloatingButton isAdmin={user?.email === 'johno@reallygoodconsulting.org' || user?.email === 'ryanjoberly@gmail.com'} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -8,12 +8,14 @@ import { useRoleRefresh } from '@/hooks/useRoleRefresh';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
-import { Home, BarChart3, User, Settings, Users, TrendingUp, Shield, BookOpen } from 'lucide-react';
+import { SimConsole } from '@/devtools/SimConsole';
+import { Home, BarChart3, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen } from 'lucide-react';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
   const { user, signOut, isCoach: authIsCoach, isSuperAdmin: authIsSuperAdmin, isOrgAdmin: authIsOrgAdmin, isLead: authIsLead, roleLoading, refreshRoles } = useAuth();
   const { overrides } = useSim();
+  const [isSimConsoleOpen, setIsSimConsoleOpen] = useState(false);
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   
   // When masquerading, use the simulated user's roles; otherwise use auth roles
@@ -53,7 +55,7 @@ export default function Layout() {
       { name: 'Coach', href: '/coach', icon: Users },
     ] : []),
     ...(canAccessAdmin ? [
-      { name: 'Builder', href: '/builder', icon: Settings },
+      { name: 'Builder', href: '/builder', icon: SettingsIcon },
       { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Eval Results', href: '/admin/eval-results', icon: TrendingUp }
     ] : [])
@@ -90,12 +92,24 @@ export default function Layout() {
             <header className="h-16 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 sticky top-0 z-10">
               <SidebarTrigger />
               
-              <NavLink to="/profile">
-                <Button variant="outline" size="icon">
-                  <User className="w-4 h-4" />
-                </Button>
-              </NavLink>
+              <div className="flex items-center gap-2">
+                {/* Sim console trigger - only for admins with dev tools enabled */}
+                {(user?.email === 'johno@reallygoodconsulting.org' || user?.email === 'ryanjoberly@gmail.com') && 
+                 import.meta.env.VITE_ENABLE_SIMTOOLS === 'true' && (
+                  <Button variant="ghost" size="icon" onClick={() => setIsSimConsoleOpen(true)}>
+                    <SettingsIcon className="w-4 h-4" />
+                  </Button>
+                )}
+                
+                <NavLink to="/profile">
+                  <Button variant="outline" size="icon">
+                    <User className="w-4 h-4" />
+                  </Button>
+                </NavLink>
+              </div>
             </header>
+            
+            <SimConsole isOpen={isSimConsoleOpen} onClose={() => setIsSimConsoleOpen(false)} />
             
             <main className="flex-1 p-6 overflow-auto w-full min-w-0">
               <Outlet />

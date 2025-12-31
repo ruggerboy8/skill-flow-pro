@@ -625,6 +625,15 @@ export async function computeWeekState(params: {
   // Check for selection pending
   const selectionPending = false; // Simplified for now
 
+  // Check if performance time gate is disabled
+  const { data: timeGateSetting } = await supabase
+    .from('app_kv')
+    .select('value')
+    .eq('key', 'global:performance_time_gate_enabled')
+    .maybeSingle();
+  
+  const isTimeGateEnabled = (timeGateSetting?.value as { enabled?: boolean } | null)?.enabled !== false;
+
   // State machine (no ISO, only tz-anchors):
 
   // Fully complete
@@ -644,6 +653,18 @@ export async function computeWeekState(params: {
         state: 'can_checkin',
         nextAction: 'Submit confidence',
         deadlineAt: checkin_due,
+        backlogCount,
+        selectionPending,
+        lastActivity,
+      };
+    }
+    // Conf is in - check if time gate is disabled
+    if (!isTimeGateEnabled) {
+      // Time gate disabled - allow immediate performance submission
+      return {
+        state: 'can_checkout',
+        nextAction: 'Submit performance',
+        deadlineAt: checkout_due,
         backlogCount,
         selectionPending,
         lastActivity,
@@ -716,8 +737,19 @@ export async function computeWeekState(params: {
     };
   }
 
-  // Fallback: if we've submitted confidence before Thu, keep it in wait_for_thu
+  // Fallback: if we've submitted confidence before Thu, check time gate
   if (confComplete && now < checkout_open) {
+    if (!isTimeGateEnabled) {
+      // Time gate disabled - allow immediate performance submission
+      return {
+        state: 'can_checkout',
+        nextAction: 'Submit performance',
+        deadlineAt: checkout_due,
+        backlogCount,
+        selectionPending,
+        lastActivity,
+      };
+    }
     return {
       state: 'wait_for_thu',
       nextAction: 'Performance opens Thursday',

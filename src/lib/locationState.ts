@@ -300,10 +300,10 @@ export async function assembleWeek(params: {
   console.info('[assembleWeek] Using weekly_assignments for Cycles 1-3: cycle=%d week=%d role=%d location=%s', 
     cycleNumber, weekInCycle, roleId, locationId);
 
-  // Calculate week_start_date from location's program start + cycle/week offset
+  // Get location timezone for calculating current week's Monday
   const { data: location } = await supabase
     .from('locations')
-    .select('program_start_date, cycle_length_weeks')
+    .select('timezone, cycle_length_weeks')
     .eq('id', locationId)
     .maybeSingle();
 
@@ -312,14 +312,16 @@ export async function assembleWeek(params: {
     return [];
   }
 
-  const programStart = new Date(location.program_start_date);
+  // Use current week's Monday (same approach as cycle 4+) instead of calculating from program_start_date
+  // This ensures we find assignments for new hires whose onboarding starts mid-location-cycle
+  const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
+    ? new Date(params.simOverrides.nowISO) 
+    : new Date();
+  const anchors = getWeekAnchors(now, location.timezone);
+  const weekStartStr = formatInTimeZone(anchors.mondayZ, location.timezone, 'yyyy-MM-dd');
   const cycleLength = location.cycle_length_weeks;
-  const weekOffset = (cycleNumber - 1) * cycleLength + (weekInCycle - 1);
-  const weekStartDate = new Date(programStart);
-  weekStartDate.setDate(weekStartDate.getDate() + weekOffset * 7);
-  const weekStartStr = weekStartDate.toISOString().split('T')[0];
 
-  console.info('[assembleWeek] Calculated week_start_date:', weekStartStr);
+  console.info('[assembleWeek] Using current Monday for onboarding lookup:', weekStartStr);
 
   const { data: weeklyAssignments } = await supabase
     .from('weekly_assignments')

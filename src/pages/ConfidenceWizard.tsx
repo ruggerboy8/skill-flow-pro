@@ -131,12 +131,21 @@ export default function ConfidenceWizard() {
   const loadData = async () => {
     if (!user) return;
 
+    // Support masquerade: if masqueradeStaffId is set, query by staff.id instead of user_id
+    const masqueradeStaffId = overrides.enabled ? overrides.masqueradeStaffId : null;
+
     // Load staff profile with location info
-    const { data: staffData, error: staffError } = await supabase
+    let queryBuilder = supabase
       .from('staff')
-      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks)')
-      .eq('user_id', user.id)
-      .single();
+      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks)');
+    
+    if (masqueradeStaffId) {
+      queryBuilder = queryBuilder.eq('id', masqueradeStaffId);
+    } else {
+      queryBuilder = queryBuilder.eq('user_id', user.id);
+    }
+
+    const { data: staffData, error: staffError } = await queryBuilder.single();
 
     if (staffError || !staffData) {
       navigate('/setup');

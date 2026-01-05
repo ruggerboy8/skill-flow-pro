@@ -83,35 +83,19 @@ export async function getLocationWeekContext(locationId: string, now: Date = new
 }
 
 /**
- * Check if staff member is eligible for pro moves based on hire date
- * Eligibility starts on the Monday on or after hire date
+ * Check if staff member is eligible for pro moves
+ * Always returns true - if someone has an account, they're eligible
  */
-export function isEligibleForProMoves(staff: { hire_date?: string | null }, now: Date = new Date()): boolean {
-  if (!staff.hire_date) return true; // Assume eligible if no hire date
-
-  const hireDate = new Date(staff.hire_date);
-  // Find the Monday on or after hire date
-  const dayOfWeek = hireDate.getDay();
-  const daysUntilMonday = dayOfWeek === 1 ? 0 : (8 - dayOfWeek) % 7;
-  const participationStart = new Date(hireDate.getTime() + (daysUntilMonday * 24 * 60 * 60 * 1000));
-  return now >= participationStart;
+export function isEligibleForProMoves(_staff: { hire_date?: string | null }, _now: Date = new Date()): boolean {
+  return true;
 }
 
 /**
  * Get number of weeks until eligibility for a staff member
+ * Always returns 0 - no grace period
  */
-export function getOnboardingWeeksLeft(staff: { hire_date?: string | null }, now: Date = new Date()): number {
-  if (!staff.hire_date) return 0;
-
-  const hireDate = new Date(staff.hire_date);
-  const dayOfWeek = hireDate.getDay();
-  const daysUntilMonday = dayOfWeek === 1 ? 0 : (8 - dayOfWeek) % 7;
-  const participationStart = new Date(hireDate.getTime() + (daysUntilMonday * 24 * 60 * 60 * 1000));
-  
-  if (now >= participationStart) return 0;
-  
-  const weeksLeft = Math.ceil((participationStart.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000));
-  return Math.max(0, weeksLeft);
+export function getOnboardingWeeksLeft(_staff: { hire_date?: string | null }, _now: Date = new Date()): number {
+  return 0;
 }
 
 /**

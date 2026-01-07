@@ -177,10 +177,10 @@ export default function PerformanceWizard() {
     // Support masquerade: if masqueradeStaffId is set, query by staff.id instead of user_id
     const masqueradeStaffId = overrides.enabled ? overrides.masqueradeStaffId : null;
 
-    // Load staff profile with location info (including timezone for time gating)
+    // Load staff profile with location info (including timezone for time gating and onboarding_active)
     let queryBuilder = supabase
       .from('staff')
-      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks, timezone)');
+      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks, timezone, onboarding_active)');
     
     if (masqueradeStaffId) {
       queryBuilder = queryBuilder.eq('id', masqueradeStaffId);
@@ -218,9 +218,13 @@ export default function PerformanceWizard() {
       console.log('Loading repair data for weekOf:', weekOf);
       
       // Try to use cycle/week if available, otherwise use weekOf to determine source
+      // Also check if location has onboarding disabled (skip onboarding mode)
+      const locationOnboardingActive = (staffData.locations as any)?.onboarding_active ?? true;
+      
       if (targetCycle !== null && targetWeek !== null && !isNaN(targetCycle) && !isNaN(targetWeek)) {
         // Have cycle/week - use them to determine source
-        const isOnboarding = targetCycle <= 3;
+        // But skip onboarding logic if onboarding is disabled
+        const isOnboarding = targetCycle <= 3 && locationOnboardingActive;
         
         if (isOnboarding) {
           // Query weekly_assignments for cycles 1-3

@@ -111,17 +111,23 @@ export async function assembleWeek(params: {
 }): Promise<any[]> {
   const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
-  // ----- GRADUATION CHECK: Cycle 4+ uses global plan -----
-  console.info(`[assembleWeek] cycle=${cycleNumber}, week=${weekInCycle}, using ${cycleNumber >= 4 ? 'weekly_assignments/weekly_plan' : 'weekly_focus'}`);
-  
-  if (cycleNumber >= 4) {
-    const { data: location } = await supabase
-      .from('locations')
-      .select('timezone, organization_id')
-      .eq('id', locationId)
-      .maybeSingle();
+  // Fetch location to check onboarding_active flag
+  const { data: locationData } = await supabase
+    .from('locations')
+    .select('timezone, organization_id, onboarding_active')
+    .eq('id', locationId)
+    .maybeSingle();
 
-    if (!location) return [];
+  if (!locationData) return [];
+
+  // Use global plan if cycle >= 4 OR onboarding is disabled
+  const useGlobalPlan = cycleNumber >= 4 || locationData.onboarding_active === false;
+
+  // ----- GRADUATION CHECK: Cycle 4+ OR skip onboarding uses global plan -----
+  console.info(`[assembleWeek] cycle=${cycleNumber}, week=${weekInCycle}, onboarding_active=${locationData.onboarding_active}, using ${useGlobalPlan ? 'weekly_assignments/weekly_plan' : 'weekly_focus'}`);
+  
+  if (useGlobalPlan) {
+    const location = locationData;
 
     const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
       ? new Date(params.simOverrides.nowISO) 
@@ -269,41 +275,39 @@ export async function assembleWeek(params: {
       console.info('[assembleWeek] Returning %d weekly_plan assignments', result.length);
       return result;
     } else {
-      console.warn('[assembleWeek] ❌ No global plan for Cycle 4+ (week %s, role %d) - found %d rows with error: %s', 
+      console.warn('[assembleWeek] ❌ No global plan for graduated location (week %s, role %d) - found %d rows with error: %s', 
         mondayStr, roleId, planData?.length || 0, planErr?.message || 'none');
       
-      // For Cycle 4+, if no plan data exists, return empty instead of falling back
-      if (cycleNumber >= 4) {
-        console.warn('[assembleWeek] No global plan for Cycle 4+ - returning empty assignments');
-        return [];
-      }
+      // For global plan mode, if no plan data exists, return empty instead of falling back
+      console.warn('[assembleWeek] No global plan for graduated location - returning empty assignments');
+      return [];
     }
   }
 
-  // ----- CYCLES 1-3: Use weekly_assignments with source='onboarding' -----
+  // ----- CYCLES 1-3 with onboarding enabled: Use weekly_assignments with source='onboarding' -----
   console.info('[assembleWeek] Using weekly_assignments for Cycles 1-3: cycle=%d week=%d role=%d location=%s', 
     cycleNumber, weekInCycle, roleId, locationId);
 
-  // Get location timezone for calculating current week's Monday
-  const { data: location } = await supabase
+  // We already have location data from above
+  const timezone = locationData.timezone;
+  const cycleLength = 6; // Default if not fetched
+
+  // Get cycle_length_weeks from a separate query if needed
+  const { data: locDetails } = await supabase
     .from('locations')
-    .select('timezone, cycle_length_weeks')
+    .select('cycle_length_weeks')
     .eq('id', locationId)
     .maybeSingle();
+  
+  const actualCycleLength = locDetails?.cycle_length_weeks || cycleLength;
 
-  if (!location) {
-    console.error('[assembleWeek] Location not found:', locationId);
-    return [];
-  }
-
-  // Use current week's Monday (same approach as cycle 4+) instead of calculating from program_start_date
+  // Use current week's Monday (same approach as global plan) instead of calculating from program_start_date
   // This ensures we find assignments for new hires whose onboarding starts mid-location-cycle
   const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
     ? new Date(params.simOverrides.nowISO) 
     : new Date();
-  const anchors = getWeekAnchors(now, location.timezone);
-  const weekStartStr = formatInTimeZone(anchors.mondayZ, location.timezone, 'yyyy-MM-dd');
-  const cycleLength = location.cycle_length_weeks;
+  const anchors = getWeekAnchors(now, timezone);
+  const weekStartStr = formatInTimeZone(anchors.mondayZ, timezone, 'yyyy-MM-dd');
 
   console.info('[assembleWeek] Using current Monday for onboarding lookup:', weekStartStr);
 

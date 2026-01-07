@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { CalendarIcon, Loader2, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +20,7 @@ interface Location {
   timezone: string;
   program_start_date: string;
   cycle_length_weeks: number;
+  onboarding_active?: boolean;
 }
 
 interface Organization {
@@ -53,6 +55,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
     timezone: "America/Chicago",
     program_start_date: new Date(),
     cycle_length_weeks: 6,
+    skipOnboarding: false,
   });
 
   const isEditing = !!location?.id;
@@ -70,6 +73,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         timezone: location.timezone,
         program_start_date: dateObj,
         cycle_length_weeks: location.cycle_length_weeks,
+        skipOnboarding: location.onboarding_active === false,
       });
     } else if (open) {
       setFormData({
@@ -78,6 +82,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         timezone: "America/Chicago",
         program_start_date: new Date(),
         cycle_length_weeks: 6,
+        skipOnboarding: false,
       });
     }
   }, [location, open]);
@@ -109,6 +114,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         program_start_date: formData.program_start_date.toISOString().split('T')[0],
         cycle_length_weeks: formData.cycle_length_weeks,
         active: true,
+        onboarding_active: !formData.skipOnboarding,
       };
 
       let error;
@@ -250,6 +256,29 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
             <p className="text-sm text-muted-foreground">
               Number of weeks in each program cycle (typically 6)
             </p>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="skip-onboarding" className="flex-1 cursor-pointer">
+                Skip Onboarding Sequence
+              </Label>
+              <Switch
+                id="skip-onboarding"
+                checked={formData.skipOnboarding}
+                onCheckedChange={(checked) => setFormData({ ...formData, skipOnboarding: checked })}
+              />
+            </div>
+            {formData.skipOnboarding && (
+              <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800">
+                  This location will use global weekly pro moves from day one instead of the 
+                  18-week onboarding curriculum (Cycles 1-3). Only enable for locations where 
+                  staff have prior experience with the program.
+                </p>
+              </div>
+            )}
           </div>
 
           {isEditing && (

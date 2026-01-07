@@ -14,7 +14,8 @@ export interface WeeklyAssignment {
 
 interface UseWeeklyAssignmentsParams {
   roleId: number | null | undefined;
-  cycleNumber?: number; // Optional: blocks global assignments for onboarding cycles
+  cycleNumber?: number; // Optional: blocks global assignments for onboarding cycles (unless onboarding is skipped)
+  onboardingActive?: boolean; // Optional: if false, skip the cycle < 4 check
   enabled?: boolean;
 }
 
@@ -25,17 +26,19 @@ interface UseWeeklyAssignmentsParams {
 export function useWeeklyAssignments({
   roleId,
   cycleNumber,
+  onboardingActive = true,
   enabled = true,
 }: UseWeeklyAssignmentsParams) {
   return useQuery({
-    queryKey: ['weekly-assignments', roleId, cycleNumber],
+    queryKey: ['weekly-assignments', roleId, cycleNumber, onboardingActive],
     queryFn: async () => {
       if (!roleId) {
         throw new Error('Role ID is required');
       }
 
-      // Safety check: Don't return global assignments for onboarding cycles (1-3)
-      if (cycleNumber !== undefined && cycleNumber < 4) {
+      // Safety check: Don't return global assignments for onboarding cycles (1-3) 
+      // UNLESS onboarding is disabled (skip onboarding mode)
+      if (cycleNumber !== undefined && cycleNumber < 4 && onboardingActive !== false) {
         console.warn('[useWeeklyAssignments] Blocked for onboarding cycle:', cycleNumber);
         return [];
       }

@@ -164,13 +164,15 @@ export default function ThisWeekPanel() {
       }
       
       // Compute current week state with simulation overrides (location-based unified)
+      // Pass staff.id for masquerade support - avoids re-fetching by user_id
       const context = await computeWeekState({
         userId: user.id,
         locationId: staff.primary_location_id!,
         roleId: staff.role_id!,
         now: effectiveNow,
         simOverrides: overrides.enabled ? overrides : undefined,
-        weekContext: { cycleNumber, weekInCycle }
+        weekContext: { cycleNumber, weekInCycle },
+        staffId: staff.id
       });
       console.log('Week context:', context);
       setWeekContext(context);

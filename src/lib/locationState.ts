@@ -483,8 +483,9 @@ export async function computeWeekState(params: {
   now?: Date;
   simOverrides?: any;
   weekContext?: { cycleNumber: number; weekInCycle: number };
+  staffId?: string; // Optional: pass staff.id directly for masquerade support
 }): Promise<StaffStatus> {
-  const { userId, locationId, now = new Date(), simOverrides, weekContext } = params;
+  const { userId, locationId, now = new Date(), simOverrides, weekContext, staffId: passedStaffId } = params;
 
   // 1) Location context (no ISO)
   const ctx = await getLocationWeekContext(locationId, now);
@@ -495,11 +496,18 @@ export async function computeWeekState(params: {
   const { checkin_open, checkin_due, checkout_open, checkout_due } = anchors;
 
   // Get staff information with org and timezone
-  const { data: staff } = await supabase
+  // Support masquerade: if staffId is passed, query by id; otherwise query by user_id
+  let staffQuery = supabase
     .from('staff')
-    .select('*, locations!inner(organization_id, timezone)')
-    .eq('user_id', userId)
-    .maybeSingle();
+    .select('*, locations!inner(organization_id, timezone)');
+  
+  if (passedStaffId) {
+    staffQuery = staffQuery.eq('id', passedStaffId);
+  } else {
+    staffQuery = staffQuery.eq('user_id', userId);
+  }
+  
+  const { data: staff } = await staffQuery.maybeSingle();
 
   if (!staff) {
     throw new Error('Staff member not found');

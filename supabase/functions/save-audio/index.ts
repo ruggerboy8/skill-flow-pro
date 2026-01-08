@@ -39,12 +39,14 @@ serve(async (req) => {
 
     const { data: staffData } = await supabase
       .from('staff')
-      .select('is_super_admin')
+      .select('is_super_admin, is_coach, is_org_admin')
       .eq('user_id', user.id)
       .single();
 
-    if (!staffData?.is_super_admin) {
-      return new Response(JSON.stringify({ error: 'Forbidden: Super admin required' }), {
+    // Allow super admins, coaches, and org admins
+    const hasAccess = staffData?.is_super_admin || staffData?.is_coach || staffData?.is_org_admin;
+    if (!hasAccess) {
+      return new Response(JSON.stringify({ error: 'Forbidden: Admin or coach access required' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

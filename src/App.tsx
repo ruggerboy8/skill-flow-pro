@@ -42,6 +42,7 @@ import StatsPriorityFocus from "@/pages/stats/StatsPriorityFocus";
 import StatsScores from "@/pages/StatsScores";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
+import RegionalDashboard from "@/pages/dashboard/RegionalDashboard";
 
 // My Role pages
 import MyRoleLayout from "@/pages/my-role/MyRoleLayout";
@@ -125,6 +126,7 @@ function AppRoutes() {
         </Route>
 
         {/* Dashboard Routes */}
+        <Route path="dashboard" element={<RegionalDashboard />} />
         <Route path="dashboard/location/:locationId" element={<LocationDetail />} />
 
         <Route path="admin" element={<AdminPage />} />

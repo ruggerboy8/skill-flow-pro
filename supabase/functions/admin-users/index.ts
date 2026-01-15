@@ -300,6 +300,11 @@ serve(async (req: Request) => {
           return json({ error: "user_id and preset required" }, 400);
         }
         
+        // Only super admins can create other super admins
+        if (preset === "super_admin" && !me.is_super_admin) {
+          return json({ error: "Only super admins can grant super admin privileges" }, 403);
+        }
+        
         // Get current staff record
         const { data: currentStaff, error: fetchErr } = await admin
           .from("staff")

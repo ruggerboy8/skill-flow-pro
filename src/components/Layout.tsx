@@ -10,7 +10,7 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
-import { Home, BarChart3, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen } from 'lucide-react';
+import { Home, BarChart3, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2 } from 'lucide-react';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -59,6 +59,9 @@ export default function Layout() {
       { name: 'Builder', href: '/builder', icon: SettingsIcon },
       { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Eval Results', href: '/admin/eval-results', icon: TrendingUp }
+    ] : []),
+    ...(isSuperAdmin ? [
+      { name: 'Command Center', href: '/dashboard', icon: Building2 }
     ] : [])
   ];
 

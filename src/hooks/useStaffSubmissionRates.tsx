@@ -53,7 +53,9 @@ export function useStaffSubmissionRates(staffIds: string[]): UseStaffSubmissionR
               return { staffId, rate: 0 };
             }
 
-            // Group by week to track conf/perf submissions per week
+            // Only count windows that are past due (matches OnTimeRateWidget logic)
+            const now = new Date();
+            const pastDueWindows = data.filter((w: any) => new Date(w.due_at) <= now);
             // This matches the OnTimeRateWidget logic - each week has 1 conf + 1 perf expected
             const weekMetricMap = new Map<string, { 
               conf_submitted: boolean;
@@ -62,7 +64,7 @@ export function useStaffSubmissionRates(staffIds: string[]): UseStaffSubmissionR
               perf_exists: boolean;
             }>();
             
-            data.forEach((row: any) => {
+            pastDueWindows.forEach((row: any) => {
               const key = row.week_of;
               if (!weekMetricMap.has(key)) {
                 weekMetricMap.set(key, { 

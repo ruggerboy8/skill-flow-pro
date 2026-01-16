@@ -136,7 +136,9 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
       const missing = totalExpected - completed;
 
       const completionRate = totalExpected > 0 ? (completed / totalExpected) * 100 : 0;
-      const onTimeRate = completed > 0 ? (onTime / completed) * 100 : 0;
+      // On-time rate should reflect on-time submissions out of TOTAL expected, not just completed
+      // This makes missing submissions count against the on-time rate
+      const onTimeRate = totalExpected > 0 ? (onTime / totalExpected) * 100 : 0;
 
       setStats({
         totalSubmissions: totalExpected,

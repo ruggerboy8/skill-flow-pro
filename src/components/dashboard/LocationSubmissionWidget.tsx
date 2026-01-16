@@ -24,8 +24,8 @@ interface LocationSubmissionStats {
 }
 
 const TIME_FILTER_LABELS: Record<TimeFilter, string> = {
-  '3weeks': 'Last 3 Weeks',
-  '6weeks': 'Last 6 Weeks',
+  '3weeks': 'Previous 3 Weeks',
+  '6weeks': 'Previous 6 Weeks',
   'all': 'All Time',
 };
 
@@ -303,6 +303,11 @@ export default function LocationSubmissionWidget({ locationId }: LocationSubmiss
       {stats && stats.totalSubmissions === 0 && (
         <p className="text-xs text-muted-foreground mt-2">No submissions found for this period.</p>
       )}
+
+      {/* Disclaimer */}
+      <p className="text-[10px] italic text-muted-foreground mt-3">
+        *Excludes current week — assignments not yet due.
+      </p>
     </div>
   );
 }

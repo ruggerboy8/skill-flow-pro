@@ -16,6 +16,9 @@ import { StaffWeekSummary } from '@/types/coachV2';
 import ReminderComposer from '@/components/coach/ReminderComposer';
 import { getChicagoMonday } from '@/lib/plannerUtils';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { useStaffSubmissionRates } from '@/hooks/useStaffSubmissionRates';
+import { useTableSort } from '@/hooks/useTableSort';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 
 interface CoachDashboardProps {
   forcedLocationId?: string;        // Locks to specific location by UUID
@@ -157,9 +160,30 @@ export default function CoachDashboardV2({
     return filtered;
   }, [summaries, selectedOrganizations, selectedLocations, selectedRoles, search, forcedLocationId]);
 
-  // Sort: missing both → missing conf → missing perf → complete, then A-Z
+  // Fetch 6-week submission rates for all visible staff
+  const staffIds = useMemo(() => filteredSummaries.map(s => s.staff_id), [filteredSummaries]);
+  const { rates: submissionRates, loading: ratesLoading } = useStaffSubmissionRates(staffIds);
+
+  // Extend summaries with 6-week submission rate for sorting
+  const extendedSummaries = useMemo(() => {
+    return filteredSummaries.map(s => ({
+      ...s,
+      sixWeekRate: submissionRates.get(s.staff_id) ?? null,
+    }));
+  }, [filteredSummaries, submissionRates]);
+
+  // Use table sort hook for sortable columns
+  const { sortedData, sortConfig, handleSort } = useTableSort(extendedSummaries);
+
+  // Default sort: missing both → missing conf → missing perf → complete, then A-Z
+  // Only apply default sort when no explicit sort is selected
   const sortedRows = useMemo(() => {
-    return [...filteredSummaries].sort((a, b) => {
+    if (sortConfig.key && sortConfig.order !== null) {
+      return sortedData;
+    }
+    
+    // Default priority-based sort
+    return [...extendedSummaries].sort((a, b) => {
       const aHasConf = a.conf_count === a.assignment_count;
       const aHasPerf = a.perf_count === a.assignment_count;
       const bHasConf = b.conf_count === b.assignment_count;
@@ -178,7 +202,7 @@ export default function CoachDashboardV2({
       if (aPriority !== bPriority) return aPriority - bPriority;
       return a.staff_name.localeCompare(b.staff_name);
     });
-  }, [filteredSummaries]);
+  }, [extendedSummaries, sortedData, sortConfig]);
 
   // Persist filters to URL
   useEffect(() => {
@@ -420,9 +444,25 @@ export default function CoachDashboardV2({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10"></TableHead>
-                  <TableHead>Name</TableHead>
+                  <SortableTableHead
+                    sortKey="staff_name"
+                    currentSortKey={sortConfig.key}
+                    sortOrder={sortConfig.order}
+                    onSort={handleSort}
+                  >
+                    Name
+                  </SortableTableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Location</TableHead>
+                  <SortableTableHead
+                    sortKey="sixWeekRate"
+                    currentSortKey={sortConfig.key}
+                    sortOrder={sortConfig.order}
+                    onSort={handleSort}
+                    className="text-center"
+                  >
+                    6 wk Submission
+                  </SortableTableHead>
                   <TableHead className="text-center">Confidence</TableHead>
                   <TableHead className="text-center">Performance</TableHead>
                 </TableRow>
@@ -432,6 +472,15 @@ export default function CoachDashboardV2({
                   const isExpanded = expandedRows.has(row.staff_id);
                   const hasAllConf = row.conf_count === row.assignment_count;
                   const hasAllPerf = row.perf_count === row.assignment_count;
+                  const sixWeekRate = row.sixWeekRate;
+                  
+                  // Determine color based on rate
+                  const getRateColor = (rate: number | null) => {
+                    if (rate === null) return 'text-muted-foreground';
+                    if (rate >= 90) return 'text-green-600';
+                    if (rate >= 70) return 'text-yellow-600';
+                    return 'text-red-600';
+                  };
                   
                   return (
                     <Collapsible key={row.staff_id} open={isExpanded} onOpenChange={() => toggleExpanded(row.staff_id)} asChild>
@@ -450,6 +499,13 @@ export default function CoachDashboardV2({
                           <TableCell className="font-medium">{row.staff_name}</TableCell>
                           <TableCell>{row.role_name}</TableCell>
                           <TableCell>{row.location_name}</TableCell>
+                          <TableCell className={`text-center font-medium ${getRateColor(sixWeekRate)}`}>
+                            {ratesLoading || sixWeekRate === null ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              `${Math.round(sixWeekRate)}%`
+                            )}
+                          </TableCell>
                           <TableCell className="text-center">
                             <StatusPill
                               hasAll={hasAllConf}
@@ -465,7 +521,7 @@ export default function CoachDashboardV2({
                         </TableRow>
                         {isExpanded && (
                           <TableRow>
-                            <TableCell colSpan={7} className="bg-muted/30">
+                            <TableCell colSpan={8} className="bg-muted/30">
                               <CollapsibleContent>
                                 <div className="p-4 space-y-2">
                                   <h4 className="font-semibold text-sm">Raw Scores Detail</h4>

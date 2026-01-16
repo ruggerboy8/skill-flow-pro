@@ -53,18 +53,56 @@ export function useStaffSubmissionRates(staffIds: string[]): UseStaffSubmissionR
               return { staffId, rate: 0 };
             }
 
-            // Group by week + metric to get unique submission windows
-            const windowMap = new Map<string, { submitted: boolean }>();
+            // Group by week to track conf/perf submissions per week
+            // This matches the OnTimeRateWidget logic - each week has 1 conf + 1 perf expected
+            const weekMetricMap = new Map<string, { 
+              conf_submitted: boolean;
+              perf_submitted: boolean;
+              conf_exists: boolean;
+              perf_exists: boolean;
+            }>();
             
             data.forEach((row: any) => {
-              const key = `${row.week_of}-${row.slot_index}-${row.metric}`;
-              if (!windowMap.has(key)) {
-                windowMap.set(key, { submitted: row.status === 'submitted' });
+              const key = row.week_of;
+              if (!weekMetricMap.has(key)) {
+                weekMetricMap.set(key, { 
+                  conf_submitted: false, 
+                  perf_submitted: false,
+                  conf_exists: false, 
+                  perf_exists: false 
+                });
+              }
+              const weekData = weekMetricMap.get(key)!;
+              
+              if (row.metric === 'confidence') {
+                weekData.conf_exists = true;
+                // Late submissions still count as submitted
+                if (row.status === 'submitted') {
+                  weekData.conf_submitted = true;
+                }
+              } else if (row.metric === 'performance') {
+                weekData.perf_exists = true;
+                if (row.status === 'submitted') {
+                  weekData.perf_submitted = true;
+                }
               }
             });
 
-            const totalExpected = windowMap.size;
-            const completed = Array.from(windowMap.values()).filter(w => w.submitted).length;
+            // Calculate totals
+            let totalExpected = 0;
+            let completed = 0;
+            
+            weekMetricMap.forEach((weekData) => {
+              if (weekData.conf_exists) {
+                totalExpected++;
+                if (weekData.conf_submitted) completed++;
+              }
+              if (weekData.perf_exists) {
+                totalExpected++;
+                if (weekData.perf_submitted) completed++;
+              }
+            });
+
             const rate = totalExpected > 0 ? (completed / totalExpected) * 100 : 100;
 
             return { staffId, rate };

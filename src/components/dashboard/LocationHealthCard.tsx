@@ -52,6 +52,9 @@ export function LocationHealthCard({ stats }: LocationHealthCardProps) {
             </div>
           </div>
           <div className="text-right">
+            <div className="text-[10px] text-primary font-medium mb-0.5 uppercase tracking-wide">
+              This Week
+            </div>
             <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
               {Math.round(stats.submissionRate)}%
             </div>

@@ -8,6 +8,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { LocationHealthCard, LocationStats } from '@/components/dashboard/LocationHealthCard';
 import { LocationSkillGaps } from '@/components/dashboard/LocationSkillGaps';
+import LocationSubmissionWidget from '@/components/dashboard/LocationSubmissionWidget';
 import CoachDashboardV2 from '@/pages/coach/CoachDashboardV2';
 import { getWeekAnchors, nowUtc, CT_TZ } from '@/lib/centralTime';
 import { getSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
@@ -106,8 +107,8 @@ export default function LocationDetail() {
           </p>
         </div>
 
-        {/* Top Row: Health Card + Skill Gaps */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Top Row: Health Card + Historical Widget */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Health Card - click disabled */}
           <div className="pointer-events-none">
             {locationStats ? (
@@ -121,10 +122,15 @@ export default function LocationDetail() {
             )}
           </div>
           
-          {/* Skill Gaps Panel */}
-          <div className="lg:col-span-2">
-            {locationId && <LocationSkillGaps locationId={locationId} />}
+          {/* Historical Submission Widget */}
+          <div>
+            {locationId && <LocationSubmissionWidget locationId={locationId} />}
           </div>
+        </div>
+
+        {/* Skill Gaps Panel */}
+        <div>
+          {locationId && <LocationSkillGaps locationId={locationId} />}
         </div>
 
         {/* Staff Roster - Embedded Coach Dashboard */}

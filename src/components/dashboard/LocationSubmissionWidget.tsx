@@ -1,23 +1,18 @@
 import { useState, useEffect } from 'react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
-import { Clock, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Clock, TrendingUp, AlertCircle, CheckCircle2, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-interface OnTimeRateWidgetProps {
-  staffId: string;
+interface LocationSubmissionWidgetProps {
+  locationId: string;
 }
 
 type TimeFilter = '3weeks' | '6weeks' | 'all';
 
-const TIME_FILTER_LABELS: Record<TimeFilter, string> = {
-  '3weeks': 'Last 3 Weeks',
-  '6weeks': 'Last 6 Weeks',
-  'all': 'All Time',
-};
-
-interface SubmissionStats {
+interface LocationSubmissionStats {
+  staffCount: number;
   totalSubmissions: number;
   completedSubmissions: number;
   completionRate: number;
@@ -27,18 +22,51 @@ interface SubmissionStats {
   missing: number;
 }
 
-export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
+const TIME_FILTER_LABELS: Record<TimeFilter, string> = {
+  '3weeks': 'Last 3 Weeks',
+  '6weeks': 'Last 6 Weeks',
+  'all': 'All Time',
+};
+
+export default function LocationSubmissionWidget({ locationId }: LocationSubmissionWidgetProps) {
   const [filter, setFilter] = useState<TimeFilter>('6weeks');
-  const [stats, setStats] = useState<SubmissionStats | null>(null);
+  const [stats, setStats] = useState<LocationSubmissionStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadStats();
-  }, [staffId, filter]);
+  }, [locationId, filter]);
 
   const loadStats = async () => {
     setLoading(true);
     try {
+      // First, get all active staff for this location
+      // Cast to any to avoid TS2589 deep type instantiation error with Supabase client
+      const staffResult = await (supabase as any)
+        .from('staff')
+        .select('id')
+        .eq('location_id', locationId)
+        .eq('is_active', true);
+      
+      if (staffResult.error) throw staffResult.error;
+
+      const staffIds: string[] = ((staffResult.data || []) as { id: string }[]).map((s) => s.id);
+      
+      if (staffIds.length === 0) {
+        setStats({
+          staffCount: 0,
+          totalSubmissions: 0,
+          completedSubmissions: 0,
+          completionRate: 0,
+          onTimeSubmissions: 0,
+          onTimeRate: 0,
+          late: 0,
+          missing: 0,
+        });
+        setLoading(false);
+        return;
+      }
+
       // Calculate cutoff date based on filter
       let cutoffDate: string | null = null;
       if (filter === '3weeks') {
@@ -51,102 +79,110 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
         cutoffDate = date.toISOString().split('T')[0];
       }
 
-      // Call RPC to get all submission windows (including missing)
-      const { data, error } = await supabase.rpc('get_staff_submission_windows', {
-        p_staff_id: staffId,
-        p_since: cutoffDate,
-      });
-
-      console.debug('OnTimeRateWidget: submission windows', {
-        staffId,
-        cutoffDate,
-        rowCount: data?.length || 0,
-        error: error?.message,
-        sampleRow: data?.[0]
-      });
-
-      if (error) throw error;
-
+      // Aggregate stats across all staff
       const now = new Date();
-      const windows = data ?? [];
-      const pastDueWindows = windows.filter((w: any) => new Date(w.due_at) <= now);
+      let totalConfTotal = 0, totalConfCompleted = 0, totalConfOnTime = 0;
+      let totalPerfTotal = 0, totalPerfCompleted = 0, totalPerfOnTime = 0;
 
-      // Group by week_of and metric
-      const weekMetricMap = new Map<string, { 
-        conf_submitted: boolean, 
-        perf_submitted: boolean, 
-        conf_on_time: boolean, 
-        perf_on_time: boolean,
-        conf_exists: boolean, 
-        perf_exists: boolean 
-      }>();
-      
-      pastDueWindows.forEach((w: any) => {
-        const key = w.week_of;
-        if (!weekMetricMap.has(key)) {
-          weekMetricMap.set(key, { 
-            conf_submitted: false, 
-            perf_submitted: false, 
-            conf_on_time: false, 
-            perf_on_time: false,
-            conf_exists: false, 
-            perf_exists: false 
+      // Batch fetch in parallel (limit concurrency to avoid overwhelming API)
+      const batchSize = 20;
+      for (let i = 0; i < staffIds.length; i += batchSize) {
+        const batch = staffIds.slice(i, i + batchSize);
+        const results = await Promise.all(
+          batch.map(async (staffId) => {
+            const { data, error } = await supabase.rpc('get_staff_submission_windows', {
+              p_staff_id: staffId,
+              p_since: cutoffDate,
+            });
+            
+            if (error) {
+              console.error('Error fetching windows for staff', staffId, error);
+              return null;
+            }
+            return data || [];
+          })
+        );
+
+        // Process each staff's data
+        results.forEach((windows) => {
+          if (!windows) return;
+          
+          const pastDueWindows = windows.filter((w: any) => new Date(w.due_at) <= now);
+          
+          // Group by week_of
+          const weekMetricMap = new Map<string, { 
+            conf_submitted: boolean;
+            perf_submitted: boolean;
+            conf_on_time: boolean;
+            perf_on_time: boolean;
+            conf_exists: boolean;
+            perf_exists: boolean;
+          }>();
+          
+          pastDueWindows.forEach((w: any) => {
+            const key = w.week_of;
+            if (!weekMetricMap.has(key)) {
+              weekMetricMap.set(key, { 
+                conf_submitted: false, 
+                perf_submitted: false, 
+                conf_on_time: false, 
+                perf_on_time: false,
+                conf_exists: false, 
+                perf_exists: false 
+              });
+            }
+            const weekData = weekMetricMap.get(key)!;
+            
+            if (w.metric === 'confidence') {
+              weekData.conf_exists = true;
+              if (w.status === 'submitted') {
+                weekData.conf_submitted = true;
+                if (w.on_time === true) {
+                  weekData.conf_on_time = true;
+                }
+              }
+            } else if (w.metric === 'performance') {
+              weekData.perf_exists = true;
+              if (w.status === 'submitted') {
+                weekData.perf_submitted = true;
+                if (w.on_time === true) {
+                  weekData.perf_on_time = true;
+                }
+              }
+            }
           });
-        }
-        const weekData = weekMetricMap.get(key)!;
-        
-        if (w.metric === 'confidence') {
-          weekData.conf_exists = true;
-          if (w.status === 'submitted') {
-            weekData.conf_submitted = true;
-            if (w.on_time === true) {
-              weekData.conf_on_time = true;
-            }
-          }
-        } else if (w.metric === 'performance') {
-          weekData.perf_exists = true;
-          if (w.status === 'submitted') {
-            weekData.perf_submitted = true;
-            if (w.on_time === true) {
-              weekData.perf_on_time = true;
-            }
-          }
-        }
-      });
 
-      // Calculate week-level stats
-      let confCompleted = 0, confOnTime = 0, confTotal = 0;
-      let perfCompleted = 0, perfOnTime = 0, perfTotal = 0;
-      
-      weekMetricMap.forEach((weekData) => {
-        if (weekData.conf_exists) {
-          confTotal++;
-          if (weekData.conf_submitted) {
-            confCompleted++;
-            if (weekData.conf_on_time) confOnTime++;
-          }
-        }
-        if (weekData.perf_exists) {
-          perfTotal++;
-          if (weekData.perf_submitted) {
-            perfCompleted++;
-            if (weekData.perf_on_time) perfOnTime++;
-          }
-        }
-      });
+          // Aggregate this staff's stats
+          weekMetricMap.forEach((weekData) => {
+            if (weekData.conf_exists) {
+              totalConfTotal++;
+              if (weekData.conf_submitted) {
+                totalConfCompleted++;
+                if (weekData.conf_on_time) totalConfOnTime++;
+              }
+            }
+            if (weekData.perf_exists) {
+              totalPerfTotal++;
+              if (weekData.perf_submitted) {
+                totalPerfCompleted++;
+                if (weekData.perf_on_time) totalPerfOnTime++;
+              }
+            }
+          });
+        });
+      }
 
-      const totalExpected = confTotal + perfTotal;
-      const completed = confCompleted + perfCompleted;
-      const onTime = confOnTime + perfOnTime;
+      const totalExpected = totalConfTotal + totalPerfTotal;
+      const completed = totalConfCompleted + totalPerfCompleted;
+      const onTime = totalConfOnTime + totalPerfOnTime;
       const late = completed - onTime;
       const missing = totalExpected - completed;
 
       const completionRate = totalExpected > 0 ? (completed / totalExpected) * 100 : 0;
-      // On-time rate should reflect on-time submissions out of TOTAL expected, not just completed
-      // This makes missing submissions count against the on-time rate
       const onTimeRate = totalExpected > 0 ? (onTime / totalExpected) * 100 : 0;
 
       setStats({
+        staffCount: staffIds.length,
         totalSubmissions: totalExpected,
         completedSubmissions: completed,
         completionRate,
@@ -156,8 +192,9 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
         missing
       });
     } catch (error) {
-      console.error('Error loading on-time stats:', error);
+      console.error('Error loading location submission stats:', error);
       setStats({ 
+        staffCount: 0,
         totalSubmissions: 0, 
         completedSubmissions: 0, 
         completionRate: 0, 
@@ -184,7 +221,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
   };
 
   if (loading) {
-    return <Skeleton className="h-24 w-full rounded-2xl bg-white/40 dark:bg-slate-800/40" />;
+    return <Skeleton className="h-32 w-full rounded-2xl bg-white/40 dark:bg-slate-800/40" />;
   }
 
   const rate = stats?.completionRate || 0;
@@ -196,9 +233,12 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
     )}>
       {/* Header Row */}
       <div className="flex items-center justify-between gap-4 mb-1">
-        <span className="text-xs font-medium text-muted-foreground">
-          {TIME_FILTER_LABELS[filter]}
-        </span>
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground">
+            {stats?.staffCount || 0} Staff • {TIME_FILTER_LABELS[filter]}
+          </span>
+        </div>
         <ToggleGroup 
           type="single" 
           value={filter} 
@@ -213,7 +253,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
       </div>
 
       {/* Main Stats */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 mt-2">
         <div className={cn(
           "flex items-center justify-center w-10 h-10 rounded-full",
           rate >= 90 ? "bg-emerald-100 dark:bg-emerald-900/50" : 
@@ -223,7 +263,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
           <TrendingUp className={cn("w-5 h-5", getHealthColor(rate))} />
         </div>
         <div>
-          <p className="text-xs text-muted-foreground font-medium">Completion Rate</p>
+          <p className="text-xs text-muted-foreground font-medium">Location Completion Rate</p>
           <div className="flex items-baseline gap-2">
             <span className={cn("text-2xl font-bold", getHealthColor(rate))}>
               {stats?.completionRate.toFixed(0)}%

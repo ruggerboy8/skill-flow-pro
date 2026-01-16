@@ -90,9 +90,31 @@ export default function PerformanceWizard() {
   // Parse repair mode parameters
   const qs = new URLSearchParams(location.search);
   const isRepair = qs.get("mode") === "repair";
+  const weekOf = qs.get("weekOf");
   const repairCycle = qs.get("cycle");
   const repairWeek = qs.get("wk");
   const returnTo = qs.get("returnTo");
+  
+  // Create storage key for persisting wizard state across navigation
+  // Include weekOf or a current week identifier to prevent stale data
+  const weekContext = isRepair ? weekOf : 'current';
+  const scoresStorageKey = user?.id ? `performance-scores-${user.id}-${weekContext}` : null;
+
+  // Restore scores from sessionStorage on mount
+  useEffect(() => {
+    if (scoresStorageKey) {
+      const storedScores = sessionStorage.getItem(scoresStorageKey);
+      if (storedScores) {
+        try {
+          const parsed = JSON.parse(storedScores);
+          console.log('Restoring performance scores from sessionStorage:', parsed);
+          setPerformanceScores(parsed);
+        } catch (e) {
+          console.error('Failed to parse stored performance scores:', e);
+        }
+      }
+    }
+  }, [scoresStorageKey]);
   
   // Immediate debug logging
   console.log('PerformanceWizard - Raw URL params:', { 
@@ -700,6 +722,11 @@ export default function PerformanceWizard() {
       });
     }
     
+    // Clear sessionStorage on successful submission
+    if (scoresStorageKey) {
+      sessionStorage.removeItem(scoresStorageKey);
+    }
+    
     // Navigate based on mode
     if (isRepair && returnTo) {
       const dest = decodeURIComponent(returnTo);
@@ -714,10 +741,16 @@ export default function PerformanceWizard() {
 
   const handleScoreChange = (score: number) => {
     if (!currentFocus) return;
-    setPerformanceScores(prev => ({
-      ...prev,
+    const newScores = {
+      ...performanceScores,
       [currentFocus.id]: score
-    }));
+    };
+    setPerformanceScores(newScores);
+    
+    // Persist to sessionStorage
+    if (scoresStorageKey) {
+      sessionStorage.setItem(scoresStorageKey, JSON.stringify(newScores));
+    }
   };
 
   const getConfidenceScore = (focusId: string) => {

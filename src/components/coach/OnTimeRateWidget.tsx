@@ -28,7 +28,7 @@ interface SubmissionStats {
 }
 
 export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
-  const [filter, setFilter] = useState<TimeFilter>('6weeks');
+  const [filter, setFilter] = useState<TimeFilter>('all');
   const [stats, setStats] = useState<SubmissionStats | null>(null);
   const [loading, setLoading] = useState(true);
 

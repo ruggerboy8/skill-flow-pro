@@ -75,6 +75,43 @@ export default function ConfidenceWizard() {
   // Parse repair mode parameters
   const qs = new URLSearchParams(location.search);
   const isRepair = qs.get("mode") === "repair";
+  const weekOf = qs.get("weekOf");
+  
+  // Create storage keys for persisting wizard state across navigation
+  // Include weekOf or a current week identifier to prevent stale data
+  const weekContext = isRepair ? weekOf : 'current';
+  const scoresStorageKey = user?.id ? `confidence-scores-${user.id}-${weekContext}` : null;
+  const selectionsStorageKey = user?.id ? `confidence-selections-${user.id}-${weekContext}` : null;
+
+  // Restore scores and selections from sessionStorage on mount
+  useEffect(() => {
+    if (scoresStorageKey) {
+      const storedScores = sessionStorage.getItem(scoresStorageKey);
+      if (storedScores) {
+        try {
+          const parsed = JSON.parse(storedScores);
+          console.log('Restoring scores from sessionStorage:', parsed);
+          setScores(parsed);
+        } catch (e) {
+          console.error('Failed to parse stored scores:', e);
+        }
+      }
+    }
+    if (selectionsStorageKey) {
+      const storedSelections = sessionStorage.getItem(selectionsStorageKey);
+      if (storedSelections) {
+        try {
+          const parsed = JSON.parse(storedSelections);
+          console.log('Restoring selections from sessionStorage:', parsed);
+          setSelectedActions(parsed);
+        } catch (e) {
+          console.error('Failed to parse stored selections:', e);
+        }
+      }
+    }
+  }, [scoresStorageKey, selectionsStorageKey]);
+
+  // Additional repair mode parameters
   const repairCycle = qs.get("cycle");
   const repairWeek = qs.get("wk");
   const returnTo = qs.get("returnTo");
@@ -727,6 +764,14 @@ export default function ConfidenceWizard() {
       console.log('Immediate submission failed, retries queued in background');
     }
     
+    // Clear sessionStorage on successful submission
+    if (scoresStorageKey) {
+      sessionStorage.removeItem(scoresStorageKey);
+    }
+    if (selectionsStorageKey) {
+      sessionStorage.removeItem(selectionsStorageKey);
+    }
+    
     setSubmitting(false);
     
     // Always navigate - data will be saved via background retries if immediate attempt failed
@@ -749,10 +794,30 @@ export default function ConfidenceWizard() {
 
   const handleScoreChange = (score: number) => {
     if (!currentFocus) return;
-    setScores(prev => ({
-      ...prev,
+    const newScores = {
+      ...scores,
       [currentFocus.id]: score
-    }));
+    };
+    setScores(newScores);
+    
+    // Persist to sessionStorage
+    if (scoresStorageKey) {
+      sessionStorage.setItem(scoresStorageKey, JSON.stringify(newScores));
+    }
+  };
+  
+  const handleSelectionChange = (focusId: string, value: string) => {
+    console.log(`Selection changed for focus ${focusId}: ${value}`);
+    const newSelections = {
+      ...selectedActions,
+      [focusId]: value
+    };
+    setSelectedActions(newSelections);
+    
+    // Persist to sessionStorage
+    if (selectionsStorageKey) {
+      sessionStorage.setItem(selectionsStorageKey, JSON.stringify(newSelections));
+    }
   };
 
   if (loading) {
@@ -847,13 +912,7 @@ export default function ConfidenceWizard() {
                 </Label>
                 <Select
                   value={selectedActions[currentFocus.id] || ""}
-                  onValueChange={(value) => {
-                    console.log(`Selection changed for focus ${currentFocus.id}: ${value}`);
-                    setSelectedActions(prev => ({
-                      ...prev,
-                      [currentFocus.id]: value
-                    }));
-                  }}
+                  onValueChange={(value) => handleSelectionChange(currentFocus.id, value)}
                 >
                   <SelectTrigger className="w-full bg-white dark:bg-slate-700">
                     <SelectValue placeholder="Choose a Pro Move..." />

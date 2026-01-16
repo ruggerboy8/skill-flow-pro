@@ -212,14 +212,14 @@ export default function LocationSubmissionWidget({ locationId }: LocationSubmiss
   };
 
   const getHealthColor = (rate: number) => {
-    if (rate >= 90) return 'text-emerald-600 dark:text-emerald-400';
-    if (rate >= 75) return 'text-amber-600 dark:text-amber-400';
+    if (rate >= 80) return 'text-emerald-600 dark:text-emerald-400';
+    if (rate >= 60) return 'text-amber-600 dark:text-amber-400';
     return 'text-rose-600 dark:text-rose-400';
   };
 
   const getHealthBg = (rate: number) => {
-    if (rate >= 90) return 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/50 dark:border-emerald-800/50';
-    if (rate >= 75) return 'bg-amber-50 dark:bg-amber-950/30 border-amber-200/50 dark:border-amber-800/50';
+    if (rate >= 80) return 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/50 dark:border-emerald-800/50';
+    if (rate >= 60) return 'bg-amber-50 dark:bg-amber-950/30 border-amber-200/50 dark:border-amber-800/50';
     return 'bg-rose-50 dark:bg-rose-950/30 border-rose-200/50 dark:border-rose-800/50';
   };
 

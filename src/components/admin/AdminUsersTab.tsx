@@ -15,6 +15,7 @@ import { EditUserDrawer } from "./EditUserDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 interface User {
   staff_id: string;
@@ -235,20 +236,40 @@ const handleResetPassword = async (user: User) => {
     return <Badge variant="default">Active</Badge>;
   };
 
-  const getRoleBadge = (user: User) => {
+  const getRoleIndicators = (user: User) => {
+    const indicators: Array<{ abbr: string; label: string; color: string }> = [];
+    
     if (user.is_super_admin) {
-      return <Badge variant="destructive" className="text-xs shrink-0">Super</Badge>;
+      indicators.push({ abbr: 'SA', label: 'Super Admin', color: 'bg-red-500 text-white' });
     }
-    if (user.is_coach && user.is_participant) {
-      return <Badge variant="secondary" className="text-xs shrink-0">Coach + Participant</Badge>;
+    if (user.coach_scope_type === 'org') {
+      indicators.push({ abbr: 'RM', label: 'Regional Manager', color: 'bg-purple-500 text-white' });
     }
-    if (user.is_coach) {
-      return <Badge variant="secondary" className="text-xs shrink-0">Coach</Badge>;
+    if (user.is_coach && user.coach_scope_type !== 'org') {
+      indicators.push({ abbr: 'C', label: 'Coach', color: 'bg-blue-500 text-white' });
     }
     if (user.is_lead) {
-      return <Badge variant="outline" className="text-xs shrink-0">Lead RDA</Badge>;
+      indicators.push({ abbr: 'L', label: 'Lead', color: 'bg-green-600 text-white' });
     }
-    return null;
+    
+    if (indicators.length === 0) return null;
+    
+    return (
+      <div className="flex items-center gap-1">
+        {indicators.map((ind, i) => (
+          <Tooltip key={i}>
+            <TooltipTrigger asChild>
+              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold ${ind.color} cursor-default shrink-0`}>
+                {ind.abbr}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{ind.label}</p>
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
+    );
   };
 
 
@@ -354,84 +375,82 @@ const handleResetPassword = async (user: User) => {
 
           {/* Users Table */}
           <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                    Name
-                  </SortableTableHead>
-                  <SortableTableHead sortKey="email" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                    Email
-                  </SortableTableHead>
-                  <SortableTableHead sortKey="role_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                    Role
-                  </SortableTableHead>
-                  <SortableTableHead sortKey="location_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                    Location
-                  </SortableTableHead>
-                  <SortableTableHead sortKey="email_confirmed_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                    Status
-                  </SortableTableHead>
-                  <SortableTableHead sortKey="last_sign_in_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                    Last Sign In
-                  </SortableTableHead>
-                  <TableHead className="w-20">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedData.length === 0 ? (
+            <TooltipProvider>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No users found
-                    </TableCell>
+                    <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-1/3">
+                      Name
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="email" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-1/4">
+                      Email
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="role_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                      Role
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="location_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                      Location
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="email_confirmed_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                      Status
+                    </SortableTableHead>
+                    <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  sortedData.map((user) => (
-                     <TableRow key={user.staff_id}>
-                       <TableCell className="font-medium w-1/4">
-                         <div className="flex items-center gap-2 min-w-0">
-                           <span className="truncate">{user.name || "No name"}</span>
-                           {getRoleBadge(user)}
-                         </div>
-                       </TableCell>
-                       <TableCell className="w-1/4 truncate">{user.email || "—"}</TableCell>
-                       <TableCell className="w-1/6 truncate">{user.role_name || "No role"}</TableCell>
-                       <TableCell className="w-1/6 truncate">{user.location_name || "No location"}</TableCell>
-                      <TableCell>{getStatusBadge(user)}</TableCell>
-                      <TableCell>{formatDate(user.last_sign_in_at)}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditUser(user)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            {user.user_id && (
-                              <DropdownMenuItem onClick={() => handleResetPassword(user)}>
-                                <Key className="h-4 w-4 mr-2" />
-                                Send reset email
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteUser(user)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                </TableHeader>
+                <TableBody>
+                  {sortedData.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No users found
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    sortedData.map((user) => (
+                      <TableRow key={user.staff_id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="truncate">{user.name || "No name"}</span>
+                            {getRoleIndicators(user)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="truncate">{user.email || "—"}</TableCell>
+                        <TableCell className="truncate">{user.role_name || "—"}</TableCell>
+                        <TableCell className="truncate">{user.location_name || "—"}</TableCell>
+                        <TableCell>{getStatusBadge(user)}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              {user.user_id && (
+                                <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                                  <Key className="h-4 w-4 mr-2" />
+                                  Send reset email
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteUser(user)}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TooltipProvider>
           </div>
 
           {/* Pagination */}

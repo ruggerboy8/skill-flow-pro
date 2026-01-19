@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, FileEdit } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDomainColor } from "@/lib/domainColors";
 
@@ -20,11 +20,13 @@ export interface LocationEvalStats {
   rdaCount: number;
   staffCount: number;
   staffWithEval: number;
+  submittedCount: number;
+  draftCount: number;
   avgObserver: number | null;
   avgSelf: number | null;
   gap: number | null;  // observer - self (positive = under-confident)
   roleDomainScores: RoleDomainScore[];
-  accountabilityRate: number | null;  // Placeholder for Phase 2
+  accountabilityRate: number | null;  // Placeholder for future
 }
 
 interface LocationEvalCardProps {
@@ -47,18 +49,39 @@ function getScoreBg(score: number | null): string {
   return 'bg-red-50 dark:bg-red-950/30';
 }
 
-export function LocationEvalCard({ stats, onClick }: LocationEvalCardProps) {
-  const getGapIndicator = (gap: number | null) => {
-    if (gap === null) return null;
-    if (Math.abs(gap) < 0.3) return { label: "Calibrated", variant: "secondary" as const };
-    // gap = observer - self: positive means self rated lower (under-confident)
-    if (gap > 0) return { label: `+${gap.toFixed(1)} gap`, variant: "outline" as const };
-    return { label: `${gap.toFixed(1)} gap`, variant: "destructive" as const };
+// Gap description with magnitude awareness
+function getGapLabel(gap: number | null): { label: string; variant: "secondary" | "outline" | "destructive" } | null {
+  if (gap === null) return null;
+  
+  const absGap = Math.abs(gap);
+  
+  if (absGap < 0.2) {
+    return { label: "Calibrated", variant: "secondary" };
+  }
+  if (absGap < 0.5) {
+    return { 
+      label: gap > 0 ? `+${gap.toFixed(1)} slight` : `${gap.toFixed(1)} slight`, 
+      variant: "outline" 
+    };
+  }
+  if (absGap < 0.8) {
+    return { 
+      label: gap > 0 ? `+${gap.toFixed(1)} moderate` : `${gap.toFixed(1)} moderate`, 
+      variant: "outline" 
+    };
+  }
+  return { 
+    label: gap > 0 ? `+${gap.toFixed(1)} large gap` : `${gap.toFixed(1)} large gap`, 
+    variant: "destructive" 
   };
+}
 
-  const gapIndicator = getGapIndicator(stats.gap);
+export function LocationEvalCard({ stats, onClick }: LocationEvalCardProps) {
+  const gapLabel = getGapLabel(stats.gap);
   const totalStaff = stats.staffCount;
-  const evaluated = stats.staffWithEval;
+  const submitted = stats.submittedCount;
+  const drafts = stats.draftCount;
+  const allComplete = submitted === totalStaff && drafts === 0;
 
   // Sort domain scores by the defined order
   const sortedDomains = [...stats.roleDomainScores].sort((a, b) => {
@@ -82,22 +105,31 @@ export function LocationEvalCard({ stats, onClick }: LocationEvalCardProps) {
               <span className="font-medium">{stats.rdaCount} RDA</span>
             </div>
           </div>
-          <Badge 
-            variant={evaluated === totalStaff ? "secondary" : "outline"} 
-            className={cn(
-              "text-[10px] shrink-0",
-              evaluated === totalStaff && "bg-primary/10 text-primary"
-            )}
-          >
-            {evaluated === totalStaff ? (
-              <span className="flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                {evaluated}/{totalStaff}
-              </span>
+          
+          {/* Status badge showing submitted and drafts */}
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {allComplete ? (
+              <Badge 
+                variant="secondary" 
+                className="text-[10px] bg-primary/10 text-primary"
+              >
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                {submitted}/{totalStaff}
+              </Badge>
             ) : (
-              `${evaluated}/${totalStaff} submitted`
+              <>
+                <Badge variant="outline" className="text-[10px]">
+                  {submitted} submitted
+                </Badge>
+                {drafts > 0 && (
+                  <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-300">
+                    <FileEdit className="h-3 w-3 mr-1" />
+                    {drafts} drafts
+                  </Badge>
+                )}
+              </>
             )}
-          </Badge>
+          </div>
         </div>
       </CardHeader>
       
@@ -143,9 +175,9 @@ export function LocationEvalCard({ stats, onClick }: LocationEvalCardProps) {
         {/* Footer metrics */}
         <div className="flex items-center justify-between gap-2 pt-1">
           {/* Calibration gap */}
-          {gapIndicator ? (
-            <Badge variant={gapIndicator.variant} className="text-[10px]">
-              {gapIndicator.label}
+          {gapLabel ? (
+            <Badge variant={gapLabel.variant} className="text-[10px]">
+              {gapLabel.label}
             </Badge>
           ) : (
             <span className="text-[10px] text-muted-foreground">No calibration data</span>

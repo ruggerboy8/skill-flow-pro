@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChevronDown, X, Settings2, HelpCircle } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import type { EvalFilters, Quarter, EvaluationPeriodType } from '@/types/analytics';
 
@@ -43,17 +40,38 @@ const PERIODS: { value: EvaluationPeriodType | Quarter; label: string; type: Eva
   { value: 'Q4', label: 'Q4', type: 'Quarterly', quarter: 'Q4' },
 ];
 
-// Generate year options (current year and 2 years back)
-function getYearOptions(): number[] {
-  const currentYear = new Date().getFullYear();
-  return [currentYear, currentYear - 1, currentYear - 2];
-}
-
 export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+
+  // Fetch years that have evaluations
+  const { data: availableYears } = useQuery({
+    queryKey: ['eval-years'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('evaluations')
+        .select('created_at')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Extract unique years
+      const years = new Set<number>();
+      (data || []).forEach(e => {
+        const year = new Date(e.created_at).getFullYear();
+        years.add(year);
+      });
+      
+      return Array.from(years).sort((a, b) => b - a);
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
+  const yearOptions = availableYears && availableYears.length > 0 
+    ? availableYears 
+    : [new Date().getFullYear()];
 
   // Load organizations on mount
   useEffect(() => {
@@ -141,8 +159,6 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
       ...filters,
       locationIds: [],
       roleIds: [],
-      includeNoEvals: true,
-      windowDays: 42
     });
   }
 
@@ -178,7 +194,6 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
 
   const locationOptions = locations.map(l => ({ value: l.id, label: l.name }));
   const roleOptions = roles.map(r => ({ value: r.role_id.toString(), label: r.role_name }));
-  const yearOptions = getYearOptions();
 
   const hasSecondaryFilters = filters.locationIds.length > 0 || filters.roleIds.length > 0;
 
@@ -264,64 +279,6 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
             </Button>
           </CollapsibleTrigger>
         </Collapsible>
-
-        {/* Options Popover */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-10">
-              <Settings2 className="h-4 w-4 mr-1" />
-              Options
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72" align="end">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="include-no-evals"
-                  checked={filters.includeNoEvals}
-                  onCheckedChange={(checked) => onFiltersChange({
-                    ...filters,
-                    includeNoEvals: !!checked
-                  })}
-                />
-                <Label htmlFor="include-no-evals" className="text-sm">
-                  Include staff with no evaluations
-                </Label>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="window-days" className="text-sm">Window (days)</Label>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Used for Pro-Moves comparison: analyzes staff submissions from this many days before each evaluation.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <Input
-                  id="window-days"
-                  type="number"
-                  min="1"
-                  max="365"
-                  className="w-20"
-                  value={filters.windowDays}
-                  onChange={(e) => onFiltersChange({
-                    ...filters,
-                    windowDays: parseInt(e.target.value) || 42
-                  })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Default: 42 days (6 weeks)
-                </p>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
       </div>
 
       {/* Row 2: Collapsible secondary filters */}

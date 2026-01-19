@@ -157,7 +157,10 @@ export default function EvalResults() {
 
       <FilterBar filters={filters} onFiltersChange={setFilters} />
 
-      <SummaryMetrics filters={filters} />
+      {/* Only show summary metrics at locations level */}
+      {view.level === 'locations' && (
+        <SummaryMetrics filters={filters} />
+      )}
 
       {/* Hierarchical content based on view state */}
       {view.level === 'locations' && viewMode === 'locations' && (

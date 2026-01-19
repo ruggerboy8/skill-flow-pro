@@ -245,6 +245,15 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
   if (isLoading) {
     return (
       <div className="space-y-6">
+        <Button 
+          variant="default" 
+          size="sm" 
+          onClick={onBack} 
+          className="mb-2 -ml-2 bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Back to All Locations
+        </Button>
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-96 w-full" />
@@ -254,11 +263,22 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <p className="text-destructive">Error loading data: {error.message}</p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Button 
+          variant="default" 
+          size="sm" 
+          onClick={onBack} 
+          className="mb-2 -ml-2 bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Back to All Locations
+        </Button>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-destructive">Error loading data: {error.message}</p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 

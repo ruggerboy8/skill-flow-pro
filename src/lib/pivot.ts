@@ -73,10 +73,14 @@ export function pivotStaffDomain(rows: LongRow[]): PivotResult {
   return { 
     rows: Array.from(byStaff.values()).sort((a, b) => {
       // Sort by location, then by staff name
-      const locationCompare = a.location_name.localeCompare(b.location_name);
+      const aLoc = a.location_name || '';
+      const bLoc = b.location_name || '';
+      const locationCompare = aLoc.localeCompare(bLoc);
       if (locationCompare !== 0) return locationCompare;
-      return a.staff_name.localeCompare(b.staff_name);
-    }), 
+      const aName = a.staff_name || '';
+      const bName = b.staff_name || '';
+      return aName.localeCompare(bName);
+    }),
     domains 
   };
 }

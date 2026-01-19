@@ -1,8 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingDown, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Users, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDomainColor } from "@/lib/domainColors";
+
+export interface DomainScore {
+  domainName: string;
+  avgObserver: number;
+}
 
 export interface LocationEvalStats {
   locationId: string;
@@ -12,7 +17,7 @@ export interface LocationEvalStats {
   avgObserver: number | null;
   avgSelf: number | null;
   gap: number | null;  // observer - self (positive = over-confident)
-  weakestDomain: string | null;
+  domainScores: DomainScore[];  // All domain averages
 }
 
 interface LocationEvalCardProps {
@@ -21,26 +26,11 @@ interface LocationEvalCardProps {
 }
 
 export function LocationEvalCard({ stats, onClick }: LocationEvalCardProps) {
-  // Visual status based on avg observer score
-  const getStatusClasses = (score: number | null) => {
-    if (score === null) return "border-muted bg-muted/20";
-    if (score < 2.5) return "border-destructive/30 bg-destructive/5";
-    if (score < 3.0) return "border-warning/30 bg-warning/5";
-    return "border-primary/30 bg-primary/5";
-  };
-
-  const getScoreColor = (score: number | null) => {
-    if (score === null) return "text-muted-foreground";
-    if (score < 2.5) return "text-destructive";
-    if (score < 3.0) return "text-warning";
-    return "text-primary";
-  };
-
   const getGapIndicator = (gap: number | null) => {
     if (gap === null) return null;
     if (Math.abs(gap) < 0.3) return { label: "Calibrated", variant: "secondary" as const };
-    if (gap < 0) return { label: `+${Math.abs(gap).toFixed(1)} Over-confident`, variant: "destructive" as const };
-    return { label: `${gap.toFixed(1)} Under-confident`, variant: "outline" as const };
+    if (gap < 0) return { label: `Over-confident`, variant: "destructive" as const };
+    return { label: `Under-confident`, variant: "outline" as const };
   };
 
   const gapIndicator = getGapIndicator(stats.gap);
@@ -50,10 +40,7 @@ export function LocationEvalCard({ stats, onClick }: LocationEvalCardProps) {
 
   return (
     <Card 
-      className={cn(
-        "cursor-pointer hover:shadow-md transition-all border-2",
-        getStatusClasses(stats.avgObserver)
-      )}
+      className="cursor-pointer hover:shadow-md transition-all border"
       onClick={onClick}
     >
       <CardHeader className="pb-2">
@@ -65,59 +52,57 @@ export function LocationEvalCard({ stats, onClick }: LocationEvalCardProps) {
               {stats.staffWithEval} of {stats.staffCount} evaluated
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-[10px] text-muted-foreground font-medium mb-0.5 uppercase tracking-wide">
-              Avg Observer
-            </div>
-            <div className={cn("text-2xl font-black", getScoreColor(stats.avgObserver))}>
-              {stats.avgObserver !== null ? stats.avgObserver.toFixed(1) : '—'}
-            </div>
-            <div className="text-[10px] text-muted-foreground leading-tight">
-              out of 4.0
-            </div>
+          <div className="flex flex-wrap gap-1 justify-end">
+            {/* Calibration indicator */}
+            {gapIndicator && (
+              <Badge variant={gapIndicator.variant} className="gap-1 text-[10px]">
+                {gapIndicator.variant === 'destructive' && <AlertTriangle className="h-3 w-3" />}
+                {gapIndicator.label}
+              </Badge>
+            )}
+            
+            {/* Coverage indicator */}
+            {evalPercent < 100 && (
+              <Badge variant="secondary" className="text-[10px]">
+                {100 - evalPercent}% missing
+              </Badge>
+            )}
+            
+            {/* All good state */}
+            {evalPercent === 100 && !gapIndicator && (
+              <Badge variant="secondary" className="bg-primary/10 text-primary gap-1 text-[10px]">
+                <CheckCircle2 className="h-3 w-3" />
+                Complete
+              </Badge>
+            )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {/* Calibration indicator */}
-          {gapIndicator && (
-            <Badge variant={gapIndicator.variant} className="gap-1 text-xs">
-              {gapIndicator.variant === 'destructive' && <AlertTriangle className="h-3 w-3" />}
-              {gapIndicator.label}
-            </Badge>
-          )}
-          
-          {/* Weakest domain */}
-          {stats.weakestDomain && (
-            <Badge 
-              variant="outline" 
-              className="gap-1 text-xs"
-              style={{ 
-                borderColor: getDomainColor(stats.weakestDomain),
-                color: getDomainColor(stats.weakestDomain)
-              }}
-            >
-              <TrendingDown className="h-3 w-3" />
-              {stats.weakestDomain}
-            </Badge>
-          )}
-          
-          {/* Coverage indicator */}
-          {evalPercent < 100 && (
-            <Badge variant="secondary" className="gap-1 text-xs">
-              {100 - evalPercent}% no eval
-            </Badge>
-          )}
-          
-          {/* All good state */}
-          {evalPercent === 100 && !gapIndicator && (
-            <Badge variant="secondary" className="bg-primary/10 text-primary gap-1">
-              <CheckCircle2 className="h-3 w-3" />
-              Complete
-            </Badge>
-          )}
-        </div>
+        {/* Domain score pills */}
+        {stats.domainScores.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {stats.domainScores.map(ds => (
+              <div
+                key={ds.domainName}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium"
+                style={{ 
+                  backgroundColor: `${getDomainColor(ds.domainName)}20`,
+                  color: getDomainColor(ds.domainName)
+                }}
+              >
+                <span 
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: getDomainColor(ds.domainName) }}
+                />
+                <span>{ds.domainName}</span>
+                <span className="font-bold">{ds.avgObserver.toFixed(1)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">No evaluation data</p>
+        )}
       </CardContent>
     </Card>
   );

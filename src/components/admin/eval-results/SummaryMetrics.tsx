@@ -73,23 +73,26 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
         ? ['Baseline'] 
         : ['Quarterly'];
 
-      // Get locations for this org first
-      const { data: locations } = await supabase
+      // Get locations for this org first - use explicit any to avoid type depth
+      const locationsQuery: any = supabase
         .from('locations')
         .select('id')
         .eq('organization_id', filters.organizationId)
         .eq('active', true);
+      const locationsResult = await locationsQuery;
 
-      const locationIds = locations?.map(l => l.id) || [];
+      const locationIds: string[] = (locationsResult.data || []).map((l: { id: string }) => l.id);
 
-      // Get all staff for this org
-      const { data: allStaff } = await supabase
-        .from('staff')
-        .select('user_id, role_id, location_id')
-        .eq('active', true)
-        .in('location_id', locationIds);
-
-      const totalStaff = allStaff?.length || 0;
+      // Get staff count for this org - cast early to avoid type depth error
+      let totalStaff = 0;
+      if (locationIds.length > 0) {
+        const staffQuery = (supabase.from('staff') as any)
+          .select('id')
+          .eq('active', true)
+          .in('location_id', locationIds);
+        const staffResult = await staffQuery;
+        totalStaff = (staffResult.data || []).length;
+      }
 
       // Get evaluations in date range for this org
       const { data: evals } = await supabase

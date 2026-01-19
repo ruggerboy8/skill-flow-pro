@@ -20,13 +20,17 @@ export default function EvalResults() {
   const navigate = useNavigate();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState('locations');
-   
+  
+  // Initialize with period-based filters
+  const currentYear = new Date().getFullYear();
+  const currentQuarter = `Q${Math.ceil((new Date().getMonth() + 1) / 3)}` as 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  
   const [filters, setFilters] = useState<EvalFilters>({
     organizationId: '',
-    evaluationTypes: [],
-    dateRange: {
-      start: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // 90 days ago
-      end: new Date()
+    evaluationPeriod: {
+      type: 'Quarterly',
+      quarter: currentQuarter,
+      year: currentYear
     },
     locationIds: [],
     roleIds: [],

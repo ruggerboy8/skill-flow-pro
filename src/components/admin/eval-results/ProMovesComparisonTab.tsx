@@ -10,6 +10,7 @@ import { Download } from 'lucide-react';
 import { downloadCSV, formatValueForCSV } from '@/lib/csvExport';
 import { getDomainColor } from '@/lib/domainColors';
 import type { EvalFilters } from '@/types/analytics';
+import { periodToDateRange } from '@/types/analytics';
 
 interface ProMovesComparisonTabProps {
   filters: EvalFilters;
@@ -36,14 +37,19 @@ export function ProMovesComparisonTab({ filters }: ProMovesComparisonTabProps) {
     queryFn: async () => {
       if (!filters.organizationId) return [];
 
+      const dateRange = periodToDateRange(filters.evaluationPeriod);
+      const evalTypes = filters.evaluationPeriod.type === 'Baseline' 
+        ? ['Baseline'] 
+        : ['Quarterly'];
+
       const params = {
         p_org_id: filters.organizationId,
         p_window_days: filters.windowDays,
-        p_start: filters.dateRange.start?.toISOString(),
-        p_end: filters.dateRange.end?.toISOString(),
+        p_start: dateRange.start.toISOString(),
+        p_end: dateRange.end.toISOString(),
         ...(filters.locationIds?.length ? { p_location_ids: filters.locationIds } : {}),
         ...(filters.roleIds?.length ? { p_role_ids: filters.roleIds } : {}),
-        ...(filters.evaluationTypes?.length ? { p_types: filters.evaluationTypes } : {}),
+        p_types: evalTypes,
       };
 
       console.log('Calling compare_conf_perf_to_eval with params:', params);

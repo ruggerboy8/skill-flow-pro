@@ -2,24 +2,36 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ChevronDown, LayoutGrid, List } from 'lucide-react';
 import { FilterBar } from '@/components/admin/eval-results/FilterBar';
 import { SummaryMetrics } from '@/components/admin/eval-results/SummaryMetrics';
+import { LocationEvalCards } from '@/components/admin/eval-results/LocationEvalCards';
+import { LocationEvalDetail } from '@/components/admin/eval-results/LocationEvalDetail';
 import { StrengthsTab } from '@/components/admin/eval-results/StrengthsTab';
-import { ProMovesComparisonTab } from '@/components/admin/eval-results/ProMovesComparisonTab';
-import { StaffLocationsTab } from '@/components/admin/eval-results/StaffLocationsTab';
-import { IndividualResultsTab } from '@/components/admin/eval-results/IndividualResultsTab';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info } from 'lucide-react';
 import type { EvalFilters } from '@/types/analytics';
 
+type ViewLevel = 
+  | { level: 'locations' }
+  | { level: 'location-detail'; locationId: string; locationName: string };
+
+type ViewMode = 'locations' | 'domains';
 
 export default function EvalResults() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState('locations');
+  
+  // View state: replaces tabs with hierarchical navigation
+  const [view, setView] = useState<ViewLevel>({ level: 'locations' });
+  const [viewMode, setViewMode] = useState<ViewMode>('locations');
   
   // Initialize with period-based filters
   const currentYear = new Date().getFullYear();
@@ -68,6 +80,19 @@ export default function EvalResults() {
     checkSuperAdmin();
   }, [user, navigate]);
 
+  // Reset view when filters change (org changes should go back to locations)
+  useEffect(() => {
+    setView({ level: 'locations' });
+  }, [filters.organizationId]);
+
+  const handleLocationClick = (locationId: string, locationName: string) => {
+    setView({ level: 'location-detail', locationId, locationName });
+  };
+
+  const handleBackToLocations = () => {
+    setView({ level: 'locations' });
+  };
+
   if (isSuperAdmin === null) {
     return (
       <div className="space-y-6">
@@ -87,59 +112,73 @@ export default function EvalResults() {
     );
   }
 
-  // Tab explanations
-  const tabExplanations: Record<string, string> = {
-    locations: 'Evaluation results grouped by location. View average scores across domains for each location.',
-    staff: 'Individual staff evaluation scores across all domains. Click a cell to see competency-level details.',
-    alignment: 'Compares staff self-reported confidence and performance scores (from weekly pro-moves submissions) against their evaluation results. Positive deltas indicate self-scores were higher than observer scores.',
-    domains: 'Overview of evaluation scores by domain and competency. Expand domains to see individual competency averages.'
-  };
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Evaluation Results</h1>
-        <p className="text-muted-foreground mt-2">
-          Analyze evaluation data across organizations, locations, and staff
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Evaluation Results</h1>
+          <p className="text-muted-foreground mt-1">
+            Analyze evaluation data across organizations and locations
+          </p>
+        </div>
+        
+        {/* View mode selector - only show on locations view */}
+        {view.level === 'locations' && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                {viewMode === 'locations' ? (
+                  <>
+                    <LayoutGrid className="mr-2 h-4 w-4" />
+                    By Location
+                  </>
+                ) : (
+                  <>
+                    <List className="mr-2 h-4 w-4" />
+                    By Domain
+                  </>
+                )}
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setViewMode('locations')}>
+                <LayoutGrid className="mr-2 h-4 w-4" />
+                By Location
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setViewMode('domains')}>
+                <List className="mr-2 h-4 w-4" />
+                By Domain
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       <FilterBar filters={filters} onFiltersChange={setFilters} />
 
       <SummaryMetrics filters={filters} />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="locations">By Location</TabsTrigger>
-          <TabsTrigger value="staff">By Staff</TabsTrigger>
-          <TabsTrigger value="alignment">Pro-Moves Alignment</TabsTrigger>
-          <TabsTrigger value="domains">Domain Detail</TabsTrigger>
-        </TabsList>
+      {/* Hierarchical content based on view state */}
+      {view.level === 'locations' && viewMode === 'locations' && (
+        <LocationEvalCards 
+          filters={filters} 
+          onLocationClick={handleLocationClick} 
+        />
+      )}
 
-        {/* Tab explanation */}
-        <Alert className="mt-4 bg-muted/50 border-muted">
-          <Info className="h-4 w-4" />
-          <AlertDescription className="text-sm text-muted-foreground">
-            {tabExplanations[activeTab]}
-          </AlertDescription>
-        </Alert>
+      {view.level === 'locations' && viewMode === 'domains' && (
+        <StrengthsTab filters={filters} />
+      )}
 
-        <TabsContent value="locations" className="mt-4">
-          <StaffLocationsTab filters={filters} />
-        </TabsContent>
-
-        <TabsContent value="staff" className="mt-4">
-          <IndividualResultsTab filters={filters} />
-        </TabsContent>
-
-        <TabsContent value="alignment" className="mt-4">
-          <ProMovesComparisonTab filters={filters} />
-        </TabsContent>
-
-        <TabsContent value="domains" className="mt-4">
-          <StrengthsTab filters={filters} />
-        </TabsContent>
-      </Tabs>
+      {view.level === 'location-detail' && (
+        <LocationEvalDetail
+          filters={filters}
+          locationId={view.locationId}
+          locationName={view.locationName}
+          onBack={handleBackToLocations}
+        />
+      )}
     </div>
   );
 }

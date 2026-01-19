@@ -52,7 +52,7 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
 
   // Form state for new evaluation
   const [newEvalForm, setNewEvalForm] = useState({
-    type: '' as 'Baseline' | 'Midpoint' | 'Quarterly' | '',
+    type: '' as 'Baseline' | 'Quarterly' | '',
     quarter: '' as 'Q1' | 'Q2' | 'Q3' | 'Q4' | '',
     programYear: new Date().getFullYear(),
     observedAt: undefined as Date | undefined
@@ -209,7 +209,7 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                 <Label htmlFor="type">Evaluation Type *</Label>
                 <Select 
                   value={newEvalForm.type} 
-                  onValueChange={(value: 'Baseline' | 'Midpoint' | 'Quarterly') => 
+                  onValueChange={(value: 'Baseline' | 'Quarterly') => 
                     setNewEvalForm(prev => ({ ...prev, type: value, quarter: value !== 'Quarterly' ? '' : prev.quarter }))
                   }
                 >
@@ -218,7 +218,6 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Baseline">Baseline</SelectItem>
-                    <SelectItem value="Midpoint">Midpoint</SelectItem>
                     <SelectItem value="Quarterly">Quarterly</SelectItem>
                   </SelectContent>
                 </Select>

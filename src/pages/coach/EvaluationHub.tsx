@@ -856,7 +856,6 @@ export function EvaluationHub() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Baseline">Baseline</SelectItem>
-                    <SelectItem value="Midpoint">Midpoint</SelectItem>
                     <SelectItem value="Quarterly">Quarterly</SelectItem>
                   </SelectContent>
                 </Select>

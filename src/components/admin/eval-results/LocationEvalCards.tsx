@@ -23,6 +23,8 @@ interface StaffLocationData {
   domain_name: string;
   n_items: number;
   avg_observer: number;
+  avg_self: number | null;
+  eval_status: string | null;
   has_eval: boolean;
 }
 
@@ -72,9 +74,14 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
       rdaStaffIds: Set<string>;
       observerScores: number[];
       selfScores: number[];
+      submittedCount: number;
+      draftCount: number;
       // domainName -> role -> scores[]
       roleDomainScores: Map<string, { dfi: number[]; rda: number[] }>;
     }>();
+
+    // Track unique evals to avoid double counting
+    const seenStaffStatus = new Map<string, Set<string>>(); // locationId -> Set of "staffId:status"
 
     rawData.forEach(row => {
       if (!byLocation.has(row.location_id)) {
@@ -86,11 +93,15 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
           rdaStaffIds: new Set(),
           observerScores: [],
           selfScores: [],
+          submittedCount: 0,
+          draftCount: 0,
           roleDomainScores: new Map(),
         });
+        seenStaffStatus.set(row.location_id, new Set());
       }
       
       const loc = byLocation.get(row.location_id)!;
+      const seen = seenStaffStatus.get(row.location_id)!;
       loc.staffIds.add(row.staff_id);
       
       // Track role counts (unique staff per role)
@@ -103,10 +114,26 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
       
       if (row.has_eval) {
         loc.staffWithEval.add(row.staff_id);
+        
+        // Track draft/submitted counts (only once per staff)
+        const statusKey = `${row.staff_id}:${row.eval_status}`;
+        if (!seen.has(statusKey)) {
+          seen.add(statusKey);
+          if (row.eval_status === 'submitted') {
+            loc.submittedCount++;
+          } else if (row.eval_status === 'draft') {
+            loc.draftCount++;
+          }
+        }
       }
       
       if (row.avg_observer !== null && row.domain_name) {
         loc.observerScores.push(row.avg_observer);
+        
+        // Track self scores for gap calculation
+        if (row.avg_self !== null) {
+          loc.selfScores.push(row.avg_self);
+        }
         
         // Track per-domain-per-role scores
         if (!loc.roleDomainScores.has(row.domain_name)) {
@@ -155,11 +182,13 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
         rdaCount: data.rdaStaffIds.size,
         staffCount: data.staffIds.size,
         staffWithEval: data.staffWithEval.size,
+        submittedCount: data.submittedCount,
+        draftCount: data.draftCount,
         avgObserver,
         avgSelf,
         gap: avgObserver !== null && avgSelf !== null ? avgObserver - avgSelf : null,
         roleDomainScores,
-        accountabilityRate: null, // Placeholder for Phase 2
+        accountabilityRate: null, // Placeholder for future
       };
     });
 

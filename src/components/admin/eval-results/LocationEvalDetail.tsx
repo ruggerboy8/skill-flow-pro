@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronLeft, Download, Users, TrendingDown, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Download } from 'lucide-react';
 import { StaffDetailDrawer } from './StaffDetailDrawer';
 import { pivotStaffDomain } from '@/lib/pivot';
 import { downloadCSV, formatValueForCSV } from '@/lib/csvExport';
@@ -75,51 +75,12 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
     enabled: !!filters.organizationId && !!locationId
   });
 
-  // Calculate summary metrics
-  const summaryMetrics = React.useMemo(() => {
-    if (!rawData || rawData.length === 0) return null;
-
+  // Calculate counts for the header
+  const staffCounts = React.useMemo(() => {
+    if (!rawData || rawData.length === 0) return { total: 0, withEval: 0 };
     const uniqueStaff = new Set(rawData.map(r => r.staff_id));
     const staffWithEval = new Set(rawData.filter(r => r.has_eval).map(r => r.staff_id));
-    
-    const observerScores = rawData.filter(r => r.observer_avg !== null).map(r => r.observer_avg!);
-    const selfScores = rawData.filter(r => r.self_avg !== null).map(r => r.self_avg!);
-    
-    const avgObserver = observerScores.length > 0 
-      ? observerScores.reduce((a, b) => a + b, 0) / observerScores.length 
-      : null;
-    const avgSelf = selfScores.length > 0 
-      ? selfScores.reduce((a, b) => a + b, 0) / selfScores.length 
-      : null;
-    
-    // Find weakest domain
-    const domainScores = new Map<string, number[]>();
-    rawData.forEach(r => {
-      if (r.domain_name && r.observer_avg !== null) {
-        if (!domainScores.has(r.domain_name)) domainScores.set(r.domain_name, []);
-        domainScores.get(r.domain_name)!.push(r.observer_avg);
-      }
-    });
-    
-    let weakestDomain: string | null = null;
-    let lowestScore = Infinity;
-    domainScores.forEach((scores, domain) => {
-      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-      if (avg < lowestScore) {
-        lowestScore = avg;
-        weakestDomain = domain;
-      }
-    });
-
-    return {
-      totalStaff: uniqueStaff.size,
-      staffWithEval: staffWithEval.size,
-      avgObserver,
-      avgSelf,
-      gap: avgObserver !== null && avgSelf !== null ? avgObserver - avgSelf : null,
-      weakestDomain,
-      weakestDomainScore: lowestScore !== Infinity ? lowestScore : null,
-    };
+    return { total: uniqueStaff.size, withEval: staffWithEval.size };
   }, [rawData]);
 
   // Convert raw data to pivot format
@@ -167,12 +128,6 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
     downloadCSV(csvData, `${locationName.replace(/\s+/g, '_')}_eval_results`);
   };
 
-  const getScoreColor = (score: number | null) => {
-    if (score === null) return "text-muted-foreground";
-    if (score < 2.5) return "text-destructive";
-    if (score < 3.0) return "text-warning";
-    return "text-primary";
-  };
 
   if (isLoading) {
     return (
@@ -206,82 +161,11 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold">{locationName}</h2>
             <Badge variant="outline">{getPeriodLabel(filters.evaluationPeriod)}</Badge>
+            <span className="text-sm text-muted-foreground">
+              {staffCounts.withEval} of {staffCounts.total} evaluated
+            </span>
           </div>
         </div>
-
-        {/* Summary metrics */}
-        {summaryMetrics && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <Users className="h-4 w-4" />
-                  Staff Evaluated
-                </div>
-                <div className="text-2xl font-bold">
-                  {summaryMetrics.staffWithEval} of {summaryMetrics.totalStaff}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground mb-1">Avg Observer</div>
-                <div className={`text-2xl font-bold ${getScoreColor(summaryMetrics.avgObserver)}`}>
-                  {summaryMetrics.avgObserver?.toFixed(2) ?? '—'}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  {summaryMetrics.gap !== null && summaryMetrics.gap < -0.3 && (
-                    <AlertTriangle className="h-4 w-4 text-warning" />
-                  )}
-                  Calibration Gap
-                </div>
-                <div className="text-2xl font-bold">
-                  {summaryMetrics.gap !== null 
-                    ? (summaryMetrics.gap >= 0 ? '+' : '') + summaryMetrics.gap.toFixed(2)
-                    : '—'}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {summaryMetrics.gap !== null && summaryMetrics.gap < -0.3 && 'Over-confident'}
-                  {summaryMetrics.gap !== null && summaryMetrics.gap > 0.3 && 'Under-confident'}
-                  {summaryMetrics.gap !== null && Math.abs(summaryMetrics.gap) <= 0.3 && 'Well calibrated'}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                  <TrendingDown className="h-4 w-4" />
-                  Weakest Domain
-                </div>
-                {summaryMetrics.weakestDomain ? (
-                  <Badge 
-                    className="text-sm font-medium"
-                    style={{ 
-                      backgroundColor: getDomainColor(summaryMetrics.weakestDomain),
-                      color: 'white'
-                    }}
-                  >
-                    {summaryMetrics.weakestDomain}
-                  </Badge>
-                ) : (
-                  <div className="text-2xl font-bold text-muted-foreground">—</div>
-                )}
-                {summaryMetrics.weakestDomainScore !== null && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Avg: {summaryMetrics.weakestDomainScore.toFixed(2)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
         {/* Staff table */}
         <Card>

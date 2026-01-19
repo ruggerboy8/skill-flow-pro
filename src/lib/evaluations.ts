@@ -68,7 +68,7 @@ export async function createDraftEvaluation({
   staffId: string;
   roleId: number;
   locationId: string;
-  type: 'Baseline' | 'Midpoint' | 'Quarterly';
+  type: 'Baseline' | 'Quarterly';
   quarter?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
   programYear: number;
   evaluatorId: string;

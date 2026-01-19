@@ -5,10 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FilterBar } from '@/components/admin/eval-results/FilterBar';
+import { SummaryMetrics } from '@/components/admin/eval-results/SummaryMetrics';
 import { StrengthsTab } from '@/components/admin/eval-results/StrengthsTab';
 import { ProMovesComparisonTab } from '@/components/admin/eval-results/ProMovesComparisonTab';
 import { StaffLocationsTab } from '@/components/admin/eval-results/StaffLocationsTab';
 import { IndividualResultsTab } from '@/components/admin/eval-results/IndividualResultsTab';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 import type { EvalFilters } from '@/types/analytics';
 
 
@@ -16,7 +19,7 @@ export default function EvalResults() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('locations');
    
   const [filters, setFilters] = useState<EvalFilters>({
     organizationId: '',
@@ -80,34 +83,57 @@ export default function EvalResults() {
     );
   }
 
+  // Tab explanations
+  const tabExplanations: Record<string, string> = {
+    locations: 'Evaluation results grouped by location. View average scores across domains for each location.',
+    staff: 'Individual staff evaluation scores across all domains. Click a cell to see competency-level details.',
+    alignment: 'Compares staff self-reported confidence and performance scores (from weekly pro-moves submissions) against their evaluation results. Positive deltas indicate self-scores were higher than observer scores.',
+    domains: 'Overview of evaluation scores by domain and competency. Expand domains to see individual competency averages.'
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Evaluation Results</h1>
         <p className="text-muted-foreground mt-2">
-          Analyze evaluation data across organizations, domains, and competencies
+          Analyze evaluation data across organizations, locations, and staff
         </p>
       </div>
 
       <FilterBar filters={filters} onFiltersChange={setFilters} />
 
+      <SummaryMetrics filters={filters} />
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="promoves">Pro-Moves vs Eval</TabsTrigger>
-          <TabsTrigger value="individual">Individual Results</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="locations">By Location</TabsTrigger>
+          <TabsTrigger value="staff">By Staff</TabsTrigger>
+          <TabsTrigger value="alignment">Pro-Moves Alignment</TabsTrigger>
+          <TabsTrigger value="domains">Domain Detail</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
-          <StrengthsTab filters={filters} />
+        {/* Tab explanation */}
+        <Alert className="mt-4 bg-muted/50 border-muted">
+          <Info className="h-4 w-4" />
+          <AlertDescription className="text-sm text-muted-foreground">
+            {tabExplanations[activeTab]}
+          </AlertDescription>
+        </Alert>
+
+        <TabsContent value="locations" className="mt-4">
+          <StaffLocationsTab filters={filters} />
         </TabsContent>
 
-        <TabsContent value="promoves" className="mt-6">
+        <TabsContent value="staff" className="mt-4">
+          <IndividualResultsTab filters={filters} />
+        </TabsContent>
+
+        <TabsContent value="alignment" className="mt-4">
           <ProMovesComparisonTab filters={filters} />
         </TabsContent>
 
-        <TabsContent value="individual" className="mt-6">
-          <IndividualResultsTab filters={filters} />
+        <TabsContent value="domains" className="mt-4">
+          <StrengthsTab filters={filters} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,8 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, X } from 'lucide-react';
+import { CalendarIcon, X, Settings2, HelpCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { EvalFilters } from '@/types/analytics';
 
 interface FilterBarProps {
@@ -34,9 +36,8 @@ interface Role {
 }
 
 const EVALUATION_TYPES = [
-  'Baseline',
-  'Midpoint', 
-  'Quarterly'
+  { value: 'Baseline', label: 'Baseline' },
+  { value: 'Quarterly', label: 'Quarterly' }
 ];
 
 export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
@@ -109,212 +110,240 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
     }
   }
 
-  function toggleEvaluationType(type: string) {
-    const newTypes = filters.evaluationTypes.includes(type)
-      ? filters.evaluationTypes.filter(t => t !== type)
-      : [...filters.evaluationTypes, type];
-    
+  function clearAllFilters() {
     onFiltersChange({
       ...filters,
-      evaluationTypes: newTypes
+      evaluationTypes: [],
+      locationIds: [],
+      roleIds: [],
+      dateRange: {
+        start: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+        end: new Date()
+      },
+      includeNoEvals: true,
+      windowDays: 42
     });
   }
 
-  function toggleLocation(locationId: string) {
-    const newLocationIds = filters.locationIds.includes(locationId)
-      ? filters.locationIds.filter(id => id !== locationId)
-      : [...filters.locationIds, locationId];
-    
-    onFiltersChange({
-      ...filters,
-      locationIds: newLocationIds
+  // Build active filter chips
+  const activeFilters: { label: string; onRemove: () => void }[] = [];
+  
+  if (filters.evaluationTypes.length > 0) {
+    activeFilters.push({
+      label: `Types: ${filters.evaluationTypes.join(', ')}`,
+      onRemove: () => onFiltersChange({ ...filters, evaluationTypes: [] })
+    });
+  }
+  
+  if (filters.locationIds.length > 0) {
+    const locationNames = filters.locationIds
+      .map(id => locations.find(l => l.id === id)?.name)
+      .filter(Boolean)
+      .join(', ');
+    activeFilters.push({
+      label: `Locations: ${locationNames || filters.locationIds.length}`,
+      onRemove: () => onFiltersChange({ ...filters, locationIds: [] })
+    });
+  }
+  
+  if (filters.roleIds.length > 0) {
+    const roleNames = filters.roleIds
+      .map(id => roles.find(r => r.role_id === id)?.role_name)
+      .filter(Boolean)
+      .join(', ');
+    activeFilters.push({
+      label: `Roles: ${roleNames || filters.roleIds.length}`,
+      onRemove: () => onFiltersChange({ ...filters, roleIds: [] })
     });
   }
 
-  function toggleRole(roleId: number) {
-    const newRoleIds = filters.roleIds.includes(roleId)
-      ? filters.roleIds.filter(id => id !== roleId)
-      : [...filters.roleIds, roleId];
-    
-    onFiltersChange({
-      ...filters,
-      roleIds: newRoleIds
-    });
-  }
+  const locationOptions = locations.map(l => ({ value: l.id, label: l.name }));
+  const roleOptions = roles.map(r => ({ value: r.role_id.toString(), label: r.role_name }));
 
   return (
-    <Card>
-      <CardContent className="p-6 space-y-4">
-        {/* Organization - Required */}
-        <div className="grid gap-2">
-          <Label>Organization *</Label>
-          <Select
-            value={filters.organizationId}
-            onValueChange={(value) => onFiltersChange({ ...filters, organizationId: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select organization..." />
-            </SelectTrigger>
-            <SelectContent>
-              {organizations.map((org) => (
-                <SelectItem key={org.id} value={org.id}>
-                  {org.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <Card className="p-4 space-y-3">
+      {/* Row 1: Primary Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Organization */}
+        <Select
+          value={filters.organizationId}
+          onValueChange={(value) => onFiltersChange({ ...filters, organizationId: value })}
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select organization..." />
+          </SelectTrigger>
+          <SelectContent>
+            {organizations.map((org) => (
+              <SelectItem key={org.id} value={org.id}>
+                {org.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Locations Multi-select */}
+        <MultiSelect
+          options={locationOptions}
+          selected={filters.locationIds}
+          onChange={(selected) => onFiltersChange({ ...filters, locationIds: selected })}
+          placeholder="All locations"
+          className="w-[180px]"
+        />
+
+        {/* Roles Multi-select */}
+        <MultiSelect
+          options={roleOptions}
+          selected={filters.roleIds.map(String)}
+          onChange={(selected) => onFiltersChange({ ...filters, roleIds: selected.map(Number) })}
+          placeholder="All roles"
+          className="w-[160px]"
+        />
+
+        {/* Eval Types */}
+        <Select
+          value={filters.evaluationTypes.length === 1 ? filters.evaluationTypes[0] : 
+                 filters.evaluationTypes.length === 0 ? 'all' : 'custom'}
+          onValueChange={(value) => {
+            if (value === 'all') {
+              onFiltersChange({ ...filters, evaluationTypes: [] });
+            } else if (value === 'custom') {
+              // Keep current selection
+            } else {
+              onFiltersChange({ ...filters, evaluationTypes: [value] });
+            }
+          }}
+        >
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Eval types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            {EVALUATION_TYPES.map((type) => (
+              <SelectItem key={type.value} value={type.value}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Date Range */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-10">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {format(filters.dateRange.start, "MMM d")} – {format(filters.dateRange.end, "MMM d")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-4" align="start">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Start Date</Label>
+                <Calendar
+                  mode="single"
+                  selected={filters.dateRange.start}
+                  onSelect={(date) => date && onFiltersChange({
+                    ...filters,
+                    dateRange: { ...filters.dateRange, start: date }
+                  })}
+                  initialFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">End Date</Label>
+                <Calendar
+                  mode="single"
+                  selected={filters.dateRange.end}
+                  onSelect={(date) => date && onFiltersChange({
+                    ...filters,
+                    dateRange: { ...filters.dateRange, end: date }
+                  })}
+                />
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Options Popover */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-10">
+              <Settings2 className="h-4 w-4 mr-1" />
+              Options
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72" align="end">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="include-no-evals"
+                  checked={filters.includeNoEvals}
+                  onCheckedChange={(checked) => onFiltersChange({
+                    ...filters,
+                    includeNoEvals: !!checked
+                  })}
+                />
+                <Label htmlFor="include-no-evals" className="text-sm">
+                  Include staff with no evaluations
+                </Label>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="window-days" className="text-sm">Window (days)</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Used in Pro-Moves Alignment tab: compares staff submissions from this many days before each evaluation to the evaluation results.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Input
+                  id="window-days"
+                  type="number"
+                  min="1"
+                  max="365"
+                  className="w-20"
+                  value={filters.windowDays}
+                  onChange={(e) => onFiltersChange({
+                    ...filters,
+                    windowDays: parseInt(e.target.value) || 42
+                  })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Default: 42 days (6 weeks)
+                </p>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Clear All */}
+        {activeFilters.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-10 text-muted-foreground">
+            Clear all
+          </Button>
+        )}
+      </div>
+
+      {/* Row 2: Active Filters as chips */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Active:</span>
+          {activeFilters.map((filter, index) => (
+            <Badge key={index} variant="secondary" className="gap-1">
+              {filter.label}
+              <X 
+                className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                onClick={filter.onRemove}
+              />
+            </Badge>
+          ))}
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Evaluation Types */}
-          <div className="space-y-2">
-            <Label>Evaluation Types</Label>
-            <div className="flex flex-wrap gap-2">
-              {EVALUATION_TYPES.map((type) => (
-                <Badge
-                  key={type}
-                  variant={filters.evaluationTypes.includes(type) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleEvaluationType(type)}
-                >
-                  {type}
-                  {filters.evaluationTypes.includes(type) && (
-                    <X className="ml-1 h-3 w-3" />
-                  )}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Date Range */}
-          <div className="space-y-2">
-            <Label>Date Range</Label>
-            <div className="flex gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(filters.dateRange.start, "MMM d")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={filters.dateRange.start}
-                    onSelect={(date) => date && onFiltersChange({
-                      ...filters,
-                      dateRange: { ...filters.dateRange, start: date }
-                    })}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <span className="self-center text-muted-foreground">to</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(filters.dateRange.end, "MMM d")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={filters.dateRange.end}
-                    onSelect={(date) => date && onFiltersChange({
-                      ...filters,
-                      dateRange: { ...filters.dateRange, end: date }
-                    })}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          {/* Locations */}
-          <div className="space-y-2">
-            <Label>Locations</Label>
-            <div className="flex flex-wrap gap-2">
-              {locations.length === 0 && !filters.organizationId && (
-                <span className="text-sm text-muted-foreground">Select organization first</span>
-              )}
-              {locations.map((location) => (
-                <Badge
-                  key={location.id}
-                  variant={filters.locationIds.includes(location.id) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleLocation(location.id)}
-                >
-                  {location.name}
-                  {filters.locationIds.includes(location.id) && (
-                    <X className="ml-1 h-3 w-3" />
-                  )}
-                </Badge>
-              ))}
-              {locations.length > 0 && filters.locationIds.length === 0 && (
-                <span className="text-sm text-muted-foreground">All locations</span>
-              )}
-            </div>
-          </div>
-
-          {/* Roles */}
-          <div className="space-y-2">
-            <Label>Roles</Label>
-            <div className="flex flex-wrap gap-2">
-              {roles.map((role) => (
-                <Badge
-                  key={role.role_id}
-                  variant={filters.roleIds.includes(role.role_id) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleRole(role.role_id)}
-                >
-                  {role.role_name}
-                  {filters.roleIds.includes(role.role_id) && (
-                    <X className="ml-1 h-3 w-3" />
-                  )}
-                </Badge>
-              ))}
-              {filters.roleIds.length === 0 && (
-                <span className="text-sm text-muted-foreground">All roles</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6">
-          {/* Include No Evals Checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="include-no-evals"
-              checked={filters.includeNoEvals}
-              onCheckedChange={(checked) => onFiltersChange({
-                ...filters,
-                includeNoEvals: !!checked
-              })}
-            />
-            <Label htmlFor="include-no-evals">Include staff with no evaluations</Label>
-          </div>
-
-          {/* Window Days Input */}
-          <div className="flex items-center space-x-2">
-            <Label htmlFor="window-days">Window (days):</Label>
-            <Input
-              id="window-days"
-              type="number"
-              min="1"
-              max="365"
-              className="w-20"
-              value={filters.windowDays}
-              onChange={(e) => onFiltersChange({
-                ...filters,
-                windowDays: parseInt(e.target.value) || 42
-              })}
-            />
-          </div>
-
-        </div>
-      </CardContent>
+      )}
     </Card>
   );
 }

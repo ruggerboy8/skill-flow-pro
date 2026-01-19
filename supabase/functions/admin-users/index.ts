@@ -594,6 +594,7 @@ serve(async (req: Request) => {
 
           // Delete all dependent records before deleting staff
           // Order matters due to FK constraints
+          // NOTE: reminder_log FK references auth.users.id (user_id), not staff.id
           const deletions = [
             admin.from("weekly_scores").delete().eq("staff_id", staffId),
             admin.from("weekly_self_select").delete().eq("user_id", staffId),
@@ -602,8 +603,8 @@ serve(async (req: Request) => {
             admin.from("coach_scopes").delete().eq("staff_id", staffId),
             admin.from("manager_priorities").delete().eq("coach_staff_id", staffId),
             admin.from("resource_events").delete().eq("staff_id", staffId),
-            admin.from("reminder_log").delete().eq("target_user_id", staffId),
-            admin.from("reminder_log").delete().eq("sender_user_id", staffId),
+            admin.from("reminder_log").delete().eq("target_user_id", user_id),  // FK to auth.users
+            admin.from("reminder_log").delete().eq("sender_user_id", user_id),  // FK to auth.users
             // evaluation_items cascade from evaluations
             admin.from("evaluations").delete().eq("staff_id", staffId),
             admin.from("evaluations").delete().eq("evaluator_id", staffId),

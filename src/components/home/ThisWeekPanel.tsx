@@ -17,7 +17,7 @@ import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
 import { computeWeekState, StaffStatus, getLocationWeekContext, LocationWeekContext } from '@/lib/locationState';
 import { useSim } from '@/devtools/SimProvider';
 import { formatInTimeZone } from 'date-fns-tz';
-import { GraduationCap, CalendarOff, ChevronRight } from 'lucide-react';
+import { GraduationCap, CalendarOff, ChevronRight, PauseCircle } from 'lucide-react';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { buildWeekBanner } from '@/v2/weekCta';
 import { enforceWeeklyRolloverNow } from '@/v2/rollover';
@@ -224,6 +224,31 @@ export default function ThisWeekPanel() {
         <div className="p-4 md:p-6 space-y-3">
           <Skeleton className="h-20 rounded-xl" />
           <Skeleton className="h-20 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
+  // Show paused account message
+  if (staff.is_paused) {
+    return (
+      <div className="bg-transparent md:bg-glass-gradient md:backdrop-blur-md md:border md:border-white/40 dark:md:border-slate-700/40 md:shadow-glass md:rounded-xl overflow-hidden">
+        <div className="px-4 py-3 md:px-6 md:py-4 md:border-b md:border-border/50">
+          <h3 className="font-semibold text-lg">This Week's Pro Moves</h3>
+          {weekOfDate && <p className="text-sm text-muted-foreground">Week of {weekOfDate}</p>}
+        </div>
+        <div className="p-4 md:p-6">
+          <div className="rounded-xl border bg-amber-50 border-amber-200 p-6 text-center">
+            <PauseCircle className="h-10 w-10 mx-auto mb-3 text-amber-600" />
+            <p className="font-semibold text-amber-900 mb-1">Your ProMoves Account is Temporarily Paused</p>
+            <p className="text-sm text-amber-700">
+              You won't receive assignments or be marked for missed submissions during this time.
+              Contact your Regional Manager if you'd like to be reinstated.
+            </p>
+            {staff.pause_reason && (
+              <p className="text-xs text-amber-600 mt-3 italic">Reason: {staff.pause_reason}</p>
+            )}
+          </div>
         </div>
       </div>
     );

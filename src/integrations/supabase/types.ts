@@ -1096,11 +1096,14 @@ export type Database = {
           is_lead: boolean
           is_org_admin: boolean
           is_participant: boolean
+          is_paused: boolean
           is_super_admin: boolean
           location: string | null
           name: string
           organization: string | null
           participation_start_at: string | null
+          pause_reason: string | null
+          paused_at: string | null
           primary_location_id: string | null
           role_id: number | null
           roles_updated_at: string | null
@@ -1119,11 +1122,14 @@ export type Database = {
           is_lead?: boolean
           is_org_admin?: boolean
           is_participant?: boolean
+          is_paused?: boolean
           is_super_admin?: boolean
           location?: string | null
           name: string
           organization?: string | null
           participation_start_at?: string | null
+          pause_reason?: string | null
+          paused_at?: string | null
           primary_location_id?: string | null
           role_id?: number | null
           roles_updated_at?: string | null
@@ -1142,11 +1148,14 @@ export type Database = {
           is_lead?: boolean
           is_org_admin?: boolean
           is_participant?: boolean
+          is_paused?: boolean
           is_super_admin?: boolean
           location?: string | null
           name?: string
           organization?: string | null
           participation_start_at?: string | null
+          pause_reason?: string | null
+          paused_at?: string | null
           primary_location_id?: string | null
           role_id?: number | null
           roles_updated_at?: string | null

@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, PauseCircle } from "lucide-react";
 
 interface Role {
   role_id: number;
@@ -33,6 +34,9 @@ interface User {
   is_coach: boolean;
   is_lead: boolean;
   is_participant: boolean;
+  is_paused?: boolean;
+  paused_at?: string | null;
+  pause_reason?: string | null;
   coach_scope_type?: 'org' | 'location' | null;
   coach_scope_id?: string | null;
   created_at?: string;
@@ -58,12 +62,16 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const [hireDate, setHireDate] = useState<string>('');
   const [editName, setEditName] = useState<string>('');
   const [editEmail, setEditEmail] = useState<string>('');
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [pauseReason, setPauseReason] = useState<string>('');
 
   useEffect(() => {
     if (user && open) {
       // Initialize editable fields
       setEditName(user.name || '');
       setEditEmail(user.email || '');
+      setIsPaused(user.is_paused ?? false);
+      setPauseReason(user.pause_reason || '');
       
       // Determine current action from flags
       if (user.is_super_admin) {
@@ -111,6 +119,24 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
 
     setLoading(true);
     try {
+      // Handle pause/unpause separately if changed
+      const pauseChanged = isPaused !== (user.is_paused ?? false);
+      
+      if (pauseChanged) {
+        const pauseAction = isPaused ? 'pause_user' : 'unpause_user';
+        const pausePayload: any = {
+          action: pauseAction,
+          user_id: user.user_id,
+        };
+        if (isPaused && pauseReason) {
+          pausePayload.reason = pauseReason;
+        }
+        
+        const { error: pauseError } = await supabase.functions.invoke('admin-users', { body: pausePayload });
+        if (pauseError) throw pauseError;
+      }
+
+      // Handle role_preset
       const payload: any = {
         action: 'role_preset',
         user_id: user.user_id,
@@ -130,9 +156,14 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
       if (error) throw error;
       
       const sideEffects = data?.side_effects;
-      const message = sideEffects?.cleared_weekly_tasks 
-        ? `User updated. Cleared ${sideEffects.deleted_scores} incomplete scores and ${sideEffects.deleted_selections} selections.`
-        : "User updated successfully";
+      let message = "User updated successfully";
+      if (pauseChanged && isPaused) {
+        message = `User paused successfully`;
+      } else if (pauseChanged && !isPaused) {
+        message = `User unpaused successfully`;
+      } else if (sideEffects?.cleared_weekly_tasks) {
+        message = `User updated. Cleared ${sideEffects.deleted_scores} incomplete scores and ${sideEffects.deleted_selections} selections.`;
+      }
       
       toast({
         title: "Success",
@@ -271,6 +302,34 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             <p className="text-xs text-muted-foreground">
               Submissions become required starting the Monday after hire date + onboarding weeks buffer
             </p>
+          </div>
+
+          {/* Pause Account Toggle */}
+          <div className="space-y-3 p-4 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg border border-amber-200/50 dark:border-amber-800/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PauseCircle className="h-5 w-5 text-amber-600" />
+                <Label htmlFor="pause-toggle" className="text-sm font-semibold cursor-pointer">
+                  Pause Account
+                </Label>
+              </div>
+              <Switch 
+                id="pause-toggle"
+                checked={isPaused} 
+                onCheckedChange={setIsPaused}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              When paused, this user won't receive assignments or be marked for missed submissions. Use for maternity leave, extended absence, etc.
+            </p>
+            {isPaused && (
+              <Input 
+                placeholder="Reason (optional, e.g. Maternity leave - returns April 2026)"
+                value={pauseReason}
+                onChange={(e) => setPauseReason(e.target.value)}
+                className="mt-2"
+              />
+            )}
           </div>
 
           {/* Action Selection */}

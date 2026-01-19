@@ -17,6 +17,9 @@ export interface StaffProfile {
   is_participant: boolean;
   is_coach: boolean;
   is_lead: boolean;
+  is_paused: boolean;
+  paused_at: string | null;
+  pause_reason: string | null;
   home_route: string | null;
   locations: {
     organization_id: string;
@@ -62,6 +65,9 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           is_participant,
           is_coach,
           is_lead,
+          is_paused,
+          paused_at,
+          pause_reason,
           home_route,
           locations (
             organization_id,

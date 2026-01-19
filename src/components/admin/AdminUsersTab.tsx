@@ -33,6 +33,9 @@ interface User {
   is_coach: boolean;
   is_lead: boolean;
   is_participant: boolean;
+  is_paused: boolean;
+  paused_at?: string | null;
+  pause_reason?: string | null;
   coach_scope_type?: 'org' | 'location' | null;
   coach_scope_id?: string | null;
   hire_date?: string | null;
@@ -223,6 +226,9 @@ const handleResetPassword = async (user: User) => {
   const { sortedData, sortConfig, handleSort } = useTableSort(filteredUsers);
 
   const getStatusBadge = (user: User) => {
+    if (user.is_paused) {
+      return <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">Paused</Badge>;
+    }
     if (!user.email_confirmed_at) {
       return <Badge variant="secondary">Invited</Badge>;
     }

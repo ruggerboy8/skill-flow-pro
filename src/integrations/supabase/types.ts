@@ -2315,6 +2315,8 @@ export type Database = {
           location_id: string
           location_name: string
           n_items: number
+          role_id: number
+          role_name: string
           staff_id: string
           staff_name: string
         }[]

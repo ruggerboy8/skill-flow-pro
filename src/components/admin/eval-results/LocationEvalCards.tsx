@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LocationEvalCard, LocationEvalStats } from './LocationEvalCard';
+import { LocationEvalCard, LocationEvalStats, DomainScore } from './LocationEvalCard';
 import type { EvalFilters } from '@/types/analytics';
 import { periodToDateRange } from '@/types/analytics';
 
@@ -109,16 +109,13 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
         ? data.selfScores.reduce((a, b) => a + b, 0) / data.selfScores.length
         : null;
       
-      // Find weakest domain (lowest avg observer)
-      let weakestDomain: string | null = null;
-      let lowestScore = Infinity;
+      // Build domain scores array (sorted by score ascending)
+      const domainScores: DomainScore[] = [];
       data.domainScores.forEach((scores, domain) => {
         const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-        if (avg < lowestScore) {
-          lowestScore = avg;
-          weakestDomain = domain;
-        }
+        domainScores.push({ domainName: domain, avgObserver: avg });
       });
+      domainScores.sort((a, b) => a.avgObserver - b.avgObserver);
       
       return {
         locationId: locId,
@@ -128,7 +125,7 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
         avgObserver,
         avgSelf,
         gap: avgObserver !== null && avgSelf !== null ? avgObserver - avgSelf : null,
-        weakestDomain,
+        domainScores,
       };
     });
 

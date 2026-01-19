@@ -14,10 +14,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StaffDomainDrawer } from './StaffDomainDrawer';
-import { pivotStaffDomain, type LongRow } from '@/lib/pivot';
+import { pivotStaffDomain } from '@/lib/pivot';
 import { downloadCSV, formatValueForCSV } from '@/lib/csvExport';
 import { getDomainColor } from '@/lib/domainColors';
 import type { EvalFilters } from '@/types/analytics';
+import { periodToDateRange } from '@/types/analytics';
 
 interface IndividualResultsTabProps {
   filters: EvalFilters;
@@ -58,13 +59,18 @@ export function IndividualResultsTab({ filters }: IndividualResultsTabProps) {
     queryFn: async () => {
       if (!filters.organizationId) return [];
 
+      const dateRange = periodToDateRange(filters.evaluationPeriod);
+      const evalTypes = filters.evaluationPeriod.type === 'Baseline' 
+        ? ['Baseline'] 
+        : ['Quarterly'];
+
       const params = {
         p_org_id: filters.organizationId,
-        p_start: filters.dateRange.start?.toISOString(),
-        p_end: filters.dateRange.end?.toISOString(),
+        p_start: dateRange.start.toISOString(),
+        p_end: dateRange.end.toISOString(),
         ...(filters.locationIds?.length ? { p_location_ids: filters.locationIds } : {}),
         ...(filters.roleIds?.length ? { p_role_ids: filters.roleIds } : {}),
-        ...(filters.evaluationTypes?.length ? { p_eval_types: filters.evaluationTypes } : {}),
+        p_eval_types: evalTypes,
         p_include_no_eval: filters.includeNoEvals,
       };
 

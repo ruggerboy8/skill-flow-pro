@@ -7,13 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, X, Settings2, HelpCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { ChevronDown, X, Settings2, HelpCircle } from 'lucide-react';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { EvalFilters } from '@/types/analytics';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
+import type { EvalFilters, Quarter, EvaluationPeriodType } from '@/types/analytics';
 
 interface FilterBarProps {
   filters: EvalFilters;
@@ -35,15 +35,25 @@ interface Role {
   role_name: string;
 }
 
-const EVALUATION_TYPES = [
-  { value: 'Baseline', label: 'Baseline' },
-  { value: 'Quarterly', label: 'Quarterly' }
+const PERIODS: { value: EvaluationPeriodType | Quarter; label: string; type: EvaluationPeriodType; quarter?: Quarter }[] = [
+  { value: 'Baseline', label: 'Baseline', type: 'Baseline' },
+  { value: 'Q1', label: 'Q1', type: 'Quarterly', quarter: 'Q1' },
+  { value: 'Q2', label: 'Q2', type: 'Quarterly', quarter: 'Q2' },
+  { value: 'Q3', label: 'Q3', type: 'Quarterly', quarter: 'Q3' },
+  { value: 'Q4', label: 'Q4', type: 'Quarterly', quarter: 'Q4' },
 ];
+
+// Generate year options (current year and 2 years back)
+function getYearOptions(): number[] {
+  const currentYear = new Date().getFullYear();
+  return [currentYear, currentYear - 1, currentYear - 2];
+}
 
 export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
   // Load organizations on mount
   useEffect(() => {
@@ -51,17 +61,12 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
     loadRoles();
   }, []);
 
-  // Load locations when organization changes and clear filters
+  // Load locations when organization changes
   useEffect(() => {
     if (filters.organizationId) {
       loadLocations();
     } else {
       setLocations([]);
-      onFiltersChange({
-        ...filters,
-        locationIds: [],
-        roleIds: []
-      });
     }
   }, [filters.organizationId]);
 
@@ -110,30 +115,44 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
     }
   }
 
-  function clearAllFilters() {
+  function handlePeriodSelect(period: typeof PERIODS[number]) {
     onFiltersChange({
       ...filters,
-      evaluationTypes: [],
+      evaluationPeriod: {
+        type: period.type,
+        quarter: period.quarter,
+        year: filters.evaluationPeriod.year
+      }
+    });
+  }
+
+  function handleYearChange(year: string) {
+    onFiltersChange({
+      ...filters,
+      evaluationPeriod: {
+        ...filters.evaluationPeriod,
+        year: parseInt(year)
+      }
+    });
+  }
+
+  function clearSecondaryFilters() {
+    onFiltersChange({
+      ...filters,
       locationIds: [],
       roleIds: [],
-      dateRange: {
-        start: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
-        end: new Date()
-      },
       includeNoEvals: true,
       windowDays: 42
     });
   }
 
-  // Build active filter chips
+  // Get current period value for highlighting
+  const currentPeriodValue = filters.evaluationPeriod.type === 'Baseline' 
+    ? 'Baseline' 
+    : filters.evaluationPeriod.quarter;
+
+  // Build active filter chips for secondary filters only
   const activeFilters: { label: string; onRemove: () => void }[] = [];
-  
-  if (filters.evaluationTypes.length > 0) {
-    activeFilters.push({
-      label: `Types: ${filters.evaluationTypes.join(', ')}`,
-      onRemove: () => onFiltersChange({ ...filters, evaluationTypes: [] })
-    });
-  }
   
   if (filters.locationIds.length > 0) {
     const locationNames = filters.locationIds
@@ -159,10 +178,13 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
 
   const locationOptions = locations.map(l => ({ value: l.id, label: l.name }));
   const roleOptions = roles.map(r => ({ value: r.role_id.toString(), label: r.role_name }));
+  const yearOptions = getYearOptions();
+
+  const hasSecondaryFilters = filters.locationIds.length > 0 || filters.roleIds.length > 0;
 
   return (
     <Card className="p-4 space-y-3">
-      {/* Row 1: Primary Filters */}
+      {/* Row 1: Organization + Period Pills + Year */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Organization */}
         <Select
@@ -181,87 +203,67 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
           </SelectContent>
         </Select>
 
-        {/* Locations Multi-select */}
-        <MultiSelect
-          options={locationOptions}
-          selected={filters.locationIds}
-          onChange={(selected) => onFiltersChange({ ...filters, locationIds: selected })}
-          placeholder="All locations"
-          className="w-[180px]"
-        />
+        {/* Period Pills */}
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          {PERIODS.map((period) => (
+            <Button
+              key={period.value}
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 px-3 rounded-md text-sm font-medium transition-colors",
+                currentPeriodValue === period.value
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              )}
+              onClick={() => handlePeriodSelect(period)}
+            >
+              {period.label}
+            </Button>
+          ))}
+        </div>
 
-        {/* Roles Multi-select */}
-        <MultiSelect
-          options={roleOptions}
-          selected={filters.roleIds.map(String)}
-          onChange={(selected) => onFiltersChange({ ...filters, roleIds: selected.map(Number) })}
-          placeholder="All roles"
-          className="w-[160px]"
-        />
-
-        {/* Eval Types */}
+        {/* Year Selector */}
         <Select
-          value={filters.evaluationTypes.length === 1 ? filters.evaluationTypes[0] : 
-                 filters.evaluationTypes.length === 0 ? 'all' : 'custom'}
-          onValueChange={(value) => {
-            if (value === 'all') {
-              onFiltersChange({ ...filters, evaluationTypes: [] });
-            } else if (value === 'custom') {
-              // Keep current selection
-            } else {
-              onFiltersChange({ ...filters, evaluationTypes: [value] });
-            }
-          }}
+          value={filters.evaluationPeriod.year.toString()}
+          onValueChange={handleYearChange}
         >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Eval types" />
+          <SelectTrigger className="w-[100px]">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            {EVALUATION_TYPES.map((type) => (
-              <SelectItem key={type.value} value={type.value}>
-                {type.label}
+            {yearOptions.map((year) => (
+              <SelectItem key={year} value={year.toString()}>
+                {year}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {/* Date Range */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-10">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {format(filters.dateRange.start, "MMM d")} – {format(filters.dateRange.end, "MMM d")}
+        {/* More Filters Toggle */}
+        <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={cn(
+                "h-10 gap-1",
+                hasSecondaryFilters && "text-primary"
+              )}
+            >
+              More filters
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform",
+                moreFiltersOpen && "rotate-180"
+              )} />
+              {hasSecondaryFilters && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                  {activeFilters.length}
+                </Badge>
+              )}
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-4" align="start">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Start Date</Label>
-                <Calendar
-                  mode="single"
-                  selected={filters.dateRange.start}
-                  onSelect={(date) => date && onFiltersChange({
-                    ...filters,
-                    dateRange: { ...filters.dateRange, start: date }
-                  })}
-                  initialFocus
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">End Date</Label>
-                <Calendar
-                  mode="single"
-                  selected={filters.dateRange.end}
-                  onSelect={(date) => date && onFiltersChange({
-                    ...filters,
-                    dateRange: { ...filters.dateRange, end: date }
-                  })}
-                />
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+          </CollapsibleTrigger>
+        </Collapsible>
 
         {/* Options Popover */}
         <Popover>
@@ -296,7 +298,7 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
                         <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
-                        <p>Used in Pro-Moves Alignment tab: compares staff submissions from this many days before each evaluation to the evaluation results.</p>
+                        <p>Used for Pro-Moves comparison: analyzes staff submissions from this many days before each evaluation.</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -320,19 +322,55 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
             </div>
           </PopoverContent>
         </Popover>
-
-        {/* Clear All */}
-        {activeFilters.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-10 text-muted-foreground">
-            Clear all
-          </Button>
-        )}
       </div>
 
-      {/* Row 2: Active Filters as chips */}
-      {activeFilters.length > 0 && (
+      {/* Row 2: Collapsible secondary filters */}
+      <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+        <CollapsibleContent className="pt-2">
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg">
+            {/* Locations Multi-select */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Locations</Label>
+              <MultiSelect
+                options={locationOptions}
+                selected={filters.locationIds}
+                onChange={(selected) => onFiltersChange({ ...filters, locationIds: selected })}
+                placeholder="All locations"
+                className="w-[200px]"
+              />
+            </div>
+
+            {/* Roles Multi-select */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Roles</Label>
+              <MultiSelect
+                options={roleOptions}
+                selected={filters.roleIds.map(String)}
+                onChange={(selected) => onFiltersChange({ ...filters, roleIds: selected.map(Number) })}
+                placeholder="All roles"
+                className="w-[180px]"
+              />
+            </div>
+
+            {/* Clear secondary filters */}
+            {hasSecondaryFilters && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={clearSecondaryFilters}
+                className="text-muted-foreground self-end"
+              >
+                Clear filters
+              </Button>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Row 3: Active Filters as chips (only when collapsed) */}
+      {!moreFiltersOpen && activeFilters.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Active:</span>
+          <span className="text-sm text-muted-foreground">Filtered by:</span>
           {activeFilters.map((filter, index) => (
             <Badge key={index} variant="secondary" className="gap-1">
               {filter.label}

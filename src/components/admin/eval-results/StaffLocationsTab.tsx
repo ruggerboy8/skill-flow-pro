@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Download, ArrowUpDown } from 'lucide-react';
 import { downloadCSV, formatValueForCSV } from '@/lib/csvExport';
 import type { EvalFilters } from '@/types/analytics';
+import { periodToDateRange } from '@/types/analytics';
 
 interface StaffLocationsTabProps {
   filters: EvalFilters;
@@ -37,14 +38,19 @@ export function StaffLocationsTab({ filters }: StaffLocationsTabProps) {
     queryFn: async () => {
       if (!filters.organizationId) return [];
 
+      const dateRange = periodToDateRange(filters.evaluationPeriod);
+      const evalTypes = filters.evaluationPeriod.type === 'Baseline' 
+        ? ['Baseline'] 
+        : ['Quarterly'];
+
       const params = {
         p_org_id: filters.organizationId,
-        p_start: filters.dateRange.start?.toISOString(),
-        p_end: filters.dateRange.end?.toISOString(),
+        p_start: dateRange.start.toISOString(),
+        p_end: dateRange.end.toISOString(),
         p_include_no_eval: filters.includeNoEvals,
         ...(filters.locationIds?.length ? { p_location_ids: filters.locationIds } : {}),
         ...(filters.roleIds?.length ? { p_role_ids: filters.roleIds } : {}),
-        ...(filters.evaluationTypes?.length ? { p_types: filters.evaluationTypes } : {}),
+        p_types: evalTypes,
       };
 
       const { data, error } = await supabase.rpc('get_location_domain_staff_averages', params);

@@ -4,24 +4,30 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, Percent, TrendingUp, ArrowUpDown } from 'lucide-react';
 import type { EvalFilters } from '@/types/analytics';
+import { periodToDateRange, getPeriodLabel } from '@/types/analytics';
 
 interface SummaryMetricsProps {
   filters: EvalFilters;
 }
 
 export function SummaryMetrics({ filters }: SummaryMetricsProps) {
+  const dateRange = periodToDateRange(filters.evaluationPeriod);
+  
   const { data, isLoading } = useQuery({
-    queryKey: ['eval-summary-metrics', filters.organizationId, filters.dateRange.start, filters.dateRange.end],
+    queryKey: ['eval-summary-metrics', filters.organizationId, filters.evaluationPeriod],
     queryFn: async () => {
       if (!filters.organizationId) return null;
+
+      const evalType = filters.evaluationPeriod.type;
 
       // Get submitted evaluations in date range for this org
       const { data: evals } = await supabase
         .from('evaluations')
         .select('id, staff_id')
         .eq('status', 'submitted')
-        .gte('created_at', filters.dateRange.start.toISOString())
-        .lte('created_at', filters.dateRange.end.toISOString());
+        .eq('type', evalType)
+        .gte('created_at', dateRange.start.toISOString())
+        .lte('created_at', dateRange.end.toISOString());
 
       const evalIds = evals?.map(e => e.id) || [];
       const uniqueStaff = new Set(evals?.map(e => e.staff_id) || []);
@@ -33,7 +39,8 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
       if (evalIds.length > 0) {
         const { data: items } = await supabase
           .from('evaluation_items')
-          .select('observer_score, self_score');
+          .select('observer_score, self_score')
+          .in('evaluation_id', evalIds);
 
         const observerScores = (items || [])
           .map(i => i.observer_score)
@@ -80,6 +87,8 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
     );
   }
 
+  const periodLabel = getPeriodLabel(filters.evaluationPeriod);
+
   const metrics = [
     {
       label: 'Staff Evaluated',
@@ -91,7 +100,7 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
       label: 'Evaluations',
       value: data?.eval_count?.toString() || '0',
       icon: Percent,
-      description: 'In selected period'
+      description: periodLabel
     },
     {
       label: 'Avg Observer',

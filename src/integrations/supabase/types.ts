@@ -2297,57 +2297,32 @@ export type Database = {
           last_week: number
         }[]
       }
-      get_location_domain_staff_averages:
-        | {
-            Args: {
-              p_end?: string
-              p_include_no_eval?: boolean
-              p_location_ids?: string[]
-              p_org_id: string
-              p_role_ids?: number[]
-              p_start?: string
-              p_types?: string[]
-            }
-            Returns: {
-              avg_observer: number
-              domain_id: number
-              domain_name: string
-              has_eval: boolean
-              location_id: string
-              location_name: string
-              n_items: number
-              role_id: number
-              role_name: string
-              staff_id: string
-              staff_name: string
-            }[]
-          }
-        | {
-            Args: {
-              p_end: string
-              p_include_no_eval?: boolean
-              p_location_ids?: string[]
-              p_org_id: string
-              p_role_ids?: number[]
-              p_start: string
-              p_types?: string[]
-            }
-            Returns: {
-              avg_observer: number
-              avg_self: number
-              domain_id: number
-              domain_name: string
-              eval_status: string
-              has_eval: boolean
-              location_id: string
-              location_name: string
-              n_items: number
-              role_id: number
-              role_name: string
-              staff_id: string
-              staff_name: string
-            }[]
-          }
+      get_location_domain_staff_averages: {
+        Args: {
+          p_end: string
+          p_include_no_eval?: boolean
+          p_location_ids?: string[]
+          p_org_id: string
+          p_role_ids?: number[]
+          p_start: string
+          p_types?: string[]
+        }
+        Returns: {
+          avg_observer: number
+          avg_self: number
+          domain_id: number
+          domain_name: string
+          eval_status: string
+          has_eval: boolean
+          location_id: string
+          location_name: string
+          n_items: number
+          role_id: number
+          role_name: string
+          staff_id: string
+          staff_name: string
+        }[]
+      }
       get_location_skill_gaps: {
         Args: {
           p_limit_per_role?: number

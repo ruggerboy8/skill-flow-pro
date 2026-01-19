@@ -56,6 +56,7 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
     staffName: '',
   });
   const [submittingEvalId, setSubmittingEvalId] = useState<string | null>(null);
+  const [showDraftsOnly, setShowDraftsOnly] = useState(false);
 
   const dateRange = periodToDateRange(filters.evaluationPeriod);
   const evalTypes = filters.evaluationPeriod.type === 'Baseline' ? ['Baseline'] : ['Quarterly'];
@@ -167,6 +168,11 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
     }))
   ) : { rows: [], domains: [] };
 
+  // Filter rows based on showDraftsOnly
+  const filteredRows = showDraftsOnly
+    ? pivotData.rows.filter(row => evalStatuses?.get(row.staff_id)?.status === 'draft')
+    : pivotData.rows;
+
   const handleRowClick = (staffId: string, staffName: string) => {
     setDrawerState({
       open: true,
@@ -261,16 +267,31 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
       <div className="space-y-6">
         {/* Header with breadcrumb */}
         <div>
-          <Button variant="ghost" size="sm" onClick={onBack} className="mb-2 -ml-2">
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={onBack} 
+            className="mb-2 -ml-2 bg-primary text-primary-foreground hover:bg-primary/90"
+          >
             <ChevronLeft className="h-4 w-4 mr-1" />
             Back to All Locations
           </Button>
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-2xl font-bold">{locationName}</h2>
             <Badge variant="outline">{getPeriodLabel(filters.evaluationPeriod)}</Badge>
-            <span className="text-sm text-muted-foreground">
-              {staffCounts.submitted} submitted · {staffCounts.drafts} drafts · {staffCounts.total - staffCounts.withEval} pending
-            </span>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">{staffCounts.submitted} submitted</span>
+              {staffCounts.drafts > 0 && (
+                <Badge 
+                  variant="outline" 
+                  className="text-amber-600 border-amber-300 cursor-pointer hover:bg-amber-50"
+                  onClick={() => setShowDraftsOnly(prev => !prev)}
+                >
+                  {showDraftsOnly ? '✓ ' : ''}{staffCounts.drafts} drafts
+                </Badge>
+              )}
+              <span className="text-muted-foreground">{staffCounts.total - staffCounts.withEval} pending</span>
+            </div>
           </div>
         </div>
 
@@ -286,9 +307,11 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
             </div>
           </CardHeader>
           <CardContent>
-            {pivotData.rows.length === 0 ? (
+            {filteredRows.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-muted-foreground">No staff data found for this location.</p>
+                <p className="text-muted-foreground">
+                  {showDraftsOnly ? 'No draft evaluations found.' : 'No staff data found for this location.'}
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -321,7 +344,7 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pivotData.rows.map((row) => (
+                    {filteredRows.map((row) => (
                       <TableRow 
                         key={row.staff_id}
                         className="cursor-pointer hover:bg-muted/50"

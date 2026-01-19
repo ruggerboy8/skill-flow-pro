@@ -43,7 +43,8 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
         ? ['Baseline'] 
         : ['Quarterly'];
 
-      const params = {
+      // Build params with explicit typing to avoid depth errors
+      const { data, error } = await (supabase.rpc as any)('get_location_domain_staff_averages', {
         p_org_id: filters.organizationId,
         p_start: dateRange.start.toISOString(),
         p_end: dateRange.end.toISOString(),
@@ -51,9 +52,7 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
         ...(filters.locationIds?.length ? { p_location_ids: filters.locationIds } : {}),
         ...(filters.roleIds?.length ? { p_role_ids: filters.roleIds } : {}),
         p_types: evalTypes,
-      };
-
-      const { data, error } = await supabase.rpc('get_location_domain_staff_averages', params);
+      });
 
       if (error) throw error;
       return data as StaffLocationData[];

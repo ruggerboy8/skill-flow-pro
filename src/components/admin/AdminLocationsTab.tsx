@@ -260,7 +260,7 @@ export function AdminLocationsTab() {
                    <SortableTableHead sortKey="active" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
                      Status
                    </SortableTableHead>
-                   <TableHead className="w-[50px]">Actions</TableHead>
+                   <TableHead className="w-12 text-right">Actions</TableHead>
                  </TableRow>
                </TableHeader>
                <TableBody>
@@ -314,10 +314,10 @@ export function AdminLocationsTab() {
                           </Badge>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>

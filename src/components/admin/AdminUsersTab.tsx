@@ -379,10 +379,10 @@ const handleResetPassword = async (user: User) => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-1/3">
+                    <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="min-w-[180px]">
                       Name
                     </SortableTableHead>
-                    <SortableTableHead sortKey="email" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-1/4">
+                    <SortableTableHead sortKey="email" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="min-w-[160px]">
                       Email
                     </SortableTableHead>
                     <SortableTableHead sortKey="role_name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
@@ -394,7 +394,7 @@ const handleResetPassword = async (user: User) => {
                     <SortableTableHead sortKey="email_confirmed_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
                       Status
                     </SortableTableHead>
-                    <TableHead className="w-16">Actions</TableHead>
+                    <TableHead className="w-12 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -417,10 +417,10 @@ const handleResetPassword = async (user: User) => {
                         <TableCell className="truncate">{user.role_name || "—"}</TableCell>
                         <TableCell className="truncate">{user.location_name || "—"}</TableCell>
                         <TableCell>{getStatusBadge(user)}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>

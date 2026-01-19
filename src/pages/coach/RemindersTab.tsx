@@ -148,6 +148,7 @@ export default function RemindersTab() {
           roles:role_id(role_name)
         `)
         .eq('is_participant', true)
+        .eq('is_paused', false)
         .not('primary_location_id', 'is', null);
       if (staffErr) throw staffErr;
 

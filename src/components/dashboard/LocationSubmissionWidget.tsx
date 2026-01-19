@@ -49,7 +49,8 @@ export default function LocationSubmissionWidget({ locationId }: LocationSubmiss
         .from('staff')
         .select('id')
         .eq('primary_location_id', locationId)
-        .eq('is_participant', true);
+        .eq('is_participant', true)
+        .eq('is_paused', false);
       
       if (staffResult.error) throw staffResult.error;
 

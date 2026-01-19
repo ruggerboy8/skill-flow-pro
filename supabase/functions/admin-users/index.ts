@@ -93,7 +93,7 @@ serve(async (req: Request) => {
 
         let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,coach_scope_type,coach_scope_id,roles(role_name),locations(name,organization_id)", {
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,is_paused,paused_at,pause_reason,coach_scope_type,coach_scope_id,roles(role_name),locations(name,organization_id)", {
             count: "exact",
           })
           .order("name", { ascending: true });
@@ -192,6 +192,9 @@ serve(async (req: Request) => {
             is_coach: s.is_coach ?? false,
             is_lead: s.is_lead ?? false,
             is_participant: s.is_participant ?? true,
+            is_paused: s.is_paused ?? false,
+            paused_at: s.paused_at ?? null,
+            pause_reason: s.pause_reason ?? null,
             coach_scopes: scopes || null,
           };
           console.log("Final row data:", row);
@@ -570,6 +573,108 @@ serve(async (req: Request) => {
         if (resetErr) throw resetErr;
 
         return json({ ok: true, message: "Password reset email sent" });
+      }
+
+      case "pause_user": {
+        const { user_id, reason } = payload ?? {};
+        if (!user_id) return json({ error: "user_id required" }, 400);
+
+        // Get current staff record
+        const { data: currentStaff, error: fetchErr } = await admin
+          .from("staff")
+          .select("id, is_paused, name")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        
+        if (fetchErr) throw fetchErr;
+        if (!currentStaff) return json({ error: "Staff not found" }, 404);
+
+        // Update to paused state
+        const { error: updateErr } = await admin
+          .from("staff")
+          .update({
+            is_paused: true,
+            paused_at: new Date().toISOString(),
+            pause_reason: reason || null,
+          })
+          .eq("user_id", user_id);
+        
+        if (updateErr) throw updateErr;
+
+        // Audit log
+        try {
+          const { data: changerStaff } = await admin
+            .from("staff")
+            .select("id")
+            .eq("user_id", authUser.user.id)
+            .maybeSingle();
+          
+          if (changerStaff) {
+            await admin.from("admin_audit").insert({
+              staff_id: currentStaff.id,
+              changed_by: changerStaff.id,
+              action: "pause_user",
+              old_values: { is_paused: false },
+              new_values: { is_paused: true, pause_reason: reason || null },
+            });
+          }
+        } catch (auditErr) {
+          console.warn("Failed to write audit log:", auditErr);
+        }
+
+        console.log(`✅ Paused user ${currentStaff.name} (staff_id: ${currentStaff.id})`);
+        return json({ ok: true, message: `User ${currentStaff.name} has been paused` });
+      }
+
+      case "unpause_user": {
+        const { user_id } = payload ?? {};
+        if (!user_id) return json({ error: "user_id required" }, 400);
+
+        // Get current staff record
+        const { data: currentStaff, error: fetchErr } = await admin
+          .from("staff")
+          .select("id, is_paused, name, pause_reason")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        
+        if (fetchErr) throw fetchErr;
+        if (!currentStaff) return json({ error: "Staff not found" }, 404);
+
+        // Update to unpaused state
+        const { error: updateErr } = await admin
+          .from("staff")
+          .update({
+            is_paused: false,
+            paused_at: null,
+            pause_reason: null,
+          })
+          .eq("user_id", user_id);
+        
+        if (updateErr) throw updateErr;
+
+        // Audit log
+        try {
+          const { data: changerStaff } = await admin
+            .from("staff")
+            .select("id")
+            .eq("user_id", authUser.user.id)
+            .maybeSingle();
+          
+          if (changerStaff) {
+            await admin.from("admin_audit").insert({
+              staff_id: currentStaff.id,
+              changed_by: changerStaff.id,
+              action: "unpause_user",
+              old_values: { is_paused: true, pause_reason: currentStaff.pause_reason },
+              new_values: { is_paused: false },
+            });
+          }
+        } catch (auditErr) {
+          console.warn("Failed to write audit log:", auditErr);
+        }
+
+        console.log(`✅ Unpaused user ${currentStaff.name} (staff_id: ${currentStaff.id})`);
+        return json({ ok: true, message: `User ${currentStaff.name} has been unpaused` });
       }
 
       case "delete_user": {

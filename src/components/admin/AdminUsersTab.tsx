@@ -375,7 +375,7 @@ const handleResetPassword = async (user: User) => {
 
           {/* Users Table */}
           <div className="rounded-md border">
-            <TooltipProvider>
+            <TooltipProvider delayDuration={0}>
               <Table>
                 <TableHeader>
                   <TableRow>

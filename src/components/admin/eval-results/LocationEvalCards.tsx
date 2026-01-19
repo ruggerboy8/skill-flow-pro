@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LocationEvalCard, LocationEvalStats, DomainScore } from './LocationEvalCard';
+import { LocationEvalCard, LocationEvalStats, RoleDomainScore } from './LocationEvalCard';
 import type { EvalFilters } from '@/types/analytics';
 import { periodToDateRange } from '@/types/analytics';
 
@@ -17,12 +17,18 @@ interface StaffLocationData {
   location_name: string;
   staff_id: string;
   staff_name: string;
+  role_id: number | null;
+  role_name: string | null;
   domain_id: number;
   domain_name: string;
   n_items: number;
   avg_observer: number;
   has_eval: boolean;
 }
+
+// Canonical role names for grouping
+const DFI_ROLE = 'DFI';
+const RDA_ROLE = 'RDA';
 
 export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCardsProps) {
   const { data: rawData, isLoading, error } = useQuery({
@@ -53,7 +59,7 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
     enabled: !!filters.organizationId
   });
 
-  // Aggregate raw data by location
+  // Aggregate raw data by location with role breakdown
   const locationStats = useMemo<LocationEvalStats[]>(() => {
     if (!rawData || rawData.length === 0) return [];
 
@@ -62,9 +68,12 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
       locationName: string;
       staffIds: Set<string>;
       staffWithEval: Set<string>;
+      dfiStaffIds: Set<string>;
+      rdaStaffIds: Set<string>;
       observerScores: number[];
       selfScores: number[];
-      domainScores: Map<string, number[]>;
+      // domainName -> role -> scores[]
+      roleDomainScores: Map<string, { dfi: number[]; rda: number[] }>;
     }>();
 
     rawData.forEach(row => {
@@ -73,28 +82,42 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
           locationName: row.location_name,
           staffIds: new Set(),
           staffWithEval: new Set(),
+          dfiStaffIds: new Set(),
+          rdaStaffIds: new Set(),
           observerScores: [],
           selfScores: [],
-          domainScores: new Map(),
+          roleDomainScores: new Map(),
         });
       }
       
       const loc = byLocation.get(row.location_id)!;
       loc.staffIds.add(row.staff_id);
       
+      // Track role counts (unique staff per role)
+      const roleName = row.role_name?.toUpperCase() || '';
+      if (roleName.includes(DFI_ROLE)) {
+        loc.dfiStaffIds.add(row.staff_id);
+      } else if (roleName.includes(RDA_ROLE)) {
+        loc.rdaStaffIds.add(row.staff_id);
+      }
+      
       if (row.has_eval) {
         loc.staffWithEval.add(row.staff_id);
       }
       
-      if (row.avg_observer !== null) {
+      if (row.avg_observer !== null && row.domain_name) {
         loc.observerScores.push(row.avg_observer);
         
-        // Track per-domain scores to find weakest
-        if (row.domain_name) {
-          if (!loc.domainScores.has(row.domain_name)) {
-            loc.domainScores.set(row.domain_name, []);
-          }
-          loc.domainScores.get(row.domain_name)!.push(row.avg_observer);
+        // Track per-domain-per-role scores
+        if (!loc.roleDomainScores.has(row.domain_name)) {
+          loc.roleDomainScores.set(row.domain_name, { dfi: [], rda: [] });
+        }
+        const domainBucket = loc.roleDomainScores.get(row.domain_name)!;
+        
+        if (roleName.includes(DFI_ROLE)) {
+          domainBucket.dfi.push(row.avg_observer);
+        } else if (roleName.includes(RDA_ROLE)) {
+          domainBucket.rda.push(row.avg_observer);
         }
       }
     });
@@ -109,23 +132,34 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
         ? data.selfScores.reduce((a, b) => a + b, 0) / data.selfScores.length
         : null;
       
-      // Build domain scores array (sorted by score ascending)
-      const domainScores: DomainScore[] = [];
-      data.domainScores.forEach((scores, domain) => {
-        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-        domainScores.push({ domainName: domain, avgObserver: avg });
+      // Build role-domain scores array
+      const roleDomainScores: RoleDomainScore[] = [];
+      data.roleDomainScores.forEach((scores, domainName) => {
+        const dfiAvg = scores.dfi.length > 0 
+          ? scores.dfi.reduce((a, b) => a + b, 0) / scores.dfi.length 
+          : null;
+        const rdaAvg = scores.rda.length > 0 
+          ? scores.rda.reduce((a, b) => a + b, 0) / scores.rda.length 
+          : null;
+        
+        // Only include if at least one role has data
+        if (dfiAvg !== null || rdaAvg !== null) {
+          roleDomainScores.push({ domainName, dfiAvg, rdaAvg });
+        }
       });
-      domainScores.sort((a, b) => a.avgObserver - b.avgObserver);
       
       return {
         locationId: locId,
         locationName: data.locationName,
+        dfiCount: data.dfiStaffIds.size,
+        rdaCount: data.rdaStaffIds.size,
         staffCount: data.staffIds.size,
         staffWithEval: data.staffWithEval.size,
         avgObserver,
         avgSelf,
         gap: avgObserver !== null && avgSelf !== null ? avgObserver - avgSelf : null,
-        domainScores,
+        roleDomainScores,
+        accountabilityRate: null, // Placeholder for Phase 2
       };
     });
 
@@ -154,7 +188,7 @@ export function LocationEvalCards({ filters, onLocationClick }: LocationEvalCard
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {[1, 2, 3, 4, 5, 6].map(i => (
-          <Skeleton key={i} className="h-36" />
+          <Skeleton key={i} className="h-52" />
         ))}
       </div>
     );

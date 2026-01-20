@@ -18,6 +18,7 @@ import {
 } from '@/types/evalMetricsV2';
 import { DistributionBar } from './DistributionBar';
 import { useOrgAccountability } from '@/hooks/useOrgAccountability';
+import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
 
 interface OrgSummaryStripProps {
   filters: EvalFilters;
@@ -327,14 +328,14 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
   obs2 = obsBottomBox - obs1;
   obs3 = nItems - obsTopBox - obsBottomBox;
   
-  // Build domain averages array
+  // Build domain averages array - sorted by canonical order
   const domainAvgs: { name: string; avg: number }[] = [];
   for (const [name, { sum, count }] of domainMap) {
     if (count > 0) {
       domainAvgs.push({ name, avg: sum / count });
     }
   }
-  domainAvgs.sort((a, b) => a.name.localeCompare(b.name));
+  domainAvgs.sort((a, b) => getDomainOrderIndex(a.name) - getDomainOrderIndex(b.name));
   
   return {
     orgMetrics: {

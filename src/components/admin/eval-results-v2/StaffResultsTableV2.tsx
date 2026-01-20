@@ -24,21 +24,24 @@ import {
 } from '@/types/evalMetricsV2';
 import type { EvalFilters } from '@/types/analytics';
 import { cn } from '@/lib/utils';
+import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
 
 interface StaffResultsTableV2Props {
   data: EvalDistributionRow[];
   filters: EvalFilters;
+  onRowClick?: (staffId: string, staffName: string) => void;
 }
 
-export function StaffResultsTableV2({ data, filters }: StaffResultsTableV2Props) {
+export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsTableV2Props) {
   const [showDraftsOnly, setShowDraftsOnly] = useState(false);
   const queryClient = useQueryClient();
 
   // Aggregate by staff
   const staffRows = aggregateByStaff(data);
   
-  // Get unique domains for columns
-  const domains = [...new Set(data.map(r => r.domain_name))].sort();
+  // Get unique domains for columns - sorted by canonical order
+  const domains = [...new Set(data.map(r => r.domain_name))]
+    .sort((a, b) => getDomainOrderIndex(a) - getDomainOrderIndex(b));
   
   // Filter if needed
   const filteredRows = showDraftsOnly 
@@ -113,13 +116,20 @@ export function StaffResultsTableV2({ data, filters }: StaffResultsTableV2Props)
           </TableHeader>
           <TableBody>
             {filteredRows.map((staff) => (
-              <TableRow key={staff.staffId}>
+              <TableRow 
+                key={staff.staffId}
+                className={cn(onRowClick && "cursor-pointer hover:bg-muted/50")}
+                onClick={() => onRowClick?.(staff.staffId, staff.staffName)}
+              >
                 <TableCell className="font-medium">{staff.staffName}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {staff.roleName}
                 </TableCell>
                 <TableCell className="text-center">
-                  {getStatusBadge(staff, () => submitMutation.mutate(staff.evaluationId!), submitMutation.isPending)}
+                  {getStatusBadge(staff, (e) => {
+                    e.stopPropagation();
+                    submitMutation.mutate(staff.evaluationId!);
+                  }, submitMutation.isPending)}
                 </TableCell>
                 <TableCell className={cn("text-center font-medium", getMismatchColor(staff.totalMismatchRate))}>
                   {formatRate(staff.totalMismatchRate)}
@@ -146,7 +156,7 @@ export function StaffResultsTableV2({ data, filters }: StaffResultsTableV2Props)
   );
 }
 
-function getStatusBadge(staff: StaffRowV2, onSubmit: () => void, isPending: boolean) {
+function getStatusBadge(staff: StaffRowV2, onSubmit: (e: React.MouseEvent) => void, isPending: boolean) {
   if (!staff.evaluationId) {
     return <Badge variant="outline" className="text-muted-foreground">No eval</Badge>;
   }

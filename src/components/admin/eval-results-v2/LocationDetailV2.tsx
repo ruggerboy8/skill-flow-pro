@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { periodToDateRange, type EvalFilters } from '@/types/analytics';
 import { DomainSnapshotTable } from './DomainSnapshotTable';
 import { StaffResultsTableV2 } from './StaffResultsTableV2';
 import { LocationSummaryPanel } from './LocationSummaryPanel';
+import { StaffDetailDrawer } from '@/components/admin/eval-results/StaffDetailDrawer';
 import { type EvalDistributionRow } from '@/types/evalMetricsV2';
 
 interface LocationDetailV2Props {
@@ -19,6 +21,13 @@ interface LocationDetailV2Props {
 
 export function LocationDetailV2({ filters, locationId, locationName, onBack }: LocationDetailV2Props) {
   const { organizationId, evaluationPeriod, roleIds } = filters;
+  
+  // Staff detail drawer state
+  const [drawerState, setDrawerState] = useState<{
+    open: boolean;
+    staffId: string;
+    staffName: string;
+  }>({ open: false, staffId: '', staffName: '' });
   
   const types = evaluationPeriod.type === 'Baseline' ? ['Baseline'] : ['Quarterly'];
   const quarter = evaluationPeriod.type === 'Quarterly' ? evaluationPeriod.quarter : null;
@@ -103,9 +112,23 @@ export function LocationDetailV2({ filters, locationId, locationName, onBack }: 
           <CardTitle className="text-lg">Staff Results</CardTitle>
         </CardHeader>
         <CardContent>
-          <StaffResultsTableV2 data={rawData || []} filters={filters} />
+          <StaffResultsTableV2 
+            data={rawData || []} 
+            filters={filters} 
+            onRowClick={(staffId, staffName) => setDrawerState({ open: true, staffId, staffName })}
+          />
         </CardContent>
       </Card>
+
+      {/* Staff Detail Drawer */}
+      <StaffDetailDrawer
+        open={drawerState.open}
+        onOpenChange={(open) => setDrawerState(prev => ({ ...prev, open }))}
+        staffId={drawerState.staffId}
+        staffName={drawerState.staffName}
+        locationName={locationName}
+        filters={filters}
+      />
     </div>
   );
 }

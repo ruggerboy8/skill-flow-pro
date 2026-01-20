@@ -224,54 +224,58 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
         </CardContent>
       </Card>
 
-      {/* Weekly Practice Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-2 text-muted-foreground mb-3">
-            <Users className="h-4 w-4" />
-            <span className="text-sm font-medium">Weekly Practice</span>
-            <TooltipProvider delayDuration={0}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="text-xs">
-                    Weekly practice completion for the 6 weeks before this evaluation period.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          
-          {accountability.isLoading ? (
-            <>
-              <Skeleton className="h-8 w-20 mb-2" />
-              <Skeleton className="h-4 w-32" />
-            </>
-          ) : accountability.completionRate !== null ? (
-            <>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold">{accountability.completionRate}%</span>
-                <span className="text-sm text-muted-foreground">completed</span>
+      {/* ProMove Submission Card - Only for Quarterly */}
+      {evaluationPeriod.type !== 'Baseline' && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 text-muted-foreground mb-3">
+              <Users className="h-4 w-4" />
+              <span className="text-sm font-medium">ProMove Submission</span>
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Weekly ProMove submission rates from the quarter before this evaluation.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            
+            {accountability.isLoading ? (
+              <>
+                <Skeleton className="h-8 w-20 mb-2" />
+                <Skeleton className="h-4 w-32" />
+              </>
+            ) : accountability.completionRate !== null ? (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{accountability.completionRate}%</span>
+                  <span className="text-sm text-muted-foreground">completed</span>
+                </div>
+                
+                <div className="text-sm text-muted-foreground mt-1">
+                  {accountability.onTimeRate}% on time
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-muted-foreground">—</div>
+                <div className="text-sm text-muted-foreground">No data available</div>
+              </>
+            )}
+            
+            {accountability.previousQuarterLabel && (
+              <div className="mt-3 text-xs text-muted-foreground italic">
+                *Data from {accountability.previousQuarterLabel}
               </div>
-              
-              <div className="text-sm text-muted-foreground mt-1">
-                {accountability.onTimeRate}% on time · {accountability.totalSubmissions} check-ins
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-2xl font-bold text-muted-foreground">—</div>
-              <div className="text-sm text-muted-foreground">No data for this period</div>
-            </>
-          )}
-          
-          <div className="mt-3 text-xs text-muted-foreground italic">
-            *6 weeks before evaluation
-          </div>
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

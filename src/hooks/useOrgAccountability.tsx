@@ -1,51 +1,62 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { EvalFilters } from '@/types/analytics';
-import { subWeeks, endOfQuarter, endOfYear, format } from 'date-fns';
+import { startOfQuarter, endOfQuarter, subQuarters, format } from 'date-fns';
 
 interface OrgAccountabilityResult {
   completionRate: number | null;
   onTimeRate: number | null;
-  totalSubmissions: number;
+  previousQuarterLabel: string | null;
   isLoading: boolean;
   error: Error | null;
 }
 
 /**
- * Get the end date for a given evaluation period.
- * Used to determine the 6-week accountability window.
+ * Get the previous quarter date range for a given evaluation period.
+ * E.g., Q1 2026 eval → Q4 2025 data
  */
-function getPeriodEndDate(period: EvalFilters['evaluationPeriod']): Date {
-  const year = period.year;
+function getPreviousQuarterRange(period: EvalFilters['evaluationPeriod']): { start: Date; end: Date; label: string } | null {
+  // Only works for Quarterly evaluations
+  if (period.type === 'Baseline') return null;
   
-  if (period.type === 'Baseline') {
-    return endOfYear(new Date(year, 0, 1));
-  }
-  
-  const quarterEndMonths: Record<string, number> = {
-    Q1: 2,
-    Q2: 5,
-    Q3: 8,
-    Q4: 11
+  const quarterStartMonths: Record<string, number> = {
+    Q1: 0,   // Jan
+    Q2: 3,   // Apr
+    Q3: 6,   // Jul
+    Q4: 9    // Oct
   };
   
-  const endMonth = quarterEndMonths[period.quarter || 'Q1'];
-  return endOfQuarter(new Date(year, endMonth, 1));
+  const startMonth = quarterStartMonths[period.quarter || 'Q1'];
+  const currentQuarterStart = new Date(period.year, startMonth, 1);
+  
+  // Get previous quarter
+  const prevQuarterStart = startOfQuarter(subQuarters(currentQuarterStart, 1));
+  const prevQuarterEnd = endOfQuarter(prevQuarterStart);
+  
+  // Build label like "Q4 2025"
+  const prevYear = prevQuarterStart.getFullYear();
+  const prevQuarterNum = Math.floor(prevQuarterStart.getMonth() / 3) + 1;
+  const label = `Q${prevQuarterNum} ${prevYear}`;
+  
+  return { start: prevQuarterStart, end: prevQuarterEnd, label };
 }
 
 export function useOrgAccountability(filters: EvalFilters): OrgAccountabilityResult {
   const { organizationId, evaluationPeriod } = filters;
   
+  // Don't run for baseline evaluations
+  const isBaseline = evaluationPeriod.type === 'Baseline';
+  
   const { data, isLoading, error } = useQuery({
-    queryKey: ['org-accountability', organizationId, evaluationPeriod],
+    queryKey: ['org-accountability-quarter', organizationId, evaluationPeriod],
     queryFn: async () => {
       if (!organizationId) return null;
       
-      const periodEnd = getPeriodEndDate(evaluationPeriod);
-      const windowStart = subWeeks(periodEnd, 6);
+      const range = getPreviousQuarterRange(evaluationPeriod);
+      if (!range) return null;
       
-      const startStr = format(windowStart, 'yyyy-MM-dd');
-      const endStr = format(periodEnd, 'yyyy-MM-dd');
+      const startStr = format(range.start, 'yyyy-MM-dd');
+      const endStr = format(range.end, 'yyyy-MM-dd');
       
       // Get locations for this org
       const locationsResult = await supabase
@@ -72,10 +83,10 @@ export function useOrgAccountability(filters: EvalFilters): OrgAccountabilityRes
       
       if (staffIds.length === 0) return null;
       
-      // Query weekly_scores for the 6-week window
+      // Query weekly_scores for the previous quarter
       const scoresResult = await supabase
         .from('weekly_scores')
-        .select('staff_id, week_of, confidence_score, performance_score, confidence_late')
+        .select('staff_id, week_of, confidence_score, performance_score, confidence_late, performance_late')
         .in('staff_id', staffIds)
         .gte('week_of', startStr)
         .lte('week_of', endStr);
@@ -83,26 +94,30 @@ export function useOrgAccountability(filters: EvalFilters): OrgAccountabilityRes
       if (scoresResult.error) throw scoresResult.error;
       const scores = scoresResult.data || [];
       
-      if (scores.length === 0) return null;
+      if (scores.length === 0) return { completionRate: null, onTimeRate: null, label: range.label };
       
-      // Calculate metrics
+      // Calculate metrics - count individual submissions (confidence + performance)
+      let totalExpected = 0;
       let completedCount = 0;
       let onTimeCount = 0;
       
       for (const score of scores) {
-        const hasConfidence = score.confidence_score !== null;
-        const hasPerformance = score.performance_score !== null;
-        if (hasConfidence && hasPerformance) {
+        // Each score row represents one week
+        // We expect 2 submissions per week: confidence + performance
+        totalExpected += 2;
+        
+        if (score.confidence_score !== null) {
           completedCount++;
           if (!score.confidence_late) onTimeCount++;
         }
+        if (score.performance_score !== null) {
+          completedCount++;
+          if (!score.performance_late) onTimeCount++;
+        }
       }
       
-      // Expected = staff * 6 weeks * 3 slots (approximate)
-      const expectedSubmissions = staffIds.length * 6 * 3;
-      
-      const completionRate = expectedSubmissions > 0 
-        ? Math.round((completedCount / expectedSubmissions) * 100) 
+      const completionRate = totalExpected > 0 
+        ? Math.round((completedCount / totalExpected) * 100) 
         : null;
       
       const onTimeRate = completedCount > 0
@@ -112,16 +127,16 @@ export function useOrgAccountability(filters: EvalFilters): OrgAccountabilityRes
       return {
         completionRate,
         onTimeRate,
-        totalSubmissions: completedCount
+        label: range.label
       };
     },
-    enabled: !!organizationId
+    enabled: !!organizationId && !isBaseline
   });
   
   return {
     completionRate: data?.completionRate ?? null,
     onTimeRate: data?.onTimeRate ?? null,
-    totalSubmissions: data?.totalSubmissions ?? 0,
+    previousQuarterLabel: data?.label ?? null,
     isLoading,
     error: error as Error | null
   };

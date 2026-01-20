@@ -25,6 +25,7 @@ import {
 import type { EvalFilters } from '@/types/analytics';
 import { cn } from '@/lib/utils';
 import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
+import { getDomainColor } from '@/lib/domainColors';
 
 interface StaffResultsTableV2Props {
   data: EvalDistributionRow[];
@@ -107,7 +108,14 @@ export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsT
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-center">% Misaligned</TableHead>
               {domains.map(domain => (
-                <TableHead key={domain} className="text-center text-xs">
+                <TableHead 
+                  key={domain} 
+                  className="text-center text-xs"
+                  style={{ 
+                    backgroundColor: getDomainColor(domain) + '20',
+                    borderBottom: `2px solid ${getDomainColor(domain)}`
+                  }}
+                >
                   <div>{domain}</div>
                   <div className="text-[10px] text-muted-foreground font-normal">Obs / Self</div>
                 </TableHead>

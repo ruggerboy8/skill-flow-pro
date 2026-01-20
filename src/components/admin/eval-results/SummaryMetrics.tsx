@@ -98,21 +98,8 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
         };
       }
 
-      // Get staff for this org with hire dates (participants only, not paused, not org admins)
-      const { data: staffData, error: staffError } = await supabase
-        .from('staff')
-        .select('id, hire_date')
-        .in('primary_location_id', locationIds)
-        .eq('is_participant', true)
-        .eq('is_paused', false)
-        .eq('is_org_admin', false);
-
-      if (staffError) throw staffError;
-      const allStaff = (staffData || []).map(s => ({ id: s.id, hire_date: s.hire_date }));
-      const allStaffIds = new Set(allStaff.map(s => s.id));
-
-      // Get evaluations for this org's locations in the selected period
-      // Use program_year/quarter for filtering (not created_at)
+      // Get evaluations for this org's locations in the selected period FIRST
+      // This lets us include evaluated staff even if they're now paused
       let evalsQuery = supabase
         .from('evaluations')
         .select('id, staff_id, status')
@@ -131,18 +118,46 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
       const submittedEvals = (evals || []).filter(e => e.status === 'submitted');
       const draftEvals = (evals || []).filter(e => e.status === 'draft');
       
-      // Get all evaluated staff (both submitted and draft count toward eligibility)
+      // Get all evaluated staff IDs from this period
       const allEvaluatedStaffIds = new Set((evals || []).map(e => e.staff_id));
       const submittedStaffIds = new Set(submittedEvals.map(e => e.staff_id));
 
-      // Compute eligible staff using the new eligibility logic
-      // Only consider staff that belong to this org
-      const evaluatedInOrg = new Set<string>();
-      for (const staffId of allEvaluatedStaffIds) {
-        if (allStaffIds.has(staffId)) {
-          evaluatedInOrg.add(staffId);
-        }
+      // Get active staff for this org (participants, not paused, not org admins)
+      // These form the baseline for hire-date eligibility
+      const { data: activeStaffData, error: activeStaffError } = await supabase
+        .from('staff')
+        .select('id, hire_date')
+        .in('primary_location_id', locationIds)
+        .eq('is_participant', true)
+        .eq('is_paused', false)
+        .eq('is_org_admin', false);
+
+      if (activeStaffError) throw activeStaffError;
+      
+      // Also fetch evaluated staff who might be paused now (they were eligible when evaluated)
+      const evaluatedNotInActive = [...allEvaluatedStaffIds].filter(
+        id => !(activeStaffData || []).some(s => s.id === id)
+      );
+      
+      let evaluatedStaffWithHireDates: { id: string; hire_date: string }[] = [];
+      if (evaluatedNotInActive.length > 0) {
+        const { data: pausedEvaluatedData } = await supabase
+          .from('staff')
+          .select('id, hire_date')
+          .in('id', evaluatedNotInActive);
+        evaluatedStaffWithHireDates = (pausedEvaluatedData || []).map(s => ({ 
+          id: s.id, 
+          hire_date: s.hire_date 
+        }));
       }
+
+      // Combine active staff + evaluated staff (even if paused) for complete picture
+      const activeStaff = (activeStaffData || []).map(s => ({ id: s.id, hire_date: s.hire_date }));
+      const allStaff = [...activeStaff, ...evaluatedStaffWithHireDates];
+      const allStaffIds = new Set(allStaff.map(s => s.id));
+
+      // All evaluated staff in this period belong to this org (by the location filter on evals)
+      const evaluatedInOrg = allEvaluatedStaffIds;
       
       const eligibleStaffIds = computeEligibleStaffIds(
         allStaff,
@@ -150,8 +165,8 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
         filters.evaluationPeriod
       );
 
-      // Calculate breakdown for tooltip
-      const eligibleByHireCount = allStaff.filter(s => {
+      // Calculate breakdown for tooltip (use only active staff for hire-date eligibility)
+      const eligibleByHireCount = activeStaff.filter(s => {
         const periodStart = new Date(
           filters.evaluationPeriod.year,
           filters.evaluationPeriod.type === 'Baseline' ? 0 :
@@ -163,10 +178,12 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
         return new Date(s.hire_date) < periodStart;
       }).length;
       
+      // "Evaluated early" = anyone in eligible set who wasn't eligible by hire date
+      // This includes both early hires AND paused staff who were evaluated
       const evaluatedEarlyCount = eligibleStaffIds.size - eligibleByHireCount;
 
-      // Count submitted evals only for staff in this org
-      const staffWithEvalCount = [...submittedStaffIds].filter(id => allStaffIds.has(id)).length;
+      // Count staff with submitted evals - includes evaluated staff even if now paused
+      const staffWithEvalCount = submittedStaffIds.size;
 
       // Get evaluation items for gap calculation (org-scoped)
       const submittedIds = submittedEvals.map(e => e.id);

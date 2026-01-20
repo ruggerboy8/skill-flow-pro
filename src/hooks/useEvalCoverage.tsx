@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { EvalFilters } from '@/types/analytics';
-import { computeEligibleStaffIds } from '@/lib/evaluationEligibility';
 
 interface EvalCoverageResult {
   eligibleCount: number;
@@ -23,14 +22,14 @@ export function useEvalCoverage(filters: EvalFilters): EvalCoverageResult {
       if (!organizationId) return null;
       
       // Get locations for this org
-      const { data: locationsData, error: locError } = await supabase
+      const locationsResult = await supabase
         .from('locations')
         .select('id')
         .eq('organization_id', organizationId)
         .eq('active', true);
       
-      if (locError) throw locError;
-      const locationIds = (locationsData || []).map(l => l.id);
+      if (locationsResult.error) throw locationsResult.error;
+      const locationIds = (locationsResult.data || []).map(l => l.id);
       
       if (locationIds.length === 0) return null;
       
@@ -46,35 +45,28 @@ export function useEvalCoverage(filters: EvalFilters): EvalCoverageResult {
         evalsQuery = evalsQuery.eq('quarter', evaluationPeriod.quarter);
       }
       
-      const { data: evals, error: evalsError } = await evalsQuery;
-      if (evalsError) throw evalsError;
+      const evalsResult = await evalsQuery;
+      if (evalsResult.error) throw evalsResult.error;
+      const evals = evalsResult.data || [];
       
       // Get active staff for eligibility calculation
-      const staffQuery = supabase
+      const staffResult = await supabase
         .from('staff')
         .select('id, hire_date')
-        .in('location_id', locationIds)
+        .in('primary_location_id', locationIds)
         .eq('is_participant', true)
-        .eq('is_org_admin', false)
-        .eq('paused', false);
+        .eq('is_paused', false);
       
-      const { data: allStaff, error: staffError } = await staffQuery;
-      if (staffError) throw staffError;
+      if (staffResult.error) throw staffResult.error;
+      const allStaff = staffResult.data || [];
       
-      const submittedEvals = (evals || []).filter(e => e.status === 'submitted');
-      const draftEvals = (evals || []).filter(e => e.status === 'draft');
+      const submittedEvals = evals.filter(e => e.status === 'submitted');
+      const draftEvals = evals.filter(e => e.status === 'draft');
       
-      const allEvaluatedStaffIds = new Set((evals || []).map(e => e.staff_id));
       const submittedStaffIds = new Set(submittedEvals.map(e => e.staff_id));
       
-      const eligibleStaffIds = computeEligibleStaffIds(
-        allStaff || [],
-        allEvaluatedStaffIds,
-        evaluationPeriod
-      );
-      
       return {
-        eligibleCount: eligibleStaffIds.size,
+        eligibleCount: allStaff.length,
         evaluatedCount: submittedStaffIds.size,
         draftCount: draftEvals.length,
         draftIds: draftEvals.map(e => e.id)

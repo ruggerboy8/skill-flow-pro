@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FilterBar } from '@/components/admin/eval-results/FilterBar';
 import { OrgSummaryStrip } from '@/components/admin/eval-results-v2/OrgSummaryStrip';
@@ -11,9 +10,9 @@ import type { EvalFilters } from '@/types/analytics';
 import type { EvalResultsV2View } from '@/types/evalMetricsV2';
 
 export default function EvalResultsV2() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin: authIsSuperAdmin, isOrgAdmin } = useAuth();
   const navigate = useNavigate();
-  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   
   // Hierarchical view state
   const [view, setView] = useState<EvalResultsV2View>({ level: 'org-snapshot' });
@@ -35,35 +34,21 @@ export default function EvalResultsV2() {
     windowDays: 42
   });
 
-  // Check if user is super admin
+  // Check if user has admin access (super admin OR org admin)
   useEffect(() => {
-    async function checkSuperAdmin() {
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase.rpc('is_super_admin', {
-          _user_id: user.id
-        });
-
-        if (error) throw error;
-
-        if (!data) {
-          navigate('/');
-          return;
-        }
-
-        setIsSuperAdmin(true);
-      } catch (error) {
-        console.error('Error checking super admin status:', error);
-        navigate('/');
-      }
+    if (!user) {
+      navigate('/login');
+      return;
     }
 
-    checkSuperAdmin();
-  }, [user, navigate]);
+    // Use auth roles directly - no need for extra RPC call
+    if (authIsSuperAdmin || isOrgAdmin) {
+      setHasAccess(true);
+    } else {
+      setHasAccess(false);
+      navigate('/');
+    }
+  }, [user, authIsSuperAdmin, isOrgAdmin, navigate]);
 
   // Reset view when org changes
   useEffect(() => {
@@ -78,7 +63,7 @@ export default function EvalResultsV2() {
     setView({ level: 'org-snapshot' });
   };
 
-  if (isSuperAdmin === null) {
+  if (hasAccess === null) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
@@ -88,7 +73,7 @@ export default function EvalResultsV2() {
     );
   }
 
-  if (!isSuperAdmin) {
+  if (!hasAccess) {
     return (
       <div className="text-center py-12">
         <h2 className="text-xl font-semibold text-muted-foreground">Access Denied</h2>

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
-import { periodToDateRange, type EvalFilters } from '@/types/analytics';
+import type { EvalFilters } from '@/types/analytics';
 import { LocationCardV2 } from './LocationCardV2';
 import { 
   calcRate, 
@@ -133,16 +133,15 @@ function aggregateByLocation(rows: EvalDistributionRow[]): LocationCardData[] {
     }
 
     const loc = locationMap.get(row.location_id)!;
-    loc.staffIds.add(row.staff_id);
-    
-    if (row.evaluation_id) {
-      loc.staffWithEval.add(row.staff_id);
-    }
-    
-    // Count roles (dedupe by staff)
+    // Count roles BEFORE adding to set (otherwise check always fails)
     if (!loc.staffIds.has(row.staff_id)) {
       if (row.role_id === 1) loc.dfiCount++;
       else if (row.role_id === 2) loc.rdaCount++;
+      loc.staffIds.add(row.staff_id);
+    }
+    
+    if (row.evaluation_id) {
+      loc.staffWithEval.add(row.staff_id);
     }
 
     loc.nItems += row.n_items;

@@ -62,26 +62,28 @@ export function LocationSummaryPanel({ data }: LocationSummaryPanelProps) {
         </CardContent>
       </Card>
 
-      {/* Agreement Card */}
+      {/* Calibration Card */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <Target className="h-4 w-4" />
-            <span className="text-sm font-medium">Agreement</span>
+            <span className="text-sm font-medium">Calibration</span>
           </div>
           
           <div className="flex items-baseline gap-2">
             <span className={`text-2xl font-bold ${getMismatchColor(mismatchRate)}`}>
               {formatRate(mismatchRate)}
             </span>
-            <span className="text-xs text-muted-foreground">disagree</span>
+            <span className="text-xs text-muted-foreground">misaligned</span>
           </div>
           
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="outline" className="text-[10px] h-5">
-              {getGapLabel(gapDirection)}
-            </Badge>
-          </div>
+          {gapDirection !== 'aligned' && (
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline" className="text-[10px] h-5">
+                {getGapLabel(gapDirection)}
+              </Badge>
+            </div>
+          )}
         </CardContent>
       </Card>
 

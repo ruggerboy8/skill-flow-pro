@@ -146,8 +146,8 @@ export function getGapDirection(obsMean: number | null, selfMean: number | null)
 
 export function getGapLabel(direction: 'overrate' | 'underrate' | 'aligned'): string {
   switch (direction) {
-    case 'overrate': return 'Staff overestimate';
-    case 'underrate': return 'Staff underestimate';
+    case 'overrate': return 'Staff tend to overestimate';
+    case 'underrate': return 'Staff tend to underestimate';
     case 'aligned': return 'Aligned';
   }
 }

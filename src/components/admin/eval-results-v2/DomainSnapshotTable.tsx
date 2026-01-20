@@ -41,9 +41,9 @@ export function DomainSnapshotTable({ data }: DomainSnapshotTableProps) {
           <TableHead>Domain</TableHead>
           <TableHead className="text-center">Scored 4</TableHead>
           <TableHead className="text-center">Scored 1-2</TableHead>
-          <TableHead className="text-center">Disagree</TableHead>
-          <TableHead className="text-center">Coach Avg</TableHead>
-          <TableHead className="text-center">Staff Avg</TableHead>
+          <TableHead className="text-center">% Misaligned</TableHead>
+          <TableHead className="text-center">Obs Avg</TableHead>
+          <TableHead className="text-center">Self Avg</TableHead>
           <TableHead className="text-center">Ratings</TableHead>
         </TableRow>
       </TableHeader>

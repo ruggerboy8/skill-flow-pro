@@ -146,17 +146,33 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
           {/* Domain rows with stacked rates and color-scaled averages */}
           {domainAvgs.length > 0 && (
             <div className="space-y-2">
+              {/* Column header for Avg */}
+              <div className="flex items-center justify-end">
+                <span className="text-xs font-medium text-muted-foreground">Avg</span>
+              </div>
               {domainAvgs.map(d => {
                 const avgColor = getScoreColor(d.avg);
+                // Format domain name for stacking (e.g., "Case Acceptance" -> ["Case", "Acceptance"])
+                const nameParts = d.name.split(' ');
+                const shouldStack = nameParts.length > 1;
+                
                 return (
                   <div key={d.name} className="flex items-center justify-between">
                     {/* Left: Domain pill + stacked rates */}
                     <div className="flex items-center gap-3">
                       <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                        style={{ backgroundColor: getDomainColorRich(d.name) }}
+                        className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium text-foreground min-w-[72px]"
+                        style={{ backgroundColor: `${getDomainColorRich(d.name)}30` }}
                       >
-                        {d.name}
+                        {shouldStack ? (
+                          <span className="flex flex-col items-center leading-tight">
+                            {nameParts.map((part, i) => (
+                              <span key={i}>{part}</span>
+                            ))}
+                          </span>
+                        ) : (
+                          d.name
+                        )}
                       </span>
                       <div className="flex flex-col text-xs">
                         <span className={getTopBoxColor(d.topBoxRate)}>

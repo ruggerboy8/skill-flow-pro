@@ -43,7 +43,7 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
           )}
         </div>
         <div className="text-xs text-muted-foreground">
-          {data.dfiCount} DFI · {data.rdaCount} RDA · {data.staffWithEval} evaluated
+          {data.staffWithEval} Evaluated ({data.rdaCount} RDA | {data.dfiCount} DFI)
         </div>
       </CardHeader>
       
@@ -62,7 +62,7 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
             <span className={cn("font-medium", getMismatchColor(data.mismatchRate))}>
               {formatRate(data.mismatchRate)}
             </span>
-            <span className="text-muted-foreground ml-1">disagree</span>
+            <span className="text-muted-foreground ml-1">misaligned</span>
           </div>
           <div className="text-muted-foreground">
             Avg: {formatMean(data.obsMean)}
@@ -76,11 +76,6 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
             <span>Weakest: {data.weakestDomain}</span>
           </div>
         )}
-        
-        {/* N Indicator */}
-        <div className="text-xs text-muted-foreground border-t pt-2">
-          {data.nItems} ratings
-        </div>
       </CardContent>
     </Card>
   );

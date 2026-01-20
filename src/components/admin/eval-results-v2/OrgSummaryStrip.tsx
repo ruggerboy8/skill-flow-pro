@@ -17,6 +17,7 @@ import {
   type EvalDistributionRow 
 } from '@/types/evalMetricsV2';
 import { DistributionBar } from './DistributionBar';
+import { useOrgAccountability } from '@/hooks/useOrgAccountability';
 
 interface OrgSummaryStripProps {
   filters: EvalFilters;
@@ -50,8 +51,11 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
     enabled: !!organizationId
   });
 
+  // Weekly Practice data
+  const accountability = useOrgAccountability(filters);
+
   // Aggregate org-level metrics
-  const orgMetrics = data ? aggregateMetrics(data) : null;
+  const { orgMetrics, domainAvgs } = data ? aggregateMetrics(data) : { orgMetrics: null, domainAvgs: [] };
 
   if (!organizationId) {
     return (
@@ -102,9 +106,6 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
   const topBoxRate = calcRate(orgMetrics.obsTopBox, orgMetrics.nItems);
   const bottomBoxRate = calcRate(orgMetrics.obsBottomBox, orgMetrics.nItems);
   const mismatchRate = calcRate(orgMetrics.mismatchCount, orgMetrics.nItems);
-  const gap = orgMetrics.obsMean && orgMetrics.selfMean 
-    ? (orgMetrics.obsMean - orgMetrics.selfMean).toFixed(1) 
-    : '—';
   const gapDirection = getGapDirection(orgMetrics.obsMean, orgMetrics.selfMean);
 
   // Distribution for tooltip
@@ -118,7 +119,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {/* Performance Card */}
+      {/* Performance Card - Equal Weight Layout */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-2 text-muted-foreground mb-3">
@@ -141,25 +142,33 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
             </TooltipProvider>
           </div>
           
-          <div className="flex items-baseline gap-3">
-            <span className={`text-3xl font-bold ${getTopBoxColor(topBoxRate)}`}>
-              {formatRate(topBoxRate)}
-            </span>
-            <span className="text-sm text-muted-foreground">scored 4</span>
+          {/* Equal weight metrics */}
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            <div>
+              <span className={`text-2xl font-bold ${getTopBoxColor(topBoxRate)}`}>
+                {formatRate(topBoxRate)}
+              </span>
+              <div className="text-xs text-muted-foreground">scored 4</div>
+            </div>
+            <div>
+              <span className="text-2xl font-bold text-muted-foreground">
+                {formatRate(bottomBoxRate)}
+              </span>
+              <div className="text-xs text-muted-foreground">scored 1-2</div>
+            </div>
           </div>
           
-          <div className="flex items-center gap-4 mt-2 text-sm">
-            <span className="text-muted-foreground">
-              {formatRate(bottomBoxRate)} scored 1-2
-            </span>
-            <span className="text-muted-foreground">
-              Avg: {formatMean(orgMetrics.obsMean)}
-            </span>
-          </div>
-          
-          <div className="mt-3 text-xs text-muted-foreground">
-            {orgMetrics.nItems.toLocaleString()} ratings
-          </div>
+          {/* Domain Averages */}
+          {domainAvgs.length > 0 && (
+            <div className="text-xs text-muted-foreground border-t pt-2 space-y-0.5">
+              <div className="font-medium mb-1">Avg by Domain:</div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {domainAvgs.map(d => (
+                  <span key={d.name}>{d.name} {formatMean(d.avg)}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -176,33 +185,45 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p className="text-xs">
-                    Percent of self-assessments that differ from observer scores.
+                    How often staff self-ratings match observer scores. Lower is better.
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
           
-          <div className="flex items-baseline gap-3">
-            <span className={`text-3xl font-bold ${getMismatchColor(mismatchRate)}`}>
+          <div className="mb-2">
+            <span className={`text-2xl font-bold ${getMismatchColor(mismatchRate)}`}>
               {formatRate(mismatchRate)}
             </span>
-            <span className="text-sm text-muted-foreground">misaligned</span>
+            <span className="text-sm text-muted-foreground ml-2">of Self Ratings differ from Observer</span>
           </div>
           
-          <div className="flex items-center gap-3 mt-2">
-            <Badge variant={gapDirection === 'aligned' ? 'secondary' : 'outline'} className="text-xs">
-              {getGapLabel(gapDirection)}
-            </Badge>
-          </div>
-          
-          <div className="mt-3 text-xs text-muted-foreground">
-            {orgMetrics.nItems.toLocaleString()} ratings
-          </div>
+          {gapDirection !== 'aligned' && (
+            <div className="flex items-center gap-2 mt-2">
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-xs cursor-help">
+                      <Info className="h-3 w-3 mr-1" />
+                      {getGapLabel(gapDirection)}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">
+                      {gapDirection === 'overrate' 
+                        ? 'On average, staff rate themselves higher than observers do.'
+                        : 'On average, staff rate themselves lower than observers do.'}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Weekly Practice Card - Placeholder */}
+      {/* Weekly Practice Card */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-2 text-muted-foreground mb-3">
@@ -222,14 +243,28 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
             </TooltipProvider>
           </div>
           
-          <div className="flex items-baseline gap-3">
-            <span className="text-3xl font-bold text-muted-foreground">—</span>
-            <span className="text-sm text-muted-foreground">completed</span>
-          </div>
-          
-          <div className="text-sm text-muted-foreground mt-2">
-            Coming soon
-          </div>
+          {accountability.isLoading ? (
+            <>
+              <Skeleton className="h-8 w-20 mb-2" />
+              <Skeleton className="h-4 w-32" />
+            </>
+          ) : accountability.completionRate !== null ? (
+            <>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold">{accountability.completionRate}%</span>
+                <span className="text-sm text-muted-foreground">completed</span>
+              </div>
+              
+              <div className="text-sm text-muted-foreground mt-1">
+                {accountability.onTimeRate}% on time · {accountability.totalSubmissions} check-ins
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-bold text-muted-foreground">—</div>
+              <div className="text-sm text-muted-foreground">No data for this period</div>
+            </>
+          )}
           
           <div className="mt-3 text-xs text-muted-foreground italic">
             *6 weeks before evaluation
@@ -240,7 +275,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
   );
 }
 
-// Aggregate raw rows into org-level metrics
+// Aggregate raw rows into org-level metrics + domain averages
 function aggregateMetrics(rows: EvalDistributionRow[]) {
   let nItems = 0;
   let obsTopBox = 0;
@@ -253,13 +288,13 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
   let obsCount = 0;
   let selfCount = 0;
   
-  // For distribution bar we need 1,2,3,4 counts
-  // We only have top-box (4) and bottom-box (1-2) from RPC
-  // Infer: obs3 = nItems - obsTopBox - obsBottomBox, obs1+obs2 = obsBottomBox
-  // For now, approximate 1s and 2s as split evenly
+  // For distribution bar
   let obs1 = 0;
   let obs2 = 0;
   let obs3 = 0;
+  
+  // Track domain averages
+  const domainMap = new Map<string, { sum: number; count: number }>();
   
   for (const row of rows) {
     nItems += row.n_items;
@@ -272,6 +307,14 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
     if (row.obs_mean !== null) {
       obsSum += row.obs_mean * row.n_items;
       obsCount += row.n_items;
+      
+      // Track by domain
+      if (!domainMap.has(row.domain_name)) {
+        domainMap.set(row.domain_name, { sum: 0, count: 0 });
+      }
+      const domain = domainMap.get(row.domain_name)!;
+      domain.sum += row.obs_mean * row.n_items;
+      domain.count += row.n_items;
     }
     if (row.self_mean !== null) {
       selfSum += row.self_mean * row.n_items;
@@ -279,22 +322,34 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
     }
   }
   
-  // Approximate distribution (we'll enhance RPC later if needed)
+  // Approximate distribution
   obs1 = Math.floor(obsBottomBox / 2);
   obs2 = obsBottomBox - obs1;
   obs3 = nItems - obsTopBox - obsBottomBox;
   
+  // Build domain averages array
+  const domainAvgs: { name: string; avg: number }[] = [];
+  for (const [name, { sum, count }] of domainMap) {
+    if (count > 0) {
+      domainAvgs.push({ name, avg: sum / count });
+    }
+  }
+  domainAvgs.sort((a, b) => a.name.localeCompare(b.name));
+  
   return {
-    nItems,
-    obsTopBox,
-    obsBottomBox,
-    selfTopBox,
-    selfBottomBox,
-    mismatchCount,
-    obsMean: obsCount > 0 ? obsSum / obsCount : null,
-    selfMean: selfCount > 0 ? selfSum / selfCount : null,
-    obs1,
-    obs2,
-    obs3
+    orgMetrics: {
+      nItems,
+      obsTopBox,
+      obsBottomBox,
+      selfTopBox,
+      selfBottomBox,
+      mismatchCount,
+      obsMean: obsCount > 0 ? obsSum / obsCount : null,
+      selfMean: selfCount > 0 ? selfSum / selfCount : null,
+      obs1,
+      obs2,
+      obs3
+    },
+    domainAvgs
   };
 }

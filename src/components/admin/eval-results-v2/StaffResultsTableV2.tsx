@@ -102,10 +102,11 @@ export function StaffResultsTableV2({ data, filters }: StaffResultsTableV2Props)
               <TableHead>Staff</TableHead>
               <TableHead>Role</TableHead>
               <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-center">Disagree</TableHead>
+              <TableHead className="text-center">% Misaligned</TableHead>
               {domains.map(domain => (
                 <TableHead key={domain} className="text-center text-xs">
-                  {domain}
+                  <div>{domain}</div>
+                  <div className="text-[10px] text-muted-foreground font-normal">Obs / Self</div>
                 </TableHead>
               ))}
             </TableRow>

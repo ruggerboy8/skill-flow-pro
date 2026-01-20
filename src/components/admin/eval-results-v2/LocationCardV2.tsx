@@ -64,13 +64,6 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
           <span className="text-muted-foreground ml-1">misaligned</span>
         </div>
         
-        {/* Weakest Domain Flag - always show when present */}
-        {data.weakestDomain && (
-          <div className="flex items-center gap-1 text-xs text-amber-600">
-            <AlertTriangle className="h-3 w-3" />
-            <span>Weakest: {data.weakestDomain}</span>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

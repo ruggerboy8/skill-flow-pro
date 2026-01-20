@@ -161,8 +161,11 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
                     {/* Left: Domain pill + stacked rates */}
                     <div className="flex items-center gap-3">
                       <span
-                        className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium text-foreground min-w-[72px]"
-                        style={{ backgroundColor: `${getDomainColorRich(d.name)}30` }}
+                        className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium min-w-[72px]"
+                        style={{ 
+                          backgroundColor: getDomainColorRich(d.name) + '30',
+                          color: '#000'
+                        }}
                       >
                         {shouldStack ? (
                           <span className="flex flex-col items-center leading-tight">

@@ -41,8 +41,8 @@ export function DomainSnapshotTable({ data }: DomainSnapshotTableProps) {
       <TableHeader>
         <TableRow>
           <TableHead>Domain</TableHead>
-          <TableHead className="text-center">Scored 4</TableHead>
           <TableHead className="text-center">Scored 1-2</TableHead>
+          <TableHead className="text-center">Scored 4</TableHead>
           <TableHead className="text-center">% Misaligned</TableHead>
           <TableHead className="text-center">Obs Avg</TableHead>
           <TableHead className="text-center">Self Avg</TableHead>
@@ -67,11 +67,11 @@ export function DomainSnapshotTable({ data }: DomainSnapshotTableProps) {
                   )}
                 </div>
               </TableCell>
-              <TableCell className={cn("text-center font-medium", getTopBoxColor(domain.topBoxRate))}>
-                {formatRate(domain.topBoxRate)}
-              </TableCell>
               <TableCell className="text-center text-muted-foreground">
                 {formatRate(domain.bottomBoxRate)}
+              </TableCell>
+              <TableCell className={cn("text-center font-medium", getTopBoxColor(domain.topBoxRate))}>
+                {formatRate(domain.topBoxRate)}
               </TableCell>
               <TableCell className={cn("text-center font-medium", getMismatchColor(domain.mismatchRate))}>
                 {formatRate(domain.mismatchRate)}

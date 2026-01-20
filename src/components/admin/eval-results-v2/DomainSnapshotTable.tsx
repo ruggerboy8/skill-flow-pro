@@ -46,7 +46,6 @@ export function DomainSnapshotTable({ data }: DomainSnapshotTableProps) {
           <TableHead className="text-center">% Misaligned</TableHead>
           <TableHead className="text-center">Obs Avg</TableHead>
           <TableHead className="text-center">Self Avg</TableHead>
-          <TableHead className="text-center">Ratings</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -81,9 +80,6 @@ export function DomainSnapshotTable({ data }: DomainSnapshotTableProps) {
               </TableCell>
               <TableCell className="text-center text-muted-foreground">
                 {formatMean(domain.selfMean)}
-              </TableCell>
-              <TableCell className="text-center text-muted-foreground text-sm">
-                {domain.nItems}
               </TableCell>
             </TableRow>
           );

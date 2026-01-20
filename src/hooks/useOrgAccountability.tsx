@@ -56,7 +56,6 @@ export function useOrgAccountability(filters: EvalFilters): OrgAccountabilityRes
       if (!range) return null;
       
       const startStr = format(range.start, 'yyyy-MM-dd');
-      const endStr = format(range.end, 'yyyy-MM-dd');
       
       // Get locations for this org
       const locationsResult = await supabase
@@ -83,79 +82,68 @@ export function useOrgAccountability(filters: EvalFilters): OrgAccountabilityRes
       
       if (staffIds.length === 0) return null;
       
-      // Query weekly_scores for the previous quarter
-      const scoresResult = await supabase
-        .from('weekly_scores')
-        .select('staff_id, week_of, confidence_score, performance_score, confidence_late, performance_late')
-        .in('staff_id', staffIds)
-        .gte('week_of', startStr)
-        .lte('week_of', endStr);
+      // Use the same RPC as OnTimeRateWidget for each staff member
+      // This properly tracks each individual assignment slot (3 conf + 3 perf = 6 per week)
+      let totalExpected = 0;
+      let totalCompleted = 0;
+      let totalOnTime = 0;
       
-      if (scoresResult.error) throw scoresResult.error;
-      const scores = scoresResult.data || [];
-      
-      if (scores.length === 0) return { completionRate: null, onTimeRate: null, label: range.label };
-      
-      // Calculate weeks in the quarter (count unique week_of values from data, or estimate ~13 weeks)
-      const uniqueWeeks = new Set(scores.map(s => s.week_of));
-      const weeksInQuarter = Math.max(uniqueWeeks.size, 13); // At least 13 weeks in a quarter
-      
-      // Expected: each staff should have 1 conf + 1 perf per week = 2 submissions per week
-      const totalExpected = staffIds.length * weeksInQuarter * 2;
-      
-      // Group scores by staff+week to determine if they submitted for that week
-      // (multiple score rows per week due to multiple Pro Moves)
-      const staffWeekMap = new Map<string, {
-        hasConf: boolean;
-        hasPerf: boolean;
-        confOnTime: boolean;
-        perfOnTime: boolean;
-      }>();
-      
-      for (const score of scores) {
-        const key = `${score.staff_id}|${score.week_of}`;
-        if (!staffWeekMap.has(key)) {
-          staffWeekMap.set(key, {
-            hasConf: false,
-            hasPerf: false,
-            confOnTime: false,
-            perfOnTime: false
-          });
-        }
-        const entry = staffWeekMap.get(key)!;
+      // Process in batches to avoid overwhelming the API
+      const batchSize = 20;
+      for (let i = 0; i < staffIds.length; i += batchSize) {
+        const batch = staffIds.slice(i, i + batchSize);
         
-        // If ANY row for this week has a score, they submitted for that week
-        if (score.confidence_score !== null) {
-          entry.hasConf = true;
-          if (score.confidence_late === false) entry.confOnTime = true;
-        }
-        if (score.performance_score !== null) {
-          entry.hasPerf = true;
-          if (score.performance_late === false) entry.perfOnTime = true;
-        }
-      }
-      
-      // Count completed and on-time
-      let completedCount = 0;
-      let onTimeCount = 0;
-      
-      for (const entry of staffWeekMap.values()) {
-        if (entry.hasConf) {
-          completedCount++;
-          if (entry.confOnTime) onTimeCount++;
-        }
-        if (entry.hasPerf) {
-          completedCount++;
-          if (entry.perfOnTime) onTimeCount++;
+        const results = await Promise.all(batch.map(async (staffId) => {
+          try {
+            const { data, error } = await supabase.rpc('get_staff_submission_windows', {
+              p_staff_id: staffId,
+              p_since: startStr,
+            });
+            
+            if (error || !data) return { expected: 0, completed: 0, onTime: 0 };
+            
+            // Filter to previous quarter end date and past due only
+            const endDate = range.end;
+            const pastDueInQuarter = data.filter((w: any) => {
+              const dueAt = new Date(w.due_at);
+              const weekOf = new Date(w.week_of);
+              return dueAt <= new Date() && weekOf <= endDate;
+            });
+            
+            // Count each assignment slot individually (matches OnTimeRateWidget logic)
+            let expected = 0;
+            let completed = 0;
+            let onTime = 0;
+            
+            for (const row of pastDueInQuarter) {
+              expected++;
+              if (row.status === 'submitted') {
+                completed++;
+                if (row.on_time === true) {
+                  onTime++;
+                }
+              }
+            }
+            
+            return { expected, completed, onTime };
+          } catch {
+            return { expected: 0, completed: 0, onTime: 0 };
+          }
+        }));
+        
+        for (const r of results) {
+          totalExpected += r.expected;
+          totalCompleted += r.completed;
+          totalOnTime += r.onTime;
         }
       }
       
       const completionRate = totalExpected > 0 
-        ? Math.round((completedCount / totalExpected) * 100) 
+        ? Math.round((totalCompleted / totalExpected) * 100) 
         : null;
       
-      const onTimeRate = completedCount > 0
-        ? Math.round((onTimeCount / completedCount) * 100)
+      const onTimeRate = totalExpected > 0
+        ? Math.round((totalOnTime / totalExpected) * 100)
         : null;
       
       return {

@@ -96,23 +96,57 @@ export function useOrgAccountability(filters: EvalFilters): OrgAccountabilityRes
       
       if (scores.length === 0) return { completionRate: null, onTimeRate: null, label: range.label };
       
-      // Calculate metrics - count individual submissions (confidence + performance)
-      let totalExpected = 0;
+      // Calculate weeks in the quarter (count unique week_of values from data, or estimate ~13 weeks)
+      const uniqueWeeks = new Set(scores.map(s => s.week_of));
+      const weeksInQuarter = Math.max(uniqueWeeks.size, 13); // At least 13 weeks in a quarter
+      
+      // Expected: each staff should have 1 conf + 1 perf per week = 2 submissions per week
+      const totalExpected = staffIds.length * weeksInQuarter * 2;
+      
+      // Group scores by staff+week to determine if they submitted for that week
+      // (multiple score rows per week due to multiple Pro Moves)
+      const staffWeekMap = new Map<string, {
+        hasConf: boolean;
+        hasPerf: boolean;
+        confOnTime: boolean;
+        perfOnTime: boolean;
+      }>();
+      
+      for (const score of scores) {
+        const key = `${score.staff_id}|${score.week_of}`;
+        if (!staffWeekMap.has(key)) {
+          staffWeekMap.set(key, {
+            hasConf: false,
+            hasPerf: false,
+            confOnTime: false,
+            perfOnTime: false
+          });
+        }
+        const entry = staffWeekMap.get(key)!;
+        
+        // If ANY row for this week has a score, they submitted for that week
+        if (score.confidence_score !== null) {
+          entry.hasConf = true;
+          if (score.confidence_late === false) entry.confOnTime = true;
+        }
+        if (score.performance_score !== null) {
+          entry.hasPerf = true;
+          if (score.performance_late === false) entry.perfOnTime = true;
+        }
+      }
+      
+      // Count completed and on-time
       let completedCount = 0;
       let onTimeCount = 0;
       
-      for (const score of scores) {
-        // Each score row represents one week
-        // We expect 2 submissions per week: confidence + performance
-        totalExpected += 2;
-        
-        if (score.confidence_score !== null) {
+      for (const entry of staffWeekMap.values()) {
+        if (entry.hasConf) {
           completedCount++;
-          if (!score.confidence_late) onTimeCount++;
+          if (entry.confOnTime) onTimeCount++;
         }
-        if (score.performance_score !== null) {
+        if (entry.hasPerf) {
           completedCount++;
-          if (!score.performance_late) onTimeCount++;
+          if (entry.perfOnTime) onTimeCount++;
         }
       }
       

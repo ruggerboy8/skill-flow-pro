@@ -21,6 +21,21 @@ export interface EvalFilters {
  * Q1 = Jan-Mar, Q2 = Apr-Jun, Q3 = Jul-Sep, Q4 = Oct-Dec
  * Baseline returns the full year range.
  */
+/**
+ * Quarter start months for various calculations
+ */
+export const QUARTER_START_MONTHS: Record<Quarter, number> = {
+  Q1: 0,  // Jan
+  Q2: 3,  // Apr
+  Q3: 6,  // Jul
+  Q4: 9   // Oct
+};
+
+/**
+ * Convert an evaluation period to a date range for RPC calls.
+ * Q1 = Jan-Mar, Q2 = Apr-Jun, Q3 = Jul-Sep, Q4 = Oct-Dec
+ * Baseline returns the full year range.
+ */
 export function periodToDateRange(period: EvaluationPeriod): { start: Date; end: Date } {
   const year = period.year;
   

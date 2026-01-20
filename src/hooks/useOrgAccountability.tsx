@@ -103,11 +103,11 @@ export function useOrgAccountability(filters: EvalFilters): OrgAccountabilityRes
             if (error || !data) return { expected: 0, completed: 0, onTime: 0 };
             
             // Filter to previous quarter end date and past due only
-            const endDate = range.end;
+            // Compare week_of as strings to avoid timezone issues
+            const endDateStr = format(range.end, 'yyyy-MM-dd');
             const pastDueInQuarter = data.filter((w: any) => {
               const dueAt = new Date(w.due_at);
-              const weekOf = new Date(w.week_of);
-              return dueAt <= new Date() && weekOf <= endDate;
+              return dueAt <= new Date() && w.week_of <= endDateStr;
             });
             
             // Count each assignment slot individually (matches OnTimeRateWidget logic)

@@ -1,15 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Users, FileText, ArrowUpDown, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Users, FileText, ArrowUpDown, Info, CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
 import type { EvalFilters } from '@/types/analytics';
 import { periodToDateRange, getPeriodLabel } from '@/types/analytics';
 import { computeEligibleStaffIds } from '@/lib/evaluationEligibility';
+import { bulkSubmitCompleteDrafts } from '@/lib/evaluations';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 interface SummaryMetricsProps {
   filters: EvalFilters;
@@ -248,11 +251,15 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
         return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
       });
 
+      // Get draft eval IDs for bulk submit
+      const draftEvalIds = draftEvals.map(e => e.id);
+
       return {
         eligibleStaff: eligibleStaffIds.size,
         staffWithEval: staffWithEvalCount,
         submittedCount: submittedEvals.length,
         draftCount: draftEvals.length,
+        draftEvalIds,
         gap,
         roleDomainScores,
         eligibleByHireCount,
@@ -261,6 +268,37 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
     },
     enabled: !!filters.organizationId
   });
+
+  const queryClient = useQueryClient();
+
+  // Bulk submit mutation
+  const bulkSubmitMutation = useMutation({
+    mutationFn: async (evalIds: string[]) => {
+      return bulkSubmitCompleteDrafts(evalIds);
+    },
+    onSuccess: (result) => {
+      if (result.successCount > 0) {
+        toast.success(`Submitted ${result.successCount} complete evaluation${result.successCount > 1 ? 's' : ''}`);
+      }
+      if (result.failedCount > 0) {
+        toast.warning(`${result.failedCount} draft${result.failedCount > 1 ? 's' : ''} skipped (incomplete scores)`);
+      }
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ['eval-summary-metrics-v3'] });
+      queryClient.invalidateQueries({ queryKey: ['location-eval-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['location-eval-detail'] });
+      queryClient.invalidateQueries({ queryKey: ['eval-statuses'] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Bulk submit failed: ${error.message}`);
+    }
+  });
+
+  const handleBulkSubmit = () => {
+    if (data?.draftEvalIds && data.draftEvalIds.length > 0) {
+      bulkSubmitMutation.mutate(data.draftEvalIds);
+    }
+  };
 
   if (!filters.organizationId) return null;
 
@@ -275,6 +313,8 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
 
   const gapDesc = getGapDescription(data?.gap ?? null);
   const periodLabel = getPeriodLabel(filters.evaluationPeriod);
+  const hasDrafts = (data?.draftCount ?? 0) > 0;
+  const bulkSubmitting = bulkSubmitMutation.isPending;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -312,12 +352,28 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
                 <FileText className="h-3 w-3 mr-1" />
                 {data?.submittedCount ?? 0} submitted
               </Badge>
-              {(data?.draftCount ?? 0) > 0 && (
+              {hasDrafts && (
                 <Badge variant="outline" className="text-xs border-warning text-warning">
                   {data?.draftCount} drafts
                 </Badge>
               )}
             </div>
+            {hasDrafts && (
+              <Button
+                variant="default"
+                size="sm"
+                className="w-full mt-3"
+                onClick={handleBulkSubmit}
+                disabled={bulkSubmitting}
+              >
+                {bulkSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                )}
+                Submit All Complete
+              </Button>
+            )}
           </CardContent>
         </Card>
 

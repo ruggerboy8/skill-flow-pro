@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Info, TrendingUp, Users, Target } from 'lucide-react';
-import { periodToDateRange, type EvalFilters } from '@/types/analytics';
+import { type EvalFilters } from '@/types/analytics';
 import { 
   calcRate, 
   formatRate, 
@@ -18,7 +18,8 @@ import {
 } from '@/types/evalMetricsV2';
 import { DistributionBar } from './DistributionBar';
 import { useOrgAccountability } from '@/hooks/useOrgAccountability';
-import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
+import { getDomainOrderIndex } from '@/lib/domainUtils';
+import { getDomainColorRich } from '@/lib/domainColors';
 
 interface OrgSummaryStripProps {
   filters: EvalFilters;
@@ -28,7 +29,6 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
   const { organizationId, evaluationPeriod, locationIds, roleIds } = filters;
   
   // Build query params
-  const dateRange = periodToDateRange(evaluationPeriod);
   const types = evaluationPeriod.type === 'Baseline' ? ['Baseline'] : ['Quarterly'];
   const quarter = evaluationPeriod.type === 'Quarterly' ? evaluationPeriod.quarter : null;
   
@@ -143,30 +143,54 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
             </TooltipProvider>
           </div>
           
-          {/* Equal weight metrics */}
-          <div className="grid grid-cols-2 gap-4 mb-3">
-            <div>
-              <span className={`text-2xl font-bold ${getTopBoxColor(topBoxRate)}`}>
-                {formatRate(topBoxRate)}
-              </span>
-              <div className="text-xs text-muted-foreground">scored 4</div>
-            </div>
-            <div>
-              <span className="text-2xl font-bold text-muted-foreground">
-                {formatRate(bottomBoxRate)}
-              </span>
-              <div className="text-xs text-muted-foreground">scored 1-2</div>
-            </div>
-          </div>
-          
-          {/* Domain Averages */}
+          {/* Domain rows with stacked rates and color-scaled averages */}
           {domainAvgs.length > 0 && (
-            <div className="text-xs text-muted-foreground border-t pt-2 space-y-0.5">
-              <div className="font-medium mb-1">Avg by Domain:</div>
-              <div className="flex flex-wrap gap-x-3 gap-y-1">
-                {domainAvgs.map(d => (
-                  <span key={d.name}>{d.name} {formatMean(d.avg)}</span>
-                ))}
+            <div className="space-y-2">
+              {domainAvgs.map(d => {
+                const avgColor = getScoreColor(d.avg);
+                return (
+                  <div key={d.name} className="flex items-center justify-between">
+                    {/* Left: Domain pill + stacked rates */}
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                        style={{ backgroundColor: getDomainColorRich(d.name) }}
+                      >
+                        {d.name}
+                      </span>
+                      <div className="flex flex-col text-xs">
+                        <span className={getTopBoxColor(d.topBoxRate)}>
+                          {formatRate(d.topBoxRate)} scored 4
+                        </span>
+                        <span className="text-muted-foreground">
+                          {formatRate(d.bottomBoxRate)} scored 1-2
+                        </span>
+                      </div>
+                    </div>
+                    {/* Right: Color-scaled average */}
+                    <span className={`text-lg font-bold ${avgColor}`}>
+                      {formatMean(d.avg)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Fallback if no domain data */}
+          {domainAvgs.length === 0 && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className={`text-2xl font-bold ${getTopBoxColor(topBoxRate)}`}>
+                  {formatRate(topBoxRate)}
+                </span>
+                <div className="text-xs text-muted-foreground">scored 4</div>
+              </div>
+              <div>
+                <span className="text-2xl font-bold text-muted-foreground">
+                  {formatRate(bottomBoxRate)}
+                </span>
+                <div className="text-xs text-muted-foreground">scored 1-2</div>
               </div>
             </div>
           )}
@@ -280,6 +304,14 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
   );
 }
 
+// Color for score averages based on thresholds
+function getScoreColor(score: number | null): string {
+  if (score === null) return 'text-muted-foreground';
+  if (score >= 3.0) return 'text-green-600';
+  if (score >= 2.5) return 'text-amber-600';
+  return 'text-red-600';
+}
+
 // Aggregate raw rows into org-level metrics + domain averages
 function aggregateMetrics(rows: EvalDistributionRow[]) {
   let nItems = 0;
@@ -298,8 +330,14 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
   let obs2 = 0;
   let obs3 = 0;
   
-  // Track domain averages
-  const domainMap = new Map<string, { sum: number; count: number }>();
+  // Track domain metrics
+  const domainMap = new Map<string, { 
+    sum: number; 
+    count: number; 
+    topBox: number; 
+    bottomBox: number; 
+    nItems: number;
+  }>();
   
   for (const row of rows) {
     nItems += row.n_items;
@@ -309,15 +347,18 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
     selfBottomBox += row.self_bottom_box;
     mismatchCount += row.mismatch_count;
     
+    // Track by domain
+    if (!domainMap.has(row.domain_name)) {
+      domainMap.set(row.domain_name, { sum: 0, count: 0, topBox: 0, bottomBox: 0, nItems: 0 });
+    }
+    const domain = domainMap.get(row.domain_name)!;
+    domain.nItems += row.n_items;
+    domain.topBox += row.obs_top_box;
+    domain.bottomBox += row.obs_bottom_box;
+    
     if (row.obs_mean !== null) {
       obsSum += row.obs_mean * row.n_items;
       obsCount += row.n_items;
-      
-      // Track by domain
-      if (!domainMap.has(row.domain_name)) {
-        domainMap.set(row.domain_name, { sum: 0, count: 0 });
-      }
-      const domain = domainMap.get(row.domain_name)!;
       domain.sum += row.obs_mean * row.n_items;
       domain.count += row.n_items;
     }
@@ -333,10 +374,15 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
   obs3 = nItems - obsTopBox - obsBottomBox;
   
   // Build domain averages array - sorted by canonical order
-  const domainAvgs: { name: string; avg: number }[] = [];
-  for (const [name, { sum, count }] of domainMap) {
-    if (count > 0) {
-      domainAvgs.push({ name, avg: sum / count });
+  const domainAvgs: { name: string; avg: number; topBoxRate: number; bottomBoxRate: number }[] = [];
+  for (const [name, d] of domainMap) {
+    if (d.nItems > 0) {
+      domainAvgs.push({ 
+        name, 
+        avg: d.count > 0 ? d.sum / d.count : 0,
+        topBoxRate: calcRate(d.topBox, d.nItems),
+        bottomBoxRate: calcRate(d.bottomBox, d.nItems)
+      });
     }
   }
   domainAvgs.sort((a, b) => getDomainOrderIndex(a.name) - getDomainOrderIndex(b.name));

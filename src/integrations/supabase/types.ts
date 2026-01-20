@@ -2249,6 +2249,36 @@ export type Database = {
           week_in_cycle: number
         }[]
       }
+      get_eval_distribution_metrics: {
+        Args: {
+          p_location_ids?: string[]
+          p_org_id: string
+          p_program_year: number
+          p_quarter?: string
+          p_role_ids?: number[]
+          p_types: string[]
+        }
+        Returns: {
+          domain_id: number
+          domain_name: string
+          evaluation_id: string
+          evaluation_status: string
+          location_id: string
+          location_name: string
+          mismatch_count: number
+          n_items: number
+          obs_bottom_box: number
+          obs_mean: number
+          obs_top_box: number
+          role_id: number
+          role_name: string
+          self_bottom_box: number
+          self_mean: number
+          self_top_box: number
+          staff_id: string
+          staff_name: string
+        }[]
+      }
       get_evaluations_summary:
         | {
             Args: { p_staff_id: string }

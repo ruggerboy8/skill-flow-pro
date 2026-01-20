@@ -29,6 +29,7 @@ import StaffDetailV2 from "@/pages/coach/StaffDetailV2";
 import { EvaluationHub } from "@/pages/coach/EvaluationHub";
 import AdminPage from "@/pages/AdminPage";
 import EvalResults from "@/pages/admin/EvalResults";
+import EvalResultsV2 from "@/pages/admin/EvalResultsV2";
 import EvaluationViewer from "@/pages/EvaluationViewer";
 import AdminBuilder from "@/pages/AdminBuilder";
 import CycleList from "@/pages/admin/CycleList";
@@ -131,6 +132,7 @@ function AppRoutes() {
 
         <Route path="admin" element={<AdminPage />} />
         <Route path="admin/eval-results" element={<EvalResults />} />
+        <Route path="admin/eval-results-v2" element={<EvalResultsV2 />} />
         <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
         <Route path="builder" element={<AdminBuilder />} />
         <Route path="builder/:roleId" element={<CycleList />} />

@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, X, Calendar } from 'lucide-react';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { EvalFilters, Quarter, EvaluationPeriodType } from '@/types/analytics';
+import type { EvalFilters, Quarter, EvaluationPeriod } from '@/types/analytics';
+import { getPeriodLabel, comparePeriods, periodsEqual } from '@/types/analytics';
 
 interface FilterBarProps {
   filters: EvalFilters;
@@ -32,46 +34,88 @@ interface Role {
   role_name: string;
 }
 
-const PERIODS: { value: EvaluationPeriodType | Quarter; label: string; type: EvaluationPeriodType; quarter?: Quarter }[] = [
-  { value: 'Baseline', label: 'Baseline', type: 'Baseline' },
-  { value: 'Q1', label: 'Q1', type: 'Quarterly', quarter: 'Q1' },
-  { value: 'Q2', label: 'Q2', type: 'Quarterly', quarter: 'Q2' },
-  { value: 'Q3', label: 'Q3', type: 'Quarterly', quarter: 'Q3' },
-  { value: 'Q4', label: 'Q4', type: 'Quarterly', quarter: 'Q4' },
-];
-
 export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
 
-  // Fetch years that have evaluations
-  const { data: availableYears } = useQuery({
-    queryKey: ['eval-years'],
+  // Fetch available periods for the selected organization
+  const { data: availablePeriods = [], isLoading: periodsLoading } = useQuery({
+    queryKey: ['org-eval-periods', filters.organizationId],
     queryFn: async () => {
+      if (!filters.organizationId) return [];
+      
+      // Query evaluations for this org via staff -> locations -> organizations
       const { data, error } = await supabase
         .from('evaluations')
-        .select('created_at')
-        .order('created_at', { ascending: false });
+        .select(`
+          type,
+          created_at,
+          staff!inner(
+            primary_location_id,
+            locations!inner(
+              organization_id
+            )
+          )
+        `)
+        .eq('staff.locations.organization_id', filters.organizationId)
+        .eq('status', 'submitted');
       
       if (error) throw error;
       
-      // Extract unique years
-      const years = new Set<number>();
-      (data || []).forEach(e => {
-        const year = new Date(e.created_at).getFullYear();
-        years.add(year);
+      // Extract unique periods
+      const periodSet = new Map<string, EvaluationPeriod>();
+      
+      (data || []).forEach((e: any) => {
+        const date = new Date(e.created_at);
+        const year = date.getFullYear();
+        const type = e.type as 'Baseline' | 'Quarterly';
+        
+        if (type === 'Baseline') {
+          const key = `Baseline-${year}`;
+          if (!periodSet.has(key)) {
+            periodSet.set(key, { type: 'Baseline', year });
+          }
+        } else {
+          // For quarterly, determine quarter from date
+          const month = date.getMonth();
+          const quarter = `Q${Math.ceil((month + 1) / 3)}` as Quarter;
+          const key = `${quarter}-${year}`;
+          if (!periodSet.has(key)) {
+            periodSet.set(key, { type: 'Quarterly', quarter, year });
+          }
+        }
       });
       
-      return Array.from(years).sort((a, b) => b - a);
+      // Sort periods newest first
+      return Array.from(periodSet.values()).sort(comparePeriods);
     },
+    enabled: !!filters.organizationId,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  const yearOptions = availableYears && availableYears.length > 0 
-    ? availableYears 
-    : [new Date().getFullYear()];
+  // Find current period index in available periods
+  const currentPeriodIndex = useMemo(() => {
+    return availablePeriods.findIndex(p => periodsEqual(p, filters.evaluationPeriod));
+  }, [availablePeriods, filters.evaluationPeriod]);
+
+  // Auto-select most recent period when org changes and periods load
+  useEffect(() => {
+    if (availablePeriods.length > 0 && filters.organizationId) {
+      // Check if current filter matches any available period
+      const matchExists = availablePeriods.some(p => periodsEqual(p, filters.evaluationPeriod));
+      
+      if (!matchExists) {
+        // Auto-select the most recent period (first in the sorted array)
+        onFiltersChange({
+          ...filters,
+          evaluationPeriod: availablePeriods[0]
+        });
+      }
+    }
+  }, [availablePeriods, filters.organizationId]);
 
   // Load organizations on mount
   useEffect(() => {
@@ -133,25 +177,27 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
     }
   }
 
-  function handlePeriodSelect(period: typeof PERIODS[number]) {
-    onFiltersChange({
-      ...filters,
-      evaluationPeriod: {
-        type: period.type,
-        quarter: period.quarter,
-        year: filters.evaluationPeriod.year
-      }
-    });
+  function navigatePeriod(direction: 'prev' | 'next') {
+    if (availablePeriods.length === 0) return;
+    
+    const newIndex = direction === 'prev' 
+      ? currentPeriodIndex + 1  // prev = older = higher index
+      : currentPeriodIndex - 1; // next = newer = lower index
+    
+    if (newIndex >= 0 && newIndex < availablePeriods.length) {
+      onFiltersChange({
+        ...filters,
+        evaluationPeriod: availablePeriods[newIndex]
+      });
+    }
   }
 
-  function handleYearChange(year: string) {
+  function selectPeriod(period: EvaluationPeriod) {
     onFiltersChange({
       ...filters,
-      evaluationPeriod: {
-        ...filters.evaluationPeriod,
-        year: parseInt(year)
-      }
+      evaluationPeriod: period
     });
+    setPeriodPickerOpen(false);
   }
 
   function clearSecondaryFilters() {
@@ -162,10 +208,10 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
     });
   }
 
-  // Get current period value for highlighting
-  const currentPeriodValue = filters.evaluationPeriod.type === 'Baseline' 
-    ? 'Baseline' 
-    : filters.evaluationPeriod.quarter;
+  // Navigation state
+  const canGoNewer = currentPeriodIndex > 0;
+  const canGoOlder = currentPeriodIndex < availablePeriods.length - 1 && currentPeriodIndex !== -1;
+  const hasData = availablePeriods.length > 0;
 
   // Build active filter chips for secondary filters only
   const activeFilters: { label: string; onRemove: () => void }[] = [];
@@ -199,7 +245,7 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
 
   return (
     <Card className="p-4 space-y-3">
-      {/* Row 1: Organization + Period Pills + Year */}
+      {/* Row 1: Organization + Timeline Navigation */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Organization */}
         <Select
@@ -218,42 +264,94 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
           </SelectContent>
         </Select>
 
-        {/* Period Pills */}
-        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-          {PERIODS.map((period) => (
+        {/* Timeline Navigation */}
+        {filters.organizationId && (
+          <div className="flex items-center gap-1">
+            {/* Previous (Older) Button */}
             <Button
-              key={period.value}
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-8 px-3 rounded-md text-sm font-medium transition-colors",
-                currentPeriodValue === period.value
-                  ? "bg-background shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-              )}
-              onClick={() => handlePeriodSelect(period)}
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              disabled={!canGoOlder || periodsLoading}
+              onClick={() => navigatePeriod('prev')}
+              title="Previous period (older)"
             >
-              {period.label}
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          ))}
-        </div>
 
-        {/* Year Selector */}
-        <Select
-          value={filters.evaluationPeriod.year.toString()}
-          onValueChange={handleYearChange}
-        >
-          <SelectTrigger className="w-[100px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {yearOptions.map((year) => (
-              <SelectItem key={year} value={year.toString()}>
-                {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            {/* Period Selector */}
+            <Popover open={periodPickerOpen} onOpenChange={setPeriodPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "min-w-[140px] justify-center gap-2 font-medium",
+                    !hasData && "text-muted-foreground"
+                  )}
+                  disabled={periodsLoading}
+                >
+                  <Calendar className="h-4 w-4" />
+                  {periodsLoading ? (
+                    "Loading..."
+                  ) : hasData ? (
+                    <>
+                      {getPeriodLabel(filters.evaluationPeriod)}
+                      {availablePeriods.length > 1 && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          ({currentPeriodIndex + 1}/{availablePeriods.length})
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    "No evaluations"
+                  )}
+                  <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="center">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground px-2 py-1">
+                    Available evaluation periods
+                  </p>
+                  {availablePeriods.length === 0 ? (
+                    <p className="text-sm text-muted-foreground px-2 py-2">
+                      No evaluations found for this organization
+                    </p>
+                  ) : (
+                    availablePeriods.map((period, idx) => (
+                      <Button
+                        key={`${period.type}-${period.quarter || ''}-${period.year}`}
+                        variant={periodsEqual(period, filters.evaluationPeriod) ? "secondary" : "ghost"}
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => selectPeriod(period)}
+                      >
+                        {getPeriodLabel(period)}
+                        {idx === 0 && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            Latest
+                          </Badge>
+                        )}
+                      </Button>
+                    ))
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Next (Newer) Button */}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              disabled={!canGoNewer || periodsLoading}
+              onClick={() => navigatePeriod('next')}
+              title="Next period (newer)"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         {/* More Filters Toggle */}
         <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>

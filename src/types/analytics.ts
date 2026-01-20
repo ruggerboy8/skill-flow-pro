@@ -58,3 +58,36 @@ export function getPeriodLabel(period: EvaluationPeriod): string {
   }
   return `${period.quarter} ${period.year}`;
 }
+
+/**
+ * Compare two evaluation periods for sorting.
+ * Returns negative if a comes before b (older), positive if a comes after b (newer).
+ * Sorted newest first when used with sort().
+ */
+export function comparePeriods(a: EvaluationPeriod, b: EvaluationPeriod): number {
+  // First compare years (descending - newer first)
+  if (a.year !== b.year) {
+    return b.year - a.year;
+  }
+  
+  // Same year - compare by period type/quarter
+  // Order within year: Q4 > Q3 > Q2 > Q1 > Baseline
+  const getPeriodWeight = (p: EvaluationPeriod): number => {
+    if (p.type === 'Baseline') return 0;
+    const quarterWeights: Record<Quarter, number> = { Q1: 1, Q2: 2, Q3: 3, Q4: 4 };
+    return quarterWeights[p.quarter || 'Q1'];
+  };
+  
+  return getPeriodWeight(b) - getPeriodWeight(a);
+}
+
+/**
+ * Check if two evaluation periods are equal
+ */
+export function periodsEqual(a: EvaluationPeriod, b: EvaluationPeriod): boolean {
+  if (a.type !== b.type || a.year !== b.year) return false;
+  if (a.type === 'Quarterly') {
+    return a.quarter === b.quarter;
+  }
+  return true;
+}

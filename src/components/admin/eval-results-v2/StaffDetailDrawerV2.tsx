@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { AlertTriangle, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvalFilters } from '@/types/analytics';
@@ -74,12 +74,12 @@ export function StaffDetailDrawerV2({
     return value != null ? value.toFixed(1) : '—';
   };
 
-  const getGapIndicator = (observer: number | null, self: number | null) => {
+  const getGapLabel = (observer: number | null, self: number | null) => {
     if (observer === null || self === null) return null;
     const gap = observer - self;
-    if (Math.abs(gap) < 0.5) return { type: 'calibrated', icon: CheckCircle2, color: 'text-primary' };
-    if (gap < 0) return { type: 'over-confident', icon: TrendingUp, color: 'text-destructive' };
-    return { type: 'under-confident', icon: TrendingDown, color: 'text-warning' };
+    if (Math.abs(gap) < 0.5) return null;
+    if (gap < 0) return { type: 'over-confident', color: 'text-destructive' };
+    return { type: 'under-confident', color: 'text-warning' };
   };
 
   // Calculate domain summaries
@@ -182,7 +182,6 @@ export function StaffDetailDrawerV2({
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">Domain Overview</h3>
                 <div className="grid grid-cols-2 gap-3">
                   {domainSummaries.map(domain => {
-                    const gap = getGapIndicator(domain.observer_avg, domain.self_avg);
                     return (
                       <Card 
                         key={domain.domain_id}
@@ -192,9 +191,6 @@ export function StaffDetailDrawerV2({
                         <CardContent className="pt-3 pb-3">
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-sm">{domain.domain_name}</span>
-                            {gap && (
-                              <gap.icon className={`h-4 w-4 ${gap.color}`} />
-                            )}
                           </div>
                           <div className="flex gap-4 text-sm">
                             <div>
@@ -230,7 +226,6 @@ export function StaffDetailDrawerV2({
                       </div>
                       <div className="space-y-2 ml-5">
                         {competencies.map(comp => {
-                          const gap = getGapIndicator(comp.observer_score, comp.self_score);
                           return (
                             <div
                               key={comp.competency_id}
@@ -246,9 +241,6 @@ export function StaffDetailDrawerV2({
                                   <div className="text-xs text-muted-foreground">Self</div>
                                   <div className="font-medium">{comp.self_score ?? '—'}</div>
                                 </div>
-                                {gap && (
-                                  <gap.icon className={`h-4 w-4 ${gap.color}`} />
-                                )}
                               </div>
                             </div>
                           );

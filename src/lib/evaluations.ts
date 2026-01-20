@@ -538,3 +538,63 @@ export function getQuarterWindow(now: Date, timezone: string): QuarterWindow {
     targetYear
   };
 }
+
+/**
+ * Check if a draft evaluation has all required scores filled out.
+ * Returns true if all items have both observer_score and self_score.
+ */
+export async function isDraftComplete(evalId: string): Promise<boolean> {
+  const { data: items, error } = await supabase
+    .from('evaluation_items')
+    .select('observer_score, self_score')
+    .eq('evaluation_id', evalId);
+
+  if (error || !items || items.length === 0) {
+    return false;
+  }
+
+  return items.every(item => item.observer_score !== null && item.self_score !== null);
+}
+
+/**
+ * Bulk submit multiple draft evaluations that have all scores completed.
+ * Returns an object with success count and any errors.
+ * Note: The submitted_by will be the last person who edited the evaluation (evaluator_id stays unchanged).
+ */
+export async function bulkSubmitCompleteDrafts(
+  evalIds: string[]
+): Promise<{ successCount: number; failedCount: number; errors: string[] }> {
+  const results = { successCount: 0, failedCount: 0, errors: [] as string[] };
+
+  // Check which drafts are complete
+  const completeEvalIds: string[] = [];
+  
+  for (const evalId of evalIds) {
+    const isComplete = await isDraftComplete(evalId);
+    if (isComplete) {
+      completeEvalIds.push(evalId);
+    } else {
+      results.failedCount++;
+      results.errors.push(`Eval ${evalId.slice(0, 8)}... has missing scores`);
+    }
+  }
+
+  if (completeEvalIds.length === 0) {
+    return results;
+  }
+
+  // Submit all complete evaluations at once
+  const { error } = await supabase
+    .from('evaluations')
+    .update({ status: 'submitted' })
+    .in('id', completeEvalIds);
+
+  if (error) {
+    results.failedCount += completeEvalIds.length;
+    results.errors.push(`Batch submit failed: ${error.message}`);
+  } else {
+    results.successCount = completeEvalIds.length;
+  }
+
+  return results;
+}

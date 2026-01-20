@@ -56,7 +56,10 @@ export function StaffResultsTableV2({ data, filters }: StaffResultsTableV2Props)
     },
     onSuccess: () => {
       toast.success('Evaluation submitted');
-      queryClient.invalidateQueries({ queryKey: ['eval-distribution'] });
+      // Invalidate all V2 eval queries
+      queryClient.invalidateQueries({ queryKey: ['eval-distribution-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['eval-distribution-metrics-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['eval-distribution-location-detail'] });
     },
     onError: (error) => {
       toast.error('Failed to submit evaluation');
@@ -115,7 +118,7 @@ export function StaffResultsTableV2({ data, filters }: StaffResultsTableV2Props)
                   {staff.roleName}
                 </TableCell>
                 <TableCell className="text-center">
-                  {getStatusBadge(staff, () => submitMutation.mutate(staff.evaluationId!))}
+                  {getStatusBadge(staff, () => submitMutation.mutate(staff.evaluationId!), submitMutation.isPending)}
                 </TableCell>
                 <TableCell className={cn("text-center font-medium", getMismatchColor(staff.totalMismatchRate))}>
                   {formatRate(staff.totalMismatchRate)}
@@ -142,7 +145,7 @@ export function StaffResultsTableV2({ data, filters }: StaffResultsTableV2Props)
   );
 }
 
-function getStatusBadge(staff: StaffRowV2, onSubmit: () => void) {
+function getStatusBadge(staff: StaffRowV2, onSubmit: () => void, isPending: boolean) {
   if (!staff.evaluationId) {
     return <Badge variant="outline" className="text-muted-foreground">No eval</Badge>;
   }
@@ -155,8 +158,14 @@ function getStatusBadge(staff: StaffRowV2, onSubmit: () => void) {
     return (
       <div className="flex items-center gap-2 justify-center">
         <Badge variant="outline" className="border-amber-300 text-amber-600">Draft</Badge>
-        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={onSubmit}>
-          Submit
+        <Button 
+          size="sm" 
+          variant="ghost" 
+          className="h-6 text-xs" 
+          onClick={onSubmit}
+          disabled={isPending}
+        >
+          {isPending ? 'Submitting...' : 'Submit'}
         </Button>
       </div>
     );

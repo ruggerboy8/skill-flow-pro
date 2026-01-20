@@ -53,32 +53,31 @@ export function LocationSummaryPanel({ data }: LocationSummaryPanelProps) {
             <span className={`text-2xl font-bold ${getTopBoxColor(topBoxRate)}`}>
               {formatRate(topBoxRate)}
             </span>
-            <span className="text-xs text-muted-foreground">top-box</span>
+            <span className="text-xs text-muted-foreground">scored 4</span>
           </div>
           
           <div className="text-xs text-muted-foreground mt-1">
-            {formatRate(bottomBoxRate)} bottom-box · Mean: {formatMean(metrics.obsMean)}
+            {formatRate(bottomBoxRate)} scored 1-2 · Avg: {formatMean(metrics.obsMean)}
           </div>
         </CardContent>
       </Card>
 
-      {/* Calibration Card */}
+      {/* Agreement Card */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <Target className="h-4 w-4" />
-            <span className="text-sm font-medium">Calibration</span>
+            <span className="text-sm font-medium">Agreement</span>
           </div>
           
           <div className="flex items-baseline gap-2">
             <span className={`text-2xl font-bold ${getMismatchColor(mismatchRate)}`}>
               {formatRate(mismatchRate)}
             </span>
-            <span className="text-xs text-muted-foreground">mismatch</span>
+            <span className="text-xs text-muted-foreground">disagree</span>
           </div>
           
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-muted-foreground">Gap: {gap}</span>
             <Badge variant="outline" className="text-[10px] h-5">
               {getGapLabel(gapDirection)}
             </Badge>
@@ -86,12 +85,12 @@ export function LocationSummaryPanel({ data }: LocationSummaryPanelProps) {
         </CardContent>
       </Card>
 
-      {/* Accountability Card - Placeholder */}
+      {/* Weekly Practice Card - Placeholder */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <Users className="h-4 w-4" />
-            <span className="text-sm font-medium">Accountability</span>
+            <span className="text-sm font-medium">Weekly Practice</span>
           </div>
           
           <div className="text-2xl font-bold text-muted-foreground">—</div>

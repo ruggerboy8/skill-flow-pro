@@ -123,7 +123,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
         <CardContent className="p-6">
           <div className="flex items-center gap-2 text-muted-foreground mb-3">
             <TrendingUp className="h-4 w-4" />
-            <span className="text-sm font-medium">Performance (Observer)</span>
+            <span className="text-sm font-medium">Performance</span>
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -133,8 +133,8 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
                   <p className="font-medium mb-2">Score Distribution</p>
                   <DistributionBar distribution={distribution} />
                   <p className="text-xs mt-2">
-                    Top-box = % rated 4 (Mastery)<br />
-                    Bottom-box = % rated 1–2
+                    Scored 4 = Excellent performance<br />
+                    Scored 1-2 = Needs development
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -145,30 +145,30 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
             <span className={`text-3xl font-bold ${getTopBoxColor(topBoxRate)}`}>
               {formatRate(topBoxRate)}
             </span>
-            <span className="text-sm text-muted-foreground">top-box</span>
+            <span className="text-sm text-muted-foreground">scored 4</span>
           </div>
           
           <div className="flex items-center gap-4 mt-2 text-sm">
             <span className="text-muted-foreground">
-              {formatRate(bottomBoxRate)} bottom-box
+              {formatRate(bottomBoxRate)} scored 1-2
             </span>
             <span className="text-muted-foreground">
-              Mean: {formatMean(orgMetrics.obsMean)}
+              Avg: {formatMean(orgMetrics.obsMean)}
             </span>
           </div>
           
           <div className="mt-3 text-xs text-muted-foreground">
-            N = {orgMetrics.nItems.toLocaleString()} ratings
+            {orgMetrics.nItems.toLocaleString()} ratings
           </div>
         </CardContent>
       </Card>
 
-      {/* Calibration Card */}
+      {/* Agreement Card */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-2 text-muted-foreground mb-3">
             <Target className="h-4 w-4" />
-            <span className="text-sm font-medium">Calibration</span>
+            <span className="text-sm font-medium">Agreement</span>
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -176,10 +176,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p className="text-xs">
-                    <strong>Mismatch rate:</strong> % of ratings where observer ≠ self score<br /><br />
-                    <strong>Gap:</strong> Observer mean − Self mean<br />
-                    Positive = staff underrate themselves<br />
-                    Negative = staff overrate themselves
+                    Shows how often coach and staff gave the same score. "Different views" means they disagreed.
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -190,30 +187,27 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
             <span className={`text-3xl font-bold ${getMismatchColor(mismatchRate)}`}>
               {formatRate(mismatchRate)}
             </span>
-            <span className="text-sm text-muted-foreground">mismatch</span>
+            <span className="text-sm text-muted-foreground">disagree</span>
           </div>
           
           <div className="flex items-center gap-3 mt-2">
-            <span className="text-sm text-muted-foreground">
-              Gap: {gap}
-            </span>
             <Badge variant={gapDirection === 'aligned' ? 'secondary' : 'outline'} className="text-xs">
               {getGapLabel(gapDirection)}
             </Badge>
           </div>
           
           <div className="mt-3 text-xs text-muted-foreground">
-            N = {orgMetrics.nItems.toLocaleString()} comparisons
+            {orgMetrics.nItems.toLocaleString()} ratings
           </div>
         </CardContent>
       </Card>
 
-      {/* Accountability Card - Placeholder */}
+      {/* Weekly Practice Card - Placeholder */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-2 text-muted-foreground mb-3">
             <Users className="h-4 w-4" />
-            <span className="text-sm font-medium">Accountability</span>
+            <span className="text-sm font-medium">Weekly Practice</span>
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -221,7 +215,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p className="text-xs">
-                    Pro-Moves submission metrics for the 6-week window before the evaluation period end date.
+                    Weekly practice completion for the 6 weeks before this evaluation period.
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -230,7 +224,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
           
           <div className="flex items-baseline gap-3">
             <span className="text-3xl font-bold text-muted-foreground">—</span>
-            <span className="text-sm text-muted-foreground">participation</span>
+            <span className="text-sm text-muted-foreground">completed</span>
           </div>
           
           <div className="text-sm text-muted-foreground mt-2">
@@ -238,7 +232,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
           </div>
           
           <div className="mt-3 text-xs text-muted-foreground italic">
-            *Excludes current week — assignments not yet due.
+            *6 weeks before evaluation
           </div>
         </CardContent>
       </Card>

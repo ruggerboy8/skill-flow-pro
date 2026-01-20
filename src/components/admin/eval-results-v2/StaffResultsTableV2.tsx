@@ -102,7 +102,7 @@ export function StaffResultsTableV2({ data, filters }: StaffResultsTableV2Props)
               <TableHead>Staff</TableHead>
               <TableHead>Role</TableHead>
               <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-center">Mismatch</TableHead>
+              <TableHead className="text-center">Disagree</TableHead>
               {domains.map(domain => (
                 <TableHead key={domain} className="text-center text-xs">
                   {domain}

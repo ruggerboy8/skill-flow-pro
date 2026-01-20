@@ -31,9 +31,14 @@ export function AppSidebar({ navigation, backfillMissingCount = 0 }: AppSidebarP
     if (href === '/') {
       return currentPath === '/';
     }
-    // Special handling for admin routes - both /admin and /admin/eval-results should highlight admin
+    // Eval results has its own nav item, so don't highlight admin for it
     if (href === '/admin') {
-      return currentPath === '/admin' || currentPath.startsWith('/admin/');
+      return currentPath === '/admin' || 
+        (currentPath.startsWith('/admin/') && !currentPath.startsWith('/admin/eval-results'));
+    }
+    // For eval-results, match exactly or sub-routes
+    if (href === '/admin/eval-results-v2') {
+      return currentPath.startsWith('/admin/eval-results');
     }
     return currentPath.startsWith(href);
   };

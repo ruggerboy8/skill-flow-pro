@@ -163,12 +163,12 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
         </CardContent>
       </Card>
 
-      {/* Agreement Card */}
+      {/* Calibration Card */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-2 text-muted-foreground mb-3">
             <Target className="h-4 w-4" />
-            <span className="text-sm font-medium">Agreement</span>
+            <span className="text-sm font-medium">Calibration</span>
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -176,7 +176,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p className="text-xs">
-                    Shows how often coach and staff gave the same score. "Different views" means they disagreed.
+                    Percent of self-assessments that differ from observer scores.
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -187,7 +187,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
             <span className={`text-3xl font-bold ${getMismatchColor(mismatchRate)}`}>
               {formatRate(mismatchRate)}
             </span>
-            <span className="text-sm text-muted-foreground">disagree</span>
+            <span className="text-sm text-muted-foreground">misaligned</span>
           </div>
           
           <div className="flex items-center gap-3 mt-2">

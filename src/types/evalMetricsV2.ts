@@ -139,15 +139,15 @@ export function getMismatchBg(rate: number): string {
 export function getGapDirection(obsMean: number | null, selfMean: number | null): 'overrate' | 'underrate' | 'aligned' {
   if (obsMean === null || selfMean === null) return 'aligned';
   const gap = obsMean - selfMean;
-  if (gap < -0.2) return 'overrate';  // self > obs = staff overrates themselves
-  if (gap > 0.2) return 'underrate';  // obs > self = staff underrates themselves
+  if (gap < -0.2) return 'overrate';  // self > obs = staff rates higher
+  if (gap > 0.2) return 'underrate';  // obs > self = coach rates higher
   return 'aligned';
 }
 
 export function getGapLabel(direction: 'overrate' | 'underrate' | 'aligned'): string {
   switch (direction) {
-    case 'overrate': return 'Staff overrate';
-    case 'underrate': return 'Staff underrate';
-    case 'aligned': return 'Aligned';
+    case 'overrate': return 'Staff rate higher';
+    case 'underrate': return 'Coach rates higher';
+    case 'aligned': return 'Same view';
   }
 }

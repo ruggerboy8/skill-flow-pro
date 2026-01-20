@@ -48,12 +48,12 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
       </CardHeader>
       
       <CardContent className="pt-0 space-y-3">
-        {/* Primary Metric: Top-box Rate */}
+        {/* Primary Metric: Scored 4 Rate */}
         <div className="flex items-baseline gap-2">
           <span className={cn("text-2xl font-bold", getTopBoxColor(data.topBoxRate))}>
             {formatRate(data.topBoxRate)}
           </span>
-          <span className="text-sm text-muted-foreground">top-box (4s)</span>
+          <span className="text-sm text-muted-foreground">scored 4</span>
         </div>
         
         {/* Secondary Metrics */}
@@ -62,15 +62,15 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
             <span className={cn("font-medium", getMismatchColor(data.mismatchRate))}>
               {formatRate(data.mismatchRate)}
             </span>
-            <span className="text-muted-foreground ml-1">mismatch</span>
+            <span className="text-muted-foreground ml-1">disagree</span>
           </div>
           <div className="text-muted-foreground">
-            Mean: {formatMean(data.obsMean)}
+            Avg: {formatMean(data.obsMean)}
           </div>
         </div>
         
-        {/* Weakest Domain Flag */}
-        {data.weakestDomain && data.bottomBoxRate > 15 && (
+        {/* Weakest Domain Flag - always show when present */}
+        {data.weakestDomain && (
           <div className="flex items-center gap-1 text-xs text-amber-600">
             <AlertTriangle className="h-3 w-3" />
             <span>Weakest: {data.weakestDomain}</span>
@@ -79,7 +79,7 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
         
         {/* N Indicator */}
         <div className="text-xs text-muted-foreground border-t pt-2">
-          N = {data.nItems} ratings
+          {data.nItems} ratings
         </div>
       </CardContent>
     </Card>

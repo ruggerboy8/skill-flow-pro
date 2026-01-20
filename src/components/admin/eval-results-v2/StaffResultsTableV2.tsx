@@ -29,7 +29,7 @@ import { DOMAIN_ORDER, getDomainOrderIndex } from '@/lib/domainUtils';
 interface StaffResultsTableV2Props {
   data: EvalDistributionRow[];
   filters: EvalFilters;
-  onRowClick?: (staffId: string, staffName: string) => void;
+  onRowClick?: (staffId: string, staffName: string, evaluationId: string | null) => void;
 }
 
 export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsTableV2Props) {
@@ -119,7 +119,7 @@ export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsT
               <TableRow 
                 key={staff.staffId}
                 className={cn(onRowClick && "cursor-pointer hover:bg-muted/50")}
-                onClick={() => onRowClick?.(staff.staffId, staff.staffName)}
+                onClick={() => onRowClick?.(staff.staffId, staff.staffName, staff.evaluationId)}
               >
                 <TableCell className="font-medium">{staff.staffName}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">

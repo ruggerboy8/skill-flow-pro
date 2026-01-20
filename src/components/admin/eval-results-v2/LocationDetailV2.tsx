@@ -5,11 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
-import { periodToDateRange, type EvalFilters } from '@/types/analytics';
+import { type EvalFilters } from '@/types/analytics';
 import { DomainSnapshotTable } from './DomainSnapshotTable';
 import { StaffResultsTableV2 } from './StaffResultsTableV2';
 import { LocationSummaryPanel } from './LocationSummaryPanel';
-import { StaffDetailDrawer } from '@/components/admin/eval-results/StaffDetailDrawer';
+import { StaffDetailDrawerV2 } from './StaffDetailDrawerV2';
 import { type EvalDistributionRow } from '@/types/evalMetricsV2';
 
 interface LocationDetailV2Props {
@@ -27,7 +27,8 @@ export function LocationDetailV2({ filters, locationId, locationName, onBack }: 
     open: boolean;
     staffId: string;
     staffName: string;
-  }>({ open: false, staffId: '', staffName: '' });
+    evaluationId: string | null;
+  }>({ open: false, staffId: '', staffName: '', evaluationId: null });
   
   const types = evaluationPeriod.type === 'Baseline' ? ['Baseline'] : ['Quarterly'];
   const quarter = evaluationPeriod.type === 'Quarterly' ? evaluationPeriod.quarter : null;
@@ -115,17 +116,18 @@ export function LocationDetailV2({ filters, locationId, locationName, onBack }: 
           <StaffResultsTableV2 
             data={rawData || []} 
             filters={filters} 
-            onRowClick={(staffId, staffName) => setDrawerState({ open: true, staffId, staffName })}
+            onRowClick={(staffId, staffName, evaluationId) => setDrawerState({ open: true, staffId, staffName, evaluationId })}
           />
         </CardContent>
       </Card>
 
       {/* Staff Detail Drawer */}
-      <StaffDetailDrawer
+      <StaffDetailDrawerV2
         open={drawerState.open}
         onOpenChange={(open) => setDrawerState(prev => ({ ...prev, open }))}
         staffId={drawerState.staffId}
         staffName={drawerState.staffName}
+        evaluationId={drawerState.evaluationId}
         locationName={locationName}
         filters={filters}
       />

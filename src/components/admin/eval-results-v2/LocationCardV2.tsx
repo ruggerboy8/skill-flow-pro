@@ -56,17 +56,12 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
           <span className="text-sm text-muted-foreground">scored 4</span>
         </div>
         
-        {/* Secondary Metrics */}
-        <div className="flex items-center justify-between text-sm">
-          <div>
-            <span className={cn("font-medium", getMismatchColor(data.mismatchRate))}>
-              {formatRate(data.mismatchRate)}
-            </span>
-            <span className="text-muted-foreground ml-1">misaligned</span>
-          </div>
-          <div className="text-muted-foreground">
-            Avg: {formatMean(data.obsMean)}
-          </div>
+        {/* Secondary Metric: Misalignment */}
+        <div className="text-sm">
+          <span className={cn("font-medium", getMismatchColor(data.mismatchRate))}>
+            {formatRate(data.mismatchRate)}
+          </span>
+          <span className="text-muted-foreground ml-1">misaligned</span>
         </div>
         
         {/* Weakest Domain Flag - always show when present */}

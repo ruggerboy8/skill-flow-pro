@@ -364,17 +364,13 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
               </span>
               <span className="text-sm text-muted-foreground">evaluated</span>
             </div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="secondary" className="text-xs">
-                <FileText className="h-3 w-3 mr-1" />
-                {data?.submittedCount ?? 0} submitted
-              </Badge>
-              {hasDrafts && (
+            {hasDrafts && (
+              <div className="flex items-center gap-2 mt-2">
                 <Badge variant="outline" className="text-xs border-warning text-warning">
                   {data?.draftCount} drafts
                 </Badge>
-              )}
-            </div>
+              </div>
+            )}
             {hasDrafts && (
               <Button
                 variant="default"

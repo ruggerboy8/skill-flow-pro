@@ -89,7 +89,7 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
         const staffQuery = (supabase.from('staff') as any)
           .select('id')
           .eq('active', true)
-          .in('location_id', locationIds);
+          .in('primary_location_id', locationIds);
         const staffResult = await staffQuery;
         totalStaff = (staffResult.data || []).length;
       }

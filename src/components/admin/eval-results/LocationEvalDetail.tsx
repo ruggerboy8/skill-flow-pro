@@ -6,13 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronLeft, Download, Send, Loader2 } from 'lucide-react';
+import { ChevronLeft, Download, Send, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StaffDetailDrawer } from './StaffDetailDrawer';
 import { pivotStaffDomain } from '@/lib/pivot';
 import { downloadCSV, formatValueForCSV } from '@/lib/csvExport';
 import { getDomainColor } from '@/lib/domainColors';
-import { submitEvaluation } from '@/lib/evaluations';
+import { submitEvaluation, bulkSubmitCompleteDrafts } from '@/lib/evaluations';
 import type { EvalFilters } from '@/types/analytics';
 import { periodToDateRange, getPeriodLabel } from '@/types/analytics';
 
@@ -57,6 +57,7 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
   });
   const [submittingEvalId, setSubmittingEvalId] = useState<string | null>(null);
   const [showDraftsOnly, setShowDraftsOnly] = useState(false);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   const dateRange = periodToDateRange(filters.evaluationPeriod);
   const evalTypes = filters.evaluationPeriod.type === 'Baseline' ? ['Baseline'] : ['Quarterly'];
@@ -131,6 +132,53 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
       setSubmittingEvalId(null);
     }
   });
+
+  // Bulk submit mutation
+  const bulkSubmitMutation = useMutation({
+    mutationFn: async () => {
+      if (!evalStatuses) return { successCount: 0, failedCount: 0, errors: [] };
+      
+      // Get all draft eval IDs
+      const draftEvalIds: string[] = [];
+      evalStatuses.forEach(status => {
+        if (status.status === 'draft') {
+          draftEvalIds.push(status.eval_id);
+        }
+      });
+      
+      if (draftEvalIds.length === 0) {
+        return { successCount: 0, failedCount: 0, errors: ['No drafts to submit'] };
+      }
+      
+      return await bulkSubmitCompleteDrafts(draftEvalIds);
+    },
+    onSuccess: (results) => {
+      if (results.successCount > 0) {
+        toast.success(`Submitted ${results.successCount} evaluation(s)`);
+      }
+      if (results.failedCount > 0) {
+        toast.warning(`${results.failedCount} evaluation(s) skipped (missing scores)`);
+      }
+      if (results.successCount === 0 && results.failedCount === 0) {
+        toast.info('No drafts to submit');
+      }
+      queryClient.invalidateQueries({ queryKey: ['location-eval-statuses', locationId] });
+      queryClient.invalidateQueries({ queryKey: ['location-staff-domain-averages', locationId] });
+      queryClient.invalidateQueries({ queryKey: ['location-eval-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['eval-summary-metrics-v2'] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Bulk submit failed: ${error.message}`);
+    },
+    onSettled: () => {
+      setBulkSubmitting(false);
+    }
+  });
+
+  const handleBulkSubmit = () => {
+    setBulkSubmitting(true);
+    bulkSubmitMutation.mutate();
+  };
 
   // Calculate counts for the header
   const staffCounts = React.useMemo(() => {
@@ -320,10 +368,27 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>Staff Results</CardTitle>
-              <Button variant="outline" size="sm" onClick={exportCSV}>
-                <Download className="mr-2 h-4 w-4" />
-                Export CSV
-              </Button>
+              <div className="flex gap-2">
+                {staffCounts.drafts > 0 && (
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={handleBulkSubmit}
+                    disabled={bulkSubmitting}
+                  >
+                    {bulkSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    )}
+                    Submit All Complete
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={exportCSV}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

@@ -1,14 +1,15 @@
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Users, FileText, ArrowUpDown } from 'lucide-react';
+import { Users, FileText, ArrowUpDown, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
 import type { EvalFilters } from '@/types/analytics';
 import { periodToDateRange, getPeriodLabel } from '@/types/analytics';
+import { computeEligibleStaffIds } from '@/lib/evaluationEligibility';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface SummaryMetricsProps {
   filters: EvalFilters;
@@ -62,10 +63,8 @@ interface RoleDomainScore {
 }
 
 export function SummaryMetrics({ filters }: SummaryMetricsProps) {
-  const dateRange = periodToDateRange(filters.evaluationPeriod);
-  
-  const { data, isLoading } = useQuery({
-    queryKey: ['eval-summary-metrics-v2', filters.organizationId, filters.evaluationPeriod],
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['eval-summary-metrics-v3', filters.organizationId, filters.evaluationPeriod],
     queryFn: async () => {
       if (!filters.organizationId) return null;
 
@@ -73,51 +72,111 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
         ? ['Baseline'] 
         : ['Quarterly'];
 
-      // Get locations for this org first - use explicit any to avoid type depth
-      const locationsQuery: any = supabase
+      // Get locations for this org
+      const { data: locationsData, error: locError } = await supabase
         .from('locations')
         .select('id')
         .eq('organization_id', filters.organizationId)
         .eq('active', true);
-      const locationsResult = await locationsQuery;
 
-      const locationIds: string[] = (locationsResult.data || []).map((l: { id: string }) => l.id);
+      if (locError) throw locError;
+      const locationIds: string[] = (locationsData || []).map(l => l.id);
 
-      // Get staff count for this org - cast early to avoid type depth error
-      let totalStaff = 0;
-      if (locationIds.length > 0) {
-        const staffQuery = (supabase.from('staff') as any)
-          .select('id')
-          .eq('active', true)
-          .in('primary_location_id', locationIds);
-        const staffResult = await staffQuery;
-        totalStaff = (staffResult.data || []).length;
+      if (locationIds.length === 0) {
+        return {
+          eligibleStaff: 0,
+          staffWithEval: 0,
+          submittedCount: 0,
+          draftCount: 0,
+          gap: null,
+          roleDomainScores: [],
+          eligibleByHireCount: 0,
+          evaluatedEarlyCount: 0,
+        };
       }
 
-      // Get evaluations in date range for this org
-      const { data: evals } = await supabase
+      // Get staff for this org with hire dates (participants only, not paused, not org admins)
+      const { data: staffData, error: staffError } = await supabase
+        .from('staff')
+        .select('id, hire_date')
+        .in('primary_location_id', locationIds)
+        .eq('is_participant', true)
+        .eq('is_paused', false)
+        .eq('is_org_admin', false);
+
+      if (staffError) throw staffError;
+      const allStaff = (staffData || []).map(s => ({ id: s.id, hire_date: s.hire_date }));
+      const allStaffIds = new Set(allStaff.map(s => s.id));
+
+      // Get evaluations for this org's locations in the selected period
+      // Use program_year/quarter for filtering (not created_at)
+      let evalsQuery = supabase
         .from('evaluations')
         .select('id, staff_id, status')
+        .in('location_id', locationIds)
         .in('type', evalTypes)
-        .gte('created_at', dateRange.start.toISOString())
-        .lte('created_at', dateRange.end.toISOString());
-
-      const submittedEvals = evals?.filter(e => e.status === 'submitted') || [];
-      const draftEvals = evals?.filter(e => e.status === 'draft') || [];
+        .eq('program_year', filters.evaluationPeriod.year);
       
-      const uniqueStaffWithEval = new Set(submittedEvals.map(e => e.staff_id));
-      const staffWithEvalCount = uniqueStaffWithEval.size;
+      // For quarterly, also filter by quarter
+      if (filters.evaluationPeriod.type === 'Quarterly' && filters.evaluationPeriod.quarter) {
+        evalsQuery = evalsQuery.eq('quarter', filters.evaluationPeriod.quarter);
+      }
 
-      // Get evaluation items for gap calculation
+      const { data: evals, error: evalsError } = await evalsQuery;
+      if (evalsError) throw evalsError;
+
+      const submittedEvals = (evals || []).filter(e => e.status === 'submitted');
+      const draftEvals = (evals || []).filter(e => e.status === 'draft');
+      
+      // Get all evaluated staff (both submitted and draft count toward eligibility)
+      const allEvaluatedStaffIds = new Set((evals || []).map(e => e.staff_id));
+      const submittedStaffIds = new Set(submittedEvals.map(e => e.staff_id));
+
+      // Compute eligible staff using the new eligibility logic
+      // Only consider staff that belong to this org
+      const evaluatedInOrg = new Set<string>();
+      for (const staffId of allEvaluatedStaffIds) {
+        if (allStaffIds.has(staffId)) {
+          evaluatedInOrg.add(staffId);
+        }
+      }
+      
+      const eligibleStaffIds = computeEligibleStaffIds(
+        allStaff,
+        evaluatedInOrg,
+        filters.evaluationPeriod
+      );
+
+      // Calculate breakdown for tooltip
+      const eligibleByHireCount = allStaff.filter(s => {
+        const periodStart = new Date(
+          filters.evaluationPeriod.year,
+          filters.evaluationPeriod.type === 'Baseline' ? 0 :
+            filters.evaluationPeriod.quarter === 'Q1' ? 0 :
+            filters.evaluationPeriod.quarter === 'Q2' ? 3 :
+            filters.evaluationPeriod.quarter === 'Q3' ? 6 : 9,
+          1
+        );
+        return new Date(s.hire_date) < periodStart;
+      }).length;
+      
+      const evaluatedEarlyCount = eligibleStaffIds.size - eligibleByHireCount;
+
+      // Count submitted evals only for staff in this org
+      const staffWithEvalCount = [...submittedStaffIds].filter(id => allStaffIds.has(id)).length;
+
+      // Get evaluation items for gap calculation (org-scoped)
       const submittedIds = submittedEvals.map(e => e.id);
       let avgObserver: number | null = null;
       let avgSelf: number | null = null;
 
       if (submittedIds.length > 0) {
-        const { data: items } = await supabase
+        const { data: items, error: itemsError } = await supabase
           .from('evaluation_items')
           .select('observer_score, self_score')
           .in('evaluation_id', submittedIds);
+
+        if (itemsError) throw itemsError;
 
         const observerScores = (items || [])
           .map(i => i.observer_score)
@@ -137,13 +196,16 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
       const gap = avgObserver !== null && avgSelf !== null ? avgObserver - avgSelf : null;
 
       // Get org-level domain averages by role using the RPC
-      const { data: domainData } = await supabase.rpc('get_location_domain_staff_averages', {
+      const dateRange = periodToDateRange(filters.evaluationPeriod);
+      const { data: domainData, error: domainError } = await supabase.rpc('get_location_domain_staff_averages', {
         p_org_id: filters.organizationId,
         p_start: dateRange.start.toISOString(),
         p_end: dateRange.end.toISOString(),
         p_include_no_eval: false,
         p_types: evalTypes,
       });
+
+      if (domainError) throw domainError;
 
       // Aggregate domain scores by role across all locations
       const roleDomainMap = new Map<string, { dfi: number[]; rda: number[] }>();
@@ -187,12 +249,14 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
       });
 
       return {
-        totalStaff,
+        eligibleStaff: eligibleStaffIds.size,
         staffWithEval: staffWithEvalCount,
         submittedCount: submittedEvals.length,
         draftCount: draftEvals.length,
         gap,
         roleDomainScores,
+        eligibleByHireCount,
+        evaluatedEarlyCount: Math.max(0, evaluatedEarlyCount),
       };
     },
     enabled: !!filters.organizationId
@@ -222,10 +286,24 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <Users className="h-4 w-4" />
               <span className="text-sm font-medium">Coverage</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      <strong>Eligible staff:</strong> Hired before this period 
+                      ({data?.eligibleByHireCount ?? 0}) + evaluated early 
+                      ({data?.evaluatedEarlyCount ?? 0})
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">
-                {data?.staffWithEval ?? 0}/{data?.totalStaff ?? 0}
+                {data?.staffWithEval ?? 0}/{data?.eligibleStaff ?? 0}
               </span>
               <span className="text-sm text-muted-foreground">evaluated</span>
             </div>
@@ -235,7 +313,7 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
                 {data?.submittedCount ?? 0} submitted
               </Badge>
               {(data?.draftCount ?? 0) > 0 && (
-                <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400">
+                <Badge variant="outline" className="text-xs border-warning text-warning">
                   {data?.draftCount} drafts
                 </Badge>
               )}

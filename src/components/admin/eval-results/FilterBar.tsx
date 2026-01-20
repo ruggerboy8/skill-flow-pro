@@ -42,35 +42,38 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
   const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
 
   // Fetch available periods for the selected organization
+  // Include both submitted AND draft evaluations for period detection
   const { data: availablePeriods = [], isLoading: periodsLoading } = useQuery({
     queryKey: ['org-eval-periods', filters.organizationId],
     queryFn: async () => {
       if (!filters.organizationId) return [];
       
-      // Query evaluations for this org via staff -> locations -> organizations
+      // Get locations for this org first
+      const { data: locations, error: locError } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('organization_id', filters.organizationId)
+        .eq('active', true);
+      
+      if (locError) throw locError;
+      const locationIds = (locations || []).map(l => l.id);
+      if (locationIds.length === 0) return [];
+      
+      // Query evaluations using location_id (stored on evaluation) for reliable scoping
+      // Include both submitted AND draft for period detection
       const { data, error } = await supabase
         .from('evaluations')
-        .select(`
-          type,
-          created_at,
-          staff!inner(
-            primary_location_id,
-            locations!inner(
-              organization_id
-            )
-          )
-        `)
-        .eq('staff.locations.organization_id', filters.organizationId)
-        .eq('status', 'submitted');
+        .select('type, program_year, quarter')
+        .in('location_id', locationIds)
+        .in('status', ['submitted', 'draft']);
       
       if (error) throw error;
       
-      // Extract unique periods
+      // Extract unique periods using program_year and quarter fields (not created_at)
       const periodSet = new Map<string, EvaluationPeriod>();
       
       (data || []).forEach((e: any) => {
-        const date = new Date(e.created_at);
-        const year = date.getFullYear();
+        const year = e.program_year as number;
         const type = e.type as 'Baseline' | 'Quarterly';
         
         if (type === 'Baseline') {
@@ -78,10 +81,9 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
           if (!periodSet.has(key)) {
             periodSet.set(key, { type: 'Baseline', year });
           }
-        } else {
-          // For quarterly, determine quarter from date
-          const month = date.getMonth();
-          const quarter = `Q${Math.ceil((month + 1) / 3)}` as Quarter;
+        } else if (e.quarter) {
+          // Use the quarter field directly from the evaluation
+          const quarter = e.quarter as Quarter;
           const key = `${quarter}-${year}`;
           if (!periodSet.has(key)) {
             periodSet.set(key, { type: 'Quarterly', quarter, year });

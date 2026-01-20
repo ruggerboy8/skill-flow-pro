@@ -343,7 +343,7 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <Users className="h-4 w-4" />
               <span className="text-sm font-medium">Coverage</span>
-              <TooltipProvider>
+              <TooltipProvider delayDuration={0}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />

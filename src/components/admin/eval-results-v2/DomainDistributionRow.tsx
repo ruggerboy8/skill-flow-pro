@@ -112,10 +112,6 @@ function DomainChart({ domain }: { domain: DomainDistribution }) {
         ))}
       </div>
       
-      {/* Sample Size */}
-      <div className="text-center mt-1">
-        <span className="text-[10px] text-muted-foreground">(n={total})</span>
-      </div>
     </div>
   );
 }

@@ -1,9 +1,12 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TrendingUp } from 'lucide-react';
 import { getDomainColorRich } from '@/lib/domainColors';
+import { formatMean } from '@/types/evalMetricsV2';
 
 interface DomainDistribution {
   name: string;
+  avg: number;
   distribution: {
     one: number;
     two: number;
@@ -24,12 +27,13 @@ export function DomainDistributionRow({ domainData }: DomainDistributionRowProps
 
   return (
     <Card>
-      <CardContent className="p-6">
-        <div className="text-sm font-medium text-muted-foreground mb-4">
-          Score Distribution by Domain
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 text-muted-foreground mb-3">
+          <TrendingUp className="h-4 w-4" />
+          <span className="text-sm font-medium">Performance</span>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {domainData.map((domain) => (
             <DomainChart key={domain.name} domain={domain} />
           ))}
@@ -40,13 +44,13 @@ export function DomainDistributionRow({ domainData }: DomainDistributionRowProps
 }
 
 function DomainChart({ domain }: { domain: DomainDistribution }) {
-  const { distribution } = domain;
+  const { distribution, avg } = domain;
   const { one, two, three, four, total } = distribution;
   
   if (total === 0) {
     return (
       <div className="text-center text-sm text-muted-foreground">
-        <DomainHeader name={domain.name} />
+        <DomainHeader name={domain.name} avg={null} />
         <div className="mt-2">No data</div>
       </div>
     );
@@ -66,11 +70,11 @@ function DomainChart({ domain }: { domain: DomainDistribution }) {
 
   return (
     <div>
-      <DomainHeader name={domain.name} />
+      <DomainHeader name={domain.name} avg={avg} />
       
       {/* Distribution Bar */}
       <TooltipProvider delayDuration={0}>
-        <div className="flex h-6 w-full rounded-md overflow-hidden mt-3">
+        <div className="flex h-5 w-full rounded-md overflow-hidden mt-2">
           {segments.map((seg) => (
             seg.percent > 0 && (
               <Tooltip key={seg.score}>
@@ -92,45 +96,52 @@ function DomainChart({ domain }: { domain: DomainDistribution }) {
         </div>
       </TooltipProvider>
       
-      {/* Score Labels */}
-      <div className="flex justify-between mt-2 px-0.5">
-        {[1, 2, 3, 4].map((score) => (
-          <span key={score} className="text-xs font-medium text-muted-foreground w-6 text-center">
-            {score}
-          </span>
-        ))}
-      </div>
-      
-      {/* Percentage Labels */}
-      <div className="flex justify-between px-0.5">
+      {/* Score Labels + Percentages combined row */}
+      <div className="flex justify-between mt-1.5 px-0.5">
         {segments.map((seg) => (
-          <span key={seg.score} className="text-xs text-muted-foreground w-6 text-center">
-            {seg.percent}%
-          </span>
+          <div key={seg.score} className="text-center w-6">
+            <span className="text-[10px] font-medium text-muted-foreground">{seg.score}</span>
+            <span className="text-[10px] text-muted-foreground block">{seg.percent}%</span>
+          </div>
         ))}
       </div>
       
       {/* Sample Size */}
-      <div className="text-center mt-2">
-        <span className="text-xs text-muted-foreground">(n={total})</span>
+      <div className="text-center mt-1">
+        <span className="text-[10px] text-muted-foreground">(n={total})</span>
       </div>
     </div>
   );
 }
 
-function DomainHeader({ name }: { name: string }) {
+function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
   const domainColor = getDomainColorRich(name);
+  const avgColor = getScoreColor(avg);
   
   return (
-    <div 
-      className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-medium"
-      style={{ 
-        backgroundColor: domainColor + '20',
-        borderLeft: `3px solid ${domainColor}`,
-        color: '#000'
-      }}
-    >
-      {name}
+    <div className="flex items-center justify-between">
+      <div 
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+        style={{ 
+          backgroundColor: domainColor + '20',
+          borderLeft: `3px solid ${domainColor}`,
+          color: '#000'
+        }}
+      >
+        {name}
+      </div>
+      {avg !== null && (
+        <span className={`text-sm font-bold ${avgColor}`}>
+          {formatMean(avg)}
+        </span>
+      )}
     </div>
   );
+}
+
+function getScoreColor(score: number | null): string {
+  if (score === null) return 'text-muted-foreground';
+  if (score >= 3.0) return 'text-green-600';
+  if (score >= 2.5) return 'text-amber-600';
+  return 'text-red-600';
 }

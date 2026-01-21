@@ -94,11 +94,11 @@ export function LocationDetailV2({ filters, locationId, locationName, onBack }: 
         </div>
       </div>
 
-      {/* Location Summary Panel (same 3 metrics as org level) */}
-      <LocationSummaryPanel data={rawData || []} />
-
-      {/* Domain Performance with Distribution Charts */}
+      {/* Domain Performance with Distribution Charts (Top) */}
       <LocationDomainDistribution data={rawData || []} />
+
+      {/* Calibration and Weekly Practice Cards */}
+      <LocationSummaryPanel data={rawData || []} locationId={locationId} evaluationPeriod={evaluationPeriod} />
 
       {/* Staff Results Table */}
       <Card>

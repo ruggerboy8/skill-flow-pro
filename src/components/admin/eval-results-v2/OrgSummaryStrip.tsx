@@ -122,108 +122,16 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Performance Card - Equal Weight Layout */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-3">
-              <TrendingUp className="h-4 w-4" />
-              <span className="text-sm font-medium">Performance</span>
-              <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="font-medium mb-2">Score Distribution</p>
-                    <DistributionBar distribution={distribution} />
-                    <p className="text-xs mt-2">
-                      Scored 4 = Excellent performance<br />
-                      Scored 1-2 = Needs development
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            
-            {/* Domain rows with stacked rates and color-scaled averages */}
-            {domainAvgs.length > 0 && (
-              <div className="space-y-2">
-                {/* Column header for Avg */}
-                <div className="flex items-center justify-end">
-                  <span className="text-xs font-medium text-muted-foreground">Avg</span>
-                </div>
-                {domainAvgs.map(d => {
-                  const avgColor = getScoreColor(d.avg);
-                  // Format domain name for stacking (e.g., "Case Acceptance" -> ["Case", "Acceptance"])
-                  const nameParts = d.name.split(' ');
-                  const shouldStack = nameParts.length > 1;
-                  
-                  return (
-                    <div key={d.name} className="flex items-center justify-between">
-                      {/* Left: Domain pill + stacked rates */}
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium min-w-[72px]"
-                          style={{ 
-                            backgroundColor: getDomainColorRich(d.name) + '30',
-                            color: '#000'
-                          }}
-                        >
-                          {shouldStack ? (
-                            <span className="flex flex-col items-center leading-tight">
-                              {nameParts.map((part, i) => (
-                                <span key={i}>{part}</span>
-                              ))}
-                            </span>
-                          ) : (
-                            d.name
-                          )}
-                        </span>
-                        <div className="flex flex-col text-xs">
-                          <span className={getTopBoxColor(d.topBoxRate)}>
-                            {formatRate(d.topBoxRate)} scored 4
-                          </span>
-                          <span className="text-muted-foreground">
-                            {formatRate(d.bottomBoxRate)} scored 1-2
-                          </span>
-                        </div>
-                      </div>
-                      {/* Right: Color-scaled average */}
-                      <span className={`text-lg font-bold ${avgColor}`}>
-                        {formatMean(d.avg)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {/* Fallback if no domain data */}
-            {domainAvgs.length === 0 && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className={`text-2xl font-bold ${getTopBoxColor(topBoxRate)}`}>
-                    {formatRate(topBoxRate)}
-                  </span>
-                  <div className="text-xs text-muted-foreground">scored 4</div>
-                </div>
-                <div>
-                  <span className="text-2xl font-bold text-muted-foreground">
-                    {formatRate(bottomBoxRate)}
-                  </span>
-                  <div className="text-xs text-muted-foreground">scored 1-2</div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+    <div className="space-y-3">
+      {/* Performance - Domain Distribution Row (Top) */}
+      <DomainDistributionRow domainData={domainDistributions} />
 
+      {/* Calibration and ProMove Cards (Compact Row) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* Calibration Card */}
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 text-muted-foreground mb-3">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <Target className="h-4 w-4" />
               <span className="text-sm font-medium">Calibration</span>
               <TooltipProvider delayDuration={0}>
@@ -240,19 +148,16 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
               </TooltipProvider>
             </div>
             
-            <div className="mb-2">
-              <span className={`text-2xl font-bold ${getMismatchColor(mismatchRate)}`}>
+            <div className="flex items-baseline gap-2">
+              <span className={`text-xl font-bold ${getMismatchColor(mismatchRate)}`}>
                 {formatRate(mismatchRate)}
               </span>
-              <span className="text-sm text-muted-foreground ml-2">of Self Ratings differ from Observer</span>
-            </div>
-            
-            {gapDirection !== 'aligned' && (
-              <div className="flex items-center gap-2 mt-2">
+              <span className="text-sm text-muted-foreground">of Self Ratings differ from Observer</span>
+              {gapDirection !== 'aligned' && (
                 <TooltipProvider delayDuration={0}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge variant="outline" className="text-xs cursor-help">
+                      <Badge variant="outline" className="text-xs cursor-help ml-2">
                         <Info className="h-3 w-3 mr-1" />
                         {getGapLabel(gapDirection)}
                       </Badge>
@@ -266,16 +171,16 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
 
         {/* ProMove Submission Card - Only for Quarterly */}
         {evaluationPeriod.type !== 'Baseline' && (
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-3">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-2">
                 <Users className="h-4 w-4" />
                 <span className="text-sm font-medium">ProMove Submission</span>
                 <TooltipProvider delayDuration={0}>
@@ -293,40 +198,35 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
               </div>
               
               {accountability.isLoading ? (
-                <>
-                  <Skeleton className="h-8 w-20 mb-2" />
-                  <Skeleton className="h-4 w-32" />
-                </>
+                <div className="flex items-baseline gap-4">
+                  <Skeleton className="h-6 w-16" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
               ) : accountability.completionRate !== null ? (
-                <>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold">{accountability.completionRate}%</span>
+                <div className="flex items-baseline gap-4">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-bold">{accountability.completionRate}%</span>
                     <span className="text-sm text-muted-foreground">completed</span>
                   </div>
-                  
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {accountability.onTimeRate}% on time
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-sm text-muted-foreground">{accountability.onTimeRate}% on time</span>
                   </div>
-                </>
+                  {accountability.previousQuarterLabel && (
+                    <span className="text-xs text-muted-foreground italic">
+                      *{accountability.previousQuarterLabel}
+                    </span>
+                  )}
+                </div>
               ) : (
-                <>
-                  <div className="text-2xl font-bold text-muted-foreground">—</div>
-                  <div className="text-sm text-muted-foreground">No data available</div>
-                </>
-              )}
-              
-              {accountability.previousQuarterLabel && (
-                <div className="mt-3 text-xs text-muted-foreground italic">
-                  *Data from {accountability.previousQuarterLabel}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-bold text-muted-foreground">—</span>
+                  <span className="text-sm text-muted-foreground">No data available</span>
                 </div>
               )}
             </CardContent>
           </Card>
         )}
       </div>
-
-      {/* Domain Distribution Row */}
-      <DomainDistributionRow domainData={domainDistributions} />
     </div>
   );
 }
@@ -425,20 +325,23 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
   const domainAvgs: { name: string; avg: number; topBoxRate: number; bottomBoxRate: number }[] = [];
   const domainDistributions: { 
     name: string; 
+    avg: number;
     distribution: { one: number; two: number; three: number; four: number; total: number } 
   }[] = [];
   
   for (const [name, d] of domainMap) {
     if (d.nItems > 0) {
+      const avg = d.count > 0 ? d.sum / d.count : 0;
       domainAvgs.push({ 
         name, 
-        avg: d.count > 0 ? d.sum / d.count : 0,
+        avg,
         topBoxRate: calcRate(d.topBox, d.nItems),
         bottomBoxRate: calcRate(d.bottomBox, d.nItems)
       });
       
       domainDistributions.push({
         name,
+        avg,
         distribution: {
           one: d.obs1,
           two: d.obs2,

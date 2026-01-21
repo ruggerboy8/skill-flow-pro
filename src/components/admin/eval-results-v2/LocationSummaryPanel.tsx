@@ -1,27 +1,33 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Target, Users } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Target, Users, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   calcRate, 
   formatRate, 
-  formatMean,
-  getTopBoxColor,
   getMismatchColor,
   getGapDirection,
   getGapLabel,
   type EvalDistributionRow 
 } from '@/types/evalMetricsV2';
+import { useLocationAccountability } from '@/hooks/useLocationAccountability';
+import type { EvalFilters } from '@/types/analytics';
 
 interface LocationSummaryPanelProps {
   data: EvalDistributionRow[];
+  locationId: string;
+  evaluationPeriod: EvalFilters['evaluationPeriod'];
 }
 
-export function LocationSummaryPanel({ data }: LocationSummaryPanelProps) {
+export function LocationSummaryPanel({ data, locationId, evaluationPeriod }: LocationSummaryPanelProps) {
   const metrics = aggregateMetrics(data);
+  const accountability = useLocationAccountability(locationId, evaluationPeriod);
+  const isBaseline = evaluationPeriod.type === 'Baseline';
   
   if (metrics.nItems === 0) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <Card className="border-dashed">
           <CardContent className="py-6 text-center text-muted-foreground">
             No evaluation data
@@ -31,82 +37,115 @@ export function LocationSummaryPanel({ data }: LocationSummaryPanelProps) {
     );
   }
 
-  const topBoxRate = calcRate(metrics.obsTopBox, metrics.nItems);
-  const bottomBoxRate = calcRate(metrics.obsBottomBox, metrics.nItems);
   const mismatchRate = calcRate(metrics.mismatchCount, metrics.nItems);
-  const gap = metrics.obsMean && metrics.selfMean 
-    ? (metrics.obsMean - metrics.selfMean).toFixed(1) 
-    : '—';
   const gapDirection = getGapDirection(metrics.obsMean, metrics.selfMean);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {/* Performance Card */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-2">
-            <TrendingUp className="h-4 w-4" />
-            <span className="text-sm font-medium">Performance</span>
-          </div>
-          
-          <div className="flex items-baseline gap-2">
-            <span className={`text-2xl font-bold ${getTopBoxColor(topBoxRate)}`}>
-              {formatRate(topBoxRate)}
-            </span>
-            <span className="text-xs text-muted-foreground">scored 4</span>
-          </div>
-          
-          <div className="text-xs text-muted-foreground mt-1">
-            {formatRate(bottomBoxRate)} scored 1-2 · Avg: {formatMean(metrics.obsMean)}
-          </div>
-        </CardContent>
-      </Card>
-
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {/* Calibration Card */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <Target className="h-4 w-4" />
             <span className="text-sm font-medium">Calibration</span>
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-xs">
+                    How often staff self-ratings match observer scores. Lower is better.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           
           <div className="flex items-baseline gap-2">
-            <span className={`text-2xl font-bold ${getMismatchColor(mismatchRate)}`}>
+            <span className={`text-xl font-bold ${getMismatchColor(mismatchRate)}`}>
               {formatRate(mismatchRate)}
             </span>
-            <span className="text-xs text-muted-foreground">misaligned</span>
+            <span className="text-sm text-muted-foreground">of Self Ratings differ from Observer</span>
+            {gapDirection !== 'aligned' && (
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-xs cursor-help ml-2">
+                      <Info className="h-3 w-3 mr-1" />
+                      {getGapLabel(gapDirection)}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">
+                      {gapDirection === 'overrate' 
+                        ? 'On average, staff rate themselves higher than observers do.'
+                        : 'On average, staff rate themselves lower than observers do.'}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
-          
-          {gapDirection !== 'aligned' && (
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline" className="text-[10px] h-5">
-                {getGapLabel(gapDirection)}
-              </Badge>
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {/* Weekly Practice Card - Placeholder */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-2">
-            <Users className="h-4 w-4" />
-            <span className="text-sm font-medium">Weekly Practice</span>
-          </div>
-          
-          <div className="text-2xl font-bold text-muted-foreground">—</div>
-          <div className="text-xs text-muted-foreground mt-1">Coming soon</div>
-        </CardContent>
-      </Card>
+      {/* Weekly Practice Card - Only for Quarterly */}
+      {!isBaseline && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-2">
+              <Users className="h-4 w-4" />
+              <span className="text-sm font-medium">ProMove Submission</span>
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Weekly ProMove submission rates from the quarter before this evaluation.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            
+            {accountability.isLoading ? (
+              <div className="flex items-baseline gap-4">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            ) : accountability.completionRate !== null ? (
+              <div className="flex items-baseline gap-4">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-bold">{accountability.completionRate}%</span>
+                  <span className="text-sm text-muted-foreground">completed</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-sm text-muted-foreground">{accountability.onTimeRate}% on time</span>
+                </div>
+                {accountability.previousQuarterLabel && (
+                  <span className="text-xs text-muted-foreground italic">
+                    *{accountability.previousQuarterLabel}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-muted-foreground">—</span>
+                <span className="text-sm text-muted-foreground">No data available</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
 
 function aggregateMetrics(rows: EvalDistributionRow[]) {
   let nItems = 0;
-  let obsTopBox = 0;
-  let obsBottomBox = 0;
   let mismatchCount = 0;
   let obsSum = 0;
   let selfSum = 0;
@@ -115,8 +154,6 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
   
   for (const row of rows) {
     nItems += row.n_items;
-    obsTopBox += row.obs_top_box;
-    obsBottomBox += row.obs_bottom_box;
     mismatchCount += row.mismatch_count;
     
     if (row.obs_mean !== null) {
@@ -131,8 +168,6 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
   
   return {
     nItems,
-    obsTopBox,
-    obsBottomBox,
     mismatchCount,
     obsMean: obsCount > 0 ? obsSum / obsCount : null,
     selfMean: selfCount > 0 ? selfSum / selfCount : null

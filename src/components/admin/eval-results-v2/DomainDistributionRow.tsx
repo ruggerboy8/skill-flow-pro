@@ -18,9 +18,10 @@ interface DomainDistribution {
 
 interface DomainDistributionRowProps {
   domainData: DomainDistribution[];
+  staffCount?: number;
 }
 
-export function DomainDistributionRow({ domainData }: DomainDistributionRowProps) {
+export function DomainDistributionRow({ domainData, staffCount }: DomainDistributionRowProps) {
   if (domainData.length === 0) {
     return null;
   }
@@ -31,6 +32,11 @@ export function DomainDistributionRow({ domainData }: DomainDistributionRowProps
         <div className="flex items-center gap-2 text-muted-foreground mb-3">
           <TrendingUp className="h-4 w-4" />
           <span className="text-sm font-medium">Performance</span>
+          {staffCount !== undefined && staffCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              · {staffCount} staff evaluated
+            </span>
+          )}
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

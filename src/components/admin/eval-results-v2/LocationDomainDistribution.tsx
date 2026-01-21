@@ -66,7 +66,7 @@ function DomainChart({ domain }: { domain: DomainData }) {
   if (total === 0) {
     return (
       <div className="text-center text-sm text-muted-foreground">
-        <DomainHeader name={domain.name} />
+        <DomainHeader name={domain.name} avg={null} />
         <div className="mt-2">No data</div>
       </div>
     );
@@ -86,7 +86,7 @@ function DomainChart({ domain }: { domain: DomainData }) {
 
   return (
     <div>
-      <DomainHeader name={domain.name} />
+      <DomainHeader name={domain.name} avg={obsMean} />
       
       {/* Distribution Bar */}
       <TooltipProvider delayDuration={0}>
@@ -141,19 +141,27 @@ function DomainChart({ domain }: { domain: DomainData }) {
   );
 }
 
-function DomainHeader({ name }: { name: string }) {
+function DomainHeader({ name, avg }: { name: string; avg: number | null }) {
   const domainColor = getDomainColorRich(name);
+  const avgColor = getScoreColor(avg);
   
   return (
-    <div 
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-      style={{ 
-        backgroundColor: domainColor + '20',
-        borderLeft: `3px solid ${domainColor}`,
-        color: '#000'
-      }}
-    >
-      {name}
+    <div className="flex items-center justify-between">
+      <div 
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+        style={{ 
+          backgroundColor: domainColor + '20',
+          borderLeft: `3px solid ${domainColor}`,
+          color: '#000'
+        }}
+      >
+        {name}
+      </div>
+      {avg !== null && (
+        <span className={`text-sm font-bold ${avgColor}`}>
+          {formatMean(avg)}
+        </span>
+      )}
     </div>
   );
 }

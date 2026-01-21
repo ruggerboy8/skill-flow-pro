@@ -57,9 +57,9 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
   const accountability = useOrgAccountability(filters);
 
   // Aggregate org-level metrics
-  const { orgMetrics, domainAvgs, domainDistributions } = data 
+  const { orgMetrics, domainAvgs, domainDistributions, staffCount } = data 
     ? aggregateMetrics(data) 
-    : { orgMetrics: null, domainAvgs: [], domainDistributions: [] };
+    : { orgMetrics: null, domainAvgs: [], domainDistributions: [], staffCount: 0 };
 
   if (!organizationId) {
     return (
@@ -124,7 +124,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
   return (
     <div className="space-y-3">
       {/* Performance - Domain Distribution Row (Top) */}
-      <DomainDistributionRow domainData={domainDistributions} />
+      <DomainDistributionRow domainData={domainDistributions} staffCount={staffCount} />
 
       {/* Calibration and ProMove Cards (Compact Row) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -271,6 +271,9 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
     obs4: number;
   }>();
   
+  // Track unique staff
+  const staffSet = new Set<string>();
+  
   for (const row of rows) {
     nItems += row.n_items;
     obsTopBox += row.obs_top_box;
@@ -278,6 +281,7 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
     selfTopBox += row.self_top_box;
     selfBottomBox += row.self_bottom_box;
     mismatchCount += row.mismatch_count;
+    staffSet.add(row.staff_id);
     
     // Track by domain
     if (!domainMap.has(row.domain_name)) {
@@ -371,6 +375,7 @@ function aggregateMetrics(rows: EvalDistributionRow[]) {
       obs3
     },
     domainAvgs,
-    domainDistributions
+    domainDistributions,
+    staffCount: staffSet.size
   };
 }

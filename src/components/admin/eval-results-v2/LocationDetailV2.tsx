@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft } from 'lucide-react';
 import { type EvalFilters } from '@/types/analytics';
-import { DomainSnapshotTable } from './DomainSnapshotTable';
+import { LocationDomainDistribution } from './LocationDomainDistribution';
 import { StaffResultsTableV2 } from './StaffResultsTableV2';
 import { LocationSummaryPanel } from './LocationSummaryPanel';
 import { StaffDetailDrawerV2 } from './StaffDetailDrawerV2';
@@ -97,15 +97,8 @@ export function LocationDetailV2({ filters, locationId, locationName, onBack }: 
       {/* Location Summary Panel (same 3 metrics as org level) */}
       <LocationSummaryPanel data={rawData || []} />
 
-      {/* Domain Snapshot Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Domain Performance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DomainSnapshotTable data={rawData || []} />
-        </CardContent>
-      </Card>
+      {/* Domain Performance with Distribution Charts */}
+      <LocationDomainDistribution data={rawData || []} />
 
       {/* Staff Results Table */}
       <Card>

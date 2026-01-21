@@ -383,6 +383,7 @@ export type Database = {
         Row: {
           audio_recording_path: string | null
           created_at: string
+          draft_interview_audio_path: string | null
           draft_observation_audio_path: string | null
           evaluator_id: string
           extracted_insights: Json | null
@@ -403,6 +404,7 @@ export type Database = {
         Insert: {
           audio_recording_path?: string | null
           created_at?: string
+          draft_interview_audio_path?: string | null
           draft_observation_audio_path?: string | null
           evaluator_id: string
           extracted_insights?: Json | null
@@ -423,6 +425,7 @@ export type Database = {
         Update: {
           audio_recording_path?: string | null
           created_at?: string
+          draft_interview_audio_path?: string | null
           draft_observation_audio_path?: string | null
           evaluator_id?: string
           extracted_insights?: Json | null

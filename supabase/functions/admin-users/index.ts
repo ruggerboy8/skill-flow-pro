@@ -212,27 +212,44 @@ serve(async (req: Request) => {
           return json({ error: "Missing required fields: email, name, role_id, and location_id are all required" }, 400);
         }
 
-        // 1) Create staff row with email
-        const { data: staff, error: staffErr } = await admin
-          .from("staff")
-          .insert({ name, email, role_id, primary_location_id: location_id, is_participant: true })
-          .select("id")
-          .single();
-        if (staffErr) throw staffErr;
-
-        // 2) Send invite with redirect back to app (uses the Invite User email template)
+        // 1) Send invite first to get the user_id (uses the Invite User email template)
         const redirectTo = `${SITE_URL}/auth/callback`;
         const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
-          data: { staff_id: staff.id },
           redirectTo
         });
         if (invErr) throw invErr;
 
-        // 3) Backfill staff.user_id if invite created a user now
-        if (invite?.user?.id) {
-          await admin.from("staff").update({ user_id: invite.user.id }).eq("id", staff.id);
+        if (!invite?.user?.id) {
+          return json({ error: "Failed to create user - no user ID returned" }, 500);
         }
-        return json({ ok: true, staff_id: staff.id, user_id: invite?.user?.id ?? null, email_sent: true });
+
+        // 2) Create staff row with the user_id from the invite
+        const { data: staff, error: staffErr } = await admin
+          .from("staff")
+          .insert({ 
+            name, 
+            email, 
+            role_id, 
+            primary_location_id: location_id, 
+            is_participant: true,
+            user_id: invite.user.id
+          })
+          .select("id")
+          .single();
+        
+        if (staffErr) {
+          // If staff creation fails, we should clean up the auth user
+          console.error("Staff creation failed, cleaning up auth user:", staffErr);
+          await admin.auth.admin.deleteUser(invite.user.id);
+          throw staffErr;
+        }
+
+        // 3) Update user metadata with staff_id
+        await admin.auth.admin.updateUserById(invite.user.id, {
+          user_metadata: { staff_id: staff.id }
+        });
+
+        return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true });
       }
 
       case "update_user": {

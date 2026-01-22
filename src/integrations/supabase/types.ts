@@ -460,6 +460,51 @@ export type Database = {
           },
         ]
       }
+      excused_submissions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          metric: string
+          reason: string | null
+          staff_id: string
+          week_of: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          metric: string
+          reason?: string | null
+          staff_id: string
+          week_of: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          metric?: string
+          reason?: string | null
+          staff_id?: string
+          week_of?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "excused_submissions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "excused_submissions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       excused_weeks: {
         Row: {
           created_at: string | null

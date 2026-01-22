@@ -8,7 +8,6 @@ interface AuthContextType {
   loading: boolean;
   roleLoading: boolean;
   needsPasswordSetup: boolean;
-  needsProfileSetup: boolean;
   isCoach: boolean;
   isSuperAdmin: boolean;
   isOrgAdmin: boolean;
@@ -30,7 +29,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [roleLoading, setRoleLoading] = useState(false);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
-  const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [isCoach, setIsCoach] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isOrgAdmin, setIsOrgAdmin] = useState(false);
@@ -43,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data } = await supabase
           .from('staff')
-          .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead, name, role_id, primary_location_id')
+          .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead')
           .eq('user_id', userId)
           .single();
         
@@ -53,11 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsOrgAdmin(data.is_org_admin || false);
           setIsParticipant(data.is_participant);
           setIsLead(data.is_lead || false);
-          // Check if profile is complete
-          setNeedsProfileSetup(false);
         } else {
-          // No staff record exists, user needs to complete profile
-          setNeedsProfileSetup(true);
+          // No staff record exists - reset all roles
           setIsCoach(false);
           setIsSuperAdmin(false);
           setIsOrgAdmin(false);
@@ -81,15 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!hasPasswordSet) {
             // User needs to set password
             setNeedsPasswordSetup(true);
-            setNeedsProfileSetup(false); // Don't show profile setup until password is set
           } else {
             setNeedsPasswordSetup(false);
-            // Check if user needs to complete profile
+            // Check user roles
             checkUserStatus(session.user.id);
           }
         } else {
           setNeedsPasswordSetup(false);
-          setNeedsProfileSetup(false);
           setIsCoach(false);
           setIsSuperAdmin(false);
           setIsOrgAdmin(false);
@@ -111,15 +104,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const hasPasswordSet = session.user.user_metadata?.password_set;
         if (!hasPasswordSet) {
           setNeedsPasswordSetup(true);
-          setNeedsProfileSetup(false);
         } else {
           setNeedsPasswordSetup(false);
-          // Check if user needs to complete profile
+          // Check user roles
           checkUserStatus(session.user.id);
         }
       } else {
         setNeedsPasswordSetup(false);
-        setNeedsProfileSetup(false);
         setIsCoach(false);
         setIsSuperAdmin(false);
         setIsOrgAdmin(false);
@@ -190,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await supabase
         .from('staff')
-        .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead, name, role_id, primary_location_id')
+        .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead')
         .eq('user_id', user.id)
         .single();
       
@@ -200,9 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsOrgAdmin(data.is_org_admin || false);
         setIsParticipant(data.is_participant);
         setIsLead(data.is_lead || false);
-        setNeedsProfileSetup(false);
       } else {
-        setNeedsProfileSetup(true);
         setIsCoach(false);
         setIsSuperAdmin(false);
         setIsOrgAdmin(false);
@@ -216,14 +205,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-    return (
+  return (
     <AuthContext.Provider value={{
       user,
       session,
       loading,
       roleLoading,
       needsPasswordSetup,
-      needsProfileSetup,
       isCoach,
       isSuperAdmin,
       isOrgAdmin,

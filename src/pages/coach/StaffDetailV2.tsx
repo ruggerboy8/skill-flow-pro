@@ -83,8 +83,18 @@ export default function StaffDetailV2() {
       }
     },
     onSuccess: (_, { metric, action }) => {
+      // Invalidate excused submissions cache
       queryClient.invalidateQueries({ queryKey: ['excused_submissions', staffId] });
-      queryClient.invalidateQueries({ queryKey: ['staff-submission-windows', staffId] });
+      // Invalidate all submission windows queries for this staff member (partial key match)
+      queryClient.invalidateQueries({ queryKey: ['staff-submission-windows', staffId], exact: false });
+      // Invalidate batch submission rates (used by coach dashboard)
+      queryClient.invalidateQueries({ queryKey: ['staff-submission-rates-batch'], exact: false });
+      // Invalidate location/org accountability queries that may include this staff member
+      queryClient.invalidateQueries({ queryKey: ['location-accountability-quarter'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['org-accountability-quarter'], exact: false });
+      // Invalidate weekly scores queries that feed into the history
+      queryClient.invalidateQueries({ queryKey: ['weekly-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-all-weekly-scores', staffId] });
       toast.success(`${metric === 'confidence' ? 'Confidence' : 'Performance'} ${action === 'add' ? 'excused' : 'excuse removed'}`);
     },
     onError: (error) => {

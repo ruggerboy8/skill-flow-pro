@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
 import { Clock, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -27,31 +28,115 @@ interface SubmissionStats {
   missing: number;
 }
 
+function calculateCutoffDate(filter: TimeFilter): string | null {
+  if (filter === '3weeks') {
+    const date = new Date();
+    date.setDate(date.getDate() - 21);
+    return date.toISOString().split('T')[0];
+  } else if (filter === '6weeks') {
+    const date = new Date();
+    date.setDate(date.getDate() - 42);
+    return date.toISOString().split('T')[0];
+  }
+  return null;
+}
+
+function calculateStats(data: any[]): SubmissionStats {
+  const now = new Date();
+  const pastDueWindows = data.filter((w: any) => new Date(w.due_at) <= now);
+
+  // Group by week_of and metric
+  const weekMetricMap = new Map<string, { 
+    conf_submitted: boolean, 
+    perf_submitted: boolean, 
+    conf_on_time: boolean, 
+    perf_on_time: boolean,
+    conf_exists: boolean, 
+    perf_exists: boolean 
+  }>();
+  
+  pastDueWindows.forEach((w: any) => {
+    const key = w.week_of;
+    if (!weekMetricMap.has(key)) {
+      weekMetricMap.set(key, { 
+        conf_submitted: false, 
+        perf_submitted: false, 
+        conf_on_time: false, 
+        perf_on_time: false,
+        conf_exists: false, 
+        perf_exists: false 
+      });
+    }
+    const weekData = weekMetricMap.get(key)!;
+    
+    if (w.metric === 'confidence') {
+      weekData.conf_exists = true;
+      if (w.status === 'submitted') {
+        weekData.conf_submitted = true;
+        if (w.on_time === true) {
+          weekData.conf_on_time = true;
+        }
+      }
+    } else if (w.metric === 'performance') {
+      weekData.perf_exists = true;
+      if (w.status === 'submitted') {
+        weekData.perf_submitted = true;
+        if (w.on_time === true) {
+          weekData.perf_on_time = true;
+        }
+      }
+    }
+  });
+
+  // Calculate week-level stats
+  let confCompleted = 0, confOnTime = 0, confTotal = 0;
+  let perfCompleted = 0, perfOnTime = 0, perfTotal = 0;
+  
+  weekMetricMap.forEach((weekData) => {
+    if (weekData.conf_exists) {
+      confTotal++;
+      if (weekData.conf_submitted) {
+        confCompleted++;
+        if (weekData.conf_on_time) confOnTime++;
+      }
+    }
+    if (weekData.perf_exists) {
+      perfTotal++;
+      if (weekData.perf_submitted) {
+        perfCompleted++;
+        if (weekData.perf_on_time) perfOnTime++;
+      }
+    }
+  });
+
+  const totalExpected = confTotal + perfTotal;
+  const completed = confCompleted + perfCompleted;
+  const onTime = confOnTime + perfOnTime;
+  const late = completed - onTime;
+  const missing = totalExpected - completed;
+
+  const completionRate = totalExpected > 0 ? (completed / totalExpected) * 100 : 0;
+  const onTimeRate = totalExpected > 0 ? (onTime / totalExpected) * 100 : 0;
+
+  return {
+    totalSubmissions: totalExpected,
+    completedSubmissions: completed,
+    completionRate,
+    onTimeSubmissions: onTime,
+    onTimeRate,
+    late,
+    missing
+  };
+}
+
 export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
   const [filter, setFilter] = useState<TimeFilter>('all');
-  const [stats, setStats] = useState<SubmissionStats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadStats();
-  }, [staffId, filter]);
-
-  const loadStats = async () => {
-    setLoading(true);
-    try {
-      // Calculate cutoff date based on filter
-      let cutoffDate: string | null = null;
-      if (filter === '3weeks') {
-        const date = new Date();
-        date.setDate(date.getDate() - 21);
-        cutoffDate = date.toISOString().split('T')[0];
-      } else if (filter === '6weeks') {
-        const date = new Date();
-        date.setDate(date.getDate() - 42);
-        cutoffDate = date.toISOString().split('T')[0];
-      }
-
-      // Call RPC to get all submission windows (including missing)
+  
+  const cutoffDate = calculateCutoffDate(filter);
+  
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['staff-submission-windows', staffId, cutoffDate],
+    queryFn: async () => {
       const { data, error } = await supabase.rpc('get_staff_submission_windows', {
         p_staff_id: staffId,
         p_since: cutoffDate,
@@ -66,110 +151,12 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
       });
 
       if (error) throw error;
-
-      const now = new Date();
-      const windows = data ?? [];
-      const pastDueWindows = windows.filter((w: any) => new Date(w.due_at) <= now);
-
-      // Group by week_of and metric
-      const weekMetricMap = new Map<string, { 
-        conf_submitted: boolean, 
-        perf_submitted: boolean, 
-        conf_on_time: boolean, 
-        perf_on_time: boolean,
-        conf_exists: boolean, 
-        perf_exists: boolean 
-      }>();
       
-      pastDueWindows.forEach((w: any) => {
-        const key = w.week_of;
-        if (!weekMetricMap.has(key)) {
-          weekMetricMap.set(key, { 
-            conf_submitted: false, 
-            perf_submitted: false, 
-            conf_on_time: false, 
-            perf_on_time: false,
-            conf_exists: false, 
-            perf_exists: false 
-          });
-        }
-        const weekData = weekMetricMap.get(key)!;
-        
-        if (w.metric === 'confidence') {
-          weekData.conf_exists = true;
-          if (w.status === 'submitted') {
-            weekData.conf_submitted = true;
-            if (w.on_time === true) {
-              weekData.conf_on_time = true;
-            }
-          }
-        } else if (w.metric === 'performance') {
-          weekData.perf_exists = true;
-          if (w.status === 'submitted') {
-            weekData.perf_submitted = true;
-            if (w.on_time === true) {
-              weekData.perf_on_time = true;
-            }
-          }
-        }
-      });
-
-      // Calculate week-level stats
-      let confCompleted = 0, confOnTime = 0, confTotal = 0;
-      let perfCompleted = 0, perfOnTime = 0, perfTotal = 0;
-      
-      weekMetricMap.forEach((weekData) => {
-        if (weekData.conf_exists) {
-          confTotal++;
-          if (weekData.conf_submitted) {
-            confCompleted++;
-            if (weekData.conf_on_time) confOnTime++;
-          }
-        }
-        if (weekData.perf_exists) {
-          perfTotal++;
-          if (weekData.perf_submitted) {
-            perfCompleted++;
-            if (weekData.perf_on_time) perfOnTime++;
-          }
-        }
-      });
-
-      const totalExpected = confTotal + perfTotal;
-      const completed = confCompleted + perfCompleted;
-      const onTime = confOnTime + perfOnTime;
-      const late = completed - onTime;
-      const missing = totalExpected - completed;
-
-      const completionRate = totalExpected > 0 ? (completed / totalExpected) * 100 : 0;
-      // On-time rate should reflect on-time submissions out of TOTAL expected, not just completed
-      // This makes missing submissions count against the on-time rate
-      const onTimeRate = totalExpected > 0 ? (onTime / totalExpected) * 100 : 0;
-
-      setStats({
-        totalSubmissions: totalExpected,
-        completedSubmissions: completed,
-        completionRate,
-        onTimeSubmissions: onTime,
-        onTimeRate,
-        late,
-        missing
-      });
-    } catch (error) {
-      console.error('Error loading on-time stats:', error);
-      setStats({ 
-        totalSubmissions: 0, 
-        completedSubmissions: 0, 
-        completionRate: 0, 
-        onTimeSubmissions: 0, 
-        onTimeRate: 0, 
-        late: 0, 
-        missing: 0
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      return calculateStats(data ?? []);
+    },
+    enabled: !!staffId,
+    staleTime: 30 * 1000, // 30 seconds
+  });
 
   const getHealthColor = (rate: number) => {
     if (rate >= 80) return 'text-emerald-600 dark:text-emerald-400';
@@ -183,7 +170,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
     return 'bg-rose-50 dark:bg-rose-950/30 border-rose-200/50 dark:border-rose-800/50';
   };
 
-  if (loading) {
+  if (isLoading) {
     return <Skeleton className="h-24 w-full rounded-2xl bg-white/40 dark:bg-slate-800/40" />;
   }
 

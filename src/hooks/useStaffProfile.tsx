@@ -21,6 +21,7 @@ export interface StaffProfile {
   paused_at: string | null;
   pause_reason: string | null;
   home_route: string | null;
+  allow_backfill_until: string | null;
   locations: {
     organization_id: string;
     program_start_date: string;
@@ -69,6 +70,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           paused_at,
           pause_reason,
           home_route,
+          allow_backfill_until,
           locations (
             organization_id,
             program_start_date,

@@ -93,7 +93,7 @@ serve(async (req: Request) => {
 
         let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,is_paused,paused_at,pause_reason,coach_scope_type,coach_scope_id,hire_date,roles(role_name),locations(name,organization_id)", {
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,is_paused,paused_at,pause_reason,coach_scope_type,coach_scope_id,hire_date,allow_backfill_until,roles(role_name),locations(name,organization_id)", {
             count: "exact",
           })
           .order("name", { ascending: true });
@@ -197,6 +197,7 @@ serve(async (req: Request) => {
             pause_reason: s.pause_reason ?? null,
             coach_scopes: scopes || null,
             hire_date: s.hire_date ?? null,
+            allow_backfill_until: s.allow_backfill_until ?? null,
           };
           console.log("Final row data:", row);
           return row;
@@ -298,7 +299,7 @@ serve(async (req: Request) => {
       }
 
       case "role_preset": {
-        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date, name, email } = payload ?? {};
+        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date, name, email, allow_backfill } = payload ?? {};
         
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
@@ -441,6 +442,21 @@ serve(async (req: Request) => {
         }
         if (email) {
           updates.email = email;
+        }
+        
+        // Handle backfill permission toggle
+        if (allow_backfill !== undefined) {
+          if (allow_backfill) {
+            // Enable backfill for 7 days from now
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + 7);
+            updates.allow_backfill_until = expiryDate.toISOString();
+            console.log(`Enabling backfill for user ${user_id} until ${expiryDate.toISOString()}`);
+          } else {
+            // Disable backfill
+            updates.allow_backfill_until = null;
+            console.log(`Disabling backfill for user ${user_id}`);
+          }
         }
         
         // Sync scope to staff table for RPC compatibility (get_coach_roster_summary uses staff.coach_scope_*)

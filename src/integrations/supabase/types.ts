@@ -1088,6 +1088,7 @@ export type Database = {
       }
       staff: {
         Row: {
+          allow_backfill_until: string | null
           coach_scope_id: string | null
           coach_scope_type: string | null
           created_at: string | null
@@ -1114,6 +1115,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allow_backfill_until?: string | null
           coach_scope_id?: string | null
           coach_scope_type?: string | null
           created_at?: string | null
@@ -1140,6 +1142,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allow_backfill_until?: string | null
           coach_scope_id?: string | null
           coach_scope_type?: string | null
           created_at?: string | null

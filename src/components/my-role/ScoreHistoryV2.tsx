@@ -7,12 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useSim } from '@/devtools/SimProvider';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { useMyWeeklyScores } from '@/hooks/useMyWeeklyScores';
 import { RawScoreRow } from '@/types/coachV2';
 import { getDomainColorRich } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
-import { Trash2, Tag, History } from 'lucide-react';
+import { Trash2, Tag, History, Wrench } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +26,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 
 interface MonthGroup {
   monthKey: string;
@@ -67,6 +68,11 @@ export default function ScoreHistoryV2() {
     staffId: isMasquerading ? staffId : undefined
   });
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  // Check if backfill is currently enabled
+  const hasActiveBackfill = staffProfile?.allow_backfill_until && 
+    new Date(staffProfile.allow_backfill_until) > new Date();
 
   const mondayOf = (d: Date = new Date()): Date => {
     const day = d.getDay();
@@ -258,6 +264,13 @@ export default function ScoreHistoryV2() {
                           const hasAllPerf = summary.perf_count === summary.assignment_count;
                           const isCurrentWeek = weekOf === currentWeekOf;
                           const weekLabel = format(parseISO(weekOf), 'MMM d');
+                          
+                          // Check if this week is in the past (not current week)
+                          const weekDate = parseISO(weekOf);
+                          const isPastWeek = isBefore(weekDate, startOfDay(new Date())) && !isCurrentWeek;
+                          
+                          // Show backfill button if: user has backfill permission, week is in the past, and confidence is missing
+                          const canBackfillConfidence = hasActiveBackfill && isPastWeek && !hasAllConf && !isExempt;
 
                           return (
                             <AccordionItem 
@@ -296,7 +309,22 @@ export default function ScoreHistoryV2() {
                                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                       <div className="flex items-center gap-1.5">
                                         <span>Conf:</span>
-                                        <StatusPill hasAll={hasAllConf} hasAnyLate={summary.has_any_late} />
+                                        {canBackfillConfidence ? (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-5 px-2 text-[10px] border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              navigate(`/confidence/current/step/1?mode=repair&weekOf=${weekOf}`);
+                                            }}
+                                          >
+                                            <Wrench className="h-3 w-3 mr-1" />
+                                            Backfill
+                                          </Button>
+                                        ) : (
+                                          <StatusPill hasAll={hasAllConf} hasAnyLate={summary.has_any_late} />
+                                        )}
                                       </div>
                                       <div className="flex items-center gap-1.5">
                                         <span>Perf:</span>

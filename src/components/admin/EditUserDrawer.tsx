@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, PauseCircle } from "lucide-react";
+import { Loader2, PauseCircle, Wrench } from "lucide-react";
+import { format, addDays, differenceInDays } from "date-fns";
 
 interface Role {
   role_id: number;
@@ -41,6 +42,7 @@ interface User {
   coach_scope_id?: string | null;
   created_at?: string;
   hire_date?: string | null;
+  allow_backfill_until?: string | null;
 }
 
 interface EditUserDrawerProps {
@@ -64,6 +66,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const [editEmail, setEditEmail] = useState<string>('');
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [pauseReason, setPauseReason] = useState<string>('');
+  const [allowBackfill, setAllowBackfill] = useState<boolean>(false);
 
   useEffect(() => {
     if (user && open) {
@@ -72,6 +75,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
       setEditEmail(user.email || '');
       setIsPaused(user.is_paused ?? false);
       setPauseReason(user.pause_reason || '');
+      
+      // Check if backfill is currently enabled (allow_backfill_until is in the future)
+      const hasActiveBackfill = user.allow_backfill_until && new Date(user.allow_backfill_until) > new Date();
+      setAllowBackfill(hasActiveBackfill);
       
       // Determine current action from flags
       if (user.is_super_admin) {
@@ -144,6 +151,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         hire_date: hireDate || null,
         name: editName.trim() || null,
         email: editEmail.trim() || null,
+        allow_backfill: allowBackfill,
       };
       
       if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') {
@@ -329,6 +337,36 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 onChange={(e) => setPauseReason(e.target.value)}
                 className="mt-2"
               />
+            )}
+          </div>
+
+          {/* Temporary Backfill Access Toggle */}
+          <div className="space-y-3 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wrench className="h-5 w-5 text-blue-600" />
+                <Label htmlFor="backfill-toggle" className="text-sm font-semibold cursor-pointer">
+                  Temporary Backfill Access
+                </Label>
+              </div>
+              <Switch 
+                id="backfill-toggle"
+                checked={allowBackfill} 
+                onCheckedChange={setAllowBackfill}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              When enabled, this user can backfill missing confidence scores for past weeks. Permission auto-expires in 7 days.
+            </p>
+            {allowBackfill && user?.allow_backfill_until && new Date(user.allow_backfill_until) > new Date() && (
+              <p className="text-xs font-medium text-blue-600">
+                Expires: {format(new Date(user.allow_backfill_until), 'MMM d, yyyy')} ({differenceInDays(new Date(user.allow_backfill_until), new Date())} days remaining)
+              </p>
+            )}
+            {allowBackfill && (!user?.allow_backfill_until || new Date(user.allow_backfill_until) <= new Date()) && (
+              <p className="text-xs font-medium text-blue-600">
+                Will expire: {format(addDays(new Date(), 7), 'MMM d, yyyy')}
+              </p>
             )}
           </div>
 

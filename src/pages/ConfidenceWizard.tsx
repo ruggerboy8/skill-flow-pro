@@ -171,10 +171,10 @@ export default function ConfidenceWizard() {
     // Support masquerade: if masqueradeStaffId is set, query by staff.id instead of user_id
     const masqueradeStaffId = overrides.enabled ? overrides.masqueradeStaffId : null;
 
-    // Load staff profile with location info (including onboarding_active)
+    // Load staff profile with location info (including onboarding_active and allow_backfill_until)
     let queryBuilder = supabase
       .from('staff')
-      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks, onboarding_active)');
+      .select('id, role_id, primary_location_id, allow_backfill_until, locations(program_start_date, cycle_length_weeks, onboarding_active)');
     
     if (masqueradeStaffId) {
       queryBuilder = queryBuilder.eq('id', masqueradeStaffId);
@@ -640,6 +640,11 @@ export default function ConfidenceWizard() {
     // Check if late submission using location timezone
     const { checkin_due } = getWeekAnchors(effectiveNow, timezone);
     const isLate = effectiveNow > checkin_due;
+    
+    // Check if this is an authorized backfill (user has allow_backfill_until in the future)
+    const isAuthorizedBackfill = isRepair && 
+      (staff as any).allow_backfill_until && 
+      new Date((staff as any).allow_backfill_until) > new Date();
 
     const scoreInserts = weeklyFocus.map(focus => {
       const scoreValue = scores[focus.id];
@@ -655,10 +660,11 @@ export default function ConfidenceWizard() {
         confidence_score: scoreValue, // Remove fallback - validation ensures this exists
         confidence_date: new Date().toISOString(),
         confidence_source: isRepair ? 'backfill' as const : 'live' as const,
-        confidence_late: isLate,
+        // Force on-time for authorized backfills
+        confidence_late: isAuthorizedBackfill ? false : isLate,
       };
       
-      console.log(`Created base object for focus ${focus.id}:`, base);
+      console.log(`Created base object for focus ${focus.id}:`, base, `isAuthorizedBackfill: ${isAuthorizedBackfill}`);
       
       // For self-select slots: set selected_action_id
       if (selfSelectById[focus.id] && selectedActions[focus.id] && selectedActions[focus.id] !== "") {

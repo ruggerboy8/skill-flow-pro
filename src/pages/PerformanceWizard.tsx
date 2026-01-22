@@ -728,8 +728,9 @@ export default function PerformanceWizard() {
     }
     
     // Navigate based on mode
-    if (isRepair && returnTo) {
-      const dest = decodeURIComponent(returnTo);
+    if (isRepair) {
+      // Backfill mode: return to practice log or specified returnTo
+      const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
       setTimeout(() => {
         navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
       }, 150);

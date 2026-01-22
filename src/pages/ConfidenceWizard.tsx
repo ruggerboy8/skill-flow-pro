@@ -881,13 +881,14 @@ export default function ConfidenceWizard() {
     setSubmitting(false);
     
     // Always navigate - data will be saved via background retries if immediate attempt failed
-    if (isRepair && returnTo) {
-      const dest = decodeURIComponent(returnTo);
+    if (isRepair) {
+      // Backfill mode: return to practice log or specified returnTo
+      const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
       console.log('Navigating back to:', dest);
       setTimeout(() => {
         navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
       }, 150);
-    } else if (returnTo && !isRepair) {
+    } else if (returnTo) {
       const dest = decodeURIComponent(returnTo);
       console.log('Returning to performance wizard:', dest);
       setTimeout(() => {

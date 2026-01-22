@@ -325,19 +325,22 @@ export default function ConfidenceWizard() {
         cycleNumber = targetCycle;
         weekInCycle = targetWeek;
       } else {
-        // No cycle/week - query weekly_plan by weekOf (assume ongoing phase)
-        console.log('No cycle/week params, querying weekly_plan by weekOf');
+        // No cycle/week - try weekly_assignments first (onboarding), then weekly_plan (ongoing)
+        console.log('No cycle/week params, querying by weekOf - trying weekly_assignments first');
         
-        const { data: planData, error: planError } = await supabase
-          .from('weekly_plan')
+        // First try weekly_assignments (for onboarding users)
+        const { data: assignData, error: assignError } = await supabase
+          .from('weekly_assignments')
           .select(`
             id,
             display_order,
             competency_id,
             self_select,
             action_id,
-            pro_moves!weekly_plan_action_id_fkey ( 
+            week_start_date,
+            pro_moves!weekly_assignments_action_id_fkey ( 
               action_statement,
+              intervention_text,
               competencies ( 
                 name,
                 domains!competencies_domain_id_fkey ( domain_name )
@@ -349,42 +352,98 @@ export default function ConfidenceWizard() {
             )
           `)
           .eq('role_id', staffData.role_id)
+          .eq('location_id', staffData.primary_location_id)
           .eq('week_start_date', weekOf)
+          .eq('source', 'onboarding')
           .eq('status', 'locked')
           .order('display_order');
 
-        console.log('Repair query result (plan by weekOf):', { planData, planError });
+        console.log('Repair query result (assignments by weekOf):', { assignData, assignError });
 
-        if (!planData || planData.length === 0) {
-          console.error('No weekly_plan data found for weekOf:', weekOf);
-          toast({
-            title: 'Error',
-            description: 'No assignments found for this week. Please try again.',
-            variant: 'destructive'
+        if (assignData && assignData.length > 0) {
+          // Found onboarding assignments
+          assignments = assignData.map((item: any) => {
+            let domainName = 'Unknown';
+            if (item.pro_moves?.competencies?.domains?.domain_name) {
+              domainName = item.pro_moves.competencies.domains.domain_name;
+            } else if (item.competencies?.domains?.domain_name) {
+              domainName = item.competencies.domains.domain_name;
+            }
+
+            return {
+              weekly_focus_id: `assign:${item.id}`,
+              type: item.self_select ? 'self_select' : 'site',
+              display_order: item.display_order,
+              action_statement: item.pro_moves?.action_statement || '',
+              intervention_text: item.pro_moves?.intervention_text || null,
+              domain_name: domainName,
+              required: true,
+              locked: false
+            };
           });
-          setLoading(false);
-          return;
-        }
+        } else {
+          // Fall back to weekly_plan (for ongoing phase users)
+          console.log('No weekly_assignments found, trying weekly_plan');
+          
+          const { data: planData, error: planError } = await supabase
+            .from('weekly_plan')
+            .select(`
+              id,
+              display_order,
+              competency_id,
+              self_select,
+              action_id,
+              pro_moves!weekly_plan_action_id_fkey ( 
+                action_statement,
+                intervention_text,
+                competencies ( 
+                  name,
+                  domains!competencies_domain_id_fkey ( domain_name )
+                )
+              ),
+              competencies ( 
+                name,
+                domains!competencies_domain_id_fkey ( domain_name )
+              )
+            `)
+            .eq('role_id', staffData.role_id)
+            .eq('week_start_date', weekOf)
+            .eq('status', 'locked')
+            .order('display_order');
 
-        assignments = (planData || []).map((item: any) => {
-          let domainName = 'Unknown';
-          if (item.pro_moves?.competencies?.domains?.domain_name) {
-            domainName = item.pro_moves.competencies.domains.domain_name;
-          } else if (item.competencies?.domains?.domain_name) {
-            domainName = item.competencies.domains.domain_name;
+          console.log('Repair query result (plan by weekOf):', { planData, planError });
+
+          if (!planData || planData.length === 0) {
+            console.error('No assignments found for weekOf:', weekOf);
+            toast({
+              title: 'Error',
+              description: 'No assignments found for this week. Please try again.',
+              variant: 'destructive'
+            });
+            setLoading(false);
+            return;
           }
 
-          return {
-            weekly_focus_id: `plan:${item.id}`,
-            type: item.self_select ? 'self_select' : 'site',
-            display_order: item.display_order,
-            action_statement: item.pro_moves?.action_statement || '',
-            intervention_text: item.pro_moves?.intervention_text || null,
-            domain_name: domainName,
-            required: true,
-            locked: false
-          };
-        });
+          assignments = planData.map((item: any) => {
+            let domainName = 'Unknown';
+            if (item.pro_moves?.competencies?.domains?.domain_name) {
+              domainName = item.pro_moves.competencies.domains.domain_name;
+            } else if (item.competencies?.domains?.domain_name) {
+              domainName = item.competencies.domains.domain_name;
+            }
+
+            return {
+              weekly_focus_id: `plan:${item.id}`,
+              type: item.self_select ? 'self_select' : 'site',
+              display_order: item.display_order,
+              action_statement: item.pro_moves?.action_statement || '',
+              intervention_text: item.pro_moves?.intervention_text || null,
+              domain_name: domainName,
+              required: true,
+              locked: false
+            };
+          });
+        }
         
         // Set cycle/week to unknown for display
         cycleNumber = 0;

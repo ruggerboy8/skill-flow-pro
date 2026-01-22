@@ -855,6 +855,8 @@ export type Database = {
           description: string | null
           intervention_text: string | null
           resources_url: string | null
+          retired_at: string | null
+          retired_by: string | null
           role_id: number | null
           status: string | null
           steps: string | null
@@ -871,6 +873,8 @@ export type Database = {
           description?: string | null
           intervention_text?: string | null
           resources_url?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
           role_id?: number | null
           status?: string | null
           steps?: string | null
@@ -887,6 +891,8 @@ export type Database = {
           description?: string | null
           intervention_text?: string | null
           resources_url?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
           role_id?: number | null
           status?: string | null
           steps?: string | null
@@ -915,6 +921,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_onboarding_progress"
             referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "pro_moves_retired_by_fkey"
+            columns: ["retired_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pro_moves_retired_by_fkey"
+            columns: ["retired_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
           },
         ]
       }

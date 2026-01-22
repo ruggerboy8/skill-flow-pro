@@ -12,11 +12,14 @@ import {
   Video, 
   FileText, 
   Volume2, 
-  Link as LinkIcon
+  Link as LinkIcon,
+  AlertTriangle
 } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { LearningDrawer } from './LearningDrawer';
 import { useTableSort } from '@/hooks/useTableSort';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { format, parseISO, startOfWeek } from 'date-fns';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
@@ -80,11 +83,13 @@ export function ProMoveList({
   onEdit 
 }: ProMoveListProps) {
   const { toast } = useToast();
+  const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
   const [loading, setLoading] = useState(true);
   const [resourceStatus, setResourceStatus] = useState<Map<number, ResourceStatus>>(new Map());
   const [learningDrawerOpen, setLearningDrawerOpen] = useState(false);
   const [selectedProMove, setSelectedProMove] = useState<ProMove | null>(null);
+  const [retirementWarning, setRetirementWarning] = useState<{ proMove: ProMove; weeks: string[] } | null>(null);
 
   useEffect(() => {
     loadProMoves();
@@ -245,20 +250,67 @@ export function ProMoveList({
     });
   });
 
-  const toggleActive = async (proMove: ProMove) => {
+  // Check for future assignments before retiring
+  const checkFutureAssignments = async (proMove: ProMove): Promise<string[]> => {
+    const currentMonday = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const currentMondayStr = format(currentMonday, 'yyyy-MM-dd');
+    
+    const { data } = await supabase
+      .from('weekly_assignments')
+      .select('week_start_date')
+      .eq('action_id', proMove.action_id)
+      .gte('week_start_date', currentMondayStr)
+      .is('superseded_at', null)
+      .order('week_start_date');
+    
+    const uniqueWeeks = [...new Set((data || []).map(d => d.week_start_date))];
+    return uniqueWeeks;
+  };
+
+  const handleRetireClick = async (proMove: ProMove) => {
+    if (proMove.active) {
+      // Check for future assignments before showing retire dialog
+      const futureWeeks = await checkFutureAssignments(proMove);
+      if (futureWeeks.length > 0) {
+        setRetirementWarning({ proMove, weeks: futureWeeks });
+        return;
+      }
+    }
+    // No future assignments or restoring - proceed directly
+    await executeToggleActive(proMove, false);
+  };
+
+  const executeToggleActive = async (proMove: ProMove, acknowledgedWarning: boolean) => {
     try {
+      const isRetiring = proMove.active;
+      
+      const updateData: Record<string, any> = { 
+        active: !proMove.active 
+      };
+      
+      // Set audit fields when retiring
+      if (isRetiring && staffProfile?.id) {
+        updateData.retired_at = new Date().toISOString();
+        updateData.retired_by = staffProfile.id;
+      } else if (!isRetiring) {
+        // Clear audit fields when restoring
+        updateData.retired_at = null;
+        updateData.retired_by = null;
+      }
+
       const { error } = await supabase
         .from('pro_moves')
-        .update({ active: !proMove.active })
+        .update(updateData)
         .eq('action_id', proMove.action_id);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: `Pro-move ${proMove.active ? 'retired' : 'restored'} successfully.`,
+        description: `Pro-move ${isRetiring ? 'retired' : 'restored'} successfully.`,
       });
 
+      setRetirementWarning(null);
       loadProMoves();
     } catch (error) {
       toast({
@@ -470,32 +522,39 @@ export function ProMoveList({
                       <Edit className="w-4 h-4" />
                     </Button>
                     
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title={proMove.active ? 'Retire' : 'Restore'}>
-                          {proMove.active ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            {proMove.active ? 'Retire Pro-Move?' : 'Restore Pro-Move?'}
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {proMove.active 
-                              ? "Retiring a Pro-Move hides it from selection going forward. Historical records are preserved."
-                              : "Restoring a Pro-Move will make it available for selection again."
-                            }
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => toggleActive(proMove)}>
-                            {proMove.active ? 'Retire' : 'Restore'}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    {proMove.active ? (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8" 
+                        title="Retire"
+                        onClick={() => handleRetireClick(proMove)}
+                      >
+                        <EyeOff className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                    ) : (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="Restore">
+                            <Eye className="w-4 h-4 text-muted-foreground" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Restore Pro-Move?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Restoring a Pro-Move will make it available for selection again.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => executeToggleActive(proMove, false)}>
+                              Restore
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
 
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -539,6 +598,41 @@ export function ProMoveList({
           onResourcesChange={(summary) => handleResourcesChange(selectedProMove.action_id, summary)}
         />
       )}
+
+      {/* Retirement Warning Dialog */}
+      <AlertDialog open={!!retirementWarning} onOpenChange={(open) => !open && setRetirementWarning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Pro-Move Has Future Assignments
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>This Pro-Move is currently assigned to the following future weeks:</p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  {retirementWarning?.weeks.map(week => (
+                    <li key={week} className="font-medium">
+                      Week of {format(parseISO(week), 'MMM d, yyyy')}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-amber-600 dark:text-amber-400">
+                  Please update these weeks in the Global Assignment Builder after retiring.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => retirementWarning && executeToggleActive(retirementWarning.proMove, true)}
+            >
+              Retire Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -241,7 +241,7 @@ setSubmitting(true);
           <CardHeader>
             <CardTitle className="text-center">Monday Confidence</CardTitle>
             <CardDescription className="text-center">
-              Rate how confident you are you'll do each action 100% this week
+              Rate how confident you are that you're already doing each action 100% of the time
             </CardDescription>
             <Badge variant="outline" className="mx-auto">
               Cycle 1 · Week {weekNum}

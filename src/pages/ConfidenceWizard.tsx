@@ -1050,7 +1050,7 @@ export default function ConfidenceWizard() {
       <div className="px-4 max-w-md mx-auto mt-8 space-y-6">
         <div className="text-center">
           <p className="text-base font-medium text-foreground mb-1">How confident are you?</p>
-          <p className="text-sm text-muted-foreground">That you'll do this 100% this week</p>
+          <p className="text-sm text-muted-foreground">That you're already doing this 100% of the time</p>
         </div>
         <NumberScale
           value={scores[currentFocus.id] || null}

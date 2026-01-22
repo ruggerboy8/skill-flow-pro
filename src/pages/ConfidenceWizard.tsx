@@ -325,11 +325,11 @@ export default function ConfidenceWizard() {
         cycleNumber = targetCycle;
         weekInCycle = targetWeek;
       } else {
-        // No cycle/week - try weekly_assignments first (onboarding), then weekly_plan (ongoing)
+        // No cycle/week - try weekly_assignments first (location-specific onboarding, then global), then weekly_plan
         console.log('No cycle/week params, querying by weekOf - trying weekly_assignments first');
         
-        // First try weekly_assignments (for onboarding users)
-        const { data: assignData, error: assignError } = await supabase
+        // First try location-specific onboarding assignments
+        const { data: onboardingData, error: onboardingError } = await supabase
           .from('weekly_assignments')
           .select(`
             id,
@@ -338,6 +338,7 @@ export default function ConfidenceWizard() {
             self_select,
             action_id,
             week_start_date,
+            source,
             pro_moves!weekly_assignments_action_id_fkey ( 
               action_statement,
               intervention_text,
@@ -356,12 +357,52 @@ export default function ConfidenceWizard() {
           .eq('week_start_date', weekOf)
           .eq('source', 'onboarding')
           .eq('status', 'locked')
+          .is('superseded_at', null)
           .order('display_order');
 
-        console.log('Repair query result (assignments by weekOf):', { assignData, assignError });
+        console.log('Repair query result (onboarding assignments):', { onboardingData, onboardingError });
+
+        // If no location-specific onboarding, try global assignments
+        let assignData = onboardingData;
+        if (!onboardingData || onboardingData.length === 0) {
+          console.log('No onboarding assignments, trying global assignments');
+          const { data: globalData, error: globalError } = await supabase
+            .from('weekly_assignments')
+            .select(`
+              id,
+              display_order,
+              competency_id,
+              self_select,
+              action_id,
+              week_start_date,
+              source,
+              pro_moves!weekly_assignments_action_id_fkey ( 
+                action_statement,
+                intervention_text,
+                competencies ( 
+                  name,
+                  domains!competencies_domain_id_fkey ( domain_name )
+                )
+              ),
+              competencies ( 
+                name,
+                domains!competencies_domain_id_fkey ( domain_name )
+              )
+            `)
+            .eq('role_id', staffData.role_id)
+            .eq('week_start_date', weekOf)
+            .eq('source', 'global')
+            .eq('status', 'locked')
+            .is('org_id', null)
+            .is('superseded_at', null)
+            .order('display_order');
+
+          console.log('Repair query result (global assignments):', { globalData, globalError });
+          assignData = globalData;
+        }
 
         if (assignData && assignData.length > 0) {
-          // Found onboarding assignments
+          // Found assignments (onboarding or global)
           assignments = assignData.map((item: any) => {
             let domainName = 'Unknown';
             if (item.pro_moves?.competencies?.domains?.domain_name) {

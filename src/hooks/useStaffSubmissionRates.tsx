@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface StaffSubmissionRate {
@@ -13,20 +13,18 @@ interface UseStaffSubmissionRatesResult {
 
 /**
  * Fetches 6-week submission rates for a batch of staff members
+ * Uses React Query for proper cache invalidation when excusals change
  */
 export function useStaffSubmissionRates(staffIds: string[]): UseStaffSubmissionRatesResult {
-  const [rates, setRates] = useState<Map<string, number>>(new Map());
-  const [loading, setLoading] = useState(false);
+  const sortedIds = [...staffIds].sort().join(',');
+  
+  const { data: rates = new Map(), isLoading } = useQuery({
+    queryKey: ['staff-submission-rates-batch', sortedIds],
+    queryFn: async () => {
+      if (staffIds.length === 0) {
+        return new Map<string, number>();
+      }
 
-  useEffect(() => {
-    if (staffIds.length === 0) {
-      setRates(new Map());
-      return;
-    }
-
-    const fetchRates = async () => {
-      setLoading(true);
-      
       // Calculate 6 weeks ago cutoff
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - 42);
@@ -119,12 +117,11 @@ export function useStaffSubmissionRates(staffIds: string[]): UseStaffSubmissionR
         });
       }
 
-      setRates(newRates);
-      setLoading(false);
-    };
+      return newRates;
+    },
+    enabled: staffIds.length > 0,
+    staleTime: 30 * 1000, // 30 seconds
+  });
 
-    fetchRates();
-  }, [staffIds.join(',')]); // Re-fetch when staff list changes
-
-  return { rates, loading };
+  return { rates, loading: isLoading };
 }

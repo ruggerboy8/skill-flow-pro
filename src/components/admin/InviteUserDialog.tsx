@@ -1,13 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Copy, CheckCircle } from "lucide-react";
+import { Loader2, CheckCircle, Mail } from "lucide-react";
 
 interface Role {
   role_id: number;
@@ -15,6 +14,12 @@ interface Role {
 }
 
 interface Location {
+  id: string;
+  name: string;
+  organization_id?: string;
+}
+
+interface Organization {
   id: string;
   name: string;
 }
@@ -25,23 +30,34 @@ interface InviteUserDialogProps {
   onSuccess: () => void;
   roles: Role[];
   locations: Location[];
+  organizations: Organization[];
 }
 
-export function InviteUserDialog({ open, onClose, onSuccess, roles, locations }: InviteUserDialogProps) {
+export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, organizations }: InviteUserDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [setupLink, setSetupLink] = useState<string | null>(null);
+  const [inviteSent, setInviteSent] = useState(false);
+  const [invitedName, setInvitedName] = useState("");
   const [formData, setFormData] = useState({
     email: "",
     name: "",
+    organization_id: "",
     role_id: "",
     location_id: "",
-    is_super_admin: false,
   });
+
+  // Filter locations based on selected organization
+  const filteredLocations = useMemo(() => {
+    if (!formData.organization_id) return [];
+    return locations.filter(loc => loc.organization_id === formData.organization_id);
+  }, [formData.organization_id, locations]);
+
+  // Check if form is valid (all required fields filled)
+  const isFormValid = formData.email && formData.name && formData.organization_id && formData.role_id && formData.location_id;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email || !formData.name) return;
+    if (!isFormValid) return;
 
     setLoading(true);
 
@@ -51,26 +67,20 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations }:
           action: 'invite_user',
           email: formData.email,
           name: formData.name,
-          role_id: formData.role_id === "none" ? null : (formData.role_id ? parseInt(formData.role_id) : null),
-          location_id: formData.location_id === "none" ? null : (formData.location_id || null),
-          is_super_admin: formData.is_super_admin,
+          role_id: parseInt(formData.role_id),
+          location_id: formData.location_id,
         },
       });
 
       if (error) throw error;
 
-      setSetupLink(data.setup_link);
+      setInvitedName(formData.name);
+      setInviteSent(true);
 
       toast({
-        title: "Success",
-        description: "User invited successfully",
+        title: "Invite sent!",
+        description: `${formData.name} will receive an email to set up their account.`,
       });
-
-      if (!data.setup_link) {
-        // User already existed, close immediately
-        handleClose();
-        onSuccess();
-      }
     } catch (error: any) {
       console.error("Error inviting user:", error);
       toast({
@@ -87,22 +97,13 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations }:
     setFormData({
       email: "",
       name: "",
+      organization_id: "",
       role_id: "",
       location_id: "",
-      is_super_admin: false,
     });
-    setSetupLink(null);
+    setInviteSent(false);
+    setInvitedName("");
     onClose();
-  };
-
-  const copySetupLink = async () => {
-    if (setupLink) {
-      await navigator.clipboard.writeText(setupLink);
-      toast({
-        title: "Copied",
-        description: "Setup link copied to clipboard",
-      });
-    }
   };
 
   const finishInvite = () => {
@@ -110,32 +111,38 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations }:
     onSuccess();
   };
 
-  if (setupLink) {
+  // Reset location when organization changes
+  const handleOrganizationChange = (orgId: string) => {
+    setFormData({ 
+      ...formData, 
+      organization_id: orgId,
+      location_id: "" // Clear location when org changes
+    });
+  };
+
+  if (inviteSent) {
     return (
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-500" />
-              <span>User Invited Successfully</span>
+              <span>Invite sent!</span>
             </DialogTitle>
             <DialogDescription>
-              Share this setup link with {formData.name} to complete their account setup.
+              We've sent an email to {invitedName} with instructions to set up their account.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Input value={setupLink} readOnly className="flex-1" />
-              <Button onClick={copySetupLink} size="sm" variant="outline">
-                <Copy className="h-4 w-4" />
-              </Button>
+          <div className="flex items-center justify-center py-6">
+            <div className="rounded-full bg-primary/10 p-4">
+              <Mail className="h-8 w-8 text-primary" />
             </div>
-            <p className="text-sm text-muted-foreground">
-              This link allows {formData.name} to set their password and access the system.
-            </p>
           </div>
+          <p className="text-sm text-muted-foreground text-center">
+            They'll receive an email with a link to create their password and start using ProMoves.
+          </p>
           <DialogFooter>
-            <Button onClick={finishInvite}>Done</Button>
+            <Button onClick={finishInvite} className="w-full">Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -148,7 +155,7 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations }:
         <DialogHeader>
           <DialogTitle>Invite teammate</DialogTitle>
           <DialogDescription>
-            Add a new team member to the system
+            Add a new team member to ProMoves
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -176,13 +183,28 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations }:
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
+            <Label htmlFor="organization">Organization *</Label>
+            <Select value={formData.organization_id} onValueChange={handleOrganizationChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select organization" />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.map((org) => (
+                  <SelectItem key={org.id} value={org.id}>
+                    {org.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="role">Role *</Label>
             <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No role</SelectItem>
                 {roles.map((role) => (
                   <SelectItem key={role.role_id} value={role.role_id.toString()}>
                     {role.role_name}
@@ -193,38 +215,35 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations }:
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="location">Location</Label>
-            <Select value={formData.location_id} onValueChange={(value) => setFormData({ ...formData, location_id: value })}>
+            <Label htmlFor="location">Location *</Label>
+            <Select 
+              value={formData.location_id} 
+              onValueChange={(value) => setFormData({ ...formData, location_id: value })}
+              disabled={!formData.organization_id}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Select a location" />
+                <SelectValue placeholder={formData.organization_id ? "Select a location" : "Select organization first"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No location</SelectItem>
-                {locations.map((location) => (
+                {filteredLocations.map((location) => (
                   <SelectItem key={location.id} value={location.id}>
                     {location.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="super_admin"
-              checked={formData.is_super_admin}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_super_admin: checked })}
-            />
-            <Label htmlFor="super_admin">Super administrator</Label>
+            <p className="text-xs text-muted-foreground">
+              If they work at multiple locations, choose their primary location.
+            </p>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !formData.email || !formData.name}>
+            <Button type="submit" disabled={loading || !isFormValid}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Invite
+              Send invite
             </Button>
           </DialogFooter>
         </form>

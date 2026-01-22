@@ -207,18 +207,20 @@ serve(async (req: Request) => {
       }
 
       case "invite_user": {
-        const { email, name, role_id, location_id, is_super_admin = false } = payload ?? {};
-        if (!email || !name || !role_id) return json({ error: "Missing required fields" }, 400);
+        const { email, name, role_id, location_id } = payload ?? {};
+        if (!email || !name || !role_id || !location_id) {
+          return json({ error: "Missing required fields: email, name, role_id, and location_id are all required" }, 400);
+        }
 
-        // 1) Create staff row
+        // 1) Create staff row with email
         const { data: staff, error: staffErr } = await admin
           .from("staff")
-          .insert({ name, role_id, primary_location_id: location_id, is_super_admin })
+          .insert({ name, email, role_id, primary_location_id: location_id, is_participant: true })
           .select("id")
           .single();
         if (staffErr) throw staffErr;
 
-        // 2) Send invite with redirect back to app
+        // 2) Send invite with redirect back to app (uses the Invite User email template)
         const redirectTo = `${SITE_URL}/auth/callback`;
         const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
           data: { staff_id: staff.id },
@@ -230,7 +232,7 @@ serve(async (req: Request) => {
         if (invite?.user?.id) {
           await admin.from("staff").update({ user_id: invite.user.id }).eq("id", staff.id);
         }
-        return json({ ok: true, staff_id: staff.id, user_id: invite?.user?.id ?? null });
+        return json({ ok: true, staff_id: staff.id, user_id: invite?.user?.id ?? null, email_sent: true });
       }
 
       case "update_user": {

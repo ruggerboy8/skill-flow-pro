@@ -11,6 +11,7 @@ import AuthCallback from "@/pages/AuthCallback";
 import ResetPassword from "@/pages/ResetPassword";
 import SetupPassword from "@/pages/SetupPassword";
 import Setup from "@/pages/Setup";
+import ForgotPassword from "@/pages/ForgotPassword";
 import Layout from "@/components/Layout";
 import Index from "@/pages/Index";
 import Welcome from "@/pages/Welcome";
@@ -66,6 +67,7 @@ function AppRoutes() {
     console.log("AppRoutes - Returning ResetPassword component");
     return <ResetPassword />;
   }
+  if (pathname.startsWith("/forgot-password")) return <ForgotPassword />;
 
   if (loading) {
     return (

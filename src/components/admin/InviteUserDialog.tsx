@@ -199,22 +199,6 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="role">Role *</Label>
-            <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((role) => (
-                  <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                    {role.role_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="location">Location *</Label>
             <Select 
               value={formData.location_id} 
@@ -235,6 +219,22 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
             <p className="text-xs text-muted-foreground">
               If they work at multiple locations, choose their primary location.
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="role">Role *</Label>
+            <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((role) => (
+                  <SelectItem key={role.role_id} value={role.role_id.toString()}>
+                    {role.role_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <DialogFooter>

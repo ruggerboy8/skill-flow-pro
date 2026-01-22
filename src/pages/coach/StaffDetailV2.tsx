@@ -1,29 +1,100 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ArrowLeft, CalendarOff } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ArrowLeft, CalendarOff, MoreVertical, Check, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 import { QuarterlyEvalsTab } from '@/components/coach/QuarterlyEvalsTab';
 import { StaffPriorityFocusTab } from '@/components/coach/StaffPriorityFocusTab';
 import { RawScoreRow } from '@/types/coachV2';
 import { getDomainColor } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
+import { toast } from 'sonner';
+
+type ExcusedSubmission = {
+  id: string;
+  staff_id: string;
+  week_of: string;
+  metric: 'confidence' | 'performance';
+  reason: string | null;
+  created_at: string;
+};
 
 export default function StaffDetailV2() {
   const { staffId } = useParams<{ staffId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isSuperAdmin } = useUserRole();
+  const queryClient = useQueryClient();
   const selectedWeek = searchParams.get('week');
 
   const { rawData, weekSummaries, loading, error } = useStaffAllWeeklyScores({ staffId });
+
+  // Fetch excused submissions for this staff member
+  const { data: excusedSubmissions = [] } = useQuery({
+    queryKey: ['excused_submissions', staffId],
+    queryFn: async () => {
+      if (!staffId) return [];
+      const { data, error } = await supabase
+        .from('excused_submissions')
+        .select('*')
+        .eq('staff_id', staffId);
+      if (error) throw error;
+      return data as ExcusedSubmission[];
+    },
+    enabled: !!staffId && isSuperAdmin,
+  });
+
+  // Mutation for adding/removing excusals
+  const excuseMutation = useMutation({
+    mutationFn: async ({ weekOf, metric, action }: { weekOf: string; metric: 'confidence' | 'performance'; action: 'add' | 'remove' }) => {
+      if (action === 'add') {
+        const { error } = await supabase.from('excused_submissions').insert({
+          staff_id: staffId,
+          week_of: weekOf,
+          metric,
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('excused_submissions')
+          .delete()
+          .eq('staff_id', staffId)
+          .eq('week_of', weekOf)
+          .eq('metric', metric);
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, { metric, action }) => {
+      queryClient.invalidateQueries({ queryKey: ['excused_submissions', staffId] });
+      queryClient.invalidateQueries({ queryKey: ['staff-submission-windows', staffId] });
+      toast.success(`${metric === 'confidence' ? 'Confidence' : 'Performance'} ${action === 'add' ? 'excused' : 'excuse removed'}`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update excuse: ${error.message}`);
+    },
+  });
+
+  // Helper to check if a metric is excused
+  const isExcused = (weekOf: string, metric: 'confidence' | 'performance') =>
+    excusedSubmissions.some(e => e.week_of === weekOf && e.metric === metric);
 
   // Get staff info from first available summary
   const staffInfo = useMemo(() => {
@@ -70,9 +141,26 @@ export default function StaffDetailV2() {
   }, [weekSummaries]);
 
   // Status pill component
-  function StatusPill({ hasAll, hasAnyLate, isExempt }: { hasAll: boolean; hasAnyLate: boolean; isExempt?: boolean }) {
+  function StatusPill({ 
+    hasAll, 
+    hasAnyLate, 
+    isExempt,
+    isExcused 
+  }: { 
+    hasAll: boolean; 
+    hasAnyLate: boolean; 
+    isExempt?: boolean;
+    isExcused?: boolean;
+  }) {
     if (isExempt) {
       return <span className="text-muted-foreground">—</span>;
+    }
+    if (isExcused) {
+      return (
+        <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-slate-200">
+          Excused
+        </Badge>
+      );
     }
     if (!hasAll) {
       return (
@@ -92,6 +180,95 @@ export default function StaffDetailV2() {
       <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
         Complete
       </Badge>
+    );
+  }
+
+  // Excuse dropdown component for super admins
+  function ExcuseDropdown({ weekOf }: { weekOf: string }) {
+    const confExcused = isExcused(weekOf, 'confidence');
+    const perfExcused = isExcused(weekOf, 'performance');
+
+    const handleExcuse = (metric: 'confidence' | 'performance') => {
+      const alreadyExcused = metric === 'confidence' ? confExcused : perfExcused;
+      excuseMutation.mutate({
+        weekOf,
+        metric,
+        action: alreadyExcused ? 'remove' : 'add',
+      });
+    };
+
+    const handleExcuseBoth = () => {
+      if (!confExcused) {
+        excuseMutation.mutate({ weekOf, metric: 'confidence', action: 'add' });
+      }
+      if (!perfExcused) {
+        excuseMutation.mutate({ weekOf, metric: 'performance', action: 'add' });
+      }
+    };
+
+    const handleRemoveAll = () => {
+      if (confExcused) {
+        excuseMutation.mutate({ weekOf, metric: 'confidence', action: 'remove' });
+      }
+      if (perfExcused) {
+        excuseMutation.mutate({ weekOf, metric: 'performance', action: 'remove' });
+      }
+    };
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => e.stopPropagation()}>
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuItem onClick={() => handleExcuse('confidence')}>
+            {confExcused ? (
+              <>
+                <X className="h-4 w-4 mr-2 text-destructive" />
+                Remove Confidence Excuse
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Excuse Confidence
+              </>
+            )}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleExcuse('performance')}>
+            {perfExcused ? (
+              <>
+                <X className="h-4 w-4 mr-2 text-destructive" />
+                Remove Performance Excuse
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Excuse Performance
+              </>
+            )}
+          </DropdownMenuItem>
+          {(!confExcused || !perfExcused) && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleExcuseBoth}>
+                <Check className="h-4 w-4 mr-2" />
+                Excuse Both
+              </DropdownMenuItem>
+            </>
+          )}
+          {(confExcused || perfExcused) && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleRemoveAll} className="text-destructive">
+                <X className="h-4 w-4 mr-2" />
+                Remove All Excuses
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
@@ -177,7 +354,9 @@ export default function StaffDetailV2() {
                 <CardContent>
                   <Accordion type="multiple" defaultValue={selectedWeek ? [selectedWeek] : []}>
                     {weeks.map(([weekOf, summary]) => {
-                      const isExempt = summary.scores.length > 0 && (summary.scores[0] as RawScoreRow & { is_week_exempt?: boolean }).is_week_exempt;
+                      const isWeekExempt = summary.scores.length > 0 && (summary.scores[0] as RawScoreRow & { is_week_exempt?: boolean }).is_week_exempt;
+                      const confExcused = isExcused(weekOf, 'confidence');
+                      const perfExcused = isExcused(weekOf, 'performance');
                       const hasAllConf = summary.conf_count === summary.assignment_count;
                       const hasAllPerf = summary.perf_count === summary.assignment_count;
                       
@@ -189,7 +368,7 @@ export default function StaffDetailV2() {
                                 <span className="font-medium">
                                   Week of {format(parseISO(weekOf), 'MMM d, yyyy')}
                                 </span>
-                                {isExempt && (
+                                {isWeekExempt && (
                                   <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
                                     <CalendarOff className="h-3 w-3 mr-1" />
                                     Exempt
@@ -202,7 +381,8 @@ export default function StaffDetailV2() {
                                   <StatusPill
                                     hasAll={hasAllConf}
                                     hasAnyLate={summary.scores.some(s => s.confidence_late)}
-                                    isExempt={isExempt}
+                                    isExempt={isWeekExempt}
+                                    isExcused={confExcused}
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -210,9 +390,11 @@ export default function StaffDetailV2() {
                                   <StatusPill
                                     hasAll={hasAllPerf}
                                     hasAnyLate={summary.scores.some(s => s.performance_late)}
-                                    isExempt={isExempt}
+                                    isExempt={isWeekExempt}
+                                    isExcused={perfExcused}
                                   />
                                 </div>
+                                {isSuperAdmin && <ExcuseDropdown weekOf={weekOf} />}
                               </div>
                             </div>
                           </AccordionTrigger>

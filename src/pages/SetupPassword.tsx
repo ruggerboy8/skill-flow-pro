@@ -1,27 +1,73 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Check, Loader2 } from 'lucide-react';
+import alcanLogo from '@/assets/alcan-logo-full.jpg';
+
+interface StaffInfo {
+  name: string;
+  locationName: string | null;
+}
 
 export default function SetupPassword() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
+  const [loadingInfo, setLoadingInfo] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Fetch staff info for personalization
+  useEffect(() => {
+    const fetchStaffInfo = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setLoadingInfo(false);
+          return;
+        }
+
+        const { data: staff } = await supabase
+          .from('staff')
+          .select(`
+            name,
+            locations:primary_location_id(name)
+          `)
+          .eq('user_id', user.id)
+          .single();
+
+        if (staff) {
+          setStaffInfo({
+            name: staff.name,
+            locationName: (staff.locations as any)?.name || null
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching staff info:', error);
+      } finally {
+        setLoadingInfo(false);
+      }
+    };
+
+    fetchStaffInfo();
+  }, []);
+
+  const firstName = staffInfo?.name?.split(' ')[0] || 'there';
 
   const handleSetupPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (password !== confirmPassword) {
       toast({
-        title: "Password mismatch",
-        description: "Passwords do not match. Please try again.",
+        title: "Passwords don't match",
+        description: "Please make sure both passwords are the same.",
         variant: "destructive"
       });
       return;
@@ -39,38 +85,28 @@ export default function SetupPassword() {
     setLoading(true);
     
     try {
-      // Step 1: Set the actual password
       const { error: passwordError } = await supabase.auth.updateUser({
         password: password
       });
 
-      if (passwordError) {
-        throw passwordError;
-      }
+      if (passwordError) throw passwordError;
 
-      // Step 2: Set the password_set flag in user metadata
       const { error: metadataError } = await supabase.auth.updateUser({
         data: { password_set: true }
       });
 
-      if (metadataError) {
-        throw metadataError;
-      }
+      if (metadataError) throw metadataError;
 
       setSuccess(true);
-      toast({
-        title: "Password set successfully",
-        description: "Your account is now complete! You can sign in with email and password."
-      });
 
-      // Redirect after a short delay
+      // Navigate to welcome after a brief celebration
       setTimeout(() => {
-        navigate('/setup');
-      }, 2000);
+        navigate('/welcome');
+      }, 1500);
 
     } catch (error: any) {
       toast({
-        title: "Error setting password",
+        title: "Something went wrong",
         description: error.message,
         variant: "destructive"
       });
@@ -81,17 +117,16 @@ export default function SetupPassword() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6 text-center">
-            <div className="text-green-600 text-2xl mb-4">✓</div>
-            <h2 className="text-xl font-semibold mb-2">Password Set!</h2>
-            <p className="text-muted-foreground mb-4">
-              You can now sign in with your email and password.
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-muted/30">
+        <Card className="w-full max-w-md border-0 shadow-xl bg-card/95 backdrop-blur">
+          <CardContent className="pt-10 pb-10 text-center space-y-4">
+            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center animate-in zoom-in duration-300">
+              <Check className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="text-2xl font-semibold text-foreground">You're all set!</h2>
+            <p className="text-muted-foreground">
+              Taking you to your welcome...
             </p>
-            <Button onClick={() => navigate('/setup')} className="w-full">
-              Continue →
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -99,47 +134,77 @@ export default function SetupPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Create Your Password</CardTitle>
-          <CardDescription>
-            Complete your account setup by creating a password
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-muted/30">
+      <Card className="w-full max-w-md border-0 shadow-xl bg-card/95 backdrop-blur">
+        <CardContent className="pt-8 pb-8 space-y-6">
+          {/* Logo */}
+          <div className="flex justify-center">
+            <img 
+              src={alcanLogo} 
+              alt="Alcan Dental Cooperative" 
+              className="h-16 w-auto object-contain"
+            />
+          </div>
+
+          {/* Personalized Greeting */}
+          <div className="text-center space-y-2">
+            {loadingInfo ? (
+              <div className="h-8 w-48 mx-auto bg-muted animate-pulse rounded" />
+            ) : (
+              <h1 className="text-2xl font-bold text-foreground">
+                Hey {firstName}! 👋
+              </h1>
+            )}
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              {staffInfo?.locationName 
+                ? `Your manager at ${staffInfo.locationName} invited you to ProMoves. Let's get you set up with a password.`
+                : "You've been invited to ProMoves. Let's get you set up with a password."
+              }
+            </p>
+          </div>
+
+          {/* Password Form */}
           <form onSubmit={handleSetupPassword} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-foreground">Password</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Choose a password (min 6 characters)"
+                placeholder="At least 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                className="h-11"
               />
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Label htmlFor="confirm-password" className="text-foreground">Confirm Password</Label>
               <Input
                 id="confirm-password"
                 type="password"
-                placeholder="Confirm your password"
+                placeholder="Type it again"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                className="h-11"
               />
             </div>
             
             <Button 
               type="submit" 
-              className="w-full" 
+              className="w-full h-12 text-base font-semibold mt-2" 
               disabled={loading || !password || !confirmPassword}
             >
-              {loading ? "Setting password..." : "Set Password"}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Setting up...
+                </>
+              ) : (
+                "I'm Ready"
+              )}
             </Button>
           </form>
         </CardContent>

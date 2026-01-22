@@ -10,7 +10,6 @@ import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import ResetPassword from "@/pages/ResetPassword";
 import SetupPassword from "@/pages/SetupPassword";
-import Setup from "@/pages/Setup";
 import ForgotPassword from "@/pages/ForgotPassword";
 import Layout from "@/components/Layout";
 import Index from "@/pages/Index";
@@ -54,19 +53,12 @@ import DomainDetail from "@/pages/my-role/DomainDetail";
 
 // App routes with pre-routing checks for public pages
 function AppRoutes() {
-  const { user, loading, needsPasswordSetup, needsProfileSetup } = useAuth();
+  const { user, loading, needsPasswordSetup } = useAuth();
   const { pathname } = useLocation();
-
-  // Debug logging
-  console.log("AppRoutes - Current pathname:", pathname);
-  console.log("AppRoutes - Checking reset-password:", pathname.startsWith("/reset-password"));
 
   // Public routes for auth flows (must run BEFORE auth gating)
   if (pathname.startsWith("/auth/callback")) return <AuthCallback />;
-  if (pathname.startsWith("/reset-password")) {
-    console.log("AppRoutes - Returning ResetPassword component");
-    return <ResetPassword />;
-  }
+  if (pathname.startsWith("/reset-password")) return <ResetPassword />;
   if (pathname.startsWith("/forgot-password")) return <ForgotPassword />;
 
   if (loading) {
@@ -79,14 +71,12 @@ function AppRoutes() {
 
   if (!user) return <Login />;
   if (needsPasswordSetup) return <SetupPassword />;
-  if (needsProfileSetup) return <Setup />;
 
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="welcome" element={<Welcome />} />
-        <Route path="setup" element={<Setup />} />
         <Route path="setup-password" element={<SetupPassword />} />
 
         <Route path="stats" element={<StatsLayout />}>
@@ -166,7 +156,6 @@ const queryClient = new QueryClient({
 });
 
 export default function App() {
-  console.log("App component rendering");
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

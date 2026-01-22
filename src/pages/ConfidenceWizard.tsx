@@ -1044,14 +1044,6 @@ export default function ConfidenceWizard() {
           </div>
         </div>
 
-        {/* Repair Mode Indicator */}
-        {isRepair && (
-          <div className="mt-4 text-center">
-            <Badge variant="outline" className="text-xs bg-white/80">
-              Backfilling: {currentFocus.week_label || `Cycle ${currentFocus.cycle}, Week ${currentFocus.week_in_cycle}`}
-            </Badge>
-          </div>
-        )}
       </div>
 
       {/* Question & Scale */}

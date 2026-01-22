@@ -93,7 +93,7 @@ serve(async (req: Request) => {
 
         let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,is_paused,paused_at,pause_reason,coach_scope_type,coach_scope_id,roles(role_name),locations(name,organization_id)", {
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,is_paused,paused_at,pause_reason,coach_scope_type,coach_scope_id,hire_date,roles(role_name),locations(name,organization_id)", {
             count: "exact",
           })
           .order("name", { ascending: true });
@@ -196,6 +196,7 @@ serve(async (req: Request) => {
             paused_at: s.paused_at ?? null,
             pause_reason: s.pause_reason ?? null,
             coach_scopes: scopes || null,
+            hire_date: s.hire_date ?? null,
           };
           console.log("Final row data:", row);
           return row;

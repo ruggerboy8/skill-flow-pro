@@ -57,6 +57,7 @@ export default function ScoreHistoryV2() {
   const [openWeeks, setOpenWeeks] = useState<string[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingWeek, setDeletingWeek] = useState<string | null>(null);
+  const [retiredActionIds, setRetiredActionIds] = useState<Set<number>>(new Set());
   
   const { isSuperAdmin } = useAuth();
   const { overrides } = useSim();
@@ -73,6 +74,35 @@ export default function ScoreHistoryV2() {
   // Check if backfill is currently enabled
   const hasActiveBackfill = staffProfile?.allow_backfill_until && 
     new Date(staffProfile.allow_backfill_until) > new Date();
+
+  // Fetch retired status for all action_ids in score history
+  useEffect(() => {
+    const fetchRetiredStatus = async () => {
+      // Collect all unique action_ids from all scores
+      const allActionIds = new Set<number>();
+      weekSummaries.forEach((summary) => {
+        summary.scores.forEach((score: RawScoreRow) => {
+          if (score.action_id) allActionIds.add(score.action_id);
+        });
+      });
+
+      if (allActionIds.size === 0) return;
+
+      const { data } = await supabase
+        .from('pro_moves')
+        .select('action_id')
+        .in('action_id', Array.from(allActionIds))
+        .eq('active', false);
+
+      if (data) {
+        setRetiredActionIds(new Set(data.map(d => d.action_id)));
+      }
+    };
+
+    if (!loading && weekSummaries.size > 0) {
+      fetchRetiredStatus();
+    }
+  }, [loading, weekSummaries]);
 
   const mondayOf = (d: Date = new Date()): Date => {
     const day = d.getDay();
@@ -340,10 +370,11 @@ export default function ScoreHistoryV2() {
                                   <div className="space-y-2 pt-2">
                                     {scores.map((score, index) => {
                                       const domainColor = getDomainColorRich(score.domain_name || 'General');
+                                      const isRetired = score.action_id ? retiredActionIds.has(score.action_id) : false;
                                       return (
                                         <div 
                                           key={index} 
-                                          className="flex overflow-hidden rounded-lg border border-border/50 bg-muted/20"
+                                          className={`flex overflow-hidden rounded-lg border border-border/50 bg-muted/20 ${isRetired ? 'opacity-70' : ''}`}
                                         >
                                           {/* Mini Spine */}
                                           <div 
@@ -368,11 +399,19 @@ export default function ScoreHistoryV2() {
                                                     <span>Self-Select</span>
                                                   </div>
                                                 )}
+                                                {isRetired && (
+                                                  <Badge 
+                                                    variant="outline" 
+                                                    className="text-[9px] h-4 px-1 text-muted-foreground border-muted-foreground/30"
+                                                  >
+                                                    Retired
+                                                  </Badge>
+                                                )}
                                               </div>
                                               
                                               <div className="scale-90 origin-right shrink-0">
                                                 <ConfPerfDelta 
-                                                  confidence={score.confidence_score} 
+                                                  confidence={score.confidence_score}
                                                   performance={score.performance_score} 
                                                 />
                                               </div>

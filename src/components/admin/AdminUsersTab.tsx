@@ -323,21 +323,24 @@ const handleResetPassword = async (user: User) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Search and Filters */}
-          <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
-            <div className="flex flex-1 space-x-2">
-              <Input
-                placeholder="Search by name or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              />
-              <Button onClick={handleSearch} variant="outline">
-                <Search className="h-4 w-4" />
-              </Button>
-            </div>
+          {/* Search */}
+          <div className="flex space-x-2">
+            <Input
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="max-w-md"
+            />
+            <Button onClick={handleSearch} variant="outline">
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
               <SelectContent>
@@ -350,7 +353,7 @@ const handleResetPassword = async (user: User) => {
               </SelectContent>
             </Select>
             <Select value={locationFilter} onValueChange={setLocationFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Filter by location" />
               </SelectTrigger>
               <SelectContent>
@@ -363,7 +366,7 @@ const handleResetPassword = async (user: User) => {
               </SelectContent>
             </Select>
             <Select value={superAdminFilter} onValueChange={setSuperAdminFilter}>
-              <SelectTrigger className="w-full md:w-[160px]">
+              <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Filter admin" />
               </SelectTrigger>
               <SelectContent>

@@ -154,7 +154,7 @@ export function RecordingProcessCard({
           </div>
         ) : isPausedWithRecording ? (
           <div className="space-y-4">
-            {/* Coaching context */}
+            {/* Coaching context - at the top */}
             <div className="text-sm text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Observation starters:</p>
               <ul className="list-disc list-inside space-y-0.5 text-xs">

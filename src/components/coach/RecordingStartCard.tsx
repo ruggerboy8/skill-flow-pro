@@ -119,6 +119,19 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
               )}
             </div>
           </div>
+
+          {/* Observation starters - show when recording or paused */}
+          {isRecording && (
+            <div className="mt-4 pt-3 border-t text-sm text-muted-foreground space-y-1.5">
+              <p className="font-medium text-foreground text-xs">Observation starters:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-xs">
+                <li>"I liked when you..."</li>
+                <li>"Don't forget to..."</li>
+                <li>"Instead of ___, try..."</li>
+                <li>"I noticed that when ___, you..."</li>
+              </ul>
+            </div>
+          )}
         </CardContent>
       </Card>
     );

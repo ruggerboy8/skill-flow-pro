@@ -153,66 +153,53 @@ export function RecordingProcessCard({
             </div>
           </div>
         ) : isPausedWithRecording ? (
-          <div className="space-y-4">
-            {/* Coaching context - at the top */}
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">Observation starters:</p>
-              <ul className="list-disc list-inside space-y-0.5 text-xs">
-                <li>"I liked when you..."</li>
-                <li>"Don't forget to..."</li>
-                <li>"Instead of ___, try..."</li>
-                <li>"I noticed that when ___, you..."</li>
-              </ul>
-            </div>
-
-            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-amber-500" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Recording paused</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatTime(recordingState.recordingTime)} recorded
-                  </p>
-                </div>
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-amber-500" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Recording paused</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatTime(recordingState.recordingTime)} recorded
+                </p>
               </div>
-              
-              {/* Audio preview while paused */}
-              {recordingState.previewUrl && (
-                <div className="flex items-center gap-3 p-2 bg-background/50 rounded-md">
-                  <audio 
-                    ref={audioRef}
-                    src={recordingState.previewUrl}
-                    onEnded={() => setIsPlayingCurrent(false)}
-                    className="hidden"
-                  />
-                  
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0 h-9 w-9 rounded-full"
-                    onClick={toggleCurrentPlayback}
-                  >
-                    {isPlayingCurrent ? (
-                      <Pause className="w-4 h-4" />
-                    ) : (
-                      <Play className="w-4 h-4" />
-                    )}
-                  </Button>
-                  
-                  <p className="text-xs text-muted-foreground flex-1">
-                    Preview your recording
-                  </p>
-                </div>
-              )}
-              
-              <Button
-                onClick={onFinishAndTranscribe}
-                className="w-full gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                Finish & Transcribe
-              </Button>
             </div>
+            
+            {/* Audio preview while paused */}
+            {recordingState.previewUrl && (
+              <div className="flex items-center gap-3 p-2 bg-background/50 rounded-md">
+                <audio 
+                  ref={audioRef}
+                  src={recordingState.previewUrl}
+                  onEnded={() => setIsPlayingCurrent(false)}
+                  className="hidden"
+                />
+                
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 h-9 w-9 rounded-full"
+                  onClick={toggleCurrentPlayback}
+                >
+                  {isPlayingCurrent ? (
+                    <Pause className="w-4 h-4" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                </Button>
+                
+                <p className="text-xs text-muted-foreground flex-1">
+                  Preview your recording
+                </p>
+              </div>
+            )}
+            
+            <Button
+              onClick={onFinishAndTranscribe}
+              className="w-full gap-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              Finish & Transcribe
+            </Button>
           </div>
         ) : hasRestoredRecording ? (
           <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">

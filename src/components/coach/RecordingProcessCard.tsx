@@ -1,9 +1,14 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mic, Play, Pause, RotateCcw, Sparkles } from 'lucide-react';
+import { Loader2, Mic, Play, Pause, RotateCcw, Sparkles, Check, ArrowRight, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AudioRecordingState, AudioRecordingControls } from '@/hooks/useAudioRecording';
+
+interface InsightsSummary {
+  strengthCount: number;
+  growthCount: number;
+}
 
 interface RecordingProcessCardProps {
   recordingState: AudioRecordingState;
@@ -16,6 +21,12 @@ interface RecordingProcessCardProps {
   onProcessAudio: (blob: Blob) => void;
   onDiscardRestored: () => void;
   onFinishAndTranscribe?: () => Promise<void>;
+  // New success state props
+  processingComplete?: boolean;
+  insightsSummary?: InsightsSummary | null;
+  onViewInsights?: () => void;
+  onEditTranscript?: () => void;
+  onDismissSuccess?: () => void;
 }
 
 export function RecordingProcessCard({
@@ -29,6 +40,11 @@ export function RecordingProcessCard({
   onProcessAudio,
   onDiscardRestored,
   onFinishAndTranscribe,
+  processingComplete,
+  insightsSummary,
+  onViewInsights,
+  onEditTranscript,
+  onDismissSuccess,
 }: RecordingProcessCardProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingRestored, setIsPlayingRestored] = useState(false);
@@ -78,7 +94,7 @@ export function RecordingProcessCard({
   const isPausedWithRecording = recordingState.isRecording && recordingState.isPaused;
   const hasCurrentRecording = !!recordingState.audioBlob && !recordingState.isRecording;
   const hasRestoredRecording = !!restoredAudioUrl && !hasCurrentRecording && !recordingState.isRecording;
-  const showCard = isPausedWithRecording || hasCurrentRecording || hasRestoredRecording || isLoadingDraft || isProcessing;
+  const showCard = isPausedWithRecording || hasCurrentRecording || hasRestoredRecording || isLoadingDraft || isProcessing || processingComplete;
 
   if (!showCard) {
     return null;
@@ -89,7 +105,7 @@ export function RecordingProcessCard({
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />
-          Process Recording
+          {processingComplete ? 'Analysis Complete' : 'Process Recording'}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -104,6 +120,36 @@ export function RecordingProcessCard({
             <div>
               <p className="font-medium text-sm">{processingStep}</p>
               <p className="text-xs text-muted-foreground">This may take a moment...</p>
+            </div>
+          </div>
+        ) : processingComplete ? (
+          <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center shrink-0">
+                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-green-800 dark:text-green-200">
+                  Your observation has been analyzed
+                </p>
+                {insightsSummary && (insightsSummary.strengthCount > 0 || insightsSummary.growthCount > 0) && (
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    Found {insightsSummary.strengthCount} strength{insightsSummary.strengthCount !== 1 ? 's' : ''} and {insightsSummary.growthCount} growth area{insightsSummary.growthCount !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              <Button onClick={onViewInsights} className="gap-2">
+                <Sparkles className="w-4 h-4" />
+                View Insights
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={onEditTranscript} className="gap-1.5">
+                <FileText className="w-4 h-4" />
+                Edit Transcript
+              </Button>
             </div>
           </div>
         ) : isPausedWithRecording ? (

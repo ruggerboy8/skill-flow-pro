@@ -110,8 +110,10 @@ export function EvaluationHub() {
   const [processingStep, setProcessingStep] = useState<string>('');
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [showFloatingPill, setShowFloatingPill] = useState(false);
+  const [processingJustCompleted, setProcessingJustCompleted] = useState(false);
   const startCardRef = useRef<HTMLDivElement>(null);
   const processSectionRef = useRef<HTMLDivElement>(null);
+  const transcriptSectionRef = useRef<HTMLDivElement>(null);
   
   
   // Sidebar control
@@ -203,6 +205,35 @@ export function EvaluationHub() {
   // Scroll to process section when "Done?" is clicked
   const scrollToProcessSection = useCallback(() => {
     processSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // Calculate insights summary for success state
+  const insightsSummary = React.useMemo(() => {
+    const observer = evaluation?.extracted_insights?.observer;
+    if (!observer?.domain_insights) return null;
+    
+    let strengthCount = 0;
+    let growthCount = 0;
+    
+    observer.domain_insights.forEach((d: any) => {
+      strengthCount += d.strengths?.length || 0;
+      growthCount += d.growth_areas?.length || 0;
+    });
+    
+    return { strengthCount, growthCount };
+  }, [evaluation?.extracted_insights]);
+
+  // Handler for View Insights button
+  const handleViewInsights = useCallback(() => {
+    setProcessingJustCompleted(false);
+    setActiveTab('summary');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Handler for Edit Transcript button
+  const handleEditTranscript = useCallback(() => {
+    setProcessingJustCompleted(false);
+    transcriptSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
   const loadDraftAudio = async (path: string) => {
@@ -347,10 +378,9 @@ export function EvaluationHub() {
         setRestoredAudioBlob(null);
       }
 
-      toast({
-        title: 'Success',
-        description: 'Observations transcribed and analyzed successfully',
-      });
+      // Show success state and auto-expand transcript
+      setProcessingJustCompleted(true);
+      setIsObservationTranscriptExpanded(true);
     } catch (error) {
       console.error('[EvaluationHub] Processing error:', error);
       toast({
@@ -1578,13 +1608,17 @@ export function EvaluationHub() {
                 onProcessAudio={handleProcessAudio}
                 onDiscardRestored={handleDiscardRestoredAudio}
                 onFinishAndTranscribe={handleFinishAndTranscribe}
+                processingComplete={processingJustCompleted}
+                insightsSummary={insightsSummary}
+                onViewInsights={handleViewInsights}
+                onEditTranscript={handleEditTranscript}
               />
             </div>
           )}
 
           {/* Observation Transcript Card - collapsible like interview transcript */}
           {summaryRawTranscript && (
-            <Card className="mt-6">
+            <Card className="mt-6" ref={transcriptSectionRef}>
               <CardHeader 
                 className="cursor-pointer select-none py-3"
                 onClick={() => setIsObservationTranscriptExpanded(!isObservationTranscriptExpanded)}

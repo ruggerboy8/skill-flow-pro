@@ -95,28 +95,37 @@ export default {
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
 			},
-			keyframes: {
-				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+		keyframes: {
+			'accordion-down': {
+				from: {
+					height: '0'
 				},
-				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
+				to: {
+					height: 'var(--radix-accordion-content-height)'
 				}
 			},
-			animation: {
-				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+			'accordion-up': {
+				from: {
+					height: 'var(--radix-accordion-content-height)'
+				},
+				to: {
+					height: '0'
+				}
+			},
+			'pulse-glow': {
+				'0%, 100%': {
+					boxShadow: '0 0 0 0 rgba(239, 68, 68, 0.5)'
+				},
+				'50%': {
+					boxShadow: '0 0 0 8px rgba(239, 68, 68, 0)'
+				}
 			}
+		},
+		animation: {
+			'accordion-down': 'accordion-down 0.2s ease-out',
+			'accordion-up': 'accordion-up 0.2s ease-out',
+			'pulse-glow': 'pulse-glow 1.5s ease-in-out infinite'
+		}
 		}
 	},
 	plugins: [require("tailwindcss-animate")],

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,11 +40,16 @@ import {
   updateEvaluationMetadata,
   updateSummaryFeedback,
   updateInterviewTranscript,
-  type EvaluationWithItems
+  updateExtractedInsights,
+  type EvaluationWithItems,
+  type ExtractedInsights,
+  type InsightsPerspective
 } from '@/lib/evaluations';
 import { ProMovesAccordion } from '@/components/coach/ProMovesAccordion';
 import { SummaryTab } from '@/components/coach/SummaryTab';
-import { ObservationRecorder } from '@/components/coach/ObservationRecorder';
+import { RecordingStartCard } from '@/components/coach/RecordingStartCard';
+import { RecordingProcessCard } from '@/components/coach/RecordingProcessCard';
+import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { InterviewRecorder } from '@/components/coach/InterviewRecorder';
 import { useAudioRecording } from '@/hooks/useAudioRecording';
 import ReactQuill from 'react-quill';
@@ -95,6 +100,16 @@ export function EvaluationHub() {
   const [draftInterviewAudioPath, setDraftInterviewAudioPath] = useState<string | null>(null);
   const [showNaConfirmDialog, setShowNaConfirmDialog] = useState(false);
 
+  // Recording state for split recording UI
+  const [restoredAudioUrl, setRestoredAudioUrl] = useState<string | null>(null);
+  const [restoredAudioBlob, setRestoredAudioBlob] = useState<Blob | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
+  const [processingStep, setProcessingStep] = useState<string>('');
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [showFloatingPill, setShowFloatingPill] = useState(false);
+  const startCardRef = useRef<HTMLDivElement>(null);
+
   // Audio recording state - lifted here so it persists across tab switches
   const { state: recordingState, controls: recordingControls } = useAudioRecording();
 
@@ -124,6 +139,212 @@ export function EvaluationHub() {
       }
     }
   }, [evaluation, currentSelfIndex]);
+
+  // Load draft audio on mount if path exists
+  useEffect(() => {
+    if (draftObservationAudioPath && !restoredAudioUrl && !recordingState.audioBlob) {
+      loadDraftAudio(draftObservationAudioPath);
+    }
+  }, [draftObservationAudioPath]);
+
+  // Auto-save audio blob to storage when recording stops
+  useEffect(() => {
+    if (recordingState.audioBlob && !recordingState.isRecording && !isSavingDraft) {
+      saveDraftAudio(recordingState.audioBlob);
+    }
+  }, [recordingState.audioBlob, recordingState.isRecording]);
+
+  // Cleanup audio URL on unmount
+  useEffect(() => {
+    return () => {
+      if (restoredAudioUrl) {
+        URL.revokeObjectURL(restoredAudioUrl);
+      }
+    };
+  }, [restoredAudioUrl]);
+
+  // IntersectionObserver for floating recorder pill
+  useEffect(() => {
+    if (!recordingState.isRecording) {
+      setShowFloatingPill(false);
+      return;
+    }
+    
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Show pill when start card is out of view AND recording is active
+        setShowFloatingPill(!entry.isIntersecting);
+      },
+      { threshold: 0.1 }
+    );
+    
+    if (startCardRef.current) {
+      observer.observe(startCardRef.current);
+    }
+    
+    return () => observer.disconnect();
+  }, [recordingState.isRecording]);
+
+  const loadDraftAudio = async (path: string) => {
+    setIsLoadingDraft(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('evaluation-recordings')
+        .download(path);
+      
+      if (error) throw error;
+      
+      const url = URL.createObjectURL(data);
+      setRestoredAudioUrl(url);
+      setRestoredAudioBlob(data);
+      
+      console.log('[EvaluationHub] Draft audio loaded from:', path);
+    } catch (error) {
+      console.error('[EvaluationHub] Failed to load draft audio:', error);
+    } finally {
+      setIsLoadingDraft(false);
+    }
+  };
+
+  const saveDraftAudio = async (blob: Blob) => {
+    if (!evalId) return;
+    setIsSavingDraft(true);
+    try {
+      const fileName = `${evalId}/draft-observation-${Date.now()}.webm`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('evaluation-recordings')
+        .upload(fileName, blob, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Update database with draft path
+      handleDraftAudioSaved(fileName);
+      
+      console.log('[EvaluationHub] Draft audio saved to:', fileName);
+    } catch (error) {
+      console.error('[EvaluationHub] Failed to save draft audio:', error);
+      toast({
+        title: 'Warning',
+        description: 'Could not auto-save recording. Please process it before leaving.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const deleteDraftAudio = async (path: string) => {
+    try {
+      await supabase.storage
+        .from('evaluation-recordings')
+        .remove([path]);
+      console.log('[EvaluationHub] Draft audio deleted:', path);
+    } catch (error) {
+      console.error('[EvaluationHub] Failed to delete draft audio:', error);
+    }
+  };
+
+  const handleProcessAudio = async (audioBlob: Blob) => {
+    if (!evalId) return;
+    
+    setIsProcessingAudio(true);
+    setProcessingStep('Transcribing audio...');
+
+    try {
+      // Step 1: Transcribe audio using OpenAI Whisper
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+
+      const transcribeResponse = await supabase.functions.invoke('transcribe-audio', {
+        body: formData,
+      });
+
+      if (transcribeResponse.error) {
+        throw new Error(transcribeResponse.error.message || 'Transcription failed');
+      }
+
+      const transcript = transcribeResponse.data?.transcript;
+      if (!transcript) {
+        throw new Error('No transcript returned');
+      }
+
+      // Step 2: Extract insights using extract-insights with source='observation'
+      setProcessingStep('Extracting insights...');
+
+      const extractResponse = await supabase.functions.invoke('extract-insights', {
+        body: { transcript, staffName, source: 'observation' },
+      });
+
+      if (extractResponse.error) {
+        throw new Error(extractResponse.error.message || 'Insight extraction failed');
+      }
+
+      const insights = extractResponse.data?.insights as InsightsPerspective;
+      if (!insights) {
+        throw new Error('No insights returned');
+      }
+
+      // Step 3: Save to database - merge with existing insights
+      const updatedInsights: ExtractedInsights = {
+        ...evaluation?.extracted_insights,
+        observer: insights
+      };
+      
+      await updateExtractedInsights(evalId, updatedInsights);
+
+      // Step 4: Delete draft audio after successful processing
+      if (draftObservationAudioPath) {
+        await deleteDraftAudio(draftObservationAudioPath);
+        handleDraftAudioCleared();
+      }
+
+      // Update local state
+      handleSummaryFeedbackChange(insights.summary_html || '');
+      handleSummaryTranscriptChange(transcript);
+      setEvaluation(prev => prev ? { ...prev, extracted_insights: updatedInsights } : prev);
+
+      // Reset recording state after successful processing
+      recordingControls.resetRecording();
+      
+      // Clear restored audio state
+      if (restoredAudioUrl) {
+        URL.revokeObjectURL(restoredAudioUrl);
+        setRestoredAudioUrl(null);
+        setRestoredAudioBlob(null);
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Observations transcribed and analyzed successfully',
+      });
+    } catch (error) {
+      console.error('[EvaluationHub] Processing error:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to process audio',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessingAudio(false);
+      setProcessingStep('');
+    }
+  };
+
+  const handleDiscardRestoredAudio = async () => {
+    if (draftObservationAudioPath) {
+      await deleteDraftAudio(draftObservationAudioPath);
+      handleDraftAudioCleared();
+    }
+    if (restoredAudioUrl) {
+      URL.revokeObjectURL(restoredAudioUrl);
+    }
+    setRestoredAudioUrl(null);
+    setRestoredAudioBlob(null);
+  };
 
   const loadEvaluation = async () => {
     if (!evalId) return;
@@ -1177,24 +1398,27 @@ export function EvaluationHub() {
         </TabsList>
 
         <TabsContent value="observation">
-          {/* Observation Recorder at TOP */}
+          {/* Floating Recorder Pill - shows when scrolling and recording */}
+          {showFloatingPill && recordingState.isRecording && (
+            <FloatingRecorderPill
+              recordingTime={recordingState.recordingTime}
+              isRecording={recordingState.isRecording}
+              isPaused={recordingState.isPaused}
+              onPauseToggle={recordingControls.togglePause}
+              onStop={recordingControls.stopRecording}
+            />
+          )}
+
+          {/* Recording Start Card at TOP - minimal trigger */}
           {!isReadOnly && (
-            <ObservationRecorder
-              evalId={evalId!}
-              staffName={staffName}
-              onFeedbackGenerated={(feedback, transcript, insights) => {
-                handleSummaryFeedbackChange(feedback);
-                handleSummaryTranscriptChange(transcript);
-                if (insights) {
-                  setEvaluation(prev => prev ? { ...prev, extracted_insights: { ...prev.extracted_insights, observer: insights } } : prev);
-                }
-              }}
-              recordingState={recordingState}
-              recordingControls={recordingControls}
-              currentInsights={evaluation?.extracted_insights}
-              draftAudioPath={draftObservationAudioPath}
-              onDraftAudioSaved={handleDraftAudioSaved}
-              onDraftAudioCleared={handleDraftAudioCleared}
+            <RecordingStartCard
+              ref={startCardRef}
+              isRecording={recordingState.isRecording}
+              isPaused={recordingState.isPaused}
+              recordingTime={recordingState.recordingTime}
+              isSavingDraft={isSavingDraft}
+              onStartRecording={recordingControls.startRecording}
+              disabled={isProcessingAudio}
             />
           )}
           
@@ -1295,6 +1519,21 @@ export function EvaluationHub() {
               ))}
             </CardContent>
           </Card>
+
+          {/* Recording Process Card at BOTTOM - after all competencies */}
+          {!isReadOnly && (
+            <RecordingProcessCard
+              recordingState={recordingState}
+              recordingControls={recordingControls}
+              restoredAudioUrl={restoredAudioUrl}
+              restoredAudioBlob={restoredAudioBlob}
+              isLoadingDraft={isLoadingDraft}
+              isProcessing={isProcessingAudio}
+              processingStep={processingStep}
+              onProcessAudio={handleProcessAudio}
+              onDiscardRestored={handleDiscardRestoredAudio}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="self-assessment">

@@ -317,8 +317,10 @@ export type Database = {
           domain_name: string | null
           evaluation_id: string
           interview_prompt_snapshot: string | null
+          observer_is_na: boolean | null
           observer_note: string | null
           observer_score: number | null
+          self_is_na: boolean | null
           self_note: string | null
           self_score: number | null
         }
@@ -330,8 +332,10 @@ export type Database = {
           domain_name?: string | null
           evaluation_id: string
           interview_prompt_snapshot?: string | null
+          observer_is_na?: boolean | null
           observer_note?: string | null
           observer_score?: number | null
+          self_is_na?: boolean | null
           self_note?: string | null
           self_score?: number | null
         }
@@ -343,8 +347,10 @@ export type Database = {
           domain_name?: string | null
           evaluation_id?: string
           interview_prompt_snapshot?: string | null
+          observer_is_na?: boolean | null
           observer_note?: string | null
           observer_score?: number | null
+          self_is_na?: boolean | null
           self_note?: string | null
           self_score?: number | null
         }

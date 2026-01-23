@@ -33,6 +33,8 @@ export interface EvaluationWithItems extends Omit<Evaluation, 'extracted_insight
     interview_prompt?: string;
     domain_name?: string;
     tagline?: string;
+    observer_is_na?: boolean;
+    self_is_na?: boolean;
   })[];
   extracted_insights?: ExtractedInsights | null;
 }
@@ -461,21 +463,81 @@ export async function deleteEvaluation(evalId: string) {
 }
 
 /**
- * Check if evaluation is complete (all items have both observer and self scores)
+ * Check if evaluation is complete (all items have both observer and self scores, or are marked as NA)
  */
 export function isEvaluationComplete(evaluation: EvaluationWithItems): { 
   observerComplete: boolean; 
   selfComplete: boolean; 
-  canSubmit: boolean 
+  canSubmit: boolean;
+  observerNaCount: number;
+  selfNaCount: number;
+  naCount: number;
 } {
-  const observerComplete = evaluation.items.every(item => item.observer_score !== null);
-  const selfComplete = evaluation.items.every(item => item.self_score !== null);
+  const observerComplete = evaluation.items.every(
+    item => item.observer_score !== null || item.observer_is_na === true
+  );
+  const selfComplete = evaluation.items.every(
+    item => item.self_score !== null || item.self_is_na === true
+  );
+  
+  const observerNaCount = evaluation.items.filter(item => item.observer_is_na === true).length;
+  const selfNaCount = evaluation.items.filter(item => item.self_is_na === true).length;
+  const naCount = observerNaCount + selfNaCount;
   
   return {
     observerComplete,
     selfComplete,
-    canSubmit: observerComplete && selfComplete
+    canSubmit: observerComplete && selfComplete,
+    observerNaCount,
+    selfNaCount,
+    naCount
   };
+}
+
+/**
+ * Set observer NA status for a competency
+ */
+export async function setObserverNA(
+  evalId: string,
+  competencyId: number,
+  isNA: boolean
+) {
+  const updateData = isNA 
+    ? { observer_is_na: true, observer_score: null }
+    : { observer_is_na: false };
+    
+  const { error } = await supabase
+    .from('evaluation_items')
+    .update(updateData)
+    .eq('evaluation_id', evalId)
+    .eq('competency_id', competencyId);
+
+  if (error) {
+    throw new Error(`Failed to set observer NA: ${error.message}`);
+  }
+}
+
+/**
+ * Set self-assessment NA status for a competency
+ */
+export async function setSelfNA(
+  evalId: string,
+  competencyId: number,
+  isNA: boolean
+) {
+  const updateData = isNA 
+    ? { self_is_na: true, self_score: null }
+    : { self_is_na: false };
+    
+  const { error } = await supabase
+    .from('evaluation_items')
+    .update(updateData)
+    .eq('evaluation_id', evalId)
+    .eq('competency_id', competencyId);
+
+  if (error) {
+    throw new Error(`Failed to set self NA: ${error.message}`);
+  }
 }
 
 /**
@@ -541,19 +603,22 @@ export function getQuarterWindow(now: Date, timezone: string): QuarterWindow {
 
 /**
  * Check if a draft evaluation has all required scores filled out.
- * Returns true if all items have both observer_score and self_score.
+ * Returns true if all items have both observer_score and self_score (or are marked as NA).
  */
 export async function isDraftComplete(evalId: string): Promise<boolean> {
   const { data: items, error } = await supabase
     .from('evaluation_items')
-    .select('observer_score, self_score')
+    .select('observer_score, self_score, observer_is_na, self_is_na')
     .eq('evaluation_id', evalId);
 
   if (error || !items || items.length === 0) {
     return false;
   }
 
-  return items.every(item => item.observer_score !== null && item.self_score !== null);
+  return items.every(item => 
+    (item.observer_score !== null || item.observer_is_na === true) && 
+    (item.self_score !== null || item.self_is_na === true)
+  );
 }
 
 /**

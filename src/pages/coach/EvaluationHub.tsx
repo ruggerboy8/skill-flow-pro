@@ -32,6 +32,8 @@ import {
   setObserverNote,
   setSelfScore,
   setSelfNote,
+  setObserverNA,
+  setSelfNA,
   submitEvaluation,
   deleteEvaluation,
   isEvaluationComplete,
@@ -91,6 +93,7 @@ export function EvaluationHub() {
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
   const [draftObservationAudioPath, setDraftObservationAudioPath] = useState<string | null>(null);
   const [draftInterviewAudioPath, setDraftInterviewAudioPath] = useState<string | null>(null);
+  const [showNaConfirmDialog, setShowNaConfirmDialog] = useState(false);
 
   // Audio recording state - lifted here so it persists across tab switches
   const { state: recordingState, controls: recordingControls } = useAudioRecording();
@@ -185,14 +188,14 @@ export function EvaluationHub() {
       setSaving(true);
       await setObserverScore(evalId, competencyId, score);
       
-      // Update local state
+      // Update local state - also clear NA flag when setting a score
       setEvaluation(prev => {
         if (!prev) return prev;
         return {
           ...prev,
           items: prev.items.map(item => 
             item.competency_id === competencyId 
-              ? { ...item, observer_score: score }
+              ? { ...item, observer_score: score, observer_is_na: false }
               : item
           )
         };
@@ -208,6 +211,43 @@ export function EvaluationHub() {
       toast({
         title: "Error",
         description: "Failed to save score",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleObserverNAChange = async (competencyId: number, isNA: boolean) => {
+    if (!evalId) return;
+    
+    try {
+      setSaving(true);
+      await setObserverNA(evalId, competencyId, isNA);
+      
+      // Update local state
+      setEvaluation(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map(item => 
+            item.competency_id === competencyId 
+              ? { ...item, observer_is_na: isNA, observer_score: isNA ? null : item.observer_score }
+              : item
+          )
+        };
+      });
+
+      toast({
+        title: "Saved",
+        description: isNA ? "Marked as Not Observed" : "N/A cleared",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Failed to update observer NA:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update",
         variant: "destructive"
       });
     } finally {
@@ -250,14 +290,14 @@ export function EvaluationHub() {
       setSaving(true);
       await setSelfScore(evalId, competencyId, score);
       
-      // Update local state
+      // Update local state - also clear NA flag when setting a score
       setEvaluation(prev => {
         if (!prev) return prev;
         return {
           ...prev,
           items: prev.items.map(item => 
             item.competency_id === competencyId 
-              ? { ...item, self_score: score }
+              ? { ...item, self_score: score, self_is_na: false }
               : item
           )
         };
@@ -273,6 +313,43 @@ export function EvaluationHub() {
       toast({
         title: "Error",
         description: "Failed to save score",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSelfNAChange = async (competencyId: number, isNA: boolean) => {
+    if (!evalId) return;
+    
+    try {
+      setSaving(true);
+      await setSelfNA(evalId, competencyId, isNA);
+      
+      // Update local state
+      setEvaluation(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map(item => 
+            item.competency_id === competencyId 
+              ? { ...item, self_is_na: isNA, self_score: isNA ? null : item.self_score }
+              : item
+          )
+        };
+      });
+
+      toast({
+        title: "Saved",
+        description: isNA ? "Marked as Not Observed" : "N/A cleared",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Failed to update self NA:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update",
         variant: "destructive"
       });
     } finally {
@@ -308,13 +385,23 @@ export function EvaluationHub() {
     }
   };
 
+  const handleSubmitClick = async () => {
+    if (!evaluation) return;
+    await flushAllPendingNotes();
+    
+    if (completionStatus.naCount > 0) {
+      setShowNaConfirmDialog(true);
+    } else {
+      handleSubmitEvaluation();
+    }
+  };
+
   const handleSubmitEvaluation = async () => {
     if (!evalId || !evaluation) return;
     
     try {
       setIsSubmitting(true);
-      // Make sure all locally drafted notes are persisted first
-      await flushAllPendingNotes();
+      setShowNaConfirmDialog(false);
 
       await submitEvaluation(evalId);
       
@@ -888,8 +975,9 @@ export function EvaluationHub() {
   
   const currentItem = sortedItems[currentSelfIndex];
   
-  // Calculate observation completion count
-  const observerScoresCount = evaluation.items.filter(item => item.observer_score !== null).length;
+  // Calculate observation completion count (include NA items)
+  const observerScoresCount = evaluation.items.filter(item => item.observer_score !== null || item.observer_is_na === true).length;
+  const selfScoresCount = evaluation.items.filter(item => item.self_score !== null || item.self_is_na === true).length;
   const totalItems = evaluation.items.length;
 
   return (
@@ -1020,6 +1108,9 @@ export function EvaluationHub() {
                      completionStatus.observerComplete ? "text-green-600" : "text-muted-foreground"
                    )}>
                      Observation ({observerScoresCount}/{totalItems})
+                     {completionStatus.observerNaCount > 0 && (
+                       <span className="text-muted-foreground font-normal"> · {completionStatus.observerNaCount} N/A</span>
+                     )}
                    </span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -1032,12 +1123,15 @@ export function EvaluationHub() {
                     "font-medium",
                     completionStatus.selfComplete ? "text-green-600" : "text-muted-foreground"
                   )}>
-                    Self-Assessment
+                    Self-Assessment ({selfScoresCount}/{totalItems})
+                    {completionStatus.selfNaCount > 0 && (
+                      <span className="text-muted-foreground font-normal"> · {completionStatus.selfNaCount} N/A</span>
+                    )}
                   </span>
                 </div>
               </div>
               <Button 
-                onClick={handleSubmitEvaluation}
+                onClick={handleSubmitClick}
                 disabled={!completionStatus.canSubmit || isSubmitting}
                 className="bg-primary hover:bg-primary/90"
               >
@@ -1047,6 +1141,24 @@ export function EvaluationHub() {
           </CardContent>
         </Card>
       )}
+
+      {/* NA Confirmation Dialog */}
+      <AlertDialog open={showNaConfirmDialog} onOpenChange={setShowNaConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
+            <AlertDialogDescription>
+              There {completionStatus.naCount === 1 ? 'is' : 'are'} {completionStatus.naCount} competenc{completionStatus.naCount === 1 ? 'y' : 'ies'} marked as "Not Observed/N/A". Are you sure you want to submit?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSubmitEvaluation}>
+              I'm Sure
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1124,18 +1236,32 @@ export function EvaluationHub() {
                   <ProMovesAccordion competencyId={item.competency_id} />
                   
                   {/* Score Pills */}
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-2 flex-wrap gap-y-2">
+                    {/* N/A Button */}
+                    <button
+                      onClick={() => !isReadOnly && handleObserverNAChange(item.competency_id, !item.observer_is_na)}
+                      disabled={isReadOnly || saving}
+                      className={cn(
+                        "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
+                        item.observer_is_na
+                          ? "bg-muted text-muted-foreground border-muted-foreground"
+                          : "bg-background border-border hover:bg-muted",
+                        isReadOnly && "cursor-not-allowed opacity-60"
+                      )}
+                    >
+                      N/A
+                    </button>
                     {SCORE_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => !isReadOnly && handleObserverScoreChange(item.competency_id, option.value)}
-                        disabled={isReadOnly || saving}
+                        disabled={isReadOnly || saving || item.observer_is_na}
                         className={cn(
                           "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
-                          item.observer_score === option.value
+                          item.observer_score === option.value && !item.observer_is_na
                             ? option.color
                             : "bg-background border-border hover:bg-muted",
-                          isReadOnly && "cursor-not-allowed opacity-60"
+                          (isReadOnly || item.observer_is_na) && "cursor-not-allowed opacity-60"
                         )}
                       >
                         {option.value}
@@ -1241,18 +1367,32 @@ export function EvaluationHub() {
                 {/* Score Pills */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Self-Assessment Score</label>
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-2 flex-wrap gap-y-2">
+                    {/* N/A Button */}
+                    <button
+                      onClick={() => !isReadOnly && handleSelfNAChange(currentItem.competency_id, !currentItem.self_is_na)}
+                      disabled={isReadOnly || saving}
+                      className={cn(
+                        "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
+                        currentItem.self_is_na
+                          ? "bg-muted text-muted-foreground border-muted-foreground"
+                          : "bg-background border-border hover:bg-muted",
+                        isReadOnly && "cursor-not-allowed opacity-60"
+                      )}
+                    >
+                      N/A
+                    </button>
                     {SCORE_OPTIONS.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => !isReadOnly && handleSelfScoreChange(currentItem.competency_id, option.value)}
-                        disabled={isReadOnly || saving}
+                        disabled={isReadOnly || saving || currentItem.self_is_na}
                         className={cn(
                           "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
-                          currentItem.self_score === option.value
+                          currentItem.self_score === option.value && !currentItem.self_is_na
                             ? option.color
                             : "bg-background border-border hover:bg-muted",
-                          isReadOnly && "cursor-not-allowed opacity-60"
+                          (isReadOnly || currentItem.self_is_na) && "cursor-not-allowed opacity-60"
                         )}
                       >
                         {option.label}

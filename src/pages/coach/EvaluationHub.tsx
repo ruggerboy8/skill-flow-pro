@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText, Sparkles, ClipboardPaste } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
@@ -106,6 +106,10 @@ export function EvaluationHub() {
   const [isTranscribingInterview, setIsTranscribingInterview] = useState(false);
   const [transcriptionJustCompletedInterview, setTranscriptionJustCompletedInterview] = useState(false);
   const [analysisJustCompletedInterview, setAnalysisJustCompletedInterview] = useState(false);
+  
+  // Paste transcript dialog state
+  const [showPasteTranscriptDialog, setShowPasteTranscriptDialog] = useState(false);
+  const [pastedTranscript, setPastedTranscript] = useState('');
 
   // Recording state for split recording UI
   const [restoredAudioUrl, setRestoredAudioUrl] = useState<string | null>(null);
@@ -1154,6 +1158,37 @@ export function EvaluationHub() {
     setIsTranscriptExpanded(true);
   }, []);
 
+  // Handler for pasting transcript (bypasses audio recording)
+  const handlePasteTranscript = async () => {
+    if (!evalId || !pastedTranscript.trim()) return;
+    
+    try {
+      // Save the pasted transcript directly
+      await updateInterviewTranscript(evalId, pastedTranscript.trim());
+      setInterviewTranscript(pastedTranscript.trim());
+      
+      // Show transcription complete state and auto-expand transcript
+      setTranscriptionJustCompletedInterview(true);
+      setIsTranscriptExpanded(true);
+      
+      // Close dialog and reset
+      setShowPasteTranscriptDialog(false);
+      setPastedTranscript('');
+      
+      toast({
+        title: 'Transcript Saved',
+        description: 'Review the transcript, then click "Analyze" to extract insights.',
+      });
+    } catch (error) {
+      console.error('Failed to save pasted transcript:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save transcript",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleInterviewTranscriptChange = async (value: string) => {
     if (!evalId) return;
     setInterviewTranscript(value);
@@ -2176,12 +2211,69 @@ export function EvaluationHub() {
                           </div>
                         )}
                       </div>
+                      
+                      {/* Paste Transcript Separator */}
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-background px-2 text-muted-foreground">
+                            or paste existing transcript
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Paste Transcript Button */}
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowPasteTranscriptDialog(true)}
+                        className="w-full gap-2"
+                      >
+                        <ClipboardPaste className="w-4 h-4" />
+                        Paste Transcript
+                      </Button>
                     </>
                   )}
                 </div>
               )}
             </CardContent>
           </Card>
+          
+          {/* Paste Transcript Dialog */}
+          <AlertDialog open={showPasteTranscriptDialog} onOpenChange={setShowPasteTranscriptDialog}>
+            <AlertDialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <ClipboardPaste className="w-5 h-5" />
+                  Paste Interview Transcript
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Paste a transcript from another source (e.g., if you recorded on the wrong tab). 
+                  You can edit it after pasting, then analyze to extract insights.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex-1 overflow-auto py-4">
+                <Textarea
+                  placeholder="Paste the interview transcript here..."
+                  value={pastedTranscript}
+                  onChange={(e) => setPastedTranscript(e.target.value)}
+                  className="min-h-[300px] font-mono text-sm"
+                />
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setPastedTranscript('')}>
+                  Cancel
+                </AlertDialogCancel>
+                <Button
+                  onClick={handlePasteTranscript}
+                  disabled={!pastedTranscript.trim()}
+                >
+                  Save Transcript
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Interview Transcript - Shows after transcription, collapsible */}
           {interviewTranscript && (

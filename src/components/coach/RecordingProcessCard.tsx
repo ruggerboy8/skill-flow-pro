@@ -107,15 +107,46 @@ export function RecordingProcessCard({
             </div>
           </div>
         ) : isPausedWithRecording ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <div className="w-3 h-3 rounded-full bg-amber-500" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">Recording paused</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatTime(recordingState.recordingTime)} recorded
-                </p>
+          <div className="space-y-4">
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-amber-500" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Recording paused</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatTime(recordingState.recordingTime)} recorded
+                  </p>
+                </div>
               </div>
+              
+              {/* Audio preview while paused */}
+              {recordingState.previewUrl && (
+                <div className="flex items-center gap-3 p-2 bg-background/50 rounded-md">
+                  <audio 
+                    ref={audioRef}
+                    src={recordingState.previewUrl}
+                    onEnded={() => setIsPlayingCurrent(false)}
+                    className="hidden"
+                  />
+                  
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0 h-9 w-9 rounded-full"
+                    onClick={toggleCurrentPlayback}
+                  >
+                    {isPlayingCurrent ? (
+                      <Pause className="w-4 h-4" />
+                    ) : (
+                      <Play className="w-4 h-4" />
+                    )}
+                  </Button>
+                  
+                  <p className="text-xs text-muted-foreground flex-1">
+                    Preview your recording before finishing
+                  </p>
+                </div>
+              )}
             </div>
             
             <div className="flex items-center gap-2">

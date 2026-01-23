@@ -356,14 +356,9 @@ export function EvaluationHub() {
 
   // Combined handler: stop recording and immediately process
   const handleFinishAndTranscribe = async () => {
-    // Stop the recording
-    recordingControls.stopRecording();
+    // Stop the recording and get blob directly (avoids stale closure)
+    const audioBlob = await recordingControls.stopAndGetBlob();
     
-    // Brief delay to ensure audioBlob is populated after stopping
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    // Get the audio blob - need to access it after the stop completes
-    const audioBlob = recordingState.audioBlob;
     if (audioBlob) {
       await handleProcessAudio(audioBlob);
     }

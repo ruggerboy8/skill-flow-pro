@@ -6,7 +6,10 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 2000
+// How long a toast should stay visible before auto-dismissing.
+const TOAST_AUTO_DISMISS_DELAY = 2000
+// How long to wait after dismissing before removing from state (allows exit animation).
+const TOAST_REMOVE_DELAY = 1000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -54,6 +57,7 @@ interface State {
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+const toastAutoDismissTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) {
@@ -69,6 +73,26 @@ const addToRemoveQueue = (toastId: string) => {
   }, TOAST_REMOVE_DELAY)
 
   toastTimeouts.set(toastId, timeout)
+}
+
+const addToAutoDismissQueue = (toastId: string, delay = TOAST_AUTO_DISMISS_DELAY) => {
+  if (delay <= 0) return
+  if (toastAutoDismissTimeouts.has(toastId)) return
+
+  const timeout = setTimeout(() => {
+    toastAutoDismissTimeouts.delete(toastId)
+    dispatch({ type: "DISMISS_TOAST", toastId })
+  }, delay)
+
+  toastAutoDismissTimeouts.set(toastId, timeout)
+}
+
+const clearAutoDismissTimeout = (toastId: string) => {
+  const timeout = toastAutoDismissTimeouts.get(toastId)
+  if (timeout) {
+    clearTimeout(timeout)
+    toastAutoDismissTimeouts.delete(toastId)
+  }
 }
 
 export const reducer = (state: State, action: Action): State => {
@@ -93,9 +117,11 @@ export const reducer = (state: State, action: Action): State => {
       // ! Side effects ! - This could be extracted into a dismissToast() action,
       // but I'll keep it here for simplicity
       if (toastId) {
+        clearAutoDismissTimeout(toastId)
         addToRemoveQueue(toastId)
       } else {
         state.toasts.forEach((toast) => {
+          clearAutoDismissTimeout(toast.id)
           addToRemoveQueue(toast.id)
         })
       }
@@ -160,6 +186,9 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+
+  // Auto-dismiss after a short delay.
+  addToAutoDismissQueue(id)
 
   return {
     id: id,

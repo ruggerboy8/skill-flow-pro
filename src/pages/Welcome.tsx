@@ -96,18 +96,21 @@ export default function Welcome() {
             ) : (
               <>
                 <h1 className="text-2xl font-bold text-foreground">
-                  Welcome to the team, {firstName}! 🎉
+                  Welcome, {firstName}! 🎉
                 </h1>
-                {(staffInfo?.roleName || staffInfo?.locationName) && (
-                  <p className="text-muted-foreground">
-                    {staffInfo.roleName && staffInfo.locationName 
-                      ? `You're joining as a ${staffInfo.roleName} at ${staffInfo.locationName}`
-                      : staffInfo.roleName 
-                        ? `You're joining as a ${staffInfo.roleName}`
-                        : `You're joining the ${staffInfo.locationName} team`
-                    }
-                  </p>
-                )}
+                <p className="text-muted-foreground">
+                  {staffInfo?.roleName && staffInfo?.locationName 
+                    ? `We're thrilled to have you as a ${staffInfo.roleName} at ${staffInfo.locationName}.`
+                    : staffInfo?.roleName 
+                      ? `We're thrilled to have you as a ${staffInfo.roleName}.`
+                      : staffInfo?.locationName
+                        ? `We're thrilled to have you on the ${staffInfo.locationName} team.`
+                        : `We're thrilled to have you on board.`
+                  }
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  The Alcan team is here to support your professional growth every step of the way.
+                </p>
               </>
             )}
           </div>
@@ -118,7 +121,7 @@ export default function Welcome() {
           {/* Features */}
           <div className="space-y-4">
             <p className="text-sm font-medium text-center text-muted-foreground">
-              ProMoves helps you:
+              With ProMoves, we'll help you:
             </p>
             <div className="space-y-3">
               {features.map((feature, index) => (

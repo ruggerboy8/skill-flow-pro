@@ -157,8 +157,8 @@ export default function SetupPassword() {
             )}
             <p className="text-muted-foreground text-sm leading-relaxed">
               {staffInfo?.locationName 
-                ? `Your manager at ${staffInfo.locationName} invited you to ProMoves. Let's get you set up with a password.`
-                : "You've been invited to ProMoves. Let's get you set up with a password."
+                ? `We're getting you set up as part of the ${staffInfo.locationName} team! The Alcan team is excited to support your growth. Let's create your password.`
+                : "The Alcan team is excited to support your growth. Let's create your password to get started."
               }
             </p>
           </div>

@@ -15,7 +15,7 @@ interface RecordingProcessCardProps {
   processingStep: string;
   onProcessAudio: (blob: Blob) => void;
   onDiscardRestored: () => void;
-  onStopRecording?: () => void;
+  onFinishAndTranscribe?: () => Promise<void>;
 }
 
 export function RecordingProcessCard({
@@ -28,7 +28,7 @@ export function RecordingProcessCard({
   processingStep,
   onProcessAudio,
   onDiscardRestored,
-  onStopRecording,
+  onFinishAndTranscribe,
 }: RecordingProcessCardProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingRestored, setIsPlayingRestored] = useState(false);
@@ -129,7 +129,7 @@ export function RecordingProcessCard({
                 Keep Recording
               </Button>
               <Button
-                onClick={onStopRecording}
+                onClick={onFinishAndTranscribe}
                 className="gap-2"
               >
                 <Sparkles className="w-4 h-4" />

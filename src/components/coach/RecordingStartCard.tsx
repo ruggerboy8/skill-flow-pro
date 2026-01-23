@@ -12,11 +12,13 @@ interface RecordingStartCardProps {
   onStartRecording: () => void;
   onPauseToggle?: () => void;
   disabled?: boolean;
+  hasDraftRecording?: boolean;
+  isLoadingDraft?: boolean;
 }
 
 export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardProps>(
   function RecordingStartCard(
-    { isRecording, isPaused, recordingTime, isSavingDraft, onStartRecording, onPauseToggle, disabled },
+    { isRecording, isPaused, recordingTime, isSavingDraft, onStartRecording, onPauseToggle, disabled, hasDraftRecording, isLoadingDraft },
     ref
   ) {
     const formatTime = (seconds: number) => {
@@ -24,6 +26,9 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
       const secs = seconds % 60;
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+    
+    // Don't show the "Start" button if there's a draft - user should see RecordingProcessCard instead
+    const showDraftNotice = hasDraftRecording || isLoadingDraft;
 
     return (
       <Card ref={ref} className="mb-6">
@@ -45,7 +50,15 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
               </div>
               <div>
                 <h3 className="font-medium text-sm">Record Your Observations</h3>
-                {isRecording ? (
+                {isLoadingDraft ? (
+                  <p className="text-xs text-muted-foreground">
+                    Loading saved recording...
+                  </p>
+                ) : showDraftNotice ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Draft recording found — scroll down to review
+                  </p>
+                ) : isRecording ? (
                   <p className="text-xs text-muted-foreground">
                     {isPaused ? "Paused" : "Recording"}: {formatTime(recordingTime)}
                   </p>
@@ -65,7 +78,11 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                 </span>
               )}
               
-              {!isRecording && (
+              {isLoadingDraft && (
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              )}
+              
+              {!isRecording && !showDraftNotice && (
                 <Button
                   onClick={onStartRecording}
                   disabled={disabled}

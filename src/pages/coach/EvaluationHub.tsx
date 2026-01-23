@@ -1631,6 +1631,8 @@ export function EvaluationHub() {
               onStartRecording={recordingControls.startRecording}
               onPauseToggle={recordingControls.togglePause}
               disabled={isTranscribingObservation || isAnalyzingObservation}
+              hasDraftRecording={!!restoredAudioUrl}
+              isLoadingDraft={isLoadingDraft}
             />
           )}
           

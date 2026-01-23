@@ -49,15 +49,19 @@ export function FloatingRecorderPill({
         {/* Single toggle button - the indicator IS the button */}
         <button 
           onClick={onPauseToggle}
-          className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-muted/50 transition-colors"
+          className="flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl hover:bg-muted/50 active:scale-95 transition-all cursor-pointer"
         >
+          {/* Large clickable circle indicator */}
           <span
             className={cn(
-              "w-3 h-3 rounded-full",
-              isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"
+              "w-6 h-6 rounded-full shadow-md transition-colors",
+              "ring-2 ring-offset-2 ring-offset-background",
+              isPaused 
+                ? "bg-amber-500 ring-amber-500/50" 
+                : "bg-destructive ring-destructive/50 animate-pulse"
             )}
           />
-          <span className="text-sm font-mono font-medium tabular-nums">
+          <span className="text-sm font-mono font-medium tabular-nums text-muted-foreground">
             {formatTime(recordingTime)}
           </span>
         </button>

@@ -15,6 +15,7 @@ interface RecordingProcessCardProps {
   processingStep: string;
   onProcessAudio: (blob: Blob) => void;
   onDiscardRestored: () => void;
+  onStopRecording?: () => void;
 }
 
 export function RecordingProcessCard({
@@ -27,6 +28,7 @@ export function RecordingProcessCard({
   processingStep,
   onProcessAudio,
   onDiscardRestored,
+  onStopRecording,
 }: RecordingProcessCardProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingRestored, setIsPlayingRestored] = useState(false);
@@ -72,14 +74,11 @@ export function RecordingProcessCard({
     }
   };
 
-  // Don't show if recording is active (controls are in floating pill)
-  if (recordingState.isRecording) {
-    return null;
-  }
-
-  const hasCurrentRecording = !!recordingState.audioBlob;
-  const hasRestoredRecording = !!restoredAudioUrl && !hasCurrentRecording;
-  const showCard = hasCurrentRecording || hasRestoredRecording || isLoadingDraft || isProcessing;
+  // Show when paused (to allow stopping), when stopped with audio, or when processing
+  const isPausedWithRecording = recordingState.isRecording && recordingState.isPaused;
+  const hasCurrentRecording = !!recordingState.audioBlob && !recordingState.isRecording;
+  const hasRestoredRecording = !!restoredAudioUrl && !hasCurrentRecording && !recordingState.isRecording;
+  const showCard = isPausedWithRecording || hasCurrentRecording || hasRestoredRecording || isLoadingDraft || isProcessing;
 
   if (!showCard) {
     return null;
@@ -105,6 +104,37 @@ export function RecordingProcessCard({
             <div>
               <p className="font-medium text-sm">{processingStep}</p>
               <p className="text-xs text-muted-foreground">This may take a moment...</p>
+            </div>
+          </div>
+        ) : isPausedWithRecording ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="w-3 h-3 rounded-full bg-amber-500" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Recording paused</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatTime(recordingState.recordingTime)} recorded
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={recordingControls.togglePause}
+                className="gap-2"
+              >
+                <Play className="w-4 h-4" />
+                Keep Recording
+              </Button>
+              <Button
+                onClick={onStopRecording}
+                className="gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                Finish & Transcribe
+              </Button>
             </div>
           </div>
         ) : hasRestoredRecording ? (

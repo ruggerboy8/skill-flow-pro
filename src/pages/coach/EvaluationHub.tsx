@@ -287,12 +287,22 @@ export function EvaluationHub() {
         throw new Error(transcribeResponse.error.message || 'Transcription failed');
       }
 
-      const transcript = transcribeResponse.data?.transcript;
-      if (!transcript) {
+      const rawTranscript = transcribeResponse.data?.transcript;
+      if (!rawTranscript) {
         throw new Error('No transcript returned');
       }
 
-      // Step 2: Extract insights using extract-insights with source='observation'
+      // Step 2: Format transcript for readability
+      setProcessingStep('Formatting transcript...');
+
+      const formatResponse = await supabase.functions.invoke('format-transcript', {
+        body: { transcript: rawTranscript, source: 'observation' },
+      });
+
+      // Use formatted transcript if available, fallback to raw
+      const transcript = formatResponse.data?.formatted || rawTranscript;
+
+      // Step 3: Extract insights using extract-insights with source='observation'
       setProcessingStep('Extracting insights...');
 
       const extractResponse = await supabase.functions.invoke('extract-insights', {

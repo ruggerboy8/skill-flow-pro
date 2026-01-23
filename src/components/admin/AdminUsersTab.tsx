@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,15 +132,20 @@ export function AdminUsersTab() {
     loadRolesAndLocations();
   }, []);
 
+  // Debounced search as you type
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadUsers(1, searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
   // Re-fetch when filters change
   useEffect(() => {
     loadUsers(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleFilter, locationFilter, superAdminFilter]);
-
-  const handleSearch = () => {
-    loadUsers(1, searchTerm);
-  };
 
   const handleInviteSuccess = () => {
     setInviteDialogOpen(false);
@@ -324,17 +329,14 @@ const handleResetPassword = async (user: User) => {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Search */}
-          <div className="flex space-x-2">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="max-w-md"
+              className="pl-9"
             />
-            <Button onClick={handleSearch} variant="outline">
-              <Search className="h-4 w-4" />
-            </Button>
           </div>
 
           {/* Filters */}

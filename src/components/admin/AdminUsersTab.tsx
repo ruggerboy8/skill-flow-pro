@@ -31,6 +31,7 @@ interface User {
   location_name?: string;
   organization_id?: string;
   is_super_admin: boolean;
+  is_org_admin: boolean;
   is_coach: boolean;
   is_lead: boolean;
   is_participant: boolean;
@@ -242,10 +243,10 @@ const handleResetPassword = async (user: User) => {
     if (user.is_super_admin) {
       indicators.push({ abbr: 'SA', label: 'Super Admin', color: 'bg-red-500 text-white' });
     }
-    if (user.coach_scope_type === 'org') {
+    if (user.is_org_admin) {
       indicators.push({ abbr: 'RM', label: 'Regional Manager', color: 'bg-purple-500 text-white' });
     }
-    if (user.is_coach && user.coach_scope_type !== 'org') {
+    if (user.is_coach && !user.is_org_admin) {
       indicators.push({ abbr: 'C', label: 'Coach', color: 'bg-blue-500 text-white' });
     }
     if (user.is_lead) {

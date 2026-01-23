@@ -1255,13 +1255,13 @@ export function EvaluationHub() {
                       <button
                         key={option.value}
                         onClick={() => !isReadOnly && handleObserverScoreChange(item.competency_id, option.value)}
-                        disabled={isReadOnly || saving || item.observer_is_na}
+                        disabled={isReadOnly || saving}
                         className={cn(
                           "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
                           item.observer_score === option.value && !item.observer_is_na
                             ? option.color
                             : "bg-background border-border hover:bg-muted",
-                          (isReadOnly || item.observer_is_na) && "cursor-not-allowed opacity-60"
+                          isReadOnly && "cursor-not-allowed opacity-60"
                         )}
                       >
                         {option.value}
@@ -1386,13 +1386,13 @@ export function EvaluationHub() {
                       <button
                         key={option.value}
                         onClick={() => !isReadOnly && handleSelfScoreChange(currentItem.competency_id, option.value)}
-                        disabled={isReadOnly || saving || currentItem.self_is_na}
+                        disabled={isReadOnly || saving}
                         className={cn(
                           "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
                           currentItem.self_score === option.value && !currentItem.self_is_na
                             ? option.color
                             : "bg-background border-border hover:bg-muted",
-                          (isReadOnly || currentItem.self_is_na) && "cursor-not-allowed opacity-60"
+                          isReadOnly && "cursor-not-allowed opacity-60"
                         )}
                       >
                         {option.label}

@@ -62,6 +62,7 @@ export function AdminUsersTab() {
   const [organizations, setOrganizations] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [superAdminFilter, setSuperAdminFilter] = useState<string>("all");
@@ -132,15 +133,19 @@ export function AdminUsersTab() {
     loadRolesAndLocations();
   }, []);
 
-  // Re-fetch when filters change
+  // Debounce search term for smooth typing
   useEffect(() => {
-    loadUsers(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFilter, locationFilter, superAdminFilter]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  const handleSearch = () => {
-    loadUsers(1, searchTerm);
-  };
+  // Re-fetch when filters or debounced search change
+  useEffect(() => {
+    loadUsers(1, debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleFilter, locationFilter, superAdminFilter, debouncedSearch]);
 
   const handleInviteSuccess = () => {
     setInviteDialogOpen(false);
@@ -323,18 +328,14 @@ const handleResetPassword = async (user: User) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Search */}
-          <div className="flex space-x-2">
+          {/* Search - filters as you type */}
+          <div>
             <Input
               placeholder="Search by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="max-w-md"
             />
-            <Button onClick={handleSearch} variant="outline">
-              <Search className="h-4 w-4" />
-            </Button>
           </div>
 
           {/* Filters */}

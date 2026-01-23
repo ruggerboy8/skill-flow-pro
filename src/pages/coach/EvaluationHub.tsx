@@ -335,6 +335,13 @@ export function EvaluationHub() {
         throw new Error('No transcript returned');
       }
 
+      if (transcribeResponse.data?.truncated) {
+        toast({
+          title: 'Note: recording trimmed',
+          description: 'This recording was slightly over Whisper’s 25MB limit, so the very end was trimmed to allow transcription.',
+        });
+      }
+
       // Step 2: Format transcript for readability
       setProcessingStep('Formatting transcript...');
 
@@ -1064,6 +1071,13 @@ export function EvaluationHub() {
       const rawTranscript = transcribeData?.transcript;
       if (!rawTranscript) {
         throw new Error('No transcript returned from transcription');
+      }
+
+      if (transcribeData?.truncated) {
+        toast({
+          title: 'Note: recording trimmed',
+          description: 'This recording was slightly over Whisper’s 25MB limit, so the very end was trimmed to allow transcription.',
+        });
       }
       
       // Step 3: Parse the transcript to identify speakers

@@ -1633,6 +1633,7 @@ export function EvaluationHub() {
               disabled={isTranscribingObservation || isAnalyzingObservation}
               hasDraftRecording={!!restoredAudioUrl}
               isLoadingDraft={isLoadingDraft}
+              hasExistingInsights={!!insightsSummary}
             />
           )}
           

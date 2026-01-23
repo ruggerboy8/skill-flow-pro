@@ -1555,6 +1555,7 @@ export function EvaluationHub() {
                 processingStep={processingStep}
                 onProcessAudio={handleProcessAudio}
                 onDiscardRestored={handleDiscardRestoredAudio}
+                onStopRecording={recordingControls.stopRecording}
               />
             </div>
           )}

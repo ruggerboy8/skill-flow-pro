@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,6 +52,7 @@ import { RecordingProcessCard } from '@/components/coach/RecordingProcessCard';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { InterviewRecorder } from '@/components/coach/InterviewRecorder';
 import { useAudioRecording } from '@/hooks/useAudioRecording';
+import { useSidebar } from '@/components/ui/sidebar';
 import ReactQuill from 'react-quill';
 
 const SCORE_OPTIONS = [
@@ -109,6 +110,15 @@ export function EvaluationHub() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [showFloatingPill, setShowFloatingPill] = useState(false);
   const startCardRef = useRef<HTMLDivElement>(null);
+  const processSectionRef = useRef<HTMLDivElement>(null);
+  
+  // Competency tracking for floating pill
+  const competencyRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const [activeCompetencyY, setActiveCompetencyY] = useState<number | null>(null);
+  const [isScrollingFast, setIsScrollingFast] = useState(false);
+  
+  // Sidebar control
+  const { setOpen: setSidebarOpen } = useSidebar();
 
   // Audio recording state - lifted here so it persists across tab switches
   const { state: recordingState, controls: recordingControls } = useAudioRecording();
@@ -163,7 +173,7 @@ export function EvaluationHub() {
     };
   }, [restoredAudioUrl]);
 
-  // IntersectionObserver for floating recorder pill
+  // IntersectionObserver for floating recorder pill visibility
   useEffect(() => {
     if (!recordingState.isRecording) {
       setShowFloatingPill(false);
@@ -184,6 +194,84 @@ export function EvaluationHub() {
     
     return () => observer.disconnect();
   }, [recordingState.isRecording]);
+
+  // IntersectionObserver for competency tracking - "focus zone" in top 30% of viewport
+  useEffect(() => {
+    if (!recordingState.isRecording || !evaluation?.items) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Find the entry most in the "focus zone" (highest intersection ratio)
+        const visible = entries.filter(e => e.isIntersecting);
+        if (visible.length > 0) {
+          const best = visible.reduce((a, b) => 
+            a.intersectionRatio > b.intersectionRatio ? a : b
+          );
+          // Set Y position to align pill with this competency (center of the element)
+          const rect = best.target.getBoundingClientRect();
+          setActiveCompetencyY(rect.top + rect.height / 2);
+        }
+      },
+      { 
+        threshold: [0.2, 0.4, 0.6, 0.8],
+        rootMargin: '-10% 0px -60% 0px' // Focus on top ~30% of viewport
+      }
+    );
+    
+    competencyRefs.current.forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, [recordingState.isRecording, evaluation?.items]);
+
+  // Scroll velocity detection - pull pill back during fast scrolling
+  useEffect(() => {
+    if (!recordingState.isRecording) {
+      setIsScrollingFast(false);
+      return;
+    }
+    
+    let lastScrollY = window.scrollY;
+    let lastTime = performance.now();
+    let rafId: number;
+    let velocityTimeout: ReturnType<typeof setTimeout>;
+    
+    const checkVelocity = () => {
+      const now = performance.now();
+      const delta = Math.abs(window.scrollY - lastScrollY);
+      const timeDelta = now - lastTime;
+      const velocity = timeDelta > 0 ? (delta / timeDelta) * 1000 : 0; // px/s
+      
+      if (velocity > 400) {
+        setIsScrollingFast(true);
+        // Clear any existing timeout
+        clearTimeout(velocityTimeout);
+        // Reset after scroll settles
+        velocityTimeout = setTimeout(() => setIsScrollingFast(false), 150);
+      }
+      
+      lastScrollY = window.scrollY;
+      lastTime = now;
+      rafId = requestAnimationFrame(checkVelocity);
+    };
+    
+    rafId = requestAnimationFrame(checkVelocity);
+    
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(velocityTimeout);
+    };
+  }, [recordingState.isRecording]);
+
+  // Auto-collapse sidebar when recording starts
+  useEffect(() => {
+    if (recordingState.isRecording) {
+      setSidebarOpen(false);
+    }
+  }, [recordingState.isRecording, setSidebarOpen]);
+
+  // Scroll to process section when "Done?" is clicked
+  const scrollToProcessSection = useCallback(() => {
+    processSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   const loadDraftAudio = async (path: string) => {
     setIsLoadingDraft(true);
@@ -1406,6 +1494,9 @@ export function EvaluationHub() {
               isPaused={recordingState.isPaused}
               onPauseToggle={recordingControls.togglePause}
               onStop={recordingControls.stopRecording}
+              activeCompetencyY={activeCompetencyY}
+              isScrollingFast={isScrollingFast}
+              onDoneClick={scrollToProcessSection}
             />
           )}
 
@@ -1428,7 +1519,15 @@ export function EvaluationHub() {
             </CardHeader>
             <CardContent className="space-y-6">
               {evaluation.items.map((item) => (
-                <div key={item.competency_id} className="border rounded-lg p-4 space-y-4">
+                <div 
+                  key={item.competency_id} 
+                  ref={el => {
+                    if (el) competencyRefs.current.set(item.competency_id, el);
+                    else competencyRefs.current.delete(item.competency_id);
+                  }}
+                  data-competency-id={item.competency_id}
+                  className="border rounded-lg p-4 space-y-4"
+                >
                   <div className="flex items-center gap-3 mb-1">
                     <h4 className="font-medium">{item.competency_name_snapshot}</h4>
                     {item.domain_name && (
@@ -1522,17 +1621,19 @@ export function EvaluationHub() {
 
           {/* Recording Process Card at BOTTOM - after all competencies */}
           {!isReadOnly && (
-            <RecordingProcessCard
-              recordingState={recordingState}
-              recordingControls={recordingControls}
-              restoredAudioUrl={restoredAudioUrl}
-              restoredAudioBlob={restoredAudioBlob}
-              isLoadingDraft={isLoadingDraft}
-              isProcessing={isProcessingAudio}
-              processingStep={processingStep}
-              onProcessAudio={handleProcessAudio}
-              onDiscardRestored={handleDiscardRestoredAudio}
-            />
+            <div ref={processSectionRef}>
+              <RecordingProcessCard
+                recordingState={recordingState}
+                recordingControls={recordingControls}
+                restoredAudioUrl={restoredAudioUrl}
+                restoredAudioBlob={restoredAudioBlob}
+                isLoadingDraft={isLoadingDraft}
+                isProcessing={isProcessingAudio}
+                processingStep={processingStep}
+                onProcessAudio={handleProcessAudio}
+                onDiscardRestored={handleDiscardRestoredAudio}
+              />
+            </div>
           )}
         </TabsContent>
 

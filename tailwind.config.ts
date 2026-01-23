@@ -119,12 +119,19 @@ export default {
 				'50%': {
 					boxShadow: '0 0 0 8px rgba(239, 68, 68, 0)'
 				}
+			},
+			'spring-settle': {
+				'0%': { transform: 'translateX(0) scale(1)' },
+				'30%': { transform: 'translateX(-4px) scale(0.98)' },
+				'60%': { transform: 'translateX(2px) scale(1.01)' },
+				'100%': { transform: 'translateX(0) scale(1)' }
 			}
 		},
 		animation: {
 			'accordion-down': 'accordion-down 0.2s ease-out',
 			'accordion-up': 'accordion-up 0.2s ease-out',
-			'pulse-glow': 'pulse-glow 1.5s ease-in-out infinite'
+			'pulse-glow': 'pulse-glow 1.5s ease-in-out infinite',
+			'spring-settle': 'spring-settle 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
 		}
 		}
 	},

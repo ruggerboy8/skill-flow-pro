@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Pause, Play, Square, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,9 @@ interface FloatingRecorderPillProps {
   isPaused: boolean;
   onPauseToggle: () => void;
   onStop: () => void;
+  activeCompetencyY?: number | null;
+  isScrollingFast?: boolean;
+  onDoneClick?: () => void;
 }
 
 export function FloatingRecorderPill({
@@ -18,8 +21,23 @@ export function FloatingRecorderPill({
   isPaused,
   onPauseToggle,
   onStop,
+  activeCompetencyY,
+  isScrollingFast,
+  onDoneClick,
 }: FloatingRecorderPillProps) {
   const isMobile = useIsMobile();
+  const [hasSettled, setHasSettled] = useState(false);
+  const [prevY, setPrevY] = useState<number | null>(null);
+
+  // Track when Y changes to trigger spring animation
+  useEffect(() => {
+    if (activeCompetencyY !== null && activeCompetencyY !== prevY) {
+      setHasSettled(false);
+      const timer = setTimeout(() => setHasSettled(true), 400);
+      setPrevY(activeCompetencyY);
+      return () => clearTimeout(timer);
+    }
+  }, [activeCompetencyY, prevY]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -29,16 +47,30 @@ export function FloatingRecorderPill({
 
   if (!isRecording) return null;
 
+  // Calculate dynamic positioning
+  // Desktop: left side in margin, aligned with active competency
+  // Mobile: bottom center above nav
+  const dynamicStyle: React.CSSProperties = isMobile
+    ? {}
+    : {
+        top: activeCompetencyY != null ? `${activeCompetencyY}px` : '50%',
+        transform: activeCompetencyY != null 
+          ? `translateY(-50%) ${isScrollingFast ? 'translateX(-12px)' : 'translateX(0)'}`
+          : 'translateY(-50%)',
+        transition: 'top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s ease-out',
+      };
+
   return (
     <div
       className={cn(
         "fixed z-50 flex flex-col items-center gap-1",
-        // Desktop: left side, vertically centered
+        // Desktop: left side in margin area
         // Mobile: bottom center, above nav
         isMobile 
           ? "bottom-20 left-1/2 -translate-x-1/2" 
-          : "left-4 top-1/2 -translate-y-1/2"
+          : "left-4"
       )}
+      style={dynamicStyle}
     >
       <div
         className={cn(
@@ -47,7 +79,9 @@ export function FloatingRecorderPill({
           // Pulsing glow when recording, static amber when paused
           isPaused 
             ? "ring-2 ring-amber-500/50" 
-            : "animate-pulse-glow"
+            : "animate-pulse-glow",
+          // Spring animation when settling to new competency
+          !isMobile && !hasSettled && !isScrollingFast && "animate-spring-settle"
         )}
       >
         {/* Recording indicator + time */}
@@ -87,12 +121,17 @@ export function FloatingRecorderPill({
           </Button>
         </div>
 
-        {/* "Done?" hint when paused */}
+        {/* "Done?" clickable pill when paused */}
         {isPaused && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground animate-fade-in">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full text-xs px-3 py-1 h-auto animate-fade-in flex items-center gap-1"
+            onClick={onDoneClick}
+          >
             <span>Done?</span>
             <ChevronDown className="h-3 w-3" />
-          </div>
+          </Button>
         )}
       </div>
     </div>

@@ -1,14 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mic, Play, Pause, RotateCcw, Sparkles, Check, ArrowRight, FileText } from 'lucide-react';
+import { Loader2, Mic, Play, Pause, RotateCcw, Sparkles, Check, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AudioRecordingState, AudioRecordingControls } from '@/hooks/useAudioRecording';
-
-interface InsightsSummary {
-  strengthCount: number;
-  growthCount: number;
-}
 
 interface RecordingProcessCardProps {
   recordingState: AudioRecordingState;
@@ -16,17 +11,14 @@ interface RecordingProcessCardProps {
   restoredAudioUrl: string | null;
   restoredAudioBlob: Blob | null;
   isLoadingDraft: boolean;
-  isProcessing: boolean;
+  isTranscribing: boolean;
   processingStep: string;
-  onProcessAudio: (blob: Blob) => void;
+  onTranscribeAudio: (blob: Blob) => void;
   onDiscardRestored: () => void;
   onFinishAndTranscribe?: () => Promise<void>;
-  // New success state props
-  processingComplete?: boolean;
-  insightsSummary?: InsightsSummary | null;
-  onViewInsights?: () => void;
+  // Transcription complete state
+  transcriptionComplete?: boolean;
   onEditTranscript?: () => void;
-  onDismissSuccess?: () => void;
 }
 
 export function RecordingProcessCard({
@@ -35,16 +27,13 @@ export function RecordingProcessCard({
   restoredAudioUrl,
   restoredAudioBlob,
   isLoadingDraft,
-  isProcessing,
+  isTranscribing,
   processingStep,
-  onProcessAudio,
+  onTranscribeAudio,
   onDiscardRestored,
   onFinishAndTranscribe,
-  processingComplete,
-  insightsSummary,
-  onViewInsights,
+  transcriptionComplete,
   onEditTranscript,
-  onDismissSuccess,
 }: RecordingProcessCardProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingRestored, setIsPlayingRestored] = useState(false);
@@ -78,23 +67,23 @@ export function RecordingProcessCard({
     setIsPlayingCurrent(!isPlayingCurrent);
   };
 
-  const handleProcessCurrent = () => {
+  const handleTranscribeCurrent = () => {
     if (recordingState.audioBlob) {
-      onProcessAudio(recordingState.audioBlob);
+      onTranscribeAudio(recordingState.audioBlob);
     }
   };
 
-  const handleProcessRestored = () => {
+  const handleTranscribeRestored = () => {
     if (restoredAudioBlob) {
-      onProcessAudio(restoredAudioBlob);
+      onTranscribeAudio(restoredAudioBlob);
     }
   };
 
-  // Show when paused (to allow stopping), when stopped with audio, or when processing
+  // Show when paused (to allow stopping), when stopped with audio, or when transcribing
   const isPausedWithRecording = recordingState.isRecording && recordingState.isPaused;
   const hasCurrentRecording = !!recordingState.audioBlob && !recordingState.isRecording;
   const hasRestoredRecording = !!restoredAudioUrl && !hasCurrentRecording && !recordingState.isRecording;
-  const showCard = isPausedWithRecording || hasCurrentRecording || hasRestoredRecording || isLoadingDraft || isProcessing || processingComplete;
+  const showCard = isPausedWithRecording || hasCurrentRecording || hasRestoredRecording || isLoadingDraft || isTranscribing || transcriptionComplete;
 
   if (!showCard) {
     return null;
@@ -105,7 +94,7 @@ export function RecordingProcessCard({
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />
-          {processingComplete ? 'Analysis Complete' : 'Process Recording'}
+          {transcriptionComplete ? 'Transcription Complete' : 'Process Recording'}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -114,7 +103,7 @@ export function RecordingProcessCard({
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Loading saved recording...</p>
           </div>
-        ) : isProcessing ? (
+        ) : isTranscribing ? (
           <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <div>
@@ -122,7 +111,7 @@ export function RecordingProcessCard({
               <p className="text-xs text-muted-foreground">This may take a moment...</p>
             </div>
           </div>
-        ) : processingComplete ? (
+        ) : transcriptionComplete ? (
           <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center shrink-0">
@@ -130,25 +119,18 @@ export function RecordingProcessCard({
               </div>
               <div className="flex-1">
                 <p className="font-medium text-green-800 dark:text-green-200">
-                  Your observation has been analyzed
+                  Your observation has been transcribed
                 </p>
-                {insightsSummary && (insightsSummary.strengthCount > 0 || insightsSummary.growthCount > 0) && (
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    Found {insightsSummary.strengthCount} strength{insightsSummary.strengthCount !== 1 ? 's' : ''} and {insightsSummary.growthCount} growth area{insightsSummary.growthCount !== 1 ? 's' : ''}
-                  </p>
-                )}
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  Review the transcript below, then click "Analyze" to extract insights.
+                </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-2 pt-1 flex-wrap">
-              <Button onClick={onViewInsights} className="gap-2">
-                <Sparkles className="w-4 h-4" />
-                View Insights
-                <ArrowRight className="w-4 h-4" />
-              </Button>
+            <div className="flex items-center gap-2 pt-1">
               <Button variant="outline" size="sm" onClick={onEditTranscript} className="gap-1.5">
                 <FileText className="w-4 h-4" />
-                Edit Transcript
+                Review Transcript
               </Button>
             </div>
           </div>
@@ -197,7 +179,7 @@ export function RecordingProcessCard({
               onClick={onFinishAndTranscribe}
               className="w-full gap-2"
             >
-              <Sparkles className="w-4 h-4" />
+              <FileText className="w-4 h-4" />
               Finish & Transcribe
             </Button>
           </div>
@@ -235,16 +217,18 @@ export function RecordingProcessCard({
               <Button
                 variant="default"
                 size="sm"
-                onClick={handleProcessRestored}
-                disabled={isProcessing}
+                onClick={handleTranscribeRestored}
+                disabled={isTranscribing}
+                className="gap-1.5"
               >
-                Transcribe & Format
+                <FileText className="w-4 h-4" />
+                Transcribe
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onDiscardRestored}
-                disabled={isProcessing}
+                disabled={isTranscribing}
               >
                 <RotateCcw className="w-4 h-4 mr-1" /> Start Fresh
               </Button>
@@ -283,18 +267,18 @@ export function RecordingProcessCard({
             
             <div className="flex items-center gap-2">
               <Button
-                onClick={handleProcessCurrent}
-                disabled={isProcessing}
+                onClick={handleTranscribeCurrent}
+                disabled={isTranscribing}
                 className="gap-2"
               >
-                <Sparkles className="w-4 h-4" />
-                Transcribe & Format
+                <FileText className="w-4 h-4" />
+                Transcribe
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={recordingControls.resetRecording}
-                disabled={isProcessing}
+                disabled={isTranscribing}
               >
                 <RotateCcw className="w-4 h-4 mr-1" /> Re-record
               </Button>

@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
@@ -106,11 +106,13 @@ export function EvaluationHub() {
   const [restoredAudioUrl, setRestoredAudioUrl] = useState<string | null>(null);
   const [restoredAudioBlob, setRestoredAudioBlob] = useState<Blob | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
-  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
+  const [isTranscribingObservation, setIsTranscribingObservation] = useState(false);
+  const [isAnalyzingObservation, setIsAnalyzingObservation] = useState(false);
   const [processingStep, setProcessingStep] = useState<string>('');
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [showFloatingPill, setShowFloatingPill] = useState(false);
-  const [processingJustCompleted, setProcessingJustCompleted] = useState(false);
+  const [transcriptionJustCompleted, setTranscriptionJustCompleted] = useState(false);
+  const [analysisJustCompleted, setAnalysisJustCompleted] = useState(false);
   const startCardRef = useRef<HTMLDivElement>(null);
   const processSectionRef = useRef<HTMLDivElement>(null);
   const transcriptSectionRef = useRef<HTMLDivElement>(null);
@@ -225,14 +227,14 @@ export function EvaluationHub() {
 
   // Handler for View Insights button
   const handleViewInsights = useCallback(() => {
-    setProcessingJustCompleted(false);
+    setAnalysisJustCompleted(false);
     setActiveTab('summary');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   // Handler for Edit Transcript button
   const handleEditTranscript = useCallback(() => {
-    setProcessingJustCompleted(false);
+    setTranscriptionJustCompleted(false);
     transcriptSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
@@ -299,10 +301,11 @@ export function EvaluationHub() {
     }
   };
 
-  const handleProcessAudio = async (audioBlob: Blob) => {
+  // Step 2: Transcribe audio only (no insight extraction)
+  const handleTranscribeObservation = async (audioBlob: Blob) => {
     if (!evalId) return;
     
-    setIsProcessingAudio(true);
+    setIsTranscribingObservation(true);
     setProcessingStep('Transcribing audio...');
 
     try {
@@ -333,11 +336,56 @@ export function EvaluationHub() {
       // Use formatted transcript if available, fallback to raw
       const transcript = formatResponse.data?.formatted || rawTranscript;
 
-      // Step 3: Extract insights using extract-insights with source='observation'
-      setProcessingStep('Extracting insights...');
+      // Save transcript to database
+      handleSummaryTranscriptChange(transcript);
 
+      // Delete draft audio after successful transcription
+      if (draftObservationAudioPath) {
+        await deleteDraftAudio(draftObservationAudioPath);
+        handleDraftAudioCleared();
+      }
+
+      // Reset recording state after successful transcription
+      recordingControls.resetRecording();
+      
+      // Clear restored audio state
+      if (restoredAudioUrl) {
+        URL.revokeObjectURL(restoredAudioUrl);
+        setRestoredAudioUrl(null);
+        setRestoredAudioBlob(null);
+      }
+
+      // Show transcription complete state and auto-expand transcript
+      setTranscriptionJustCompleted(true);
+      setIsObservationTranscriptExpanded(true);
+      
+      toast({
+        title: 'Transcription Complete',
+        description: 'Review and edit the transcript, then click "Analyze" to extract insights.',
+      });
+    } catch (error) {
+      console.error('[EvaluationHub] Transcription error:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to transcribe audio',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTranscribingObservation(false);
+      setProcessingStep('');
+    }
+  };
+
+  // Step 3: Analyze transcript to extract insights (separate from transcription)
+  const handleAnalyzeObservation = async () => {
+    if (!evalId || !summaryRawTranscript) return;
+    
+    setIsAnalyzingObservation(true);
+    setProcessingStep('Extracting insights...');
+
+    try {
       const extractResponse = await supabase.functions.invoke('extract-insights', {
-        body: { transcript, staffName, source: 'observation' },
+        body: { transcript: summaryRawTranscript, staffName, source: 'observation' },
       });
 
       if (extractResponse.error) {
@@ -349,7 +397,7 @@ export function EvaluationHub() {
         throw new Error('No insights returned');
       }
 
-      // Step 3: Save to database - merge with existing insights
+      // Save to database - merge with existing insights
       const updatedInsights: ExtractedInsights = {
         ...evaluation?.extracted_insights,
         observer: insights
@@ -357,50 +405,38 @@ export function EvaluationHub() {
       
       await updateExtractedInsights(evalId, updatedInsights);
 
-      // Step 4: Delete draft audio after successful processing
-      if (draftObservationAudioPath) {
-        await deleteDraftAudio(draftObservationAudioPath);
-        handleDraftAudioCleared();
-      }
-
       // Update local state
       handleSummaryFeedbackChange(insights.summary_html || '');
-      handleSummaryTranscriptChange(transcript);
       setEvaluation(prev => prev ? { ...prev, extracted_insights: updatedInsights } : prev);
 
-      // Reset recording state after successful processing
-      recordingControls.resetRecording();
+      // Show analysis complete state
+      setTranscriptionJustCompleted(false);
+      setAnalysisJustCompleted(true);
       
-      // Clear restored audio state
-      if (restoredAudioUrl) {
-        URL.revokeObjectURL(restoredAudioUrl);
-        setRestoredAudioUrl(null);
-        setRestoredAudioBlob(null);
-      }
-
-      // Show success state and auto-expand transcript
-      setProcessingJustCompleted(true);
-      setIsObservationTranscriptExpanded(true);
+      toast({
+        title: 'Analysis Complete',
+        description: 'Insights have been extracted from your observation.',
+      });
     } catch (error) {
-      console.error('[EvaluationHub] Processing error:', error);
+      console.error('[EvaluationHub] Analysis error:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to process audio',
+        description: error instanceof Error ? error.message : 'Failed to analyze transcript',
         variant: 'destructive',
       });
     } finally {
-      setIsProcessingAudio(false);
+      setIsAnalyzingObservation(false);
       setProcessingStep('');
     }
   };
 
-  // Combined handler: stop recording and immediately process
+  // Combined handler: stop recording and immediately transcribe (not analyze)
   const handleFinishAndTranscribe = async () => {
     // Stop the recording and get blob directly (avoids stale closure)
     const audioBlob = await recordingControls.stopAndGetBlob();
     
     if (audioBlob) {
-      await handleProcessAudio(audioBlob);
+      await handleTranscribeObservation(audioBlob);
     }
   };
 
@@ -1489,7 +1525,7 @@ export function EvaluationHub() {
               isSavingDraft={isSavingDraft}
               onStartRecording={recordingControls.startRecording}
               onPauseToggle={recordingControls.togglePause}
-              disabled={isProcessingAudio}
+              disabled={isTranscribingObservation || isAnalyzingObservation}
             />
           )}
           
@@ -1603,14 +1639,12 @@ export function EvaluationHub() {
                 restoredAudioUrl={restoredAudioUrl}
                 restoredAudioBlob={restoredAudioBlob}
                 isLoadingDraft={isLoadingDraft}
-                isProcessing={isProcessingAudio}
+                isTranscribing={isTranscribingObservation}
                 processingStep={processingStep}
-                onProcessAudio={handleProcessAudio}
+                onTranscribeAudio={handleTranscribeObservation}
                 onDiscardRestored={handleDiscardRestoredAudio}
                 onFinishAndTranscribe={handleFinishAndTranscribe}
-                processingComplete={processingJustCompleted}
-                insightsSummary={insightsSummary}
-                onViewInsights={handleViewInsights}
+                transcriptionComplete={transcriptionJustCompleted}
                 onEditTranscript={handleEditTranscript}
               />
             </div>
@@ -1636,7 +1670,7 @@ export function EvaluationHub() {
               </CardHeader>
               {isObservationTranscriptExpanded && (
                 <CardContent className="pt-0">
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <ReactQuill
                       theme="snow"
                       value={summaryRawTranscript}
@@ -1655,6 +1689,62 @@ export function EvaluationHub() {
                       <p className="text-xs text-muted-foreground">
                         You can edit the transcript above to correct any transcription errors.
                       </p>
+                    )}
+                    
+                    {/* Analyze button - only show if not read-only */}
+                    {!isReadOnly && (
+                      <div className="pt-3 border-t flex items-center justify-between">
+                        {analysisJustCompleted ? (
+                          <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                            <Check className="w-4 h-4" />
+                            <span className="text-sm font-medium">Insights extracted</span>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            Ready to extract insights from your observation?
+                          </p>
+                        )}
+                        <Button 
+                          onClick={handleAnalyzeObservation}
+                          disabled={isAnalyzingObservation || !summaryRawTranscript}
+                          className="gap-2"
+                        >
+                          {isAnalyzingObservation ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : analysisJustCompleted ? (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              Re-analyze
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              Analyze & Extract Insights
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {/* View Insights link after analysis */}
+                    {analysisJustCompleted && insightsSummary && (
+                      <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            <span className="text-sm text-green-800 dark:text-green-200">
+                              Found {insightsSummary.strengthCount} strength{insightsSummary.strengthCount !== 1 ? 's' : ''} and {insightsSummary.growthCount} growth area{insightsSummary.growthCount !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={handleViewInsights} className="gap-1.5">
+                            View Insights
+                            <ArrowRight className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </CardContent>

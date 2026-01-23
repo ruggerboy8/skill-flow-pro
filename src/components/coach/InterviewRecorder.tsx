@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mic, Play, Pause, RotateCcw, Square, Upload, FileAudio } from 'lucide-react';
+import { Loader2, Mic, Play, Pause, RotateCcw, Square, FileAudio, FileText, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -12,8 +11,12 @@ interface InterviewRecorderProps {
   onDraftAudioSaved?: (path: string) => void;
   onDraftAudioCleared?: () => void;
   onRecordingFinalized?: (path: string) => void;
+  onTranscribe?: (audioBlob: Blob) => void;
   hasUploadedRecording?: boolean;
   isReadOnly?: boolean;
+  isTranscribing?: boolean;
+  transcriptionComplete?: boolean;
+  onReviewTranscript?: () => void;
 }
 
 export function InterviewRecorder({
@@ -22,8 +25,12 @@ export function InterviewRecorder({
   onDraftAudioSaved,
   onDraftAudioCleared,
   onRecordingFinalized,
+  onTranscribe,
   hasUploadedRecording = false,
   isReadOnly = false,
+  isTranscribing = false,
+  transcriptionComplete = false,
+  onReviewTranscript,
 }: InterviewRecorderProps) {
   const { toast } = useToast();
   
@@ -309,7 +316,8 @@ export function InterviewRecorder({
     setIsPlaying(!isPlaying);
   };
 
-  const handleUseRecording = async () => {
+  // Finish recording: upload as final, notify parent (no auto-transcription)
+  const handleFinishRecording = async () => {
     const blobToUse = audioBlob || restoredAudioBlob;
     if (!blobToUse) return;
     
@@ -346,8 +354,8 @@ export function InterviewRecorder({
       }
       
       toast({
-        title: 'Success',
-        description: 'Interview recording saved successfully',
+        title: 'Recording Saved',
+        description: 'Click "Transcribe" to convert the audio to text.',
       });
     } catch (error) {
       console.error('Failed to finalize recording:', error);
@@ -358,6 +366,14 @@ export function InterviewRecorder({
       });
     } finally {
       setIsFinalizing(false);
+    }
+  };
+
+  // Trigger transcription via parent callback
+  const handleTranscribe = () => {
+    const blobToUse = audioBlob || restoredAudioBlob;
+    if (blobToUse && onTranscribe) {
+      onTranscribe(blobToUse);
     }
   };
 
@@ -404,6 +420,48 @@ export function InterviewRecorder({
           <Loader2 className="w-5 h-5 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Loading saved recording...</p>
         </div>
+      ) : isTranscribing ? (
+        // Transcription in progress state
+        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            <div>
+              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                Transcribing interview...
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                This may take a minute for longer recordings
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : transcriptionComplete ? (
+        // Transcription complete state
+        <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Check className="w-5 h-5 text-green-600" />
+              <div>
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                  Transcription complete
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  Review and edit the transcript below, then analyze to extract insights.
+                </p>
+              </div>
+            </div>
+            {onReviewTranscript && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onReviewTranscript}
+                className="text-green-700 border-green-300 hover:bg-green-100"
+              >
+                Review Transcript
+              </Button>
+            )}
+          </div>
+        </div>
       ) : hasRestoredAudio ? (
         // Recovery UI for draft recording
         <div className="space-y-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
@@ -439,13 +497,13 @@ export function InterviewRecorder({
             <Button
               variant="default"
               size="sm"
-              onClick={handleUseRecording}
+              onClick={handleFinishRecording}
               disabled={isFinalizing}
             >
               {isFinalizing ? (
                 <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving...</>
               ) : (
-                'Use This Recording'
+                'Finish Recording'
               )}
             </Button>
             <Button
@@ -490,13 +548,13 @@ export function InterviewRecorder({
             <Button
               variant="default"
               size="sm"
-              onClick={handleUseRecording}
+              onClick={handleFinishRecording}
               disabled={isFinalizing}
             >
               {isFinalizing ? (
                 <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving...</>
               ) : (
-                'Use This Recording'
+                'Finish Recording'
               )}
             </Button>
             <Button

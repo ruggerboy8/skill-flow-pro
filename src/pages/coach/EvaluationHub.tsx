@@ -101,6 +101,11 @@ export function EvaluationHub() {
   const [draftObservationAudioPath, setDraftObservationAudioPath] = useState<string | null>(null);
   const [draftInterviewAudioPath, setDraftInterviewAudioPath] = useState<string | null>(null);
   const [showNaConfirmDialog, setShowNaConfirmDialog] = useState(false);
+  
+  // Interview-specific recording flow states (mirrors observation flow)
+  const [isTranscribingInterview, setIsTranscribingInterview] = useState(false);
+  const [transcriptionJustCompletedInterview, setTranscriptionJustCompletedInterview] = useState(false);
+  const [analysisJustCompletedInterview, setAnalysisJustCompletedInterview] = useState(false);
 
   // Recording state for split recording UI
   const [restoredAudioUrl, setRestoredAudioUrl] = useState<string | null>(null);
@@ -1027,13 +1032,13 @@ export function EvaluationHub() {
     }
   };
 
-  // Interview transcription handlers
-  const handleTranscribeAndParse = async () => {
+  // Step 2: Transcribe interview audio only (no insight extraction)
+  const handleTranscribeInterview = async () => {
     if (!evaluation?.audio_recording_path || !evalId) return;
     
+    setIsTranscribingInterview(true);
+
     try {
-      setIsTranscribing(true);
-      
       // Step 1: Download the audio file
       const { data: audioData, error: downloadError } = await supabase.storage
         .from('evaluation-recordings')
@@ -1043,7 +1048,6 @@ export function EvaluationHub() {
       
       // Step 2: Send to transcribe-audio edge function
       const formData = new FormData();
-      // Use correct filename with original extension for Whisper API
       const originalFilename = evaluation.audio_recording_path.split('/').pop() || 'audio.m4a';
       formData.append('audio', audioData, originalFilename);
       
@@ -1057,9 +1061,6 @@ export function EvaluationHub() {
       if (!rawTranscript) {
         throw new Error('No transcript returned from transcription');
       }
-      
-      setIsTranscribing(false);
-      setIsParsing(true);
       
       // Step 3: Parse the transcript to identify speakers
       const { data: parseData, error: parseError } = await supabase.functions.invoke('parse-interview', {
@@ -1077,9 +1078,13 @@ export function EvaluationHub() {
       await updateInterviewTranscript(evalId, parsedTranscript);
       setInterviewTranscript(parsedTranscript);
       
+      // Show transcription complete state and auto-expand transcript
+      setTranscriptionJustCompletedInterview(true);
+      setIsTranscriptExpanded(true);
+      
       toast({
-        title: "Success",
-        description: "Interview transcribed and formatted successfully"
+        title: 'Transcription Complete',
+        description: 'Review and edit the transcript, then click "Analyze" to extract insights.',
       });
     } catch (error) {
       console.error('Transcription/parsing failed:', error);
@@ -1089,10 +1094,65 @@ export function EvaluationHub() {
         variant: "destructive"
       });
     } finally {
-      setIsTranscribing(false);
+      setIsTranscribingInterview(false);
+    }
+  };
+
+  // Step 3: Analyze interview transcript to extract insights (separate from transcription)
+  const handleAnalyzeInterview = async () => {
+    if (!evalId || !interviewTranscript) return;
+    
+    setIsParsing(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('extract-insights', {
+        body: { transcript: interviewTranscript, staffName, source: 'interview' },
+      });
+      
+      if (error) throw error;
+      
+      if (data?.insights) {
+        // Save under self_assessment key
+        const currentInsights = (evaluation?.extracted_insights as any) || {};
+        const updatedInsights = {
+          ...currentInsights,
+          self_assessment: {
+            summary_html: data.insights.summary_html,
+            domain_insights: data.insights.domain_insights
+          }
+        };
+        await updateExtractedInsights(evalId, updatedInsights);
+        setEvaluation(prev => prev ? { ...prev, extracted_insights: updatedInsights } : prev);
+        
+        // Show analysis complete state
+        setTranscriptionJustCompletedInterview(false);
+        setAnalysisJustCompletedInterview(true);
+        
+        toast({ 
+          title: 'Analysis Complete', 
+          description: 'Self-assessment insights have been extracted.' 
+        });
+      }
+    } catch (err) {
+      console.error('Extract insights failed:', err);
+      toast({ title: 'Error', description: 'Failed to extract insights', variant: 'destructive' });
+    } finally {
       setIsParsing(false);
     }
   };
+
+  // Handler for View Insights button (interview)
+  const handleViewInterviewInsights = useCallback(() => {
+    setAnalysisJustCompletedInterview(false);
+    setActiveTab('summary');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Handler for Review Transcript button (interview)
+  const handleReviewInterviewTranscript = useCallback(() => {
+    setTranscriptionJustCompletedInterview(false);
+    setIsTranscriptExpanded(true);
+  }, []);
 
   const handleInterviewTranscriptChange = async (value: string) => {
     if (!evalId) return;
@@ -1944,22 +2004,17 @@ export function EvaluationHub() {
                     </div>
                   </div>
                   
-                  {/* Transcribe Button - Only show when audio exists and not read-only */}
+                  {/* Transcribe Button - Only show when audio exists and not read-only and no transcript yet */}
                   {!isReadOnly && !interviewTranscript && (
                     <Button
-                      onClick={handleTranscribeAndParse}
-                      disabled={isTranscribing || isParsing}
+                      onClick={handleTranscribeInterview}
+                      disabled={isTranscribingInterview}
                       className="w-full"
                     >
-                      {isTranscribing ? (
+                      {isTranscribingInterview ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Transcribing audio...
-                        </>
-                      ) : isParsing ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Identifying speakers...
+                          Transcribing interview...
                         </>
                       ) : (
                         <>
@@ -1970,59 +2025,58 @@ export function EvaluationHub() {
                     </Button>
                   )}
                   
-                  {/* Extract Insights Button - appears after transcript exists */}
-                  {interviewTranscript && !isReadOnly && (
-                    <Button
-                      onClick={async () => {
-                        try {
-                          setIsParsing(true);
-                          const { data, error } = await supabase.functions.invoke('extract-insights', {
-                            body: { transcript: interviewTranscript, staffName, source: 'interview' },
-                          });
-                          if (error) throw error;
-                          if (data?.insights) {
-                            const { updateExtractedInsights } = await import('@/lib/evaluations');
-                            // Save under self_assessment key
-                            const currentInsights = (evaluation?.extracted_insights as any) || {};
-                            const updatedInsights = {
-                              ...currentInsights,
-                              self_assessment: {
-                                summary_html: data.insights.summary_html,
-                                domain_insights: data.insights.domain_insights
-                              }
-                            };
-                            await updateExtractedInsights(evalId!, updatedInsights);
-                            setEvaluation(prev => prev ? { ...prev, extracted_insights: updatedInsights } : prev);
-                            toast({ title: 'Success', description: 'Self-assessment insights extracted' });
-                          }
-                        } catch (err) {
-                          console.error('Extract insights failed:', err);
-                          toast({ title: 'Error', description: 'Failed to extract insights', variant: 'destructive' });
-                        } finally {
-                          setIsParsing(false);
-                        }
-                      }}
-                      disabled={isParsing}
-                      variant={(evaluation?.extracted_insights as any)?.self_assessment ? "outline" : "secondary"}
-                      className="w-full"
-                    >
-                      {isParsing ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Extracting insights...
-                        </>
-                      ) : (evaluation?.extracted_insights as any)?.self_assessment ? (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Regenerate Self-Assessment Insights
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Extract Insights
-                        </>
-                      )}
-                    </Button>
+                  {/* Transcription Complete Success State */}
+                  {transcriptionJustCompletedInterview && (
+                    <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Check className="w-5 h-5 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                              Transcription complete
+                            </p>
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                              Review the transcript below, then analyze to extract insights.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleReviewInterviewTranscript}
+                          className="text-green-700 border-green-300 hover:bg-green-100 dark:text-green-300 dark:border-green-700 dark:hover:bg-green-900"
+                        >
+                          Review Transcript
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Analysis Complete Success State */}
+                  {analysisJustCompletedInterview && (
+                    <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Sparkles className="w-5 h-5 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                              Analysis complete
+                            </p>
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                              Self-assessment insights have been extracted.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleViewInterviewInsights}
+                          className="text-green-700 border-green-300 hover:bg-green-100 dark:text-green-300 dark:border-green-700 dark:hover:bg-green-900"
+                        >
+                          View Insights
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : (
@@ -2149,7 +2203,7 @@ export function EvaluationHub() {
               </CardHeader>
               {isTranscriptExpanded && (
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <ReactQuill
                       theme="snow"
                       value={interviewTranscript}
@@ -2168,6 +2222,34 @@ export function EvaluationHub() {
                       <p className="text-xs text-muted-foreground">
                         You can edit the transcript above to correct any transcription errors.
                       </p>
+                    )}
+                    
+                    {/* Analyze & Extract Insights Button - moved here from recording card */}
+                    {!isReadOnly && (
+                      <div className="pt-4 border-t flex justify-end">
+                        <Button
+                          onClick={handleAnalyzeInterview}
+                          disabled={isParsing}
+                          className="gap-2"
+                        >
+                          {isParsing ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Extracting insights...
+                            </>
+                          ) : (evaluation?.extracted_insights as any)?.self_assessment ? (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              Re-analyze Transcript
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              Analyze & Extract Insights
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </CardContent>

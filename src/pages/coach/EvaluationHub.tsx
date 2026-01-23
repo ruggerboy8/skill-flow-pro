@@ -335,11 +335,9 @@ export function EvaluationHub() {
         throw new Error('No transcript returned');
       }
 
-      if (transcribeResponse.data?.truncated) {
-        toast({
-          title: 'Note: recording trimmed',
-          description: 'This recording was slightly over Whisper’s 25MB limit, so the very end was trimmed to allow transcription.',
-        });
+      // Log which service was used for debugging
+      if (transcribeResponse.data?.service === 'elevenlabs') {
+        console.log('[EvaluationHub] Large file transcribed using ElevenLabs');
       }
 
       // Step 2: Format transcript for readability
@@ -1073,11 +1071,9 @@ export function EvaluationHub() {
         throw new Error('No transcript returned from transcription');
       }
 
-      if (transcribeData?.truncated) {
-        toast({
-          title: 'Note: recording trimmed',
-          description: 'This recording was slightly over Whisper’s 25MB limit, so the very end was trimmed to allow transcription.',
-        });
+      // Log which service was used for debugging
+      if (transcribeData?.service === 'elevenlabs') {
+        console.log('[EvaluationHub] Large interview file transcribed using ElevenLabs');
       }
       
       // Step 3: Parse the transcript to identify speakers

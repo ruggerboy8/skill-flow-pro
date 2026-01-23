@@ -78,8 +78,8 @@ export interface EvalDistributionRow {
   role_name: string;
   staff_id: string;
   staff_name: string;
-  evaluation_id: string;
-  evaluation_status: string;
+  evaluation_id: string | null;
+  evaluation_status: string | null;
   n_items: number;
   obs_top_box: number;
   obs_bottom_box: number;

@@ -40,8 +40,9 @@ export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsT
   // Aggregate by staff
   const staffRows = aggregateByStaff(data);
   
-  // Get unique domains for columns - sorted by canonical order
+  // Get unique domains for columns - sorted by canonical order (exclude placeholder)
   const domains = [...new Set(data.map(r => r.domain_name))]
+    .filter(d => d !== '__placeholder__')
     .sort((a, b) => getDomainOrderIndex(a) - getDomainOrderIndex(b));
   
   // Filter if needed
@@ -234,6 +235,11 @@ function aggregateByStaff(rows: EvalDistributionRow[]): StaffRowV2[] {
 
     const staff = staffMap.get(row.staff_id)!;
     
+    // Skip placeholder rows (staff without evals)
+    if (row.domain_name === '__placeholder__') {
+      continue;
+    }
+    
     // Add domain data
     staff.domains[row.domain_name] = {
       obsTopBox: row.obs_top_box,
@@ -271,8 +277,13 @@ function aggregateByStaff(rows: EvalDistributionRow[]): StaffRowV2[] {
     });
   }
 
-  // Sort by name
-  result.sort((a, b) => a.staffName.localeCompare(b.staffName));
+  // Sort: staff without evals first, then by name
+  result.sort((a, b) => {
+    const aHasEval = a.evaluationId !== null;
+    const bHasEval = b.evaluationId !== null;
+    if (aHasEval !== bHasEval) return aHasEval ? 1 : -1;
+    return a.staffName.localeCompare(b.staffName);
+  });
   
   return result;
 }

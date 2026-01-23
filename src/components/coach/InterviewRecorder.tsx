@@ -503,7 +503,7 @@ export function InterviewRecorder({
               {isFinalizing ? (
                 <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving...</>
               ) : (
-                'Finish Recording'
+                'Save Recording'
               )}
             </Button>
             <Button
@@ -554,7 +554,7 @@ export function InterviewRecorder({
               {isFinalizing ? (
                 <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving...</>
               ) : (
-                'Finish Recording'
+                'Save Recording'
               )}
             </Button>
             <Button

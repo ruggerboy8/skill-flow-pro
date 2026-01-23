@@ -108,6 +108,17 @@ export function RecordingProcessCard({
           </div>
         ) : isPausedWithRecording ? (
           <div className="space-y-4">
+            {/* Coaching context */}
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">Observation starters:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-xs">
+                <li>"I liked when you..."</li>
+                <li>"Don't forget to..."</li>
+                <li>"Instead of ___, try..."</li>
+                <li>"I noticed that when ___, you..."</li>
+              </ul>
+            </div>
+
             <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-amber-500" />
@@ -143,25 +154,14 @@ export function RecordingProcessCard({
                   </Button>
                   
                   <p className="text-xs text-muted-foreground flex-1">
-                    Preview your recording before finishing
+                    Preview your recording
                   </p>
                 </div>
               )}
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={recordingControls.togglePause}
-                className="gap-2"
-              >
-                <Play className="w-4 h-4" />
-                Keep Recording
-              </Button>
+              
               <Button
                 onClick={onFinishAndTranscribe}
-                className="gap-2"
+                className="w-full gap-2"
               >
                 <Sparkles className="w-4 h-4" />
                 Finish & Transcribe

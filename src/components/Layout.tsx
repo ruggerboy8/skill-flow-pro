@@ -7,6 +7,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoleRefresh } from '@/hooks/useRoleRefresh';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useRoutePersistence } from '@/hooks/useRoutePersistence';
 import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
@@ -27,6 +28,9 @@ export default function Layout() {
   const isLead = isMasquerading ? (staffProfile?.is_lead || false) : authIsLead;
   const location = useLocation();
   const { toast } = useToast();
+  
+  // Persist and restore route on page refresh
+  useRoutePersistence();
 
   // Monitor for role changes and refresh automatically
   useRoleRefresh(user?.id || null, {

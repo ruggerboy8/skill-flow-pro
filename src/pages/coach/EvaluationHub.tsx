@@ -97,6 +97,7 @@ export function EvaluationHub() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
+  const [isObservationTranscriptExpanded, setIsObservationTranscriptExpanded] = useState(false);
   const [draftObservationAudioPath, setDraftObservationAudioPath] = useState<string | null>(null);
   const [draftInterviewAudioPath, setDraftInterviewAudioPath] = useState<string | null>(null);
   const [showNaConfirmDialog, setShowNaConfirmDialog] = useState(false);
@@ -350,6 +351,21 @@ export function EvaluationHub() {
     } finally {
       setIsProcessingAudio(false);
       setProcessingStep('');
+    }
+  };
+
+  // Combined handler: stop recording and immediately process
+  const handleFinishAndTranscribe = async () => {
+    // Stop the recording
+    recordingControls.stopRecording();
+    
+    // Brief delay to ensure audioBlob is populated after stopping
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Get the audio blob - need to access it after the stop completes
+    const audioBlob = recordingState.audioBlob;
+    if (audioBlob) {
+      await handleProcessAudio(audioBlob);
     }
   };
 
@@ -1437,6 +1453,7 @@ export function EvaluationHub() {
               recordingTime={recordingState.recordingTime}
               isSavingDraft={isSavingDraft}
               onStartRecording={recordingControls.startRecording}
+              onPauseToggle={recordingControls.togglePause}
               disabled={isProcessingAudio}
             />
           )}
@@ -1555,9 +1572,55 @@ export function EvaluationHub() {
                 processingStep={processingStep}
                 onProcessAudio={handleProcessAudio}
                 onDiscardRestored={handleDiscardRestoredAudio}
-                onStopRecording={recordingControls.stopRecording}
+                onFinishAndTranscribe={handleFinishAndTranscribe}
               />
             </div>
+          )}
+
+          {/* Observation Transcript Card - collapsible like interview transcript */}
+          {summaryRawTranscript && (
+            <Card className="mt-6">
+              <CardHeader 
+                className="cursor-pointer select-none py-3"
+                onClick={() => setIsObservationTranscriptExpanded(!isObservationTranscriptExpanded)}
+              >
+                <CardTitle className="text-base flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Observation Transcript
+                  </div>
+                  <ChevronRight className={cn(
+                    "w-5 h-5 transition-transform text-muted-foreground",
+                    isObservationTranscriptExpanded && "rotate-90"
+                  )} />
+                </CardTitle>
+              </CardHeader>
+              {isObservationTranscriptExpanded && (
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    <ReactQuill
+                      theme="snow"
+                      value={summaryRawTranscript}
+                      onChange={handleSummaryTranscriptChange}
+                      readOnly={isReadOnly}
+                      className="bg-background [&_.ql-editor]:min-h-[100px]"
+                      modules={{
+                        toolbar: isReadOnly ? false : [
+                          ['bold', 'italic'],
+                          [{ 'list': 'bullet' }],
+                          ['clean']
+                        ]
+                      }}
+                    />
+                    {!isReadOnly && (
+                      <p className="text-xs text-muted-foreground">
+                        You can edit the transcript above to correct any transcription errors.
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
           )}
         </TabsContent>
 

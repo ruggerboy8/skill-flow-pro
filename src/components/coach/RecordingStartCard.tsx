@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mic, Loader2 } from 'lucide-react';
+import { Mic, Loader2, Pause, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface RecordingStartCardProps {
@@ -10,12 +10,13 @@ interface RecordingStartCardProps {
   recordingTime: number;
   isSavingDraft: boolean;
   onStartRecording: () => void;
+  onPauseToggle?: () => void;
   disabled?: boolean;
 }
 
 export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardProps>(
   function RecordingStartCard(
-    { isRecording, isPaused, recordingTime, isSavingDraft, onStartRecording, disabled },
+    { isRecording, isPaused, recordingTime, isSavingDraft, onStartRecording, onPauseToggle, disabled },
     ref
   ) {
     const formatTime = (seconds: number) => {
@@ -78,18 +79,43 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
               )}
 
               {isRecording && (
-                <span className={cn(
-                  "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium",
-                  isPaused 
-                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
-                    : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200"
-                )}>
+                <div className="flex items-center gap-2">
+                  {/* Status badge */}
                   <span className={cn(
-                    "w-2 h-2 rounded-full",
-                    isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"
-                  )} />
-                  {isPaused ? "Paused" : "Recording"}
-                </span>
+                    "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium",
+                    isPaused 
+                      ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                      : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200"
+                  )}>
+                    <span className={cn(
+                      "w-2 h-2 rounded-full",
+                      isPaused ? "bg-amber-500" : "bg-red-500 animate-pulse"
+                    )} />
+                    {isPaused ? "Paused" : "Recording"}
+                  </span>
+                  
+                  {/* Pause/Resume button - always visible when recording */}
+                  {onPauseToggle && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onPauseToggle}
+                      className="gap-1.5"
+                    >
+                      {isPaused ? (
+                        <>
+                          <Play className="w-4 h-4" />
+                          Resume
+                        </>
+                      ) : (
+                        <>
+                          <Pause className="w-4 h-4" />
+                          Pause
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           </div>

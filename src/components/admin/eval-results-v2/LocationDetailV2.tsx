@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,13 @@ interface LocationDetailV2Props {
   onBack: () => void;
 }
 
+interface LocationStaff {
+  id: string;
+  name: string;
+  role_id: number | null;
+  role_name: string | null;
+}
+
 export function LocationDetailV2({ filters, locationId, locationName, onBack }: LocationDetailV2Props) {
   const { organizationId, evaluationPeriod, roleIds } = filters;
   
@@ -33,6 +40,36 @@ export function LocationDetailV2({ filters, locationId, locationName, onBack }: 
   const types = evaluationPeriod.type === 'Baseline' ? ['Baseline'] : ['Quarterly'];
   const quarter = evaluationPeriod.type === 'Quarterly' ? evaluationPeriod.quarter : null;
   
+  // Fetch all active staff for this location (excluding paused)
+  const { data: locationStaff } = useQuery({
+    queryKey: ['location-staff', locationId, roleIds],
+    queryFn: async () => {
+      let query = supabase
+        .from('staff')
+        .select('id, name, role_id, roles:roles!staff_role_id_fkey(role_name)')
+        .eq('primary_location_id', locationId)
+        .eq('is_participant', true)
+        .eq('is_paused', false)
+        .eq('is_org_admin', false);
+      
+      if (roleIds.length > 0) {
+        query = query.in('role_id', roleIds);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      return (data || []).map(s => ({
+        id: s.id,
+        name: s.name,
+        role_id: s.role_id,
+        role_name: (s.roles as any)?.role_name || null
+      })) as LocationStaff[];
+    },
+    enabled: !!locationId
+  });
+  
+  // Fetch evaluation data
   const { data: rawData, isLoading, error } = useQuery({
     queryKey: ['eval-distribution-location-detail', organizationId, locationId, evaluationPeriod, roleIds],
     queryFn: async () => {
@@ -50,6 +87,40 @@ export function LocationDetailV2({ filters, locationId, locationName, onBack }: 
     },
     enabled: !!organizationId && !!locationId
   });
+
+  // Merge: all location staff + evaluation data
+  const mergedData = useMemo(() => {
+    if (!locationStaff) return rawData || [];
+    
+    // Get staff IDs that have evaluation data
+    const staffWithEvals = new Set((rawData || []).map(r => r.staff_id));
+    
+    // Create placeholder rows for staff without evals
+    const placeholderRows: EvalDistributionRow[] = locationStaff
+      .filter(s => !staffWithEvals.has(s.id))
+      .map(s => ({
+        staff_id: s.id,
+        staff_name: s.name,
+        role_id: s.role_id || 0,
+        role_name: s.role_name || 'Unknown',
+        location_id: locationId,
+        location_name: locationName,
+        domain_id: 0,
+        domain_name: '__placeholder__', // Special marker for no eval
+        evaluation_id: null,
+        evaluation_status: null,
+        obs_top_box: 0,
+        obs_bottom_box: 0,
+        self_top_box: 0,
+        self_bottom_box: 0,
+        mismatch_count: 0,
+        obs_mean: null,
+        self_mean: null,
+        n_items: 0
+      }));
+    
+    return [...(rawData || []), ...placeholderRows];
+  }, [rawData, locationStaff, locationId, locationName]);
 
   if (isLoading) {
     return (
@@ -107,8 +178,8 @@ export function LocationDetailV2({ filters, locationId, locationName, onBack }: 
         </CardHeader>
         <CardContent>
           <StaffResultsTableV2 
-            data={rawData || []} 
-            filters={filters} 
+            data={mergedData} 
+            filters={filters}
             onRowClick={(staffId, staffName, evaluationId) => setDrawerState({ open: true, staffId, staffName, evaluationId })}
           />
         </CardContent>

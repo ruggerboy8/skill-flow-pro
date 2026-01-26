@@ -11,7 +11,7 @@ import { useRoutePersistence } from '@/hooks/useRoutePersistence';
 import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
-import { Home, BarChart3, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2 } from 'lucide-react';
+import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2 } from 'lucide-react';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -54,10 +54,9 @@ export default function Layout() {
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
-    // My Role & Stats hidden for regional admins (org admins) - they use coach/admin tools
+    // My Role hidden for regional admins (org admins) - they use coach/admin tools
     ...(!isOrgAdmin ? [
       { name: 'My Role', href: '/my-role', icon: BookOpen },
-      { name: 'Stats', href: '/stats', icon: BarChart3 },
     ] : []),
     // My Location for Office Managers (view-only access to their location)
     ...(showLocationDashboard ? [

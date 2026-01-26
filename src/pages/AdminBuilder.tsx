@@ -72,9 +72,10 @@ export default function AdminBuilder() {
       </div>
 
       <Tabs defaultValue="dfi-planner" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="dfi-planner">DFI Planner</TabsTrigger>
           <TabsTrigger value="rda-planner">RDA Planner</TabsTrigger>
+          <TabsTrigger value="om-planner">OM Planner</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
         </TabsList>
@@ -85,6 +86,10 @@ export default function AdminBuilder() {
 
         <TabsContent value="rda-planner" className="space-y-6">
           <PlannerTabContent roleId={2} roleName="RDA" />
+        </TabsContent>
+
+        <TabsContent value="om-planner" className="space-y-6">
+          <PlannerTabContent roleId={3} roleName="Office Manager" />
         </TabsContent>
 
         <TabsContent value="onboarding" className="space-y-6">
@@ -112,6 +117,19 @@ export default function AdminBuilder() {
               </CardHeader>
               <CardContent className="pt-6">
                 <SimpleFocusBuilder roleFilter={2} />
+              </CardContent>
+            </Card>
+
+            {/* Office Manager Section */}
+            <Card>
+              <CardHeader className="bg-muted/30">
+                <h2 className="text-lg font-semibold">Office Manager Onboarding Builder</h2>
+                <p className="text-sm text-muted-foreground">
+                  Configure week-by-week pro-move assignments for Office Manager onboarding (Cycles 1–3)
+                </p>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <SimpleFocusBuilder roleFilter={3} />
               </CardContent>
             </Card>
           </div>

@@ -17,6 +17,7 @@ export interface StaffProfile {
   is_participant: boolean;
   is_coach: boolean;
   is_lead: boolean;
+  is_office_manager: boolean;
   is_paused: boolean;
   paused_at: string | null;
   pause_reason: string | null;
@@ -66,6 +67,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           is_participant,
           is_coach,
           is_lead,
+          is_office_manager,
           is_paused,
           paused_at,
           pause_reason,

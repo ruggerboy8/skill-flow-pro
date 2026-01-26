@@ -1169,6 +1169,7 @@ export type Database = {
           id: string
           is_coach: boolean
           is_lead: boolean
+          is_office_manager: boolean
           is_org_admin: boolean
           is_participant: boolean
           is_paused: boolean
@@ -1196,6 +1197,7 @@ export type Database = {
           id?: string
           is_coach?: boolean
           is_lead?: boolean
+          is_office_manager?: boolean
           is_org_admin?: boolean
           is_participant?: boolean
           is_paused?: boolean
@@ -1223,6 +1225,7 @@ export type Database = {
           id?: string
           is_coach?: boolean
           is_lead?: boolean
+          is_office_manager?: boolean
           is_org_admin?: boolean
           is_participant?: boolean
           is_paused?: boolean
@@ -2479,6 +2482,7 @@ export type Database = {
           weekly_focus_id: string
         }[]
       }
+      get_office_manager_location_id: { Args: never; Returns: string }
       get_performance_trend: {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json
@@ -2751,6 +2755,10 @@ export type Database = {
           hire_date: string
           onboarding_weeks: number
         }
+        Returns: boolean
+      }
+      is_office_manager_for_location: {
+        Args: { loc_id: string }
         Returns: boolean
       }
       is_org_allowed_for_sequencing: {

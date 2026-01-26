@@ -43,7 +43,7 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
           )}
         </div>
         <div className="text-xs text-muted-foreground">
-          {data.staffWithEval} Evaluated ({data.rdaCount} RDA | {data.dfiCount} DFI)
+          {data.staffWithEval} Evaluated ({data.rdaCount} RDA | {data.dfiCount} DFI{data.omCount > 0 ? ` | ${data.omCount} OM` : ''})
         </div>
       </CardHeader>
       

@@ -1,6 +1,6 @@
 // Core types for the sequencer ranking system
 
-export type RoleId = 1 | 2; // 1=DFI, 2=RDA
+export type RoleId = 1 | 2 | 3; // 1=DFI, 2=RDA, 3=Office Manager
 
 export interface RankRequest {
   roleId: RoleId;

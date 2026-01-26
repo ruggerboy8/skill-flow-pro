@@ -76,15 +76,35 @@ export default function RegionalDashboard() {
     
     const stats: LocationStats[] = Array.from(byLocation.entries()).map(([locId, staff]) => {
       const locStats = calculateLocationStats(staff, gates);
+      const excuseStatus = getExcuseStatus(locId);
+      
+      // Adjust stats based on excuse status
+      let adjustedMissingConf = locStats.missingConfCount;
+      let adjustedMissingPerf = locStats.missingPerfCount;
+      let adjustedPendingConf = locStats.pendingConfCount;
+      let adjustedSubmissionRate = locStats.submissionRate;
+      
+      if (excuseStatus.isConfExcused) {
+        adjustedMissingConf = 0;
+        adjustedPendingConf = 0;
+      }
+      if (excuseStatus.isPerfExcused) {
+        adjustedMissingPerf = 0;
+      }
+      
+      // If fully excused, show 100%
+      if (excuseStatus.isConfExcused && excuseStatus.isPerfExcused) {
+        adjustedSubmissionRate = 100;
+      }
       
       return {
         id: locId,
         name: staff[0]?.location_name || 'Unknown',
         staffCount: locStats.staffCount,
-        submissionRate: locStats.submissionRate,
-        missingConfCount: locStats.missingConfCount,
-        missingPerfCount: locStats.missingPerfCount,
-        pendingConfCount: locStats.pendingConfCount,
+        submissionRate: adjustedSubmissionRate,
+        missingConfCount: adjustedMissingConf,
+        missingPerfCount: adjustedMissingPerf,
+        pendingConfCount: adjustedPendingConf,
       };
     });
 

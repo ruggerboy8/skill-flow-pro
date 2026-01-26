@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
+import { useLocationExcuses } from '@/hooks/useLocationExcuses';
 import { LocationHealthCard, LocationStats } from '@/components/dashboard/LocationHealthCard';
 import { LocationSkillGaps } from '@/components/dashboard/LocationSkillGaps';
 import LocationSubmissionWidget from '@/components/dashboard/LocationSubmissionWidget';
@@ -37,6 +38,24 @@ export default function LocationDetail({
   const weekOf = formatInTimeZone(anchors.mondayZ, CT_TZ, 'yyyy-MM-dd');
   
   const { summaries, loading, error } = useStaffWeeklyScores({ weekOf });
+  
+  // Location excuses
+  const { getExcuseStatus } = useLocationExcuses(weekOf);
+  const excuseStatus = useMemo(() => 
+    locationId ? getExcuseStatus(locationId) : null, 
+    [getExcuseStatus, locationId]
+  );
+  
+  // Submission gates for contextual display
+  const submissionGates = useMemo(() => {
+    const gates = getSubmissionGates(now, anchors);
+    return {
+      confidenceOpen: true,
+      confidenceClosed: gates.isPastConfidenceDeadline,
+      performanceOpen: gates.isPerformanceOpen,
+      performanceClosed: false,
+    };
+  }, [now, anchors]);
 
   // Filter to just this location and compute stats
   const { locationStaff, locationStats, locationName } = useMemo(() => {
@@ -128,7 +147,11 @@ export default function LocationDetail({
           {/* Health Card - click disabled */}
           <div className="pointer-events-none">
             {locationStats ? (
-              <LocationHealthCard stats={locationStats} />
+              <LocationHealthCard 
+                stats={locationStats} 
+                excuseStatus={excuseStatus ?? undefined}
+                submissionGates={submissionGates}
+              />
             ) : (
               <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">

@@ -1,198 +1,203 @@
 
-# Enhanced Location Excuse System
 
-## Overview
+# Location Excuse System: Complete Data Waterfall Fix
 
-Replace the current three-dot dropdown menu on location cards with a centralized "Excuse Submissions" button in the dashboard header. This button opens a wizard dialog that allows org managers and super admins to:
+## Problem Analysis
 
-1. Select a specific week (not just current week)
-2. Multi-select locations they oversee
-3. Choose which metric(s) to excuse (Confidence, Performance, or both)
-4. View existing excuses for selected locations
-5. Optionally add a reason (e.g., "Weather closure")
+When a location is marked as "Excused", the system currently:
+- Shows excuse badges on the `LocationHealthCard` in the Regional Dashboard
+- Updates `get_staff_submission_windows` RPC to exclude excused location/week/metric combinations from historical rates
 
----
-
-## UI Changes
-
-### 1. Regional Dashboard Header
-
-Add an "Excuse Submissions" button next to the location count badge:
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ Regional Command Center                                             │
-│ Week of Jan 27, 2025                              [3 Locations]     │
-│                                          [Excuse Submissions]       │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-The button only appears for users with `canManageExcuses` (super admin or org admin).
-
-### 2. Excuse Submissions Dialog (Wizard)
-
-A dialog with the following sections:
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ Excuse Submissions                                              [X] │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│ Week                                                                │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ [◄] Week of Jan 27, 2025                                    [►] │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                     │
-│ Locations                                                           │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ [South Phoenix ✕] [Mesa ✕]              Select locations...     │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                     │
-│ Metrics to Excuse                                                   │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ [✓] Confidence                                                  │ │
-│ │ [✓] Performance                                                 │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                     │
-│ Reason (optional)                                                   │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ Weather closure - ice storm                                     │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                     │
-│ ─────────────────────────────────────────────────────────────────── │
-│                                                                     │
-│ Current Status for Selected Week:                                   │
-│ ┌─────────────────────────────────────────────────────────────────┐ │
-│ │ South Phoenix:   [Conf ✓] [Perf ✓]  ← Already fully excused     │ │
-│ │ Mesa:            [Conf ✓] [Perf —]  ← Conf excused only         │ │
-│ │ Gilbert:         [Conf —] [Perf —]  ← No excuses                │ │
-│ └─────────────────────────────────────────────────────────────────┘ │
-│                                                                     │
-│                               [Cancel]  [Apply Excuses]             │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### 3. LocationHealthCard Updates
-
-- **Remove**: Three-dot dropdown menu and all excuse toggle callbacks
-- **Keep**: Visual badges showing excuse status
-- **Enhance**: Show contextual badge based on submission period:
-  - Before Tuesday 2pm (confidence period): Show "Conf Excused: Weather" if confidence is excused
-  - After Thursday (performance period): Show "Perf Excused: Weather" if performance is excused
-  - If both excused: Show "Excused: Weather" (single badge)
+However, the system **fails** to:
+1. **Filter the staff roster display** - Staff at excused locations still show as "Missing" in the embedded `CoachDashboardV2` table on the `LocationDetail` page
+2. **Update the Location Detail page summary stats** - The `LocationHealthCard` on the detail page doesn't receive excuse status
+3. **Adjust the Coach Dashboard calculations** - Missing counts, reminder buttons, and sorting still treat excused staff as incomplete
+4. **Show contextual "Excused" badges per staff member** - Instead of "Missing", staff should show "Excused" for the relevant metric
 
 ---
 
-## Component Changes
+## Complete Data Flow (Current vs. Expected)
 
-### New Component: `ExcuseSubmissionsDialog.tsx`
-
-Located at: `src/components/dashboard/ExcuseSubmissionsDialog.tsx`
-
-Features:
-- Week navigation with chevron buttons (prev/next week)
-- MultiSelect for locations (filtered to managed locations)
-- Checkboxes for Confidence and Performance
-- Optional reason text input
-- Real-time status display showing existing excuses for selected week
-- Submit button that creates/updates excuses in batch
-
-### Modified: `LocationHealthCard.tsx`
-
-- Remove dropdown menu imports and code
-- Remove excuse action props (`onToggleExcuse`, `onExcuseBoth`, `onRemoveAllExcuses`)
-- Keep `excuseStatus` prop for display purposes
-- Add `submissionGates` prop to show contextual badges
-- Update badge logic to show reason and be period-aware
-
-### Modified: `RegionalDashboard.tsx`
-
-- Add dialog state management
-- Add "Excuse Submissions" button in header (conditionally rendered)
-- Remove per-card excuse handlers
-- Pass `submissionGates` to each LocationHealthCard
-
-### Modified: `useLocationExcuses.tsx`
-
-- Update to accept optional `weekOf` parameter (for fetching any week)
-- Add new mutation: `bulkExcuseLocations` for batch operations
-- Keep existing query logic but make it more flexible
-
----
-
-## Data Flow
-
-```
-User clicks "Excuse Submissions"
-        ↓
-Dialog opens with current week selected
-        ↓
-User selects week (can navigate to past weeks)
-        ↓
-Dialog fetches excused_locations for that week
-        ↓
-User multi-selects locations
-        ↓
-Status panel shows which are already excused
-        ↓
-User checks Confidence/Performance boxes
-        ↓
-User clicks "Apply Excuses"
-        ↓
-Batch INSERT into excused_locations (skip already-excused)
-        ↓
-Cache invalidation → UI updates
+```text
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ EXCUSE CREATED IN excused_locations TABLE                                     │
+│ (location_id, week_of, metric='confidence'|'performance', reason)             │
+└───────────────────────────────────────────────────────────────────────────────┘
+                                      │
+           ┌──────────────────────────┼──────────────────────────┐
+           ▼                          ▼                          ▼
+┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
+│ HISTORICAL RATES    │    │ LOCATION CARDS      │    │ STAFF ROSTER        │
+│ (get_staff_         │    │ (RegionalDashboard) │    │ (CoachDashboardV2)  │
+│  submission_windows)│    │                     │    │                     │
+├─────────────────────┤    ├─────────────────────┤    ├─────────────────────┤
+│ ✅ WORKING          │    │ ✅ WORKING          │    │ ❌ BROKEN           │
+│ Excused weeks are   │    │ Shows "Excused"     │    │ Staff show as       │
+│ excluded from       │    │ badge with reason   │    │ "Missing" even      │
+│ denominators        │    │                     │    │ when location is    │
+│                     │    │                     │    │ excused             │
+└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
+                                                                 │
+                           ┌─────────────────────────────────────┤
+                           ▼                                     ▼
+                ┌─────────────────────┐               ┌─────────────────────┐
+                │ LOCATION DETAIL     │               │ MISSING COUNTS      │
+                │ HEALTH CARD         │               │ & REMINDER BUTTONS  │
+                ├─────────────────────┤               ├─────────────────────┤
+                │ ❌ BROKEN           │               │ ❌ BROKEN           │
+                │ No excuse status    │               │ Excused staff still │
+                │ passed to this      │               │ counted as missing  │
+                │ component           │               │                     │
+                └─────────────────────┘               └─────────────────────┘
 ```
 
 ---
 
-## Submission Period Logic for Badges
+## Required Changes
 
-The LocationHealthCard will receive `submissionGates` and display contextual badges:
+### 1. LocationDetail.tsx - Pass Excuse Status to Health Card
+
+**Current state**: The `LocationDetail` page embeds a `LocationHealthCard` but doesn't fetch or pass `excuseStatus`.
+
+**Fix**: Import and use `useLocationExcuses` hook, pass excuse status to the health card.
 
 ```typescript
-// Before confidence deadline (before Tue 2pm):
-// - Primary focus is confidence, so show conf excuse status prominently
+// Add to LocationDetail.tsx
+const { getExcuseStatus } = useLocationExcuses(weekOf);
+const excuseStatus = getExcuseStatus(locationId);
 
-// After performance opens (after Thu 00:01):
-// - Primary focus is performance, so show perf excuse status prominently
-
-// Badge display logic:
-if (isFullyExcused) {
-  // Show single "Excused" badge with reason
-} else if (isConfExcused && !isPastConfidenceDeadline) {
-  // During confidence period, show "Conf Excused: {reason}"
-} else if (isPerfExcused && isPerformanceOpen) {
-  // During performance period, show "Perf Excused: {reason}"
-}
+// Pass to LocationHealthCard
+<LocationHealthCard 
+  stats={locationStats} 
+  excuseStatus={excuseStatus}
+  submissionGates={submissionGates}
+/>
 ```
 
----
+### 2. CoachDashboardV2.tsx - Add Location Excuse Awareness
 
-## Technical Details
+**Current state**: The `StatusPill` component only knows about `hasAll` and `hasAnyLate`. It has no concept of location-level excuses.
 
-### Week Navigation
+**Fix**: 
 
-Use existing `getWeekAnchors` pattern with `addDays(monday, -7)` and `addDays(monday, 7)` for navigation. Format week display using `formatInTimeZone(mondayZ, CT_TZ, 'MMM d, yyyy')`.
-
-### Location Filtering
-
-Super admins see all locations. Org admins see locations from their managed organizations. Query locations table filtered by `managedOrgIds`.
-
-### Batch Excuse Mutation
+A. Accept optional `locationExcuseStatus` prop (map of locationId -> ExcuseStatus)
+B. Update `StatusPill` to accept and display "Excused" status
+C. Filter excused staff from "missing" counts used for reminder buttons
+D. Show appropriate badge when metric is excused
 
 ```typescript
-async function bulkExcuseLocations({
-  locationIds: string[],
-  weekOf: string,
-  metrics: ('confidence' | 'performance')[],
-  reason?: string
+// Updated StatusPill signature
+function StatusPill({ 
+  hasAll, 
+  hasAnyLate, 
+  isExcused 
+}: { 
+  hasAll: boolean; 
+  hasAnyLate: boolean;
+  isExcused?: boolean;
 }) {
-  // For each location + metric combo, check if already exists
-  // Insert only new combinations
-  // Use upsert with on_conflict to handle edge cases
+  if (isExcused) {
+    return (
+      <Badge variant="secondary" className="bg-muted text-muted-foreground">
+        Excused
+      </Badge>
+    );
+  }
+  // ... existing logic
 }
 ```
+
+### 3. CoachDashboardV2.tsx - Fetch Location Excuses
+
+**Current state**: The component doesn't fetch any excuse data.
+
+**Fix**: Fetch excuses for the selected week and build a lookup map.
+
+```typescript
+// Add to CoachDashboardV2
+const { excuses } = useLocationExcuses(weekOfString);
+
+// Build lookup map
+const locationExcuseMap = useMemo(() => {
+  const map = new Map<string, { confExcused: boolean; perfExcused: boolean }>();
+  excuses.forEach(e => {
+    const existing = map.get(e.location_id) || { confExcused: false, perfExcused: false };
+    if (e.metric === 'confidence') existing.confExcused = true;
+    if (e.metric === 'performance') existing.perfExcused = true;
+    map.set(e.location_id, existing);
+  });
+  return map;
+}, [excuses]);
+```
+
+### 4. CoachDashboardV2.tsx - Update Missing Counts
+
+**Current state**: Missing counts include all staff with incomplete submissions.
+
+**Fix**: Exclude staff whose location has the relevant metric excused.
+
+```typescript
+// Updated missing counts
+const missingConfCount = sortedRows.filter(s => {
+  const excuse = locationExcuseMap.get(s.location_id);
+  if (excuse?.confExcused) return false; // Don't count as missing
+  return s.conf_count < s.assignment_count;
+}).length;
+
+const missingPerfCount = sortedRows.filter(s => {
+  const excuse = locationExcuseMap.get(s.location_id);
+  if (excuse?.perfExcused) return false; // Don't count as missing
+  return s.perf_count < s.assignment_count;
+}).length;
+```
+
+### 5. RegionalDashboard.tsx - Adjust Location Stats Calculation
+
+**Current state**: `calculateLocationStats` doesn't know about excuses, so stats include "missing" counts for excused locations.
+
+**Fix**: When a location is fully excused, set its submission rate to 100% (or display "—") and zero out missing counts.
+
+```typescript
+// In the locationStats mapping
+const locStats = calculateLocationStats(staff, gates);
+const excuseStatus = getExcuseStatus(locId);
+
+// Adjust stats based on excuse status
+let adjustedSubmissionRate = locStats.submissionRate;
+let adjustedMissingConf = locStats.missingConfCount;
+let adjustedMissingPerf = locStats.missingPerfCount;
+let adjustedPendingConf = locStats.pendingConfCount;
+
+if (excuseStatus.isConfExcused) {
+  adjustedMissingConf = 0;
+  adjustedPendingConf = 0;
+  // Recalculate submission rate excluding confidence...
+}
+if (excuseStatus.isPerfExcused) {
+  adjustedMissingPerf = 0;
+  // Recalculate submission rate excluding performance...
+}
+
+// If fully excused, show 100% or special indicator
+const isFullyExcused = excuseStatus.isConfExcused && excuseStatus.isPerfExcused;
+```
+
+### 6. LocationSubmissionWidget.tsx - Check if Needs Update
+
+The historical submission widget uses `get_staff_submission_windows` which is already updated. But need to verify the display handles excused weeks gracefully.
+
+---
+
+## Display Logic Summary
+
+| Scenario | Location Card Badge | Staff Row Badge | Counted as Missing? |
+|----------|---------------------|-----------------|---------------------|
+| Conf excused, before Tue deadline | "Conf Excused" | "Excused" (conf column) | No |
+| Conf excused, after Tue deadline | "Conf Excused" | "Excused" (conf column) | No |
+| Perf excused, before Thu | "Perf Excused" | "Excused" (perf column) | No |
+| Perf excused, after Thu | "Perf Excused" | "Excused" (perf column) | No |
+| Both excused | "Excused: {reason}" | "Excused" (both columns) | No |
+| Not excused, incomplete | "X Late/Missing" | "Missing" | Yes |
 
 ---
 
@@ -200,16 +205,32 @@ async function bulkExcuseLocations({
 
 | File | Changes |
 |------|---------|
-| `src/components/dashboard/ExcuseSubmissionsDialog.tsx` | New component - wizard dialog |
-| `src/components/dashboard/LocationHealthCard.tsx` | Remove dropdown, add contextual badges |
-| `src/pages/dashboard/RegionalDashboard.tsx` | Add button, wire up dialog |
-| `src/hooks/useLocationExcuses.tsx` | Add bulk mutation, flexible week param |
+| `src/pages/dashboard/LocationDetail.tsx` | Import `useLocationExcuses`, pass `excuseStatus` and `submissionGates` to `LocationHealthCard` |
+| `src/pages/coach/CoachDashboardV2.tsx` | Import `useLocationExcuses`, build excuse lookup map, update `StatusPill`, adjust missing counts, filter reminder recipients |
+| `src/pages/dashboard/RegionalDashboard.tsx` | Adjust location stats when excused (zero out missing counts, adjust submission rate) |
+| `src/lib/submissionStatus.ts` | (Optional) Add helper function `calculateLocationStatsWithExcuses(staff, gates, excuseStatus)` |
 
 ---
 
 ## Edge Cases Handled
 
-1. **Already excused**: Status panel shows existing excuses; submission skips duplicates
-2. **Mixed states**: Some locations excused for confidence only - clearly shown in status
-3. **Past weeks**: Can excuse a past week retroactively (for late documentation)
-4. **Remove excuses**: Not in scope for this wizard (keep manual removal via different flow if needed, or add a "Remove" section later)
+1. **Partially excused** (conf only or perf only): Only the excused metric shows "Excused"; the other still shows actual status
+2. **Location excused mid-week**: Immediately reflected in UI after cache invalidation
+3. **Week navigation in Coach Dashboard**: Excuse status updates per-week as user navigates
+4. **Mixed locations in view**: When org manager views multiple locations, each location's excuse status is evaluated independently
+5. **Reminder emails**: Staff at excused locations are excluded from reminder recipient lists
+
+---
+
+## Summary
+
+The core issue is that the excuse system was implemented at the UI layer for location cards but not propagated down to the staff roster table. The fix requires:
+
+1. Fetching location excuses in `CoachDashboardV2`
+2. Passing excuse context to the `StatusPill` component
+3. Filtering missing counts to exclude excused staff
+4. Updating the `LocationDetail` page to pass excuse status
+5. Optionally adjusting aggregated stats to reflect excuses
+
+This ensures consistent "Excused" display throughout the entire drill-down hierarchy: Regional Dashboard, Location Detail, Staff Roster.
+

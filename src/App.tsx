@@ -37,10 +37,6 @@ import WeekList from "@/pages/admin/WeekList";
 import WeekEditor from "@/pages/admin/WeekEditor";
 import PlannerPage from "@/pages/planner/PlannerPage";
 import NotFound from "@/pages/NotFound";
-import StatsLayout from "@/pages/StatsLayout";
-import AtAGlance from "@/pages/stats/AtAGlance";
-import StatsPriorityFocus from "@/pages/stats/StatsPriorityFocus";
-import StatsScores from "@/pages/StatsScores";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
 import RegionalDashboard from "@/pages/dashboard/RegionalDashboard";
@@ -80,13 +76,6 @@ function AppRoutes() {
         <Route path="welcome" element={<Welcome />} />
         <Route path="setup-password" element={<SetupPassword />} />
 
-        <Route path="stats" element={<StatsLayout />}>
-          <Route index element={<AtAGlance />} />
-          <Route path="glance" element={<AtAGlance />} />
-          <Route path="focus" element={<StatsPriorityFocus />} />
-          <Route path="scores" element={<StatsScores />} />
-          <Route path="evaluations" element={<StatsEvaluations />} />
-        </Route>
 
         {/* My Role - new professional guidebook */}
         <Route path="my-role" element={<MyRoleLayout />}>

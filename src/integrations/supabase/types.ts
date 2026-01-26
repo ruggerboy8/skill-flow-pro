@@ -466,6 +466,51 @@ export type Database = {
           },
         ]
       }
+      excused_locations: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          location_id: string
+          metric: string
+          reason: string | null
+          week_of: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          location_id: string
+          metric: string
+          reason?: string | null
+          week_of: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          location_id?: string
+          metric?: string
+          reason?: string | null
+          week_of?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "excused_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "excused_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
       excused_submissions: {
         Row: {
           created_at: string | null

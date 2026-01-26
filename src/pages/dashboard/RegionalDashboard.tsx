@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useLocationExcuses } from '@/hooks/useLocationExcuses';
 import { LocationHealthCard, LocationStats } from '@/components/dashboard/LocationHealthCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,6 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { getWeekAnchors, nowUtc, CT_TZ } from '@/lib/centralTime';
 import { getSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
-
 export default function RegionalDashboard() {
   const navigate = useNavigate();
   const { managedLocationIds, managedOrgIds, isSuperAdmin } = useUserRole();
@@ -29,6 +29,18 @@ export default function RegionalDashboard() {
   
   // Reuse existing hook - no new RPC needed
   const { summaries, loading, error } = useStaffWeeklyScores({ weekOf });
+  
+  // Location-level excuses
+  const { 
+    getExcuseStatus, 
+    canManage: canManageExcuses,
+    toggleExcuse,
+    excuseBoth,
+    removeAllExcuses,
+    isToggling,
+    isExcusingBoth,
+    isRemovingAll,
+  } = useLocationExcuses(weekOf);
 
   // Aggregate by location client-side
   const { locationStats, totals } = useMemo(() => {
@@ -208,7 +220,16 @@ export default function RegionalDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {locationStats.map(stats => (
-              <LocationHealthCard key={stats.id} stats={stats} />
+              <LocationHealthCard 
+                key={stats.id} 
+                stats={stats} 
+                excuseStatus={getExcuseStatus(stats.id)}
+                canManageExcuses={canManageExcuses}
+                onToggleExcuse={(metric) => toggleExcuse({ locationId: stats.id, metric })}
+                onExcuseBoth={() => excuseBoth({ locationId: stats.id, reason: 'Weather closure' })}
+                onRemoveAllExcuses={() => removeAllExcuses({ locationId: stats.id })}
+                isUpdating={isToggling || isExcusingBoth || isRemovingAll}
+              />
             ))}
           </div>
         )}

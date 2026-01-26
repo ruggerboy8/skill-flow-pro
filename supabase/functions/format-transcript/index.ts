@@ -12,10 +12,10 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error('[format-transcript] LOVABLE_API_KEY not configured');
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      console.error('[format-transcript] OPENAI_API_KEY not configured');
+      throw new Error('OPENAI_API_KEY is not configured');
     }
 
     const { transcript, source } = await req.json();
@@ -54,14 +54,14 @@ Output format: Plain text with line breaks. No HTML, no markdown headers.`;
 ${transcript}
 ---`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -71,7 +71,7 @@ ${transcript}
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[format-transcript] AI gateway error:', response.status, errorText);
+      console.error('[format-transcript] OpenAI API error:', response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -79,10 +79,10 @@ ${transcript}
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 402 || response.status === 401) {
         return new Response(
-          JSON.stringify({ error: 'Payment required, please add funds.', formatted: transcript }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'OpenAI API authentication or billing issue.', formatted: transcript }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       

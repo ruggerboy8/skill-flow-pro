@@ -97,10 +97,13 @@ export function MultiSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0 bg-popover z-50" align="start">
-        <Command>
+      <PopoverContent
+        className="w-[240px] p-0 bg-popover z-[60] overflow-hidden"
+        align="start"
+      >
+        <Command className="h-auto">
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList className="max-h-60 overflow-y-auto">
+          <CommandList className="max-h-60 overflow-y-auto overscroll-contain touch-pan-y">
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (

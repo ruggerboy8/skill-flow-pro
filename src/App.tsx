@@ -44,6 +44,7 @@ import StatsScores from "@/pages/StatsScores";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
 import RegionalDashboard from "@/pages/dashboard/RegionalDashboard";
+import MyLocationPage from "@/pages/my-location/MyLocationPage";
 
 // My Role pages
 import MyRoleLayout from "@/pages/my-role/MyRoleLayout";
@@ -121,6 +122,7 @@ function AppRoutes() {
         {/* Dashboard Routes */}
         <Route path="dashboard" element={<RegionalDashboard />} />
         <Route path="dashboard/location/:locationId" element={<LocationDetail />} />
+        <Route path="my-location" element={<MyLocationPage />} />
 
         <Route path="admin" element={<AdminPage />} />
         <Route path="admin/eval-results" element={<EvalResults />} />
@@ -133,6 +135,7 @@ function AppRoutes() {
         
         <Route path="planner/dfi" element={<PlannerPage roleId={1} roleName="DFI" />} />
         <Route path="planner/rda" element={<PlannerPage roleId={2} roleName="RDA" />} />
+        <Route path="planner/om" element={<PlannerPage roleId={3} roleName="Office Manager" />} />
 
         {/* legacy redirects */}
         <Route path="admin/organizations" element={<Navigate to="/admin?tab=organizations" replace />} />

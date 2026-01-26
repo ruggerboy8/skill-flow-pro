@@ -20,7 +20,7 @@ import { DOMAIN_META, DRIVER_LABELS } from '@/lib/constants/domains';
 import { downloadCSV } from '@/lib/csvExport';
 
 export function WeeklyProMovesPanel() {
-  const [roleId, setRoleId] = useState<1 | 2>(2);
+  const [roleId, setRoleId] = useState<1 | 2 | 3>(2);
   const [weights, setWeights] = useState(DEFAULT_ENGINE_CONFIG.weights);
   const [advanced, setAdvanced] = useState({
     cooldownWeeks: DEFAULT_ENGINE_CONFIG.cooldownWeeks,
@@ -79,7 +79,8 @@ export function WeeklyProMovesPanel() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `weekly-promoves-${roleId === 1 ? 'dfi' : 'rda'}-${new Date().toISOString().slice(0, 10)}.json`;
+    const roleName = roleId === 1 ? 'dfi' : roleId === 2 ? 'rda' : 'om';
+    link.download = `weekly-promoves-${roleName}-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -167,13 +168,14 @@ export function WeeklyProMovesPanel() {
             <CardTitle>Role</CardTitle>
           </CardHeader>
           <CardContent>
-            <Select value={String(roleId)} onValueChange={(v) => setRoleId(Number(v) as 1 | 2)}>
+            <Select value={String(roleId)} onValueChange={(v) => setRoleId(Number(v) as 1 | 2 | 3)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="1">DFI</SelectItem>
                 <SelectItem value="2">RDA</SelectItem>
+                <SelectItem value="3">Office Manager</SelectItem>
               </SelectContent>
             </Select>
           </CardContent>

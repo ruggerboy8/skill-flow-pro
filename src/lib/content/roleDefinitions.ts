@@ -1,4 +1,4 @@
-export type RoleType = 'DFI' | 'RDA';
+export type RoleType = 'DFI' | 'RDA' | 'OM';
 
 export interface DomainContent {
   description: string;
@@ -41,8 +41,33 @@ export const ROLE_CONTENT: Record<RoleType, Record<string, DomainContent>> = {
       description: 'Addressing patient objections to treatment, clearly explaining plans, and establishing the dental team\'s credibility.',
       valueProp: 'Empowers patients to make informed decisions without feeling pressured.'
     }
+  },
+  OM: {
+    'Clinical': {
+      description: 'Understanding clinical workflows, supporting procedure scheduling, and ensuring patient care coordination across the practice.',
+      valueProp: 'Your oversight ensures clinical operations run smoothly and patients receive timely, coordinated care.'
+    },
+    'Clerical': {
+      description: 'Managing practice operations, overseeing scheduling efficiency, coordinating staff coverage, and maintaining accurate financial records.',
+      valueProp: 'Your organizational leadership keeps the practice running efficiently and profitably.'
+    },
+    'Cultural': {
+      description: 'Fostering a positive team environment, mentoring staff, and serving as the primary point of contact for patient escalations.',
+      valueProp: 'You set the tone for the practice culture and model professional excellence.'
+    },
+    'Case Acceptance': {
+      description: 'Supporting treatment presentation, understanding financial options, and coaching staff on effective patient communication.',
+      valueProp: 'Your guidance helps the team convert treatment plans into accepted care.'
+    }
   }
 };
+
+// Helper to convert role_id to RoleType
+export function getRoleType(roleId: number | null | undefined): RoleType {
+  if (roleId === 1) return 'DFI';
+  if (roleId === 2) return 'RDA';
+  return 'OM'; // Default to OM for role_id=3 or others
+}
 
 // Ordered list of domains for consistent display
 export const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'] as const;

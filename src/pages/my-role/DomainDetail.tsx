@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Sparkles, Trophy, TrendingUp } from 'lucide-react';
 import { useDomainDetail, type ProMoveDetail } from '@/hooks/useDomainDetail';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
-import { ROLE_CONTENT, type RoleType } from '@/lib/content/roleDefinitions';
+import { ROLE_CONTENT, getRoleType, type RoleType } from '@/lib/content/roleDefinitions';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import CompetencyAccordion from '@/components/my-role/CompetencyAccordion';
 import { ProMoveDrawer } from '@/components/my-role/ProMoveDrawer';
@@ -33,7 +33,7 @@ export default function DomainDetail() {
   
   const { data, isLoading, error } = useDomainDetail(domainSlug);
 
-  const roleType: RoleType = staffProfile?.role_id === 1 ? 'DFI' : 'RDA';
+  const roleType: RoleType = getRoleType(staffProfile?.role_id);
   const domainContent = data?.domainName ? ROLE_CONTENT[roleType]?.[data.domainName] : null;
   const richColor = data?.domainName ? getDomainColorRichRaw(data.domainName) : '0 0% 50%';
   

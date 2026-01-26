@@ -27,6 +27,7 @@ export interface LocationCardData {
   locationName: string;
   dfiCount: number;
   rdaCount: number;
+  omCount: number;
   staffWithEval: number;
   topBoxRate: number;      // % of 4s
   bottomBoxRate: number;   // % of 1-2s

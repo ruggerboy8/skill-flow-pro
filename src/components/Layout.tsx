@@ -26,6 +26,7 @@ export default function Layout() {
   const isSuperAdmin = isMasquerading ? (staffProfile?.is_super_admin || false) : authIsSuperAdmin;
   const isOrgAdmin = isMasquerading ? (staffProfile?.is_org_admin || false) : authIsOrgAdmin;
   const isLead = isMasquerading ? (staffProfile?.is_lead || false) : authIsLead;
+  const isOfficeManager = isMasquerading ? (staffProfile?.is_office_manager || false) : (staffProfile?.is_office_manager || false);
   const location = useLocation();
   const { toast } = useToast();
   
@@ -47,6 +48,9 @@ export default function Layout() {
 
   // Can access admin = super admin OR org admin
   const canAccessAdmin = isSuperAdmin || isOrgAdmin;
+  
+  // Office managers who are NOT coaches should see "My Location" link
+  const showLocationDashboard = isOfficeManager && !isCoach && !isOrgAdmin;
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
@@ -54,6 +58,10 @@ export default function Layout() {
     ...(!isOrgAdmin ? [
       { name: 'My Role', href: '/my-role', icon: BookOpen },
       { name: 'Stats', href: '/stats', icon: BarChart3 },
+    ] : []),
+    // My Location for Office Managers (view-only access to their location)
+    ...(showLocationDashboard ? [
+      { name: 'My Location', href: '/my-location', icon: Building2 },
     ] : []),
     // Backfill nav removed - keeping function for individual score backfill only
     ...(isCoach || isSuperAdmin || isOrgAdmin || isLead ? [

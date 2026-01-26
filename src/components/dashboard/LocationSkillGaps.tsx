@@ -59,7 +59,9 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
 
   const dfiGaps = gaps.filter(g => g.role_name === 'DFI');
   const rdaGaps = gaps.filter(g => g.role_name === 'RDA');
-
+  const omGaps = gaps.filter(g => g.role_name === 'Office Manager');
+  
+  const hasOmGaps = omGaps.length > 0;
   const lookbackLabel = lookback === 'all' ? 'all time' : `${lookback} weeks`;
 
   function getConfidenceColor(avg: number): string {
@@ -189,6 +191,9 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
           <TabsList className="w-full">
             <TabsTrigger value="dfi" className="flex-1">DFI</TabsTrigger>
             <TabsTrigger value="rda" className="flex-1">RDA</TabsTrigger>
+            {hasOmGaps && (
+              <TabsTrigger value="om" className="flex-1">OM</TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="dfi" className="mt-3">
             <GapList items={dfiGaps} roleName="DFI" />
@@ -196,6 +201,11 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
           <TabsContent value="rda" className="mt-3">
             <GapList items={rdaGaps} roleName="RDA" />
           </TabsContent>
+          {hasOmGaps && (
+            <TabsContent value="om" className="mt-3">
+              <GapList items={omGaps} roleName="Office Manager" />
+            </TabsContent>
+          )}
         </Tabs>
       </CardContent>
     </Card>

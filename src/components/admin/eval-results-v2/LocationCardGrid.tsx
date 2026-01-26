@@ -105,6 +105,7 @@ function aggregateByLocation(rows: EvalDistributionRow[]): LocationCardData[] {
     staffWithEval: Set<string>;
     dfiCount: number;
     rdaCount: number;
+    omCount: number;
     nItems: number;
     obsTopBox: number;
     obsBottomBox: number;
@@ -122,6 +123,7 @@ function aggregateByLocation(rows: EvalDistributionRow[]): LocationCardData[] {
         staffWithEval: new Set(),
         dfiCount: 0,
         rdaCount: 0,
+        omCount: 0,
         nItems: 0,
         obsTopBox: 0,
         obsBottomBox: 0,
@@ -137,6 +139,7 @@ function aggregateByLocation(rows: EvalDistributionRow[]): LocationCardData[] {
     if (!loc.staffIds.has(row.staff_id)) {
       if (row.role_id === 1) loc.dfiCount++;
       else if (row.role_id === 2) loc.rdaCount++;
+      else if (row.role_id === 3) loc.omCount++;
       loc.staffIds.add(row.staff_id);
     }
     
@@ -190,6 +193,7 @@ function aggregateByLocation(rows: EvalDistributionRow[]): LocationCardData[] {
       locationName: loc.locationName,
       dfiCount: loc.dfiCount,
       rdaCount: loc.rdaCount,
+      omCount: loc.omCount,
       staffWithEval: loc.staffWithEval.size,
       topBoxRate,
       bottomBoxRate,

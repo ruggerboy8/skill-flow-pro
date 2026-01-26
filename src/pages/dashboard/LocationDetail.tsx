@@ -13,8 +13,17 @@ import CoachDashboardV2 from '@/pages/coach/CoachDashboardV2';
 import { getWeekAnchors, nowUtc, CT_TZ } from '@/lib/centralTime';
 import { getSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
 
-export default function LocationDetail() {
-  const { locationId } = useParams<{ locationId: string }>();
+interface LocationDetailProps {
+  overrideLocationId?: string;
+  isOfficeManagerView?: boolean;
+}
+
+export default function LocationDetail({ 
+  overrideLocationId,
+  isOfficeManagerView = false 
+}: LocationDetailProps) {
+  const { locationId: routeLocationId } = useParams<{ locationId: string }>();
+  const locationId = overrideLocationId || routeLocationId;
   const navigate = useNavigate();
   const [now, setNow] = useState(nowUtc());
 
@@ -97,12 +106,19 @@ export default function LocationDetail() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mb-2 -ml-2">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Regional Dashboard
-          </Button>
-          <h1 className="text-2xl font-bold">{locationName}</h1>
-          <p className="text-muted-foreground text-sm">
+          {!isOfficeManagerView && (
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mb-2 -ml-2">
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back to Regional Dashboard
+            </Button>
+          )}
+          <h1 className="text-2xl font-bold">
+            {isOfficeManagerView ? 'My Location' : locationName}
+          </h1>
+          {isOfficeManagerView && (
+            <p className="text-lg text-muted-foreground">{locationName}</p>
+          )}
+          <p className="text-muted-foreground text-sm mt-1">
             Performance Insights • Week of {formatInTimeZone(anchors.mondayZ, CT_TZ, 'MMM d, yyyy')}
           </p>
         </div>

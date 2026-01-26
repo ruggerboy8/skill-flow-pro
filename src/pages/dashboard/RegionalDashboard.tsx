@@ -1,21 +1,23 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useLocationExcuses } from '@/hooks/useLocationExcuses';
 import { LocationHealthCard, LocationStats } from '@/components/dashboard/LocationHealthCard';
+import { ExcuseSubmissionsDialog } from '@/components/dashboard/ExcuseSubmissionsDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, AlertCircle, TrendingUp } from 'lucide-react';
+import { Users, AlertCircle, TrendingUp, CloudOff } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { getWeekAnchors, nowUtc, CT_TZ } from '@/lib/centralTime';
 import { getSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
+
 export default function RegionalDashboard() {
-  const navigate = useNavigate();
   const { managedLocationIds, managedOrgIds, isSuperAdmin } = useUserRole();
   const [now, setNow] = useState(nowUtc());
+  const [excuseDialogOpen, setExcuseDialogOpen] = useState(false);
 
   // Keep time updated for live dashboard feel
   useEffect(() => {
@@ -27,6 +29,17 @@ export default function RegionalDashboard() {
   const anchors = useMemo(() => getWeekAnchors(now), [now]);
   const weekOf = formatInTimeZone(anchors.mondayZ, CT_TZ, 'yyyy-MM-dd');
   
+  // Submission gates for contextual badge display
+  const submissionGates = useMemo(() => {
+    const gates = getSubmissionGates(now, anchors);
+    return {
+      confidenceOpen: true, // Always open during the week
+      confidenceClosed: gates.isPastConfidenceDeadline,
+      performanceOpen: gates.isPerformanceOpen,
+      performanceClosed: false, // Week-end logic not needed here
+    };
+  }, [now, anchors]);
+  
   // Reuse existing hook - no new RPC needed
   const { summaries, loading, error } = useStaffWeeklyScores({ weekOf });
   
@@ -34,12 +47,6 @@ export default function RegionalDashboard() {
   const { 
     getExcuseStatus, 
     canManage: canManageExcuses,
-    toggleExcuse,
-    excuseBoth,
-    removeAllExcuses,
-    isToggling,
-    isExcusingBoth,
-    isRemovingAll,
   } = useLocationExcuses(weekOf);
 
   // Aggregate by location client-side
@@ -144,9 +151,22 @@ export default function RegionalDashboard() {
               Week of {formatInTimeZone(anchors.mondayZ, CT_TZ, 'MMM d, yyyy')}
             </p>
           </div>
-          <Badge variant="outline" className="text-sm">
-            {totals.locationCount} Location{totals.locationCount !== 1 ? 's' : ''}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-sm">
+              {totals.locationCount} Location{totals.locationCount !== 1 ? 's' : ''}
+            </Badge>
+            {canManageExcuses && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setExcuseDialogOpen(true)}
+                className="gap-2"
+              >
+                <CloudOff className="h-4 w-4" />
+                Excuse Submissions
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -224,16 +244,19 @@ export default function RegionalDashboard() {
                 key={stats.id} 
                 stats={stats} 
                 excuseStatus={getExcuseStatus(stats.id)}
-                canManageExcuses={canManageExcuses}
-                onToggleExcuse={(metric) => toggleExcuse({ locationId: stats.id, metric })}
-                onExcuseBoth={() => excuseBoth({ locationId: stats.id, reason: 'Weather closure' })}
-                onRemoveAllExcuses={() => removeAllExcuses({ locationId: stats.id })}
-                isUpdating={isToggling || isExcusingBoth || isRemovingAll}
+                submissionGates={submissionGates}
               />
             ))}
           </div>
         )}
       </div>
+      
+      {/* Excuse Submissions Dialog */}
+      <ExcuseSubmissionsDialog
+        open={excuseDialogOpen}
+        onOpenChange={setExcuseDialogOpen}
+        initialWeekOf={weekOf}
+      />
     </div>
   );
 }

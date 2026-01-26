@@ -1,16 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Users, AlertCircle, CheckCircle2, MoreVertical, CloudOff, Check, X } from "lucide-react";
+import { Users, AlertCircle, CheckCircle2, CloudOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 export interface LocationStats {
   id: string;
@@ -29,24 +21,23 @@ export interface ExcuseStatus {
   perfReason: string | null;
 }
 
+export interface SubmissionGates {
+  confidenceOpen: boolean;
+  confidenceClosed: boolean;
+  performanceOpen: boolean;
+  performanceClosed: boolean;
+}
+
 interface LocationHealthCardProps {
   stats: LocationStats;
   excuseStatus?: ExcuseStatus;
-  canManageExcuses?: boolean;
-  onToggleExcuse?: (metric: 'confidence' | 'performance') => void;
-  onExcuseBoth?: () => void;
-  onRemoveAllExcuses?: () => void;
-  isUpdating?: boolean;
+  submissionGates?: SubmissionGates;
 }
 
 export function LocationHealthCard({ 
   stats, 
   excuseStatus,
-  canManageExcuses = false,
-  onToggleExcuse,
-  onExcuseBoth,
-  onRemoveAllExcuses,
-  isUpdating = false,
+  submissionGates,
 }: LocationHealthCardProps) {
   const navigate = useNavigate();
 
@@ -68,12 +59,46 @@ export function LocationHealthCard({
     return "text-primary";
   };
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    // Don't navigate if clicking on the dropdown
-    if ((e.target as HTMLElement).closest('[data-dropdown-trigger]')) {
-      return;
+  // Determine which excuse badge to show based on submission period
+  const getContextualExcuseBadge = () => {
+    if (isFullyExcused) {
+      const reason = excuseStatus?.confReason || excuseStatus?.perfReason;
+      return (
+        <Badge variant="secondary" className="bg-muted text-muted-foreground gap-1 shrink-0">
+          <CloudOff className="h-3 w-3" />
+          {reason ? `Excused: ${reason}` : 'Excused'}
+        </Badge>
+      );
     }
-    navigate(`/dashboard/location/${stats.id}`);
+    
+    if (isPartiallyExcused) {
+      // During confidence period (before deadline), show conf excuse prominently
+      if (excuseStatus?.isConfExcused && submissionGates && !submissionGates.confidenceClosed) {
+        return (
+          <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
+            Conf Excused{excuseStatus.confReason ? `: ${excuseStatus.confReason}` : ''}
+          </Badge>
+        );
+      }
+      
+      // During performance period, show perf excuse prominently
+      if (excuseStatus?.isPerfExcused && submissionGates?.performanceOpen) {
+        return (
+          <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
+            Perf Excused{excuseStatus.perfReason ? `: ${excuseStatus.perfReason}` : ''}
+          </Badge>
+        );
+      }
+      
+      // Fallback: show whichever is excused
+      return (
+        <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
+          {excuseStatus?.isConfExcused ? 'Conf' : 'Perf'} Excused
+        </Badge>
+      );
+    }
+    
+    return null;
   };
 
   return (
@@ -82,131 +107,30 @@ export function LocationHealthCard({
         "cursor-pointer hover:shadow-md transition-all border-2 relative",
         getStatusClasses(stats.submissionRate)
       )}
-      onClick={handleCardClick}
+      onClick={() => navigate(`/dashboard/location/${stats.id}`)}
     >
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-lg font-bold truncate">{stats.name}</CardTitle>
-              {isFullyExcused && (
-                <Badge variant="secondary" className="bg-muted text-muted-foreground gap-1 shrink-0">
-                  <CloudOff className="h-3 w-3" />
-                  Excused
-                </Badge>
-              )}
-              {isPartiallyExcused && (
-                <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
-                  {excuseStatus?.isConfExcused ? 'Conf' : 'Perf'} Excused
-                </Badge>
-              )}
+              {getContextualExcuseBadge()}
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
               <Users className="h-3 w-3" />
               {stats.staffCount} Active Staff
             </div>
           </div>
-          <div className="flex items-start gap-2">
-            <div className="text-right">
-              <div className="text-[10px] text-primary font-medium mb-0.5 uppercase tracking-wide">
-                This Week
-              </div>
-              <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
-                {isFullyExcused ? '—' : `${Math.round(stats.submissionRate)}%`}
-              </div>
-              <div className="text-[10px] text-muted-foreground leading-tight">
-                {isFullyExcused ? 'Location Excused' : 'Submitted'}
-              </div>
+          <div className="text-right shrink-0">
+            <div className="text-[10px] text-primary font-medium mb-0.5 uppercase tracking-wide">
+              This Week
             </div>
-            {canManageExcuses && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild data-dropdown-trigger>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 shrink-0"
-                    disabled={isUpdating}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">Location actions</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleExcuse?.('confidence');
-                    }}
-                    disabled={isUpdating}
-                  >
-                    {excuseStatus?.isConfExcused ? (
-                      <>
-                        <X className="h-4 w-4 mr-2 text-destructive" />
-                        Remove Confidence Excuse
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-4 w-4 mr-2 text-primary" />
-                        Excuse Confidence (this week)
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleExcuse?.('performance');
-                    }}
-                    disabled={isUpdating}
-                  >
-                    {excuseStatus?.isPerfExcused ? (
-                      <>
-                        <X className="h-4 w-4 mr-2 text-destructive" />
-                        Remove Performance Excuse
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-4 w-4 mr-2 text-primary" />
-                        Excuse Performance (this week)
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  
-                  {!isFullyExcused && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onExcuseBoth?.();
-                        }}
-                        disabled={isUpdating}
-                      >
-                        <CloudOff className="h-4 w-4 mr-2 text-primary" />
-                        Excuse Both (Weather/Closure)
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  
-                  {(excuseStatus?.isConfExcused || excuseStatus?.isPerfExcused) && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveAllExcuses?.();
-                        }}
-                        disabled={isUpdating}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Remove All Excuses
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
+              {isFullyExcused ? '—' : `${Math.round(stats.submissionRate)}%`}
+            </div>
+            <div className="text-[10px] text-muted-foreground leading-tight">
+              {isFullyExcused ? 'Location Excused' : 'Submitted'}
+            </div>
           </div>
         </div>
       </CardHeader>

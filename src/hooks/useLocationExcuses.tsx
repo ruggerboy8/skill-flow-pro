@@ -54,7 +54,99 @@ export function useLocationExcuses(weekOf: string) {
     };
   };
 
-  // Toggle a single metric excuse
+  // Invalidate all related queries
+  const invalidateQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['location-excuses'] });
+    queryClient.invalidateQueries({ queryKey: ['staff-submission-windows'] });
+    queryClient.invalidateQueries({ queryKey: ['staff-submission-rates-batch'] });
+    queryClient.invalidateQueries({ queryKey: ['location-accountability'] });
+    queryClient.invalidateQueries({ queryKey: ['org-accountability'] });
+    queryClient.invalidateQueries({ queryKey: ['staff-weekly-scores'] });
+  };
+
+  // Bulk excuse multiple locations at once
+  const bulkExcuseLocationsMutation = useMutation({
+    mutationFn: async ({ 
+      locationIds, 
+      weekOf: targetWeekOf,
+      metrics,
+      reason 
+    }: { 
+      locationIds: string[]; 
+      weekOf: string;
+      metrics: ('confidence' | 'performance')[];
+      reason?: string;
+    }) => {
+      // Fetch existing excuses for these locations and week
+      const { data: existingExcuses, error: fetchError } = await supabase
+        .from('excused_locations')
+        .select('location_id, metric')
+        .eq('week_of', targetWeekOf)
+        .in('location_id', locationIds);
+      
+      if (fetchError) throw fetchError;
+      
+      // Build set of already-excused combinations
+      const existingSet = new Set(
+        (existingExcuses || []).map(e => `${e.location_id}:${e.metric}`)
+      );
+      
+      // Build list of new excuses to insert
+      const toInsert: Array<{ 
+        location_id: string; 
+        week_of: string; 
+        metric: string; 
+        reason: string | null;
+      }> = [];
+      
+      for (const locationId of locationIds) {
+        for (const metric of metrics) {
+          const key = `${locationId}:${metric}`;
+          if (!existingSet.has(key)) {
+            toInsert.push({
+              location_id: locationId,
+              week_of: targetWeekOf,
+              metric,
+              reason: reason || null,
+            });
+          }
+        }
+      }
+      
+      if (toInsert.length === 0) {
+        return { inserted: 0, skipped: locationIds.length * metrics.length };
+      }
+      
+      const { error: insertError } = await supabase
+        .from('excused_locations')
+        .insert(toInsert);
+      
+      if (insertError) throw insertError;
+      
+      return { 
+        inserted: toInsert.length, 
+        skipped: (locationIds.length * metrics.length) - toInsert.length 
+      };
+    },
+    onSuccess: (result) => {
+      invalidateQueries();
+      
+      if (result.inserted > 0) {
+        toast.success(
+          `Excused ${result.inserted} location-metric combination${result.inserted > 1 ? 's' : ''}` +
+          (result.skipped > 0 ? ` (${result.skipped} already excused)` : '')
+        );
+      } else {
+        toast.info('All selected locations were already excused for the selected metrics');
+      }
+    },
+    onError: (error) => {
+      console.error('Error bulk excusing locations:', error);
+      toast.error('Failed to excuse locations');
+    },
+  });
+
+  // Toggle a single metric excuse (kept for backwards compatibility)
   const toggleExcuseMutation = useMutation({
     mutationFn: async ({ 
       locationId, 
@@ -92,13 +184,7 @@ export function useLocationExcuses(weekOf: string) {
       }
     },
     onSuccess: (result) => {
-      // Invalidate related queries
-      queryClient.invalidateQueries({ queryKey: ['location-excuses'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-submission-windows'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-submission-rates-batch'] });
-      queryClient.invalidateQueries({ queryKey: ['location-accountability'] });
-      queryClient.invalidateQueries({ queryKey: ['org-accountability'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-weekly-scores'] });
+      invalidateQueries();
 
       const metricLabel = result.metric === 'confidence' ? 'Confidence' : 'Performance';
       if (result.action === 'added') {
@@ -152,12 +238,7 @@ export function useLocationExcuses(weekOf: string) {
       return { count: toInsert.length };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['location-excuses'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-submission-windows'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-submission-rates-batch'] });
-      queryClient.invalidateQueries({ queryKey: ['location-accountability'] });
-      queryClient.invalidateQueries({ queryKey: ['org-accountability'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-weekly-scores'] });
+      invalidateQueries();
       toast.success('Location fully excused for this week');
     },
     onError: (error) => {
@@ -178,12 +259,7 @@ export function useLocationExcuses(weekOf: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['location-excuses'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-submission-windows'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-submission-rates-batch'] });
-      queryClient.invalidateQueries({ queryKey: ['location-accountability'] });
-      queryClient.invalidateQueries({ queryKey: ['org-accountability'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-weekly-scores'] });
+      invalidateQueries();
       toast.success('All excuses removed for this location');
     },
     onError: (error) => {
@@ -198,6 +274,10 @@ export function useLocationExcuses(weekOf: string) {
     error,
     getExcuseStatus,
     canManage,
+    // New bulk mutation
+    bulkExcuseLocations: bulkExcuseLocationsMutation.mutate,
+    isBulkExcusing: bulkExcuseLocationsMutation.isPending,
+    // Legacy single-location mutations (still useful)
     toggleExcuse: toggleExcuseMutation.mutate,
     excuseBoth: excuseBothMutation.mutate,
     removeAllExcuses: removeAllExcusesMutation.mutate,

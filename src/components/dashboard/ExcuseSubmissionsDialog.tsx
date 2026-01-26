@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useLocationExcuses } from '@/hooks/useLocationExcuses';
-import { getWeekAnchors, CT_TZ } from '@/lib/centralTime';
+import { CT_TZ } from '@/lib/centralTime';
 import {
   Dialog,
   DialogContent,
@@ -17,20 +17,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { ChevronLeft, ChevronRight, Check, Minus, Loader2 } from 'lucide-react';
 
 interface ExcuseSubmissionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialWeekOf: string;
-}
-
-interface LocationOption {
-  value: string;
-  label: string;
 }
 
 export function ExcuseSubmissionsDialog({
@@ -43,6 +38,7 @@ export function ExcuseSubmissionsDialog({
   // State
   const [weekMonday, setWeekMonday] = useState(() => new Date(initialWeekOf + 'T00:00:00'));
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  const [locationSearch, setLocationSearch] = useState('');
   const [excuseConfidence, setExcuseConfidence] = useState(true);
   const [excusePerformance, setExcusePerformance] = useState(true);
   const [reason, setReason] = useState('Weather closure');
@@ -78,11 +74,20 @@ export function ExcuseSubmissionsDialog({
     enabled: open,
   });
   
-  // Location options for multi-select
-  const locationOptions: LocationOption[] = useMemo(() => 
-    locations.map(loc => ({ value: loc.id, label: loc.name })),
-    [locations]
-  );
+  const filteredLocations = useMemo(() => {
+    const q = locationSearch.trim().toLowerCase();
+    if (!q) return locations;
+    return locations.filter((l) => l.name?.toLowerCase().includes(q));
+  }, [locations, locationSearch]);
+
+  const setLocationChecked = (locationId: string, checked: boolean) => {
+    setSelectedLocationIds((prev) => {
+      if (checked) {
+        return prev.includes(locationId) ? prev : [...prev, locationId];
+      }
+      return prev.filter((id) => id !== locationId);
+    });
+  };
   
   // Fetch excuses for the selected week
   const { 
@@ -140,6 +145,7 @@ export function ExcuseSubmissionsDialog({
     if (newOpen) {
       setWeekMonday(new Date(initialWeekOf + 'T00:00:00'));
       setSelectedLocationIds([]);
+      setLocationSearch('');
       setExcuseConfidence(true);
       setExcusePerformance(true);
       setReason('Weather closure');
@@ -178,19 +184,54 @@ export function ExcuseSubmissionsDialog({
           
           {/* Location Multi-Select */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Locations</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-sm font-medium">Locations</Label>
+              <span className="text-xs text-muted-foreground">
+                {selectedLocationIds.length} selected
+              </span>
+            </div>
             {locationsLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading locations...
               </div>
             ) : (
-              <MultiSelect
-                options={locationOptions}
-                selected={selectedLocationIds}
-                onChange={setSelectedLocationIds}
-                placeholder="Select locations..."
-              />
+              <>
+                <Input
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                  placeholder="Search locations..."
+                />
+                <div className="border rounded-md max-h-60 overflow-y-auto overscroll-contain divide-y">
+                  {filteredLocations.length === 0 ? (
+                    <div className="p-3 text-sm text-muted-foreground">No locations found.</div>
+                  ) : (
+                    filteredLocations.map((loc) => {
+                      const checked = selectedLocationIds.includes(loc.id);
+                      const checkboxId = `loc-${loc.id}`;
+
+                      return (
+                        <div
+                          key={loc.id}
+                          className="flex items-center gap-2 p-2 hover:bg-accent/50"
+                        >
+                          <Checkbox
+                            id={checkboxId}
+                            checked={checked}
+                            onCheckedChange={(v) => setLocationChecked(loc.id, v === true)}
+                          />
+                          <Label
+                            htmlFor={checkboxId}
+                            className="font-normal cursor-pointer flex-1 min-w-0"
+                          >
+                            <span className="block truncate">{loc.name}</span>
+                          </Label>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
             )}
           </div>
           

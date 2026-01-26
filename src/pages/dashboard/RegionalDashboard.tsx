@@ -163,7 +163,7 @@ export default function RegionalDashboard() {
                 className="gap-2"
               >
                 <CloudOff className="h-4 w-4" />
-                Excuse Submissions
+                Excuse ProMoves
               </Button>
             )}
           </div>

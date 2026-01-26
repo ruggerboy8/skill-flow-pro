@@ -153,7 +153,7 @@ export function ExcuseSubmissionsDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Excuse Submissions</DialogTitle>
+          <DialogTitle>Excuse ProMoves</DialogTitle>
           <DialogDescription>
             Excuse locations from confidence and/or performance submissions for a specific week.
           </DialogDescription>

@@ -69,8 +69,7 @@ export default function Layout() {
     ...(canAccessAdmin ? [
       { name: 'Builder', href: '/builder', icon: SettingsIcon },
       { name: 'Admin', href: '/admin', icon: Shield },
-      { name: 'Eval Results', href: '/admin/eval-results', icon: TrendingUp },
-      { name: 'Eval Results 2.0', href: '/admin/eval-results-v2', icon: TrendingUp }
+      { name: 'Evaluations', href: '/admin/evaluations', icon: TrendingUp }
     ] : []),
     ...(isSuperAdmin ? [
       { name: 'Command Center', href: '/dashboard', icon: Building2 }

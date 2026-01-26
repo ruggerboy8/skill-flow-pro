@@ -28,7 +28,6 @@ import CoachDashboardV2 from "@/pages/coach/CoachDashboardV2";
 import StaffDetailV2 from "@/pages/coach/StaffDetailV2";
 import { EvaluationHub } from "@/pages/coach/EvaluationHub";
 import AdminPage from "@/pages/AdminPage";
-import EvalResults from "@/pages/admin/EvalResults";
 import EvalResultsV2 from "@/pages/admin/EvalResultsV2";
 import EvaluationViewer from "@/pages/EvaluationViewer";
 import AdminBuilder from "@/pages/AdminBuilder";
@@ -114,8 +113,10 @@ function AppRoutes() {
         <Route path="my-location" element={<MyLocationPage />} />
 
         <Route path="admin" element={<AdminPage />} />
-        <Route path="admin/eval-results" element={<EvalResults />} />
-        <Route path="admin/eval-results-v2" element={<EvalResultsV2 />} />
+        <Route path="admin/evaluations" element={<EvalResultsV2 />} />
+        {/* Legacy redirects for old eval results paths */}
+        <Route path="admin/eval-results" element={<Navigate to="/admin/evaluations" replace />} />
+        <Route path="admin/eval-results-v2" element={<Navigate to="/admin/evaluations" replace />} />
         <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
         <Route path="builder" element={<AdminBuilder />} />
         <Route path="builder/:roleId" element={<CycleList />} />

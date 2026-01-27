@@ -241,6 +241,11 @@ serve(async (req: Request) => {
           // If staff creation fails, we should clean up the auth user
           console.error("Staff creation failed, cleaning up auth user:", staffErr);
           await admin.auth.admin.deleteUser(invite.user.id);
+          
+          // Return user-friendly error for duplicate email
+          if (staffErr.code === "23505" && staffErr.message?.includes("email")) {
+            return json({ error: "A user with this email address already exists." }, 409);
+          }
           throw staffErr;
         }
 

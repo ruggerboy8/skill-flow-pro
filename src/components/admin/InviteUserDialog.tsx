@@ -72,7 +72,16 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
         },
       });
 
-      if (error) throw error;
+      // Handle edge function errors (non-2xx responses include error in data)
+      if (error) {
+        // Try to get the actual error message from the response
+        const errorMessage = data?.error || error.message || "Failed to invite user";
+        throw new Error(errorMessage);
+      }
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       setInvitedName(formData.name);
       setInviteSent(true);

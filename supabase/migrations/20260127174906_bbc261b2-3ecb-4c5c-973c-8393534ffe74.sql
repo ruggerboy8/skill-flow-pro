@@ -1,0 +1,162 @@
+
+-- Fix get_staff_weekly_scores to include Office Managers
+-- They should be able to view staff at their location via coach_scopes
+
+DROP FUNCTION IF EXISTS public.get_staff_weekly_scores(uuid, text);
+
+CREATE OR REPLACE FUNCTION public.get_staff_weekly_scores(
+  p_coach_user_id uuid,
+  p_week_of text DEFAULT NULL
+)
+RETURNS TABLE(
+  staff_id uuid,
+  staff_name text,
+  staff_email text,
+  user_id uuid,
+  role_id bigint,
+  role_name text,
+  location_id uuid,
+  location_name text,
+  organization_id uuid,
+  organization_name text,
+  score_id uuid,
+  week_of date,
+  assignment_id text,
+  action_id bigint,
+  selected_action_id bigint,
+  confidence_score integer,
+  confidence_date timestamptz,
+  confidence_late boolean,
+  confidence_source score_source,
+  performance_score integer,
+  performance_date timestamptz,
+  performance_late boolean,
+  performance_source score_source,
+  action_statement text,
+  domain_id bigint,
+  domain_name text,
+  display_order integer,
+  self_select boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_coach_staff_id uuid;
+  v_coach_scope_type text;
+  v_coach_scope_id uuid;
+  v_is_super_admin boolean;
+  v_is_org_admin boolean;
+  v_most_recent_week date;
+BEGIN
+  -- Get coach info from staff table
+  -- UPDATED: Include is_office_manager so OMs can access their location's data
+  SELECT s.id, s.coach_scope_type, s.coach_scope_id, s.is_super_admin, s.is_org_admin
+  INTO v_coach_staff_id, v_coach_scope_type, v_coach_scope_id, v_is_super_admin, v_is_org_admin
+  FROM staff s
+  WHERE s.user_id = p_coach_user_id
+    AND (s.is_coach OR s.is_super_admin OR s.is_org_admin OR s.is_office_manager)
+  LIMIT 1;
+
+  -- If not a coach/admin/OM, return empty
+  IF v_coach_staff_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Get the target week
+  IF p_week_of IS NOT NULL THEN
+    v_most_recent_week := date_trunc('week', p_week_of::date)::date;
+  ELSE
+    SELECT MAX((ws.week_of::date - ((EXTRACT(DOW FROM ws.week_of)::int + 6) % 7))::date)
+    INTO v_most_recent_week
+    FROM weekly_scores ws;
+  END IF;
+
+  RETURN QUERY
+  WITH coach_scopes_expanded AS (
+    -- Get all scopes from coach_scopes table for this user
+    SELECT cs.scope_type, cs.scope_id
+    FROM coach_scopes cs
+    WHERE cs.staff_id = v_coach_staff_id
+    
+    UNION
+    
+    -- Also include the legacy scope from staff table if set
+    SELECT v_coach_scope_type, v_coach_scope_id
+    WHERE v_coach_scope_type IS NOT NULL AND v_coach_scope_id IS NOT NULL
+  ),
+  filtered_staff AS (
+    SELECT
+      s.id,
+      s.name,
+      s.email,
+      s.user_id,
+      s.role_id,
+      r.role_name,
+      l.id AS location_id,
+      l.name AS location_name,
+      o.id AS organization_id,
+      o.name AS organization_name
+    FROM staff s
+    INNER JOIN locations l ON l.id = s.primary_location_id
+    INNER JOIN organizations o ON o.id = l.organization_id
+    LEFT JOIN roles r ON r.role_id = s.role_id
+    WHERE s.is_participant = true
+      AND s.is_org_admin = false  -- Filter out regional managers
+      AND s.primary_location_id IS NOT NULL
+      AND (
+        v_is_super_admin = true
+        OR EXISTS (
+          SELECT 1 FROM coach_scopes_expanded cse
+          WHERE (cse.scope_type = 'org' AND o.id = cse.scope_id)
+             OR (cse.scope_type = 'location' AND l.id = cse.scope_id)
+        )
+      )
+  )
+  SELECT
+    fs.id AS staff_id,
+    fs.name AS staff_name,
+    fs.email AS staff_email,
+    fs.user_id,
+    fs.role_id::bigint,
+    fs.role_name,
+    fs.location_id,
+    fs.location_name,
+    fs.organization_id,
+    fs.organization_name,
+    ws.id AS score_id,
+    (ws.week_of::date - ((EXTRACT(DOW FROM ws.week_of)::int + 6) % 7))::date AS week_of,
+    ws.assignment_id,
+    wa.action_id::bigint,
+    ws.selected_action_id::bigint,
+    ws.confidence_score,
+    ws.confidence_date,
+    ws.confidence_late,
+    ws.confidence_source,
+    ws.performance_score,
+    ws.performance_date,
+    ws.performance_late,
+    ws.performance_source,
+    COALESCE(pm.action_statement, pm_sel.action_statement, 'Self-Select') AS action_statement,
+    COALESCE(c.domain_id, c_sel.domain_id)::bigint AS domain_id,
+    COALESCE(d.domain_name, d_sel.domain_name) AS domain_name,
+    wa.display_order,
+    wa.self_select
+  FROM filtered_staff fs
+  LEFT JOIN weekly_scores ws ON ws.staff_id = fs.id
+    AND (ws.week_of::date - ((EXTRACT(DOW FROM ws.week_of)::int + 6) % 7))::date = v_most_recent_week
+  LEFT JOIN weekly_assignments wa ON wa.id::text = REPLACE(ws.assignment_id, 'assign:', '')
+  LEFT JOIN pro_moves pm ON pm.action_id = wa.action_id
+  LEFT JOIN pro_moves pm_sel ON pm_sel.action_id = ws.selected_action_id
+  LEFT JOIN competencies c ON c.competency_id = pm.competency_id
+  LEFT JOIN competencies c_sel ON c_sel.competency_id = pm_sel.competency_id
+  LEFT JOIN domains d ON d.domain_id = c.domain_id
+  LEFT JOIN domains d_sel ON d_sel.domain_id = c_sel.domain_id
+  ORDER BY 
+    fs.name,
+    ws.week_of DESC NULLS LAST,
+    ws.performance_date DESC NULLS LAST,
+    ws.confidence_date DESC NULLS LAST;
+END;
+$$;

@@ -224,6 +224,9 @@ serve(async (req: Request) => {
         }
 
         // 2) Create staff row with the user_id from the invite
+        // Office Manager (role_id = 3) gets special flags
+        const isOfficeManager = role_id === 3;
+        
         const { data: staff, error: staffErr } = await admin
           .from("staff")
           .insert({ 
@@ -232,6 +235,7 @@ serve(async (req: Request) => {
             role_id, 
             primary_location_id: location_id, 
             is_participant: true,
+            is_office_manager: isOfficeManager,
             user_id: invite.user.id
           })
           .select("id")
@@ -249,7 +253,22 @@ serve(async (req: Request) => {
           throw staffErr;
         }
 
-        // 3) Update user metadata with staff_id
+        // 3) For Office Managers, create a coach_scope entry for their location
+        if (isOfficeManager && staff?.id) {
+          const { error: scopeErr } = await admin
+            .from("coach_scopes")
+            .insert({
+              staff_id: staff.id,
+              scope_type: 'location',
+              scope_id: location_id
+            });
+          
+          if (scopeErr) {
+            console.warn("Failed to create coach_scope for Office Manager:", scopeErr);
+          }
+        }
+
+        // 4) Update user metadata with staff_id
         await admin.auth.admin.updateUserById(invite.user.id, {
           user_metadata: { staff_id: staff.id }
         });

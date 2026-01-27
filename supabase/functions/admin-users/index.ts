@@ -302,9 +302,28 @@ serve(async (req: Request) => {
           .from("staff")
           .update(updateData)
           .eq("user_id", user_id)
-          .select("id")
+          .select("id, is_office_manager")
           .maybeSingle();
         if (stErr) throw stErr;
+
+        // If location changed for an Office Manager, update their coach_scopes
+        if (location_id !== undefined && staff?.is_office_manager) {
+          // Delete existing location scopes for this staff
+          await admin
+            .from("coach_scopes")
+            .delete()
+            .eq("staff_id", staff.id)
+            .eq("scope_type", "location");
+          
+          // Insert new location scope
+          await admin
+            .from("coach_scopes")
+            .insert({
+              staff_id: staff.id,
+              scope_type: "location",
+              scope_id: location_id
+            });
+        }
 
         // Write audit log
         if (currentStaff) {

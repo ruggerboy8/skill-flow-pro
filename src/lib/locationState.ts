@@ -587,6 +587,27 @@ export async function computeWeekState(params: {
   let confComplete = requiredIds.every(id => byId.get(id)?.conf);
   let perfComplete = requiredIds.every(id => byId.get(id)?.perf);
 
+  // Check for individual excused submissions - treat excused metrics as complete
+  const { data: excusedSubmissions } = await supabase
+    .from('excused_submissions')
+    .select('metric')
+    .eq('staff_id', staffId)
+    .eq('week_of', mondayStr);
+
+  const excusedMetrics = new Set(
+    (excusedSubmissions ?? []).map(e => e.metric)
+  );
+
+  // If a metric is excused, treat it as complete so the CTA skips it
+  if (excusedMetrics.has('confidence')) {
+    confComplete = true;
+    console.log('[weekState] Confidence excused for week', mondayStr);
+  }
+  if (excusedMetrics.has('performance')) {
+    perfComplete = true;
+    console.log('[weekState] Performance excused for week', mondayStr);
+  }
+
   console.log('[weekState] Confidence complete:', confComplete, '(required slots:', required, ')');
   console.log('[weekState] Performance complete:', perfComplete, '(required slots:', required, ')');
 

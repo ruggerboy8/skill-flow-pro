@@ -67,12 +67,14 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [pauseReason, setPauseReason] = useState<string>('');
   const [allowBackfill, setAllowBackfill] = useState<boolean>(false);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
 
   useEffect(() => {
     if (user && open) {
       // Initialize editable fields
       setEditName(user.name || '');
       setEditEmail(user.email || '');
+      setSelectedLocationId(user.location_id || '');
       setIsPaused(user.is_paused ?? false);
       setPauseReason(user.pause_reason || '');
       
@@ -152,6 +154,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         name: editName.trim() || null,
         email: editEmail.trim() || null,
         allow_backfill: allowBackfill,
+        location_id: selectedLocationId || null,
       };
       
       if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') {
@@ -295,6 +298,31 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             />
             <p className="text-xs text-muted-foreground">
               Changing email will update both the staff record and auth account
+            </p>
+          </div>
+
+          {/* Location */}
+          <div className="space-y-2">
+            <Label htmlFor="edit-location">Primary Location</Label>
+            <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+              <SelectTrigger id="edit-location">
+                <SelectValue placeholder="Select location" />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    <div className="flex flex-col">
+                      <span>{location.name}</span>
+                      {location.organization && (
+                        <span className="text-xs text-muted-foreground">{location.organization.name}</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              The location this staff member belongs to
             </p>
           </div>
 

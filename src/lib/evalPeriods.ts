@@ -17,13 +17,14 @@ export interface EvaluationPeriod {
 export function generateEvalPeriods(startYear: number, endYear: number): EvaluationPeriod[] {
   const periods: EvaluationPeriod[] = [];
   
+  // Pin Baseline at the top (using most recent year)
+  periods.push({ type: 'Baseline', year: endYear });
+  
+  // Then quarterly periods in descending order (most recent first)
   for (let year = endYear; year >= startYear; year--) {
-    // Add quarterly periods in reverse order (Q4, Q3, Q2, Q1)
     for (const quarter of ['Q4', 'Q3', 'Q2', 'Q1'] as Quarter[]) {
       periods.push({ type: 'Quarterly', quarter, year });
     }
-    // Add baseline for this year at the end of that year's evaluations
-    periods.push({ type: 'Baseline', year });
   }
   
   return periods;

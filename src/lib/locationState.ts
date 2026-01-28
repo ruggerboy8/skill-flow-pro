@@ -598,14 +598,24 @@ export async function computeWeekState(params: {
     (excusedSubmissions ?? []).map(e => e.metric)
   );
 
-  // If a metric is excused, treat it as complete so the CTA skips it
+  // Also check for location-level excuses (excused_locations table)
+  const { data: locationExcuses } = await supabase
+    .from('excused_locations')
+    .select('metric')
+    .eq('location_id', locationId)
+    .eq('week_of', mondayStr);
+
+  // Merge location excuses into the set
+  (locationExcuses ?? []).forEach(e => excusedMetrics.add(e.metric));
+
+  // If a metric is excused (individually OR at location level), treat it as complete so the CTA skips it
   if (excusedMetrics.has('confidence')) {
     confComplete = true;
-    console.log('[weekState] Confidence excused for week', mondayStr);
+    console.log('[weekState] Confidence excused for week', mondayStr, '(individual or location-level)');
   }
   if (excusedMetrics.has('performance')) {
     perfComplete = true;
-    console.log('[weekState] Performance excused for week', mondayStr);
+    console.log('[weekState] Performance excused for week', mondayStr, '(individual or location-level)');
   }
 
   console.log('[weekState] Confidence complete:', confComplete, '(required slots:', required, ')');

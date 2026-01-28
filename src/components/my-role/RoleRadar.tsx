@@ -44,10 +44,25 @@ export default function RoleRadar() {
         });
 
         if (data && data.length > 0) {
-          // Group by eval_id to find the most recent evaluation
+          // Get visibility status for each evaluation
+          const evalIds = [...new Set(data.map(r => r.eval_id))];
+          const { data: evalData } = await supabase
+            .from('evaluations')
+            .select('id, is_visible_to_staff')
+            .in('id', evalIds);
+          
+          const visibilityMap = new Map<string, boolean>();
+          if (evalData) {
+            evalData.forEach(e => visibilityMap.set(e.id, e.is_visible_to_staff));
+          }
+
+          // Group by eval_id to find the most recent VISIBLE evaluation
           const evalGroups = new Map<string, { submitted_at: string; domains: DomainScore[] }>();
           
           for (const row of data) {
+            // Skip non-visible evaluations
+            if (!visibilityMap.get(row.eval_id)) continue;
+            
             if (!evalGroups.has(row.eval_id)) {
               evalGroups.set(row.eval_id, { 
                 submitted_at: row.submitted_at, 
@@ -60,7 +75,7 @@ export default function RoleRadar() {
             });
           }
 
-          // Find most recent evaluation
+          // Find most recent visible evaluation
           let mostRecent: { submitted_at: string; domains: DomainScore[] } | null = null;
           for (const evalData of evalGroups.values()) {
             if (!mostRecent || new Date(evalData.submitted_at) > new Date(mostRecent.submitted_at)) {

@@ -663,3 +663,47 @@ export async function bulkSubmitCompleteDrafts(
 
   return results;
 }
+
+/**
+ * Set visibility of a single evaluation for staff members
+ */
+export async function setEvaluationVisibility(evalId: string, visible: boolean) {
+  const { error } = await supabase
+    .from('evaluations')
+    .update({ is_visible_to_staff: visible })
+    .eq('id', evalId);
+  
+  if (error) {
+    throw new Error(`Failed to update visibility: ${error.message}`);
+  }
+}
+
+/**
+ * Bulk set visibility for all submitted evaluations at a location for a given period
+ */
+export async function bulkSetVisibilityByLocation(
+  locationId: string,
+  period: { type: 'Baseline' | 'Quarterly'; quarter?: string; year: number },
+  visible: boolean
+): Promise<{ updatedCount: number }> {
+  let query = supabase
+    .from('evaluations')
+    .update({ is_visible_to_staff: visible })
+    .eq('location_id', locationId)
+    .eq('status', 'submitted')
+    .eq('program_year', period.year);
+  
+  if (period.type === 'Quarterly' && period.quarter) {
+    query = query.eq('quarter', period.quarter).eq('type', 'Quarterly');
+  } else {
+    query = query.eq('type', 'Baseline');
+  }
+  
+  const { data, error } = await query.select('id');
+  
+  if (error) {
+    throw new Error(`Failed to update visibility: ${error.message}`);
+  }
+  
+  return { updatedCount: data?.length || 0 };
+}

@@ -56,21 +56,35 @@ export function useDomainDetail(domainSlug: string) {
 
       if (compError) throw compError;
 
-      // 2. Get the user's most recent submitted evaluation
+      // 2. Get the user's most recent submitted AND VISIBLE evaluation
       const { data: evalData } = await supabase.rpc('get_evaluations_summary', {
         p_staff_id: staffProfile.id,
         p_only_submitted: true
       });
 
-      // Find the most recent evaluation and extract scores by competency
+      // Find the most recent VISIBLE evaluation and extract scores by competency
       const competencyScores = new Map<number, number>();
       let mostRecentDate: Date | null = null;
+      let mostRecentEvalId: string | null = null;
       
       if (evalData && evalData.length > 0) {
-        // Get the most recent evaluation
-        let mostRecentEvalId: string | null = null;
+        // Get visibility status for each evaluation
+        const evalIds = [...new Set(evalData.map(r => r.eval_id))];
+        const { data: evalsWithVisibility } = await supabase
+          .from('evaluations')
+          .select('id, is_visible_to_staff')
+          .in('id', evalIds);
+        
+        const visibilityMap = new Map<string, boolean>();
+        if (evalsWithVisibility) {
+          evalsWithVisibility.forEach(e => visibilityMap.set(e.id, e.is_visible_to_staff));
+        }
 
+        // Find the most recent visible evaluation
         for (const row of evalData) {
+          // Skip non-visible evaluations
+          if (!visibilityMap.get(row.eval_id)) continue;
+          
           const dt = new Date(row.submitted_at);
           if (!mostRecentDate || dt > mostRecentDate) {
             mostRecentDate = dt;
@@ -79,7 +93,7 @@ export function useDomainDetail(domainSlug: string) {
         }
 
         if (mostRecentEvalId) {
-          // Fetch detailed evaluation items for the most recent eval
+          // Fetch detailed evaluation items for the most recent visible eval
           const { data: evalItems } = await supabase
             .from('evaluation_items')
             .select('competency_id, observer_score')

@@ -42,9 +42,28 @@ export default function StatsEvaluations() {
           p_only_submitted: true 
         });
 
-        // transform rows -> EvalRow[]
+        // Get visibility status for each evaluation
+        const evalIds = [...new Set((data ?? []).map(r => r.eval_id))];
+        let visibilityMap = new Map<string, boolean>();
+        
+        if (evalIds.length > 0) {
+          const { data: evalData } = await supabase
+            .from('evaluations')
+            .select('id, is_visible_to_staff')
+            .in('id', evalIds);
+          
+          if (evalData) {
+            evalData.forEach(e => visibilityMap.set(e.id, e.is_visible_to_staff));
+          }
+        }
+
+        // transform rows -> EvalRow[], filtering out non-visible evals
         const map = new Map<string, EvalRow>();
         for (const r of (data ?? [])) {
+          // Skip evaluations that are not visible to staff
+          const isVisible = visibilityMap.get(r.eval_id);
+          if (!isVisible) continue;
+          
           if (!map.has(r.eval_id)) {
             const labelBits = [];
             if (r.quarter) labelBits.push(r.quarter);

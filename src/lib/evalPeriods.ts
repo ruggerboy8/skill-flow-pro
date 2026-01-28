@@ -47,7 +47,7 @@ export function getCurrentEvalPeriod(): EvaluationPeriod {
  */
 export function formatEvalPeriod(period: EvaluationPeriod): string {
   if (period.type === 'Baseline') {
-    return `Baseline ${period.year}`;
+    return 'Baseline';
   }
   return `${period.quarter} ${period.year}`;
 }

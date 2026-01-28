@@ -395,6 +395,7 @@ export type Database = {
           extracted_insights: Json | null
           id: string
           interview_transcript: string | null
+          is_visible_to_staff: boolean
           location_id: string
           observed_at: string | null
           program_year: number
@@ -416,6 +417,7 @@ export type Database = {
           extracted_insights?: Json | null
           id?: string
           interview_transcript?: string | null
+          is_visible_to_staff?: boolean
           location_id: string
           observed_at?: string | null
           program_year: number
@@ -437,6 +439,7 @@ export type Database = {
           extracted_insights?: Json | null
           id?: string
           interview_transcript?: string | null
+          is_visible_to_staff?: boolean
           location_id?: string
           observed_at?: string | null
           program_year?: number

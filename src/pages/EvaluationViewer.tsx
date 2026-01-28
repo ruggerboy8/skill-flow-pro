@@ -191,8 +191,15 @@ export default function EvaluationViewer() {
         }
 
         // Allow access if: own evaluation OR is coach/admin
-        if (evalData.staff_id !== staff.id && !isCoach && !isSuperAdmin) {
+        const isOwnEval = evalData.staff_id === staff.id;
+        if (!isOwnEval && !isCoach && !isSuperAdmin) {
           setError("You don't have access to this evaluation.");
+          return;
+        }
+
+        // If viewing own evaluation, check visibility
+        if (isOwnEval && !isCoach && !isSuperAdmin && !evalData.is_visible_to_staff) {
+          setError("This evaluation is not yet available for viewing. Results will be released soon.");
           return;
         }
 

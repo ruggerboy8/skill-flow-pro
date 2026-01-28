@@ -1,25 +1,32 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEvalCoverage } from '@/hooks/useEvalCoverage';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FilterBar } from '@/components/admin/eval-results/FilterBar';
 import { OrgSummaryStrip } from '@/components/admin/eval-results-v2/OrgSummaryStrip';
 import { LocationCardGrid } from '@/components/admin/eval-results-v2/LocationCardGrid';
 import { LocationDetailV2 } from '@/components/admin/eval-results-v2/LocationDetailV2';
+import { DeliveryTab } from '@/components/admin/eval-results-v2/DeliveryTab';
 import { bulkSubmitCompleteDrafts } from '@/lib/evaluations';
 import { toast } from 'sonner';
 import type { EvalFilters } from '@/types/analytics';
 import type { EvalResultsV2View } from '@/types/evalMetricsV2';
+import type { EvaluationPeriod } from '@/lib/evalPeriods';
 
 export default function EvalResultsV2() {
   const { user, isSuperAdmin: authIsSuperAdmin, isOrgAdmin } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  
+  // Tab state from URL
+  const activeTab = searchParams.get('tab') || 'results';
   
   // Hierarchical view state
   const [view, setView] = useState<EvalResultsV2View>({ level: 'org-snapshot' });
@@ -96,6 +103,22 @@ export default function EvalResultsV2() {
     setView({ level: 'org-snapshot' });
   };
 
+  const handleTabChange = (tab: string) => {
+    setSearchParams({ tab });
+    // Reset to org-snapshot when switching tabs
+    setView({ level: 'org-snapshot' });
+  };
+
+  // Create period object for DeliveryTab from filters
+  const deliveryPeriod: EvaluationPeriod = filters.evaluationPeriod;
+
+  const handleDeliveryPeriodChange = (period: EvaluationPeriod) => {
+    setFilters(prev => ({
+      ...prev,
+      evaluationPeriod: period
+    }));
+  };
+
   if (hasAccess === null) {
     return (
       <div className="space-y-6">
@@ -125,8 +148,8 @@ export default function EvalResultsV2() {
           </p>
         </div>
         
-        {/* Coverage badges in header */}
-        {filters.organizationId && view.level === 'org-snapshot' && (
+        {/* Coverage badges in header - only show on Results tab at org-snapshot view */}
+        {activeTab === 'results' && filters.organizationId && view.level === 'org-snapshot' && (
           <div className="flex items-center gap-2 flex-wrap">
             {coverageLoading ? (
               <Skeleton className="h-6 w-24" />
@@ -156,26 +179,53 @@ export default function EvalResultsV2() {
         )}
       </div>
 
-      <FilterBar filters={filters} onFiltersChange={setFilters} />
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList>
+          <TabsTrigger value="results">Results</TabsTrigger>
+          <TabsTrigger value="delivery">Delivery</TabsTrigger>
+        </TabsList>
 
-      {view.level === 'org-snapshot' && (
-        <>
-          <OrgSummaryStrip filters={filters} />
-          <LocationCardGrid 
-            filters={filters} 
-            onLocationClick={handleLocationClick} 
-          />
-        </>
-      )}
+        <TabsContent value="results" className="space-y-6">
+          <FilterBar filters={filters} onFiltersChange={setFilters} />
 
-      {view.level === 'location-detail' && (
-        <LocationDetailV2
-          filters={filters}
-          locationId={view.locationId}
-          locationName={view.locationName}
-          onBack={handleBackToOrg}
-        />
-      )}
+          {view.level === 'org-snapshot' && (
+            <>
+              <OrgSummaryStrip filters={filters} />
+              <LocationCardGrid 
+                filters={filters} 
+                onLocationClick={handleLocationClick} 
+              />
+            </>
+          )}
+
+          {view.level === 'location-detail' && (
+            <LocationDetailV2
+              filters={filters}
+              locationId={view.locationId}
+              locationName={view.locationName}
+              onBack={handleBackToOrg}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="delivery" className="space-y-6">
+          <FilterBar filters={filters} onFiltersChange={setFilters} hidePeriodSelector />
+
+          {filters.organizationId ? (
+            <DeliveryTab
+              organizationId={filters.organizationId}
+              period={deliveryPeriod}
+              onPeriodChange={handleDeliveryPeriodChange}
+            />
+          ) : (
+            <div className="text-center py-12 border rounded-lg bg-muted/30">
+              <p className="text-muted-foreground">
+                Select an organization to view delivery progress.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

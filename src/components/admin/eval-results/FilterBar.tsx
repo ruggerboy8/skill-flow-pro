@@ -17,6 +17,8 @@ import { getPeriodLabel, comparePeriods, periodsEqual } from '@/types/analytics'
 interface FilterBarProps {
   filters: EvalFilters;
   onFiltersChange: (filters: EvalFilters) => void;
+  /** Hide the period selector (used when another component handles period selection) */
+  hidePeriodSelector?: boolean;
 }
 
 interface Organization {
@@ -34,7 +36,7 @@ interface Role {
   role_name: string;
 }
 
-export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
+export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false }: FilterBarProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -266,8 +268,8 @@ export function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
           </SelectContent>
         </Select>
 
-        {/* Timeline Navigation */}
-        {filters.organizationId && (
+        {/* Timeline Navigation - only show if not hidden */}
+        {filters.organizationId && !hidePeriodSelector && (
           <div className="flex items-center gap-1">
             {/* Previous (Older) Button */}
             <Button

@@ -5,6 +5,8 @@ import type { EvaluationPeriod } from '@/lib/evalPeriods';
 export interface LocationProgress {
   locationId: string;
   locationName: string;
+  organizationId: string;
+  organizationName: string;
   totalStaff: number;
   draftCount: number;
   submittedCount: number;
@@ -20,22 +22,21 @@ interface UseEvalDeliveryProgressResult {
 }
 
 /**
- * Hook to fetch evaluation delivery progress data per location
+ * Hook to fetch evaluation delivery progress data for ALL locations
+ * Optionally filter by organization client-side
  */
 export function useEvalDeliveryProgress(
-  organizationId: string | null,
   period: EvaluationPeriod | null
 ): UseEvalDeliveryProgressResult {
   const query = useQuery({
-    queryKey: ['eval-delivery-progress', organizationId, period?.type, period?.quarter, period?.year],
+    queryKey: ['eval-delivery-progress', period?.type, period?.quarter, period?.year],
     queryFn: async (): Promise<LocationProgress[]> => {
-      if (!organizationId || !period) return [];
+      if (!period) return [];
 
-      // 1. Get all active locations for this organization
+      // 1. Get all active locations with their organization info
       const { data: locations, error: locError } = await supabase
         .from('locations')
-        .select('id, name')
-        .eq('organization_id', organizationId)
+        .select('id, name, organization_id, organizations!locations_organization_id_fkey(name)')
         .eq('active', true)
         .order('name');
 
@@ -113,9 +114,14 @@ export function useEvalDeliveryProgress(
           ? Math.round((evals.submitted / totalStaff) * 100) 
           : 0;
         
+        // Extract org name from the joined data
+        const orgData = loc.organizations as { name: string } | null;
+        
         return {
           locationId: loc.id,
           locationName: loc.name,
+          organizationId: loc.organization_id,
+          organizationName: orgData?.name || 'Unknown',
           totalStaff,
           draftCount: evals.drafts,
           submittedCount: evals.submitted,
@@ -127,7 +133,7 @@ export function useEvalDeliveryProgress(
 
       return result;
     },
-    enabled: !!organizationId && !!period
+    enabled: !!period
   });
 
   return {

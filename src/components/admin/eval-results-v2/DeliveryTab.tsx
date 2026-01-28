@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MoreHorizontal, Eye, EyeOff, Send, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEvalDeliveryProgress, type LocationProgress } from '@/hooks/useEvalDeliveryProgress';
@@ -15,14 +16,29 @@ import type { EvaluationPeriod } from '@/lib/evalPeriods';
 import { formatEvalPeriod } from '@/lib/evalPeriods';
 
 interface DeliveryTabProps {
-  organizationId: string;
   period: EvaluationPeriod;
   onPeriodChange: (period: EvaluationPeriod) => void;
 }
 
-export function DeliveryTab({ organizationId, period, onPeriodChange }: DeliveryTabProps) {
+export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
   const queryClient = useQueryClient();
-  const { locations, isLoading, refetch } = useEvalDeliveryProgress(organizationId, period);
+  const { locations, isLoading, refetch } = useEvalDeliveryProgress(period);
+  const [orgFilter, setOrgFilter] = useState<string>('all');
+
+  // Get unique organizations for the filter dropdown
+  const organizations = useMemo(() => {
+    const orgMap = new Map<string, string>();
+    locations.forEach(loc => {
+      orgMap.set(loc.organizationId, loc.organizationName);
+    });
+    return Array.from(orgMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [locations]);
+
+  // Filter locations by selected organization
+  const filteredLocations = useMemo(() => {
+    if (orgFilter === 'all') return locations;
+    return locations.filter(loc => loc.organizationId === orgFilter);
+  }, [locations, orgFilter]);
 
   // Mutation for setting visibility
   const visibilityMutation = useMutation({
@@ -88,43 +104,52 @@ export function DeliveryTab({ organizationId, period, onPeriodChange }: Delivery
     );
   }
 
-  const hasAnyData = locations.some(loc => loc.draftCount > 0 || loc.submittedCount > 0);
+  const hasAnyData = filteredLocations.some(loc => loc.draftCount > 0 || loc.submittedCount > 0);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
         <EvalPeriodSelector
           value={period}
           onChange={onPeriodChange}
           className="w-48"
         />
+        <Select value={orgFilter} onValueChange={setOrgFilter}>
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder="Filter by organization" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Organizations</SelectItem>
+            {organizations.map(([id, name]) => (
+              <SelectItem key={id} value={id}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {!hasAnyData ? (
-        <div className="text-center py-12 border rounded-lg bg-muted/30">
-          <p className="text-lg text-muted-foreground">
-            No {formatEvalPeriod(period)} evaluations yet.
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Progress will appear here once evaluations are created.
-          </p>
-        </div>
-      ) : (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Location</TableHead>
+              <TableHead>Organization</TableHead>
+              <TableHead className="text-center">Staff</TableHead>
+              <TableHead className="text-center">Drafts</TableHead>
+              <TableHead className="text-center">Submitted</TableHead>
+              <TableHead className="text-center">Coverage</TableHead>
+              <TableHead className="text-center">Visible</TableHead>
+              <TableHead className="w-12"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredLocations.length === 0 ? (
               <TableRow>
-                <TableHead>Location</TableHead>
-                <TableHead className="text-center">Staff</TableHead>
-                <TableHead className="text-center">Drafts</TableHead>
-                <TableHead className="text-center">Submitted</TableHead>
-                <TableHead className="text-center">Coverage</TableHead>
-                <TableHead className="text-center">Visible</TableHead>
-                <TableHead className="w-12"></TableHead>
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  No locations found.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {locations.map(loc => (
+            ) : (
+              filteredLocations.map(loc => (
                 <LocationRow
                   key={loc.locationId}
                   location={loc}
@@ -136,10 +161,16 @@ export function DeliveryTab({ organizationId, period, onPeriodChange }: Delivery
                     visibilityMutation.isPending || submitDraftsMutation.isPending
                   }
                 />
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {!hasAnyData && filteredLocations.length > 0 && (
+        <p className="text-sm text-muted-foreground text-center">
+          No {formatEvalPeriod(period)} evaluations yet for the selected locations.
+        </p>
       )}
     </div>
   );
@@ -153,11 +184,12 @@ interface LocationRowProps {
 }
 
 function LocationRow({ location, onToggleVisibility, onSubmitDrafts, isUpdating }: LocationRowProps) {
-  const { locationName, totalStaff, draftCount, submittedCount, coveragePercent, allVisible, visibleCount } = location;
+  const { locationName, organizationName, totalStaff, draftCount, submittedCount, coveragePercent, allVisible, visibleCount } = location;
 
   return (
     <TableRow>
       <TableCell className="font-medium">{locationName}</TableCell>
+      <TableCell className="text-muted-foreground">{organizationName}</TableCell>
       <TableCell className="text-center">{totalStaff}</TableCell>
       <TableCell className="text-center">
         {draftCount > 0 ? (

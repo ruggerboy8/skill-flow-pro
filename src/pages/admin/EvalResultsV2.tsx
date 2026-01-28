@@ -209,21 +209,10 @@ export default function EvalResultsV2() {
         </TabsContent>
 
         <TabsContent value="delivery" className="space-y-6">
-          <FilterBar filters={filters} onFiltersChange={setFilters} hidePeriodSelector />
-
-          {filters.organizationId ? (
-            <DeliveryTab
-              organizationId={filters.organizationId}
-              period={deliveryPeriod}
-              onPeriodChange={handleDeliveryPeriodChange}
-            />
-          ) : (
-            <div className="text-center py-12 border rounded-lg bg-muted/30">
-              <p className="text-muted-foreground">
-                Select an organization to view delivery progress.
-              </p>
-            </div>
-          )}
+          <DeliveryTab
+            period={deliveryPeriod}
+            onPeriodChange={handleDeliveryPeriodChange}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -234,12 +234,12 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
         action_id: row.data.action_id && row.data.action_id.trim() !== '' ? parseInt(row.data.action_id) : null,
         role_name: row.data.role_name,
         competency_name: row.data.competency_name,
-        text: row.data.text,
+        action_statement: row.data.text,
         description: row.data.description || null,
         resources_url: row.data.resources_url || null,
         intervention_text: row.data.intervention_text || null,
         script: row.data.script || null,
-        active: row.data.active === 'false' ? false : true
+        active: row.data.active?.toLowerCase() === 'false' ? false : true
       }));
 
       const { data: result, error } = await supabase.rpc('bulk_upsert_pro_moves', {

@@ -17,10 +17,19 @@ export function ProMovesAccordion({ competencyId, className }: ProMovesAccordion
   const [isOpen, setIsOpen] = useState(false);
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedForCompetency, setLoadedForCompetency] = useState<number | null>(null);
+
+  // Reset state when competencyId changes
+  useEffect(() => {
+    if (loadedForCompetency !== competencyId) {
+      setProMoves([]);
+      setLoadedForCompetency(null);
+      setIsOpen(false);
+    }
+  }, [competencyId, loadedForCompetency]);
 
   const loadProMoves = async () => {
-    if (loaded) return;
+    if (loadedForCompetency === competencyId) return;
     
     setLoading(true);
     try {
@@ -33,7 +42,7 @@ export function ProMovesAccordion({ competencyId, className }: ProMovesAccordion
 
       if (error) throw error;
       setProMoves(data || []);
-      setLoaded(true);
+      setLoadedForCompetency(competencyId);
     } catch (error) {
       console.error('[ProMovesAccordion] Error loading pro moves:', error);
     } finally {
@@ -42,7 +51,7 @@ export function ProMovesAccordion({ competencyId, className }: ProMovesAccordion
   };
 
   const handleToggle = () => {
-    if (!isOpen && !loaded) {
+    if (!isOpen && loadedForCompetency !== competencyId) {
       loadProMoves();
     }
     setIsOpen(!isOpen);
@@ -60,11 +69,11 @@ export function ProMovesAccordion({ competencyId, className }: ProMovesAccordion
           <ChevronRight className="w-3 h-3" />
         )}
         <span>
-          {loading ? 'Loading...' : `View Associated Pro Moves${loaded ? ` (${proMoves.length})` : ''}`}
+          {loading ? 'Loading...' : `View Associated Pro Moves${loadedForCompetency === competencyId ? ` (${proMoves.length})` : ''}`}
         </span>
       </button>
       
-      {isOpen && loaded && (
+      {isOpen && loadedForCompetency === competencyId && (
         <div className="mt-2 pl-4 border-l-2 border-muted">
           {proMoves.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">

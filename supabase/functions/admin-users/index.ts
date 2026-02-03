@@ -207,7 +207,7 @@ serve(async (req: Request) => {
       }
 
       case "invite_user": {
-        const { email, name, role_id, location_id } = payload ?? {};
+        const { email, name, role_id, location_id, participation_start_at } = payload ?? {};
         if (!email || !name || !role_id || !location_id) {
           return json({ error: "Missing required fields: email, name, role_id, and location_id are all required" }, 400);
         }
@@ -236,7 +236,8 @@ serve(async (req: Request) => {
             primary_location_id: location_id, 
             is_participant: true,
             is_office_manager: isOfficeManager,
-            user_id: invite.user.id
+            user_id: invite.user.id,
+            participation_start_at: participation_start_at || null
           })
           .select("id")
           .single();

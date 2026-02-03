@@ -44,6 +44,7 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
     organization_id: "",
     role_id: "",
     location_id: "",
+    participation_start_at: "",
   });
 
   // Filter locations based on selected organization
@@ -69,6 +70,7 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
           name: formData.name,
           role_id: parseInt(formData.role_id),
           location_id: formData.location_id,
+          ...(formData.participation_start_at && { participation_start_at: formData.participation_start_at }),
         },
       });
 
@@ -109,6 +111,7 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
       organization_id: "",
       role_id: "",
       location_id: "",
+      participation_start_at: "",
     });
     setInviteSent(false);
     setInvitedName("");
@@ -244,6 +247,20 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="start-date">Start Date (optional)</Label>
+            <Input
+              id="start-date"
+              type="date"
+              value={formData.participation_start_at}
+              onChange={(e) => setFormData({ ...formData, participation_start_at: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              When left blank, submissions follow the standard onboarding timeline. 
+              Set a date to specify when ProMoves become required.
+            </p>
           </div>
 
           <DialogFooter>

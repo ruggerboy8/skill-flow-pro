@@ -346,7 +346,7 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
               <div className="text-sm text-gray-600">
                 <p className="font-medium mb-2">Required CSV columns:</p>
                 <ul className="list-disc list-inside space-y-1">
-                  <li><code>role_name</code> - Role name (DFI, RDA)</li>
+                  <li><code>role_name</code> - Role name (DFI, RDA, Office Manager)</li>
                   <li><code>competency_name</code> - Exact competency name</li>
                   <li><code>text</code> - Pro-move statement</li>
                 </ul>

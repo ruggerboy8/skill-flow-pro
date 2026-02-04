@@ -2051,6 +2051,7 @@ export type Database = {
           is_self_select: boolean | null
           location_id: string | null
           metric: string | null
+          on_time: boolean | null
           required: boolean | null
           role_id: number | null
           slot_index: number | null

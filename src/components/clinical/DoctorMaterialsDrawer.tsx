@@ -123,41 +123,58 @@ export function DoctorMaterialsDrawer({
     });
   };
 
-  const formatField = async (type: string) => {
-    const content = resources[type]?.content?.trim();
-    if (!content) {
+  const formatAllContent = async () => {
+    const sectionsWithContent = MATERIAL_SECTIONS.filter(
+      s => resources[s.type]?.content?.trim()
+    );
+    
+    if (sectionsWithContent.length === 0) {
       toast({
         title: 'No Content',
-        description: 'Enter some content first, then format it.',
+        description: 'Add content to at least one section first.',
         variant: 'destructive',
       });
       return;
     }
 
-    setFormattingField(type);
-    try {
-      const { data, error } = await supabase.functions.invoke('format-pro-move-content', {
-        body: { content, contentType: type },
-      });
+    setFormattingField('all');
+    let successCount = 0;
+    let errorCount = 0;
 
-      if (error) throw error;
+    for (const section of sectionsWithContent) {
+      try {
+        const content = resources[section.type]?.content?.trim();
+        if (!content) continue;
 
-      if (data?.formatted) {
-        handleContentChange(type, data.formatted);
-        toast({
-          title: 'Formatted',
-          description: 'Content has been auto-formatted. Review before saving.',
+        const { data, error } = await supabase.functions.invoke('format-pro-move-content', {
+          body: { content, contentType: section.type },
         });
+
+        if (error) throw error;
+
+        if (data?.formatted) {
+          handleContentChange(section.type, data.formatted);
+          successCount++;
+        }
+      } catch (error) {
+        console.error(`Error formatting ${section.type}:`, error);
+        errorCount++;
       }
-    } catch (error) {
-      console.error('Error formatting content:', error);
+    }
+
+    setFormattingField(null);
+    
+    if (successCount > 0) {
+      toast({
+        title: 'Formatted',
+        description: `${successCount} section${successCount > 1 ? 's' : ''} formatted${errorCount > 0 ? `, ${errorCount} failed` : ''}. Review before saving.`,
+      });
+    } else {
       toast({
         title: 'Error',
         description: 'Failed to format content. Please try again.',
         variant: 'destructive',
       });
-    } finally {
-      setFormattingField(null);
     }
   };
 
@@ -243,38 +260,39 @@ export function DoctorMaterialsDrawer({
             </div>
           ) : (
             <div className="mt-6 space-y-6">
+              {/* Format All Button */}
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={formatAllContent}
+                  disabled={formattingField !== null || !MATERIAL_SECTIONS.some(s => resources[s.type]?.content?.trim())}
+                  className="gap-2"
+                >
+                  {formattingField === 'all' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-4 w-4" />
+                  )}
+                  Format All Content
+                </Button>
+              </div>
+
               {/* Material Sections */}
               {MATERIAL_SECTIONS.map((section, idx) => {
                 const resource = resources[section.type];
                 const isAIGenerated = aiGeneratedContent?.[section.type] === resource?.content;
-                const isFormatting = formattingField === section.type;
                 
                 return (
                   <div key={section.type} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="flex items-center gap-2">
-                        {section.title}
-                        {isAIGenerated && (
-                          <span className="text-xs bg-warning/20 text-warning-foreground px-2 py-0.5 rounded">
-                            AI Generated
-                          </span>
-                        )}
-                      </Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => formatField(section.type)}
-                        disabled={isFormatting || !resource?.content?.trim()}
-                        className="h-7 gap-1 text-xs"
-                      >
-                        {isFormatting ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Wand2 className="h-3 w-3" />
-                        )}
-                        Format
-                      </Button>
-                    </div>
+                    <Label className="flex items-center gap-2">
+                      {section.title}
+                      {isAIGenerated && (
+                        <span className="text-xs bg-warning/20 text-warning-foreground px-2 py-0.5 rounded">
+                          AI Generated
+                        </span>
+                      )}
+                    </Label>
                     <Textarea
                       value={resource?.content || ''}
                       onChange={(e) => handleContentChange(section.type, e.target.value)}

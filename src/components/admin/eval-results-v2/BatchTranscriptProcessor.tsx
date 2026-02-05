@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -17,12 +17,13 @@ import {
 import { Mic, ChevronDown, Search, Play, Check, AlertTriangle, Loader2, X, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useBatchProcessor } from '@/contexts/BatchProcessorContext';
 
 interface PendingEval {
   id: string;
   staffName: string;
   locationName: string;
-  period: string; // e.g., "Q1 2025", "Baseline"
+  period: string;
   audioPath: string | null;
   audioSize: number | null;
   hasTranscript: boolean;
@@ -38,33 +39,13 @@ function formatPeriod(type: string, quarter: string | null, year: number): strin
   return quarter ? `${quarter} ${year}` : `${year}`;
 }
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
-const DELAY_BETWEEN_ITEMS_MS = 1000; // 1 second delay between items
-
 export function BatchTranscriptProcessor() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isStopping, setIsStopping] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingEvals, setPendingEvals] = useState<PendingEval[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
   
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Warn user before leaving page while processing
-  useEffect(() => {
-    if (!isProcessing) return;
-    
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = 'Processing is in progress. Are you sure you want to leave?';
-      return e.returnValue;
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isProcessing]);
+  const { state, setPendingEvals, startProcessing, stopProcessing, resetState } = useBatchProcessor();
+  const { isProcessing, isStopping, pendingEvals, currentIndex } = state;
 
   const missingTranscriptCount = pendingEvals.filter(e => e.issue === 'no_transcript').length;
   const missingInsightsCount = pendingEvals.filter(e => e.issue === 'no_insights').length;
@@ -74,16 +55,14 @@ export function BatchTranscriptProcessor() {
   // Cost estimates (rough approximations)
   const estimatedCostMin = (missingTranscriptCount * 0.06) + (missingInsightsCount * 0.02);
   const estimatedCostMax = (missingTranscriptCount * 0.10) + (missingInsightsCount * 0.04);
-  const estimatedTimeMin = Math.ceil((missingTranscriptCount * 15 + missingInsightsCount * 5) / 60); // minutes
-  const estimatedTimeMax = Math.ceil((missingTranscriptCount * 30 + missingInsightsCount * 10) / 60); // minutes
+  const estimatedTimeMin = Math.ceil((missingTranscriptCount * 15 + missingInsightsCount * 5) / 60);
+  const estimatedTimeMax = Math.ceil((missingTranscriptCount * 30 + missingInsightsCount * 10) / 60);
 
   async function scanForMissing() {
     setIsScanning(true);
-    setPendingEvals([]);
+    resetState();
 
     try {
-      // Query for evaluations needing transcription or insight extraction
-      // Don't use embedded relations since location_id FK isn't in schema cache
       const { data, error } = await supabase
         .from('evaluations')
         .select(`
@@ -102,23 +81,19 @@ export function BatchTranscriptProcessor() {
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        setPendingEvals([]);
         toast.info('All evaluations are up to date');
         return;
       }
 
-      // Get unique staff and location IDs
       const staffIds = [...new Set(data.map(d => d.staff_id))];
       const locationIds = [...new Set(data.map(d => d.location_id))];
 
-      // Fetch staff names
       const { data: staffData } = await supabase
         .from('staff')
         .select('id, name')
         .in('id', staffIds);
       const staffMap = new Map((staffData || []).map(s => [s.id, s.name]));
 
-      // Fetch location names
       const { data: locationData } = await supabase
         .from('locations')
         .select('id, name')
@@ -130,10 +105,8 @@ export function BatchTranscriptProcessor() {
       for (const row of data) {
         const staffName = staffMap.get(row.staff_id) || 'Unknown';
         const locationName = locationMap.get(row.location_id) || 'Unknown';
-
         const period = formatPeriod(row.type, row.quarter, row.program_year);
 
-        // Determine issue type
         if (row.audio_recording_path && !row.summary_raw_transcript) {
           evals.push({
             id: row.id,
@@ -180,159 +153,9 @@ export function BatchTranscriptProcessor() {
     }
   }
 
-  function stopProcessing() {
-    setIsStopping(true);
-    abortControllerRef.current?.abort();
-  }
-
-  async function processAll() {
-    if (pendingEvals.length === 0) return;
-
+  function handleStartProcessing() {
     setShowConfirmDialog(false);
-    setIsProcessing(true);
-    setIsStopping(false);
-    setCurrentIndex(0);
-
-    // Create new AbortController for this batch
-    abortControllerRef.current = new AbortController();
-
-    const pendingItems = pendingEvals.filter(e => e.status === 'pending');
-
-    for (let i = 0; i < pendingItems.length; i++) {
-      // Check if stopped
-      if (abortControllerRef.current?.signal.aborted) {
-        toast.info('Processing stopped by user');
-        break;
-      }
-
-      const evalItem = pendingItems[i];
-      setCurrentIndex(i);
-
-      // Update status to processing
-      setPendingEvals(prev => prev.map(e => 
-        e.id === evalItem.id ? { ...e, status: 'processing' } : e
-      ));
-
-      try {
-        const result = await processOne(evalItem);
-        setPendingEvals(prev => prev.map(e => 
-          e.id === evalItem.id ? { ...e, ...result } : e
-        ));
-      } catch (err) {
-        console.error('Process error:', err);
-        setPendingEvals(prev => prev.map(e => 
-          e.id === evalItem.id ? { ...e, status: 'error', message: 'Unexpected error' } : e
-        ));
-      }
-
-      // Add delay between items (unless this is the last one or we're stopping)
-      if (i < pendingItems.length - 1 && !abortControllerRef.current?.signal.aborted) {
-        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_ITEMS_MS));
-      }
-    }
-
-    setIsProcessing(false);
-    setIsStopping(false);
-    abortControllerRef.current = null;
-    
-    // Get final counts from current state
-    setPendingEvals(prev => {
-      const successCount = prev.filter(e => e.status === 'success').length;
-      const skippedCount = prev.filter(e => e.status === 'skipped').length;
-      const errorCount = prev.filter(e => e.status === 'error').length;
-      
-      if (successCount > 0 || skippedCount > 0 || errorCount > 0) {
-        toast.success(`Processing complete: ${successCount} succeeded, ${skippedCount} skipped, ${errorCount} errors`);
-      }
-      
-      return prev;
-    });
-  }
-
-  async function processOne(evalItem: PendingEval): Promise<Partial<PendingEval>> {
-    let transcript = evalItem.existingTranscript;
-
-    // Stage 1: Transcription (if needed)
-    if (evalItem.issue === 'no_transcript' && evalItem.audioPath) {
-      try {
-        // Download audio file
-        const { data: audioBlob, error: downloadError } = await supabase.storage
-          .from('evaluation-recordings')
-          .download(evalItem.audioPath);
-
-        if (downloadError || !audioBlob) {
-          return { status: 'error', message: 'Failed to download audio' };
-        }
-
-        // Check file size
-        if (audioBlob.size > MAX_FILE_SIZE) {
-          return { status: 'skipped', message: 'Audio file too large (>25MB)', audioSize: audioBlob.size };
-        }
-
-        // Send to transcribe-audio - use correct filename extension from path
-        const formData = new FormData();
-        const fileName = evalItem.audioPath.split('/').pop() || 'audio.webm';
-        formData.append('audio', audioBlob, fileName);
-
-        const { data: transcriptResult, error: transcribeError } = await supabase.functions
-          .invoke('transcribe-audio', { body: formData });
-
-        if (transcribeError || !transcriptResult?.transcript) {
-          return { status: 'error', message: transcribeError?.message || 'Transcription failed' };
-        }
-
-        transcript = transcriptResult.transcript;
-
-        // Save transcript
-        const { error: updateError } = await supabase
-          .from('evaluations')
-          .update({ summary_raw_transcript: transcript })
-          .eq('id', evalItem.id);
-
-        if (updateError) {
-          return { status: 'error', message: 'Failed to save transcript' };
-        }
-      } catch (err) {
-        console.error('Transcription error:', err);
-        return { status: 'error', message: 'Transcription failed' };
-      }
-    }
-
-    // Stage 2: Insight Extraction
-    if (transcript) {
-      try {
-        const { data: insightsResult, error: insightsError } = await supabase.functions
-          .invoke('extract-insights', {
-            body: {
-              transcript,
-              staffName: evalItem.staffName,
-              source: 'observation'
-            }
-          });
-
-        if (insightsError || !insightsResult?.insights) {
-          return { status: 'error', message: insightsError?.message || 'Insight extraction failed' };
-        }
-
-        // Save insights
-        const insights = { observer: insightsResult.insights };
-        const { error: updateError } = await supabase
-          .from('evaluations')
-          .update({ extracted_insights: insights })
-          .eq('id', evalItem.id);
-
-        if (updateError) {
-          return { status: 'error', message: 'Failed to save insights' };
-        }
-
-        return { status: 'success', message: 'Completed' };
-      } catch (err) {
-        console.error('Insight extraction error:', err);
-        return { status: 'error', message: 'Insight extraction failed' };
-      }
-    }
-
-    return { status: 'error', message: 'No transcript available' };
+    startProcessing();
   }
 
   function formatFileSize(bytes: number | null): string {
@@ -388,7 +211,12 @@ export function BatchTranscriptProcessor() {
             <div className="flex items-center gap-2">
               <Mic className="w-4 h-4" />
               <span className="font-medium">Missing Transcripts & Insights</span>
-              {pendingEvals.length > 0 && (
+              {isProcessing && (
+                <Badge variant="default" className="ml-2 animate-pulse">
+                  Processing...
+                </Badge>
+              )}
+              {!isProcessing && pendingEvals.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {pendingCount} pending
                 </Badge>
@@ -448,7 +276,7 @@ export function BatchTranscriptProcessor() {
             {isProcessing && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span>Processing {currentIndex + 1} of {pendingEvals.filter(e => e.status !== 'success' && e.status !== 'skipped' && e.status !== 'error').length + completedCount}</span>
+                  <span>Processing {currentIndex + 1} of {pendingEvals.length}</span>
                   <span>{Math.round((completedCount / pendingEvals.length) * 100)}%</span>
                 </div>
                 <Progress value={(completedCount / pendingEvals.length) * 100} />
@@ -483,7 +311,7 @@ export function BatchTranscriptProcessor() {
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             {getStatusBadge(evalItem)}
-                            {evalItem.message && evalItem.status !== 'success' && (
+                            {evalItem.message && (
                               <span className="text-xs text-muted-foreground">{evalItem.message}</span>
                             )}
                           </div>
@@ -496,8 +324,8 @@ export function BatchTranscriptProcessor() {
             )}
 
             {pendingEvals.length === 0 && !isScanning && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Click "Scan" to find evaluations needing transcription or insight extraction.
+              <p className="text-sm text-muted-foreground">
+                Click "Scan" to find evaluations with audio recordings that haven't been transcribed yet.
               </p>
             )}
           </div>
@@ -514,9 +342,8 @@ export function BatchTranscriptProcessor() {
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>This will process <strong>{pendingCount}</strong> evaluation{pendingCount !== 1 ? 's' : ''}:</p>
-                
-                <ul className="list-disc list-inside space-y-1 text-sm">
+                <p>This will process <strong>{pendingCount}</strong> evaluation(s):</p>
+                <ul className="list-disc list-inside text-sm space-y-1">
                   {missingTranscriptCount > 0 && (
                     <li>{missingTranscriptCount} need transcription + insights</li>
                   )}
@@ -524,21 +351,20 @@ export function BatchTranscriptProcessor() {
                     <li>{missingInsightsCount} need insights only</li>
                   )}
                 </ul>
-
-                <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
-                  <p><strong>Estimated cost:</strong> ~${estimatedCostMin.toFixed(2)} – ${estimatedCostMax.toFixed(2)}</p>
-                  <p><strong>Estimated time:</strong> ~{estimatedTimeMin}–{estimatedTimeMax} minutes</p>
+                <div className="bg-muted p-3 rounded-md text-sm space-y-1">
+                  <p><strong>Estimated cost:</strong> ${estimatedCostMin.toFixed(2)} - ${estimatedCostMax.toFixed(2)}</p>
+                  <p><strong>Estimated time:</strong> {estimatedTimeMin}-{estimatedTimeMax} minutes</p>
                 </div>
-
-                <p className="text-xs text-muted-foreground">
-                  You can stop at any time, but already-processed items will remain updated.
+                <p className="text-sm">
+                  You can stop at any time. Already-processed items will remain updated.
+                  <strong> Processing will continue even if you navigate away.</strong>
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={processAll}>
+            <AlertDialogAction onClick={handleStartProcessing}>
               Start Processing
             </AlertDialogAction>
           </AlertDialogFooter>

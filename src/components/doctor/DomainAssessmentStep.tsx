@@ -181,12 +181,6 @@ export function DomainAssessmentStep({
       <DoctorMaterialsSheet
         proMoveId={selectedProMoveId}
         proMoveStatement={selectedProMove?.action_statement || ''}
-        currentScore={selectedProMove ? ratings[selectedProMove.action_id]?.score : null}
-        onScoreChange={(score) => {
-          if (selectedProMoveId) {
-            onRatingChange(selectedProMoveId, score);
-          }
-        }}
         onClose={() => setSelectedProMoveId(null)}
       />
     </>

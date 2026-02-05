@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getDomainColor } from '@/lib/domainColors';
 import { DoctorProMoveForm } from '@/components/clinical/DoctorProMoveForm';
 import { DoctorMaterialsDrawer } from '@/components/clinical/DoctorMaterialsDrawer';
+import { BatchContentFormatter } from '@/components/clinical/BatchContentFormatter';
 import { DOMAIN_ORDER } from '@/lib/domainUtils';
 
 const DOCTOR_ROLE_ID = 4;
@@ -320,10 +321,13 @@ export default function DoctorProMoveLibrary() {
           <h1 className="text-2xl font-bold">Clinical Pro-Move Library</h1>
           <p className="text-muted-foreground">Manage doctor-specific pro moves and learning materials</p>
         </div>
-        <Button onClick={handleAddProMove}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Pro-Move
-        </Button>
+        <div className="flex gap-2">
+          <BatchContentFormatter onComplete={() => setRefreshKey(prev => prev + 1)} />
+          <Button onClick={handleAddProMove}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Pro-Move
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

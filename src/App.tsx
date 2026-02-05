@@ -52,6 +52,7 @@ import DomainDetail from "@/pages/my-role/DomainDetail";
 import ClinicalLayout from "@/pages/clinical/ClinicalLayout";
 import ClinicalHome from "@/pages/clinical/ClinicalHome";
 import DoctorManagement from "@/pages/clinical/DoctorManagement";
+import DoctorProMoveLibrary from "@/pages/clinical/DoctorProMoveLibrary";
 import DoctorDetail from "@/pages/clinical/DoctorDetail";
 
 // Doctor pages
@@ -129,6 +130,7 @@ function AppRoutes() {
           <Route index element={<ClinicalHome />} />
           <Route path="doctors" element={<DoctorManagement />} />
           <Route path="doctors/:staffId" element={<DoctorDetail />} />
+          <Route path="pro-moves" element={<DoctorProMoveLibrary />} />
         </Route>
 
         {/* Doctor Routes */}

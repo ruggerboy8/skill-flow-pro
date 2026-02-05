@@ -47,24 +47,13 @@ export function AIContentAssistant({ proMoveStatement, onGenerated }: AIContentA
         throw new Error('No audio recorded');
       }
 
-      // Convert blob to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-      });
-      reader.readAsDataURL(audioBlob);
-      const base64Audio = await base64Promise;
+      // Send as FormData (matching other callers)
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
 
       // Transcribe audio
       const { data: transcribeData, error: transcribeError } = await supabase.functions.invoke('transcribe-audio', {
-        body: { 
-          audio: base64Audio,
-          mimeType: 'audio/webm'
-        }
+        body: formData,
       });
 
       if (transcribeError) throw transcribeError;

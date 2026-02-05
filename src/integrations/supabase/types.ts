@@ -290,6 +290,93 @@ export type Database = {
           },
         ]
       }
+      doctor_baseline_assessments: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          doctor_staff_id: string
+          id: string
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          doctor_staff_id: string
+          id?: string
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          doctor_staff_id?: string
+          id?: string
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_baseline_assessments_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: true
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_baseline_assessments_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: true
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
+      doctor_baseline_items: {
+        Row: {
+          action_id: number
+          assessment_id: string
+          created_at: string | null
+          id: string
+          self_note: string | null
+          self_score: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_id: number
+          assessment_id: string
+          created_at?: string | null
+          id?: string
+          self_note?: string | null
+          self_score?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_id?: number
+          assessment_id?: string
+          created_at?: string | null
+          id?: string
+          self_note?: string | null
+          self_score?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_baseline_items_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "doctor_baseline_items_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_baseline_assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       domains: {
         Row: {
           color_hex: string | null
@@ -1215,7 +1302,9 @@ export type Database = {
           hire_date: string
           home_route: string | null
           id: string
+          is_clinical_director: boolean | null
           is_coach: boolean
+          is_doctor: boolean | null
           is_lead: boolean
           is_office_manager: boolean
           is_org_admin: boolean
@@ -1243,7 +1332,9 @@ export type Database = {
           hire_date?: string
           home_route?: string | null
           id?: string
+          is_clinical_director?: boolean | null
           is_coach?: boolean
+          is_doctor?: boolean | null
           is_lead?: boolean
           is_office_manager?: boolean
           is_org_admin?: boolean
@@ -1271,7 +1362,9 @@ export type Database = {
           hire_date?: string
           home_route?: string | null
           id?: string
+          is_clinical_director?: boolean | null
           is_coach?: boolean
+          is_doctor?: boolean | null
           is_lead?: boolean
           is_office_manager?: boolean
           is_org_admin?: boolean

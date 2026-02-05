@@ -1,0 +1,316 @@
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { BaselineWelcome } from '@/components/doctor/BaselineWelcome';
+import { DomainAssessmentStep } from '@/components/doctor/DomainAssessmentStep';
+import { BaselineComplete } from '@/components/doctor/BaselineComplete';
+import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
+
+interface DomainGroup {
+  domain_id: number;
+  domain_name: string;
+  color_hex: string;
+  proMoves: ProMoveItem[];
+}
+
+interface ProMoveItem {
+  action_id: number;
+  action_statement: string;
+  competency_name: string;
+}
+
+export default function BaselineWizard() {
+  const { data: staff } = useStaffProfile();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
+  const [currentStep, setCurrentStep] = useState<'welcome' | 'assessment' | 'complete'>('welcome');
+  const [currentDomainIndex, setCurrentDomainIndex] = useState(0);
+  const [assessmentId, setAssessmentId] = useState<string | null>(null);
+  const [ratings, setRatings] = useState<Record<number, { score: number | null; note: string }>>({});
+
+  // Fetch existing assessment
+  const { data: existingAssessment } = useQuery({
+    queryKey: ['my-baseline-assessment', staff?.id],
+    queryFn: async () => {
+      if (!staff?.id) return null;
+      const { data, error } = await supabase
+        .from('doctor_baseline_assessments')
+        .select('id, status')
+        .eq('doctor_staff_id', staff.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!staff?.id,
+  });
+
+  // Fetch existing ratings if resuming
+  const { data: existingItems } = useQuery({
+    queryKey: ['my-baseline-items', assessmentId],
+    queryFn: async () => {
+      if (!assessmentId) return [];
+      const { data, error } = await supabase
+        .from('doctor_baseline_items')
+        .select('action_id, self_score, self_note')
+        .eq('assessment_id', assessmentId);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!assessmentId,
+  });
+
+  // Fetch doctor pro moves grouped by domain
+  const { data: domains, isLoading: domainsLoading } = useQuery({
+    queryKey: ['doctor-pro-moves-by-domain'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pro_moves')
+        .select(`
+          action_id,
+          action_statement,
+          competencies (
+            name,
+            domains (
+              domain_id,
+              domain_name,
+              color_hex
+            )
+          )
+        `)
+        .eq('role_id', 4)
+        .eq('active', true)
+        .order('action_id');
+      
+      if (error) throw error;
+      
+      // Group by domain
+      const domainMap = new Map<number, DomainGroup>();
+      
+      data?.forEach((pm: any) => {
+        const domain = pm.competencies?.domains;
+        if (!domain) return;
+        
+        if (!domainMap.has(domain.domain_id)) {
+          domainMap.set(domain.domain_id, {
+            domain_id: domain.domain_id,
+            domain_name: domain.domain_name,
+            color_hex: domain.color_hex,
+            proMoves: [],
+          });
+        }
+        
+        domainMap.get(domain.domain_id)!.proMoves.push({
+          action_id: pm.action_id,
+          action_statement: pm.action_statement,
+          competency_name: pm.competencies?.name || '',
+        });
+      });
+      
+      return Array.from(domainMap.values());
+    },
+  });
+
+  // Initialize assessment on component load
+  useEffect(() => {
+    if (existingAssessment?.status === 'completed') {
+      navigate('/doctor');
+    } else if (existingAssessment?.id) {
+      setAssessmentId(existingAssessment.id);
+      setCurrentStep('assessment');
+    }
+  }, [existingAssessment, navigate]);
+
+  // Load existing ratings when resuming
+  useEffect(() => {
+    if (existingItems?.length) {
+      const loadedRatings: Record<number, { score: number | null; note: string }> = {};
+      existingItems.forEach(item => {
+        loadedRatings[item.action_id] = {
+          score: item.self_score,
+          note: item.self_note || '',
+        };
+      });
+      setRatings(loadedRatings);
+    }
+  }, [existingItems]);
+
+  // Create assessment mutation
+  const createAssessmentMutation = useMutation({
+    mutationFn: async () => {
+      if (!staff?.id) throw new Error('No staff ID');
+      
+      const { data, error } = await supabase
+        .from('doctor_baseline_assessments')
+        .insert({
+          doctor_staff_id: staff.id,
+          status: 'in_progress',
+        })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      return data.id;
+    },
+    onSuccess: (id) => {
+      setAssessmentId(id);
+      setCurrentStep('assessment');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error starting assessment',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Save rating mutation
+  const saveRatingMutation = useMutation({
+    mutationFn: async ({ actionId, score, note }: { actionId: number; score: number | null; note: string }) => {
+      if (!assessmentId) throw new Error('No assessment ID');
+      
+      const { error } = await supabase
+        .from('doctor_baseline_items')
+        .upsert({
+          assessment_id: assessmentId,
+          action_id: actionId,
+          self_score: score,
+          self_note: note || null,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'assessment_id,action_id',
+        });
+      
+      if (error) throw error;
+    },
+  });
+
+  // Complete assessment mutation
+  const completeAssessmentMutation = useMutation({
+    mutationFn: async () => {
+      if (!assessmentId) throw new Error('No assessment ID');
+      
+      const { error } = await supabase
+        .from('doctor_baseline_assessments')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', assessmentId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-baseline'] });
+      setCurrentStep('complete');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error completing assessment',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleStart = () => {
+    if (existingAssessment?.id) {
+      setAssessmentId(existingAssessment.id);
+      setCurrentStep('assessment');
+    } else {
+      createAssessmentMutation.mutate();
+    }
+  };
+
+  const handleRatingChange = (actionId: number, score: number | null, note: string = '') => {
+    setRatings(prev => ({
+      ...prev,
+      [actionId]: { score, note },
+    }));
+    
+    // Auto-save
+    saveRatingMutation.mutate({ actionId, score, note });
+  };
+
+  const handleNextDomain = () => {
+    if (domains && currentDomainIndex < domains.length - 1) {
+      setCurrentDomainIndex(prev => prev + 1);
+    }
+  };
+
+  const handlePrevDomain = () => {
+    if (currentDomainIndex > 0) {
+      setCurrentDomainIndex(prev => prev - 1);
+    }
+  };
+
+  const handleComplete = () => {
+    completeAssessmentMutation.mutate();
+  };
+
+  const handleFinish = () => {
+    navigate('/doctor');
+  };
+
+  if (domainsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  const totalProMoves = domains?.reduce((sum, d) => sum + d.proMoves.length, 0) || 0;
+  const ratedCount = Object.values(ratings).filter(r => r.score !== null).length;
+  const progressPct = totalProMoves > 0 ? Math.round((ratedCount / totalProMoves) * 100) : 0;
+  const isLastDomain = domains ? currentDomainIndex === domains.length - 1 : false;
+  const allRated = ratedCount === totalProMoves;
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      {currentStep === 'welcome' && (
+        <BaselineWelcome 
+          staffName={staff?.name?.split(' ')[0] || 'Doctor'}
+          onStart={handleStart}
+          isLoading={createAssessmentMutation.isPending}
+        />
+      )}
+
+      {currentStep === 'assessment' && domains && domains[currentDomainIndex] && (
+        <div className="space-y-6">
+          {/* Progress header */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">
+                Domain {currentDomainIndex + 1} of {domains.length}
+              </span>
+              <span>{ratedCount} of {totalProMoves} Pro Moves rated</span>
+            </div>
+            <Progress value={progressPct} className="h-2" />
+          </div>
+
+          <DomainAssessmentStep
+            domain={domains[currentDomainIndex]}
+            ratings={ratings}
+            onRatingChange={handleRatingChange}
+            onPrevious={currentDomainIndex > 0 ? handlePrevDomain : undefined}
+            onNext={isLastDomain ? undefined : handleNextDomain}
+            onComplete={isLastDomain && allRated ? handleComplete : undefined}
+            isCompleting={completeAssessmentMutation.isPending}
+          />
+        </div>
+      )}
+
+      {currentStep === 'complete' && (
+        <BaselineComplete onFinish={handleFinish} />
+      )}
+    </div>
+  );
+}

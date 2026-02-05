@@ -48,6 +48,17 @@ import RoleRadar from "@/components/my-role/RoleRadar";
 import PracticeLog from "@/pages/my-role/PracticeLog";
 import DomainDetail from "@/pages/my-role/DomainDetail";
 
+// Clinical Director pages
+import ClinicalLayout from "@/pages/clinical/ClinicalLayout";
+import ClinicalHome from "@/pages/clinical/ClinicalHome";
+import DoctorManagement from "@/pages/clinical/DoctorManagement";
+import DoctorDetail from "@/pages/clinical/DoctorDetail";
+
+// Doctor pages
+import DoctorLayout from "@/pages/doctor/DoctorLayout";
+import DoctorHome from "@/pages/doctor/DoctorHome";
+import BaselineWizard from "@/pages/doctor/BaselineWizard";
+
 // App routes with pre-routing checks for public pages
 function AppRoutes() {
   const { user, loading, needsPasswordSetup } = useAuth();
@@ -112,6 +123,19 @@ function AppRoutes() {
         <Route path="dashboard" element={<RegionalDashboard />} />
         <Route path="dashboard/location/:locationId" element={<LocationDetail />} />
         <Route path="my-location" element={<MyLocationPage />} />
+
+        {/* Clinical Director Routes */}
+        <Route path="clinical" element={<ClinicalLayout />}>
+          <Route index element={<ClinicalHome />} />
+          <Route path="doctors" element={<DoctorManagement />} />
+          <Route path="doctors/:staffId" element={<DoctorDetail />} />
+        </Route>
+
+        {/* Doctor Routes */}
+        <Route path="doctor" element={<DoctorLayout />}>
+          <Route index element={<DoctorHome />} />
+          <Route path="baseline" element={<BaselineWizard />} />
+        </Route>
 
         <Route path="admin" element={<AdminPage />} />
         <Route path="admin/evaluations" element={<EvalResultsV2 />} />

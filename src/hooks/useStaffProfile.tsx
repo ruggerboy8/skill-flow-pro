@@ -8,6 +8,7 @@ import { useSim } from '@/devtools/SimProvider';
 
 export interface StaffProfile {
   id: string;
+  name?: string;
   role_id: number | null;
   primary_location_id: string | null;
   coach_scope_type: string | null;
@@ -18,6 +19,8 @@ export interface StaffProfile {
   is_coach: boolean;
   is_lead: boolean;
   is_office_manager: boolean;
+  is_doctor: boolean;
+  is_clinical_director: boolean;
   is_paused: boolean;
   paused_at: string | null;
   pause_reason: string | null;
@@ -58,6 +61,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
         .from('staff')
         .select(`
           id,
+          name,
           role_id,
           primary_location_id,
           coach_scope_type,
@@ -68,6 +72,8 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           is_coach,
           is_lead,
           is_office_manager,
+          is_doctor,
+          is_clinical_director,
           is_paused,
           paused_at,
           pause_reason,

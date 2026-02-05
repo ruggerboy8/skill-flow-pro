@@ -192,7 +192,7 @@ export function BatchTranscriptProcessor() {
       try {
         // Download audio file
         const { data: audioBlob, error: downloadError } = await supabase.storage
-          .from('evaluation-audio')
+          .from('evaluation-recordings')
           .download(evalItem.audioPath);
 
         if (downloadError || !audioBlob) {

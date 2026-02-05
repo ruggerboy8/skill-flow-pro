@@ -12,6 +12,7 @@ interface PendingEval {
   id: string;
   staffName: string;
   locationName: string;
+  period: string; // e.g., "Q1 2025", "Baseline"
   audioPath: string | null;
   audioSize: number | null;
   hasTranscript: boolean;
@@ -20,6 +21,11 @@ interface PendingEval {
   issue: 'no_transcript' | 'no_insights';
   status: 'pending' | 'processing' | 'success' | 'skipped' | 'error';
   message?: string;
+}
+
+function formatPeriod(type: string, quarter: string | null, year: number): string {
+  if (type === 'Baseline') return 'Baseline';
+  return quarter ? `${quarter} ${year}` : `${year}`;
 }
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
@@ -50,7 +56,10 @@ export function BatchTranscriptProcessor() {
           summary_raw_transcript,
           extracted_insights,
           staff_id,
-          location_id
+          location_id,
+          type,
+          quarter,
+          program_year
         `)
         .or('and(audio_recording_path.not.is.null,summary_raw_transcript.is.null),and(summary_raw_transcript.not.is.null,extracted_insights.is.null)');
 
@@ -86,12 +95,15 @@ export function BatchTranscriptProcessor() {
         const staffName = staffMap.get(row.staff_id) || 'Unknown';
         const locationName = locationMap.get(row.location_id) || 'Unknown';
 
+        const period = formatPeriod(row.type, row.quarter, row.program_year);
+
         // Determine issue type
         if (row.audio_recording_path && !row.summary_raw_transcript) {
           evals.push({
             id: row.id,
             staffName,
             locationName,
+            period,
             audioPath: row.audio_recording_path,
             audioSize: null,
             hasTranscript: false,
@@ -105,6 +117,7 @@ export function BatchTranscriptProcessor() {
             id: row.id,
             staffName,
             locationName,
+            period,
             audioPath: row.audio_recording_path,
             audioSize: null,
             hasTranscript: true,
@@ -350,7 +363,9 @@ export function BatchTranscriptProcessor() {
 
             {pendingEvals.length > 0 && (
               <span className="text-sm text-muted-foreground">
-                Found: {missingTranscriptCount} missing transcripts, {missingInsightsCount} missing insights
+                {missingTranscriptCount > 0 && `${missingTranscriptCount} need transcription + insights`}
+                {missingTranscriptCount > 0 && missingInsightsCount > 0 && ', '}
+                {missingInsightsCount > 0 && `${missingInsightsCount} need insights only`}
               </span>
             )}
           </div>
@@ -372,6 +387,7 @@ export function BatchTranscriptProcessor() {
                   <TableRow>
                     <TableHead>Staff</TableHead>
                     <TableHead>Location</TableHead>
+                    <TableHead>Period</TableHead>
                     <TableHead>Audio Size</TableHead>
                     <TableHead>Issue</TableHead>
                     <TableHead>Status</TableHead>
@@ -382,10 +398,11 @@ export function BatchTranscriptProcessor() {
                     <TableRow key={evalItem.id}>
                       <TableCell className="font-medium">{evalItem.staffName}</TableCell>
                       <TableCell className="text-muted-foreground">{evalItem.locationName}</TableCell>
+                      <TableCell>{evalItem.period}</TableCell>
                       <TableCell>{formatFileSize(evalItem.audioSize)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {evalItem.issue === 'no_transcript' ? 'No Transcript' : 'No Insights'}
+                          {evalItem.issue === 'no_transcript' ? 'Trans + Insights' : 'Insights Only'}
                         </Badge>
                       </TableCell>
                       <TableCell>

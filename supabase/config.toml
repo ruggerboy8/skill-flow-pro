@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.format-transcript]
 verify_jwt = true
+
+[functions.categorize-doctor-content]
+verify_jwt = true

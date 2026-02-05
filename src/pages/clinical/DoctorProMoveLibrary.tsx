@@ -9,7 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Check, X, Search, ArrowLeft, Trash2 } from 'lucide-react';
+import { Plus, Search, ArrowLeft, Trash2, HelpCircle, MessageSquareText, CheckSquare, ThumbsUp } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDomainColor } from '@/lib/domainColors';
 import { DoctorProMoveForm } from '@/components/clinical/DoctorProMoveForm';
 import { DoctorMaterialsDrawer } from '@/components/clinical/DoctorMaterialsDrawer';
@@ -281,14 +282,23 @@ export default function DoctorProMoveLibrary() {
 
   const selectedProMove = proMoves.find(pm => pm.action_id === selectedProMoveId);
 
-  const StatusBadge = ({ has, label }: { has: boolean; label: string }) => (
-    <Badge 
-      variant={has ? 'default' : 'outline'} 
-      className={`text-xs ${has ? 'bg-emerald-600' : 'text-muted-foreground'}`}
-    >
-      {has ? <Check className="w-3 h-3 mr-1" /> : <X className="w-3 h-3 mr-1" />}
-      {label}
-    </Badge>
+  const MaterialIcon = ({ has, icon: Icon, label }: { has: boolean; icon: React.ElementType; label: string }) => (
+    <TooltipProvider delayDuration={0}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={`flex items-center justify-center w-7 h-7 rounded-full border ${
+            has 
+              ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950 dark:border-emerald-900' 
+              : 'text-muted-foreground/20 border-transparent'
+          }`}>
+            <Icon className="w-3.5 h-3.5" />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-xs">{has ? label : `No ${label.toLowerCase()}`}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 
   return (
@@ -438,12 +448,12 @@ export default function DoctorProMoveLibrary() {
                   </div>
                 </div>
 
-                {/* Resource status badges */}
-                <div className="flex flex-wrap gap-1">
-                  <StatusBadge has={pm.resources.has_why} label="Why" />
-                  <StatusBadge has={pm.resources.has_script} label="Script" />
-                  <StatusBadge has={pm.resources.has_gut_check} label="Gut Check" />
-                  <StatusBadge has={pm.resources.has_good_looks_like} label="Good" />
+                {/* Resource status icons */}
+                <div className="flex items-center gap-1">
+                  <MaterialIcon has={pm.resources.has_why} icon={HelpCircle} label="Why" />
+                  <MaterialIcon has={pm.resources.has_script} icon={MessageSquareText} label="Script" />
+                  <MaterialIcon has={pm.resources.has_good_looks_like} icon={ThumbsUp} label="Good Looks Like" />
+                  <MaterialIcon has={pm.resources.has_gut_check} icon={CheckSquare} label="Gut Check" />
                 </div>
 
                 {/* Actions */}

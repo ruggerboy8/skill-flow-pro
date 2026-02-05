@@ -22,29 +22,29 @@ const BAND_CONFIG: Record<number, {
   textClass: string;
 }> = {
   4: {
-    label: '4 — Consistent, even when you\'re behind',
-    subtext: 'If this is a 4, you\'re saying you could model it on demand and your team would see it most days.',
+    label: '4 — Exceptional, above and beyond',
+    subtext: 'If this is a 4, you\'re saying you go beyond the standard—others look to you as the example.',
     bgClass: 'bg-emerald-50 dark:bg-emerald-950/30',
     borderClass: 'border-emerald-200 dark:border-emerald-800',
     textClass: 'text-emerald-700 dark:text-emerald-300',
   },
   3: {
-    label: '3 — Usually, with predictable misses',
-    subtext: 'If this is a 3, you\'re saying it\'s part of your standard approach, but you can name when it slips.',
+    label: '3 — Excellent, consistent standard',
+    subtext: 'If this is a 3, you\'re saying you do this reliably and well—it\'s part of who you are.',
     bgClass: 'bg-blue-50 dark:bg-blue-950/30',
     borderClass: 'border-blue-200 dark:border-blue-800',
     textClass: 'text-blue-700 dark:text-blue-300',
   },
   2: {
-    label: '2 — Sometimes, not yet reliable',
-    subtext: 'If this is a 2, you\'re saying you do it occasionally, but it\'s not consistent across patients/days.',
+    label: '2 — Good, with room to grow',
+    subtext: 'If this is a 2, you\'re saying there\'s opportunity here—you\'re working on it.',
     bgClass: 'bg-amber-50 dark:bg-amber-950/30',
     borderClass: 'border-amber-200 dark:border-amber-800',
     textClass: 'text-amber-700 dark:text-amber-300',
   },
   1: {
-    label: '1 — Rare / not in your current routine',
-    subtext: 'If this is a 1, you\'re saying it doesn\'t reliably show up today.',
+    label: '1 — Needs focus',
+    subtext: 'If this is a 1, you\'re saying this isn\'t reliably showing up yet.',
     bgClass: 'bg-red-50 dark:bg-red-950/30',
     borderClass: 'border-red-200 dark:border-red-800',
     textClass: 'text-red-700 dark:text-red-300',

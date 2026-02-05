@@ -19,10 +19,10 @@ export default function NumberScale({ value, onChange, disabled, hideTips }: Num
   }, [value]);
 
   const tooltipText = {
-    4: "Absolute PRO: you never miss, could teach a seminar.",
-    3: "Pretty darn good: ~95% of the time at high quality.",
-    2: "Getting better: reasonably consistent but room to improve.",
-    1: "Needs more support: skill is still developing."
+    4: "Exceptional: above and beyond, others look to you as the example.",
+    3: "Excellent: you do this reliably and well—it's part of who you are.",
+    2: "Good: there's opportunity here, you're working on it.",
+    1: "Needs focus: this isn't reliably showing up yet."
   };
 
   const handleClick = (score: number) => {

@@ -263,10 +263,10 @@ export function ClinicalBaselineResults({
       {/* Tally Row - Score Summary Cards */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { score: 4, label: 'Consistent', bgColor: 'hsl(160 60% 95%)', textColor: 'hsl(160 80% 35%)', borderColor: 'hsl(160 50% 70%)' },
-          { score: 3, label: 'Usually', bgColor: 'hsl(210 80% 95%)', textColor: 'hsl(210 80% 45%)', borderColor: 'hsl(210 60% 70%)' },
-          { score: 2, label: 'Sometimes', bgColor: 'hsl(38 90% 95%)', textColor: 'hsl(38 80% 40%)', borderColor: 'hsl(38 70% 65%)' },
-          { score: 1, label: 'Rare', bgColor: 'hsl(0 70% 95%)', textColor: 'hsl(0 70% 45%)', borderColor: 'hsl(0 60% 70%)' },
+          { score: 4, label: 'Exceptional', bgColor: 'hsl(160 60% 95%)', textColor: 'hsl(160 80% 35%)', borderColor: 'hsl(160 50% 70%)' },
+          { score: 3, label: 'Excellent', bgColor: 'hsl(210 80% 95%)', textColor: 'hsl(210 80% 45%)', borderColor: 'hsl(210 60% 70%)' },
+          { score: 2, label: 'Room to Grow', bgColor: 'hsl(38 90% 95%)', textColor: 'hsl(38 80% 40%)', borderColor: 'hsl(38 70% 65%)' },
+          { score: 1, label: 'Needs Focus', bgColor: 'hsl(0 70% 95%)', textColor: 'hsl(0 70% 45%)', borderColor: 'hsl(0 60% 70%)' },
         ].map(({ score, label, bgColor, textColor, borderColor }) => (
           <Card 
             key={score} 

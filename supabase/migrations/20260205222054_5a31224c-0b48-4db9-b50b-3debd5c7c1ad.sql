@@ -1,0 +1,1 @@
+UPDATE competencies SET name = 'Preventive Care' WHERE competency_id = 402;

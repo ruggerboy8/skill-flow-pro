@@ -30,10 +30,10 @@ interface DomainAssessmentStepProps {
 }
 
 const SCORE_LABELS = [
-  { value: 1, label: 'Need to improve', short: '1' },
+  { value: 1, label: 'Needs focus', short: '1' },
   { value: 2, label: 'Room to grow', short: '2' },
-  { value: 3, label: 'Almost always', short: '3' },
-  { value: 4, label: 'Could teach it', short: '4' },
+  { value: 3, label: 'Excellent', short: '3' },
+  { value: 4, label: 'Exceptional', short: '4' },
 ];
 
 export function DomainAssessmentStep({
@@ -74,10 +74,10 @@ export function DomainAssessmentStep({
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
               <span className="font-medium text-muted-foreground">Key:</span>
-              <span><strong className="text-primary">4</strong> = Could teach it</span>
-              <span><strong className="text-primary">3</strong> = 95% of the time</span>
-              <span><strong className="text-primary">2</strong> = Room to grow</span>
-              <span><strong className="text-primary">1</strong> = Need to improve</span>
+              <span><strong className="text-primary">4</strong> = Exceptional, above & beyond</span>
+              <span><strong className="text-primary">3</strong> = Excellent, consistent</span>
+              <span><strong className="text-primary">2</strong> = Good, room to grow</span>
+              <span><strong className="text-primary">1</strong> = Needs focus</span>
             </div>
           </div>
 

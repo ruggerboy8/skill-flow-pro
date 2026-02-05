@@ -48,12 +48,12 @@ export function BaselineSummaryPanel({ staffId, assessmentId, status }: Baseline
           action_id,
           self_score,
           self_note,
-          pro_moves (
+          pro_moves!doctor_baseline_items_action_id_fkey (
             action_statement,
-            competencies (
+            competencies!fk_pro_moves_competency_id (
               competency_id,
               name,
-              domains (
+              domains!competencies_domain_id_fkey (
                 domain_id,
                 domain_name,
                 color_hex

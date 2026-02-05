@@ -79,7 +79,7 @@ export function ClinicalBaselineResults({
             action_statement,
             competencies!inner (
               name,
-              domains!inner (
+              domains!competencies_domain_id_fkey (
                 domain_id,
                 domain_name
               )

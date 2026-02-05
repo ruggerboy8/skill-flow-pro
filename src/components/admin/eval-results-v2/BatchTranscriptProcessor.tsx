@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -51,6 +51,20 @@ export function BatchTranscriptProcessor() {
   const [currentIndex, setCurrentIndex] = useState(0);
   
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Warn user before leaving page while processing
+  useEffect(() => {
+    if (!isProcessing) return;
+    
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'Processing is in progress. Are you sure you want to leave?';
+      return e.returnValue;
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isProcessing]);
 
   const missingTranscriptCount = pendingEvals.filter(e => e.issue === 'no_transcript').length;
   const missingInsightsCount = pendingEvals.filter(e => e.issue === 'no_insights').length;

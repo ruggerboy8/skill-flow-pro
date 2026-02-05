@@ -1,10 +1,20 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Mic, ChevronDown, Search, Play, Check, AlertTriangle, Loader2, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Mic, ChevronDown, Search, Play, Check, AlertTriangle, Loader2, X, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -29,17 +39,29 @@ function formatPeriod(type: string, quarter: string | null, year: number): strin
 }
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+const DELAY_BETWEEN_ITEMS_MS = 1000; // 1 second delay between items
 
 export function BatchTranscriptProcessor() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingEvals, setPendingEvals] = useState<PendingEval[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const missingTranscriptCount = pendingEvals.filter(e => e.issue === 'no_transcript').length;
   const missingInsightsCount = pendingEvals.filter(e => e.issue === 'no_insights').length;
   const completedCount = pendingEvals.filter(e => e.status === 'success' || e.status === 'skipped' || e.status === 'error').length;
+  const pendingCount = pendingEvals.filter(e => e.status === 'pending').length;
+
+  // Cost estimates (rough approximations)
+  const estimatedCostMin = (missingTranscriptCount * 0.06) + (missingInsightsCount * 0.02);
+  const estimatedCostMax = (missingTranscriptCount * 0.10) + (missingInsightsCount * 0.04);
+  const estimatedTimeMin = Math.ceil((missingTranscriptCount * 15 + missingInsightsCount * 5) / 60); // minutes
+  const estimatedTimeMax = Math.ceil((missingTranscriptCount * 30 + missingInsightsCount * 10) / 60); // minutes
 
   async function scanForMissing() {
     setIsScanning(true);
@@ -144,15 +166,31 @@ export function BatchTranscriptProcessor() {
     }
   }
 
+  function stopProcessing() {
+    setIsStopping(true);
+    abortControllerRef.current?.abort();
+  }
+
   async function processAll() {
     if (pendingEvals.length === 0) return;
 
+    setShowConfirmDialog(false);
     setIsProcessing(true);
+    setIsStopping(false);
     setCurrentIndex(0);
+
+    // Create new AbortController for this batch
+    abortControllerRef.current = new AbortController();
 
     const pendingItems = pendingEvals.filter(e => e.status === 'pending');
 
     for (let i = 0; i < pendingItems.length; i++) {
+      // Check if stopped
+      if (abortControllerRef.current?.signal.aborted) {
+        toast.info('Processing stopped by user');
+        break;
+      }
+
       const evalItem = pendingItems[i];
       setCurrentIndex(i);
 
@@ -172,16 +210,29 @@ export function BatchTranscriptProcessor() {
           e.id === evalItem.id ? { ...e, status: 'error', message: 'Unexpected error' } : e
         ));
       }
+
+      // Add delay between items (unless this is the last one or we're stopping)
+      if (i < pendingItems.length - 1 && !abortControllerRef.current?.signal.aborted) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_ITEMS_MS));
+      }
     }
 
     setIsProcessing(false);
+    setIsStopping(false);
+    abortControllerRef.current = null;
     
-    const results = pendingEvals;
-    const successCount = results.filter(e => e.status === 'success').length;
-    const skippedCount = results.filter(e => e.status === 'skipped').length;
-    const errorCount = results.filter(e => e.status === 'error').length;
-
-    toast.success(`Processing complete: ${successCount} succeeded, ${skippedCount} skipped, ${errorCount} errors`);
+    // Get final counts from current state
+    setPendingEvals(prev => {
+      const successCount = prev.filter(e => e.status === 'success').length;
+      const skippedCount = prev.filter(e => e.status === 'skipped').length;
+      const errorCount = prev.filter(e => e.status === 'error').length;
+      
+      if (successCount > 0 || skippedCount > 0 || errorCount > 0) {
+        toast.success(`Processing complete: ${successCount} succeeded, ${skippedCount} skipped, ${errorCount} errors`);
+      }
+      
+      return prev;
+    });
   }
 
   async function processOne(evalItem: PendingEval): Promise<Partial<PendingEval>> {
@@ -312,121 +363,172 @@ export function BatchTranscriptProcessor() {
   }
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg bg-card">
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="ghost"
-          className="w-full flex items-center justify-between p-4 h-auto"
-        >
-          <div className="flex items-center gap-2">
-            <Mic className="w-4 h-4" />
-            <span className="font-medium">Missing Transcripts & Insights</span>
-            {pendingEvals.length > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {pendingEvals.filter(e => e.status === 'pending').length} pending
-              </Badge>
-            )}
-          </div>
-          <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        </Button>
-      </CollapsibleTrigger>
-      
-      <CollapsibleContent className="px-4 pb-4">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={scanForMissing}
-              disabled={isScanning || isProcessing}
-            >
-              {isScanning ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Search className="w-4 h-4 mr-2" />
+    <>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg bg-card">
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="w-full flex items-center justify-between p-4 h-auto"
+          >
+            <div className="flex items-center gap-2">
+              <Mic className="w-4 h-4" />
+              <span className="font-medium">Missing Transcripts & Insights</span>
+              {pendingEvals.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {pendingCount} pending
+                </Badge>
               )}
-              Scan
-            </Button>
-            
-            <Button
-              size="sm"
-              onClick={processAll}
-              disabled={isProcessing || pendingEvals.filter(e => e.status === 'pending').length === 0}
-            >
+            </div>
+            <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </Button>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent className="px-4 pb-4">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={scanForMissing}
+                disabled={isScanning || isProcessing}
+              >
+                {isScanning ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4 mr-2" />
+                )}
+                Scan
+              </Button>
+              
               {isProcessing ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={stopProcessing}
+                  disabled={isStopping}
+                >
+                  <Square className="w-4 h-4 mr-2" />
+                  {isStopping ? 'Stopping...' : 'Stop'}
+                </Button>
               ) : (
-                <Play className="w-4 h-4 mr-2" />
+                <Button
+                  size="sm"
+                  onClick={() => setShowConfirmDialog(true)}
+                  disabled={pendingCount === 0}
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Process All
+                </Button>
               )}
-              Process All
-            </Button>
+
+              {pendingEvals.length > 0 && !isProcessing && (
+                <span className="text-sm text-muted-foreground">
+                  {missingTranscriptCount > 0 && `${missingTranscriptCount} need transcription + insights`}
+                  {missingTranscriptCount > 0 && missingInsightsCount > 0 && ', '}
+                  {missingInsightsCount > 0 && `${missingInsightsCount} need insights only`}
+                </span>
+              )}
+            </div>
+
+            {isProcessing && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Processing {currentIndex + 1} of {pendingEvals.filter(e => e.status !== 'success' && e.status !== 'skipped' && e.status !== 'error').length + completedCount}</span>
+                  <span>{Math.round((completedCount / pendingEvals.length) * 100)}%</span>
+                </div>
+                <Progress value={(completedCount / pendingEvals.length) * 100} />
+              </div>
+            )}
 
             {pendingEvals.length > 0 && (
-              <span className="text-sm text-muted-foreground">
-                {missingTranscriptCount > 0 && `${missingTranscriptCount} need transcription + insights`}
-                {missingTranscriptCount > 0 && missingInsightsCount > 0 && ', '}
-                {missingInsightsCount > 0 && `${missingInsightsCount} need insights only`}
-              </span>
+              <div className="border rounded-lg max-h-64 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Staff</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Audio Size</TableHead>
+                      <TableHead>Issue</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingEvals.map(evalItem => (
+                      <TableRow key={evalItem.id}>
+                        <TableCell className="font-medium">{evalItem.staffName}</TableCell>
+                        <TableCell className="text-muted-foreground">{evalItem.locationName}</TableCell>
+                        <TableCell>{evalItem.period}</TableCell>
+                        <TableCell>{formatFileSize(evalItem.audioSize)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {evalItem.issue === 'no_transcript' ? 'Trans + Insights' : 'Insights Only'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {getStatusBadge(evalItem)}
+                            {evalItem.message && evalItem.status !== 'success' && (
+                              <span className="text-xs text-muted-foreground">{evalItem.message}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {pendingEvals.length === 0 && !isScanning && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Click "Scan" to find evaluations needing transcription or insight extraction.
+              </p>
             )}
           </div>
+        </CollapsibleContent>
+      </Collapsible>
 
-          {isProcessing && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Processing {currentIndex + 1} of {pendingEvals.filter(e => e.status !== 'success' && e.status !== 'skipped' && e.status !== 'error').length + completedCount}</span>
-                <span>{Math.round((completedCount / pendingEvals.length) * 100)}%</span>
+      {/* Confirmation Dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-warning" />
+              Confirm Batch Processing
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>This will process <strong>{pendingCount}</strong> evaluation{pendingCount !== 1 ? 's' : ''}:</p>
+                
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  {missingTranscriptCount > 0 && (
+                    <li>{missingTranscriptCount} need transcription + insights</li>
+                  )}
+                  {missingInsightsCount > 0 && (
+                    <li>{missingInsightsCount} need insights only</li>
+                  )}
+                </ul>
+
+                <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+                  <p><strong>Estimated cost:</strong> ~${estimatedCostMin.toFixed(2)} – ${estimatedCostMax.toFixed(2)}</p>
+                  <p><strong>Estimated time:</strong> ~{estimatedTimeMin}–{estimatedTimeMax} minutes</p>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  You can stop at any time, but already-processed items will remain updated.
+                </p>
               </div>
-              <Progress value={(completedCount / pendingEvals.length) * 100} />
-            </div>
-          )}
-
-          {pendingEvals.length > 0 && (
-            <div className="border rounded-lg max-h-64 overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Staff</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Period</TableHead>
-                    <TableHead>Audio Size</TableHead>
-                    <TableHead>Issue</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingEvals.map(evalItem => (
-                    <TableRow key={evalItem.id}>
-                      <TableCell className="font-medium">{evalItem.staffName}</TableCell>
-                      <TableCell className="text-muted-foreground">{evalItem.locationName}</TableCell>
-                      <TableCell>{evalItem.period}</TableCell>
-                      <TableCell>{formatFileSize(evalItem.audioSize)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {evalItem.issue === 'no_transcript' ? 'Trans + Insights' : 'Insights Only'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          {getStatusBadge(evalItem)}
-                          {evalItem.message && evalItem.status !== 'success' && (
-                            <span className="text-xs text-muted-foreground">{evalItem.message}</span>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-
-          {pendingEvals.length === 0 && !isScanning && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Click "Scan" to find evaluations needing transcription or insight extraction.
-            </p>
-          )}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={processAll}>
+              Start Processing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

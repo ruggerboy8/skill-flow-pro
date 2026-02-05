@@ -4,6 +4,10 @@ import { Loader2, Mic, Play, Pause, RotateCcw, Square, FileAudio, FileText, Chec
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useAudioRecording, type AudioSegment } from '@/hooks/useAudioRecording';
+
+// Segment size threshold (20MB) for transcription chunking
+const SEGMENT_SIZE_BYTES = 20 * 1024 * 1024;
 
 interface InterviewRecorderProps {
   evalId: string;
@@ -11,7 +15,7 @@ interface InterviewRecorderProps {
   onDraftAudioSaved?: (path: string) => void;
   onDraftAudioCleared?: () => void;
   onRecordingFinalized?: (path: string) => void;
-  onTranscribe?: (audioBlob: Blob) => void;
+  onTranscribe?: (audioBlob: Blob, segmentTranscripts?: string[]) => void;
   hasUploadedRecording?: boolean;
   isReadOnly?: boolean;
   isTranscribing?: boolean;
@@ -34,12 +38,61 @@ export function InterviewRecorder({
 }: InterviewRecorderProps) {
   const { toast } = useToast();
   
-  // Recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  // Segment transcripts for large recordings
+  const [segmentTranscripts, setSegmentTranscripts] = useState<string[]>([]);
+  
+  // Segment upload callback
+  const handleSegmentReady = useCallback(async (segment: AudioSegment) => {
+    console.log(`[InterviewRecorder] Segment ${segment.index} ready, transcribing...`);
+    try {
+      const formData = new FormData();
+      formData.append('audio', segment.blob, `segment-${segment.index}.webm`);
+      
+      const response = await supabase.functions.invoke('transcribe-audio', {
+        body: formData,
+      });
+      
+      if (response.error) {
+        console.error(`[InterviewRecorder] Segment ${segment.index} transcription failed:`, response.error);
+        setSegmentTranscripts(prev => {
+          const updated = [...prev];
+          updated[segment.index] = '';
+          return updated;
+        });
+        return;
+      }
+      
+      const transcript = response.data?.transcript || '';
+      console.log(`[InterviewRecorder] Segment ${segment.index} transcribed: ${transcript.length} chars`);
+      
+      setSegmentTranscripts(prev => {
+        const updated = [...prev];
+        updated[segment.index] = transcript;
+        return updated;
+      });
+      
+      toast({
+        title: `Segment ${segment.index + 1} saved`,
+        description: `${(segment.blob.size / (1024 * 1024)).toFixed(1)}MB transcribed`,
+      });
+    } catch (error) {
+      console.error(`[InterviewRecorder] Segment ${segment.index} error:`, error);
+      setSegmentTranscripts(prev => {
+        const updated = [...prev];
+        updated[segment.index] = '';
+        return updated;
+      });
+    }
+  }, [toast]);
+  
+  // Use shared audio recording hook with segmentation
+  const { state: recordingState, controls: recordingControls } = useAudioRecording({
+    enableSegmentation: true,
+    onSegmentReady: handleSegmentReady,
+  });
+  
+  // Extract state from hook
+  const { isRecording, isPaused, recordingTime, audioBlob, audioUrl } = recordingState;
   
   // Draft/recovery state
   const [restoredAudioUrl, setRestoredAudioUrl] = useState<string | null>(null);
@@ -52,10 +105,6 @@ export function InterviewRecorder({
   const [isFinalizing, setIsFinalizing] = useState(false);
   
   // Refs
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const checkpointIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -80,15 +129,10 @@ export function InterviewRecorder({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
       if (checkpointIntervalRef.current) clearInterval(checkpointIntervalRef.current);
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
       if (restoredAudioUrl) URL.revokeObjectURL(restoredAudioUrl);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
     };
-  }, []);
+  }, [restoredAudioUrl]);
 
   // Warn before unload if recording in progress
   useEffect(() => {
@@ -154,24 +198,10 @@ export function InterviewRecorder({
   };
 
   const saveCheckpoint = useCallback(async () => {
-    if (!isRecording || audioChunksRef.current.length === 0) return;
-    
-    try {
-      const checkpointBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-      const fileName = `${evalId}/checkpoint-interview-${Date.now()}.webm`;
-      
-      await supabase.storage
-        .from('evaluation-recordings')
-        .upload(fileName, checkpointBlob, {
-          cacheControl: '3600',
-          upsert: true
-        });
-      
-      console.log('[InterviewRecorder] Checkpoint saved:', fileName);
-    } catch (error) {
-      console.error('[InterviewRecorder] Checkpoint save failed:', error);
-    }
-  }, [isRecording, evalId]);
+    // With the hook, we don't have direct access to chunks, but segments are auto-transcribed
+    // This is now handled by the segmentation in useAudioRecording
+    console.log('[InterviewRecorder] Checkpoint save triggered (handled by segmentation)');
+  }, []);
 
   const deleteDraftAudio = async (path: string) => {
     try {
@@ -186,46 +216,11 @@ export function InterviewRecorder({
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      // Clear prior segment transcripts when starting new recording
+      setSegmentTranscripts([]);
+      await recordingControls.startRecording();
       
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(blob);
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-        
-        stream.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-        
-        // Clear checkpoint interval
-        if (checkpointIntervalRef.current) {
-          clearInterval(checkpointIntervalRef.current);
-          checkpointIntervalRef.current = null;
-        }
-      };
-
-      mediaRecorder.start(1000);
-      setIsRecording(true);
-      setIsPaused(false);
-      setRecordingTime(0);
-      
-      // Timer for display
-      timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-      
-      // Checkpoint saves every 60 seconds for long interviews
+      // Checkpoint saves every 60 seconds for long interviews (now handled by segmentation)
       checkpointIntervalRef.current = setInterval(() => {
         saveCheckpoint();
       }, 60000);
@@ -241,45 +236,20 @@ export function InterviewRecorder({
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsPaused(false);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+    recordingControls.stopRecording();
+    if (checkpointIntervalRef.current) {
+      clearInterval(checkpointIntervalRef.current);
+      checkpointIntervalRef.current = null;
     }
   };
 
   const togglePause = () => {
-    if (!mediaRecorderRef.current || !isRecording) return;
-    
-    if (isPaused) {
-      mediaRecorderRef.current.resume();
-      setIsPaused(false);
-      timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-    } else {
-      mediaRecorderRef.current.pause();
-      setIsPaused(true);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
+    recordingControls.togglePause();
   };
 
   const resetRecording = () => {
-    setAudioBlob(null);
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null);
-    }
-    setRecordingTime(0);
-    setIsRecording(false);
-    setIsPaused(false);
+    recordingControls.resetRecording();
+    setSegmentTranscripts([]);
   };
 
   const handleDiscardRestoredAudio = async () => {
@@ -369,11 +339,12 @@ export function InterviewRecorder({
     }
   };
 
-  // Trigger transcription via parent callback
+  // Trigger transcription via parent callback - pass segment transcripts if available
   const handleTranscribe = () => {
     const blobToUse = audioBlob || restoredAudioBlob;
     if (blobToUse && onTranscribe) {
-      onTranscribe(blobToUse);
+      // Pass segment transcripts if we have any from large recording
+      onTranscribe(blobToUse, segmentTranscripts.length > 0 ? segmentTranscripts : undefined);
     }
   };
 

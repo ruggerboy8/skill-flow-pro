@@ -51,7 +51,8 @@ import { RecordingStartCard } from '@/components/coach/RecordingStartCard';
 import { RecordingProcessCard } from '@/components/coach/RecordingProcessCard';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { InterviewRecorder } from '@/components/coach/InterviewRecorder';
-import { useAudioRecording } from '@/hooks/useAudioRecording';
+import { useAudioRecording, type AudioSegment } from '@/hooks/useAudioRecording';
+import { transcribeWithChunking, type ChunkProgress, CHUNK_SIZE_BYTES } from '@/lib/audioChunking';
 import { useSidebar } from '@/components/ui/sidebar';
 import ReactQuill from 'react-quill';
 
@@ -122,16 +123,67 @@ export function EvaluationHub() {
   const [showFloatingPill, setShowFloatingPill] = useState(false);
   const [transcriptionJustCompleted, setTranscriptionJustCompleted] = useState(false);
   const [analysisJustCompleted, setAnalysisJustCompleted] = useState(false);
+  const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(null);
   const startCardRef = useRef<HTMLDivElement>(null);
   const processSectionRef = useRef<HTMLDivElement>(null);
   const transcriptSectionRef = useRef<HTMLDivElement>(null);
   
+  // Segment transcript tracking for large recordings
+  const [segmentTranscripts, setSegmentTranscripts] = useState<string[]>([]);
   
   // Sidebar control
   const { setOpen: setSidebarOpen } = useSidebar();
 
+  // Segment upload callback for observer notes
+  const handleObserverSegmentReady = useCallback(async (segment: AudioSegment) => {
+    console.log(`[EvaluationHub] Segment ${segment.index} ready, transcribing...`);
+    try {
+      const formData = new FormData();
+      formData.append('audio', segment.blob, `segment-${segment.index}.webm`);
+      
+      const response = await supabase.functions.invoke('transcribe-audio', {
+        body: formData,
+      });
+      
+      if (response.error) {
+        console.error(`[EvaluationHub] Segment ${segment.index} transcription failed:`, response.error);
+        // Store empty string to maintain index alignment
+        setSegmentTranscripts(prev => {
+          const updated = [...prev];
+          updated[segment.index] = '';
+          return updated;
+        });
+        return;
+      }
+      
+      const transcript = response.data?.transcript || '';
+      console.log(`[EvaluationHub] Segment ${segment.index} transcribed: ${transcript.length} chars`);
+      
+      setSegmentTranscripts(prev => {
+        const updated = [...prev];
+        updated[segment.index] = transcript;
+        return updated;
+      });
+      
+      toast({
+        title: `Segment ${segment.index + 1} saved`,
+        description: `${(segment.blob.size / (1024 * 1024)).toFixed(1)}MB transcribed`,
+      });
+    } catch (error) {
+      console.error(`[EvaluationHub] Segment ${segment.index} error:`, error);
+      setSegmentTranscripts(prev => {
+        const updated = [...prev];
+        updated[segment.index] = '';
+        return updated;
+      });
+    }
+  }, [toast]);
+
   // Audio recording state - lifted here so it persists across tab switches
-  const { state: recordingState, controls: recordingControls } = useAudioRecording();
+  const { state: recordingState, controls: recordingControls } = useAudioRecording({
+    enableSegmentation: true,
+    onSegmentReady: handleObserverSegmentReady,
+  });
 
   useEffect(() => {
     if (evalId) {
@@ -318,27 +370,59 @@ export function EvaluationHub() {
     setProcessingStep('Transcribing audio...');
 
     try {
-      // Step 1: Transcribe audio using OpenAI Whisper
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
-
-      const transcribeResponse = await supabase.functions.invoke('transcribe-audio', {
-        body: formData,
-      });
-
-      if (transcribeResponse.error) {
-        throw new Error(transcribeResponse.error.message || 'Transcription failed');
+      // Concatenate any prior segment transcripts with final segment
+      let rawTranscript: string;
+      
+      if (segmentTranscripts.length > 0) {
+        // We have prior segments - transcribe final segment and concatenate
+        console.log(`[EvaluationHub] Concatenating ${segmentTranscripts.length} prior segments with final`);
+        setProcessingStep(`Transcribing final segment...`);
+        
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+        
+        const transcribeResponse = await supabase.functions.invoke('transcribe-audio', {
+          body: formData,
+        });
+        
+        if (transcribeResponse.error) {
+          throw new Error(transcribeResponse.error.message || 'Transcription failed');
+        }
+        
+        const finalTranscript = transcribeResponse.data?.transcript || '';
+        
+        // Concatenate all segments in order
+        rawTranscript = [...segmentTranscripts, finalTranscript]
+          .filter(Boolean)
+          .join(' ');
+        
+        console.log(`[EvaluationHub] Combined transcript from ${segmentTranscripts.length + 1} segments: ${rawTranscript.length} chars`);
+        
+        // Clear segment transcripts
+        setSegmentTranscripts([]);
+      } else {
+        // No prior segments - use chunking utility for large files
+        setProcessingStep('Transcribing audio...');
+        
+        const result = await transcribeWithChunking(audioBlob, (progress) => {
+          if (progress.phase === 'transcribing' && progress.totalChunks > 1) {
+            setProcessingStep(`Transcribing chunk ${progress.currentChunk} of ${progress.totalChunks}...`);
+          }
+          setChunkProgress(progress);
+        });
+        
+        rawTranscript = result.transcript;
+        
+        if (result.chunked) {
+          console.log(`[EvaluationHub] Large file transcribed in ${result.totalChunks} chunks`);
+        }
       }
-
-      const rawTranscript = transcribeResponse.data?.transcript;
+      
       if (!rawTranscript) {
         throw new Error('No transcript returned');
       }
-
-      // Log which service was used for debugging
-      if (transcribeResponse.data?.service === 'elevenlabs') {
-        console.log('[EvaluationHub] Large file transcribed using ElevenLabs');
-      }
+      
+      setChunkProgress(null);
 
       // Step 2: Format transcript for readability
       setProcessingStep('Formatting transcript...');
@@ -1046,6 +1130,7 @@ export function EvaluationHub() {
     if (!evaluation?.audio_recording_path || !evalId) return;
     
     setIsTranscribingInterview(true);
+    setChunkProgress(null);
 
     try {
       // Step 1: Download the audio file
@@ -1055,25 +1140,18 @@ export function EvaluationHub() {
       
       if (downloadError) throw downloadError;
       
-      // Step 2: Send to transcribe-audio edge function
-      const formData = new FormData();
-      const originalFilename = evaluation.audio_recording_path.split('/').pop() || 'audio.m4a';
-      formData.append('audio', audioData, originalFilename);
-      
-      const { data: transcribeData, error: transcribeError } = await supabase.functions.invoke('transcribe-audio', {
-        body: formData,
+      // Step 2: Transcribe with automatic chunking for large files
+      const result = await transcribeWithChunking(audioData, (progress) => {
+        setChunkProgress(progress);
       });
       
-      if (transcribeError) throw transcribeError;
-      
-      const rawTranscript = transcribeData?.transcript;
+      const rawTranscript = result.transcript;
       if (!rawTranscript) {
         throw new Error('No transcript returned from transcription');
       }
 
-      // Log which service was used for debugging
-      if (transcribeData?.service === 'elevenlabs') {
-        console.log('[EvaluationHub] Large interview file transcribed using ElevenLabs');
+      if (result.chunked) {
+        console.log(`[EvaluationHub] Large interview transcribed in ${result.totalChunks} chunks`);
       }
       
       // Step 3: Parse the transcript to identify speakers
@@ -1109,6 +1187,7 @@ export function EvaluationHub() {
       });
     } finally {
       setIsTranscribingInterview(false);
+      setChunkProgress(null);
     }
   };
 

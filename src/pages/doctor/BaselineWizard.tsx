@@ -75,9 +75,9 @@ export default function BaselineWizard() {
         .select(`
           action_id,
           action_statement,
-          competencies (
+          competencies!fk_pro_moves_competency_id (
             name,
-            domains (
+            domains!competencies_domain_id_fkey (
               domain_id,
               domain_name,
               color_hex
@@ -90,12 +90,21 @@ export default function BaselineWizard() {
       
       if (error) throw error;
       
+      console.log('BaselineWizard pro_moves data:', data);
+      
       // Group by domain
       const domainMap = new Map<number, DomainGroup>();
       
       data?.forEach((pm: any) => {
-        const domain = pm.competencies?.domains;
-        if (!domain) return;
+        const competency = pm.competencies;
+        const domain = competency?.domains;
+        
+        console.log('Processing pm:', pm.action_id, 'competency:', competency, 'domain:', domain);
+        
+        if (!domain?.domain_id) {
+          console.warn('Skipping pm without domain:', pm.action_id);
+          return;
+        }
         
         if (!domainMap.has(domain.domain_id)) {
           domainMap.set(domain.domain_id, {
@@ -109,11 +118,13 @@ export default function BaselineWizard() {
         domainMap.get(domain.domain_id)!.proMoves.push({
           action_id: pm.action_id,
           action_statement: pm.action_statement,
-          competency_name: pm.competencies?.name || '',
+          competency_name: competency?.name || '',
         });
       });
       
-      return Array.from(domainMap.values());
+      const result = Array.from(domainMap.values());
+      console.log('BaselineWizard domains result:', result);
+      return result;
     },
   });
 
@@ -263,6 +274,17 @@ export default function BaselineWizard() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Handle empty domains - show welcome with error message
+  if (!domains || domains.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">No doctor pro moves found. Please contact administration.</p>
+        </div>
       </div>
     );
   }

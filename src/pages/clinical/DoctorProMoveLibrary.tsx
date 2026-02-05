@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,11 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Check, X, Search } from 'lucide-react';
+import { Plus, Check, X, Search, ArrowLeft } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
-import { ProMoveForm } from '@/components/admin/ProMoveForm';
+import { DoctorProMoveForm } from '@/components/clinical/DoctorProMoveForm';
 import { DoctorMaterialsDrawer } from '@/components/clinical/DoctorMaterialsDrawer';
-
 const DOCTOR_ROLE_ID = 4;
 
 interface Competency {
@@ -38,6 +38,7 @@ interface ProMove {
 
 export default function DoctorProMoveLibrary() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
@@ -218,6 +219,17 @@ export default function DoctorProMoveLibrary() {
 
   return (
     <div className="space-y-6">
+      {/* Back button */}
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => navigate('/clinical')}
+        className="gap-2"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Doctor Portal
+      </Button>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -314,11 +326,10 @@ export default function DoctorProMoveLibrary() {
                   <p className="font-medium">{pm.action_statement}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge 
-                      variant="outline" 
-                      className="text-xs"
+                      className="text-xs text-black dark:text-black"
                       style={{ 
-                        borderColor: getDomainColor(pm.domain_name),
-                        color: getDomainColor(pm.domain_name)
+                        backgroundColor: getDomainColor(pm.domain_name),
+                        border: 'none'
                       }}
                     >
                       {pm.domain_name}
@@ -359,12 +370,10 @@ export default function DoctorProMoveLibrary() {
 
       {/* Modals */}
       {showAddForm && (
-        <ProMoveForm
+        <DoctorProMoveForm
           proMove={editingProMove}
           onClose={handleFormClose}
-          roles={[{ role_id: DOCTOR_ROLE_ID, role_name: 'Doctor' }]}
           competencies={competencies}
-          selectedRole={DOCTOR_ROLE_ID.toString()}
         />
       )}
 

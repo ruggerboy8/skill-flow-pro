@@ -58,6 +58,7 @@ export default function Layout() {
   const navigation = isDoctor ? [
     // Doctor-specific navigation
     { name: 'Home', href: '/doctor', icon: Home },
+    { name: 'My Role', href: '/doctor/my-role', icon: BookOpen },
   ] : [
     // Standard navigation
     { name: 'Home', href: '/', icon: Home },

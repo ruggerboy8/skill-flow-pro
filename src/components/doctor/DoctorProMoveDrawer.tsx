@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { GraduationCap, Video, MessageCircle, Link as LinkIcon, PlayCircle } from "lucide-react";
+import { GraduationCap, Lightbulb, MessageSquareQuote, HelpCircle, CheckCircle2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { getDomainColorRichRaw } from "@/lib/domainColors";
-import { extractYouTubeId } from "@/lib/youtubeHelpers";
+import ReactMarkdown from "react-markdown";
 import type { DoctorProMoveDetail } from "@/hooks/useDoctorDomainDetail";
 
 interface DoctorProMoveDrawerProps {
@@ -17,13 +18,45 @@ interface DoctorProMoveDrawerProps {
   domainName: string;
 }
 
-interface ContentState {
-  description: string | null;
-  script: string | null;
-  audio_url: string | null;
-  video_id: string | null;
-  links: Array<{ id: string; url: string | null; title: string | null }>;
+interface ResourceData {
+  type: string;
+  content_md: string | null;
 }
+
+const MATERIAL_SECTIONS = [
+  { 
+    type: 'doctor_why', 
+    title: 'Why It Matters', 
+    icon: Lightbulb,
+    color: 'text-amber-600 dark:text-amber-400',
+    bgColor: 'bg-amber-50 dark:bg-amber-950/30',
+    borderColor: 'border-amber-200 dark:border-amber-800',
+  },
+  { 
+    type: 'doctor_script', 
+    title: 'Scripting', 
+    icon: MessageSquareQuote,
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-50 dark:bg-blue-950/30',
+    borderColor: 'border-blue-200 dark:border-blue-800',
+  },
+  { 
+    type: 'doctor_good_looks_like', 
+    title: 'What Good Looks Like', 
+    icon: CheckCircle2,
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
+    borderColor: 'border-emerald-200 dark:border-emerald-800',
+  },
+  { 
+    type: 'doctor_gut_check', 
+    title: 'Gut Check Questions', 
+    icon: HelpCircle,
+    color: 'text-purple-600 dark:text-purple-400',
+    bgColor: 'bg-purple-50 dark:bg-purple-950/30',
+    borderColor: 'border-purple-200 dark:border-purple-800',
+  },
+];
 
 export function DoctorProMoveDrawer({
   open,
@@ -32,13 +65,7 @@ export function DoctorProMoveDrawer({
   domainName,
 }: DoctorProMoveDrawerProps) {
   const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState<ContentState>({
-    description: null,
-    script: null,
-    audio_url: null,
-    video_id: null,
-    links: []
-  });
+  const [resources, setResources] = useState<ResourceData[]>([]);
 
   const richColor = getDomainColorRichRaw(domainName);
 
@@ -48,44 +75,15 @@ export function DoctorProMoveDrawer({
     async function loadResources() {
       setLoading(true);
       
-      // 1. Fetch description from pro_moves
-      const { data: moveData } = await supabase
-        .from('pro_moves')
-        .select('description')
-        .eq('action_id', move!.action_id)
-        .single();
-
-      // 2. Fetch Resources
-      const { data: resources } = await supabase
+      const { data, error } = await supabase
         .from('pro_move_resources')
-        .select('*')
+        .select('type, content_md')
         .eq('action_id', move!.action_id)
-        .in('status', ['active', 'published'])
-        .order('display_order');
-
-      // Process Resources
-      const script = resources?.find(r => r.type === 'script')?.content_md || null;
-      const videoUrl = resources?.find(r => r.type === 'video')?.url;
-      const links = resources?.filter(r => r.type === 'link').map(r => ({
-        id: r.id,
-        url: r.url,
-        title: r.title
-      })) || [];
+        .in('type', ['doctor_why', 'doctor_script', 'doctor_gut_check', 'doctor_good_looks_like']);
       
-      let audioUrl = null;
-      const audioRes = resources?.find(r => r.type === 'audio');
-      if (audioRes?.url) {
-        const { data } = supabase.storage.from('pro-move-audio').getPublicUrl(audioRes.url);
-        audioUrl = data.publicUrl;
+      if (!error && data) {
+        setResources(data);
       }
-
-      setContent({
-        description: moveData?.description || null,
-        script,
-        video_id: videoUrl ? extractYouTubeId(videoUrl) : null,
-        audio_url: audioUrl,
-        links
-      });
       setLoading(false);
     }
 
@@ -94,26 +92,15 @@ export function DoctorProMoveDrawer({
 
   if (!move) return null;
 
-  // Helper for section headers
-  const SectionHeader = ({ icon: Icon, title }: { icon: React.ElementType; title: string }) => (
-    <div className="flex items-center gap-2 mb-3 mt-6">
-      <div 
-        className="p-1.5 rounded-md" 
-        style={{ backgroundColor: `hsl(${richColor} / 0.1)` }}
-      >
-        <Icon className="h-4 w-4" style={{ color: `hsl(${richColor})` }} />
-      </div>
-      <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h3>
-    </div>
-  );
+  const getResourceContent = (type: string) => {
+    return resources.find(r => r.type === type)?.content_md || null;
+  };
 
-  const hasContent = content.description || content.script || content.audio_url || content.video_id || content.links.length > 0;
+  const hasAnyContent = MATERIAL_SECTIONS.some(s => getResourceContent(s.type));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-[540px] h-[100dvh] p-0 flex flex-col gap-0 border-l-0 sm:border-l">
+      <SheetContent className="w-full sm:max-w-xl h-[100dvh] p-0 flex flex-col gap-0 border-l-0 sm:border-l">
         {/* Header */}
         <SheetHeader 
           className="px-6 py-6 text-left border-b"
@@ -141,95 +128,68 @@ export function DoctorProMoveDrawer({
         </SheetHeader>
 
         <ScrollArea className="flex-1 px-6">
-          <div className="py-6 space-y-1">
+          <div className="py-6 space-y-4">
             {loading ? (
               <div className="space-y-4">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-24 w-full mt-6" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
               </div>
-            ) : !hasContent ? (
+            ) : !hasAnyContent ? (
               <div className="text-center py-12 text-muted-foreground">
                 <GraduationCap className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">No learning materials available yet.</p>
               </div>
             ) : (
               <>
-                {/* Description (The Why) */}
-                {content.description && (
-                  <div className="text-sm text-muted-foreground leading-relaxed">
-                    {content.description}
-                  </div>
-                )}
-
-                {/* Script */}
-                {content.script && (
-                  <section>
-                    <SectionHeader icon={MessageCircle} title="Suggested Verbiage" />
-                    <div 
-                      className="text-base md:text-lg leading-relaxed p-4 md:p-5 rounded-2xl border-2 border-dashed"
-                      style={{ 
-                        backgroundColor: `hsl(${richColor} / 0.03)`,
-                        borderColor: `hsl(${richColor} / 0.2)` 
-                      }}
+                {/* Material sections as styled cards - matching DoctorMaterialsSheet */}
+                {MATERIAL_SECTIONS.map(section => {
+                  const content = getResourceContent(section.type);
+                  if (!content) return null;
+                  
+                  const Icon = section.icon;
+                  
+                  return (
+                    <Card 
+                      key={section.type} 
+                      className={`${section.bgColor} ${section.borderColor} border`}
                     >
-                      "{content.script}"
-                    </div>
-                  </section>
-                )}
-
-                {/* Audio */}
-                {content.audio_url && (
-                  <section>
-                    <SectionHeader icon={PlayCircle} title="Listen" />
-                    <div className="p-1 rounded-full border bg-muted/20">
-                      <audio 
-                        controls 
-                        src={content.audio_url} 
-                        className="w-full h-10" 
-                        style={{ borderRadius: "9999px" }} 
-                      />
-                    </div>
-                  </section>
-                )}
-
-                {/* Video */}
-                {content.video_id && (
-                  <section>
-                    <SectionHeader icon={Video} title="Watch" />
-                    <div className="relative w-full aspect-video rounded-xl overflow-hidden border bg-black shadow-sm">
-                      <iframe
-                        className="absolute inset-0 w-full h-full"
-                        src={`https://www.youtube.com/embed/${content.video_id}`}
-                        title="Learning video"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  </section>
-                )}
-
-                {/* Additional Links */}
-                {content.links.length > 0 && (
-                  <section>
-                    <SectionHeader icon={LinkIcon} title="Resources" />
-                    <div className="space-y-2">
-                      {content.links.map(link => (
-                        <Button 
-                          key={link.id} 
-                          variant="outline" 
-                          className="w-full justify-start" 
-                          asChild
-                        >
-                          <a href={link.url || '#'} target="_blank" rel="noreferrer">
-                            <LinkIcon className="mr-2 h-4 w-4" /> 
-                            {link.title || 'View Resource'}
-                          </a>
-                        </Button>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                      <CardContent className="pt-4 pb-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Icon className={`h-5 w-5 ${section.color}`} />
+                          <h3 className={`font-semibold ${section.color}`}>
+                            {section.title}
+                          </h3>
+                        </div>
+                        <div className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
+                          <ReactMarkdown
+                            components={{
+                              p: ({ children }) => (
+                                <p className="text-foreground/90">{children}</p>
+                              ),
+                              ul: ({ children }) => (
+                                <ul className="list-disc pl-4 space-y-1">{children}</ul>
+                              ),
+                              li: ({ children }) => (
+                                <li className="text-foreground/90">{children}</li>
+                              ),
+                              blockquote: ({ children }) => (
+                                <blockquote className="border-l-4 border-current/30 pl-4 italic text-foreground/80">
+                                  {children}
+                                </blockquote>
+                              ),
+                              strong: ({ children }) => (
+                                <strong className="font-semibold text-foreground">{children}</strong>
+                              ),
+                            }}
+                          >
+                            {content}
+                          </ReactMarkdown>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </>
             )}
           </div>

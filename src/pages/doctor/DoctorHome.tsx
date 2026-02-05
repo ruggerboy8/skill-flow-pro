@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, CheckCircle2, BookOpen } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2 } from 'lucide-react';
 
 export default function DoctorHome() {
   const { data: staff } = useStaffProfile();
@@ -98,25 +98,6 @@ export default function DoctorHome() {
           </CardContent>
         </Card>
       )}
-
-      {/* My Role Card - Links to Pro Move Library */}
-      <Card className="hover:shadow-md transition-shadow">
-        <Link to="/doctor/my-role">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <BookOpen className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-lg">My Role</CardTitle>
-                <CardDescription>
-                  Explore the doctor competency blueprint and pro moves
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Link>
-      </Card>
     </div>
   );
 }

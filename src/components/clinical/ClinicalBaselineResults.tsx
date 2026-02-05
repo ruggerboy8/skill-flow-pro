@@ -3,13 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RatingBandCollapsible } from '@/components/doctor/RatingBandCollapsible';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
-import { ClipboardCheck, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { getDomainColorRichRaw } from '@/lib/domainColors';
+import { ClipboardCheck, CheckCircle2, Clock, AlertCircle, ChevronDown } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface ClinicalBaselineResultsProps {
@@ -225,160 +225,174 @@ export function ClinicalBaselineResults({
     );
   }
 
+  // Score color config
+  const SCORE_COLORS: Record<number, { bg: string; border: string; text: string }> = {
+    4: { bg: 'hsl(160 60% 95%)', border: 'hsl(160 50% 80%)', text: 'hsl(160 80% 25%)' },
+    3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)' },
+    2: { bg: 'hsl(38 90% 95%)', border: 'hsl(38 70% 75%)', text: 'hsl(38 80% 30%)' },
+    1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)' },
+  };
+
+  // Flatten and sort items by score descending for each domain
+  const getSortedDomainItems = (domain: string) => {
+    const domainData = groupedByDomain[domain];
+    if (!domainData) return [];
+    return Object.entries(domainData)
+      .flatMap(([score, items]) => items.map(item => ({ ...item, score: Number(score) })))
+      .sort((a, b) => b.score - a.score);
+  };
+
   // Completed state - full results view
   return (
-    <div className="space-y-6">
-      {/* Header Card */}
+    <Collapsible defaultOpen className="space-y-4">
       <Card className="overflow-hidden border-0 shadow-lg">
-        <div className="bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-background dark:from-emerald-950/30 dark:via-emerald-950/10 p-6">
-          <div className="flex items-start gap-4">
-            <div className="p-3 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
-              <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-semibold">Baseline Self-Assessment</h2>
-                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300">
-                  Complete
-                </Badge>
+        <CollapsibleTrigger className="w-full">
+          <div className="bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-background dark:from-emerald-950/30 dark:via-emerald-950/10 p-5">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
+                <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
               </div>
-              {completedAt && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Completed {format(new Date(completedAt), 'MMMM d, yyyy')}
-                </p>
-              )}
-              {flaggedDomains.length > 0 && (
-                <div className="flex items-center gap-2 mt-3 text-amber-700 dark:text-amber-400">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm">
-                    Doctor flagged {flaggedDomains.length} domain{flaggedDomains.length > 1 ? 's' : ''} for discussion: {flaggedDomains.join(', ')}
-                  </span>
+              <div className="flex-1 text-left">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold">Baseline Self-Assessment</h2>
+                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300">
+                    Complete
+                  </Badge>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Tally Row - Score Summary Cards */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { score: 4, label: 'Exceptional', bgColor: 'hsl(160 60% 95%)', textColor: 'hsl(160 80% 35%)', borderColor: 'hsl(160 50% 70%)' },
-          { score: 3, label: 'Excellent', bgColor: 'hsl(210 80% 95%)', textColor: 'hsl(210 80% 45%)', borderColor: 'hsl(210 60% 70%)' },
-          { score: 2, label: 'Room to Grow', bgColor: 'hsl(38 90% 95%)', textColor: 'hsl(38 80% 40%)', borderColor: 'hsl(38 70% 65%)' },
-          { score: 1, label: 'Needs Focus', bgColor: 'hsl(0 70% 95%)', textColor: 'hsl(0 70% 45%)', borderColor: 'hsl(0 60% 70%)' },
-        ].map(({ score, label, bgColor, textColor, borderColor }) => (
-          <Card 
-            key={score} 
-            className="text-center border-0 shadow-sm"
-            style={{ backgroundColor: bgColor }}
-          >
-            <CardContent className="py-4 px-2">
-              <div 
-                className="text-3xl font-bold"
-                style={{ color: textColor }}
-              >
-                {tallyCounts[score as keyof typeof tallyCounts]}
+                {completedAt && (
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Completed {format(new Date(completedAt), 'MMMM d, yyyy')}
+                  </p>
+                )}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">{label}</div>
-              <Badge 
-                variant="outline" 
-                className="mt-2"
-                style={{ color: textColor, borderColor: borderColor }}
-              >
-                {score}s
-              </Badge>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Domain Tabs */}
-      {orderedDomains.length > 0 && (
-        <Card className="border-0 shadow-lg overflow-hidden">
-          <Tabs defaultValue={orderedDomains[0]} className="w-full">
-            <div className="border-b bg-muted/30">
-              <TabsList className="w-full h-auto p-1 bg-transparent gap-1">
-                {orderedDomains.map((domain) => {
-                  const domainColor = getDomainColorRichRaw(domain);
-                  const isFlagged = flaggedDomains.includes(domain);
-                  return (
-                    <TabsTrigger 
-                      key={domain} 
-                      value={domain} 
-                      className="flex-1 min-w-fit data-[state=active]:shadow-sm transition-all"
-                    >
-                      <span 
-                        className="w-2 h-2 rounded-full mr-2 hidden sm:inline-block"
-                        style={{ backgroundColor: `hsl(${domainColor})` }}
-                      />
-                      {domain}
-                      {isFlagged && (
-                        <AlertCircle className="h-3 w-3 ml-1 text-amber-500" />
-                      )}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
+              <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </div>
+            {flaggedDomains.length > 0 && (
+              <div className="flex items-center gap-2 mt-3 ml-14 text-amber-700 dark:text-amber-400">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm">
+                  Flagged {flaggedDomains.length} domain{flaggedDomains.length > 1 ? 's' : ''} for discussion: {flaggedDomains.join(', ')}
+                </span>
+              </div>
+            )}
+          </div>
+        </CollapsibleTrigger>
 
-            {orderedDomains.map((domain) => {
-              const domainData = groupedByDomain[domain];
-              const domainColor = getDomainColorRaw(domain);
-              const domainColorRich = getDomainColorRichRaw(domain);
-              const isFlagged = flaggedDomains.includes(domain);
-              
+        <CollapsibleContent>
+          {/* Tally Row - Score Summary */}
+          <div className="grid grid-cols-4 gap-2 p-4 border-b bg-muted/20">
+            {[
+              { score: 4, label: 'Exceptional' },
+              { score: 3, label: 'Excellent' },
+              { score: 2, label: 'Room to Grow' },
+              { score: 1, label: 'Needs Focus' },
+            ].map(({ score, label }) => {
+              const colors = SCORE_COLORS[score];
               return (
-                <TabsContent 
-                  key={domain} 
-                  value={domain} 
-                  className="mt-0 p-4 space-y-3"
-                  style={{
-                    background: `linear-gradient(135deg, hsl(${domainColor} / 0.15) 0%, transparent 50%)`,
-                  }}
+                <div 
+                  key={score} 
+                  className="text-center py-3 px-2 rounded-lg border"
+                  style={{ backgroundColor: colors.bg, borderColor: colors.border }}
                 >
-                  {/* Domain Header Badge */}
-                  <div className="flex items-center gap-2 mb-4">
-                    <span 
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: `hsl(${domainColorRich})` }}
-                    />
-                    <span className="font-medium text-sm" style={{ color: `hsl(${domainColorRich})` }}>
-                      {domain}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      ({Object.values(domainData).flat().length} items)
-                    </span>
-                    {isFlagged && (
-                      <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
-                        Flagged for discussion
-                      </Badge>
-                    )}
+                  <div className="text-2xl font-bold" style={{ color: colors.text }}>
+                    {tallyCounts[score as keyof typeof tallyCounts]}
                   </div>
-
-                  {/* Rating Bands - 4, 3, 2, 1 order */}
-                  {[4, 3, 2, 1].map((score) => (
-                    <RatingBandCollapsible
-                      key={score}
-                      score={score}
-                      items={domainData[score].map(item => ({
-                        action_id: item.action_id,
-                        action_statement: item.action_statement,
-                        competency_name: item.competency_name,
-                      }))}
-                      defaultOpen={score === 4}
-                      onItemClick={(item) => {
-                        const fullItem = domainData[score].find(i => i.action_id === item.action_id);
-                        if (fullItem) setSelectedItem(fullItem);
-                      }}
-                    />
-                  ))}
-                </TabsContent>
+                  <div className="text-xs font-medium" style={{ color: colors.text }}>
+                    {label}
+                  </div>
+                </div>
               );
             })}
-          </Tabs>
-        </Card>
-      )}
+          </div>
+
+          {/* Domain Tabs */}
+          {orderedDomains.length > 0 && (
+            <Tabs defaultValue={orderedDomains[0]} className="w-full">
+              <div className="border-b">
+                <TabsList className="w-full h-auto p-0 bg-transparent rounded-none">
+                  {orderedDomains.map((domain) => {
+                    const domainColor = getDomainColorRichRaw(domain);
+                    const isFlagged = flaggedDomains.includes(domain);
+                    return (
+                      <TabsTrigger 
+                        key={domain} 
+                        value={domain} 
+                        className="flex-1 py-3 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-muted/50 font-medium transition-all"
+                      >
+                        <span 
+                          className="w-2.5 h-2.5 rounded-full mr-2"
+                          style={{ backgroundColor: `hsl(${domainColor})` }}
+                        />
+                        {domain}
+                        {isFlagged && (
+                          <AlertCircle className="h-3.5 w-3.5 ml-1.5 text-amber-500" />
+                        )}
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </div>
+
+              {orderedDomains.map((domain) => {
+                const sortedItems = getSortedDomainItems(domain);
+                const isFlagged = flaggedDomains.includes(domain);
+                
+                return (
+                  <TabsContent 
+                    key={domain} 
+                    value={domain} 
+                    className="mt-0 p-0"
+                  >
+                    {isFlagged && (
+                      <div className="px-4 py-2 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-200 dark:border-amber-800">
+                        <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm">
+                          <AlertCircle className="h-4 w-4" />
+                          Doctor flagged this domain for discussion
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Pro Move Rows - sorted by score descending */}
+                    <div className="divide-y">
+                      {sortedItems.map((item) => {
+                        const colors = SCORE_COLORS[item.score];
+                        return (
+                          <button
+                            key={item.action_id}
+                            onClick={() => setSelectedItem(item)}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group"
+                            style={{ backgroundColor: colors.bg }}
+                          >
+                            <div 
+                              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border"
+                              style={{ 
+                                backgroundColor: colors.bg, 
+                                borderColor: colors.border,
+                                color: colors.text 
+                              }}
+                            >
+                              {item.score}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground">
+                                {item.action_statement}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {item.competency_name}
+                              </p>
+                            </div>
+                            <ChevronDown className="h-4 w-4 text-muted-foreground -rotate-90 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
+          )}
+        </CollapsibleContent>
+      </Card>
 
       {/* Materials Sheet */}
       <DoctorMaterialsSheet
@@ -386,6 +400,6 @@ export function ClinicalBaselineResults({
         proMoveStatement={selectedItem?.action_statement || ''}
         onClose={() => setSelectedItem(null)}
       />
-    </div>
+    </Collapsible>
   );
 }

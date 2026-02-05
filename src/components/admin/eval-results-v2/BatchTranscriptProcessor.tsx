@@ -41,6 +41,7 @@ export function BatchTranscriptProcessor() {
 
     try {
       // Query for evaluations needing transcription or insight extraction
+      // Don't use embedded relations since location_id FK isn't in schema cache
       const { data, error } = await supabase
         .from('evaluations')
         .select(`
@@ -48,20 +49,42 @@ export function BatchTranscriptProcessor() {
           audio_recording_path,
           summary_raw_transcript,
           extracted_insights,
-          staff:staff_id (name),
-          location:location_id (name)
+          staff_id,
+          location_id
         `)
         .or('and(audio_recording_path.not.is.null,summary_raw_transcript.is.null),and(summary_raw_transcript.not.is.null,extracted_insights.is.null)');
 
       if (error) throw error;
 
+      if (!data || data.length === 0) {
+        setPendingEvals([]);
+        toast.info('All evaluations are up to date');
+        return;
+      }
+
+      // Get unique staff and location IDs
+      const staffIds = [...new Set(data.map(d => d.staff_id))];
+      const locationIds = [...new Set(data.map(d => d.location_id))];
+
+      // Fetch staff names
+      const { data: staffData } = await supabase
+        .from('staff')
+        .select('id, name')
+        .in('id', staffIds);
+      const staffMap = new Map((staffData || []).map(s => [s.id, s.name]));
+
+      // Fetch location names
+      const { data: locationData } = await supabase
+        .from('locations')
+        .select('id, name')
+        .in('id', locationIds);
+      const locationMap = new Map((locationData || []).map(l => [l.id, l.name]));
+
       const evals: PendingEval[] = [];
 
-      for (const row of data || []) {
-        const staffName = (row.staff as any)?.name || 'Unknown';
-        const locationName = (row.location as any)?.name || 'Unknown';
-        const hasTranscript = !!row.summary_raw_transcript;
-        const hasInsights = !!row.extracted_insights;
+      for (const row of data) {
+        const staffName = staffMap.get(row.staff_id) || 'Unknown';
+        const locationName = locationMap.get(row.location_id) || 'Unknown';
 
         // Determine issue type
         if (row.audio_recording_path && !row.summary_raw_transcript) {
@@ -70,7 +93,7 @@ export function BatchTranscriptProcessor() {
             staffName,
             locationName,
             audioPath: row.audio_recording_path,
-            audioSize: null, // Will be fetched during processing
+            audioSize: null,
             hasTranscript: false,
             hasInsights: false,
             existingTranscript: null,

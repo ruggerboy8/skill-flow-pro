@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Check, X, Search, ArrowLeft } from 'lucide-react';
+import { Plus, Check, X, Search, ArrowLeft, Trash2 } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { DoctorProMoveForm } from '@/components/clinical/DoctorProMoveForm';
 import { DoctorMaterialsDrawer } from '@/components/clinical/DoctorMaterialsDrawer';
@@ -50,6 +51,8 @@ export default function DoctorProMoveLibrary() {
   const [editingProMove, setEditingProMove] = useState<any>(null);
   const [selectedProMoveId, setSelectedProMoveId] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<ProMove | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadCompetencies();
@@ -203,6 +206,54 @@ export default function DoctorProMoveLibrary() {
   const handleMaterialsClose = () => {
     setSelectedProMoveId(null);
     setRefreshKey(prev => prev + 1);
+  };
+
+  const handleDeleteProMove = async () => {
+    if (!deleteTarget) return;
+    
+    setIsDeleting(true);
+    try {
+      // First delete any associated resources
+      await supabase
+        .from('pro_move_resources')
+        .delete()
+        .eq('action_id', deleteTarget.action_id);
+
+      // Then delete the pro move
+      const { error } = await supabase
+        .from('pro_moves')
+        .delete()
+        .eq('action_id', deleteTarget.action_id);
+
+      if (error) {
+        // FK constraint violation - pro move is referenced elsewhere
+        if (error.code === '23503') {
+          toast({
+            title: 'Cannot Delete',
+            description: 'This pro move is referenced in assignments or scores. Consider deactivating it instead.',
+            variant: 'destructive',
+          });
+        } else {
+          throw error;
+        }
+      } else {
+        toast({
+          title: 'Deleted',
+          description: 'Pro move has been deleted',
+        });
+        setRefreshKey(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('Error deleting pro move:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete pro move',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   const selectedProMove = proMoves.find(pm => pm.action_id === selectedProMoveId);
@@ -361,6 +412,14 @@ export default function DoctorProMoveLibrary() {
                   >
                     Materials
                   </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setDeleteTarget(pm)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
             </div>
@@ -385,6 +444,28 @@ export default function DoctorProMoveLibrary() {
           onOpenChange={(open) => !open && handleMaterialsClose()}
         />
       )}
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Pro Move?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{deleteTarget?.action_statement}" and all associated learning materials. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProMove}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

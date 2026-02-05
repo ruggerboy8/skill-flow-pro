@@ -7,11 +7,11 @@ import RegionalDashboard from '@/pages/dashboard/RegionalDashboard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Wrench, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { differenceInDays } from 'date-fns';
 
 export default function Index() {
-  const { isParticipant, showRegionalDashboard, isLoading } = useUserRole();
+  const { isParticipant, showRegionalDashboard, isDoctor, isLoading } = useUserRole();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
 
   // Check if backfill is currently enabled
@@ -32,6 +32,11 @@ export default function Index() {
         </div>
       </div>
     );
+  }
+
+  // Doctors → Doctor home (baseline assessment)
+  if (isDoctor) {
+    return <Navigate to="/doctor" replace />;
   }
 
   // Non-participants (coaches/regional managers) → Command Center

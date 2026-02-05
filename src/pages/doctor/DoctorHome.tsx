@@ -25,12 +25,12 @@ export default function DoctorHome() {
     enabled: !!staff?.id,
   });
 
-  const firstName = staff?.name?.split(' ')[0] || 'Doctor';
+  const displayName = staff?.name || 'Doctor';
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="text-center">
-        <h1 className="text-3xl font-bold">Welcome, Dr. {firstName}</h1>
+        <h1 className="text-3xl font-bold">Welcome, {displayName}</h1>
         <p className="text-muted-foreground mt-2">
           Your professional development journey
         </p>

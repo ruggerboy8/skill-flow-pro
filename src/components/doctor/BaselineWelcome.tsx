@@ -17,7 +17,7 @@ export function BaselineWelcome({ staffName, onStart, isLoading }: BaselineWelco
             <ClipboardList className="h-12 w-12 text-primary" />
           </div>
         </div>
-        <CardTitle className="text-2xl">Welcome, Dr. {staffName}</CardTitle>
+        <CardTitle className="text-2xl">Welcome, {staffName}</CardTitle>
         <CardDescription className="text-base mt-2">
           You're about to complete your baseline self-assessment
         </CardDescription>

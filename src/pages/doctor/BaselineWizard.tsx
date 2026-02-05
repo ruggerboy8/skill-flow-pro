@@ -277,7 +277,7 @@ export default function BaselineWizard() {
     <div className="max-w-4xl mx-auto">
       {currentStep === 'welcome' && (
         <BaselineWelcome 
-          staffName={staff?.name?.split(' ')[0] || 'Doctor'}
+          staffName={staff?.name || 'Doctor'}
           onStart={handleStart}
           isLoading={createAssessmentMutation.isPending}
         />

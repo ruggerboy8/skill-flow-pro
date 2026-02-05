@@ -295,6 +295,7 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           doctor_staff_id: string
+          flagged_domains: string[] | null
           id: string
           started_at: string | null
           status: string | null
@@ -303,6 +304,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           doctor_staff_id: string
+          flagged_domains?: string[] | null
           id?: string
           started_at?: string | null
           status?: string | null
@@ -311,6 +313,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           doctor_staff_id?: string
+          flagged_domains?: string[] | null
           id?: string
           started_at?: string | null
           status?: string | null

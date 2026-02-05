@@ -255,9 +255,10 @@ export function BatchTranscriptProcessor() {
           return { status: 'skipped', message: 'Audio file too large (>25MB)', audioSize: audioBlob.size };
         }
 
-        // Send to transcribe-audio
+        // Send to transcribe-audio - use correct filename extension from path
         const formData = new FormData();
-        formData.append('audio', audioBlob, 'audio.webm');
+        const fileName = evalItem.audioPath.split('/').pop() || 'audio.webm';
+        formData.append('audio', audioBlob, fileName);
 
         const { data: transcriptResult, error: transcribeError } = await supabase.functions
           .invoke('transcribe-audio', { body: formData });

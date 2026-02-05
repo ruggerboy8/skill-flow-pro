@@ -30,10 +30,10 @@ interface DomainAssessmentStepProps {
 }
 
 const SCORE_LABELS = [
-  { value: 1, label: 'Developing', short: '1' },
-  { value: 2, label: 'Emerging', short: '2' },
-  { value: 3, label: 'Proficient', short: '3' },
-  { value: 4, label: 'Mastery', short: '4' },
+  { value: 1, label: 'Need to improve', short: '1' },
+  { value: 2, label: 'Room to grow', short: '2' },
+  { value: 3, label: 'Almost always', short: '3' },
+  { value: 4, label: 'Could teach it', short: '4' },
 ];
 
 export function DomainAssessmentStep({
@@ -136,12 +136,11 @@ export function DomainAssessmentStep({
           {/* Legend */}
           <div className="mt-6 pt-4 border-t">
             <p className="text-xs text-muted-foreground mb-2">Rating Scale:</p>
-            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-              {SCORE_LABELS.map(s => (
-                <span key={s.value}>
-                  <strong>{s.value}</strong> = {s.label}
-                </span>
-              ))}
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <span><strong>4</strong> = I could teach a graduate course on this</span>
+              <span><strong>3</strong> = I do this 95% of the time</span>
+              <span><strong>2</strong> = I have some room for growth</span>
+              <span><strong>1</strong> = I need to improve / didn't know I was supposed to</span>
             </div>
           </div>
 

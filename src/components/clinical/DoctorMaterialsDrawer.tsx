@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, ChevronDown, Sparkles, Eye } from 'lucide-react';
+import { Loader2, ChevronDown, Sparkles, Eye, Wand2 } from 'lucide-react';
 import { AIContentAssistant } from './AIContentAssistant';
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
 
@@ -46,6 +46,7 @@ export function DoctorMaterialsDrawer({
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiGeneratedContent, setAIGeneratedContent] = useState<Record<string, string> | null>(null);
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
+  const [formattingField, setFormattingField] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !actionId) return;
@@ -120,6 +121,44 @@ export function DoctorMaterialsDrawer({
       title: 'Content Generated',
       description: 'AI-generated content has been added. Review and edit before saving.',
     });
+  };
+
+  const formatField = async (type: string) => {
+    const content = resources[type]?.content?.trim();
+    if (!content) {
+      toast({
+        title: 'No Content',
+        description: 'Enter some content first, then format it.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setFormattingField(type);
+    try {
+      const { data, error } = await supabase.functions.invoke('format-pro-move-content', {
+        body: { content, contentType: type },
+      });
+
+      if (error) throw error;
+
+      if (data?.formatted) {
+        handleContentChange(type, data.formatted);
+        toast({
+          title: 'Formatted',
+          description: 'Content has been auto-formatted. Review before saving.',
+        });
+      }
+    } catch (error) {
+      console.error('Error formatting content:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to format content. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setFormattingField(null);
+    }
   };
 
   const saveAll = async () => {
@@ -208,17 +247,34 @@ export function DoctorMaterialsDrawer({
               {MATERIAL_SECTIONS.map((section, idx) => {
                 const resource = resources[section.type];
                 const isAIGenerated = aiGeneratedContent?.[section.type] === resource?.content;
+                const isFormatting = formattingField === section.type;
                 
                 return (
                   <div key={section.type} className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      {section.title}
-                      {isAIGenerated && (
-                        <span className="text-xs bg-warning/20 text-warning-foreground px-2 py-0.5 rounded">
-                          AI Generated
-                        </span>
-                      )}
-                    </Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        {section.title}
+                        {isAIGenerated && (
+                          <span className="text-xs bg-warning/20 text-warning-foreground px-2 py-0.5 rounded">
+                            AI Generated
+                          </span>
+                        )}
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => formatField(section.type)}
+                        disabled={isFormatting || !resource?.content?.trim()}
+                        className="h-7 gap-1 text-xs"
+                      >
+                        {isFormatting ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Wand2 className="h-3 w-3" />
+                        )}
+                        Format
+                      </Button>
+                    </div>
                     <Textarea
                       value={resource?.content || ''}
                       onChange={(e) => handleContentChange(section.type, e.target.value)}

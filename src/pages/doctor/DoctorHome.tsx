@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, CheckCircle2 } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Eye } from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function DoctorHome() {
   const { data: staff } = useStaffProfile();
@@ -37,22 +38,31 @@ export default function DoctorHome() {
       </div>
 
       {baseline?.status === 'completed' ? (
-        <Card className="border-green-200 bg-green-50/50">
+        <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
+              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
               <div>
                 <CardTitle>Baseline Complete</CardTitle>
                 <CardDescription>
-                  Your baseline self-assessment has been submitted.
+                  {baseline.completed_at 
+                    ? `Completed ${format(new Date(baseline.completed_at), 'MMMM d, yyyy')}`
+                    : 'Your baseline self-assessment has been submitted.'
+                  }
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Dr. Alex will reach out to schedule your baseline check-in conversation.
             </p>
+            <Link to="/doctor/baseline-results">
+              <Button variant="outline" className="w-full gap-2">
+                <Eye className="h-4 w-4" />
+                View My Baseline
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       ) : baseline?.status === 'in_progress' ? (

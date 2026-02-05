@@ -40,10 +40,25 @@ const DELAY_BETWEEN_ITEMS_MS = 1000;
 export function BatchProcessorProvider({ children }: { children: ReactNode }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
-  const [pendingEvals, setPendingEvals] = useState<PendingEval[]>([]);
+  const [pendingEvals, setPendingEvalsState] = useState<PendingEval[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pendingEvalsRef = useRef<PendingEval[]>([]);
+  
+  // Keep ref in sync with state
+  const setPendingEvals = (evals: PendingEval[] | ((prev: PendingEval[]) => PendingEval[])) => {
+    if (typeof evals === 'function') {
+      setPendingEvalsState(prev => {
+        const next = evals(prev);
+        pendingEvalsRef.current = next;
+        return next;
+      });
+    } else {
+      pendingEvalsRef.current = evals;
+      setPendingEvalsState(evals);
+    }
+  };
 
   // Warn user before leaving page while processing
   useEffect(() => {
@@ -83,7 +98,7 @@ export function BatchProcessorProvider({ children }: { children: ReactNode }) {
       if (evalItem.issue === 'no_transcript' && evalItem.audioPath) {
         // Download audio from storage
         const { data: audioData, error: downloadError } = await supabase.storage
-          .from('evaluation-audio')
+          .from('evaluation-recordings')
           .download(evalItem.audioPath);
 
         if (downloadError) {
@@ -173,20 +188,22 @@ export function BatchProcessorProvider({ children }: { children: ReactNode }) {
   }
 
   async function startProcessing() {
-    const itemsToProcess = pendingEvals.filter(e => e.status === 'pending');
+    // Use ref to get current evals (avoids stale closure)
+    const evalsSnapshot = [...pendingEvalsRef.current];
+    const itemsToProcess = evalsSnapshot.filter(e => e.status === 'pending');
     if (itemsToProcess.length === 0) return;
 
     setIsProcessing(true);
     setIsStopping(false);
     abortControllerRef.current = new AbortController();
 
-    for (let i = 0; i < pendingEvals.length; i++) {
+    for (let i = 0; i < evalsSnapshot.length; i++) {
       // Check if we should stop
       if (abortControllerRef.current?.signal.aborted) {
         break;
       }
 
-      const evalItem = pendingEvals[i];
+      const evalItem = evalsSnapshot[i];
       if (evalItem.status !== 'pending') continue;
 
       setCurrentIndex(i);
@@ -204,7 +221,7 @@ export function BatchProcessorProvider({ children }: { children: ReactNode }) {
       ));
 
       // Delay before next item (unless stopped or last item)
-      if (i < pendingEvals.length - 1 && !abortControllerRef.current?.signal.aborted) {
+      if (i < evalsSnapshot.length - 1 && !abortControllerRef.current?.signal.aborted) {
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_ITEMS_MS));
       }
     }
@@ -212,8 +229,10 @@ export function BatchProcessorProvider({ children }: { children: ReactNode }) {
     setIsProcessing(false);
     setIsStopping(false);
     
-    const successCount = pendingEvals.filter(e => e.status === 'success').length;
-    const errorCount = pendingEvals.filter(e => e.status === 'error').length;
+    // Get final counts from ref (current state)
+    const finalEvals = pendingEvalsRef.current;
+    const successCount = finalEvals.filter(e => e.status === 'success').length;
+    const errorCount = finalEvals.filter(e => e.status === 'error').length;
     
     if (abortControllerRef.current?.signal.aborted) {
       toast.info('Processing stopped');

@@ -13,6 +13,8 @@ import { Plus, Check, X, Search, ArrowLeft, Trash2 } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { DoctorProMoveForm } from '@/components/clinical/DoctorProMoveForm';
 import { DoctorMaterialsDrawer } from '@/components/clinical/DoctorMaterialsDrawer';
+import { DOMAIN_ORDER } from '@/lib/domainUtils';
+
 const DOCTOR_ROLE_ID = 4;
 
 interface Competency {
@@ -44,6 +46,7 @@ export default function DoctorProMoveLibrary() {
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDomain, setSelectedDomain] = useState<string>('all');
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
@@ -53,6 +56,19 @@ export default function DoctorProMoveLibrary() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<ProMove | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Get unique domains from competencies
+  const domains = [...new Set(competencies.map(c => c.domain_name).filter(Boolean))];
+  const sortedDomains = domains.sort((a, b) => {
+    const aIdx = DOMAIN_ORDER.indexOf(a || '');
+    const bIdx = DOMAIN_ORDER.indexOf(b || '');
+    return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+  });
+
+  // Filter competencies by selected domain
+  const filteredCompetencies = selectedDomain === 'all' 
+    ? competencies 
+    : competencies.filter(c => c.domain_name === selectedDomain);
 
   useEffect(() => {
     loadCompetencies();
@@ -167,13 +183,20 @@ export default function DoctorProMoveLibrary() {
   };
 
   const filteredProMoves = proMoves.filter(pm => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      pm.action_statement.toLowerCase().includes(term) ||
-      pm.competency_name.toLowerCase().includes(term) ||
-      pm.domain_name.toLowerCase().includes(term)
-    );
+    // Domain filter
+    if (selectedDomain !== 'all' && pm.domain_name !== selectedDomain) return false;
+    
+    // Search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matches = 
+        pm.action_statement.toLowerCase().includes(term) ||
+        pm.competency_name.toLowerCase().includes(term) ||
+        pm.domain_name.toLowerCase().includes(term);
+      if (!matches) return false;
+    }
+    
+    return true;
   });
 
   const handleAddProMove = () => {
@@ -294,7 +317,33 @@ export default function DoctorProMoveLibrary() {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-muted/50 rounded-lg">
+        <div className="space-y-2">
+          <Label>Domain</Label>
+          <Select value={selectedDomain} onValueChange={(val) => {
+            setSelectedDomain(val);
+            setSelectedCompetency('all'); // Reset competency when domain changes
+          }}>
+            <SelectTrigger>
+              <SelectValue placeholder="All domains" />
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              <SelectItem value="all">All domains</SelectItem>
+              {sortedDomains.map(domain => (
+                <SelectItem key={domain} value={domain || ''}>
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: getDomainColor(domain || '') }}
+                    />
+                    {domain}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="space-y-2">
           <Label>Competency</Label>
           <Select value={selectedCompetency} onValueChange={setSelectedCompetency}>
@@ -303,7 +352,7 @@ export default function DoctorProMoveLibrary() {
             </SelectTrigger>
             <SelectContent className="bg-background z-50">
               <SelectItem value="all">All competencies</SelectItem>
-              {competencies.map(competency => (
+              {filteredCompetencies.map(competency => (
                 <SelectItem key={competency.competency_id} value={competency.competency_id.toString()}>
                   <div className="flex items-center gap-2">
                     <div 

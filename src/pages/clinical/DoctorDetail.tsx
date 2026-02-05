@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, MapPin, Calendar, ClipboardCheck } from 'lucide-react';
 import { format } from 'date-fns';
-import { BaselineSummaryPanel } from '@/components/clinical/BaselineSummaryPanel';
+import { ClinicalBaselineResults } from '@/components/clinical/ClinicalBaselineResults';
 
 export default function DoctorDetail() {
   const { staffId } = useParams<{ staffId: string }>();
@@ -140,11 +140,12 @@ export default function DoctorDetail() {
         </Card>
       </div>
 
-      {/* Baseline Summary */}
-      <BaselineSummaryPanel 
+      {/* Baseline Results */}
+      <ClinicalBaselineResults 
         staffId={staffId!} 
         assessmentId={baseline?.id}
         status={baseline?.status}
+        completedAt={baseline?.completed_at}
       />
     </div>
   );

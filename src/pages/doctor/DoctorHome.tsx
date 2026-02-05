@@ -1,0 +1,117 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { Link } from 'react-router-dom';
+import { ClipboardCheck, BookOpen, CheckCircle2 } from 'lucide-react';
+
+export default function DoctorHome() {
+  const { data: staff } = useStaffProfile();
+
+  const { data: baseline } = useQuery({
+    queryKey: ['my-baseline', staff?.id],
+    queryFn: async () => {
+      if (!staff?.id) return null;
+      const { data, error } = await supabase
+        .from('doctor_baseline_assessments')
+        .select('id, status, completed_at')
+        .eq('doctor_staff_id', staff.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!staff?.id,
+  });
+
+  const firstName = staff?.name?.split(' ')[0] || 'Doctor';
+
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold">Welcome, Dr. {firstName}</h1>
+        <p className="text-muted-foreground mt-2">
+          Your professional development journey
+        </p>
+      </div>
+
+      {baseline?.status === 'completed' ? (
+        <Card className="border-green-200 bg-green-50/50">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-8 w-8 text-green-600" />
+              <div>
+                <CardTitle>Baseline Complete</CardTitle>
+                <CardDescription>
+                  Your baseline self-assessment has been submitted.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Dr. Alex will reach out to schedule your baseline check-in conversation.
+            </p>
+          </CardContent>
+        </Card>
+      ) : baseline?.status === 'in_progress' ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <ClipboardCheck className="h-8 w-8 text-primary" />
+              <div>
+                <CardTitle>Continue Your Baseline</CardTitle>
+                <CardDescription>
+                  You have an assessment in progress.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Link to="/doctor/baseline">
+              <Button className="w-full">
+                Continue Assessment
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <ClipboardCheck className="h-8 w-8 text-primary" />
+              <div>
+                <CardTitle>Complete Your Baseline</CardTitle>
+                <CardDescription>
+                  Start your self-assessment to begin your development journey.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Link to="/doctor/baseline">
+              <Button className="w-full">
+                Start Baseline Assessment
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <BookOpen className="h-6 w-6 text-muted-foreground" />
+            <div>
+              <CardTitle className="text-lg">Pro Moves Reference</CardTitle>
+              <CardDescription>
+                Review the doctor pro moves and learning materials.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+    </div>
+  );
+}

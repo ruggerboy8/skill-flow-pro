@@ -47,7 +47,7 @@ serve(async (req: Request) => {
 
   const { data: me, error: meErr } = await caller
     .from("staff")
-    .select("is_super_admin, is_org_admin, user_id, name")
+    .select("is_super_admin, is_org_admin, is_clinical_director, user_id, name")
     .eq("user_id", authUser.user.id)
     .maybeSingle();
 
@@ -93,7 +93,7 @@ serve(async (req: Request) => {
 
         let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,is_paused,paused_at,pause_reason,coach_scope_type,coach_scope_id,hire_date,allow_backfill_until,roles(role_name),locations(name,organization_id)", {
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,is_paused,paused_at,pause_reason,coach_scope_type,coach_scope_id,hire_date,allow_backfill_until,is_doctor,is_clinical_director,roles(role_name),locations(name,organization_id)", {
             count: "exact",
           })
           .order("name", { ascending: true });
@@ -195,6 +195,8 @@ serve(async (req: Request) => {
             is_paused: s.is_paused ?? false,
             paused_at: s.paused_at ?? null,
             pause_reason: s.pause_reason ?? null,
+            is_doctor: s.is_doctor ?? false,
+            is_clinical_director: s.is_clinical_director ?? false,
             coach_scopes: scopes || null,
             hire_date: s.hire_date ?? null,
             allow_backfill_until: s.allow_backfill_until ?? null,
@@ -462,6 +464,28 @@ serve(async (req: Request) => {
             coach_scope_type: null,
             coach_scope_id: null,
             home_route: '/coach',
+          },
+          doctor: {
+            is_participant: false,
+            is_lead: false,
+            is_coach: false,
+            is_org_admin: false,
+            is_super_admin: false,
+            is_doctor: true,
+            coach_scope_type: null,
+            coach_scope_id: null,
+            home_route: '/doctor',
+          },
+          clinical_director: {
+            is_participant: false,
+            is_lead: false,
+            is_coach: false,
+            is_org_admin: false,
+            is_super_admin: false,
+            is_clinical_director: true,
+            coach_scope_type: null,
+            coach_scope_id: null,
+            home_route: '/clinical',
           },
         };
         
@@ -821,6 +845,72 @@ serve(async (req: Request) => {
         }
 
         return json({ ok: true });
+      }
+
+      case "invite_doctor": {
+        // Only clinical directors or super admins can invite doctors
+        if (!me.is_clinical_director && !me.is_super_admin) {
+          return json({ error: "Only Clinical Directors can invite doctors" }, 403);
+        }
+        
+        const { email, name, location_id, organization_id } = payload ?? {};
+        if (!email || !name || !organization_id) {
+          return json({ error: "Missing required fields: email, name, and organization_id are required" }, 400);
+        }
+
+        // 1) Send invite first to get the user_id
+        const redirectTo = `${SITE_URL}/auth/callback`;
+        const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
+          redirectTo,
+          data: { user_type: 'doctor' }
+        });
+        if (invErr) {
+          // Check for duplicate email
+          if (invErr.message?.includes("already been registered")) {
+            return json({ error: "A user with this email address already exists." }, 409);
+          }
+          throw invErr;
+        }
+
+        if (!invite?.user?.id) {
+          return json({ error: "Failed to create user - no user ID returned" }, 500);
+        }
+
+        // 2) Create staff row with is_doctor = true
+        // location_id is optional for roaming doctors
+        const { data: staff, error: staffErr } = await admin
+          .from("staff")
+          .insert({ 
+            name, 
+            email, 
+            role_id: 4,  // Doctor role
+            primary_location_id: location_id || null,  // null = roaming
+            is_participant: false,
+            is_doctor: true,
+            user_id: invite.user.id,
+            home_route: '/doctor',
+          })
+          .select("id")
+          .single();
+        
+        if (staffErr) {
+          // If staff creation fails, clean up the auth user
+          console.error("Staff creation failed, cleaning up auth user:", staffErr);
+          await admin.auth.admin.deleteUser(invite.user.id);
+          
+          if (staffErr.code === "23505" && staffErr.message?.includes("email")) {
+            return json({ error: "A user with this email address already exists." }, 409);
+          }
+          throw staffErr;
+        }
+
+        // 3) Update user metadata with staff_id
+        await admin.auth.admin.updateUserById(invite.user.id, {
+          user_metadata: { staff_id: staff.id, user_type: 'doctor' }
+        });
+
+        console.log(`✅ Invited doctor ${name} (${email}) - staff_id: ${staff.id}`);
+        return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true });
       }
 
       default:

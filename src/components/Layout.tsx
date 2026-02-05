@@ -11,7 +11,7 @@ import { useRoutePersistence } from '@/hooks/useRoutePersistence';
 import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
-import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2 } from 'lucide-react';
+import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Stethoscope } from 'lucide-react';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -27,6 +27,8 @@ export default function Layout() {
   const isOrgAdmin = isMasquerading ? (staffProfile?.is_org_admin || false) : authIsOrgAdmin;
   const isLead = isMasquerading ? (staffProfile?.is_lead || false) : authIsLead;
   const isOfficeManager = isMasquerading ? (staffProfile?.is_office_manager || false) : (staffProfile?.is_office_manager || false);
+  const isDoctor = staffProfile?.is_doctor || false;
+  const isClinicalDirector = staffProfile?.is_clinical_director || false;
   const location = useLocation();
   const { toast } = useToast();
   
@@ -52,7 +54,12 @@ export default function Layout() {
   // Office managers who are NOT coaches should see "My Location" link
   const showLocationDashboard = isOfficeManager && !isCoach && !isOrgAdmin;
 
-  const navigation = [
+  // Determine navigation based on user type
+  const navigation = isDoctor ? [
+    // Doctor-specific navigation
+    { name: 'Home', href: '/doctor', icon: Home },
+  ] : [
+    // Standard navigation
     { name: 'Home', href: '/', icon: Home },
     // My Role hidden for regional admins (org admins) - they use coach/admin tools
     ...(!isOrgAdmin ? [
@@ -61,6 +68,10 @@ export default function Layout() {
     // My Location for Office Managers (view-only access to their location)
     ...(showLocationDashboard ? [
       { name: 'My Location', href: '/my-location', icon: Building2 },
+    ] : []),
+    // Clinical Director portal
+    ...(isClinicalDirector || isSuperAdmin ? [
+      { name: 'Clinical', href: '/clinical', icon: Stethoscope },
     ] : []),
     // Backfill nav removed - keeping function for individual score backfill only
     ...(isCoach || isSuperAdmin || isOrgAdmin || isLead ? [

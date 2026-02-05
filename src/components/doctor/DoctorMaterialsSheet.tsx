@@ -15,8 +15,6 @@ import ReactMarkdown from 'react-markdown';
 interface DoctorMaterialsSheetProps {
   proMoveId: number | null;
   proMoveStatement: string;
-  currentScore: number | null;
-  onScoreChange: (score: number) => void;
   onClose: () => void;
 }
 
@@ -24,13 +22,6 @@ interface ResourceData {
   type: string;
   content_md: string | null;
 }
-
-const SCORE_LABELS = [
-  { value: 1, label: 'Need to improve', description: 'I need to improve this / didn\'t know I was supposed to be doing this' },
-  { value: 2, label: 'Room to grow', description: 'I have some room for growth' },
-  { value: 3, label: 'Almost always', description: 'I do this 95% of the time' },
-  { value: 4, label: 'Could teach it', description: 'I could teach a graduate course on this' },
-];
 
 const MATERIAL_SECTIONS = [
   { 
@@ -70,8 +61,6 @@ const MATERIAL_SECTIONS = [
 export function DoctorMaterialsSheet({
   proMoveId,
   proMoveStatement,
-  currentScore,
-  onScoreChange,
   onClose,
 }: DoctorMaterialsSheetProps) {
   const { data: resources, isLoading } = useQuery({
@@ -179,53 +168,6 @@ export function DoctorMaterialsSheet({
               )}
             </>
           )}
-
-          {/* Rating section at bottom */}
-          <div className="pt-6 border-t">
-            <Label className="text-base font-semibold mb-1 block">Your Self-Rating</Label>
-            <p className="text-sm text-muted-foreground mb-4">
-              How confident are you that you're already doing this 100% of the time?
-            </p>
-            <RadioGroup
-              value={currentScore?.toString() || ''}
-              onValueChange={(val) => onScoreChange(parseInt(val))}
-              className="space-y-2"
-            >
-              {SCORE_LABELS.map((s) => (
-                <Label
-                  key={s.value}
-                  htmlFor={`sheet-${s.value}`}
-                  className={`
-                    flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer
-                    transition-all
-                    ${currentScore === s.value 
-                      ? 'bg-primary/10 border-primary' 
-                      : 'border-muted hover:border-primary/50 hover:bg-muted/50'
-                    }
-                  `}
-                >
-                  <RadioGroupItem
-                    value={s.value.toString()}
-                    id={`sheet-${s.value}`}
-                    className="sr-only"
-                  />
-                  <span className={`
-                    w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg
-                    ${currentScore === s.value 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted text-muted-foreground'
-                    }
-                  `}>
-                    {s.value}
-                  </span>
-                  <div className="flex-1">
-                    <span className="font-medium block">{s.label}</span>
-                    <span className="text-xs text-muted-foreground">{s.description}</span>
-                  </div>
-                </Label>
-              ))}
-            </RadioGroup>
-          </div>
         </div>
       </SheetContent>
     </Sheet>

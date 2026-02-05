@@ -286,8 +286,6 @@ export function DoctorMaterialsDrawer({
       <DoctorMaterialsSheet
         proMoveId={showLearnerPreview ? actionId : null}
         proMoveStatement={proMoveStatement}
-        currentScore={null}
-        onScoreChange={() => {}}
         onClose={() => setShowLearnerPreview(false)}
       />
     </>

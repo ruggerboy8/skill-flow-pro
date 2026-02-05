@@ -361,6 +361,9 @@ export function DoctorMaterialsDrawer({
         proMoveId={showLearnerPreview ? actionId : null}
         proMoveStatement={proMoveStatement}
         onClose={() => setShowLearnerPreview(false)}
+        previewContent={showLearnerPreview ? Object.fromEntries(
+          Object.entries(resources).map(([type, r]) => [type, r.content])
+        ) : undefined}
       />
     </>
   );

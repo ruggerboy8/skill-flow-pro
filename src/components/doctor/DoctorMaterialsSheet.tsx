@@ -16,6 +16,8 @@ interface DoctorMaterialsSheetProps {
   proMoveId: number | null;
   proMoveStatement: string;
   onClose: () => void;
+  /** Optional preview content - when provided, uses this instead of fetching from DB */
+  previewContent?: Record<string, string>;
 }
 
 interface ResourceData {
@@ -62,7 +64,9 @@ export function DoctorMaterialsSheet({
   proMoveId,
   proMoveStatement,
   onClose,
+  previewContent,
 }: DoctorMaterialsSheetProps) {
+  // Only fetch from DB if no preview content is provided
   const { data: resources, isLoading } = useQuery({
     queryKey: ['doctor-pro-move-resources', proMoveId],
     queryFn: async () => {
@@ -77,10 +81,14 @@ export function DoctorMaterialsSheet({
       if (error) throw error;
       return data as ResourceData[];
     },
-    enabled: !!proMoveId,
+    enabled: !!proMoveId && !previewContent,
   });
 
   const getResourceContent = (type: string) => {
+    // Use preview content if available, otherwise use fetched resources
+    if (previewContent) {
+      return previewContent[type] || null;
+    }
     return resources?.find(r => r.type === type)?.content_md || null;
   };
 
@@ -104,7 +112,7 @@ export function DoctorMaterialsSheet({
             </div>
           )}
 
-          {isLoading ? (
+          {isLoading && !previewContent ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
             </div>

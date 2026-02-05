@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { BatchProcessorProvider } from "@/contexts/BatchProcessorContext";
 
 // Pages (same imports you already have)
 import Login from "@/pages/Login";
@@ -152,12 +153,14 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <RouteErrorBoundary>
-            <AppRoutes />
-          </RouteErrorBoundary>
-          <Toaster />
-        </BrowserRouter>
+        <BatchProcessorProvider>
+          <BrowserRouter>
+            <RouteErrorBoundary>
+              <AppRoutes />
+            </RouteErrorBoundary>
+            <Toaster />
+          </BrowserRouter>
+        </BatchProcessorProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

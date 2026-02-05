@@ -70,6 +70,17 @@ export function DomainAssessmentStep({
           </div>
         </CardHeader>
         <CardContent>
+          {/* Sticky Legend at top */}
+          <div className="mb-4 p-3 bg-muted/50 rounded-lg border">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">Key:</span>
+              <span><strong className="text-primary">4</strong> = Could teach it</span>
+              <span><strong className="text-primary">3</strong> = 95% of the time</span>
+              <span><strong className="text-primary">2</strong> = Room to grow</span>
+              <span><strong className="text-primary">1</strong> = Need to improve</span>
+            </div>
+          </div>
+
           <div className="space-y-1">
             {/* Header row */}
             <div className="grid grid-cols-[1fr,auto] gap-4 px-3 py-2 text-sm font-medium text-muted-foreground border-b">
@@ -131,17 +142,6 @@ export function DomainAssessmentStep({
                 </div>
               );
             })}
-          </div>
-
-          {/* Legend */}
-          <div className="mt-6 pt-4 border-t">
-            <p className="text-xs text-muted-foreground mb-2">Rating Scale:</p>
-            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <span><strong>4</strong> = I could teach a graduate course on this</span>
-              <span><strong>3</strong> = I do this 95% of the time</span>
-              <span><strong>2</strong> = I have some room for growth</span>
-              <span><strong>1</strong> = I need to improve / didn't know I was supposed to</span>
-            </div>
           </div>
 
           {/* Navigation */}

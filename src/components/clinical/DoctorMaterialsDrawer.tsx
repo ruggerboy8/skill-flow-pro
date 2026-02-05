@@ -8,8 +8,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, ChevronDown, Sparkles } from 'lucide-react';
+import { Loader2, ChevronDown, Sparkles, Eye } from 'lucide-react';
 import { AIContentAssistant } from './AIContentAssistant';
+import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
 
 interface DoctorMaterialsDrawerProps {
   actionId: number;
@@ -44,6 +45,7 @@ export function DoctorMaterialsDrawer({
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiGeneratedContent, setAIGeneratedContent] = useState<Record<string, string> | null>(null);
+  const [showLearnerPreview, setShowLearnerPreview] = useState(false);
 
   useEffect(() => {
     if (!open || !actionId) return;
@@ -177,10 +179,23 @@ export function DoctorMaterialsDrawer({
       <Sheet open={open} onOpenChange={handleClose}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="text-left pr-8">
-              Learning Materials
-            </SheetTitle>
-            <p className="text-sm text-muted-foreground text-left">{proMoveStatement}</p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <SheetTitle className="text-left">
+                  Learning Materials
+                </SheetTitle>
+                <p className="text-sm text-muted-foreground text-left mt-1">{proMoveStatement}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLearnerPreview(true)}
+                className="flex-shrink-0"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View as Learner
+              </Button>
+            </div>
           </SheetHeader>
 
           {loading ? (
@@ -266,6 +281,15 @@ export function DoctorMaterialsDrawer({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Learner Preview Sheet */}
+      <DoctorMaterialsSheet
+        proMoveId={showLearnerPreview ? actionId : null}
+        proMoveStatement={proMoveStatement}
+        currentScore={null}
+        onScoreChange={() => {}}
+        onClose={() => setShowLearnerPreview(false)}
+      />
     </>
   );
 }

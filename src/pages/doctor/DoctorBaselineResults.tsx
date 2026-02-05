@@ -9,6 +9,9 @@ import { RatingBandCollapsible } from '@/components/doctor/RatingBandCollapsible
 import { GutCheckPrompt } from '@/components/doctor/GutCheckPrompt';
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
+import { ClipboardCheck, CheckCircle2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface BaselineItem {
   action_id: number;
@@ -181,92 +184,151 @@ export default function DoctorBaselineResults() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Baseline Self-Assessment</h1>
-        {baseline.completed_at && (
-          <p className="text-sm text-muted-foreground mt-1">
-            Completed {format(new Date(baseline.completed_at), 'MMMM d, yyyy')}
-          </p>
-        )}
-        <p className="text-sm text-muted-foreground mt-2 italic">
-          This is a self-calibration snapshot. Ratings are most useful when they reflect consistency, not intent.
-        </p>
-      </div>
-
-      {/* Tally Row */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="flex items-center justify-around text-center">
-            <div>
-              <span className="text-2xl font-bold text-emerald-600">{tallyCounts[4]}</span>
-              <span className="text-sm text-muted-foreground ml-1">4s</span>
+      {/* Header Card */}
+      <Card className="overflow-hidden border-0 shadow-lg">
+        <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background p-6">
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-xl bg-primary/10">
+              <ClipboardCheck className="h-8 w-8 text-primary" />
             </div>
-            <div className="h-8 w-px bg-border" />
-            <div>
-              <span className="text-2xl font-bold text-blue-600">{tallyCounts[3]}</span>
-              <span className="text-sm text-muted-foreground ml-1">3s</span>
-            </div>
-            <div className="h-8 w-px bg-border" />
-            <div>
-              <span className="text-2xl font-bold text-amber-600">{tallyCounts[2]}</span>
-              <span className="text-sm text-muted-foreground ml-1">2s</span>
-            </div>
-            <div className="h-8 w-px bg-border" />
-            <div>
-              <span className="text-2xl font-bold text-red-600">{tallyCounts[1]}</span>
-              <span className="text-sm text-muted-foreground ml-1">1s</span>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold">Baseline Self-Assessment</h1>
+              {baseline.completed_at && (
+                <div className="flex items-center gap-2 mt-1">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span className="text-sm text-muted-foreground">
+                    Completed {format(new Date(baseline.completed_at), 'MMMM d, yyyy')}
+                  </span>
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground mt-3 italic border-l-2 border-primary/30 pl-3">
+                This is a self-calibration snapshot. Ratings are most useful when they reflect consistency, not intent.
+              </p>
             </div>
           </div>
-        </CardContent>
+        </div>
       </Card>
+
+      {/* Tally Row - Score Summary Cards */}
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { score: 4, label: 'Consistent', bgColor: 'hsl(160 60% 95%)', textColor: 'hsl(160 80% 35%)', borderColor: 'hsl(160 50% 70%)' },
+          { score: 3, label: 'Usually', bgColor: 'hsl(210 80% 95%)', textColor: 'hsl(210 80% 45%)', borderColor: 'hsl(210 60% 70%)' },
+          { score: 2, label: 'Sometimes', bgColor: 'hsl(38 90% 95%)', textColor: 'hsl(38 80% 40%)', borderColor: 'hsl(38 70% 65%)' },
+          { score: 1, label: 'Rare', bgColor: 'hsl(0 70% 95%)', textColor: 'hsl(0 70% 45%)', borderColor: 'hsl(0 60% 70%)' },
+        ].map(({ score, label, bgColor, textColor, borderColor }) => (
+          <Card 
+            key={score} 
+            className="text-center border-0 shadow-sm"
+            style={{ backgroundColor: bgColor }}
+          >
+            <CardContent className="py-4 px-2">
+              <div 
+                className="text-3xl font-bold"
+                style={{ color: textColor }}
+              >
+                {tallyCounts[score as keyof typeof tallyCounts]}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">{label}</div>
+              <Badge 
+                variant="outline" 
+                className="mt-2"
+                style={{ color: textColor, borderColor: borderColor }}
+              >
+                {score}s
+              </Badge>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Domain Tabs */}
       {orderedDomains.length > 0 && (
-        <Tabs defaultValue={orderedDomains[0]} className="w-full">
-          <TabsList className="w-full flex-wrap h-auto gap-1">
-            {orderedDomains.map((domain) => (
-              <TabsTrigger key={domain} value={domain} className="flex-1 min-w-fit">
-                {domain}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <Card className="border-0 shadow-lg overflow-hidden">
+          <Tabs defaultValue={orderedDomains[0]} className="w-full">
+            <div className="border-b bg-muted/30">
+              <TabsList className="w-full h-auto p-1 bg-transparent gap-1">
+                {orderedDomains.map((domain) => {
+                  const domainColor = getDomainColorRichRaw(domain);
+                  return (
+                    <TabsTrigger 
+                      key={domain} 
+                      value={domain} 
+                      className="flex-1 min-w-fit data-[state=active]:shadow-sm transition-all"
+                      style={{
+                        '--domain-color': `hsl(${domainColor})`,
+                      } as React.CSSProperties}
+                    >
+                      <span 
+                        className="w-2 h-2 rounded-full mr-2 hidden sm:inline-block"
+                        style={{ backgroundColor: `hsl(${domainColor})` }}
+                      />
+                      {domain}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </div>
 
-          {orderedDomains.map((domain) => {
-            const domainData = groupedByDomain[domain];
-            const hasFours = domainData[4].length > 0;
-            
-            return (
-              <TabsContent key={domain} value={domain} className="mt-4 space-y-3">
-                {/* Gut Check Prompt */}
-                <GutCheckPrompt
-                  domainName={domain}
-                  hasFoursInDomain={hasFours}
-                  isAlreadyFlagged={flaggedDomains.includes(domain)}
-                  onFlag={async (d) => flagMutation.mutateAsync(d)}
-                />
+            {orderedDomains.map((domain) => {
+              const domainData = groupedByDomain[domain];
+              const hasFours = domainData[4].length > 0;
+              const domainColor = getDomainColorRaw(domain);
+              const domainColorRich = getDomainColorRichRaw(domain);
+              
+              return (
+                <TabsContent 
+                  key={domain} 
+                  value={domain} 
+                  className="mt-0 p-4 space-y-3"
+                  style={{
+                    background: `linear-gradient(135deg, hsl(${domainColor} / 0.15) 0%, transparent 50%)`,
+                  }}
+                >
+                  {/* Domain Header Badge */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <span 
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: `hsl(${domainColorRich})` }}
+                    />
+                    <span className="font-medium text-sm" style={{ color: `hsl(${domainColorRich})` }}>
+                      {domain}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({Object.values(domainData).flat().length} items)
+                    </span>
+                  </div>
 
-                {/* Rating Bands - 4, 3, 2, 1 order */}
-                {[4, 3, 2, 1].map((score) => (
-                  <RatingBandCollapsible
-                    key={score}
-                    score={score}
-                    items={domainData[score].map(item => ({
-                      action_id: item.action_id,
-                      action_statement: item.action_statement,
-                      competency_name: item.competency_name,
-                    }))}
-                    defaultOpen={score === 4}
-                    onItemClick={(item) => {
-                      const fullItem = domainData[score].find(i => i.action_id === item.action_id);
-                      if (fullItem) setSelectedItem(fullItem);
-                    }}
+                  {/* Gut Check Prompt */}
+                  <GutCheckPrompt
+                    domainName={domain}
+                    hasFoursInDomain={hasFours}
+                    isAlreadyFlagged={flaggedDomains.includes(domain)}
+                    onFlag={async (d) => flagMutation.mutateAsync(d)}
                   />
-                ))}
-              </TabsContent>
-            );
-          })}
-        </Tabs>
+
+                  {/* Rating Bands - 4, 3, 2, 1 order */}
+                  {[4, 3, 2, 1].map((score) => (
+                    <RatingBandCollapsible
+                      key={score}
+                      score={score}
+                      items={domainData[score].map(item => ({
+                        action_id: item.action_id,
+                        action_statement: item.action_statement,
+                        competency_name: item.competency_name,
+                      }))}
+                      defaultOpen={score === 4}
+                      onItemClick={(item) => {
+                        const fullItem = domainData[score].find(i => i.action_id === item.action_id);
+                        if (fullItem) setSelectedItem(fullItem);
+                      }}
+                    />
+                  ))}
+                </TabsContent>
+              );
+            })}
+          </Tabs>
+        </Card>
       )}
 
       {/* Materials Sheet */}

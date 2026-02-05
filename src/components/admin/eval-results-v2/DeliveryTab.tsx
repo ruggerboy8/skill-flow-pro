@@ -10,6 +10,7 @@ import { MoreHorizontal, Eye, EyeOff, Send, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEvalDeliveryProgress, type LocationProgress } from '@/hooks/useEvalDeliveryProgress';
 import { EvalPeriodSelector } from './EvalPeriodSelector';
+import { BatchTranscriptProcessor } from './BatchTranscriptProcessor';
 import { bulkSetVisibilityByLocation, bulkSubmitCompleteDrafts } from '@/lib/evaluations';
 import { supabase } from '@/integrations/supabase/client';
 import type { EvaluationPeriod } from '@/lib/evalPeriods';
@@ -108,6 +109,8 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
 
   return (
     <div className="space-y-4">
+      <BatchTranscriptProcessor />
+      
       <div className="flex items-center gap-4">
         <EvalPeriodSelector
           value={period}

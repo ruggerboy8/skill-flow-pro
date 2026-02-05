@@ -1,78 +1,128 @@
 
-# Auto-Formatting Pro Move Materials (OpenAI)
+
+# Doctor Baseline Results View
 
 ## Overview
 
-This plan creates an AI-powered formatting system for doctor pro move learning materials using the **OpenAI API** (matching existing infrastructure for `format-transcript` and `extract-insights`). The system will clean up unstructured text blobs into properly formatted markdown.
+This plan creates a calibration-focused results view for doctors who have completed their baseline self-assessment. The design emphasizes identity statements over metrics, using rating bands (4, 3, 2, 1) with challenging labels that encourage honest self-reflection.
 
 ---
 
-## Current State
+## Architecture
 
-- **140 doctor resources** across 4 types need formatting
-- Scripts and gut check questions appear as unstructured text blobs
-- Project already uses `OPENAI_API_KEY` for other AI functions
-- `gpt-4o-mini` is used for similar text processing tasks
+### New Route
+- **Path**: `/doctor/baseline-results`
+- Accessible from Doctor Home page after baseline completion
+- Read-only view (no inline editing; optional "flag for discussion" actions)
+
+### New Components
+
+| Component | Purpose |
+|-----------|---------|
+| `DoctorBaselineResults.tsx` | Main page with header, tally, and domain tabs |
+| `RatingBandCollapsible.tsx` | Reusable collapsible band (4, 3, 2, 1) with calibration label |
 
 ---
 
-## Implementation Details
+## Page Structure
 
-### 1. New Edge Function: `format-pro-move-content`
+### Header Section
+```text
+Baseline Self-Assessment
+Completed [date]
 
-**Location**: `supabase/functions/format-pro-move-content/index.ts`
+"This is a self-calibration snapshot. Ratings are most useful 
+when they reflect consistency, not intent."
+```
 
-Uses OpenAI API directly (matching `format-transcript` pattern):
+### Tally Row (Simple Counts)
+```text
+4: __ moves  |  3: __ moves  |  2: __ moves  |  1: __ moves
+```
+- No charts or graphs
+- Simple horizontal layout with subtle separators
+- Each count styled with score color for visual consistency
+
+### Domain Tabs
+```text
+[ Clinical ] [ Clerical ] [ Cultural ] [ Case Acceptance ]
+```
+- Uses existing `Tabs` component
+- Each tab contains 4 rating bands
+- Defaults to first domain with content
+
+---
+
+## Rating Bands (Per Domain)
+
+Each domain tab displays 4 collapsible sections, always in order 4 -> 1:
+
+### Band 4 (Expanded by default)
+- **Label**: "4 - Consistent, even when you're behind"
+- **Subtext**: "If this is a 4, you're saying you could model it on demand and your team would see it most days."
+
+### Band 3 (Collapsed)
+- **Label**: "3 - Usually, with predictable misses"  
+- **Subtext**: "If this is a 3, you're saying it's part of your standard approach, but you can name when it slips."
+
+### Band 2 (Collapsed)
+- **Label**: "2 - Sometimes, not yet reliable"
+- **Subtext**: "If this is a 2, you're saying you do it occasionally, but it's not consistent across patients/days."
+
+### Band 1 (Collapsed)
+- **Label**: "1 - Rare / not in your current routine"
+- **Subtext**: "If this is a 1, you're saying it doesn't reliably show up today."
+
+### Items Within Bands
+- Pro Move title (tappable to open materials drawer)
+- Clicking opens existing `DoctorMaterialsSheet` with full learning content
+
+---
+
+## Gut Check Prompt (Per Domain)
+
+At top of each domain tab, above the bands:
 
 ```text
-Endpoint: https://api.openai.com/v1/chat/completions
-Model: gpt-4o-mini
-Auth: Bearer ${OPENAI_API_KEY}
+"Quick gut check: do the items in your '4' list feel true on your busiest day?"
+
+[ Yes, feels accurate ]  [ Some might be generous ]
 ```
 
-**Input**:
-```json
+**Behavior**:
+- "Yes, feels accurate" - dismisses prompt, stores acknowledgment
+- "Some might be generous" - shows toast: "You can discuss these with Alex in your check-in" and stores a flag
+
+The flags are stored in a simple `doctor_baseline_flags` column or table for coach visibility, but do not change scores. This preserves the baseline snapshot.
+
+---
+
+## Data Flow
+
+### Fetch Baseline Items
+```sql
+SELECT 
+  dbi.action_id,
+  dbi.self_score,
+  pm.action_statement,
+  c.name as competency_name,
+  d.domain_name,
+  d.color_hex
+FROM doctor_baseline_items dbi
+JOIN pro_moves pm ON dbi.action_id = pm.action_id
+JOIN competencies c ON pm.competency_id = c.competency_id  
+JOIN domains d ON c.domain_id = d.domain_id
+WHERE dbi.assessment_id = [assessment_id]
+```
+
+### Group by Domain -> Score
+```typescript
 {
-  "content": "raw text...",
-  "contentType": "doctor_script" | "doctor_gut_check" | "doctor_why" | "doctor_good_looks_like"
+  Clinical: { 4: [...], 3: [...], 2: [...], 1: [...] },
+  Clerical: { 4: [...], 3: [...], 2: [...], 1: [...] },
+  ...
 }
 ```
-
-**Type-Specific Formatting Rules**:
-
-| Type | Formatting Applied |
-|------|-------------------|
-| `doctor_script` | Wrap quotes in blockquotes, add line breaks between examples |
-| `doctor_gut_check` | Convert to bulleted list with question format |
-| `doctor_good_looks_like` | Convert to bulleted list of observable behaviors |
-| `doctor_why` | Add paragraph breaks, bold key concepts |
-
----
-
-### 2. Batch Processing Component
-
-**Location**: `src/components/clinical/BatchContentFormatter.tsx`
-
-Admin tool for one-time cleanup of existing 140 resources:
-
-- "Format All Materials" button in library header
-- Progress indicator (X/140 processed)
-- Preview panel showing before/after samples
-- Chunked processing (5 at a time) to avoid rate limits
-- "Apply Changes" to save all formatted content
-
----
-
-### 3. Inline Format Buttons
-
-**Location**: `src/components/clinical/DoctorMaterialsDrawer.tsx`
-
-For future content entry:
-
-- Small "Format" button next to each textarea
-- Calls edge function with current content
-- Shows "AI Formatted" indicator after processing
-- Same pattern as existing "AI Generated" badges
 
 ---
 
@@ -80,42 +130,64 @@ For future content entry:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `supabase/functions/format-pro-move-content/index.ts` | Create | OpenAI-powered formatting function |
-| `supabase/config.toml` | Modify | Add function config with `verify_jwt = true` |
-| `src/components/clinical/BatchContentFormatter.tsx` | Create | Batch processing UI component |
-| `src/pages/clinical/DoctorProMoveLibrary.tsx` | Modify | Add "Format All" button in header |
-| `src/components/clinical/DoctorMaterialsDrawer.tsx` | Modify | Add per-field format buttons |
+| `src/pages/doctor/DoctorBaselineResults.tsx` | Create | Main results page |
+| `src/components/doctor/RatingBandCollapsible.tsx` | Create | Reusable band component |
+| `src/components/doctor/GutCheckPrompt.tsx` | Create | Domain-level gut check widget |
+| `src/pages/doctor/DoctorHome.tsx` | Modify | Add "View My Baseline" button when complete |
+| `src/App.tsx` | Modify | Add route `/doctor/baseline-results` |
 
 ---
 
-## User Workflows
+## Doctor Home Page Update
 
-### One-Time Batch Processing
+After baseline completion, the card changes to:
+
 ```text
-1. Open Clinical Pro-Move Library
-2. Click "Format All Materials" button
-3. Confirm: "Process 140 resources?"
-4. View progress bar and sample previews
-5. Click "Apply Changes" to save
-6. Toast: "140 materials formatted"
+[CheckCircle icon]
+Baseline Complete
+Completed [formatted date]
+
+[View My Baseline] button
 ```
 
-### Future Content (Per-Field)
-```text
-1. Open Materials drawer for a Pro Move
-2. Type/paste content in any field
-3. Click "Format" button next to field
-4. Content replaced with structured version
-5. Review and save
-```
+The "View My Baseline" button navigates to `/doctor/baseline-results`.
 
 ---
 
-## Technical Notes
+## Visual Design
 
-- Uses `gpt-4o-mini` for cost efficiency (same as `format-transcript`)
-- Direct OpenAI API calls via `https://api.openai.com/v1/chat/completions`
-- Leverages existing `OPENAI_API_KEY` secret
-- Rate limit handling with user-friendly messages
-- Batch processor uses 5-at-a-time chunking with delays
+### Color Scheme
+- Band headers use subtle background tints based on score:
+  - 4: Light green tint
+  - 3: Light blue tint  
+  - 2: Light amber tint
+  - 1: Light red tint
+- Domain tabs use existing domain color system
+- Pro Move items have hover state and arrow indicator
+
+### Responsive
+- Works on desktop and tablet
+- Domain tabs wrap on mobile
+- Bands are full-width collapsibles
+
+---
+
+## Database Addition (Optional)
+
+If implementing the "flag for discussion" feature:
+
+```sql
+ALTER TABLE doctor_baseline_assessments 
+ADD COLUMN flagged_domains text[] DEFAULT '{}';
+```
+
+This stores domain names where the doctor clicked "Some might be generous" for coach visibility.
+
+---
+
+## Future Considerations
+
+- **Coach View**: The Clinical Director can see which domains a doctor flagged
+- **Export**: Add ability to export baseline as PDF for doctor records
+- **Time Travel**: Eventually show baseline vs. later self-assessment if doctors re-take
 

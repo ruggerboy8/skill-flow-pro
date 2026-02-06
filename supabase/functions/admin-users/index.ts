@@ -679,6 +679,33 @@ serve(async (req: Request) => {
         return json({ ok: true, message: "Password reset email sent" });
       }
 
+      case "resend_invite": {
+        const { user_id } = payload ?? {};
+        if (!user_id) return json({ error: "user_id required" }, 400);
+
+        // Get user's email from auth
+        const { data: ures, error: getErr } = await admin.auth.admin.getUserById(user_id);
+        if (getErr) throw getErr;
+        
+        const email = ures.user?.email;
+        if (!email) return json({ error: "User has no email" }, 400);
+
+        // Check if user has already confirmed their email
+        if (ures.user?.email_confirmed_at) {
+          return json({ error: "User has already confirmed their email. Use 'Send reset email' instead." }, 400);
+        }
+
+        // Resend invite by calling inviteUserByEmail again
+        const redirectTo = `${SITE_URL}/auth/callback`;
+        const { error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
+          redirectTo
+        });
+        if (invErr) throw invErr;
+
+        console.log(`✅ Resent invitation to ${email}`);
+        return json({ ok: true, message: `Invitation resent to ${email}` });
+      }
+
       case "pause_user": {
         const { user_id, reason } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);

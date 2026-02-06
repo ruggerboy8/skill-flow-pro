@@ -8,7 +8,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Search, MoreHorizontal, Edit, Key, Trash2 } from "lucide-react";
+import { UserPlus, Search, MoreHorizontal, Edit, Key, Trash2, Mail } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { InviteUserDialog } from "./InviteUserDialog";
 import { EditUserDrawer } from "./EditUserDrawer";
@@ -215,6 +215,27 @@ const handleResetPassword = async (user: User) => {
     toast({
       title: "Error",
       description: "Failed to send reset email",
+      variant: "destructive",
+    });
+  }
+};
+
+const handleResendInvite = async (user: User) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-users', {
+      body: { action: 'resend_invite', user_id: user.user_id },
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    toast({
+      title: "Invitation resent",
+      description: `A new invitation was sent to ${user.email}.`,
+    });
+  } catch (error: any) {
+    console.error("Error resending invite:", error);
+    toast({
+      title: "Error",
+      description: error.message || "Failed to resend invitation",
       variant: "destructive",
     });
   }
@@ -434,7 +455,13 @@ const handleResetPassword = async (user: User) => {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
-                              {user.user_id && (
+                              {user.user_id && !user.email_confirmed_at && (
+                                <DropdownMenuItem onClick={() => handleResendInvite(user)}>
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  Resend invitation
+                                </DropdownMenuItem>
+                              )}
+                              {user.user_id && user.email_confirmed_at && (
                                 <DropdownMenuItem onClick={() => handleResetPassword(user)}>
                                   <Key className="h-4 w-4 mr-2" />
                                   Send reset email

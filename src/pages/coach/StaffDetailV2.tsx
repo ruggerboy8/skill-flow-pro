@@ -41,7 +41,7 @@ export default function StaffDetailV2() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, isOrgAdmin } = useUserRole();
   const queryClient = useQueryClient();
   const selectedWeek = searchParams.get('week');
 
@@ -59,7 +59,7 @@ export default function StaffDetailV2() {
       if (error) throw error;
       return data as ExcusedSubmission[];
     },
-    enabled: !!staffId && isSuperAdmin,
+    enabled: !!staffId && (isSuperAdmin || isOrgAdmin),
   });
 
   // Mutation for adding/removing excusals
@@ -404,7 +404,7 @@ export default function StaffDetailV2() {
                                     isExcused={perfExcused}
                                   />
                                 </div>
-                                {isSuperAdmin && <ExcuseDropdown weekOf={weekOf} />}
+                                {(isSuperAdmin || isOrgAdmin) && <ExcuseDropdown weekOf={weekOf} />}
                               </div>
                             </div>
                           </AccordionTrigger>

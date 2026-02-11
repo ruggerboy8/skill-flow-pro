@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Check, Loader2, Info } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { ChevronLeft, ChevronRight, Check, Loader2, Info, MessageSquare } from 'lucide-react';
 import { DoctorMaterialsSheet } from './DoctorMaterialsSheet';
 
 interface ProMoveItem {
@@ -23,6 +24,7 @@ interface DomainAssessmentStepProps {
   domain: DomainGroup;
   ratings: Record<number, { score: number | null; note: string }>;
   onRatingChange: (actionId: number, score: number | null, note?: string) => void;
+  onNoteChange?: (actionId: number, noteText: string) => void;
   onPrevious?: () => void;
   onNext?: () => void;
   onComplete?: () => void;
@@ -40,12 +42,26 @@ export function DomainAssessmentStep({
   domain,
   ratings,
   onRatingChange,
+  onNoteChange,
   onPrevious,
   onNext,
   onComplete,
   isCompleting,
 }: DomainAssessmentStepProps) {
   const [selectedProMoveId, setSelectedProMoveId] = useState<number | null>(null);
+  const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
+  const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  const handleNoteChange = useCallback((actionId: number, noteText: string) => {
+    // Clear existing debounce timer
+    if (debounceTimers.current[actionId]) {
+      clearTimeout(debounceTimers.current[actionId]);
+    }
+    // Debounce save at 600ms
+    debounceTimers.current[actionId] = setTimeout(() => {
+      onNoteChange?.(actionId, noteText);
+    }, 600);
+  }, [onNoteChange]);
 
   const domainRatedCount = domain.proMoves.filter(
     pm => ratings[pm.action_id]?.score !== null && ratings[pm.action_id]?.score !== undefined
@@ -97,48 +113,88 @@ export function DomainAssessmentStep({
             {/* Pro Move rows */}
             {domain.proMoves.map((pm) => {
               const currentRating = ratings[pm.action_id]?.score;
+              const currentNote = ratings[pm.action_id]?.note || '';
+              const hasNote = currentNote.trim().length > 0;
+              const isNoteExpanded = expandedNoteId === pm.action_id;
               
               return (
-                <div 
-                  key={pm.action_id}
-                  className="grid grid-cols-[1fr,auto] gap-4 px-3 py-3 rounded-lg hover:bg-muted/50 group"
-                >
-                  <div 
-                    className="flex items-center gap-2 cursor-pointer"
-                    onClick={() => setSelectedProMoveId(pm.action_id)}
-                  >
-                    <Info className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                    <span className="text-sm">{pm.action_statement}</span>
+                <div key={pm.action_id} className="rounded-lg hover:bg-muted/50 group">
+                  <div className="grid grid-cols-[1fr,auto] gap-4 px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProMoveId(pm.action_id)}
+                        className="cursor-pointer flex items-center gap-2 text-left flex-1 min-w-0"
+                      >
+                        <Info className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                        <span className="text-sm">{pm.action_statement}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedNoteId(isNoteExpanded ? null : pm.action_id)}
+                        className={`flex-shrink-0 p-1 rounded transition-colors ${
+                          hasNote 
+                            ? 'text-primary' 
+                            : 'text-muted-foreground/40 hover:text-muted-foreground'
+                        }`}
+                        title={hasNote ? 'Edit note' : 'Add note'}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </button>
+                    </div>
+                    
+                    <RadioGroup
+                      value={currentRating?.toString() || ''}
+                      onValueChange={(val) => onRatingChange(pm.action_id, parseInt(val))}
+                      className="flex gap-2"
+                    >
+                      {SCORE_LABELS.map((s) => (
+                        <div key={s.value} className="w-10 flex justify-center">
+                          <Label
+                            htmlFor={`${pm.action_id}-${s.value}`}
+                            className={`
+                              w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer
+                              transition-all
+                              ${currentRating === s.value 
+                                ? 'bg-primary border-primary text-primary-foreground' 
+                                : 'border-muted-foreground/30 hover:border-primary/50'
+                              }
+                            `}
+                          >
+                            <RadioGroupItem
+                              value={s.value.toString()}
+                              id={`${pm.action_id}-${s.value}`}
+                              className="sr-only"
+                            />
+                            <span className="text-xs font-medium">{s.value}</span>
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
                   </div>
-                  
-                  <RadioGroup
-                    value={currentRating?.toString() || ''}
-                    onValueChange={(val) => onRatingChange(pm.action_id, parseInt(val))}
-                    className="flex gap-2"
-                  >
-                    {SCORE_LABELS.map((s) => (
-                      <div key={s.value} className="w-10 flex justify-center">
-                        <Label
-                          htmlFor={`${pm.action_id}-${s.value}`}
-                          className={`
-                            w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer
-                            transition-all
-                            ${currentRating === s.value 
-                              ? 'bg-primary border-primary text-primary-foreground' 
-                              : 'border-muted-foreground/30 hover:border-primary/50'
-                            }
-                          `}
-                        >
-                          <RadioGroupItem
-                            value={s.value.toString()}
-                            id={`${pm.action_id}-${s.value}`}
-                            className="sr-only"
-                          />
-                          <span className="text-xs font-medium">{s.value}</span>
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
+
+                  {/* Inline note textarea */}
+                  {isNoteExpanded && (
+                    <div className="px-3 pb-3">
+                      <Textarea
+                        placeholder="Add a note, question, or reflection..."
+                        defaultValue={currentNote}
+                        onChange={(e) => handleNoteChange(pm.action_id, e.target.value)}
+                        onBlur={(e) => {
+                          // Flush on blur immediately
+                          if (debounceTimers.current[pm.action_id]) {
+                            clearTimeout(debounceTimers.current[pm.action_id]);
+                          }
+                          onNoteChange?.(pm.action_id, e.target.value);
+                        }}
+                        className="min-h-[60px] text-sm"
+                        rows={2}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Notes auto-save. Visible to you and your coach.
+                      </p>
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -10,12 +10,13 @@ import { GutCheckPrompt } from '@/components/doctor/GutCheckPrompt';
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
-import { ClipboardCheck, CheckCircle2 } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface BaselineItem {
   action_id: number;
   self_score: number;
+  self_note: string | null;
   action_statement: string;
   competency_name: string;
   domain_name: string;
@@ -66,6 +67,7 @@ export default function DoctorBaselineResults() {
         .select(`
           action_id,
           self_score,
+          self_note,
           pro_moves!inner (
             action_statement,
             competencies!inner (
@@ -86,6 +88,7 @@ export default function DoctorBaselineResults() {
       return (data || []).map((item: any) => ({
         action_id: item.action_id,
         self_score: item.self_score,
+        self_note: item.self_note || null,
         action_statement: item.pro_moves.action_statement,
         competency_name: item.pro_moves.competencies.name,
         domain_name: item.pro_moves.competencies.domains.domain_name,
@@ -316,6 +319,7 @@ export default function DoctorBaselineResults() {
                         action_id: item.action_id,
                         action_statement: item.action_statement,
                         competency_name: item.competency_name,
+                        self_note: item.self_note,
                       }))}
                       defaultOpen={score === 4}
                       onItemClick={(item) => {
@@ -336,6 +340,7 @@ export default function DoctorBaselineResults() {
         proMoveId={selectedItem?.action_id || null}
         proMoveStatement={selectedItem?.action_statement || ''}
         onClose={() => setSelectedItem(null)}
+        noteText={selectedItem?.self_note}
       />
     </div>
   );

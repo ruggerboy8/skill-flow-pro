@@ -1,10 +1,11 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, MessageSquare } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export interface BaselineItem {
   action_id: number;
   action_statement: string;
   competency_name: string;
+  self_note?: string | null;
 }
 
 interface RatingBandCollapsibleProps {
@@ -88,8 +89,13 @@ export function RatingBandCollapsible({
               onClick={() => onItemClick(item)}
               className="w-full flex items-center justify-between p-3 rounded-md hover:bg-muted/50 transition-colors text-left group"
             >
-              <span className="text-sm">{item.action_statement}</span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-sm">{item.action_statement}</span>
+                {item.self_note?.trim() && (
+                  <MessageSquare className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                )}
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
             </button>
           ))}
         </div>

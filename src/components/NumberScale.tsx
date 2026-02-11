@@ -34,8 +34,8 @@ export default function NumberScale({ value, onChange, disabled, hideTips }: Num
     if (!isSelected) return "hover:bg-slate-50 border-slate-200 text-slate-600";
     
     switch(num) {
-      case 1: return "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200";
-      case 2: return "bg-orange-100 border-orange-300 text-orange-800 hover:bg-orange-200";
+      case 1: return "bg-orange-100 border-orange-300 text-orange-800 hover:bg-orange-200";
+      case 2: return "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200";
       case 3: return "bg-blue-100 border-blue-300 text-blue-800 hover:bg-blue-200";
       case 4: return "bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-200";
       default: return "bg-primary text-primary-foreground";

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 interface BaselineTutorialProps {
   firstActionId: number;
   onComplete: () => void;
+  onForceOpenMaterials: (actionId: number) => void;
 }
 
 interface TutorialStep {
@@ -11,24 +12,27 @@ interface TutorialStep {
   title: string;
   description: string;
   position: 'bottom' | 'top' | 'right';
+  requiresAction?: 'click-pro-move';
 }
 
-export function BaselineTutorial({ firstActionId, onComplete }: BaselineTutorialProps) {
+export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMaterials }: BaselineTutorialProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [waitingForAction, setWaitingForAction] = useState(false);
 
   const steps: TutorialStep[] = [
     {
       targetSelector: `#score-btns-${firstActionId}`,
       title: 'Rate yourself',
-      description: "You'll rate yourself on each Pro Move using these numbers. 1 = Needs focus, 4 = Exceptional.",
+      description: "You'll rate yourself on each Pro Move using these numbers. 1 = I rarely do this, 4 = I am a master.",
       position: 'bottom',
     },
     {
       targetSelector: `#pm-text-${firstActionId}`,
-      title: 'Learn more',
-      description: 'Tap any Pro Move to see more information about it.',
+      title: 'Tap to learn more',
+      description: 'Go ahead — tap this Pro Move now to see the learning materials.',
       position: 'bottom',
+      requiresAction: 'click-pro-move',
     },
     {
       targetSelector: `#note-btn-${firstActionId}`,
@@ -57,7 +61,30 @@ export function BaselineTutorial({ firstActionId, onComplete }: BaselineTutorial
     };
   }, [updatePosition]);
 
+  // Listen for materials sheet opening to advance past the click-pro-move step
+  useEffect(() => {
+    if (!waitingForAction) return;
+    
+    const handleSheetOpened = () => {
+      setWaitingForAction(false);
+      // Small delay so user sees the drawer before tutorial advances
+      setTimeout(() => {
+        setCurrentStep(prev => prev + 1);
+      }, 1500);
+    };
+
+    window.addEventListener('tutorial-materials-opened', handleSheetOpened);
+    return () => window.removeEventListener('tutorial-materials-opened', handleSheetOpened);
+  }, [waitingForAction]);
+
   const handleNext = () => {
+    const step = steps[currentStep];
+    if (step?.requiresAction === 'click-pro-move') {
+      // Force-open materials and wait for the event
+      setWaitingForAction(true);
+      onForceOpenMaterials(firstActionId);
+      return;
+    }
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
@@ -93,13 +120,29 @@ export function BaselineTutorial({ firstActionId, onComplete }: BaselineTutorial
     borderRadius: 8,
     boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
     zIndex: 55,
-    pointerEvents: 'none',
+    pointerEvents: step.requiresAction ? 'none' : 'none',
   };
 
   return (
     <>
       {/* Backdrop cutout */}
       <div style={highlightStyle} />
+
+      {/* Allow clicking through to the target element for action steps */}
+      {step.requiresAction && (
+        <div
+          style={{
+            position: 'fixed',
+            top: targetRect.top - 4,
+            left: targetRect.left - 4,
+            width: targetRect.width + 8,
+            height: targetRect.height + 8,
+            zIndex: 56,
+            cursor: 'pointer',
+          }}
+          onClick={() => handleNext()}
+        />
+      )}
 
       {/* Tooltip */}
       <div
@@ -116,9 +159,19 @@ export function BaselineTutorial({ firstActionId, onComplete }: BaselineTutorial
           >
             Skip
           </button>
-          <Button size="sm" onClick={handleNext}>
-            {currentStep < steps.length - 1 ? 'Next' : 'Got it'}
-          </Button>
+          {!step.requiresAction && (
+            <Button size="sm" onClick={handleNext}>
+              {currentStep < steps.length - 1 ? 'Next' : 'Got it'}
+            </Button>
+          )}
+          {step.requiresAction && !waitingForAction && (
+            <Button size="sm" onClick={handleNext}>
+              Tap it ↑
+            </Button>
+          )}
+          {waitingForAction && (
+            <span className="text-xs text-muted-foreground">Opening...</span>
+          )}
         </div>
         <div className="flex gap-1 mt-2 justify-center">
           {steps.map((_, i) => (

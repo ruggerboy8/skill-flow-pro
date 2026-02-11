@@ -34,6 +34,7 @@ export default function BaselineWizard() {
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<Record<number, { score: number | null; note: string }>>({});
   const [showTutorial, setShowTutorial] = useState(false);
+  const [forceOpenProMoveId, setForceOpenProMoveId] = useState<number | null>(null);
 
   // Fetch existing assessment
   const { data: existingAssessment } = useQuery({
@@ -375,6 +376,7 @@ export default function BaselineWizard() {
             onNext={isLastDomain ? undefined : handleNextDomain}
             onComplete={isLastDomain && allRated ? handleComplete : undefined}
             isCompleting={completeAssessmentMutation.isPending}
+            forceOpenProMoveId={forceOpenProMoveId}
           />
         </div>
       )}
@@ -388,6 +390,7 @@ export default function BaselineWizard() {
         <BaselineTutorial
           firstActionId={firstProMove.action_id}
           onComplete={handleTutorialComplete}
+          onForceOpenMaterials={(actionId) => setForceOpenProMoveId(actionId)}
         />
       )}
     </div>

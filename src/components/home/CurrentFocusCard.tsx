@@ -1,12 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { DomainBadge } from '@/components/ui/domain-badge';
 import { Button } from '@/components/ui/button';
 import { Target, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
-import { getDomainColor } from '@/lib/domainColors';
 import { quarterNum } from '@/lib/reviewPayload';
 
 /**
@@ -105,15 +104,7 @@ export function CurrentFocusCard() {
       <CardContent className="space-y-2">
         {data.items.map(item => (
           <div key={item.actionId} className="flex items-start gap-2 py-1.5">
-            {item.domainName && (
-              <Badge
-                variant="outline"
-                className="shrink-0 mt-0.5 text-xs"
-                style={{ borderColor: getDomainColor(item.domainName) }}
-              >
-                {item.domainName}
-              </Badge>
-            )}
+            <DomainBadge domain={item.domainName} className="mt-0.5" />
             <span className="text-sm leading-relaxed">{item.statement}</span>
           </div>
         ))}

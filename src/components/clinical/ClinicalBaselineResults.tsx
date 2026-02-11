@@ -519,7 +519,6 @@ export function ClinicalBaselineResults({
                         </div>
                       )}
                       {sortedItems.map((item) => {
-                        const colors = SCORE_COLORS[item.score];
                         const coachScore = coachRatingsMap.get(item.action_id);
                         const isCoachNa = coachScore === 0;
                         const hasBigDiff = coachScore !== undefined && !isCoachNa && Math.abs(item.self_score - coachScore) >= 2;
@@ -527,6 +526,12 @@ export function ClinicalBaselineResults({
                         const coachNote = coachNotesMap.get(item.action_id);
                         const hasNote = hasDoctorNote || !!coachNote;
                         const isExpanded = expandedNoteId === item.action_id;
+
+                        // Row color follows whichever column is sorted
+                        const activeScore = sortBy === 'coach' && showCoachRatings && coachScore && coachScore >= 1 && coachScore <= 4
+                          ? coachScore
+                          : item.score;
+                        const colors = SCORE_COLORS[activeScore];
 
                         return (
                           <div key={item.action_id}>

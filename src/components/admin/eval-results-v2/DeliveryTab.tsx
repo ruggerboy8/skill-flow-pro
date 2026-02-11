@@ -246,16 +246,16 @@ function LocationCard({ location, statusFilter, isPending, onBulkRelease, onSing
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="border rounded-lg">
         <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left">
+          <button className="w-full grid grid-cols-[minmax(280px,1fr)_minmax(380px,620px)_auto] items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left">
             {/* Left cluster */}
             <div className="flex items-center gap-2 min-w-0">
               <ChevronRight className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
               <span className="font-medium truncate">{locationName}</span>
-              <span className="text-muted-foreground text-sm shrink-0">{organizationName}</span>
+              <span className="text-muted-foreground text-sm truncate">{organizationName}</span>
             </div>
 
             {/* Middle cluster: progress chips */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center justify-end gap-1.5 flex-wrap">
               <ProgressChip label="Submitted" count={submittedCount} total={totalStaff} />
               {draftCount > 0 && <ProgressChip label="Draft" count={draftCount} />}
               {statusCounts.released > 0 && <ProgressChip label="Released" count={statusCounts.released} />}
@@ -264,8 +264,8 @@ function LocationCard({ location, statusFilter, isPending, onBulkRelease, onSing
               {statusCounts.focus_set > 0 && <ProgressChip label="Focus" count={statusCounts.focus_set} />}
             </div>
 
-            {/* Right cluster: Release All only in collapsed */}
-            <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+            {/* Right cluster: Release All */}
+            <div className="flex justify-end gap-1 shrink-0" onClick={e => e.stopPropagation()}>
               {hasUnreleased && (
                 <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={isPending} onClick={() => onBulkRelease(true)}>
                   <Eye className="w-3 h-3" /> Release All
@@ -324,7 +324,7 @@ function StaffRow({ staff, isPending, onRelease }: StaffRowProps) {
   const showHide = ['released', 'viewed', 'reviewed', 'focus_set'].includes(staff.status);
 
   return (
-    <div className="flex items-center justify-between pl-10 py-1.5 px-4">
+    <div className="grid grid-cols-[minmax(280px,1fr)_160px_120px] items-center gap-3 pl-10 py-1.5 px-4">
       {/* Left: name + role */}
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-sm truncate">{staff.staffName}</span>
@@ -332,12 +332,12 @@ function StaffRow({ staff, isPending, onRelease }: StaffRowProps) {
       </div>
 
       {/* Middle: status pill */}
-      <div className="mx-4">
+      <div className="flex justify-center">
         <DeliveryStatusPill status={staff.status} />
       </div>
 
       {/* Right: action */}
-      <div className="shrink-0">
+      <div className="flex justify-end">
         {showRelease && (
           <Button size="sm" variant="outline" className="h-6 text-xs gap-1" disabled={isPending} onClick={() => onRelease(true)}>
             <Eye className="w-3 h-3" /> Release

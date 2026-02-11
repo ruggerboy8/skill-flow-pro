@@ -14,7 +14,7 @@ import { getDomainColor } from '@/lib/domainColors';
 import { parseReviewPayload, type ReviewPayload, type ReviewPayloadItem } from '@/lib/reviewPayload';
 import { CompetencyCard } from '@/components/review/CompetencyCard';
 
-const STEP_LABELS = ['Intro', 'Highlights', 'Choose Focus', 'ProMoves'];
+const STEP_LABELS = ['Intro', 'Full Evaluation', 'Highlights', 'Choose Focus', 'ProMoves'];
 
 export default function EvaluationReview() {
   const { evalId } = useParams<{ evalId: string }>();
@@ -64,7 +64,24 @@ export default function EvaluationReview() {
         }
         // Always call RPC — it returns cached v2 or recomputes
         const { data } = await supabase.rpc('compute_and_store_review_payload', { p_eval_id: evalId });
-        setPayload(parseReviewPayload(data));
+        const parsed = parseReviewPayload(data);
+        if (parsed) {
+          // Enrich with taglines
+          const allCompIds = [
+            ...parsed.top_candidates.map(c => c.competency_id),
+            ...parsed.bottom_candidates.map(c => c.competency_id),
+          ];
+          if (allCompIds.length > 0) {
+            const { data: comps } = await supabase
+              .from('competencies')
+              .select('competency_id, tagline')
+              .in('competency_id', allCompIds);
+            const taglineMap = new Map((comps ?? []).map(c => [c.competency_id, c.tagline]));
+            parsed.top_candidates.forEach(c => { c.tagline = taglineMap.get(c.competency_id) ?? null; });
+            parsed.bottom_candidates.forEach(c => { c.tagline = taglineMap.get(c.competency_id) ?? null; });
+          }
+        }
+        setPayload(parsed);
       } catch (err) {
         console.error('Failed to initialize review:', err);
         toast.error('Failed to load review data');
@@ -73,22 +90,21 @@ export default function EvaluationReview() {
     init();
   }, [evalData, evalId]);
 
-  // Selected competency IDs (for ProMoves query)
+  // Selected competency IDs for ProMoves — only the 2 improve competencies
   const selectedCompIds = useMemo(() => {
     const ids: number[] = [];
-    if (keepCrushingId) ids.push(keepCrushingId);
     improveIds.forEach(id => ids.push(id));
     return ids;
-  }, [keepCrushingId, improveIds]);
+  }, [improveIds]);
 
-  // Fetch ProMoves for user-selected competencies (Step 3)
+  // Fetch ProMoves for user-selected improve competencies (Step 4)
   const { data: proMoves } = useQuery({
     queryKey: ['review-pro-moves', selectedCompIds],
     queryFn: async () => {
       if (selectedCompIds.length === 0) return [];
       const { data, error } = await supabase
         .from('pro_moves')
-        .select('action_id, action_statement, competency_id, competencies!fk_pro_moves_competency_id(name, domains!competencies_domain_id_fkey(domain_name))')
+        .select('action_id, action_statement, competency_id, competencies!fk_pro_moves_competency_id(name, tagline, domains!competencies_domain_id_fkey(domain_name))')
         .in('competency_id', selectedCompIds)
         .eq('active', true)
         .order('competency_id')
@@ -96,7 +112,7 @@ export default function EvaluationReview() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: selectedCompIds.length === 3 && step === 3,
+    enabled: selectedCompIds.length === 2 && step === 4,
   });
 
   // Group pro moves by competency
@@ -125,17 +141,17 @@ export default function EvaluationReview() {
     });
   };
 
-  const handleSave = async (withFocus: boolean) => {
+  const handleSave = async () => {
     if (!evalId) return;
     setSaving(true);
     try {
-      const actionIds = withFocus ? Array.from(selectedActionIds) : [];
+      const actionIds = Array.from(selectedActionIds);
       const { error } = await supabase.rpc('save_eval_acknowledgement_and_focus', {
         p_eval_id: evalId,
         p_action_ids: actionIds,
       });
       if (error) throw error;
-      toast.success(withFocus ? 'Focus saved and review completed!' : 'Review completed!');
+      toast.success('Focus saved and review completed!');
       queryClient.invalidateQueries({ queryKey: ['eval-review'] });
       queryClient.invalidateQueries({ queryKey: ['staff-quarter-focus'] });
       navigate('/');
@@ -148,7 +164,6 @@ export default function EvaluationReview() {
 
   const handleKeepCrushingSelect = useCallback((compId: number) => {
     setKeepCrushingId(prev => prev === compId ? null : compId);
-    // Auto-scroll to improve section
     setTimeout(() => {
       improveSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 150);
@@ -227,7 +242,7 @@ export default function EvaluationReview() {
           {step > 0 ? 'Back' : 'Exit'}
         </Button>
         <span className="text-sm text-muted-foreground">
-          Step {step + 1} of 4 — {STEP_LABELS[step]}
+          Step {step + 1} of 5 — {STEP_LABELS[step]}
         </span>
       </div>
 
@@ -237,11 +252,12 @@ export default function EvaluationReview() {
           <h1 className="text-2xl font-bold">{periodLabel} Evaluation Review</h1>
           <Card>
             <CardContent className="py-8 space-y-5">
-              <p className="text-muted-foreground">This review takes about 2 minutes. You'll do three things:</p>
+              <p className="text-muted-foreground">This review takes about 2 minutes. You'll do four things:</p>
               <ol className="space-y-2 text-sm list-decimal list-inside">
+                <li><strong>Review your full evaluation</strong> — see all scores and notes</li>
                 <li><strong>Scan highlights</strong> — see your top strengths and opportunities</li>
                 <li><strong>Pick 3 competencies</strong> — 1 to keep crushing, 2 to improve</li>
-                <li><strong>Choose 1–3 ProMoves</strong> — practical actions for this quarter</li>
+                <li><strong>Choose 1–3 ProMoves</strong> — practical actions for your improvement areas</li>
               </ol>
               <p className="text-xs text-muted-foreground">Your focus will be pinned on Home so you can track progress.</p>
               <div className="flex flex-col gap-3 pt-2">
@@ -249,9 +265,6 @@ export default function EvaluationReview() {
                   Start <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
                 <div className="flex gap-4 justify-center">
-                  <Button variant="link" size="sm" onClick={() => navigate(`/evaluation/${evalId}`)}>
-                    <Eye className="w-4 h-4 mr-1" /> View full evaluation
-                  </Button>
                   <Button variant="link" size="sm" onClick={() => navigate('/')}>
                     Exit to Home
                   </Button>
@@ -262,8 +275,41 @@ export default function EvaluationReview() {
         </div>
       )}
 
-      {/* ─── Step 1: Highlights ─────────────────────────────── */}
+      {/* ─── Step 1: View Full Evaluation ─────────────────── */}
       {step === 1 && (
+        <div className="space-y-6">
+          <h1 className="text-2xl font-bold">Review Your Full Evaluation</h1>
+          <Card>
+            <CardContent className="py-8 space-y-5">
+              <p className="text-muted-foreground text-sm">
+                Take a moment to review all your scores and coach notes before selecting your focus areas.
+              </p>
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                onClick={() => navigate(`/evaluation/${evalId}`)}
+              >
+                <Eye className="w-4 h-4 mr-2" /> View Full Evaluation
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Use the back button after reviewing to return here and continue.
+              </p>
+            </CardContent>
+          </Card>
+          <div className="flex justify-between pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setStep(2)}>
+              Skip — I've already reviewed it
+            </Button>
+            <Button onClick={() => setStep(2)}>
+              Next <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Step 2: Highlights ─────────────────────────────── */}
+      {step === 2 && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold">Highlights</h1>
 
@@ -323,20 +369,16 @@ export default function EvaluationReview() {
             </>
           )}
 
-          <Button variant="link" className="text-sm" onClick={() => navigate(`/evaluation/${evalId}`)}>
-            See full scores →
-          </Button>
-
           <div className="flex justify-end pt-2">
-            <Button onClick={() => setStep(2)}>
+            <Button onClick={() => setStep(3)}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 2: Choose Focus Competencies ──────────────── */}
-      {step === 2 && (
+      {/* ─── Step 3: Choose Focus Competencies ──────────────── */}
+      {step === 3 && (
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold">Choose 3 Focus Competencies</h1>
@@ -391,24 +433,22 @@ export default function EvaluationReview() {
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button onClick={() => setStep(3)} disabled={!focusSelectionComplete}>
+            <Button onClick={() => setStep(4)} disabled={!focusSelectionComplete}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 3: ProMoves & Complete ────────────────────── */}
-      {step === 3 && (
-        <Step3ProMoves
+      {/* ─── Step 4: ProMoves & Complete ────────────────────── */}
+      {step === 4 && (
+        <Step4ProMoves
           payload={payload}
-          keepCrushingId={keepCrushingId}
           improveIds={improveIds}
           proMovesByCompetency={proMovesByCompetency}
           selectedActionIds={selectedActionIds}
           onToggle={toggleAction}
-          onSave={() => handleSave(true)}
-          onSkip={() => handleSave(false)}
+          onSave={handleSave}
           saving={saving}
         />
       )}
@@ -416,46 +456,38 @@ export default function EvaluationReview() {
   );
 }
 
-// ─── Step 3 Component ──────────────────────────────────────────────────
+// ─── Step 4 Component ──────────────────────────────────────────────────
 
-function Step3ProMoves({
+function Step4ProMoves({
   payload,
-  keepCrushingId,
   improveIds,
   proMovesByCompetency,
   selectedActionIds,
   onToggle,
   onSave,
-  onSkip,
   saving,
 }: {
   payload: ReviewPayload;
-  keepCrushingId: number | null;
   improveIds: Set<number>;
   proMovesByCompetency: Map<number, any[]>;
   selectedActionIds: Set<number>;
   onToggle: (id: number) => void;
   onSave: () => void;
-  onSkip: () => void;
   saving: boolean;
 }) {
-  // Find observer_note for improve competencies from payload
   const getObserverNote = (compId: number): string | null => {
     const item = payload.bottom_candidates.find(c => c.competency_id === compId);
     return item?.observer_note?.trim() || null;
   };
 
-  // Order: keep crushing first, then improve
-  const orderedCompIds: number[] = [];
-  if (keepCrushingId) orderedCompIds.push(keepCrushingId);
-  improveIds.forEach(id => orderedCompIds.push(id));
+  const orderedCompIds = Array.from(improveIds);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Choose ProMoves</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Select 1–3 ProMoves to focus on this quarter. These will be pinned to your home page.
+          Select 1–3 ProMoves for your improvement areas. These will be pinned to your home page.
         </p>
       </div>
 
@@ -465,8 +497,7 @@ function Step3ProMoves({
 
         const compName = (moves[0]?.competencies as any)?.name ?? `Competency ${compId}`;
         const domainName = (moves[0]?.competencies as any)?.domains?.domain_name ?? '';
-        const isImprove = improveIds.has(compId);
-        const coachNote = isImprove ? getObserverNote(compId) : null;
+        const coachNote = getObserverNote(compId);
 
         return (
           <Card key={compId}>
@@ -479,11 +510,10 @@ function Step3ProMoves({
                 )}
                 <span className="font-medium text-sm">{compName}</span>
                 <Badge variant="secondary" className="text-xs ml-auto">
-                  {isImprove ? 'Improve' : 'Keep crushing'}
+                  Improve
                 </Badge>
               </div>
 
-              {/* Coach context callout for improve items */}
               {coachNote && (
                 <div className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded p-2 border-l-2 border-muted-foreground/30">
                   <span className="font-medium">Coach context:</span> {coachNote}
@@ -528,14 +558,6 @@ function Step3ProMoves({
         >
           {saving ? 'Saving...' : 'Save focus and complete review'}
         </Button>
-        <button
-          type="button"
-          className="w-full text-sm text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
-          onClick={onSkip}
-          disabled={saving}
-        >
-          Complete review without selecting focus
-        </button>
       </div>
     </div>
   );

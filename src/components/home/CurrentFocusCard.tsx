@@ -78,21 +78,8 @@ export function CurrentFocusCard() {
 
   if (!data) return null;
 
-  if (data.type === 'prompt') {
-    return (
-      <Card className="border-dashed border-muted-foreground/30">
-        <CardContent className="py-4 flex items-center gap-3">
-          <Target className="w-4 h-4 text-muted-foreground shrink-0" />
-          <p className="text-sm text-muted-foreground flex-1">
-            Select your quarterly focus to keep your priorities front and center
-          </p>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/evaluation/${data.evalId}/review`)}>
-            Select Focus <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Don't show prompt — focus only appears after completing the review wizard
+  if (data.type === 'prompt') return null;
 
   return (
     <Card>

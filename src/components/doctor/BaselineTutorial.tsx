@@ -41,7 +41,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     {
       targetSelector: '[data-tutorial-drawer]',
       title: 'Learning materials',
-      description: "This is where you'll find everything you need — why this Pro Move matters, scripts you can use, and what great looks like. You can open this for any Pro Move anytime.\n\nClose the drawer to continue.",
+      description: "This is where you'll find everything you need — why this Pro Move matters, scripts you can use, and what great looks like. You can open this for any Pro Move anytime.\n\n👆 Tap the dark area outside this box to close the drawer and continue.",
       position: 'left-center',
       waitForDrawerClose: true,
     },

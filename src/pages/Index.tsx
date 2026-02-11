@@ -2,6 +2,8 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import ThisWeekPanel from '@/components/home/ThisWeekPanel';
 import { RecentWinBanner } from '@/components/home/RecentWinBanner';
+import { EvalReadyCard } from '@/components/home/EvalReadyCard';
+import { CurrentFocusCard } from '@/components/home/CurrentFocusCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import RegionalDashboard from '@/pages/dashboard/RegionalDashboard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -67,9 +69,13 @@ export default function Index() {
           </Alert>
         )}
 
+        <EvalReadyCard />
+
         <RecentWinBanner />
 
         <ThisWeekPanel />
+
+        <CurrentFocusCard />
         
         {/* Deadline disclaimer */}
         <div className="rounded-none md:rounded-lg border-y md:border border-border bg-muted/50 p-3 md:p-4 text-center">

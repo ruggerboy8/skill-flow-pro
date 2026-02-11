@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MoreHorizontal, Eye, EyeOff, Send, Check } from 'lucide-react';
+import { MoreHorizontal, Eye, EyeOff, Send, Check, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEvalDeliveryProgress, type LocationProgress } from '@/hooks/useEvalDeliveryProgress';
 import { EvalPeriodSelector } from './EvalPeriodSelector';
@@ -27,6 +27,7 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
   const { locations, isLoading, refetch } = useEvalDeliveryProgress(period);
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const [orgFilter, setOrgFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Get unique organizations for the filter dropdown
   const organizations = useMemo(() => {
@@ -37,11 +38,27 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
     return Array.from(orgMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [locations]);
 
-  // Filter locations by selected organization
+  // Filter locations by selected organization and status
   const filteredLocations = useMemo(() => {
-    if (orgFilter === 'all') return locations;
-    return locations.filter(loc => loc.organizationId === orgFilter);
-  }, [locations, orgFilter]);
+    let result = locations;
+    if (orgFilter !== 'all') {
+      result = result.filter(loc => loc.organizationId === orgFilter);
+    }
+    // Status filters operate on locations that have relevant evals
+    if (statusFilter !== 'all') {
+      result = result.filter(loc => {
+        switch (statusFilter) {
+          case 'not_released': return loc.submittedCount > loc.visibleCount;
+          case 'released_not_viewed': return loc.visibleCount > 0 && loc.viewedCount < loc.visibleCount;
+          case 'viewed_not_ack': return loc.viewedCount > 0 && loc.acknowledgedCount < loc.viewedCount;
+          case 'ack_no_focus': return loc.acknowledgedCount > 0 && loc.focusSelectedCount < loc.acknowledgedCount;
+          case 'complete': return loc.acknowledgedCount > 0;
+          default: return true;
+        }
+      });
+    }
+    return result;
+  }, [locations, orgFilter, statusFilter]);
 
   // Mutation for setting visibility
   const visibilityMutation = useMutation({
@@ -132,7 +149,29 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
         </Select>
       </div>
 
-      <div className="border rounded-lg">
+      {/* Status filter chips */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { value: 'all', label: 'All' },
+          { value: 'not_released', label: 'Not released' },
+          { value: 'released_not_viewed', label: 'Released, not viewed' },
+          { value: 'viewed_not_ack', label: 'Viewed, not acknowledged' },
+          { value: 'ack_no_focus', label: 'Acknowledged, no focus' },
+          { value: 'complete', label: 'Complete' },
+        ].map(chip => (
+          <Button
+            key={chip.value}
+            variant={statusFilter === chip.value ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter(chip.value)}
+            className="text-xs"
+          >
+            {chip.label}
+          </Button>
+        ))}
+      </div>
+
+      <div className="border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -143,13 +182,16 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
               <TableHead className="text-center">Submitted</TableHead>
               <TableHead className="text-center">Coverage</TableHead>
               <TableHead className="text-center">Visible</TableHead>
+              <TableHead className="text-center">Viewed</TableHead>
+              <TableHead className="text-center">Ack'd</TableHead>
+              <TableHead className="text-center">Focus</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredLocations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                   No locations found.
                 </TableCell>
               </TableRow>
@@ -189,7 +231,14 @@ interface LocationRowProps {
 }
 
 function LocationRow({ location, onToggleVisibility, onSubmitDrafts, isUpdating }: LocationRowProps) {
-  const { locationName, organizationName, totalStaff, draftCount, submittedCount, coveragePercent, allVisible, visibleCount } = location;
+  const { locationName, organizationName, totalStaff, draftCount, submittedCount, coveragePercent, allVisible, visibleCount, viewedCount, acknowledgedCount, focusSelectedCount } = location;
+
+  const deliveryCell = (count: number, total: number) => {
+    if (total === 0) return <span className="text-muted-foreground">—</span>;
+    if (count === total) return <Check className="w-4 h-4 text-green-600 mx-auto" />;
+    if (count === 0) return <Minus className="w-4 h-4 text-muted-foreground mx-auto" />;
+    return <span className="text-sm text-muted-foreground">{count}/{total}</span>;
+  };
 
   return (
     <TableRow>
@@ -223,16 +272,14 @@ function LocationRow({ location, onToggleVisibility, onSubmitDrafts, isUpdating 
         {submittedCount === 0 ? (
           <span className="text-muted-foreground">—</span>
         ) : allVisible ? (
-          <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
-            <Check className="w-3 h-3 mr-1" />
-            Yes
-          </Badge>
+          <Check className="w-4 h-4 text-green-600 mx-auto" />
         ) : (
-          <Badge variant="outline" className="text-muted-foreground">
-            {visibleCount}/{submittedCount}
-          </Badge>
+          <span className="text-sm text-muted-foreground">{visibleCount}/{submittedCount}</span>
         )}
       </TableCell>
+      <TableCell className="text-center">{deliveryCell(viewedCount, visibleCount)}</TableCell>
+      <TableCell className="text-center">{deliveryCell(acknowledgedCount, visibleCount)}</TableCell>
+      <TableCell className="text-center">{deliveryCell(focusSelectedCount, acknowledgedCount)}</TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

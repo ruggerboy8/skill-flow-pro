@@ -13,6 +13,10 @@ export interface LocationProgress {
   visibleCount: number;
   coveragePercent: number;
   allVisible: boolean;
+  // Delivery tracking (only counts released evals)
+  viewedCount: number;
+  acknowledgedCount: number;
+  focusSelectedCount: number;
 }
 
 interface UseEvalDeliveryProgressResult {
@@ -68,9 +72,10 @@ export function useEvalDeliveryProgress(
       }
 
       // 3. Query evaluations for this period across all locations
+      //    Include delivery tracking fields
       let evalQuery = supabase
         .from('evaluations')
-        .select('id, location_id, status, is_visible_to_staff')
+        .select('id, location_id, status, is_visible_to_staff, viewed_at, acknowledged_at, focus_selected_at')
         .in('location_id', locationIds)
         .eq('program_year', period.year);
 
@@ -88,11 +93,16 @@ export function useEvalDeliveryProgress(
         drafts: number; 
         submitted: number; 
         visible: number;
+        viewed: number;
+        acknowledged: number;
+        focusSelected: number;
       }>();
 
       for (const e of evaluations || []) {
         const locId = e.location_id;
-        const current = evalsByLocation.get(locId) || { drafts: 0, submitted: 0, visible: 0 };
+        const current = evalsByLocation.get(locId) || { 
+          drafts: 0, submitted: 0, visible: 0, viewed: 0, acknowledged: 0, focusSelected: 0 
+        };
         
         if (e.status === 'draft') {
           current.drafts++;
@@ -100,6 +110,10 @@ export function useEvalDeliveryProgress(
           current.submitted++;
           if (e.is_visible_to_staff) {
             current.visible++;
+            // Only count delivery metrics for released (visible) evals
+            if (e.viewed_at) current.viewed++;
+            if (e.acknowledged_at) current.acknowledged++;
+            if (e.focus_selected_at) current.focusSelected++;
           }
         }
         
@@ -109,7 +123,9 @@ export function useEvalDeliveryProgress(
       // 4. Build final result
       const result: LocationProgress[] = locations.map(loc => {
         const totalStaff = staffCountByLocation.get(loc.id) || 0;
-        const evals = evalsByLocation.get(loc.id) || { drafts: 0, submitted: 0, visible: 0 };
+        const evals = evalsByLocation.get(loc.id) || { 
+          drafts: 0, submitted: 0, visible: 0, viewed: 0, acknowledged: 0, focusSelected: 0 
+        };
         const coveragePercent = totalStaff > 0 
           ? Math.round((evals.submitted / totalStaff) * 100) 
           : 0;
@@ -127,7 +143,10 @@ export function useEvalDeliveryProgress(
           submittedCount: evals.submitted,
           visibleCount: evals.visible,
           coveragePercent,
-          allVisible: evals.submitted > 0 && evals.visible === evals.submitted
+          allVisible: evals.submitted > 0 && evals.visible === evals.submitted,
+          viewedCount: evals.viewed,
+          acknowledgedCount: evals.acknowledged,
+          focusSelectedCount: evals.focusSelected,
         };
       });
 

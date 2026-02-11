@@ -364,7 +364,7 @@ serve(async (req: Request) => {
       }
 
       case "role_preset": {
-        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date, name, email, allow_backfill } = payload ?? {};
+        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date, name, email, allow_backfill, location_id } = payload ?? {};
         
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
@@ -529,6 +529,9 @@ serve(async (req: Request) => {
         }
         if (email) {
           updates.email = email;
+        }
+        if (location_id !== undefined) {
+          updates.primary_location_id = location_id;
         }
         
         // Handle backfill permission toggle

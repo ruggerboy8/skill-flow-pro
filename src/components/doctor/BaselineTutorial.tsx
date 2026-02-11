@@ -5,20 +5,24 @@ interface BaselineTutorialProps {
   firstActionId: number;
   onComplete: () => void;
   onForceOpenMaterials: (actionId: number) => void;
+  onCloseMaterials: () => void;
 }
 
 interface TutorialStep {
   targetSelector: string;
   title: string;
   description: string;
-  position: 'bottom' | 'top' | 'right';
+  position: 'bottom' | 'top' | 'right' | 'left-center';
   requiresAction?: 'click-pro-move';
+  /** If true, closing this step will also close the materials drawer */
+  closeDrawerOnAdvance?: boolean;
 }
 
-export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMaterials }: BaselineTutorialProps) {
+export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMaterials, onCloseMaterials }: BaselineTutorialProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [waitingForAction, setWaitingForAction] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const steps: TutorialStep[] = [
     {
@@ -35,6 +39,14 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
       requiresAction: 'click-pro-move',
     },
     {
+      // Target the sheet content panel
+      targetSelector: '[data-tutorial-drawer]',
+      title: 'Learning materials',
+      description: "This is where you'll find everything you need — why this Pro Move matters, scripts you can use, and what great looks like. You can open this for any Pro Move anytime.",
+      position: 'left-center',
+      closeDrawerOnAdvance: true,
+    },
+    {
       targetSelector: `#note-btn-${firstActionId}`,
       title: 'Add notes',
       description: "If you have a question, comment, or thought about a Pro Move, jot it down here as you go.",
@@ -48,43 +60,52 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     const el = document.querySelector(step.targetSelector);
     if (el) {
       setTargetRect(el.getBoundingClientRect());
+    } else {
+      setTargetRect(null);
     }
-  }, [currentStep, steps]);
+  }, [currentStep]);
 
   useEffect(() => {
     updatePosition();
+    // Poll briefly for drawer elements that may not exist yet
+    const interval = setInterval(updatePosition, 200);
+    const timeout = setTimeout(() => clearInterval(interval), 3000);
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
   }, [updatePosition]);
 
-  // Listen for materials sheet opening to advance past the click-pro-move step
+  // Listen for materials sheet opening to advance to the drawer explanation step
   useEffect(() => {
     if (!waitingForAction) return;
     
     const handleSheetOpened = () => {
       setWaitingForAction(false);
-      // Small delay so user sees the drawer before tutorial advances
+      setDrawerOpen(true);
+      // Wait for drawer animation to finish, then advance
       setTimeout(() => {
         setCurrentStep(prev => prev + 1);
-      }, 1500);
+      }, 600);
     };
 
     window.addEventListener('tutorial-materials-opened', handleSheetOpened);
     return () => window.removeEventListener('tutorial-materials-opened', handleSheetOpened);
   }, [waitingForAction]);
 
-  const handleNext = () => {
+  const advanceStep = () => {
     const step = steps[currentStep];
-    if (step?.requiresAction === 'click-pro-move') {
-      // Force-open materials and wait for the event
-      setWaitingForAction(true);
-      onForceOpenMaterials(firstActionId);
-      return;
+    
+    // Close drawer if this step requires it
+    if (step?.closeDrawerOnAdvance) {
+      onCloseMaterials();
+      setDrawerOpen(false);
     }
+
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
@@ -92,12 +113,30 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     }
   };
 
+  const handleNext = () => {
+    const step = steps[currentStep];
+    if (step?.requiresAction === 'click-pro-move') {
+      setWaitingForAction(true);
+      onForceOpenMaterials(firstActionId);
+      return;
+    }
+    advanceStep();
+  };
+
+  const handleSkip = () => {
+    if (drawerOpen) {
+      onCloseMaterials();
+      setDrawerOpen(false);
+    }
+    onComplete();
+  };
+
   const step = steps[currentStep];
   if (!step || !targetRect) return null;
 
   // Calculate tooltip position
-  const padding = 8;
-  const tooltipStyle: React.CSSProperties = { position: 'fixed', zIndex: 60 };
+  const padding = 12;
+  const tooltipStyle: React.CSSProperties = { position: 'fixed', zIndex: 9999 };
 
   if (step.position === 'bottom') {
     tooltipStyle.top = targetRect.bottom + padding;
@@ -108,6 +147,10 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
   } else if (step.position === 'right') {
     tooltipStyle.top = targetRect.top;
     tooltipStyle.left = targetRect.right + padding;
+  } else if (step.position === 'left-center') {
+    // Position to the left of the drawer
+    tooltipStyle.top = targetRect.top + targetRect.height / 2 - 80;
+    tooltipStyle.right = window.innerWidth - targetRect.left + padding;
   }
 
   // Cutout highlight
@@ -119,8 +162,8 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     height: targetRect.height + 8,
     borderRadius: 8,
     boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
-    zIndex: 55,
-    pointerEvents: step.requiresAction ? 'none' : 'none',
+    zIndex: 9998,
+    pointerEvents: 'none',
   };
 
   return (
@@ -137,7 +180,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
             left: targetRect.left - 4,
             width: targetRect.width + 8,
             height: targetRect.height + 8,
-            zIndex: 56,
+            zIndex: 9999,
             cursor: 'pointer',
           }}
           onClick={() => handleNext()}
@@ -154,7 +197,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
         <div className="flex items-center justify-between">
           <button
             type="button"
-            onClick={onComplete}
+            onClick={handleSkip}
             className="text-xs text-muted-foreground hover:text-foreground underline"
           >
             Skip

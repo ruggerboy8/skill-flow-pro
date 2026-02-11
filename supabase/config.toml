@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.notify-eval-release]
 verify_jwt = true
+
+[functions.format-reflection]
+verify_jwt = false

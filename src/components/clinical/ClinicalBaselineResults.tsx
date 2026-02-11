@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
+import { ReflectionSection } from '@/components/doctor/ReflectionSection';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -58,7 +59,7 @@ export function ClinicalBaselineResults({
       if (!assessmentId) return null;
       const { data, error } = await supabase
         .from('doctor_baseline_assessments')
-        .select('id, flagged_domains')
+        .select('id, flagged_domains, reflection_original, reflection_formatted')
         .eq('id', assessmentId)
         .maybeSingle();
       
@@ -418,6 +419,16 @@ export function ClinicalBaselineResults({
                 );
               })}
             </Tabs>
+          )}
+          
+          {/* Reflection Section */}
+          {baseline?.reflection_formatted && (
+            <div className="p-4">
+              <ReflectionSection
+                formatted={baseline.reflection_formatted}
+                original={baseline.reflection_original}
+              />
+            </div>
           )}
         </CollapsibleContent>
       </Card>

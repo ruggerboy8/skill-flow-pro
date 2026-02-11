@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RatingBandCollapsible } from '@/components/doctor/RatingBandCollapsible';
 import { GutCheckPrompt } from '@/components/doctor/GutCheckPrompt';
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
+import { ReflectionSection } from '@/components/doctor/ReflectionSection';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import { ClipboardCheck, CheckCircle2, MessageSquare } from 'lucide-react';
@@ -46,7 +47,7 @@ export default function DoctorBaselineResults() {
       if (!staff?.id) return null;
       const { data, error } = await supabase
         .from('doctor_baseline_assessments')
-        .select('id, status, completed_at, flagged_domains')
+        .select('id, status, completed_at, flagged_domains, reflection_original, reflection_formatted, reflection_mode, reflection_submitted_at')
         .eq('doctor_staff_id', staff.id)
         .maybeSingle();
       
@@ -333,6 +334,14 @@ export default function DoctorBaselineResults() {
             })}
           </Tabs>
         </Card>
+      )}
+
+      {/* Reflection Section */}
+      {baseline?.reflection_formatted && (
+        <ReflectionSection
+          formatted={baseline.reflection_formatted}
+          original={baseline.reflection_original}
+        />
       )}
 
       {/* Materials Sheet */}

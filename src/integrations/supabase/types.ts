@@ -297,6 +297,10 @@ export type Database = {
           doctor_staff_id: string
           flagged_domains: string[] | null
           id: string
+          reflection_formatted: string | null
+          reflection_mode: string | null
+          reflection_original: string | null
+          reflection_submitted_at: string | null
           started_at: string | null
           status: string | null
         }
@@ -306,6 +310,10 @@ export type Database = {
           doctor_staff_id: string
           flagged_domains?: string[] | null
           id?: string
+          reflection_formatted?: string | null
+          reflection_mode?: string | null
+          reflection_original?: string | null
+          reflection_submitted_at?: string | null
           started_at?: string | null
           status?: string | null
         }
@@ -315,6 +323,10 @@ export type Database = {
           doctor_staff_id?: string
           flagged_domains?: string[] | null
           id?: string
+          reflection_formatted?: string | null
+          reflection_mode?: string | null
+          reflection_original?: string | null
+          reflection_submitted_at?: string | null
           started_at?: string | null
           status?: string | null
         }

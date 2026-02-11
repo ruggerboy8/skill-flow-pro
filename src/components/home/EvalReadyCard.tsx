@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ClipboardCheck, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { quarterNum } from '@/lib/reviewPayload';
 
 /**
@@ -13,25 +13,19 @@ import { quarterNum } from '@/lib/reviewPayload';
  * Shows when a staff member has released evaluations they haven't acknowledged.
  */
 export function EvalReadyCard() {
-  const { user } = useAuth();
+  const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const navigate = useNavigate();
+  const staffId = staffProfile?.id;
 
   const { data } = useQuery({
-    queryKey: ['eval-ready-card', user?.id],
+    queryKey: ['eval-ready-card', staffId],
     queryFn: async () => {
-      if (!user) return null;
-
-      const { data: staff } = await supabase
-        .from('staff')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (!staff) return null;
+      if (!staffId) return null;
 
       const { data: evals, error } = await supabase
         .from('evaluations')
         .select('id, type, quarter, program_year, viewed_at, acknowledged_at')
-        .eq('staff_id', staff.id)
+        .eq('staff_id', staffId)
         .eq('status', 'submitted')
         .eq('is_visible_to_staff', true)
         .is('acknowledged_at', null);
@@ -57,7 +51,7 @@ export function EvalReadyCard() {
         totalCount: sorted.length,
       };
     },
-    enabled: !!user,
+    enabled: !!staffId,
     staleTime: 1000 * 60 * 2,
   });
 

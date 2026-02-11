@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, ArrowRight, Star, Target, GitCompare, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDomainColor } from '@/lib/domainColors';
 import { parseReviewPayload, type ReviewPayload, type ReviewPayloadItem } from '@/lib/reviewPayload';
 
@@ -17,7 +17,8 @@ export default function EvaluationReview() {
   const { evalId } = useParams<{ evalId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  const staffId = staffProfile?.id;
 
   const [step, setStep] = useState(1);
   const [payload, setPayload] = useState<ReviewPayload | null>(null);
@@ -27,16 +28,9 @@ export default function EvaluationReview() {
 
   // Fetch evaluation + staff validation
   const { data: evalData, isLoading: evalLoading, error: evalError } = useQuery({
-    queryKey: ['eval-review', evalId],
+    queryKey: ['eval-review', evalId, staffId],
     queryFn: async () => {
-      if (!user || !evalId) throw new Error('Missing user or evalId');
-
-      const { data: staff } = await supabase
-        .from('staff')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (!staff) throw new Error('Staff record not found');
+      if (!staffId || !evalId) throw new Error('Missing staff or evalId');
 
       const { data: evaluation, error } = await supabase
         .from('evaluations')
@@ -45,13 +39,13 @@ export default function EvaluationReview() {
         .single();
       if (error) throw error;
       if (!evaluation) throw new Error('Evaluation not found');
-      if (evaluation.staff_id !== staff.id) throw new Error('Not your evaluation');
+      if (evaluation.staff_id !== staffId) throw new Error('Not your evaluation');
       if (evaluation.status !== 'submitted') throw new Error('Evaluation is not submitted');
       if (!evaluation.is_visible_to_staff) throw new Error('Evaluation is not released');
 
-      return { evaluation, staffId: staff.id };
+      return { evaluation, staffId };
     },
-    enabled: !!user && !!evalId,
+    enabled: !!staffId && !!evalId,
   });
 
   // On mount: mark viewed + compute payload (once)

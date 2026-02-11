@@ -145,7 +145,7 @@ export function ClinicalBaselineResults({
 
       const { data, error } = await supabase
         .from('coach_baseline_items')
-        .select('action_id, rating')
+        .select('action_id, rating, note_text')
         .eq('assessment_id', assessment.id)
         .not('rating', 'is', null);
       if (error) throw error;
@@ -154,10 +154,16 @@ export function ClinicalBaselineResults({
     enabled: !!myStaff?.id,
   });
 
-  // Build coach ratings lookup
+  // Build coach ratings + notes lookup
   const coachRatingsMap = useMemo(() => {
     const map = new Map<number, number>();
     coachItems?.forEach(ci => { if (ci.rating !== null) map.set(ci.action_id, ci.rating); });
+    return map;
+  }, [coachItems]);
+
+  const coachNotesMap = useMemo(() => {
+    const map = new Map<number, string>();
+    coachItems?.forEach(ci => { if (ci.note_text?.trim()) map.set(ci.action_id, ci.note_text.trim()); });
     return map;
   }, [coachItems]);
 
@@ -503,7 +509,9 @@ export function ClinicalBaselineResults({
                         const coachScore = coachRatingsMap.get(item.action_id);
                         const isCoachNa = coachScore === 0;
                         const hasBigDiff = coachScore !== undefined && !isCoachNa && Math.abs(item.self_score - coachScore) >= 2;
-                        const hasNote = !!item.self_note?.trim();
+                        const hasDoctorNote = !!item.self_note?.trim();
+                        const coachNote = coachNotesMap.get(item.action_id);
+                        const hasNote = hasDoctorNote || !!coachNote;
                         const isExpanded = expandedNoteId === item.action_id;
 
                         return (
@@ -540,8 +548,19 @@ export function ClinicalBaselineResults({
                               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${hasNote ? (isExpanded ? 'rotate-0' : '-rotate-90') : '-rotate-90 opacity-0 group-hover:opacity-100'}`} />
                             </button>
                             {hasNote && isExpanded && (
-                              <div className="bg-muted/30 border-t px-4 py-3 space-y-2">
-                                <p className="text-sm whitespace-pre-wrap text-foreground">{item.self_note}</p>
+                              <div className="bg-muted/30 border-t px-4 py-3 space-y-3">
+                                {hasDoctorNote && (
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">Doctor note</p>
+                                    <p className="text-sm whitespace-pre-wrap text-foreground">{item.self_note}</p>
+                                  </div>
+                                )}
+                                {coachNote && (
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">Coach note</p>
+                                    <p className="text-sm whitespace-pre-wrap text-foreground">{coachNote}</p>
+                                  </div>
+                                )}
                                 <button
                                   onClick={() => setSelectedItem(item)}
                                   className="text-xs text-primary hover:underline"

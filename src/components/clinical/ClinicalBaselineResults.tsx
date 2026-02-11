@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
-import { ClipboardCheck, CheckCircle2, Clock, AlertCircle, ChevronDown, MessageSquare, Eye } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Clock, AlertCircle, ChevronDown, MessageSquare, ArrowDown, ArrowUp } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface ClinicalBaselineResultsProps {
@@ -43,6 +43,22 @@ interface GroupedData {
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
+const SCORE_COLORS: Record<number, { bg: string; border: string; text: string; activeBorder: string }> = {
+  4: { bg: 'hsl(160 60% 95%)', border: 'hsl(160 50% 80%)', text: 'hsl(160 80% 25%)', activeBorder: 'hsl(160 60% 40%)' },
+  3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)', activeBorder: 'hsl(210 70% 45%)' },
+  2: { bg: 'hsl(38 90% 95%)', border: 'hsl(38 70% 75%)', text: 'hsl(38 80% 30%)', activeBorder: 'hsl(38 80% 45%)' },
+  1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)', activeBorder: 'hsl(0 65% 45%)' },
+};
+
+const SCORE_LABELS: Record<number, string> = {
+  4: 'Master',
+  3: 'Consistent',
+  2: 'Developing',
+  1: 'Rarely',
+};
+
+type SortBy = 'self' | 'coach';
+
 export function ClinicalBaselineResults({ 
   staffId, 
   assessmentId, 
@@ -54,6 +70,9 @@ export function ClinicalBaselineResults({
   const [showOnlyNoted, setShowOnlyNoted] = useState(false);
   const [showCoachRatings, setShowCoachRatings] = useState(false);
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
+  const [selfScoreFilters, setSelfScoreFilters] = useState<Set<number>>(new Set());
+  const [coachScoreFilters, setCoachScoreFilters] = useState<Set<number>>(new Set());
+  const [sortBy, setSortBy] = useState<SortBy>('self');
 
   // Fetch baseline assessment with flagged domains
   const { data: baseline } = useQuery({
@@ -114,7 +133,6 @@ export function ClinicalBaselineResults({
     queryKey: ['coach-baseline-items-compare', staffId, myStaff?.id],
     queryFn: async () => {
       if (!myStaff?.id) return [];
-      // Find the coach assessment for this doctor
       const { data: assessment, error: aErr } = await supabase
         .from('coach_baseline_assessments')
         .select('id')
@@ -179,11 +197,76 @@ export function ClinicalBaselineResults({
     return counts;
   }, [items]);
 
+  // Coach tally counts
+  const coachTallyCounts = useMemo(() => {
+    const counts = { 4: 0, 3: 0, 2: 0, 1: 0 };
+    coachRatingsMap.forEach((rating) => {
+      if (rating >= 1 && rating <= 4) counts[rating as keyof typeof counts]++;
+    });
+    return counts;
+  }, [coachRatingsMap]);
+
   const orderedDomains = useMemo(() => DOMAIN_ORDER.filter((d) => groupedByDomain[d]), [groupedByDomain]);
 
   const flaggedDomains = (baseline?.flagged_domains as string[]) || [];
   const completedCount = items?.length || 0;
   const progressPct = totalProMoves ? Math.round((completedCount / totalProMoves) * 100) : 0;
+
+  const toggleSelfFilter = (score: number) => {
+    setSelfScoreFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(score)) next.delete(score);
+      else next.add(score);
+      return next;
+    });
+  };
+
+  const toggleCoachFilter = (score: number) => {
+    setCoachScoreFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(score)) next.delete(score);
+      else next.add(score);
+      return next;
+    });
+    // Auto-enable coach ratings when filtering by coach score
+    if (!showCoachRatings) setShowCoachRatings(true);
+  };
+
+  const getSortedDomainItems = (domain: string) => {
+    const domainData = groupedByDomain[domain];
+    if (!domainData) return [];
+    let result = Object.entries(domainData)
+      .flatMap(([score, items]) => items.map(item => ({ ...item, score: Number(score) })))
+      .sort((a, b) => {
+        if (sortBy === 'coach' && showCoachRatings) {
+          const aCoach = coachRatingsMap.get(a.action_id) ?? 0;
+          const bCoach = coachRatingsMap.get(b.action_id) ?? 0;
+          if (bCoach !== aCoach) return bCoach - aCoach;
+          return b.score - a.score;
+        }
+        if (b.score !== a.score) return b.score - a.score;
+        const aCoach = coachRatingsMap.get(a.action_id) ?? 0;
+        const bCoach = coachRatingsMap.get(b.action_id) ?? 0;
+        return bCoach - aCoach;
+      });
+
+    // Apply self score filters
+    if (selfScoreFilters.size > 0) {
+      result = result.filter(item => selfScoreFilters.has(item.self_score));
+    }
+    // Apply coach score filters
+    if (coachScoreFilters.size > 0) {
+      result = result.filter(item => {
+        const cs = coachRatingsMap.get(item.action_id);
+        return cs !== undefined && coachScoreFilters.has(cs);
+      });
+    }
+    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim());
+    return result;
+  };
+
+  const hasAnyNotes = items?.some(item => item.self_note?.trim()) ?? false;
+  const hasCoachData = coachRatingsMap.size > 0;
 
   // Not started state
   if (!assessmentId) {
@@ -241,24 +324,7 @@ export function ClinicalBaselineResults({
     );
   }
 
-  const SCORE_COLORS: Record<number, { bg: string; border: string; text: string }> = {
-    4: { bg: 'hsl(160 60% 95%)', border: 'hsl(160 50% 80%)', text: 'hsl(160 80% 25%)' },
-    3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)' },
-    2: { bg: 'hsl(38 90% 95%)', border: 'hsl(38 70% 75%)', text: 'hsl(38 80% 30%)' },
-    1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)' },
-  };
-
-  const getSortedDomainItems = (domain: string) => {
-    const domainData = groupedByDomain[domain];
-    if (!domainData) return [];
-    let result = Object.entries(domainData)
-      .flatMap(([score, items]) => items.map(item => ({ ...item, score: Number(score) })))
-      .sort((a, b) => b.score - a.score);
-    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim());
-    return result;
-  };
-
-  const hasAnyNotes = items?.some(item => item.self_note?.trim()) ?? false;
+  const anyFiltersActive = selfScoreFilters.size > 0 || coachScoreFilters.size > 0;
 
   return (
     <Collapsible defaultOpen className="space-y-4">
@@ -294,22 +360,73 @@ export function ClinicalBaselineResults({
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          {/* Tally Row */}
-          <div className="grid grid-cols-4 gap-2 p-4 border-b bg-muted/20">
-            {[
-              { score: 4, label: 'Exceptional' },
-              { score: 3, label: 'Excellent' },
-              { score: 2, label: 'Room to Grow' },
-              { score: 1, label: 'Needs Focus' },
-            ].map(({ score, label }) => {
-              const colors = SCORE_COLORS[score];
-              return (
-                <div key={score} className="text-center py-3 px-2 rounded-lg border" style={{ backgroundColor: colors.bg, borderColor: colors.border }}>
-                  <div className="text-2xl font-bold" style={{ color: colors.text }}>{tallyCounts[score as keyof typeof tallyCounts]}</div>
-                  <div className="text-xs font-medium" style={{ color: colors.text }}>{label}</div>
+          {/* Tally Filter Cards */}
+          <div className="p-4 border-b bg-muted/20 space-y-3">
+            {/* Doctor row */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Doctor Self-Rating</p>
+              <div className="grid grid-cols-4 gap-2">
+                {[4, 3, 2, 1].map((score) => {
+                  const colors = SCORE_COLORS[score];
+                  const isActive = selfScoreFilters.has(score);
+                  return (
+                    <button
+                      key={score}
+                      onClick={() => toggleSelfFilter(score)}
+                      className={`text-center py-2.5 px-2 rounded-lg border-2 transition-all cursor-pointer ${isActive ? 'ring-1 ring-offset-1 shadow-md' : 'opacity-80 hover:opacity-100'}`}
+                      style={{
+                        backgroundColor: colors.bg,
+                        borderColor: isActive ? colors.activeBorder : colors.border,
+                      }}
+                    >
+                      <div className="text-xl font-bold" style={{ color: colors.text }}>{tallyCounts[score as keyof typeof tallyCounts]}</div>
+                      <div className="text-[10px] font-medium" style={{ color: colors.text }}>{SCORE_LABELS[score]}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Coach row */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Coach Rating</p>
+                <div className="flex items-center gap-2">
+                  <Switch id="show-coach-ratings" checked={showCoachRatings} onCheckedChange={setShowCoachRatings} />
+                  <Label htmlFor="show-coach-ratings" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                    Coach ratings
+                  </Label>
                 </div>
-              );
-            })}
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {[4, 3, 2, 1].map((score) => {
+                  const colors = SCORE_COLORS[score];
+                  const isActive = coachScoreFilters.has(score);
+                  const count = coachTallyCounts[score as keyof typeof coachTallyCounts];
+                  return (
+                    <button
+                      key={score}
+                      onClick={() => toggleCoachFilter(score)}
+                      className={`text-center py-2.5 px-2 rounded-lg border-2 transition-all cursor-pointer ${isActive ? 'ring-1 ring-offset-1 shadow-md' : 'opacity-80 hover:opacity-100'} ${!hasCoachData && !showCoachRatings ? 'opacity-40' : ''}`}
+                      style={{
+                        backgroundColor: colors.bg,
+                        borderColor: isActive ? colors.activeBorder : colors.border,
+                      }}
+                    >
+                      <div className="text-xl font-bold" style={{ color: colors.text }}>{count}</div>
+                      <div className="text-[10px] font-medium" style={{ color: colors.text }}>{SCORE_LABELS[score]}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {anyFiltersActive && (
+              <button
+                onClick={() => { setSelfScoreFilters(new Set()); setCoachScoreFilters(new Set()); }}
+                className="text-xs text-primary hover:underline"
+              >
+                Clear all filters
+              </button>
+            )}
           </div>
 
           {/* Domain Tabs */}
@@ -342,12 +459,6 @@ export function ClinicalBaselineResults({
                       </Label>
                     </div>
                   )}
-                  <div className="flex items-center gap-2">
-                    <Switch id="show-coach-ratings" checked={showCoachRatings} onCheckedChange={setShowCoachRatings} />
-                    <Label htmlFor="show-coach-ratings" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
-                      <Eye className="h-3 w-3 inline mr-1" />My ratings
-                    </Label>
-                  </div>
                 </div>
               </div>
 
@@ -364,13 +475,31 @@ export function ClinicalBaselineResults({
                         </div>
                       </div>
                     )}
-                    {showCoachRatings && (
-                      <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/10 text-xs text-muted-foreground">
-                        <span className="w-8 text-center font-medium">Self</span>
-                        <span className="w-8 text-center font-medium">You</span>
-                      </div>
-                    )}
+                    {/* Column headers with sortable Self/Coach */}
+                    <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/10 text-xs text-muted-foreground">
+                      <button
+                        onClick={() => setSortBy('self')}
+                        className={`w-8 text-center font-medium flex items-center justify-center gap-0.5 cursor-pointer transition-colors ${sortBy === 'self' ? 'text-foreground' : 'hover:text-foreground/70'}`}
+                      >
+                        Self
+                        {sortBy === 'self' && <ArrowDown className="h-3 w-3" />}
+                      </button>
+                      {showCoachRatings && (
+                        <button
+                          onClick={() => setSortBy('coach')}
+                          className={`w-8 text-center font-medium flex items-center justify-center gap-0.5 cursor-pointer transition-colors ${sortBy === 'coach' ? 'text-foreground' : 'hover:text-foreground/70'}`}
+                        >
+                          Coach
+                          {sortBy === 'coach' && <ArrowDown className="h-3 w-3" />}
+                        </button>
+                      )}
+                    </div>
                     <div className="divide-y">
+                      {sortedItems.length === 0 && (
+                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          No items match the current filters.
+                        </div>
+                      )}
                       {sortedItems.map((item) => {
                         const colors = SCORE_COLORS[item.score];
                         const coachScore = coachRatingsMap.get(item.action_id);
@@ -402,13 +531,13 @@ export function ClinicalBaselineResults({
                                   {coachScore !== undefined ? coachScore : '–'}
                                 </div>
                               )}
+                              {hasNote && (
+                                <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
+                              )}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-foreground">{item.action_statement}</p>
                                 <p className="text-xs text-muted-foreground mt-0.5">{item.competency_name}</p>
                               </div>
-                              {hasNote && (
-                                <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
-                              )}
                               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${hasNote ? (isExpanded ? 'rotate-0' : '-rotate-90') : '-rotate-90 opacity-0 group-hover:opacity-100'}`} />
                             </button>
                             {hasNote && isExpanded && (

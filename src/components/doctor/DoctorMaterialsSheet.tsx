@@ -103,7 +103,24 @@ export function DoctorMaterialsSheet({
 
   return (
     <Sheet open={!!proMoveId} onOpenChange={(open) => { if (!open && !preventClose) onClose(); }}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto" data-tutorial-drawer>
+      <SheetContent
+        className="w-full sm:max-w-xl overflow-y-auto"
+        data-tutorial-drawer
+        onInteractOutside={(e) => {
+          // Don't close if clicking on tutorial tooltip
+          const tooltip = document.querySelector('[data-tutorial-tooltip]');
+          if (tooltip && tooltip.contains(e.target as Node)) {
+            e.preventDefault();
+          }
+          // Also block closing entirely when preventClose is set
+          if (preventClose) {
+            e.preventDefault();
+          }
+        }}
+        onEscapeKeyDown={(e) => {
+          if (preventClose) e.preventDefault();
+        }}
+      >
         <SheetHeader className="pb-4 border-b">
           <SheetTitle className="text-left text-lg leading-relaxed">
             {proMoveStatement}

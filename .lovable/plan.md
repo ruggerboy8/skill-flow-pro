@@ -1,229 +1,184 @@
 
 
-# Doctor Baseline Enhancements -- Implementation Plan
+# Baseline Wizard UX Polish + Bug Fixes
 
-Three features added to the baseline self-assessment, built in order of complexity.
-
----
-
-## Phase 1: Per-Pro-Move Notes (no migration needed)
-
-The `self_note` column already exists on `doctor_baseline_items`. This is purely UI work.
-
-### Changes to `DomainAssessmentStep.tsx`
-- Add a `MessageSquare` icon button on each pro move row (right side, before the radio buttons or below the statement).
-- Clicking toggles an inline textarea below that row (animated expand/collapse).
-- Textarea value is the current `note` from `ratings[pm.action_id]?.note`.
-- On blur or after 600ms debounce, call a new `onNoteChange(actionId, noteText)` callback. This is separate from `onRatingChange` to handle the case where no rating exists yet.
-
-### Changes to `BaselineWizard.tsx`
-- Add a new `saveNoteMutation` that upserts only `self_note` + `updated_at` on `doctor_baseline_items` (does not touch `self_score`). This avoids overwriting a null score.
-- Pass `onNoteChange` to `DomainAssessmentStep` alongside `onRatingChange`.
-- When a rating IS set and a note exists locally, continue sending both via the existing `saveRatingMutation`.
-
-### Changes to `DoctorBaselineResults.tsx` (doctor's view)
-- Update the query to include `self_note` in the select.
-- Add `self_note` to the `BaselineItem` interface.
-- Show a small `MessageSquare` icon on rows that have a note (`self_note?.trim()` is truthy).
-- Clicking a row already opens `DoctorMaterialsSheet` -- display the note text prominently above the materials content.
-
-### Changes to `ClinicalBaselineResults.tsx` (Alex's view)
-- Update the query to include `self_note`.
-- Add `self_note` to the `BaselineItem` interface.
-- Show `MessageSquare` icon on noted rows.
-- Add a "Show only noted" switch/toggle above the domain tabs. When ON, filter `sortedItems` to only those with `self_note?.trim()`. This filters within the current domain tab, not across domains.
-- When clicking a noted row, show the note text inline or in the materials sheet.
+11 items addressing note button visibility, onboarding tutorial, color/domain theming, autofocus, scroll behavior, reflection page redesign, post-submission flow, and the transcription bug.
 
 ---
 
-## Phase 2: End-of-Assessment Reflection
+## 1. Move Note Button to Left + Circle Treatment
 
-### Database Migration
-```sql
-ALTER TABLE doctor_baseline_assessments
-  ADD COLUMN reflection_original text,
-  ADD COLUMN reflection_formatted text,
-  ADD COLUMN reflection_mode text,
-  ADD COLUMN reflection_submitted_at timestamptz;
+**File:** `src/components/doctor/DomainAssessmentStep.tsx`
+
+Move the `MessageSquare` button from after the pro move text to before it (left side). Give it a visible circular border (like the score buttons):
+- `w-7 h-7 rounded-full border border-muted-foreground/30 flex items-center justify-center`
+- When `hasNote`: filled style (e.g., `bg-primary/10 border-primary text-primary`)
+- Layout becomes: `[note-btn] [pro move text] [1] [2] [3] [4]`
+
+---
+
+## 2. Progressive Tutorial Overlay (First Load)
+
+**File:** `src/components/doctor/BaselineTutorial.tsx` (new)
+**File:** `src/pages/doctor/BaselineWizard.tsx` (modified)
+
+Build a step-by-step tooltip tutorial that fires once on the first domain load. Use localStorage key `baseline-tutorial-seen` to show only once.
+
+Steps (4 total, each highlights a specific element):
+1. **Score buttons** -- "You'll rate yourself on each Pro Move using these numbers. 1 = Needs focus, 4 = Exceptional."
+2. **Pro Move text** -- "Tap any Pro Move to see more information about it." (pulsing border highlight)
+3. **Materials sheet** -- Auto-open the sheet for the first pro move, overlay says: "This is the learning materials drawer -- you'll find details and examples here." User dismisses, sheet closes.
+4. **Note button** -- "If you have a question, comment, or thought about a Pro Move, jot it down here as you go."
+
+Implementation approach:
+- A simple state machine component with `currentStep` (0-4, 0 = not started).
+- Each step renders a fixed/absolute tooltip near the target element (use `ref` forwarding or element IDs).
+- Semi-transparent backdrop behind the tooltip, highlighted element gets `z-50 relative`.
+- "Next" / "Got it" button advances steps. "Skip" link available on every step.
+- On completion or skip, set `localStorage.setItem('baseline-tutorial-seen', 'true')`.
+
+---
+
+## 3. Score Button Colors (Domain-Aware)
+
+**File:** `src/components/doctor/DomainAssessmentStep.tsx`
+
+Replace the monochrome `bg-primary` selected state with semantic colors matching the established scale:
+
+| Score | Selected Color | Classes |
+|-------|---------------|---------|
+| 1 | Amber | `bg-amber-100 border-amber-400 text-amber-800` |
+| 2 | Orange | `bg-orange-100 border-orange-400 text-orange-800` |
+| 3 | Blue | `bg-blue-100 border-blue-400 text-blue-800` |
+| 4 | Emerald | `bg-emerald-100 border-emerald-400 text-emerald-800` |
+
+This matches the `NumberScale.tsx` color scheme already used elsewhere.
+
+Additionally, apply the domain's `color_hex` as a subtle tint on the card header background:
+- `style={{ backgroundColor: \`${domain.color_hex}15\` }}` (15 = ~8% opacity hex suffix)
+
+Update the legend key to show colored dots matching these score colors instead of plain text.
+
+---
+
+## 4. Domain Color on Card Header
+
+**File:** `src/components/doctor/DomainAssessmentStep.tsx`
+
+- Card header gets a light background tint from `domain.color_hex` (8-10% opacity).
+- The small circle indicator already uses the color; make it slightly larger (`w-5 h-5`).
+- Domain name uses `font-bold` and slightly larger text.
+
+---
+
+## 5. Note Button Auto-Focus Textarea
+
+**File:** `src/components/doctor/DomainAssessmentStep.tsx`
+
+When expanding a note:
+- Add a `ref` to each textarea using a ref map (`noteRefs = useRef<Record<number, HTMLTextAreaElement | null>>({})`).
+- After setting `expandedNoteId`, use `requestAnimationFrame` to call `.focus()` on the textarea for that action_id.
+
+---
+
+## 6. "Next Domain" Scrolls to Top
+
+**File:** `src/pages/doctor/BaselineWizard.tsx`
+
+In `handleNextDomain` and `handlePrevDomain`, add:
+```ts
+window.scrollTo({ top: 0, behavior: 'smooth' });
 ```
 
-No `reflection_audio_path` in v1 -- audio is ephemeral (transcript-only storage).
+---
 
-### New Edge Function: `format-reflection`
-- Follows the same pattern as `polish-note` (Lovable AI gateway, Gemini Flash).
-- System prompt enforces strict format-only constraints:
-  - "Do not add new information."
-  - "Do not remove any information."
-  - "Do not change tone or voice."
-  - "Do not paraphrase."
-  - "Only fix grammar, punctuation, and formatting."
-  - "If a sentence is unclear, keep wording but improve punctuation; do not reinterpret."
-  - "Preserve all proper nouns and clinical terms verbatim."
-  - "Output plain text only. Use bullet points if the speaker lists multiple items."
-- Guardrails:
-  - If output is >15% shorter than input (by character count), fall back to original.
-  - If output is empty/whitespace, fall back to original.
-  - If output starts with meta-commentary ("Here's", "Sure", "The cleaned"), strip first line and re-check, or fall back.
-- Returns `{ formatted: string }`.
+## 7. Rephrase All Instructions as Personal Notes from Dr. Alex
 
-### Changes to `BaselineComplete.tsx`
-- After the success checkmark and "What happens next?" section, add a "Reflection (optional)" card.
-- Display the four guiding prompts as soft italic text (not form fields).
-- Two-tab or two-button input mode:
-  - **Type**: Textarea, character count shown.
-  - **Record**: Reuse the existing `AudioRecorder` component. On recording complete, call the existing `transcribe-audio` edge function. Show the transcript in an editable textarea.
-- "Submit Reflection" button calls:
-  1. `format-reflection` edge function with the text.
-  2. Updates `doctor_baseline_assessments` with `reflection_original`, `reflection_formatted`, `reflection_mode` ('typed' or 'voice'), and `reflection_submitted_at`.
-- After submission: show formatted text (read-only) with "View original" toggle and "Edit" button.
-- "Edit" re-opens the textarea with `reflection_original`, and re-runs formatting on submit.
-- This section never blocks the "Go to Home" button.
+**File:** `src/components/doctor/BaselineWelcome.tsx`
 
-### Changes to `DoctorBaselineResults.tsx`
-- Fetch `reflection_original`, `reflection_formatted`, `reflection_mode`, `reflection_submitted_at` from the baseline assessment query.
-- If reflection exists, show a collapsed "Reflection" section at the bottom with the formatted text and "View original" toggle.
+Replace the generic bullet points with a personal message from Alex:
 
-### Changes to `ClinicalBaselineResults.tsx`
-- Same as doctor view: fetch and display reflection in a collapsed section at the bottom (read-only for Alex).
+> "Hey {staffName}, I'm excited to go through this with you.
+>
+> Here's how this works: you'll go through each of the Doctor Pro Moves and rate yourself on a simple 1-4 scale. This isn't a test -- it's a starting point for our conversation.
+>
+> Be honest about where you are today. That's what makes this useful."
+>
+> -- Dr. Alex
+
+**File:** `src/components/doctor/DomainAssessmentStep.tsx`
+
+Update the legend card text to feel personal:
+> "Rate yourself on each one. Remember: 4 means 'I do this even on my worst day.' Be real -- that's what makes this useful."
 
 ---
 
-## Phase 3: Coach Private Baseline Assessment
+## 8. Reflection Page Redesign
 
-### Database Migration
-```sql
-CREATE TABLE coach_baseline_assessments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  doctor_staff_id uuid NOT NULL REFERENCES staff(id),
-  coach_staff_id uuid NOT NULL REFERENCES staff(id),
-  status text DEFAULT 'in_progress',
-  started_at timestamptz DEFAULT now(),
-  completed_at timestamptz,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
-  UNIQUE (doctor_staff_id, coach_staff_id)
-);
+**File:** `src/components/doctor/BaselineComplete.tsx`
 
-CREATE TABLE coach_baseline_items (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  assessment_id uuid NOT NULL REFERENCES coach_baseline_assessments(id) ON DELETE CASCADE,
-  action_id bigint NOT NULL REFERENCES pro_moves(action_id) ON DELETE CASCADE,
-  rating int CHECK (rating >= 1 AND rating <= 4),
-  note_text text,
-  updated_at timestamptz DEFAULT now(),
-  UNIQUE (assessment_id, action_id)
-);
+Major restructure -- split into two distinct screens:
 
-ALTER TABLE coach_baseline_assessments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE coach_baseline_items ENABLE ROW LEVEL SECURITY;
-```
+**Screen A: Reflection (shown first when `currentStep === 'complete'` and no reflection submitted)**
+- Full-page card, no "optional" label
+- Personal message from Alex at top:
+  > "Before we wrap up, I'd love to hear what this was like for you. A few sentences is great -- just whatever comes to mind."
+- Guiding prompts shown as soft italic text
+- Type/Record tabs (same as now but cleaner)
+- "Submit" button at bottom
+- Small "Skip" text link below the button (advances to Screen B without saving)
 
-### RLS Policies
-Use a security definer function to check staff roles (avoids recursive RLS):
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_staff_id_for_user(_user_id uuid)
-RETURNS uuid
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT id FROM staff WHERE user_id = _user_id LIMIT 1;
-$$;
-
-CREATE OR REPLACE FUNCTION public.is_clinical_or_admin(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM staff
-    WHERE user_id = _user_id
-    AND (is_clinical_director = true OR is_super_admin = true)
-  );
-$$;
-
--- coach_baseline_assessments policies
-CREATE POLICY "Clinical staff can read own assessments"
-  ON coach_baseline_assessments FOR SELECT TO authenticated
-  USING (public.is_clinical_or_admin(auth.uid()));
-
-CREATE POLICY "Coach can insert own assessments"
-  ON coach_baseline_assessments FOR INSERT TO authenticated
-  WITH CHECK (
-    coach_staff_id = public.get_staff_id_for_user(auth.uid())
-    AND public.is_clinical_or_admin(auth.uid())
-  );
-
-CREATE POLICY "Coach can update own assessments"
-  ON coach_baseline_assessments FOR UPDATE TO authenticated
-  USING (
-    coach_staff_id = public.get_staff_id_for_user(auth.uid())
-    AND public.is_clinical_or_admin(auth.uid())
-  );
-
--- coach_baseline_items policies (same pattern)
-CREATE POLICY "Clinical staff can read own items"
-  ON coach_baseline_items FOR SELECT TO authenticated
-  USING (
-    assessment_id IN (
-      SELECT id FROM coach_baseline_assessments
-      WHERE public.is_clinical_or_admin(auth.uid())
-    )
-  );
-
-CREATE POLICY "Coach can insert own items"
-  ON coach_baseline_items FOR INSERT TO authenticated
-  WITH CHECK (
-    assessment_id IN (
-      SELECT id FROM coach_baseline_assessments
-      WHERE coach_staff_id = public.get_staff_id_for_user(auth.uid())
-    )
-  );
-
-CREATE POLICY "Coach can update own items"
-  ON coach_baseline_items FOR UPDATE TO authenticated
-  USING (
-    assessment_id IN (
-      SELECT id FROM coach_baseline_assessments
-      WHERE coach_staff_id = public.get_staff_id_for_user(auth.uid())
-    )
-  );
-```
-
-Doctors have zero policies on these tables -- no access at all.
-
-### New Component: `CoachBaselineWizard.tsx`
-- Mirrors `BaselineWizard` but targets `coach_baseline_assessments` and `coach_baseline_items`.
-- Accepts a `doctorStaffId` prop.
-- Uses the same `DomainAssessmentStep` component for the rating UI.
-- Coach's own notes are saved to `coach_baseline_items.note_text`.
-- Accessible from DoctorDetail page.
-
-### Changes to `DoctorDetail.tsx`
-- Below the existing `ClinicalBaselineResults`, add a new card: "Your Baseline Assessment (Private)".
-- Shows status: Not Started / In Progress / Complete, with "Last updated" timestamp.
-- "Start Assessment" or "Continue Assessment" button opens the `CoachBaselineWizard` (can be inline or a sub-route like `/clinical/doctors/:staffId/coach-baseline`).
-
-### Changes to `ClinicalBaselineResults.tsx`
-- Add a "Show my ratings" toggle (only visible to clinical directors).
-- When toggled ON, fetch `coach_baseline_items` for the current doctor + current coach.
-- Each pro move row shows: `Self: 3 | You: 2` side-by-side.
-- Rows where `Math.abs(selfScore - coachScore) >= 2` get a subtle amber/yellow background highlight. No "gap" label.
-- Fetch is lazy (only on toggle ON) to avoid unnecessary queries.
+**Screen B: What Happens Next (shown after reflection submit or skip)**
+- Success checkmark + "Baseline Complete!"
+- "What happens next" card with Alex's personal message
+- "Go to Home" button
+- If reflection was submitted, show it in a collapsed section below
 
 ---
 
-## Files Summary
+## 9. Fix Transcription Bug
 
-| File | Change |
-|------|--------|
-| `src/components/doctor/DomainAssessmentStep.tsx` | Inline note textarea per row |
-| `src/pages/doctor/BaselineWizard.tsx` | Separate `saveNoteMutation`, pass `onNoteChange` |
-| `src/pages/doctor/DoctorBaselineResults.tsx` | Include `self_note`, show indicators + reflection section |
-| `src/components/clinical/ClinicalBaselineResults.tsx` | Note indicators, "Show only noted" filter, reflection section, "Show my ratings" toggle |
-| `src/components/doctor/BaselineComplete.tsx` | Reflection input (type/record), submit, display |
-| `src/pages/clinical/DoctorDetail.tsx` | Coach baseline status card + start/continue button |
-| `src/components/clinical/CoachBaselineWizard.tsx` | New -- mirrors doctor wizard for coach tables |
-| `supabase/functions/format-reflection/index.ts` | New -- LLM formatting with guardrails |
-| Migration SQL | Alter `doctor_baseline_assessments` + create `coach_baseline_*` tables + RLS |
+**File:** `src/components/doctor/BaselineComplete.tsx`
+
+The `handleRecordingComplete` function sends the audio as form field `file`:
+```ts
+formData.append('file', audioBlob, 'reflection.webm');
+```
+
+But `transcribe-audio/index.ts` reads field `audio`:
+```ts
+const audioFile = formData.get('audio') as File;
+```
+
+Fix: change `'file'` to `'audio'`:
+```ts
+formData.append('audio', audioBlob, 'reflection.webm');
+```
+
+---
+
+## 10. Post-Submission Flow (item 10 from PRD)
+
+Already addressed in item 8 above -- after submitting reflection (or skipping), the user lands on the "What happens next" screen with the success state and "Go to Home" button.
+
+---
+
+## 11. Implementation Order
+
+1. Fix transcription bug (1 line, immediate)
+2. Score button colors + domain tinting (DomainAssessmentStep)
+3. Note button repositioning + circle + autofocus
+4. Scroll-to-top on domain change
+5. Rephrase instructions (BaselineWelcome + DomainAssessmentStep legend)
+6. Reflection page redesign (BaselineComplete split into reflection-first flow)
+7. Tutorial overlay (new component + BaselineWizard integration)
+
+---
+
+## Technical Notes
+
+- **Tutorial component**: Uses `position: fixed` overlay with a transparent cutout over the highlighted element. Each step uses a ref or `document.getElementById` to position the tooltip. No external library needed -- a simple ~150-line component.
+- **Score colors**: Reuse the exact color mapping from `NumberScale.tsx` (`getSemanticColor` function) to keep consistency.
+- **Domain tint**: Use inline `style` with hex color + alpha suffix rather than Tailwind classes, since domain colors are dynamic from DB.
+- **Reflection flow**: The `BaselineComplete` component gets a new internal state `phase: 'reflection' | 'done'` to manage the two screens. "Skip" sets phase to `'done'` without saving.
 

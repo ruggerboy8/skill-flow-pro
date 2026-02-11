@@ -463,6 +463,20 @@ export function ClinicalBaselineResults({
                       Coach ratings
                     </Label>
                   </div>
+                  {(selfScoreFilters.size > 0 || coachScoreFilters.size > 0 || showOnlyNoted || showCoachRatings) && (
+                    <button
+                      onClick={() => {
+                        setSelfScoreFilters(new Set());
+                        setCoachScoreFilters(new Set());
+                        setShowOnlyNoted(false);
+                        setShowCoachRatings(false);
+                        setSortBy('self');
+                      }}
+                      className="text-xs text-destructive hover:underline whitespace-nowrap"
+                    >
+                      Reset all
+                    </button>
+                  )}
                 </div>
               </div>
 

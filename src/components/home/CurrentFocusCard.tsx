@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Button } from '@/components/ui/button';
-import { Target, ArrowRight } from 'lucide-react';
+import { Target, ArrowRight, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { quarterNum } from '@/lib/reviewPayload';
@@ -96,10 +97,18 @@ export function CurrentFocusCard() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Target className="w-4 h-4 text-primary" />
-          My Quarterly Focus
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Target className="w-4 h-4 text-primary" />
+            My Quarterly Focus
+          </CardTitle>
+          <Link 
+            to={`/evaluation/${data.evalId}/review`}
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+          >
+            View Evaluation <ExternalLink className="w-3 h-3" />
+          </Link>
+        </div>
       </CardHeader>
       <CardContent className="space-y-2">
         {data.items.map(item => (

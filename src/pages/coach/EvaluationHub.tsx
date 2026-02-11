@@ -200,6 +200,10 @@ export function EvaluationHub() {
         if (item.observer_note && item.observer_note.trim()) {
           observerNotesToShow[item.competency_id] = true;
         }
+        // Auto-show notes for low scores
+        if (item.observer_score !== null && item.observer_score <= 2) {
+          observerNotesToShow[item.competency_id] = true;
+        }
       });
       setShowObserverNotes(observerNotesToShow);
 
@@ -626,6 +630,11 @@ export function EvaluationHub() {
         };
       });
 
+      // Auto-show note field for low scores
+      if (score !== null && score <= 2) {
+        setShowObserverNotes(prev => ({ ...prev, [competencyId]: true }));
+      }
+
       toast({
         title: "Saved",
         description: "Observer score updated",
@@ -813,6 +822,27 @@ export function EvaluationHub() {
   const handleSubmitClick = async () => {
     if (!evaluation) return;
     await flushAllPendingNotes();
+
+    // Re-check completion after flushing notes — merge pending notes into local items for validation
+    const itemsWithPending = evaluation.items.map(item => {
+      const pending = pendingObserverNotes[item.competency_id];
+      if (pending !== undefined) {
+        return { ...item, observer_note: pending };
+      }
+      return item;
+    });
+    const missingNoteItems = itemsWithPending.filter(
+      item => item.observer_score !== null && item.observer_score <= 2 && (!item.observer_note || item.observer_note.trim() === '')
+    );
+    if (missingNoteItems.length > 0) {
+      const names = missingNoteItems.map(i => i.competency_name_snapshot).join(', ');
+      toast({
+        title: "Notes required",
+        description: `Please add observer notes for: ${names}`,
+        variant: "destructive"
+      });
+      return;
+    }
     
     if (completionStatus.naCount > 0) {
       setShowNaConfirmDialog(true);
@@ -1622,6 +1652,9 @@ export function EvaluationHub() {
                      {completionStatus.observerNaCount > 0 && (
                        <span className="text-muted-foreground font-normal"> · {completionStatus.observerNaCount} N/A</span>
                      )}
+                     {completionStatus.missingObserverNotes > 0 && (
+                       <span className="text-orange-600 dark:text-orange-400 font-normal"> · {completionStatus.missingObserverNotes} note{completionStatus.missingObserverNotes !== 1 ? 's' : ''} needed</span>
+                     )}
                    </span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -1791,27 +1824,47 @@ export function EvaluationHub() {
                   </div>
 
                    {/* Conditional Notes */}
-                   {showObserverNotes[item.competency_id] || (isReadOnly && item.observer_note && item.observer_note.trim()) ? (
-                     <Textarea
-                       placeholder="Add your notes..."
-                       value={pendingObserverNotes[item.competency_id] ?? item.observer_note ?? ''}
-                       onChange={(e) => draftObserverNote(item.competency_id, e.target.value)}
-                       onBlur={() => saveOneObserverNote(item.competency_id)}
-                       disabled={isReadOnly}
-                       className="min-h-[80px]"
-                     />
-                   ) : (
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setShowObserverNotes(prev => ({ ...prev, [item.competency_id]: true }))}
-                       disabled={isReadOnly}
-                       className="flex items-center gap-2"
-                     >
-                       <Plus className="w-4 h-4" />
-                       Add Note
-                     </Button>
-                   )}
+                   {(() => {
+                     const isLowScore = item.observer_score !== null && item.observer_score <= 2;
+                     const noteValue = pendingObserverNotes[item.competency_id] ?? item.observer_note ?? '';
+                     const noteEmpty = !noteValue || noteValue.trim() === '';
+                     const shouldShowTextarea = showObserverNotes[item.competency_id] || isLowScore || (isReadOnly && item.observer_note && item.observer_note.trim());
+                     
+                     return shouldShowTextarea ? (
+                       <div className="space-y-1">
+                         <Textarea
+                           placeholder={isLowScore ? "Note required for scores of 1-2..." : "Add your notes..."}
+                           value={noteValue}
+                           onChange={(e) => draftObserverNote(item.competency_id, e.target.value)}
+                           onBlur={() => saveOneObserverNote(item.competency_id)}
+                           disabled={isReadOnly}
+                           className={cn(
+                             "min-h-[80px]",
+                             isLowScore && noteEmpty && !isReadOnly && "border-orange-400 focus-visible:ring-orange-400"
+                           )}
+                         />
+                         {isLowScore && !isReadOnly && (
+                           <p className={cn(
+                             "text-xs",
+                             noteEmpty ? "text-orange-600 dark:text-orange-400 font-medium" : "text-muted-foreground"
+                           )}>
+                             {noteEmpty ? "⚠ Note required for scores of 1-2" : "Note required for scores of 1-2"}
+                           </p>
+                         )}
+                       </div>
+                     ) : (
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => setShowObserverNotes(prev => ({ ...prev, [item.competency_id]: true }))}
+                         disabled={isReadOnly}
+                         className="flex items-center gap-2"
+                       >
+                         <Plus className="w-4 h-4" />
+                         Add Note
+                       </Button>
+                     );
+                   })()}
                 </div>
               ))}
             </CardContent>

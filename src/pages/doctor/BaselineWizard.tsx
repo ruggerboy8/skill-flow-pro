@@ -369,7 +369,7 @@ export default function BaselineWizard() {
       )}
 
       {currentStep === 'complete' && (
-        <BaselineComplete onFinish={handleFinish} />
+        <BaselineComplete onFinish={handleFinish} assessmentId={assessmentId} />
       )}
     </div>
   );

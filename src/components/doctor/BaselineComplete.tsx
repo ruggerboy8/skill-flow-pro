@@ -263,50 +263,6 @@ export function BaselineComplete({ onFinish, assessmentId, existingReflection }:
         </CardContent>
       </Card>
 
-      {/* Show submitted reflection if present */}
-      {submittedReflection && (
-        <Card>
-          <Collapsible>
-            <CollapsibleTrigger className="w-full">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div className="text-left">
-                  <CardTitle className="text-base">Your Reflection</CardTitle>
-                </div>
-                <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform" />
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="space-y-3">
-                <div className="rounded-lg border p-4 bg-muted/30">
-                  <p className="text-sm whitespace-pre-wrap">
-                    {showOriginal ? submittedReflection.original : submittedReflection.formatted}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowOriginal(!showOriginal)}
-                    className="text-xs gap-1"
-                  >
-                    <Eye className="h-3 w-3" />
-                    {showOriginal ? 'Show formatted' : 'View original'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleEdit}
-                    className="text-xs gap-1"
-                  >
-                    <Pencil className="h-3 w-3" />
-                    Edit
-                  </Button>
-                </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
-      )}
     </div>
   );
 }

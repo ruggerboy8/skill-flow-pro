@@ -13,6 +13,8 @@ export interface ReviewPayloadItem {
   gap: number | null;
   observer_note: string | null;
   self_note: string | null;
+  /** Client-enriched tagline (not from RPC) */
+  tagline?: string | null;
 }
 
 export interface DomainSummary {

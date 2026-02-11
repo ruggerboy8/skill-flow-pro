@@ -3059,15 +3059,10 @@ export type Database = {
         }
         Returns: undefined
       }
-      save_eval_acknowledgement_and_focus:
-        | {
-            Args: { p_action_ids: number[]; p_eval_id: string }
-            Returns: undefined
-          }
-        | {
-            Args: { p_action_ids?: number[]; p_eval_id: string }
-            Returns: undefined
-          }
+      save_eval_acknowledgement_and_focus: {
+        Args: { p_action_ids?: number[]; p_eval_id: string }
+        Returns: undefined
+      }
       seq_confidence_history_18w: {
         Args: {
           p_effective_date: string

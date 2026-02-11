@@ -169,18 +169,8 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     pointerEvents: 'none',
   };
 
-  // Block clicks on Sheet overlay during drawer step
-  const needsClickBlocker = step.closeDrawerOnAdvance;
-
   return createPortal(
     <>
-      {/* Full-screen click blocker above Sheet overlay (z-50) but below tutorial UI (z-9998) */}
-      {needsClickBlocker && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 9997 }}
-          onClick={(e) => e.stopPropagation()}
-        />
-      )}
       <div style={highlightStyle} />
 
       {/* Tooltip */}

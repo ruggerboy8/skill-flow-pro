@@ -20,6 +20,8 @@ interface DoctorMaterialsSheetProps {
   previewContent?: Record<string, string>;
   /** Optional note text to display at the top */
   noteText?: string | null;
+  /** When true, prevent closing via overlay click or escape (used during tutorial) */
+  preventClose?: boolean;
 }
 
 interface ResourceData {
@@ -68,6 +70,7 @@ export function DoctorMaterialsSheet({
   onClose,
   previewContent,
   noteText,
+  preventClose,
 }: DoctorMaterialsSheetProps) {
   // Only fetch from DB if no preview content is provided
   const { data: resources, isLoading } = useQuery({
@@ -99,7 +102,7 @@ export function DoctorMaterialsSheet({
   const hasAnyContent = MATERIAL_SECTIONS.some(s => getResourceContent(s.type));
 
   return (
-    <Sheet open={!!proMoveId} onOpenChange={(open) => !open && onClose()}>
+    <Sheet open={!!proMoveId} onOpenChange={(open) => { if (!open && !preventClose) onClose(); }}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto" data-tutorial-drawer>
         <SheetHeader className="pb-4 border-b">
           <SheetTitle className="text-left text-lg leading-relaxed">

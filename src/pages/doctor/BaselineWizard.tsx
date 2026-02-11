@@ -359,6 +359,13 @@ export default function BaselineWizard() {
           {/* Progress header */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
+              <button
+                type="button"
+                onClick={() => { setForceOpenProMoveId(null); setShowTutorial(true); }}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                View tutorial
+              </button>
               <span className="text-muted-foreground">
                 Domain {currentDomainIndex + 1} of {domains.length}
               </span>

@@ -2367,7 +2367,47 @@ export function EvaluationHub() {
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* Interview Transcript - Shows after transcription, collapsible */}
+          {/* Analyze & Extract Insights - Always visible when transcript exists */}
+          {interviewTranscript && !isReadOnly && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="py-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                  </div>
+                  <p className="text-sm font-medium">
+                    {(evaluation?.extracted_insights as any)?.self_assessment
+                      ? 'Insights have been extracted. You can re-analyze if the transcript was edited.'
+                      : 'Transcript ready — extract insights to populate competency scores.'}
+                  </p>
+                </div>
+                <Button
+                  onClick={handleAnalyzeInterview}
+                  disabled={isParsing}
+                  className="gap-2 shrink-0"
+                >
+                  {isParsing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Extracting...
+                    </>
+                  ) : (evaluation?.extracted_insights as any)?.self_assessment ? (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Re-analyze
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Analyze & Extract Insights
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Interview Transcript - Collapsible for review/edit */}
           {interviewTranscript && (
             <Card>
               <CardHeader 
@@ -2406,34 +2446,6 @@ export function EvaluationHub() {
                       <p className="text-xs text-muted-foreground">
                         You can edit the transcript above to correct any transcription errors.
                       </p>
-                    )}
-                    
-                    {/* Analyze & Extract Insights Button - moved here from recording card */}
-                    {!isReadOnly && (
-                      <div className="pt-4 border-t flex justify-end">
-                        <Button
-                          onClick={handleAnalyzeInterview}
-                          disabled={isParsing}
-                          className="gap-2"
-                        >
-                          {isParsing ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Extracting insights...
-                            </>
-                          ) : (evaluation?.extracted_insights as any)?.self_assessment ? (
-                            <>
-                              <Sparkles className="w-4 h-4" />
-                              Re-analyze Transcript
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-4 h-4" />
-                              Analyze & Extract Insights
-                            </>
-                          )}
-                        </Button>
-                      </div>
                     )}
                   </div>
                 </CardContent>

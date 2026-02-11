@@ -410,10 +410,11 @@ export default function EvaluationReview() {
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
               {payload.top_used_fallback
-                ? "These were some of your strongest areas this quarter. Pick one that you want to keep performing at a high level."
-                : "These were some of your strongest competencies this quarter. Pick one that you want to keep performing at a high level — it's worth celebrating what you're already doing well."
+                ? "These were some of your strongest areas this quarter."
+                : "These were some of your strongest competencies this quarter. It's worth celebrating what you're already doing well."
               }
             </p>
+            <p className="text-sm font-bold mt-2">Pick one that you want to keep performing at a high level.</p>
           </div>
 
           <div className="space-y-3">
@@ -441,8 +442,9 @@ export default function EvaluationReview() {
           <div>
             <h1 className="text-2xl font-bold">Grow This Quarter</h1>
             <p className="text-sm text-muted-foreground mt-2">
-              These are some competencies that could really benefit from a little extra attention. Choose 2 that feel most important for you to focus on — even small improvements here can make a real difference.
+              These are some competencies that could really benefit from a little extra attention — even small improvements here can make a real difference.
             </p>
+            <p className="text-sm font-bold mt-2">Choose 2 that feel most important for you to focus on.</p>
           </div>
 
           <div className="space-y-3">

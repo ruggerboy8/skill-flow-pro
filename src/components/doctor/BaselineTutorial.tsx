@@ -14,9 +14,7 @@ interface TutorialStep {
   title: string;
   description: string;
   position: 'bottom' | 'top' | 'right' | 'left-center';
-  /** User must click the highlighted element to advance */
   waitForUserClick?: boolean;
-  /** Close the materials drawer when advancing past this step */
   closeDrawerOnAdvance?: boolean;
 }
 
@@ -60,20 +58,18 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     const el = document.querySelector(step.targetSelector);
     if (el) {
       setTargetRect(el.getBoundingClientRect());
-    } else {
-      setTargetRect(null);
     }
+    // Don't set null — keep last known rect to avoid flicker during transitions
   }, [currentStep]);
 
+  // Keep polling continuously (no 5s cutoff) so tutorial never strands
   useEffect(() => {
     updatePosition();
     const interval = setInterval(updatePosition, 150);
-    const timeout = setTimeout(() => clearInterval(interval), 5000);
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     return () => {
       clearInterval(interval);
-      clearTimeout(timeout);
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
@@ -88,8 +84,6 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     if (!el) return;
 
     const handler = () => {
-      // User clicked the pro move — it will open the drawer via normal flow.
-      // We need to wait for the drawer to appear, then advance.
       drawerOpen.current = true;
       const poll = setInterval(() => {
         const drawerEl = document.querySelector('[data-tutorial-drawer]');
@@ -98,7 +92,6 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
           setCurrentStep(prev => prev + 1);
         }
       }, 50);
-      // Safety timeout
       setTimeout(() => clearInterval(poll), 3000);
     };
 
@@ -111,8 +104,19 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     if (step?.closeDrawerOnAdvance) {
       onCloseMaterials();
       drawerOpen.current = false;
-      // Advance immediately — the note element is already in the DOM
-      setCurrentStep(prev => prev + 1);
+      const nextIndex = currentStep + 1;
+      const nextSelector = steps[nextIndex]?.targetSelector;
+      // Poll for next target to exist before advancing (drawer close animation)
+      if (nextSelector) {
+        const poll = setInterval(() => {
+          const el = document.querySelector(nextSelector);
+          if (el) {
+            clearInterval(poll);
+            setCurrentStep(nextIndex);
+          }
+        }, 50);
+        setTimeout(() => clearInterval(poll), 2000);
+      }
       return;
     }
     if (currentStep < steps.length - 1) {
@@ -123,7 +127,6 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
   };
 
   const handleNext = () => {
-    // Don't allow button-based advancement for waitForUserClick steps
     const step = steps[currentStep];
     if (step?.waitForUserClick) return;
     advanceStep();
@@ -141,7 +144,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
   if (!step || !targetRect) return null;
 
   const padding = 12;
-  const tooltipStyle: React.CSSProperties = { position: 'fixed', zIndex: 9999 };
+  const tooltipStyle: React.CSSProperties = { position: 'fixed', zIndex: 10050 };
 
   if (step.position === 'bottom') {
     tooltipStyle.top = targetRect.bottom + padding;
@@ -165,7 +168,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     height: targetRect.height + 8,
     borderRadius: 8,
     boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
-    zIndex: 9998,
+    zIndex: 10049,
     pointerEvents: 'none',
   };
 
@@ -175,6 +178,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
 
       {/* Tooltip */}
       <div
+        data-tutorial-tooltip
         style={tooltipStyle}
         className="bg-popover border rounded-lg shadow-lg p-4 max-w-xs"
       >

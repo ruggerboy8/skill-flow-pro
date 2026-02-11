@@ -198,19 +198,21 @@ function LocationCard({ location, statusFilter, isPending, onBulkRelease, onSing
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="border rounded-lg">
         <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left">
+          <button className="w-full grid grid-cols-[1rem_1fr_10rem_7rem_auto] items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left">
             <ChevronRight className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0">
               <span className="font-medium">{locationName}</span>
               <span className="text-muted-foreground text-sm ml-2">{organizationName}</span>
             </div>
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
+            <span className="text-sm text-muted-foreground whitespace-nowrap text-right">
               {submittedCount}/{totalStaff} submitted
               {draftCount > 0 && <span className="text-amber-600 ml-1">({draftCount} draft)</span>}
             </span>
-            <ReleaseStatusBadge loc={location} />
+            <div className="justify-self-center">
+              <ReleaseStatusBadge loc={location} />
+            </div>
             {/* Bulk actions */}
-            <div className="flex gap-1 ml-2" onClick={e => e.stopPropagation()}>
+            <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
               {hasUnreleased && (
                 <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={isPending} onClick={() => onBulkRelease(true)}>
                   <Eye className="w-3 h-3" /> Release All
@@ -226,9 +228,9 @@ function LocationCard({ location, statusFilter, isPending, onBulkRelease, onSing
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <div className="border-t px-4 py-2 space-y-1">
+          <div className="border-t py-2 space-y-0">
             {filteredStaff.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-2 pl-7">No staff matching filter.</p>
+              <p className="text-sm text-muted-foreground py-2 px-4 pl-11">No staff matching filter.</p>
             ) : (
               filteredStaff.map(s => (
                 <StaffRow
@@ -258,20 +260,27 @@ function StaffRow({ staff, isPending, onRelease }: StaffRowProps) {
   const showHide = ['released', 'viewed', 'reviewed', 'focus_set'].includes(staff.status);
 
   return (
-    <div className="flex items-center gap-3 py-1.5 pl-7">
-      <span className="text-sm flex-1 min-w-0 truncate">{staff.staffName}</span>
-      {staff.roleName && <span className="text-xs text-muted-foreground shrink-0">{staff.roleName}</span>}
-      <DeliveryStatusPill status={staff.status} />
-      {showRelease && (
-        <Button size="sm" variant="outline" className="h-6 text-xs gap-1" disabled={isPending} onClick={() => onRelease(true)}>
-          <Eye className="w-3 h-3" /> Release
-        </Button>
-      )}
-      {showHide && (
-        <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 text-muted-foreground" disabled={isPending} onClick={() => onRelease(false)}>
-          <EyeOff className="w-3 h-3" /> Hide
-        </Button>
-      )}
+    <div className="grid grid-cols-[1rem_1fr_10rem_7rem_auto] items-center gap-3 py-1.5 px-4">
+      <div /> {/* spacer aligned with chevron */}
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-sm truncate">{staff.staffName}</span>
+        {staff.roleName && <span className="text-xs text-muted-foreground shrink-0">{staff.roleName}</span>}
+        <DeliveryStatusPill status={staff.status} />
+      </div>
+      <div /> {/* coverage column spacer */}
+      <div /> {/* status column spacer */}
+      <div className="flex gap-1 justify-end">
+        {showRelease && (
+          <Button size="sm" variant="outline" className="h-6 text-xs gap-1" disabled={isPending} onClick={() => onRelease(true)}>
+            <Eye className="w-3 h-3" /> Release
+          </Button>
+        )}
+        {showHide && (
+          <Button size="sm" variant="ghost" className="h-6 text-xs gap-1 text-muted-foreground" disabled={isPending} onClick={() => onRelease(false)}>
+            <EyeOff className="w-3 h-3" /> Hide
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

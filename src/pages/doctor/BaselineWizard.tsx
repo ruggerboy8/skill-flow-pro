@@ -241,13 +241,50 @@ export default function BaselineWizard() {
   };
 
   const handleRatingChange = (actionId: number, score: number | null, note: string = '') => {
+    const existingNote = ratings[actionId]?.note || '';
     setRatings(prev => ({
       ...prev,
-      [actionId]: { score, note },
+      [actionId]: { score, note: note || existingNote },
     }));
     
     // Auto-save
-    saveRatingMutation.mutate({ actionId, score, note });
+    saveRatingMutation.mutate({ actionId, score, note: note || existingNote });
+  };
+
+  // Separate note-only save (doesn't touch self_score)
+  const saveNoteMutation = useMutation({
+    mutationFn: async ({ actionId, note }: { actionId: number; note: string }) => {
+      if (!assessmentId) throw new Error('No assessment ID');
+      
+      const { error } = await supabase
+        .from('doctor_baseline_items')
+        .upsert({
+          assessment_id: assessmentId,
+          action_id: actionId,
+          self_note: note || null,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'assessment_id,action_id',
+          ignoreDuplicates: false,
+        });
+      
+      if (error) throw error;
+    },
+  });
+
+  const handleNoteChange = (actionId: number, noteText: string) => {
+    setRatings(prev => ({
+      ...prev,
+      [actionId]: { score: prev[actionId]?.score ?? null, note: noteText },
+    }));
+    
+    // If a rating already exists, use the full save; otherwise note-only
+    const existingScore = ratings[actionId]?.score;
+    if (existingScore !== null && existingScore !== undefined) {
+      saveRatingMutation.mutate({ actionId, score: existingScore, note: noteText });
+    } else {
+      saveNoteMutation.mutate({ actionId, note: noteText });
+    }
   };
 
   const handleNextDomain = () => {
@@ -322,6 +359,7 @@ export default function BaselineWizard() {
             domain={domains[currentDomainIndex]}
             ratings={ratings}
             onRatingChange={handleRatingChange}
+            onNoteChange={handleNoteChange}
             onPrevious={currentDomainIndex > 0 ? handlePrevDomain : undefined}
             onNext={isLastDomain ? undefined : handleNextDomain}
             onComplete={isLastDomain && allRated ? handleComplete : undefined}

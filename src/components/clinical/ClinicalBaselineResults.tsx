@@ -8,8 +8,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
-import { ClipboardCheck, CheckCircle2, Clock, AlertCircle, ChevronDown } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Clock, AlertCircle, ChevronDown, MessageSquare } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface ClinicalBaselineResultsProps {
@@ -22,6 +24,7 @@ interface ClinicalBaselineResultsProps {
 interface BaselineItem {
   action_id: number;
   self_score: number;
+  self_note: string | null;
   action_statement: string;
   competency_name: string;
   domain_name: string;
@@ -46,6 +49,7 @@ export function ClinicalBaselineResults({
   completedAt 
 }: ClinicalBaselineResultsProps) {
   const [selectedItem, setSelectedItem] = useState<BaselineItem | null>(null);
+  const [showOnlyNoted, setShowOnlyNoted] = useState(false);
 
   // Fetch baseline assessment with flagged domains
   const { data: baseline } = useQuery({
@@ -75,6 +79,7 @@ export function ClinicalBaselineResults({
         .select(`
           action_id,
           self_score,
+          self_note,
           pro_moves!inner (
             action_statement,
             competencies!inner (
@@ -95,6 +100,7 @@ export function ClinicalBaselineResults({
       return (data || []).map((item: any) => ({
         action_id: item.action_id,
         self_score: item.self_score,
+        self_note: item.self_note || null,
         action_statement: item.pro_moves.action_statement,
         competency_name: item.pro_moves.competencies.name,
         domain_name: item.pro_moves.competencies.domains.domain_name,
@@ -237,10 +243,16 @@ export function ClinicalBaselineResults({
   const getSortedDomainItems = (domain: string) => {
     const domainData = groupedByDomain[domain];
     if (!domainData) return [];
-    return Object.entries(domainData)
+    let result = Object.entries(domainData)
       .flatMap(([score, items]) => items.map(item => ({ ...item, score: Number(score) })))
       .sort((a, b) => b.score - a.score);
+    if (showOnlyNoted) {
+      result = result.filter(item => item.self_note?.trim());
+    }
+    return result;
   };
+
+  const hasAnyNotes = items?.some(item => item.self_note?.trim()) ?? false;
 
   // Completed state - full results view
   return (
@@ -308,8 +320,8 @@ export function ClinicalBaselineResults({
           {/* Domain Tabs */}
           {orderedDomains.length > 0 && (
             <Tabs defaultValue={orderedDomains[0]} className="w-full">
-              <div className="border-b">
-                <TabsList className="w-full h-auto p-0 bg-transparent rounded-none">
+              <div className="border-b flex items-center justify-between">
+                <TabsList className="flex-1 h-auto p-0 bg-transparent rounded-none">
                   {orderedDomains.map((domain) => {
                     const domainColor = getDomainColorRichRaw(domain);
                     const isFlagged = flaggedDomains.includes(domain);
@@ -331,6 +343,19 @@ export function ClinicalBaselineResults({
                     );
                   })}
                 </TabsList>
+                {hasAnyNotes && (
+                  <div className="flex items-center gap-2 px-4">
+                    <Switch
+                      id="show-only-noted"
+                      checked={showOnlyNoted}
+                      onCheckedChange={setShowOnlyNoted}
+                    />
+                    <Label htmlFor="show-only-noted" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                      <MessageSquare className="h-3 w-3 inline mr-1" />
+                      Noted only
+                    </Label>
+                  </div>
+                )}
               </div>
 
               {orderedDomains.map((domain) => {
@@ -381,6 +406,9 @@ export function ClinicalBaselineResults({
                                 {item.competency_name}
                               </p>
                             </div>
+                            {item.self_note?.trim() && (
+                              <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
                             <ChevronDown className="h-4 w-4 text-muted-foreground -rotate-90 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </button>
                         );
@@ -399,6 +427,7 @@ export function ClinicalBaselineResults({
         proMoveId={selectedItem?.action_id || null}
         proMoveStatement={selectedItem?.action_statement || ''}
         onClose={() => setSelectedItem(null)}
+        noteText={selectedItem?.self_note}
       />
     </Collapsible>
   );

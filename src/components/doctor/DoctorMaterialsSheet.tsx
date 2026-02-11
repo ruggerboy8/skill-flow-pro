@@ -18,6 +18,8 @@ interface DoctorMaterialsSheetProps {
   onClose: () => void;
   /** Optional preview content - when provided, uses this instead of fetching from DB */
   previewContent?: Record<string, string>;
+  /** Optional note text to display at the top */
+  noteText?: string | null;
 }
 
 interface ResourceData {
@@ -65,6 +67,7 @@ export function DoctorMaterialsSheet({
   proMoveStatement,
   onClose,
   previewContent,
+  noteText,
 }: DoctorMaterialsSheetProps) {
   // Only fetch from DB if no preview content is provided
   const { data: resources, isLoading } = useQuery({
@@ -105,6 +108,16 @@ export function DoctorMaterialsSheet({
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
+          {/* Doctor's note */}
+          {noteText?.trim() && (
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <div className="flex items-center gap-2 mb-1">
+                <MessageSquareQuote className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium text-primary">Note</span>
+              </div>
+              <p className="text-sm text-foreground/80">{noteText}</p>
+            </div>
+          )}
           {/* Description */}
           {description && (
             <div className="prose prose-sm max-w-none text-muted-foreground">

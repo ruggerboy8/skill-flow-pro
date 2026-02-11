@@ -398,6 +398,7 @@ export default function BaselineWizard() {
           firstActionId={firstProMove.action_id}
           onComplete={handleTutorialComplete}
           onForceOpenMaterials={(actionId) => setForceOpenProMoveId(actionId)}
+          onCloseMaterials={() => setForceOpenProMoveId(null)}
         />
       )}
     </div>

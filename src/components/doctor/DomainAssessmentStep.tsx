@@ -66,10 +66,12 @@ export function DomainAssessmentStep({
   useEffect(() => {
     if (forceOpenProMoveId != null) {
       setSelectedProMoveId(forceOpenProMoveId);
-      // Dispatch event so tutorial knows materials opened
       setTimeout(() => {
         window.dispatchEvent(new Event('tutorial-materials-opened'));
       }, 300);
+    } else {
+      // Close the drawer when force-open is cleared (e.g. tutorial advancing)
+      setSelectedProMoveId(null);
     }
   }, [forceOpenProMoveId]);
 

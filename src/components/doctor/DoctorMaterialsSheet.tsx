@@ -100,7 +100,7 @@ export function DoctorMaterialsSheet({
 
   return (
     <Sheet open={!!proMoveId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto" data-tutorial-drawer>
         <SheetHeader className="pb-4 border-b">
           <SheetTitle className="text-left text-lg leading-relaxed">
             {proMoveStatement}

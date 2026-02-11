@@ -8,7 +8,7 @@ import { DomainBadge } from '@/components/ui/domain-badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye, PenLine } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye, PenLine, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
@@ -50,6 +50,7 @@ export default function EvaluationReview() {
   const [selectedActionIds, setSelectedActionIds] = useState<Set<number>>(new Set());
   const [learnerNote, setLearnerNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [polishing, setPolishing] = useState(false);
   const mountedRef = useRef(false);
 
   // Fetch evaluation + staff validation
@@ -509,9 +510,39 @@ export default function EvaluationReview() {
                 }}
                 className="min-h-[120px] resize-none"
               />
-              <p className="text-xs text-muted-foreground text-right">
-                {learnerNote.length} / 500
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {learnerNote.length} / 500
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={learnerNote.trim().length === 0 || polishing}
+                  onClick={async () => {
+                    setPolishing(true);
+                    try {
+                      const { data, error } = await supabase.functions.invoke('polish-note', {
+                        body: { text: learnerNote },
+                      });
+                      if (error) throw error;
+                      if (data?.polished) {
+                        setLearnerNote(data.polished.slice(0, 500));
+                        toast.success('Note polished!');
+                      }
+                    } catch (err: any) {
+                      toast.error(err.message || 'Failed to polish note');
+                    } finally {
+                      setPolishing(false);
+                    }
+                  }}
+                >
+                  {polishing ? (
+                    <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Polishing...</>
+                  ) : (
+                    <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> AI Help</>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

@@ -1,5 +1,5 @@
 /**
- * Read-only types and helpers for the evaluation review payload.
+ * Read-only types and helpers for the evaluation review payload (V2).
  * The payload is computed server-side by the compute_and_store_review_payload RPC.
  * This file does NOT compute or persist the payload.
  */
@@ -26,47 +26,34 @@ export interface ReviewPayload {
   version: number;
   computed_at: string;
   sparse: boolean;
-  priorities: ReviewPayloadItem[];
-  strengths: ReviewPayloadItem[];
-  alignment: ReviewPayloadItem[];
-  gaps: ReviewPayloadItem[];
   domain_summaries: DomainSummary[];
-  recommended_competency_ids: number[];
+  top_candidates: ReviewPayloadItem[];
+  bottom_candidates: ReviewPayloadItem[];
+  top_used_fallback: boolean;
 }
 
 /** Current payload version this client expects */
-export const CURRENT_PAYLOAD_VERSION = 1;
+export const CURRENT_PAYLOAD_VERSION = 2;
 
 /**
- * Parse and validate a review payload from the stored JSONB.
- * Returns null if the payload is missing, malformed, or wrong version.
+ * Parse and validate a V2 review payload from the stored JSONB.
+ * Returns null if the payload is missing, malformed, or not V2.
  */
 export function parseReviewPayload(raw: unknown): ReviewPayload | null {
   if (!raw || typeof raw !== 'object') return null;
-  const payload = raw as Record<string, unknown>;
+  const p = raw as Record<string, unknown>;
 
-  // Accept both versioned payloads and raw RPC output (which lacks `version`)
-  const hasRequiredArrays = Array.isArray(payload.priorities) || Array.isArray(payload.strengths);
-  if (!hasRequiredArrays) return null;
-
-  // RPC returns `domain_averages` but our type expects `domain_summaries`
-  const domainSummaries = (payload.domain_summaries ?? payload.domain_averages ?? []) as DomainSummary[];
-
-  // Derive recommended_competency_ids from priorities if not explicitly provided
-  const recommendedIds = Array.isArray(payload.recommended_competency_ids)
-    ? payload.recommended_competency_ids as number[]
-    : ((payload.priorities as ReviewPayloadItem[]) ?? []).map(p => p.competency_id);
+  // Must have top_candidates key (V2 marker)
+  if (!Array.isArray(p.top_candidates)) return null;
 
   return {
-    version: (payload.version as number) ?? CURRENT_PAYLOAD_VERSION,
-    computed_at: (payload.computed_at as string) ?? '',
-    sparse: (payload.sparse as boolean) ?? false,
-    priorities: (payload.priorities as ReviewPayloadItem[]) ?? [],
-    strengths: (payload.strengths as ReviewPayloadItem[]) ?? [],
-    alignment: (payload.alignment as ReviewPayloadItem[]) ?? [],
-    gaps: (payload.gaps as ReviewPayloadItem[]) ?? [],
-    domain_summaries: domainSummaries,
-    recommended_competency_ids: recommendedIds,
+    version: (p.version as number) ?? CURRENT_PAYLOAD_VERSION,
+    computed_at: (p.computed_at as string) ?? '',
+    sparse: (p.sparse as boolean) ?? false,
+    domain_summaries: (p.domain_summaries as DomainSummary[]) ?? [],
+    top_candidates: (p.top_candidates as ReviewPayloadItem[]) ?? [],
+    bottom_candidates: (p.bottom_candidates as ReviewPayloadItem[]) ?? [],
+    top_used_fallback: (p.top_used_fallback as boolean) ?? false,
   };
 }
 

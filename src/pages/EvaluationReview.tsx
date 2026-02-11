@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,12 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, ArrowRight, Star, Target, GitCompare, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDomainColor } from '@/lib/domainColors';
 import { parseReviewPayload, type ReviewPayload, type ReviewPayloadItem } from '@/lib/reviewPayload';
+import { CompetencyCard } from '@/components/review/CompetencyCard';
+
+const STEP_LABELS = ['Intro', 'Highlights', 'Choose Focus', 'ProMoves'];
 
 export default function EvaluationReview() {
   const { evalId } = useParams<{ evalId: string }>();
@@ -20,18 +23,20 @@ export default function EvaluationReview() {
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const staffId = staffProfile?.id;
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [payload, setPayload] = useState<ReviewPayload | null>(null);
+  const [keepCrushingId, setKeepCrushingId] = useState<number | null>(null);
+  const [improveIds, setImproveIds] = useState<Set<number>>(new Set());
   const [selectedActionIds, setSelectedActionIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const mountedRef = useRef(false);
+  const improveSectionRef = useRef<HTMLDivElement>(null);
 
   // Fetch evaluation + staff validation
   const { data: evalData, isLoading: evalLoading, error: evalError } = useQuery({
     queryKey: ['eval-review', evalId, staffId],
     queryFn: async () => {
       if (!staffId || !evalId) throw new Error('Missing staff or evalId');
-
       const { data: evaluation, error } = await supabase
         .from('evaluations')
         .select('id, staff_id, status, is_visible_to_staff, program_year, quarter, type, review_payload, acknowledged_at, viewed_at')
@@ -42,7 +47,6 @@ export default function EvaluationReview() {
       if (evaluation.staff_id !== staffId) throw new Error('Not your evaluation');
       if (evaluation.status !== 'submitted') throw new Error('Evaluation is not submitted');
       if (!evaluation.is_visible_to_staff) throw new Error('Evaluation is not released');
-
       return { evaluation, staffId };
     },
     enabled: !!staffId && !!evalId,
@@ -55,18 +59,12 @@ export default function EvaluationReview() {
 
     const init = async () => {
       try {
-        // Mark viewed (idempotent)
         if (!evalData.evaluation.viewed_at) {
           await supabase.rpc('mark_eval_viewed', { p_eval_id: evalId });
         }
-
-        // Compute payload if needed
-        if (evalData.evaluation.review_payload) {
-          setPayload(parseReviewPayload(evalData.evaluation.review_payload));
-        } else {
-          const { data } = await supabase.rpc('compute_and_store_review_payload', { p_eval_id: evalId });
-          setPayload(parseReviewPayload(data));
-        }
+        // Always call RPC — it returns cached v2 or recomputes
+        const { data } = await supabase.rpc('compute_and_store_review_payload', { p_eval_id: evalId });
+        setPayload(parseReviewPayload(data));
       } catch (err) {
         console.error('Failed to initialize review:', err);
         toast.error('Failed to load review data');
@@ -75,23 +73,30 @@ export default function EvaluationReview() {
     init();
   }, [evalData, evalId]);
 
-  // Fetch ProMoves for recommended competencies (Step 3)
-  const recommendedCompIds = payload?.recommended_competency_ids ?? [];
+  // Selected competency IDs (for ProMoves query)
+  const selectedCompIds = useMemo(() => {
+    const ids: number[] = [];
+    if (keepCrushingId) ids.push(keepCrushingId);
+    improveIds.forEach(id => ids.push(id));
+    return ids;
+  }, [keepCrushingId, improveIds]);
+
+  // Fetch ProMoves for user-selected competencies (Step 3)
   const { data: proMoves } = useQuery({
-    queryKey: ['review-pro-moves', recommendedCompIds],
+    queryKey: ['review-pro-moves', selectedCompIds],
     queryFn: async () => {
-      if (recommendedCompIds.length === 0) return [];
+      if (selectedCompIds.length === 0) return [];
       const { data, error } = await supabase
         .from('pro_moves')
         .select('action_id, action_statement, competency_id, competencies!fk_pro_moves_competency_id(name, domains!competencies_domain_id_fkey(domain_name))')
-        .in('competency_id', recommendedCompIds)
+        .in('competency_id', selectedCompIds)
         .eq('active', true)
         .order('competency_id')
         .order('action_id');
       if (error) throw error;
       return data ?? [];
     },
-    enabled: recommendedCompIds.length > 0,
+    enabled: selectedCompIds.length === 3 && step === 3,
   });
 
   // Group pro moves by competency
@@ -114,7 +119,7 @@ export default function EvaluationReview() {
       } else if (next.size < 3) {
         next.add(actionId);
       } else {
-        toast.error('Maximum 3 focus items');
+        toast.error('Maximum 3 ProMoves');
       }
       return next;
     });
@@ -130,7 +135,6 @@ export default function EvaluationReview() {
         p_action_ids: actionIds,
       });
       if (error) throw error;
-
       toast.success(withFocus ? 'Focus saved and review completed!' : 'Review completed!');
       queryClient.invalidateQueries({ queryKey: ['eval-review'] });
       queryClient.invalidateQueries({ queryKey: ['staff-quarter-focus'] });
@@ -142,10 +146,30 @@ export default function EvaluationReview() {
     }
   };
 
+  const handleKeepCrushingSelect = useCallback((compId: number) => {
+    setKeepCrushingId(prev => prev === compId ? null : compId);
+    // Auto-scroll to improve section
+    setTimeout(() => {
+      improveSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  }, []);
+
+  const handleImproveToggle = useCallback((compId: number) => {
+    setImproveIds(prev => {
+      const next = new Set(prev);
+      if (next.has(compId)) {
+        next.delete(compId);
+      } else if (next.size < 2) {
+        next.add(compId);
+      }
+      return next;
+    });
+  }, []);
+
   // Already acknowledged
   if (evalData?.evaluation.acknowledged_at) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 py-8">
+      <div className="max-w-2xl mx-auto space-y-6 py-8 px-4">
         <Card>
           <CardContent className="py-12 text-center space-y-4">
             <CheckCircle2 className="w-12 h-12 mx-auto text-green-600" />
@@ -155,9 +179,7 @@ export default function EvaluationReview() {
               <Button variant="outline" onClick={() => navigate(`/evaluation/${evalId}`)}>
                 View Full Scores
               </Button>
-              <Button onClick={() => navigate('/')}>
-                Back to Home
-              </Button>
+              <Button onClick={() => navigate('/')}>Back to Home</Button>
             </div>
           </CardContent>
         </Card>
@@ -165,9 +187,9 @@ export default function EvaluationReview() {
     );
   }
 
-  if (evalLoading || !payload) {
+  if (evalLoading || (evalData && !payload)) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 py-8">
+      <div className="max-w-2xl mx-auto space-y-6 py-8 px-4">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -176,7 +198,7 @@ export default function EvaluationReview() {
 
   if (evalError) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 py-8">
+      <div className="max-w-2xl mx-auto space-y-6 py-8 px-4">
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">{(evalError as Error).message}</p>
@@ -189,36 +211,199 @@ export default function EvaluationReview() {
     );
   }
 
+  if (!payload) return null;
+
   const evalInfo = evalData!.evaluation;
   const periodLabel = evalInfo.type === 'Baseline' ? 'Baseline' : `${evalInfo.quarter} ${evalInfo.program_year}`;
+  const focusSelectionComplete = keepCrushingId !== null && improveIds.size === 2;
+  const totalSelected = (keepCrushingId ? 1 : 0) + improveIds.size;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 py-8">
+    <div className="max-w-2xl mx-auto space-y-6 py-8 px-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => step > 1 ? setStep(step - 1) : navigate(-1)}>
+        <Button variant="ghost" size="sm" onClick={() => step > 0 ? setStep(step - 1) : navigate(-1)}>
           <ArrowLeft className="w-4 h-4 mr-2" />
-          {step > 1 ? 'Back' : 'Exit'}
+          {step > 0 ? 'Back' : 'Exit'}
         </Button>
-        <span className="text-sm text-muted-foreground">Step {step} of 3</span>
+        <span className="text-sm text-muted-foreground">
+          Step {step + 1} of 4 — {STEP_LABELS[step]}
+        </span>
       </div>
 
-      <h1 className="text-2xl font-bold">{periodLabel} Evaluation Review</h1>
+      {/* ─── Step 0: Intro ─────────────────────────────────── */}
+      {step === 0 && (
+        <div className="space-y-6">
+          <h1 className="text-2xl font-bold">{periodLabel} Evaluation Review</h1>
+          <Card>
+            <CardContent className="py-8 space-y-5">
+              <p className="text-muted-foreground">This review takes about 2 minutes. You'll do three things:</p>
+              <ol className="space-y-2 text-sm list-decimal list-inside">
+                <li><strong>Scan highlights</strong> — see your top strengths and opportunities</li>
+                <li><strong>Pick 3 competencies</strong> — 1 to keep crushing, 2 to improve</li>
+                <li><strong>Choose 1–3 ProMoves</strong> — practical actions for this quarter</li>
+              </ol>
+              <p className="text-xs text-muted-foreground">Your focus will be pinned on Home so you can track progress.</p>
+              <div className="flex flex-col gap-3 pt-2">
+                <Button size="lg" onClick={() => setStep(1)}>
+                  Start <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+                <div className="flex gap-4 justify-center">
+                  <Button variant="link" size="sm" onClick={() => navigate(`/evaluation/${evalId}`)}>
+                    <Eye className="w-4 h-4 mr-1" /> View full evaluation
+                  </Button>
+                  <Button variant="link" size="sm" onClick={() => navigate('/')}>
+                    Exit to Home
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Step 1: Highlights */}
+      {/* ─── Step 1: Highlights ─────────────────────────────── */}
       {step === 1 && (
-        <Step1Highlights payload={payload} evalId={evalId!} />
+        <div className="space-y-6">
+          <h1 className="text-2xl font-bold">Highlights</h1>
+
+          {payload.sparse ? (
+            <Card>
+              <CardContent className="py-8 space-y-4">
+                <p className="text-muted-foreground text-sm">Limited data available for this evaluation. Here's a summary by domain:</p>
+                {payload.domain_summaries.map(ds => (
+                  <div key={ds.domain_name} className="flex items-center gap-3 py-2 border-b last:border-0">
+                    <Badge variant="outline" style={{ borderColor: getDomainColor(ds.domain_name) }}>
+                      {ds.domain_name}
+                    </Badge>
+                    <span className="text-sm">
+                      Coach avg: <strong>{ds.observer_avg}</strong>
+                      {ds.self_avg != null && <> · Self avg: <strong>{ds.self_avg}</strong></>}
+                      <span className="text-muted-foreground"> ({ds.count_scored} items)</span>
+                    </span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Strengths */}
+              {payload.top_candidates.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Star className="w-5 h-5 text-amber-500" />
+                      Strengths We Saw
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {payload.top_candidates.slice(0, 2).map(item => (
+                      <CompetencyCard key={item.competency_id} item={item} readOnly />
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Opportunities */}
+              {payload.bottom_candidates.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Target className="w-5 h-5 text-blue-500" />
+                      Opportunities
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {payload.bottom_candidates.slice(0, 2).map(item => (
+                      <CompetencyCard key={item.competency_id} item={item} readOnly />
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+
+          <Button variant="link" className="text-sm" onClick={() => navigate(`/evaluation/${evalId}`)}>
+            See full scores →
+          </Button>
+
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => setStep(2)}>
+              Next <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
       )}
 
-      {/* Step 2: Alignment & Gaps */}
+      {/* ─── Step 2: Choose Focus Competencies ──────────────── */}
       {step === 2 && (
-        <Step2AlignmentGaps payload={payload} />
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold">Choose 3 Focus Competencies</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Pick 1 to keep crushing and 2 to improve this quarter.
+            </p>
+          </div>
+
+          {/* Panel A: Keep Crushing */}
+          <div className="space-y-3">
+            <h2 className="text-base font-semibold">
+              {payload.top_used_fallback ? 'Strongest Areas' : 'Keep Crushing'}{' '}
+              <span className="text-muted-foreground font-normal text-sm">(pick 1)</span>
+            </h2>
+            {payload.top_candidates.map(item => (
+              <CompetencyCard
+                key={item.competency_id}
+                item={item}
+                selected={keepCrushingId === item.competency_id}
+                onSelect={() => handleKeepCrushingSelect(item.competency_id)}
+              />
+            ))}
+          </div>
+
+          {/* Panel B: Improve */}
+          <div className="space-y-3" ref={improveSectionRef}>
+            <h2 className="text-base font-semibold">
+              Improve This Quarter{' '}
+              <span className="text-muted-foreground font-normal text-sm">(pick 2)</span>
+            </h2>
+            {payload.bottom_candidates.map(item => (
+              <CompetencyCard
+                key={item.competency_id}
+                item={item}
+                selected={improveIds.has(item.competency_id)}
+                onSelect={() => handleImproveToggle(item.competency_id)}
+                disabled={improveIds.size >= 2 && !improveIds.has(item.competency_id)}
+              />
+            ))}
+          </div>
+
+          {/* Progress + validation */}
+          <div className="text-center space-y-2 pt-2">
+            <p className="text-sm text-muted-foreground">
+              {totalSelected} of 3 selected
+            </p>
+            {!focusSelectionComplete && (
+              <p className="text-xs text-muted-foreground">
+                {keepCrushingId === null ? 'Select 1 above' : ''}{keepCrushingId === null && improveIds.size < 2 ? ' and ' : ''}{improveIds.size < 2 ? `${2 - improveIds.size} more below` : ''} to continue
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => setStep(3)} disabled={!focusSelectionComplete}>
+              Next <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
       )}
 
-      {/* Step 3: Focus & Complete */}
+      {/* ─── Step 3: ProMoves & Complete ────────────────────── */}
       {step === 3 && (
-        <Step3Focus
+        <Step3ProMoves
           payload={payload}
+          keepCrushingId={keepCrushingId}
+          improveIds={improveIds}
           proMovesByCompetency={proMovesByCompetency}
           selectedActionIds={selectedActionIds}
           onToggle={toggleAction}
@@ -227,139 +412,16 @@ export default function EvaluationReview() {
           saving={saving}
         />
       )}
-
-      {/* Navigation */}
-      {step < 3 && (
-        <div className="flex justify-end pt-4">
-          <Button onClick={() => setStep(step + 1)}>
-            Next <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
 
-// ─── Step 1: Highlights ─────────────────────────────────────────────────
+// ─── Step 3 Component ──────────────────────────────────────────────────
 
-function Step1Highlights({ payload, evalId }: { payload: ReviewPayload; evalId: string }) {
-  const navigate = useNavigate();
-
-  if (payload.sparse) {
-    return (
-      <Card>
-        <CardContent className="py-8 space-y-4">
-          <p className="text-muted-foreground">Limited data available for this evaluation. Here's a summary by domain:</p>
-          {payload.domain_summaries.map(ds => (
-            <div key={ds.domain_name} className="flex items-center gap-3 py-2 border-b last:border-0">
-              <Badge style={{ backgroundColor: getDomainColor(ds.domain_name) }} className="text-foreground">
-                {ds.domain_name}
-              </Badge>
-              <span className="text-sm">
-                Observer avg: <strong>{ds.observer_avg}</strong>
-                {ds.self_avg != null && <> • Self avg: <strong>{ds.self_avg}</strong></>}
-                <span className="text-muted-foreground"> ({ds.count_scored} items)</span>
-              </span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Strengths */}
-      {payload.strengths.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Star className="w-5 h-5 text-amber-500" />
-              Strengths We Saw
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {payload.strengths.map(item => (
-              <PayloadItemRow key={item.competency_id} item={item} />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Priorities */}
-      {payload.priorities.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Target className="w-5 h-5 text-blue-500" />
-              Top Priorities to Improve
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {payload.priorities.map(item => (
-              <PayloadItemRow key={item.competency_id} item={item} />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      <Button variant="link" className="text-sm" onClick={() => navigate(`/evaluation/${evalId}`)}>
-        See full scores →
-      </Button>
-    </div>
-  );
-}
-
-// ─── Step 2: Alignment & Gaps ───────────────────────────────────────────
-
-function Step2AlignmentGaps({ payload }: { payload: ReviewPayload }) {
-  return (
-    <div className="space-y-6">
-      {payload.alignment.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <GitCompare className="w-5 h-5 text-green-600" />
-              Where You and Your Evaluator Aligned
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {payload.alignment.map(item => (
-              <ComparisonRow key={item.competency_id} item={item} />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            Gaps Worth Clarifying
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {payload.gaps.length > 0 ? (
-            <div className="space-y-3">
-              {payload.gaps.map(item => (
-                <ComparisonRow key={item.competency_id} item={item} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              No significant gaps detected — your self-assessment closely matched the observer's.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// ─── Step 3: Focus & Complete ───────────────────────────────────────────
-
-function Step3Focus({
+function Step3ProMoves({
   payload,
+  keepCrushingId,
+  improveIds,
   proMovesByCompetency,
   selectedActionIds,
   onToggle,
@@ -368,6 +430,8 @@ function Step3Focus({
   saving,
 }: {
   payload: ReviewPayload;
+  keepCrushingId: number | null;
+  improveIds: Set<number>;
   proMovesByCompetency: Map<number, any[]>;
   selectedActionIds: Set<number>;
   onToggle: (id: number) => void;
@@ -375,33 +439,56 @@ function Step3Focus({
   onSkip: () => void;
   saving: boolean;
 }) {
+  // Find observer_note for improve competencies from payload
+  const getObserverNote = (compId: number): string | null => {
+    const item = payload.bottom_candidates.find(c => c.competency_id === compId);
+    return item?.observer_note?.trim() || null;
+  };
+
+  // Order: keep crushing first, then improve
+  const orderedCompIds: number[] = [];
+  if (keepCrushingId) orderedCompIds.push(keepCrushingId);
+  improveIds.forEach(id => orderedCompIds.push(id));
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">Choose Your Focus</h2>
+        <h1 className="text-2xl font-bold">Choose ProMoves</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Select 1–3 Pro Moves to focus on this quarter. These will be pinned to your home page.
+          Select 1–3 ProMoves to focus on this quarter. These will be pinned to your home page.
         </p>
       </div>
 
-      {payload.recommended_competency_ids.map(compId => {
+      {orderedCompIds.map(compId => {
         const moves = proMovesByCompetency.get(compId) ?? [];
         if (moves.length === 0) return null;
 
         const compName = (moves[0]?.competencies as any)?.name ?? `Competency ${compId}`;
         const domainName = (moves[0]?.competencies as any)?.domains?.domain_name ?? '';
+        const isImprove = improveIds.has(compId);
+        const coachNote = isImprove ? getObserverNote(compId) : null;
 
         return (
           <Card key={compId}>
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 {domainName && (
-                  <Badge variant="outline" style={{ borderColor: getDomainColor(domainName) }}>
+                  <Badge variant="outline" className="text-xs" style={{ borderColor: getDomainColor(domainName) }}>
                     {domainName}
                   </Badge>
                 )}
                 <span className="font-medium text-sm">{compName}</span>
+                <Badge variant="secondary" className="text-xs ml-auto">
+                  {isImprove ? 'Improve' : 'Keep crushing'}
+                </Badge>
               </div>
+
+              {/* Coach context callout for improve items */}
+              {coachNote && (
+                <div className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded p-2 border-l-2 border-muted-foreground/30">
+                  <span className="font-medium">Coach context:</span> {coachNote}
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-2">
               {moves.map(pm => (
@@ -426,7 +513,13 @@ function Step3Focus({
         );
       })}
 
-      <div className="space-y-3 pt-4">
+      {selectedActionIds.size > 0 && (
+        <p className="text-sm text-muted-foreground text-center">
+          {selectedActionIds.size} of 3 ProMoves selected
+        </p>
+      )}
+
+      <div className="space-y-3 pt-2">
         <Button
           className="w-full"
           size="lg"
@@ -443,59 +536,6 @@ function Step3Focus({
         >
           Complete review without selecting focus
         </button>
-      </div>
-
-      {selectedActionIds.size > 0 && (
-        <p className="text-xs text-muted-foreground text-center">
-          {selectedActionIds.size} of 3 selected
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ─── Shared sub-components ──────────────────────────────────────────────
-
-function PayloadItemRow({ item }: { item: ReviewPayloadItem }) {
-  return (
-    <div className="flex items-start gap-3 py-2 border-b last:border-0">
-      <Badge variant="outline" className="mt-0.5 shrink-0" style={{ borderColor: getDomainColor(item.domain_name) }}>
-        {item.domain_name}
-      </Badge>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium">{item.competency_name}</div>
-        <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-          <span>Observer: <strong className="text-foreground">{item.observer_score}</strong></span>
-          {item.self_score != null && (
-            <span>Self: <strong className="text-foreground">{item.self_score}</strong></span>
-          )}
-        </div>
-        {item.observer_note && (
-          <p className="text-xs text-muted-foreground mt-1 italic">"{item.observer_note}"</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ComparisonRow({ item }: { item: ReviewPayloadItem }) {
-  return (
-    <div className="flex items-center gap-3 py-2 border-b last:border-0">
-      <Badge variant="outline" className="shrink-0" style={{ borderColor: getDomainColor(item.domain_name) }}>
-        {item.domain_name}
-      </Badge>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium">{item.competency_name}</div>
-      </div>
-      <div className="flex gap-4 text-sm shrink-0">
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground">Observer</div>
-          <div className="font-semibold">{item.observer_score}</div>
-        </div>
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground">Self</div>
-          <div className="font-semibold">{item.self_score ?? '—'}</div>
-        </div>
       </div>
     </div>
   );

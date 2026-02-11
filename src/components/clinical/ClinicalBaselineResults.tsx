@@ -546,17 +546,28 @@ export function ClinicalBaselineResults({
                               className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group ${hasBigDiff ? 'ring-1 ring-inset ring-amber-300 dark:ring-amber-700' : ''}`}
                               style={{ backgroundColor: hasBigDiff ? 'hsl(38 90% 97%)' : colors.bg }}
                             >
-                              <div
-                                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border"
-                                style={{ backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }}
-                              >
-                                {item.score}
-                              </div>
-                              {showCoachRatings && (
-                                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold border bg-background border-border text-foreground ${isCoachNa ? 'text-[10px]' : 'text-sm'}`}>
-                                  {coachScore !== undefined ? (isCoachNa ? 'N/A' : coachScore) : '–'}
-                                </div>
-                              )}
+                              {(() => {
+                                const selfColors = SCORE_COLORS[item.score];
+                                const coachColors = coachScore && coachScore >= 1 && coachScore <= 4 ? SCORE_COLORS[coachScore] : null;
+                                return (
+                                  <>
+                                    <div
+                                      className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border"
+                                      style={{ backgroundColor: selfColors.bg, borderColor: selfColors.border, color: selfColors.text }}
+                                    >
+                                      {item.score}
+                                    </div>
+                                    {showCoachRatings && (
+                                      <div
+                                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border ${isCoachNa ? 'text-[10px]' : ''}`}
+                                        style={coachColors ? { backgroundColor: coachColors.bg, borderColor: coachColors.border, color: coachColors.text } : {}}
+                                      >
+                                        {coachScore !== undefined ? (isCoachNa ? 'N/A' : coachScore) : '–'}
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-foreground">{item.action_statement}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5">

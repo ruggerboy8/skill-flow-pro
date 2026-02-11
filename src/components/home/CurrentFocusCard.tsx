@@ -27,7 +27,7 @@ export function CurrentFocusCard() {
       // Find the most recent released evaluation for this staff (by period, not released_at)
       const { data: evals, error: evalErr } = await supabase
         .from('evaluations')
-        .select('id, quarter, program_year, viewed_at, acknowledged_at, focus_selected_at')
+        .select('id, quarter, program_year, viewed_at, acknowledged_at, focus_selected_at, learner_note')
         .eq('staff_id', staffId)
         .eq('status', 'submitted')
         .eq('is_visible_to_staff', true)
@@ -70,7 +70,7 @@ export function CurrentFocusCard() {
         };
       });
 
-      return { type: 'focus' as const, items, evalId: newestEval.id };
+      return { type: 'focus' as const, items, evalId: newestEval.id, learnerNote: (newestEval as any).learner_note as string | null };
     },
     enabled: !!staffId,
     staleTime: 1000 * 60 * 5,
@@ -111,6 +111,12 @@ export function CurrentFocusCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
+        {data.learnerNote && (
+          <div className="bg-muted/50 rounded-lg p-3 border-l-4 border-primary/40 mb-2">
+            <p className="text-xs font-medium text-muted-foreground mb-1">My note</p>
+            <p className="text-sm italic text-foreground leading-relaxed">{data.learnerNote}</p>
+          </div>
+        )}
         {data.items.map(item => (
           <div key={item.actionId} className="flex items-start gap-2 py-1.5">
             <DomainBadge domain={item.domainName} className="mt-0.5" />

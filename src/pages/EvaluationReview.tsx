@@ -6,16 +6,21 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye, PenLine } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
-import { getDomainColor } from '@/lib/domainColors';
-import { parseReviewPayload, type ReviewPayload, type ReviewPayloadItem } from '@/lib/reviewPayload';
+import { parseReviewPayload, type ReviewPayload } from '@/lib/reviewPayload';
 import { CompetencyCard } from '@/components/review/CompetencyCard';
 
-const STEP_LABELS = ['Intro', 'Full Evaluation', 'Highlights', 'Choose Focus', 'ProMoves'];
+const STEP_LABELS = ['Welcome', 'Full Evaluation', 'Highlights', 'Keep Crushing', 'Grow', 'ProMoves', 'Note to Self'];
+const TOTAL_STEPS = STEP_LABELS.length;
+
+function getStorageKey(evalId: string) {
+  return `eval-review-step-${evalId}`;
+}
 
 export default function EvaluationReview() {
   const { evalId } = useParams<{ evalId: string }>();
@@ -24,14 +29,28 @@ export default function EvaluationReview() {
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const staffId = staffProfile?.id;
 
-  const [step, setStep] = useState(0);
+  // Restore step from sessionStorage
+  const [step, setStepRaw] = useState(() => {
+    if (!evalId) return 0;
+    const stored = sessionStorage.getItem(getStorageKey(evalId));
+    return stored ? Math.min(parseInt(stored, 10) || 0, TOTAL_STEPS - 1) : 0;
+  });
+
+  const setStep = useCallback((s: number | ((prev: number) => number)) => {
+    setStepRaw(prev => {
+      const next = typeof s === 'function' ? s(prev) : s;
+      if (evalId) sessionStorage.setItem(getStorageKey(evalId), String(next));
+      return next;
+    });
+  }, [evalId]);
+
   const [payload, setPayload] = useState<ReviewPayload | null>(null);
   const [keepCrushingId, setKeepCrushingId] = useState<number | null>(null);
   const [improveIds, setImproveIds] = useState<Set<number>>(new Set());
   const [selectedActionIds, setSelectedActionIds] = useState<Set<number>>(new Set());
+  const [learnerNote, setLearnerNote] = useState('');
   const [saving, setSaving] = useState(false);
   const mountedRef = useRef(false);
-  const improveSectionRef = useRef<HTMLDivElement>(null);
 
   // Fetch evaluation + staff validation
   const { data: evalData, isLoading: evalLoading, error: evalError } = useQuery({
@@ -63,11 +82,9 @@ export default function EvaluationReview() {
         if (!evalData.evaluation.viewed_at) {
           await supabase.rpc('mark_eval_viewed', { p_eval_id: evalId });
         }
-        // Always call RPC — it returns cached v2 or recomputes
         const { data } = await supabase.rpc('compute_and_store_review_payload', { p_eval_id: evalId });
         const parsed = parseReviewPayload(data);
         if (parsed) {
-          // Enrich with taglines
           const allCompIds = [
             ...parsed.top_candidates.map(c => c.competency_id),
             ...parsed.bottom_candidates.map(c => c.competency_id),
@@ -92,13 +109,9 @@ export default function EvaluationReview() {
   }, [evalData, evalId]);
 
   // Selected competency IDs for ProMoves — only the 2 improve competencies
-  const selectedCompIds = useMemo(() => {
-    const ids: number[] = [];
-    improveIds.forEach(id => ids.push(id));
-    return ids;
-  }, [improveIds]);
+  const selectedCompIds = useMemo(() => Array.from(improveIds), [improveIds]);
 
-  // Fetch ProMoves for user-selected improve competencies (Step 4)
+  // Fetch ProMoves for user-selected improve competencies (Step 5)
   const { data: proMoves } = useQuery({
     queryKey: ['review-pro-moves', selectedCompIds],
     queryFn: async () => {
@@ -113,7 +126,7 @@ export default function EvaluationReview() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: selectedCompIds.length === 2 && step === 4,
+    enabled: selectedCompIds.length === 2 && step === 5,
   });
 
   // Group pro moves by competency
@@ -150,11 +163,15 @@ export default function EvaluationReview() {
       const { error } = await supabase.rpc('save_eval_acknowledgement_and_focus', {
         p_eval_id: evalId,
         p_action_ids: actionIds,
+        p_learner_note: learnerNote.trim() || null,
       });
       if (error) throw error;
-      toast.success('Focus saved and review completed!');
+      // Clean up sessionStorage
+      sessionStorage.removeItem(getStorageKey(evalId));
+      toast.success("You're all set! Your focus is pinned to Home.");
       queryClient.invalidateQueries({ queryKey: ['eval-review'] });
       queryClient.invalidateQueries({ queryKey: ['staff-quarter-focus'] });
+      queryClient.invalidateQueries({ queryKey: ['current-focus-card'] });
       navigate('/');
     } catch (err: any) {
       toast.error(err.message || 'Failed to save');
@@ -165,9 +182,6 @@ export default function EvaluationReview() {
 
   const handleKeepCrushingSelect = useCallback((compId: number) => {
     setKeepCrushingId(prev => prev === compId ? null : compId);
-    setTimeout(() => {
-      improveSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 150);
   }, []);
 
   const handleImproveToggle = useCallback((compId: number) => {
@@ -231,8 +245,6 @@ export default function EvaluationReview() {
 
   const evalInfo = evalData!.evaluation;
   const periodLabel = evalInfo.type === 'Baseline' ? 'Baseline' : `${evalInfo.quarter} ${evalInfo.program_year}`;
-  const focusSelectionComplete = keepCrushingId !== null && improveIds.size === 2;
-  const totalSelected = (keepCrushingId ? 1 : 0) + improveIds.size;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 py-8 px-4">
@@ -243,27 +255,32 @@ export default function EvaluationReview() {
           {step > 0 ? 'Back' : 'Exit'}
         </Button>
         <span className="text-sm text-muted-foreground">
-          Step {step + 1} of 5 — {STEP_LABELS[step]}
+          Step {step + 1} of {TOTAL_STEPS} — {STEP_LABELS[step]}
         </span>
       </div>
 
-      {/* ─── Step 0: Intro ─────────────────────────────────── */}
+      {/* ─── Step 0: Welcome ─────────────────────────────── */}
       {step === 0 && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold">{periodLabel} Evaluation Review</h1>
           <Card>
             <CardContent className="py-8 space-y-5">
-              <p className="text-muted-foreground">This review takes about 2 minutes. You'll do four things:</p>
+              <p className="text-muted-foreground">
+                Nice work completing your evaluation! Let's take a couple of minutes to look at what stood out and set yourself up for a great quarter.
+              </p>
+              <p className="text-sm font-medium">Here's what we'll do together:</p>
               <ol className="space-y-2 text-sm list-decimal list-inside">
-                <li><strong>Review your full evaluation</strong> — see all scores and notes</li>
-                <li><strong>Scan highlights</strong> — see your top strengths and opportunities</li>
-                <li><strong>Pick 3 competencies</strong> — 1 to keep crushing, 2 to improve</li>
-                <li><strong>Choose 1–3 ProMoves</strong> — practical actions for your improvement areas</li>
+                <li><strong>Take a look at your full evaluation</strong> — review all your scores and notes</li>
+                <li><strong>Check out your highlights</strong> — see where you're shining and where you can grow</li>
+                <li><strong>Pick a strength to keep crushing</strong> — choose one area you're already rocking</li>
+                <li><strong>Choose two areas to grow</strong> — select competencies to focus on this quarter</li>
+                <li><strong>Pick your ProMoves</strong> — practical actions to help you improve</li>
+                <li><strong>Write a note to yourself</strong> — a personal reminder for the quarter ahead</li>
               </ol>
-              <p className="text-xs text-muted-foreground">Your focus will be pinned on Home so you can track progress.</p>
+              <p className="text-xs text-muted-foreground">Your selections will be pinned to your Home page so they're always easy to find.</p>
               <div className="flex flex-col gap-3 pt-2">
                 <Button size="lg" onClick={() => setStep(1)}>
-                  Start <ArrowRight className="w-4 h-4 ml-2" />
+                  Let's Go <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
                 <div className="flex gap-4 justify-center">
                   <Button variant="link" size="sm" onClick={() => navigate('/')}>
@@ -283,7 +300,7 @@ export default function EvaluationReview() {
           <Card>
             <CardContent className="py-8 space-y-5">
               <p className="text-muted-foreground text-sm">
-                Take a moment to review all your scores and coach notes before selecting your focus areas.
+                Before we dive in, take a moment to look through all your scores and coach notes. There's no rush — come back whenever you're ready.
               </p>
               <Button
                 variant="outline"
@@ -300,7 +317,7 @@ export default function EvaluationReview() {
           </Card>
           <div className="flex justify-between pt-2">
             <Button variant="ghost" size="sm" onClick={() => setStep(2)}>
-              Skip — I've already reviewed it
+              I've already looked through it — let's keep going
             </Button>
             <Button onClick={() => setStep(2)}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
@@ -340,6 +357,9 @@ export default function EvaluationReview() {
                       <Star className="w-5 h-5 text-amber-500" />
                       Strengths We Saw
                     </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Here are a couple of areas where you really stood out.
+                    </p>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {payload.top_candidates.slice(0, 2).map(item => (
@@ -349,14 +369,17 @@ export default function EvaluationReview() {
                 </Card>
               )}
 
-              {/* Opportunities */}
+              {/* Opportunities for Growth */}
               {payload.bottom_candidates.length > 0 && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Target className="w-5 h-5 text-blue-500" />
-                      Opportunities
+                      Opportunities for Growth
                     </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      And here are a couple of areas where a little extra focus could make a big difference.
+                    </p>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {payload.bottom_candidates.slice(0, 2).map(item => (
@@ -376,22 +399,22 @@ export default function EvaluationReview() {
         </div>
       )}
 
-      {/* ─── Step 3: Choose Focus Competencies ──────────────── */}
+      {/* ─── Step 3: Keep Crushing (pick 1) ──────────────── */}
       {step === 3 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Choose 3 Focus Competencies</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Pick 1 to keep crushing and 2 to improve this quarter.
+            <h1 className="text-2xl font-bold">
+              {payload.top_used_fallback ? 'Your Strongest Areas' : 'Keep Crushing'}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              {payload.top_used_fallback
+                ? "These were some of your strongest areas this quarter. Pick one that you want to keep performing at a high level."
+                : "These were some of your strongest competencies this quarter. Pick one that you want to keep performing at a high level — it's worth celebrating what you're already doing well."
+              }
             </p>
           </div>
 
-          {/* Panel A: Keep Crushing */}
           <div className="space-y-3">
-            <h2 className="text-base font-semibold">
-              {payload.top_used_fallback ? 'Strongest Areas' : 'Keep Crushing'}{' '}
-              <span className="text-muted-foreground font-normal text-sm">(pick 1)</span>
-            </h2>
             {payload.top_candidates.map(item => (
               <CompetencyCard
                 key={item.competency_id}
@@ -402,12 +425,25 @@ export default function EvaluationReview() {
             ))}
           </div>
 
-          {/* Panel B: Improve */}
-          <div className="space-y-3" ref={improveSectionRef}>
-            <h2 className="text-base font-semibold">
-              Improve This Quarter{' '}
-              <span className="text-muted-foreground font-normal text-sm">(pick 2)</span>
-            </h2>
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => setStep(4)} disabled={keepCrushingId === null}>
+              Next <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Step 4: Grow This Quarter (pick 2) ─────────── */}
+      {step === 4 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold">Grow This Quarter</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              These are some competencies that could really benefit from a little extra attention. Choose 2 that feel most important for you to focus on — even small improvements here can make a real difference.
+            </p>
+          </div>
+
+          <div className="space-y-3">
             {payload.bottom_candidates.map(item => (
               <CompetencyCard
                 key={item.competency_id}
@@ -419,60 +455,93 @@ export default function EvaluationReview() {
             ))}
           </div>
 
-          {/* Progress + validation */}
           <div className="text-center space-y-2 pt-2">
             <p className="text-sm text-muted-foreground">
-              {totalSelected} of 3 selected
+              {improveIds.size} of 2 selected
             </p>
-            {!focusSelectionComplete && (
-              <p className="text-xs text-muted-foreground">
-                {keepCrushingId === null ? 'Select 1 above' : ''}{keepCrushingId === null && improveIds.size < 2 ? ' and ' : ''}{improveIds.size < 2 ? `${2 - improveIds.size} more below` : ''} to continue
-              </p>
-            )}
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button onClick={() => setStep(4)} disabled={!focusSelectionComplete}>
+            <Button onClick={() => setStep(5)} disabled={improveIds.size < 2}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 4: ProMoves & Complete ────────────────────── */}
-      {step === 4 && (
-        <Step4ProMoves
+      {/* ─── Step 5: ProMoves ────────────────────────────── */}
+      {step === 5 && (
+        <Step5ProMoves
           payload={payload}
           improveIds={improveIds}
           proMovesByCompetency={proMovesByCompetency}
           selectedActionIds={selectedActionIds}
           onToggle={toggleAction}
-          onSave={handleSave}
-          saving={saving}
+          onNext={() => setStep(6)}
         />
+      )}
+
+      {/* ─── Step 6: Note to Self ────────────────────────── */}
+      {step === 6 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <PenLine className="w-6 h-6" />
+              Note to Self
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              Before you wrap up, take a moment to write yourself a quick reminder. What do you want to make sure you keep in mind this quarter?
+            </p>
+          </div>
+
+          <Card>
+            <CardContent className="py-6 space-y-3">
+              <Textarea
+                placeholder="This quarter, I want to make sure I..."
+                value={learnerNote}
+                onChange={e => {
+                  if (e.target.value.length <= 500) setLearnerNote(e.target.value);
+                }}
+                className="min-h-[120px] resize-none"
+              />
+              <p className="text-xs text-muted-foreground text-right">
+                {learnerNote.length} / 500
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-3 pt-2">
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Complete My Review'}
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-// ─── Step 4 Component ──────────────────────────────────────────────────
+// ─── Step 5 Component ──────────────────────────────────────────────────
 
-function Step4ProMoves({
+function Step5ProMoves({
   payload,
   improveIds,
   proMovesByCompetency,
   selectedActionIds,
   onToggle,
-  onSave,
-  saving,
+  onNext,
 }: {
   payload: ReviewPayload;
   improveIds: Set<number>;
   proMovesByCompetency: Map<number, any[]>;
   selectedActionIds: Set<number>;
   onToggle: (id: number) => void;
-  onSave: () => void;
-  saving: boolean;
+  onNext: () => void;
 }) {
   const getObserverNote = (compId: number): string | null => {
     const item = payload.bottom_candidates.find(c => c.competency_id === compId);
@@ -484,9 +553,9 @@ function Step4ProMoves({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Choose ProMoves</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Select 1–3 ProMoves for your improvement areas. These will be pinned to your home page.
+        <h1 className="text-2xl font-bold">Choose Your ProMoves</h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          From the two areas you chose to grow in, which ProMoves feel most important for you right now? Pick 1 to 3 that you want to focus on this quarter.
         </p>
       </div>
 
@@ -502,15 +571,10 @@ function Step4ProMoves({
           <Card key={compId}>
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
-                {domainName && (
-                   <DomainBadge domain={domainName} />
-                )}
+                {domainName && <DomainBadge domain={domainName} />}
                 <span className="font-medium text-sm">{compName}</span>
-                <Badge variant="secondary" className="text-xs ml-auto">
-                  Improve
-                </Badge>
+                <Badge variant="secondary" className="text-xs ml-auto">Grow</Badge>
               </div>
-
               {coachNote && (
                 <div className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded p-2 border-l-2 border-muted-foreground/30">
                   <span className="font-medium">Coach context:</span> {coachNote}
@@ -546,14 +610,9 @@ function Step4ProMoves({
         </p>
       )}
 
-      <div className="space-y-3 pt-2">
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={onSave}
-          disabled={saving || selectedActionIds.size === 0}
-        >
-          {saving ? 'Saving...' : 'Save focus and complete review'}
+      <div className="flex justify-end pt-2">
+        <Button onClick={onNext} disabled={selectedActionIds.size === 0}>
+          Next <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
     </div>

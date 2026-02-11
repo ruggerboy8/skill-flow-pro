@@ -364,7 +364,12 @@ export function ClinicalBaselineResults({
                         </div>
                       </div>
                     )}
-
+                    {showCoachRatings && (
+                      <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/10 text-xs text-muted-foreground">
+                        <span className="w-8 text-center font-medium">Self</span>
+                        <span className="w-8 text-center font-medium">You</span>
+                      </div>
+                    )}
                     <div className="divide-y">
                       {sortedItems.map((item) => {
                         const colors = SCORE_COLORS[item.score];
@@ -392,15 +397,15 @@ export function ClinicalBaselineResults({
                               >
                                 {item.score}
                               </div>
+                              {showCoachRatings && (
+                                <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border bg-background border-border text-foreground">
+                                  {coachScore !== undefined ? coachScore : '–'}
+                                </div>
+                              )}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-foreground">{item.action_statement}</p>
                                 <p className="text-xs text-muted-foreground mt-0.5">{item.competency_name}</p>
                               </div>
-                              {showCoachRatings && coachScore !== undefined && (
-                                <span className="flex-shrink-0 text-xs font-medium text-muted-foreground px-2 py-1 rounded bg-background border">
-                                  You: {coachScore}
-                                </span>
-                              )}
                               {hasNote && (
                                 <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
                               )}

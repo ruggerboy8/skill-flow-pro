@@ -69,6 +69,7 @@ export function BatchTranscriptProcessor() {
           id,
           audio_recording_path,
           summary_raw_transcript,
+          interview_transcript,
           extracted_insights,
           staff_id,
           location_id,
@@ -76,7 +77,7 @@ export function BatchTranscriptProcessor() {
           quarter,
           program_year
         `)
-        .or('and(audio_recording_path.not.is.null,summary_raw_transcript.is.null),and(summary_raw_transcript.not.is.null,extracted_insights.is.null)');
+        .or('and(audio_recording_path.not.is.null,summary_raw_transcript.is.null,interview_transcript.is.null),and(summary_raw_transcript.not.is.null,extracted_insights.is.null),and(interview_transcript.not.is.null,extracted_insights.is.null)');
 
       if (error) throw error;
 
@@ -107,7 +108,9 @@ export function BatchTranscriptProcessor() {
         const locationName = locationMap.get(row.location_id) || 'Unknown';
         const period = formatPeriod(row.type, row.quarter, row.program_year);
 
-        if (row.audio_recording_path && !row.summary_raw_transcript) {
+        const transcript = row.summary_raw_transcript || row.interview_transcript;
+        
+        if (row.audio_recording_path && !transcript) {
           evals.push({
             id: row.id,
             staffName,
@@ -121,7 +124,7 @@ export function BatchTranscriptProcessor() {
             issue: 'no_transcript',
             status: 'pending',
           });
-        } else if (row.summary_raw_transcript && !row.extracted_insights) {
+        } else if (transcript && !row.extracted_insights) {
           evals.push({
             id: row.id,
             staffName,
@@ -131,7 +134,7 @@ export function BatchTranscriptProcessor() {
             audioSize: null,
             hasTranscript: true,
             hasInsights: false,
-            existingTranscript: row.summary_raw_transcript,
+            existingTranscript: transcript,
             issue: 'no_insights',
             status: 'pending',
           });

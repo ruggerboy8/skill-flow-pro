@@ -53,6 +53,7 @@ export function ClinicalBaselineResults({
   const [selectedItem, setSelectedItem] = useState<BaselineItem | null>(null);
   const [showOnlyNoted, setShowOnlyNoted] = useState(false);
   const [showCoachRatings, setShowCoachRatings] = useState(false);
+  const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
 
   // Fetch baseline assessment with flagged domains
   const { data: baseline } = useQuery({
@@ -369,34 +370,54 @@ export function ClinicalBaselineResults({
                         const colors = SCORE_COLORS[item.score];
                         const coachScore = coachRatingsMap.get(item.action_id);
                         const hasBigDiff = coachScore !== undefined && Math.abs(item.self_score - coachScore) >= 2;
+                        const hasNote = !!item.self_note?.trim();
+                        const isExpanded = expandedNoteId === item.action_id;
 
                         return (
-                          <button
-                            key={item.action_id}
-                            onClick={() => setSelectedItem(item)}
-                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group ${hasBigDiff ? 'ring-1 ring-inset ring-amber-300 dark:ring-amber-700' : ''}`}
-                            style={{ backgroundColor: hasBigDiff ? 'hsl(38 90% 97%)' : colors.bg }}
-                          >
-                            <div
-                              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border"
-                              style={{ backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }}
+                          <div key={item.action_id}>
+                            <button
+                              onClick={() => {
+                                if (hasNote) {
+                                  setExpandedNoteId(isExpanded ? null : item.action_id);
+                                } else {
+                                  setSelectedItem(item);
+                                }
+                              }}
+                              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group ${hasBigDiff ? 'ring-1 ring-inset ring-amber-300 dark:ring-amber-700' : ''}`}
+                              style={{ backgroundColor: hasBigDiff ? 'hsl(38 90% 97%)' : colors.bg }}
                             >
-                              {item.score}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground">{item.action_statement}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">{item.competency_name}</p>
-                            </div>
-                            {showCoachRatings && coachScore !== undefined && (
-                              <span className="flex-shrink-0 text-xs font-medium text-muted-foreground px-2 py-1 rounded bg-background border">
-                                You: {coachScore}
-                              </span>
+                              <div
+                                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border"
+                                style={{ backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }}
+                              >
+                                {item.score}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-foreground">{item.action_statement}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">{item.competency_name}</p>
+                              </div>
+                              {showCoachRatings && coachScore !== undefined && (
+                                <span className="flex-shrink-0 text-xs font-medium text-muted-foreground px-2 py-1 rounded bg-background border">
+                                  You: {coachScore}
+                                </span>
+                              )}
+                              {hasNote && (
+                                <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
+                              )}
+                              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${hasNote ? (isExpanded ? 'rotate-0' : '-rotate-90') : '-rotate-90 opacity-0 group-hover:opacity-100'}`} />
+                            </button>
+                            {hasNote && isExpanded && (
+                              <div className="bg-muted/30 border-t px-4 py-3 space-y-2">
+                                <p className="text-sm whitespace-pre-wrap text-foreground">{item.self_note}</p>
+                                <button
+                                  onClick={() => setSelectedItem(item)}
+                                  className="text-xs text-primary hover:underline"
+                                >
+                                  View details →
+                                </button>
+                              </div>
                             )}
-                            {item.self_note?.trim() && (
-                              <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
-                            )}
-                            <ChevronDown className="h-4 w-4 text-muted-foreground -rotate-90 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </button>
+                          </div>
                         );
                       })}
                     </div>

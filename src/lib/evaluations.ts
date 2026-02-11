@@ -472,6 +472,7 @@ export function isEvaluationComplete(evaluation: EvaluationWithItems): {
   observerNaCount: number;
   selfNaCount: number;
   naCount: number;
+  missingObserverNotes: number;
 } {
   const observerComplete = evaluation.items.every(
     item => item.observer_score !== null || item.observer_is_na === true
@@ -484,13 +485,19 @@ export function isEvaluationComplete(evaluation: EvaluationWithItems): {
   const selfNaCount = evaluation.items.filter(item => item.self_is_na === true).length;
   const naCount = observerNaCount + selfNaCount;
   
+  // Count items with observer score of 1 or 2 that are missing notes
+  const missingObserverNotes = evaluation.items.filter(
+    item => item.observer_score !== null && item.observer_score <= 2 && (!item.observer_note || item.observer_note.trim() === '')
+  ).length;
+  
   return {
     observerComplete,
     selfComplete,
-    canSubmit: observerComplete && selfComplete,
+    canSubmit: observerComplete && selfComplete && missingObserverNotes === 0,
     observerNaCount,
     selfNaCount,
-    naCount
+    naCount,
+    missingObserverNotes
   };
 }
 

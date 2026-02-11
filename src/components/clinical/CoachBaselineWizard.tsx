@@ -281,6 +281,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           onNext={isLastDomain ? undefined : () => setCurrentDomainIndex(i => i + 1)}
           onComplete={isLastDomain && allRated ? () => completeMutation.mutate() : undefined}
           isCompleting={completeMutation.isPending}
+          showNaOption
         />
       )}
     </div>

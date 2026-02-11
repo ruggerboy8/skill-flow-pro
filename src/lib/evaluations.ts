@@ -690,6 +690,13 @@ export async function setEvaluationVisibility(
   if (error) {
     throw new Error(`Failed to update visibility: ${error.message}`);
   }
+
+  // Send email notification when releasing (not when hiding)
+  if (visible) {
+    supabase.functions.invoke('notify-eval-release', {
+      body: { eval_ids: [evalId] },
+    }).catch(err => console.error('Failed to send release notification:', err));
+  }
 }
 
 /**
@@ -713,6 +720,24 @@ export async function bulkSetVisibilityByLocation(
 
   if (error) {
     throw new Error(`Failed to update visibility: ${error.message}`);
+  }
+
+  // Send email notifications for newly released evals
+  if (visible && (data as number) > 0) {
+    // Fetch the eval IDs that were just released
+    const { data: releasedEvals } = await supabase
+      .from('evaluations')
+      .select('id')
+      .eq('location_id', locationId)
+      .eq('status', 'submitted')
+      .eq('is_visible_to_staff', true)
+      .is('viewed_at', null); // only notify for not-yet-viewed ones
+
+    if (releasedEvals && releasedEvals.length > 0) {
+      supabase.functions.invoke('notify-eval-release', {
+        body: { eval_ids: releasedEvals.map(e => e.id) },
+      }).catch(err => console.error('Failed to send release notifications:', err));
+    }
   }
 
   return { updatedCount: (data as number) || 0 };

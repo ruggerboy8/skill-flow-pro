@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Target, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDomainColor } from '@/lib/domainColors';
 import { quarterNum } from '@/lib/reviewPayload';
 
@@ -15,26 +15,20 @@ import { quarterNum } from '@/lib/reviewPayload';
  * among released evaluations for this staff member.
  */
 export function CurrentFocusCard() {
-  const { user } = useAuth();
+  const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const navigate = useNavigate();
+  const staffId = staffProfile?.id;
 
   const { data } = useQuery({
-    queryKey: ['current-focus-card', user?.id],
+    queryKey: ['current-focus-card', staffId],
     queryFn: async () => {
-      if (!user) return null;
-
-      const { data: staff } = await supabase
-        .from('staff')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (!staff) return null;
+      if (!staffId) return null;
 
       // Find the most recent released evaluation for this staff (by period, not released_at)
       const { data: evals, error: evalErr } = await supabase
         .from('evaluations')
         .select('id, quarter, program_year, viewed_at, acknowledged_at, focus_selected_at')
-        .eq('staff_id', staff.id)
+        .eq('staff_id', staffId)
         .eq('status', 'submitted')
         .eq('is_visible_to_staff', true)
         .order('program_year', { ascending: false });
@@ -62,7 +56,7 @@ export function CurrentFocusCard() {
         .from('staff_quarter_focus')
         .select('action_id, pro_moves!inner(action_statement, competency_id, competencies!fk_pro_moves_competency_id(domains!competencies_domain_id_fkey(domain_name)))')
         .eq('evaluation_id', newestEval.id)
-        .eq('staff_id', staff.id);
+        .eq('staff_id', staffId);
 
       if (focusErr || !focusRows || focusRows.length === 0) return null;
 
@@ -78,7 +72,7 @@ export function CurrentFocusCard() {
 
       return { type: 'focus' as const, items, evalId: newestEval.id };
     },
-    enabled: !!user,
+    enabled: !!staffId,
     staleTime: 1000 * 60 * 5,
   });
 

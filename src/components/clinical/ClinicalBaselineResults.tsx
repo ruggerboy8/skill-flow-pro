@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
-import { ClipboardCheck, CheckCircle2, Clock, AlertCircle, ChevronDown, MessageSquare, ArrowDown, ArrowUp } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Clock, AlertCircle, ChevronDown, MessageSquare, ArrowDown, ArrowUp, GraduationCap } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface ClinicalBaselineResultsProps {
@@ -538,14 +538,25 @@ export function ClinicalBaselineResults({
                                   {coachScore !== undefined ? (isCoachNa ? 'N/A' : coachScore) : '–'}
                                 </div>
                               )}
-                              {hasNote && (
-                                <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
-                              )}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-foreground">{item.action_statement}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">{item.competency_name}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <p className="text-xs text-muted-foreground">{item.competency_name}</p>
+                                  {hasNote && (
+                                    <span className="flex items-center gap-0.5 text-primary">
+                                      <MessageSquare className="h-3 w-3" />
+                                      <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${hasNote ? (isExpanded ? 'rotate-0' : '-rotate-90') : '-rotate-90 opacity-0 group-hover:opacity-100'}`} />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }}
+                                className="flex-shrink-0 p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                                title="View learning materials"
+                              >
+                                <GraduationCap className="h-4 w-4" />
+                              </button>
                             </button>
                             {hasNote && isExpanded && (
                               <div className="bg-muted/30 border-t px-4 py-3 space-y-3">
@@ -561,12 +572,6 @@ export function ClinicalBaselineResults({
                                     <p className="text-sm whitespace-pre-wrap text-foreground">{coachNote}</p>
                                   </div>
                                 )}
-                                <button
-                                  onClick={() => setSelectedItem(item)}
-                                  className="text-xs text-primary hover:underline"
-                                >
-                                  View details →
-                                </button>
                               </div>
                             )}
                           </div>

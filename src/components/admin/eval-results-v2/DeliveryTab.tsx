@@ -16,6 +16,24 @@ import type { EvaluationPeriod } from '@/lib/evalPeriods';
 import { formatEvalPeriod } from '@/lib/evalPeriods';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 
+const STATUS_SORT_ORDER: Record<StaffDeliveryStatus, number> = {
+  not_released: 0,
+  released: 1,
+  viewed: 2,
+  reviewed: 3,
+  focus_set: 4,
+  draft: 5,
+  no_eval: 6,
+};
+
+function sortStaff(staff: LocationProgress['staffDetails']) {
+  return [...staff].sort((a, b) => {
+    const orderDiff = STATUS_SORT_ORDER[a.status] - STATUS_SORT_ORDER[b.status];
+    if (orderDiff !== 0) return orderDiff;
+    return a.staffName.localeCompare(b.staffName);
+  });
+}
+
 interface DeliveryTabProps {
   period: EvaluationPeriod;
   onPeriodChange: (period: EvaluationPeriod) => void;
@@ -52,7 +70,6 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
     queryClient.invalidateQueries({ queryKey: ['eval-coverage-v2'] });
   };
 
-  // Bulk release/hide for a location
   const bulkVisibilityMutation = useMutation({
     mutationFn: async ({ locationId, visible }: { locationId: string; visible: boolean }) => {
       return bulkSetVisibilityByLocation(locationId, period, visible, staffProfile?.id ?? '');
@@ -65,7 +82,6 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  // Single eval release/hide
   const singleVisibilityMutation = useMutation({
     mutationFn: async ({ evalId, visible }: { evalId: string; visible: boolean }) => {
       return setEvaluationVisibility(evalId, visible, staffProfile?.id ?? '');
@@ -129,6 +145,9 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
         ))}
       </div>
 
+      {/* Delivery summary strip */}
+      <DeliverySummary locations={filteredLocations} />
+
       {/* Location list */}
       <div className="space-y-2">
         {filteredLocations.length === 0 ? (
@@ -160,18 +179,37 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
   );
 }
 
-/* ── Release status badge for a location ── */
-function ReleaseStatusBadge({ loc }: { loc: LocationProgress }) {
-  if (loc.submittedCount === 0) {
-    return <Badge variant="outline" className="text-xs text-muted-foreground">No evals</Badge>;
-  }
-  if (loc.allVisible) {
-    return <Badge className="text-xs bg-green-600">Released</Badge>;
-  }
-  if (loc.visibleCount > 0) {
-    return <Badge className="text-xs bg-amber-500">Partial</Badge>;
-  }
-  return <Badge variant="outline" className="text-xs">Not released</Badge>;
+/* ── Delivery Summary Strip ── */
+function DeliverySummary({ locations }: { locations: LocationProgress[] }) {
+  const counts = useMemo(() => {
+    const c = { not_released: 0, released: 0, viewed: 0, reviewed: 0, focus_set: 0, draft: 0, no_eval: 0 };
+    locations.forEach(loc => loc.staffDetails.forEach(s => { c[s.status]++; }));
+    return c;
+  }, [locations]);
+
+  const total = counts.not_released + counts.released + counts.viewed + counts.reviewed + counts.focus_set;
+  if (total === 0 && counts.draft === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground py-2 px-1">
+      <span className="font-medium text-foreground">Delivery Summary</span>
+      <span>Not released: <strong className="text-foreground">{counts.not_released}</strong></span>
+      <span>Released: <strong className="text-foreground">{counts.released}</strong></span>
+      <span>Viewed: <strong className="text-foreground">{counts.viewed}</strong></span>
+      <span>Reviewed: <strong className="text-foreground">{counts.reviewed}</strong></span>
+      <span>Focus: <strong className="text-foreground">{counts.focus_set}</strong></span>
+      {counts.draft > 0 && <span>Draft: <strong className="text-foreground">{counts.draft}</strong></span>}
+    </div>
+  );
+}
+
+/* ── Progress chip for location row ── */
+function ProgressChip({ label, count, total }: { label: string; count: number; total?: number }) {
+  return (
+    <Badge variant="outline" className="text-xs font-normal gap-1 shrink-0">
+      {label} <strong>{total !== undefined ? `${count}/${total}` : count}</strong>
+    </Badge>
+  );
 }
 
 /* ── Location card with collapsible staff list ── */
@@ -185,42 +223,52 @@ interface LocationCardProps {
 
 function LocationCard({ location, statusFilter, isPending, onBulkRelease, onSingleRelease }: LocationCardProps) {
   const [open, setOpen] = useState(false);
-  const { locationName, organizationName, totalStaff, submittedCount, draftCount, allVisible, visibleCount, staffDetails } = location;
+  const { locationName, organizationName, totalStaff, submittedCount, draftCount, visibleCount, staffDetails } = location;
 
-  const filteredStaff = statusFilter === 'all'
-    ? staffDetails
-    : staffDetails.filter(s => s.status === statusFilter);
+  const filteredStaff = useMemo(() => {
+    const base = statusFilter === 'all' ? staffDetails : staffDetails.filter(s => s.status === statusFilter);
+    return sortStaff(base);
+  }, [staffDetails, statusFilter]);
 
   const hasUnreleased = submittedCount > visibleCount;
   const hasVisible = visibleCount > 0;
+
+  // Compute per-status counts for progress chips
+  const statusCounts = useMemo(() => {
+    const c = { released: 0, viewed: 0, reviewed: 0, focus_set: 0 };
+    staffDetails.forEach(s => {
+      if (s.status in c) c[s.status as keyof typeof c]++;
+    });
+    return c;
+  }, [staffDetails]);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="border rounded-lg">
         <CollapsibleTrigger asChild>
-          <button className="w-full grid grid-cols-[1rem_1fr_10rem_7rem_auto] items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left">
-            <ChevronRight className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
-            <div className="min-w-0">
-              <span className="font-medium">{locationName}</span>
-              <span className="text-muted-foreground text-sm ml-2">{organizationName}</span>
+          <button className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left">
+            {/* Left cluster */}
+            <div className="flex items-center gap-2 min-w-0">
+              <ChevronRight className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+              <span className="font-medium truncate">{locationName}</span>
+              <span className="text-muted-foreground text-sm shrink-0">{organizationName}</span>
             </div>
-            <span className="text-sm text-muted-foreground whitespace-nowrap text-right">
-              {submittedCount}/{totalStaff} submitted
-              {draftCount > 0 && <span className="text-amber-600 ml-1">({draftCount} draft)</span>}
-            </span>
-            <div className="justify-self-center">
-              <ReleaseStatusBadge loc={location} />
+
+            {/* Middle cluster: progress chips */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <ProgressChip label="Submitted" count={submittedCount} total={totalStaff} />
+              {draftCount > 0 && <ProgressChip label="Draft" count={draftCount} />}
+              {statusCounts.released > 0 && <ProgressChip label="Released" count={statusCounts.released} />}
+              {statusCounts.viewed > 0 && <ProgressChip label="Viewed" count={statusCounts.viewed} />}
+              {statusCounts.reviewed > 0 && <ProgressChip label="Reviewed" count={statusCounts.reviewed} />}
+              {statusCounts.focus_set > 0 && <ProgressChip label="Focus" count={statusCounts.focus_set} />}
             </div>
-            {/* Bulk actions */}
-            <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
+
+            {/* Right cluster: Release All only in collapsed */}
+            <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
               {hasUnreleased && (
                 <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={isPending} onClick={() => onBulkRelease(true)}>
                   <Eye className="w-3 h-3" /> Release All
-                </Button>
-              )}
-              {hasVisible && (
-                <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" disabled={isPending} onClick={() => onBulkRelease(false)}>
-                  <EyeOff className="w-3 h-3" /> Hide All
                 </Button>
               )}
             </div>
@@ -229,8 +277,24 @@ function LocationCard({ location, statusFilter, isPending, onBulkRelease, onSing
 
         <CollapsibleContent>
           <div className="border-t py-2 space-y-0">
+            {/* Hide All button inside expanded area */}
+            {hasVisible && (
+              <div className="flex justify-end px-4 pb-1">
+                <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-muted-foreground" disabled={isPending} onClick={() => onBulkRelease(false)}>
+                  <EyeOff className="w-3 h-3" /> Hide All
+                </Button>
+              </div>
+            )}
+
+            {/* Filter annotation */}
+            {statusFilter !== 'all' && (
+              <p className="text-xs text-muted-foreground pl-10 px-4 pb-1">
+                Showing {filteredStaff.length} of {staffDetails.length} staff ({statusFilter.replace('_', ' ')})
+              </p>
+            )}
+
             {filteredStaff.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-2 px-4 pl-11">No staff matching filter.</p>
+              <p className="text-sm text-muted-foreground py-2 px-4 pl-10">No staff matching filter.</p>
             ) : (
               filteredStaff.map(s => (
                 <StaffRow
@@ -260,16 +324,20 @@ function StaffRow({ staff, isPending, onRelease }: StaffRowProps) {
   const showHide = ['released', 'viewed', 'reviewed', 'focus_set'].includes(staff.status);
 
   return (
-    <div className="grid grid-cols-[1rem_1fr_10rem_7rem_auto] items-center gap-3 py-1.5 px-4">
-      <div /> {/* spacer aligned with chevron */}
+    <div className="flex items-center justify-between pl-10 py-1.5 px-4">
+      {/* Left: name + role */}
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-sm truncate">{staff.staffName}</span>
         {staff.roleName && <span className="text-xs text-muted-foreground shrink-0">{staff.roleName}</span>}
+      </div>
+
+      {/* Middle: status pill */}
+      <div className="mx-4">
         <DeliveryStatusPill status={staff.status} />
       </div>
-      <div /> {/* coverage column spacer */}
-      <div /> {/* status column spacer */}
-      <div className="flex gap-1 justify-end">
+
+      {/* Right: action */}
+      <div className="shrink-0">
         {showRelease && (
           <Button size="sm" variant="outline" className="h-6 text-xs gap-1" disabled={isPending} onClick={() => onRelease(true)}>
             <Eye className="w-3 h-3" /> Release

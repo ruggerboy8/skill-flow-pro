@@ -41,3 +41,9 @@ verify_jwt = true
 
 [functions.format-pro-move-content]
 verify_jwt = true
+
+[functions.polish-note]
+verify_jwt = false
+
+[functions.notify-eval-release]
+verify_jwt = true

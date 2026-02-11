@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText, Eye, User, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileText, Eye, User, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getEvaluation } from '@/lib/evaluations';
@@ -158,6 +158,8 @@ export default function EvaluationViewer() {
   const [error, setError] = useState<string | null>(null);
   const [backUrl, setBackUrl] = useState('/stats/evaluations');
   const [activeTab, setActiveTab] = useState('scores');
+  const [isOwnEval, setIsOwnEval] = useState(false);
+  const [needsReview, setNeedsReview] = useState(false);
 
   useEffect(() => {
     if (!user || !evalId) return;
@@ -218,6 +220,19 @@ export default function EvaluationViewer() {
         if ((isCoach || isSuperAdmin) && evalData.staff_id !== staff.id) {
           setBackUrl(`/coach/${evalData.staff_id}`);
         }
+
+        // Mark viewed only if staff is viewing their OWN evaluation
+        if (isOwnEval && evalData.is_visible_to_staff) {
+          try {
+            await supabase.rpc('mark_eval_viewed', { p_eval_id: evalId });
+          } catch (e) {
+            console.warn('Failed to mark eval as viewed:', e);
+          }
+        }
+
+        // Track whether this is own eval and if review is needed
+        setIsOwnEval(isOwnEval);
+        setNeedsReview(isOwnEval && evalData.is_visible_to_staff && !(evalData as any).acknowledged_at);
 
         setEvaluation(evalData);
       } catch (err) {
@@ -306,7 +321,7 @@ export default function EvaluationViewer() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">
             {staffName && `${staffName} - `}{evaluation.type} {evaluation.quarter} {evaluation.program_year} Evaluation
           </h1>
@@ -317,6 +332,17 @@ export default function EvaluationViewer() {
             Observer items scored {observerScored}/{totalItems} • Self items scored {selfScored}/{totalItems}
           </p>
         </div>
+        {needsReview && (
+          <Button onClick={() => navigate(`/evaluation/${evalId}/review`)}>
+            Start Review
+          </Button>
+        )}
+        {isOwnEval && !needsReview && evaluation.is_visible_to_staff && (
+          <Badge variant="secondary" className="flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" />
+            Review completed
+          </Badge>
+        )}
       </div>
 
       {/* Tabbed Interface */}

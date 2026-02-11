@@ -31,6 +31,7 @@ import { EvaluationHub } from "@/pages/coach/EvaluationHub";
 import AdminPage from "@/pages/AdminPage";
 import EvalResultsV2 from "@/pages/admin/EvalResultsV2";
 import EvaluationViewer from "@/pages/EvaluationViewer";
+import EvaluationReview from "@/pages/EvaluationReview";
 import AdminBuilder from "@/pages/AdminBuilder";
 import CycleList from "@/pages/admin/CycleList";
 import WeekList from "@/pages/admin/WeekList";
@@ -151,6 +152,7 @@ function AppRoutes() {
         <Route path="admin/eval-results" element={<Navigate to="/admin/evaluations" replace />} />
         <Route path="admin/eval-results-v2" element={<Navigate to="/admin/evaluations" replace />} />
         <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
+        <Route path="evaluation/:evalId/review" element={<EvaluationReview />} />
         <Route path="builder" element={<AdminBuilder />} />
         <Route path="builder/:roleId" element={<CycleList />} />
         <Route path="builder/:roleId/:cycle" element={<WeekList />} />

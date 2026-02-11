@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DomainBadge } from '@/components/ui/domain-badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye } from 'lucide-react';
@@ -319,9 +320,7 @@ export default function EvaluationReview() {
                 <p className="text-muted-foreground text-sm">Limited data available for this evaluation. Here's a summary by domain:</p>
                 {payload.domain_summaries.map(ds => (
                   <div key={ds.domain_name} className="flex items-center gap-3 py-2 border-b last:border-0">
-                    <Badge variant="outline" style={{ borderColor: getDomainColor(ds.domain_name) }}>
-                      {ds.domain_name}
-                    </Badge>
+                    <DomainBadge domain={ds.domain_name} />
                     <span className="text-sm">
                       Coach avg: <strong>{ds.observer_avg}</strong>
                       {ds.self_avg != null && <> · Self avg: <strong>{ds.self_avg}</strong></>}
@@ -504,9 +503,7 @@ function Step4ProMoves({
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 {domainName && (
-                   <Badge variant="outline" className="text-xs text-foreground" style={{ borderColor: getDomainColor(domainName), backgroundColor: getDomainColor(domainName) }}>
-                    {domainName}
-                  </Badge>
+                   <DomainBadge domain={domainName} />
                 )}
                 <span className="font-medium text-sm">{compName}</span>
                 <Badge variant="secondary" className="text-xs ml-auto">

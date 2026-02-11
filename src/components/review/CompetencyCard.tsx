@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { DomainBadge } from '@/components/ui/domain-badge';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { getDomainColor } from '@/lib/domainColors';
 import type { ReviewPayloadItem } from '@/lib/reviewPayload';
 import { cn } from '@/lib/utils';
 
@@ -37,16 +36,7 @@ export function CompetencyCard({ item, selected, onSelect, disabled, readOnly }:
     >
       {/* Header row: domain badge + name */}
       <div className="flex items-start gap-2">
-        <Badge
-          variant="outline"
-          className="shrink-0 text-xs text-foreground"
-          style={{
-            borderColor: getDomainColor(item.domain_name),
-            backgroundColor: getDomainColor(item.domain_name),
-          }}
-        >
-          {item.domain_name}
-        </Badge>
+        <DomainBadge domain={item.domain_name} className="mt-0.5" />
         <div className="flex-1">
           <span className="text-sm font-medium leading-snug">{item.competency_name}</span>
           {item.tagline && (

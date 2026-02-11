@@ -17,8 +17,21 @@ async function transcribeWithWhisper(
   audioFile: File,
   openAIApiKey: string
 ): Promise<{ transcript: string }> {
+  // Derive correct extension from MIME type to satisfy Whisper validation
+  const mimeToExt: Record<string, string> = {
+    'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a',
+    'audio/mpeg': 'mp3', 'audio/mp3': 'mp3',
+    'audio/webm': 'webm', 'video/webm': 'webm',
+    'audio/ogg': 'ogg', 'audio/flac': 'flac',
+    'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/wave': 'wav',
+    'audio/oga': 'oga', 'audio/mpga': 'mpga',
+    'video/mp4': 'mp4',
+  };
+  const ext = mimeToExt[audioFile.type] || 'webm';
+  const fileName = `audio.${ext}`;
+
   const whisperFormData = new FormData();
-  whisperFormData.append('file', audioFile, audioFile.name || 'audio.webm');
+  whisperFormData.append('file', audioFile, fileName);
   whisperFormData.append('model', 'whisper-1');
   whisperFormData.append('language', 'en');
 

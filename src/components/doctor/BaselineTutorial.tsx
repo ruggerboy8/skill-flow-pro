@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 
 interface BaselineTutorialProps {
@@ -168,7 +169,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     pointerEvents: 'none',
   };
 
-  return (
+  return createPortal(
     <>
       <div style={highlightStyle} />
 
@@ -204,6 +205,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
           ))}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

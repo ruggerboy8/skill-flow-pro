@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
+import { getDomainColor } from '@/lib/domainColors';
 import type { ReviewPayloadItem } from '@/lib/reviewPayload';
 import { cn } from '@/lib/utils';
 
@@ -39,22 +39,21 @@ export function CompetencyCard({ item, selected, onSelect, disabled, readOnly }:
       <div className="flex items-start gap-2">
         <Badge
           variant="outline"
-          className="shrink-0 text-xs"
+          className="shrink-0 text-xs text-foreground"
           style={{
             borderColor: getDomainColor(item.domain_name),
-            backgroundColor: `hsl(${getDomainColorRaw(item.domain_name)} / 0.15)`,
-            color: getDomainColor(item.domain_name),
+            backgroundColor: getDomainColor(item.domain_name),
           }}
         >
           {item.domain_name}
         </Badge>
-        <span className="text-sm font-medium leading-snug flex-1">{item.competency_name}</span>
+        <span className="text-sm font-medium leading-snug flex-1">
+          {item.competency_name}
+          {item.tagline && (
+            <span className="text-xs italic text-muted-foreground font-normal"> — {item.tagline}</span>
+          )}
+        </span>
       </div>
-
-      {/* Tagline */}
-      {item.tagline && (
-        <p className="text-xs italic text-muted-foreground mt-1 ml-0.5">{item.tagline}</p>
-      )}
 
       {/* Scores row */}
       <div className="flex gap-4 mt-2 text-xs text-muted-foreground">

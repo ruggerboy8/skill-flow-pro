@@ -504,7 +504,7 @@ function Step4ProMoves({
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 {domainName && (
-                  <Badge variant="outline" className="text-xs" style={{ borderColor: getDomainColor(domainName) }}>
+                   <Badge variant="outline" className="text-xs text-foreground" style={{ borderColor: getDomainColor(domainName), backgroundColor: getDomainColor(domainName) }}>
                     {domainName}
                   </Badge>
                 )}

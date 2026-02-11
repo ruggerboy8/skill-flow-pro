@@ -1,6 +1,6 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface BaselineWelcomeProps {
   staffName: string;
@@ -12,44 +12,19 @@ export function BaselineWelcome({ staffName, onStart, isLoading }: BaselineWelco
   return (
     <Card className="max-w-2xl mx-auto">
       <CardHeader className="text-center">
-        <div className="flex justify-center mb-4">
-          <div className="p-4 bg-primary/10 rounded-full">
-            <ClipboardList className="h-12 w-12 text-primary" />
-          </div>
-        </div>
-        <CardTitle className="text-2xl">Welcome, {staffName}</CardTitle>
-        <CardDescription className="text-base mt-2">
-          You're about to complete your baseline self-assessment
-        </CardDescription>
+        <CardTitle className="text-2xl">Hey {staffName},</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-          <h3 className="font-semibold">What to expect:</h3>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li className="flex items-start gap-2">
-              <span className="text-primary font-bold">•</span>
-              <span>You'll rate yourself on each Doctor Pro Move across several clinical domains</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary font-bold">•</span>
-              <span>Each Pro Move includes supporting materials to help calibrate your rating</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary font-bold">•</span>
-              <span>This is a self-reflection exercise — not a test or evaluation</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary font-bold">•</span>
-              <span>Your ratings will inform a coaching conversation, not a performance review</span>
-            </li>
-          </ul>
-        </div>
-
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-          <p className="text-sm text-center italic text-muted-foreground">
-            "The goal is calibration, not grading. Be honest about where you are today — 
-            that's the foundation for meaningful growth."
+        <div className="bg-muted/50 rounded-lg p-5 space-y-4 text-sm text-muted-foreground leading-relaxed">
+          <p>I'm excited to go through this with you.</p>
+          <p>
+            Here's how this works: you'll go through each of the Doctor Pro Moves and rate yourself 
+            on a simple 1–4 scale. This isn't a test — it's a starting point for our conversation.
           </p>
+          <p>
+            Be honest about where you are today. That's what makes this useful.
+          </p>
+          <p className="text-right font-medium text-foreground">— Dr. Alex</p>
         </div>
 
         <Button 

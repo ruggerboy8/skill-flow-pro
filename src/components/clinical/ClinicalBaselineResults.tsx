@@ -483,7 +483,7 @@ export function ClinicalBaselineResults({
                     <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/10 text-xs text-muted-foreground">
                       <button
                         onClick={() => setSortBy('self')}
-                        className={`w-8 text-center font-medium flex items-center justify-center gap-0.5 cursor-pointer transition-colors ${sortBy === 'self' ? 'text-foreground' : 'hover:text-foreground/70'}`}
+                        className={`px-2 py-0.5 rounded text-center font-semibold flex items-center justify-center gap-0.5 cursor-pointer transition-all ${sortBy === 'self' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted'}`}
                       >
                         Self
                         {sortBy === 'self' && <ArrowDown className="h-3 w-3" />}
@@ -491,7 +491,7 @@ export function ClinicalBaselineResults({
                       {showCoachRatings && (
                         <button
                           onClick={() => setSortBy('coach')}
-                          className={`w-8 text-center font-medium flex items-center justify-center gap-0.5 cursor-pointer transition-colors ${sortBy === 'coach' ? 'text-foreground' : 'hover:text-foreground/70'}`}
+                          className={`px-2 py-0.5 rounded text-center font-semibold flex items-center justify-center gap-0.5 cursor-pointer transition-all ${sortBy === 'coach' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted'}`}
                         >
                           Coach
                           {sortBy === 'coach' && <ArrowDown className="h-3 w-3" />}
@@ -597,7 +597,6 @@ export function ClinicalBaselineResults({
         proMoveId={selectedItem?.action_id || null}
         proMoveStatement={selectedItem?.action_statement || ''}
         onClose={() => setSelectedItem(null)}
-        noteText={selectedItem?.self_note}
       />
     </Collapsible>
   );

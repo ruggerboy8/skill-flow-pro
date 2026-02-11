@@ -128,7 +128,7 @@ export function ClinicalBaselineResults({
     enabled: !!assessmentId,
   });
 
-  // Lazy-fetch coach ratings only when toggle is ON
+  // Always fetch coach ratings (needed for tally cards)
   const { data: coachItems } = useQuery({
     queryKey: ['coach-baseline-items-compare', staffId, myStaff?.id],
     queryFn: async () => {
@@ -151,7 +151,7 @@ export function ClinicalBaselineResults({
       if (error) throw error;
       return data || [];
     },
-    enabled: showCoachRatings && !!myStaff?.id,
+    enabled: !!myStaff?.id,
   });
 
   // Build coach ratings lookup
@@ -388,15 +388,7 @@ export function ClinicalBaselineResults({
             </div>
             {/* Coach row */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Coach Rating</p>
-                <div className="flex items-center gap-2">
-                  <Switch id="show-coach-ratings" checked={showCoachRatings} onCheckedChange={setShowCoachRatings} />
-                  <Label htmlFor="show-coach-ratings" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
-                    Coach ratings
-                  </Label>
-                </div>
-              </div>
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Coach Rating</p>
               <div className="grid grid-cols-4 gap-2">
                 {[4, 3, 2, 1].map((score) => {
                   const colors = SCORE_COLORS[score];
@@ -459,6 +451,12 @@ export function ClinicalBaselineResults({
                       </Label>
                     </div>
                   )}
+                  <div className="flex items-center gap-2">
+                    <Switch id="show-coach-ratings" checked={showCoachRatings} onCheckedChange={setShowCoachRatings} />
+                    <Label htmlFor="show-coach-ratings" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                      Coach ratings
+                    </Label>
+                  </div>
                 </div>
               </div>
 

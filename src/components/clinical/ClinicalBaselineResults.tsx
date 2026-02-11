@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
-import { ClipboardCheck, CheckCircle2, Clock, AlertCircle, ChevronDown, MessageSquare } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Clock, AlertCircle, ChevronDown, MessageSquare, Eye } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface ClinicalBaselineResultsProps {
@@ -40,7 +41,6 @@ interface GroupedData {
   [domainName: string]: DomainData;
 }
 
-// Canonical domain order
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
 
 export function ClinicalBaselineResults({ 
@@ -49,8 +49,10 @@ export function ClinicalBaselineResults({
   status,
   completedAt 
 }: ClinicalBaselineResultsProps) {
+  const { data: myStaff } = useStaffProfile();
   const [selectedItem, setSelectedItem] = useState<BaselineItem | null>(null);
   const [showOnlyNoted, setShowOnlyNoted] = useState(false);
+  const [showCoachRatings, setShowCoachRatings] = useState(false);
 
   // Fetch baseline assessment with flagged domains
   const { data: baseline } = useQuery({
@@ -62,19 +64,17 @@ export function ClinicalBaselineResults({
         .select('id, flagged_domains, reflection_original, reflection_formatted')
         .eq('id', assessmentId)
         .maybeSingle();
-      
       if (error) throw error;
       return data;
     },
     enabled: !!assessmentId,
   });
 
-  // Fetch baseline items with pro moves and domain info
+  // Fetch baseline items
   const { data: items, isLoading: loadingItems } = useQuery({
     queryKey: ['clinical-baseline-items', assessmentId],
     queryFn: async () => {
       if (!assessmentId) return [];
-      
       const { data, error } = await supabase
         .from('doctor_baseline_items')
         .select(`
@@ -94,10 +94,7 @@ export function ClinicalBaselineResults({
         `)
         .eq('assessment_id', assessmentId)
         .not('self_score', 'is', null);
-      
       if (error) throw error;
-      
-      // Flatten the nested structure
       return (data || []).map((item: any) => ({
         action_id: item.action_id,
         self_score: item.self_score,
@@ -111,7 +108,41 @@ export function ClinicalBaselineResults({
     enabled: !!assessmentId,
   });
 
-  // Get total doctor ProMoves for progress calculation
+  // Lazy-fetch coach ratings only when toggle is ON
+  const { data: coachItems } = useQuery({
+    queryKey: ['coach-baseline-items-compare', staffId, myStaff?.id],
+    queryFn: async () => {
+      if (!myStaff?.id) return [];
+      // Find the coach assessment for this doctor
+      const { data: assessment, error: aErr } = await supabase
+        .from('coach_baseline_assessments')
+        .select('id')
+        .eq('doctor_staff_id', staffId)
+        .eq('coach_staff_id', myStaff.id)
+        .eq('status', 'completed')
+        .maybeSingle();
+      if (aErr) throw aErr;
+      if (!assessment) return [];
+
+      const { data, error } = await supabase
+        .from('coach_baseline_items')
+        .select('action_id, rating')
+        .eq('assessment_id', assessment.id)
+        .not('rating', 'is', null);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: showCoachRatings && !!myStaff?.id,
+  });
+
+  // Build coach ratings lookup
+  const coachRatingsMap = useMemo(() => {
+    const map = new Map<number, number>();
+    coachItems?.forEach(ci => { if (ci.rating !== null) map.set(ci.action_id, ci.rating); });
+    return map;
+  }, [coachItems]);
+
+  // Get total doctor ProMoves
   const { data: totalProMoves } = useQuery({
     queryKey: ['doctor-pro-moves-count'],
     queryFn: async () => {
@@ -120,7 +151,6 @@ export function ClinicalBaselineResults({
         .select('*', { count: 'exact', head: true })
         .eq('role_id', 4)
         .eq('active', true);
-      
       if (error) throw error;
       return count || 0;
     },
@@ -129,39 +159,26 @@ export function ClinicalBaselineResults({
   // Group items by domain -> score
   const groupedByDomain = useMemo(() => {
     if (!items) return {} as GroupedData;
-    
     const grouped: GroupedData = {};
-    
     items.forEach((item) => {
       const domain = item.domain_name;
-      if (!grouped[domain]) {
-        grouped[domain] = { 4: [], 3: [], 2: [], 1: [] };
-      }
+      if (!grouped[domain]) grouped[domain] = { 4: [], 3: [], 2: [], 1: [] };
       const score = item.self_score;
-      if (score >= 1 && score <= 4) {
-        grouped[domain][score].push(item);
-      }
+      if (score >= 1 && score <= 4) grouped[domain][score].push(item);
     });
-    
     return grouped;
   }, [items]);
 
-  // Calculate tally counts
   const tallyCounts = useMemo(() => {
     const counts = { 4: 0, 3: 0, 2: 0, 1: 0 };
     items?.forEach((item) => {
       const score = item.self_score;
-      if (score >= 1 && score <= 4) {
-        counts[score as keyof typeof counts]++;
-      }
+      if (score >= 1 && score <= 4) counts[score as keyof typeof counts]++;
     });
     return counts;
   }, [items]);
 
-  // Get domains in canonical order
-  const orderedDomains = useMemo(() => {
-    return DOMAIN_ORDER.filter((d) => groupedByDomain[d]);
-  }, [groupedByDomain]);
+  const orderedDomains = useMemo(() => DOMAIN_ORDER.filter((d) => groupedByDomain[d]), [groupedByDomain]);
 
   const flaggedDomains = (baseline?.flagged_domains as string[]) || [];
   const completedCount = items?.length || 0;
@@ -178,9 +195,7 @@ export function ClinicalBaselineResults({
             </div>
             <div>
               <h2 className="text-xl font-semibold">Baseline Assessment</h2>
-              <p className="text-muted-foreground mt-1">
-                The doctor has not yet started their baseline assessment.
-              </p>
+              <p className="text-muted-foreground mt-1">The doctor has not yet started their baseline assessment.</p>
             </div>
           </div>
         </div>
@@ -188,16 +203,11 @@ export function ClinicalBaselineResults({
     );
   }
 
-  // Loading state
   if (loadingItems) {
     return (
       <Card className="border-0 shadow-lg">
-        <CardHeader>
-          <Skeleton className="h-8 w-64" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-32 w-full" />
-        </CardContent>
+        <CardHeader><Skeleton className="h-8 w-64" /></CardHeader>
+        <CardContent><Skeleton className="h-32 w-full" /></CardContent>
       </Card>
     );
   }
@@ -214,9 +224,7 @@ export function ClinicalBaselineResults({
             <div className="flex-1">
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-semibold">Baseline Assessment</h2>
-                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-300">
-                  In Progress
-                </Badge>
+                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-300">In Progress</Badge>
               </div>
               <div className="mt-4 space-y-2">
                 <div className="flex justify-between text-sm">
@@ -232,7 +240,6 @@ export function ClinicalBaselineResults({
     );
   }
 
-  // Score color config
   const SCORE_COLORS: Record<number, { bg: string; border: string; text: string }> = {
     4: { bg: 'hsl(160 60% 95%)', border: 'hsl(160 50% 80%)', text: 'hsl(160 80% 25%)' },
     3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)' },
@@ -240,22 +247,18 @@ export function ClinicalBaselineResults({
     1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)' },
   };
 
-  // Flatten and sort items by score descending for each domain
   const getSortedDomainItems = (domain: string) => {
     const domainData = groupedByDomain[domain];
     if (!domainData) return [];
     let result = Object.entries(domainData)
       .flatMap(([score, items]) => items.map(item => ({ ...item, score: Number(score) })))
       .sort((a, b) => b.score - a.score);
-    if (showOnlyNoted) {
-      result = result.filter(item => item.self_note?.trim());
-    }
+    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim());
     return result;
   };
 
   const hasAnyNotes = items?.some(item => item.self_note?.trim()) ?? false;
 
-  // Completed state - full results view
   return (
     <Collapsible defaultOpen className="space-y-4">
       <Card className="overflow-hidden border-0 shadow-lg">
@@ -268,9 +271,7 @@ export function ClinicalBaselineResults({
               <div className="flex-1 text-left">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold">Baseline Self-Assessment</h2>
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300">
-                    Complete
-                  </Badge>
+                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300">Complete</Badge>
                 </div>
                 {completedAt && (
                   <p className="text-sm text-muted-foreground mt-0.5">
@@ -292,7 +293,7 @@ export function ClinicalBaselineResults({
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          {/* Tally Row - Score Summary */}
+          {/* Tally Row */}
           <div className="grid grid-cols-4 gap-2 p-4 border-b bg-muted/20">
             {[
               { score: 4, label: 'Exceptional' },
@@ -302,17 +303,9 @@ export function ClinicalBaselineResults({
             ].map(({ score, label }) => {
               const colors = SCORE_COLORS[score];
               return (
-                <div 
-                  key={score} 
-                  className="text-center py-3 px-2 rounded-lg border"
-                  style={{ backgroundColor: colors.bg, borderColor: colors.border }}
-                >
-                  <div className="text-2xl font-bold" style={{ color: colors.text }}>
-                    {tallyCounts[score as keyof typeof tallyCounts]}
-                  </div>
-                  <div className="text-xs font-medium" style={{ color: colors.text }}>
-                    {label}
-                  </div>
+                <div key={score} className="text-center py-3 px-2 rounded-lg border" style={{ backgroundColor: colors.bg, borderColor: colors.border }}>
+                  <div className="text-2xl font-bold" style={{ color: colors.text }}>{tallyCounts[score as keyof typeof tallyCounts]}</div>
+                  <div className="text-xs font-medium" style={{ color: colors.text }}>{label}</div>
                 </div>
               );
             })}
@@ -321,92 +314,84 @@ export function ClinicalBaselineResults({
           {/* Domain Tabs */}
           {orderedDomains.length > 0 && (
             <Tabs defaultValue={orderedDomains[0]} className="w-full">
-              <div className="border-b flex items-center justify-between">
+              <div className="border-b flex items-center justify-between flex-wrap gap-2">
                 <TabsList className="flex-1 h-auto p-0 bg-transparent rounded-none">
                   {orderedDomains.map((domain) => {
                     const domainColor = getDomainColorRichRaw(domain);
                     const isFlagged = flaggedDomains.includes(domain);
                     return (
-                      <TabsTrigger 
-                        key={domain} 
-                        value={domain} 
+                      <TabsTrigger
+                        key={domain}
+                        value={domain}
                         className="flex-1 py-3 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-muted/50 font-medium transition-all"
                       >
-                        <span 
-                          className="w-2.5 h-2.5 rounded-full mr-2"
-                          style={{ backgroundColor: `hsl(${domainColor})` }}
-                        />
+                        <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: `hsl(${domainColor})` }} />
                         {domain}
-                        {isFlagged && (
-                          <AlertCircle className="h-3.5 w-3.5 ml-1.5 text-amber-500" />
-                        )}
+                        {isFlagged && <AlertCircle className="h-3.5 w-3.5 ml-1.5 text-amber-500" />}
                       </TabsTrigger>
                     );
                   })}
                 </TabsList>
-                {hasAnyNotes && (
-                  <div className="flex items-center gap-2 px-4">
-                    <Switch
-                      id="show-only-noted"
-                      checked={showOnlyNoted}
-                      onCheckedChange={setShowOnlyNoted}
-                    />
-                    <Label htmlFor="show-only-noted" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
-                      <MessageSquare className="h-3 w-3 inline mr-1" />
-                      Noted only
+                <div className="flex items-center gap-4 px-4">
+                  {hasAnyNotes && (
+                    <div className="flex items-center gap-2">
+                      <Switch id="show-only-noted" checked={showOnlyNoted} onCheckedChange={setShowOnlyNoted} />
+                      <Label htmlFor="show-only-noted" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                        <MessageSquare className="h-3 w-3 inline mr-1" />Noted only
+                      </Label>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Switch id="show-coach-ratings" checked={showCoachRatings} onCheckedChange={setShowCoachRatings} />
+                    <Label htmlFor="show-coach-ratings" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                      <Eye className="h-3 w-3 inline mr-1" />My ratings
                     </Label>
                   </div>
-                )}
+                </div>
               </div>
 
               {orderedDomains.map((domain) => {
                 const sortedItems = getSortedDomainItems(domain);
                 const isFlagged = flaggedDomains.includes(domain);
-                
+
                 return (
-                  <TabsContent 
-                    key={domain} 
-                    value={domain} 
-                    className="mt-0 p-0"
-                  >
+                  <TabsContent key={domain} value={domain} className="mt-0 p-0">
                     {isFlagged && (
                       <div className="px-4 py-2 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-200 dark:border-amber-800">
                         <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm">
-                          <AlertCircle className="h-4 w-4" />
-                          Doctor flagged this domain for discussion
+                          <AlertCircle className="h-4 w-4" />Doctor flagged this domain for discussion
                         </div>
                       </div>
                     )}
-                    
-                    {/* Pro Move Rows - sorted by score descending */}
+
                     <div className="divide-y">
                       {sortedItems.map((item) => {
                         const colors = SCORE_COLORS[item.score];
+                        const coachScore = coachRatingsMap.get(item.action_id);
+                        const hasBigDiff = coachScore !== undefined && Math.abs(item.self_score - coachScore) >= 2;
+
                         return (
                           <button
                             key={item.action_id}
                             onClick={() => setSelectedItem(item)}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group"
-                            style={{ backgroundColor: colors.bg }}
+                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left group ${hasBigDiff ? 'ring-1 ring-inset ring-amber-300 dark:ring-amber-700' : ''}`}
+                            style={{ backgroundColor: hasBigDiff ? 'hsl(38 90% 97%)' : colors.bg }}
                           >
-                            <div 
+                            <div
                               className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border"
-                              style={{ 
-                                backgroundColor: colors.bg, 
-                                borderColor: colors.border,
-                                color: colors.text 
-                              }}
+                              style={{ backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }}
                             >
                               {item.score}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground">
-                                {item.action_statement}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {item.competency_name}
-                              </p>
+                              <p className="text-sm font-medium text-foreground">{item.action_statement}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{item.competency_name}</p>
                             </div>
+                            {showCoachRatings && coachScore !== undefined && (
+                              <span className="flex-shrink-0 text-xs font-medium text-muted-foreground px-2 py-1 rounded bg-background border">
+                                You: {coachScore}
+                              </span>
+                            )}
                             {item.self_note?.trim() && (
                               <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
                             )}
@@ -420,20 +405,16 @@ export function ClinicalBaselineResults({
               })}
             </Tabs>
           )}
-          
+
           {/* Reflection Section */}
           {baseline?.reflection_formatted && (
             <div className="p-4">
-              <ReflectionSection
-                formatted={baseline.reflection_formatted}
-                original={baseline.reflection_original}
-              />
+              <ReflectionSection formatted={baseline.reflection_formatted} original={baseline.reflection_original} />
             </div>
           )}
         </CollapsibleContent>
       </Card>
 
-      {/* Materials Sheet */}
       <DoctorMaterialsSheet
         proMoveId={selectedItem?.action_id || null}
         proMoveStatement={selectedItem?.action_statement || ''}

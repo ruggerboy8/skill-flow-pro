@@ -169,6 +169,110 @@ export type Database = {
         }
         Relationships: []
       }
+      coach_baseline_assessments: {
+        Row: {
+          coach_staff_id: string
+          completed_at: string | null
+          created_at: string | null
+          doctor_staff_id: string
+          id: string
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          coach_staff_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          doctor_staff_id: string
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          coach_staff_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          doctor_staff_id?: string
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_baseline_assessments_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_baseline_assessments_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "coach_baseline_assessments_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_baseline_assessments_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
+      coach_baseline_items: {
+        Row: {
+          action_id: number
+          assessment_id: string
+          id: string
+          note_text: string | null
+          rating: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_id: number
+          assessment_id: string
+          id?: string
+          note_text?: string | null
+          rating?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_id?: number
+          assessment_id?: string
+          id?: string
+          note_text?: string | null
+          rating?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_baseline_items_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "coach_baseline_items_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "coach_baseline_assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coach_scopes: {
         Row: {
           created_at: string
@@ -2864,6 +2968,7 @@ export type Database = {
           self_avg: number
         }[]
       }
+      get_staff_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_staff_submission_windows: {
         Args: { p_since?: string; p_staff_id: string }
         Returns: {
@@ -3014,6 +3119,7 @@ export type Database = {
         }[]
       }
       is_admin: { Args: { check_user_id: string }; Returns: boolean }
+      is_clinical_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_coach_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_eligible_for_pro_moves: {
         Args: {

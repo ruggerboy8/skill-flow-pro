@@ -158,7 +158,7 @@ export default function EvaluationReview() {
   };
 
   const handleSave = async () => {
-    if (!evalId) return;
+    if (!evalId || !staffId) return;
     setSaving(true);
     try {
       const actionIds = Array.from(selectedActionIds);
@@ -166,6 +166,7 @@ export default function EvaluationReview() {
         p_eval_id: evalId,
         p_action_ids: actionIds,
         p_learner_note: learnerNote.trim() || null,
+        p_staff_id: staffId,
       });
       if (error) throw error;
       // Clean up sessionStorage

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 
 interface BaselineTutorialProps {
@@ -13,16 +13,16 @@ interface TutorialStep {
   title: string;
   description: string;
   position: 'bottom' | 'top' | 'right' | 'left-center';
-  requiresAction?: 'click-pro-move';
-  /** If true, closing this step will also close the materials drawer */
+  /** User must click the highlighted element to advance */
+  waitForUserClick?: boolean;
+  /** Close the materials drawer when advancing past this step */
   closeDrawerOnAdvance?: boolean;
 }
 
 export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMaterials, onCloseMaterials }: BaselineTutorialProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-  const [waitingForAction, setWaitingForAction] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerOpen = useRef(false);
 
   const steps: TutorialStep[] = [
     {
@@ -34,12 +34,11 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     {
       targetSelector: `#pm-text-${firstActionId}`,
       title: 'Tap to learn more',
-      description: 'Go ahead — tap this Pro Move now to see the learning materials.',
+      description: 'Tap this Pro Move now to see the learning materials.',
       position: 'bottom',
-      requiresAction: 'click-pro-move',
+      waitForUserClick: true,
     },
     {
-      // Target the sheet content panel
       targetSelector: '[data-tutorial-drawer]',
       title: 'Learning materials',
       description: "This is where you'll find everything you need — why this Pro Move matters, scripts you can use, and what great looks like. You can open this for any Pro Move anytime.",
@@ -67,9 +66,8 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
 
   useEffect(() => {
     updatePosition();
-    // Poll briefly for drawer elements that may not exist yet
-    const interval = setInterval(updatePosition, 200);
-    const timeout = setTimeout(() => clearInterval(interval), 3000);
+    const interval = setInterval(updatePosition, 150);
+    const timeout = setTimeout(() => clearInterval(interval), 5000);
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     return () => {
@@ -80,32 +78,42 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     };
   }, [updatePosition]);
 
-  // Listen for materials sheet opening to advance to the drawer explanation step
+  // For the "waitForUserClick" step: listen for the pro move click directly
   useEffect(() => {
-    if (!waitingForAction) return;
-    
-    const handleSheetOpened = () => {
-      setWaitingForAction(false);
-      setDrawerOpen(true);
-      // Wait for drawer animation to finish, then advance
-      setTimeout(() => {
-        setCurrentStep(prev => prev + 1);
-      }, 600);
+    const step = steps[currentStep];
+    if (!step?.waitForUserClick) return;
+
+    const el = document.querySelector(step.targetSelector) as HTMLElement | null;
+    if (!el) return;
+
+    const handler = () => {
+      // User clicked the pro move — it will open the drawer via normal flow.
+      // We need to wait for the drawer to appear, then advance.
+      drawerOpen.current = true;
+      const poll = setInterval(() => {
+        const drawerEl = document.querySelector('[data-tutorial-drawer]');
+        if (drawerEl) {
+          clearInterval(poll);
+          setCurrentStep(prev => prev + 1);
+        }
+      }, 50);
+      // Safety timeout
+      setTimeout(() => clearInterval(poll), 3000);
     };
 
-    window.addEventListener('tutorial-materials-opened', handleSheetOpened);
-    return () => window.removeEventListener('tutorial-materials-opened', handleSheetOpened);
-  }, [waitingForAction]);
+    el.addEventListener('click', handler);
+    return () => el.removeEventListener('click', handler);
+  }, [currentStep]);
 
   const advanceStep = () => {
     const step = steps[currentStep];
-    
-    // Close drawer if this step requires it
     if (step?.closeDrawerOnAdvance) {
       onCloseMaterials();
-      setDrawerOpen(false);
+      drawerOpen.current = false;
+      // Advance immediately — the note element is already in the DOM
+      setCurrentStep(prev => prev + 1);
+      return;
     }
-
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
@@ -114,19 +122,16 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
   };
 
   const handleNext = () => {
+    // Don't allow button-based advancement for waitForUserClick steps
     const step = steps[currentStep];
-    if (step?.requiresAction === 'click-pro-move') {
-      setWaitingForAction(true);
-      onForceOpenMaterials(firstActionId);
-      return;
-    }
+    if (step?.waitForUserClick) return;
     advanceStep();
   };
 
   const handleSkip = () => {
-    if (drawerOpen) {
+    if (drawerOpen.current) {
       onCloseMaterials();
-      setDrawerOpen(false);
+      drawerOpen.current = false;
     }
     onComplete();
   };
@@ -134,7 +139,6 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
   const step = steps[currentStep];
   if (!step || !targetRect) return null;
 
-  // Calculate tooltip position
   const padding = 12;
   const tooltipStyle: React.CSSProperties = { position: 'fixed', zIndex: 9999 };
 
@@ -148,12 +152,10 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     tooltipStyle.top = targetRect.top;
     tooltipStyle.left = targetRect.right + padding;
   } else if (step.position === 'left-center') {
-    // Position to the left of the drawer
     tooltipStyle.top = targetRect.top + targetRect.height / 2 - 80;
     tooltipStyle.right = window.innerWidth - targetRect.left + padding;
   }
 
-  // Cutout highlight
   const highlightStyle: React.CSSProperties = {
     position: 'fixed',
     top: targetRect.top - 4,
@@ -168,24 +170,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
 
   return (
     <>
-      {/* Backdrop cutout */}
       <div style={highlightStyle} />
-
-      {/* Allow clicking through to the target element for action steps */}
-      {step.requiresAction && (
-        <div
-          style={{
-            position: 'fixed',
-            top: targetRect.top - 4,
-            left: targetRect.left - 4,
-            width: targetRect.width + 8,
-            height: targetRect.height + 8,
-            zIndex: 9999,
-            cursor: 'pointer',
-          }}
-          onClick={() => handleNext()}
-        />
-      )}
 
       {/* Tooltip */}
       <div
@@ -202,18 +187,12 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
           >
             Skip
           </button>
-          {!step.requiresAction && (
+          {step.waitForUserClick ? (
+            <span className="text-xs text-muted-foreground italic">Tap the Pro Move above ↑</span>
+          ) : (
             <Button size="sm" onClick={handleNext}>
               {currentStep < steps.length - 1 ? 'Next' : 'Got it'}
             </Button>
-          )}
-          {step.requiresAction && !waitingForAction && (
-            <Button size="sm" onClick={handleNext}>
-              Tap it ↑
-            </Button>
-          )}
-          {waitingForAction && (
-            <span className="text-xs text-muted-foreground">Opening...</span>
           )}
         </div>
         <div className="flex gap-1 mt-2 justify-center">

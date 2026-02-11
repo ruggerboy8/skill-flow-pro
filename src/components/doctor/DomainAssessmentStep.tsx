@@ -63,16 +63,15 @@ export function DomainAssessmentStep({
   const noteRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
 
   // Allow external force-open of materials sheet (e.g. from tutorial)
+  const prevForceId = useRef<number | null | undefined>(undefined);
   useEffect(() => {
     if (forceOpenProMoveId != null) {
       setSelectedProMoveId(forceOpenProMoveId);
-      setTimeout(() => {
-        window.dispatchEvent(new Event('tutorial-materials-opened'));
-      }, 300);
-    } else {
-      // Close the drawer when force-open is cleared (e.g. tutorial advancing)
+    } else if (prevForceId.current != null) {
+      // Only close if we previously had a forced ID (tutorial closing the drawer)
       setSelectedProMoveId(null);
     }
+    prevForceId.current = forceOpenProMoveId;
   }, [forceOpenProMoveId]);
 
   const handleNoteChange = useCallback((actionId: number, noteText: string) => {

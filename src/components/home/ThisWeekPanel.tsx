@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CT_TZ } from '@/lib/centralTime';
@@ -32,8 +33,9 @@ interface WeeklyScore {
 }
 
 export default function ThisWeekPanel() {
-  const { user, isParticipant } = useAuth();
+  const { user } = useAuth();
   const { data: staff, isLoading: staffLoading } = useStaffProfile({ redirectToSetup: true });
+  const { isParticipant } = useUserRole();
   const { toast } = useToast();
   const navigate = useNavigate();
   const now = useNow();

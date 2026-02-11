@@ -47,12 +47,12 @@ export function CompetencyCard({ item, selected, onSelect, disabled, readOnly }:
         >
           {item.domain_name}
         </Badge>
-        <span className="text-sm font-medium leading-snug flex-1">
-          {item.competency_name}
+        <div className="flex-1">
+          <span className="text-sm font-medium leading-snug">{item.competency_name}</span>
           {item.tagline && (
-            <span className="text-xs italic text-muted-foreground font-normal"> — {item.tagline}</span>
+            <p className="text-xs italic text-muted-foreground mt-0.5">{item.tagline}</p>
           )}
-        </span>
+        </div>
       </div>
 
       {/* Scores row */}

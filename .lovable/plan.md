@@ -1,149 +1,229 @@
 
 
-# Evaluation Review Wizard -- Final Polish
+# Doctor Baseline Enhancements -- Implementation Plan
 
-## Summary
-
-Expand the wizard from 5 steps to 7, with each step having its own page and a warm, encouraging narrative. Add a "Note to Self" free-response step and display it on the Home focus card. Polish the coach note toggle and fix back-button behavior.
+Three features added to the baseline self-assessment, built in order of complexity.
 
 ---
 
-## Step-by-Step Flow (7 Steps)
+## Phase 1: Per-Pro-Move Notes (no migration needed)
 
-### Step 0 -- Welcome
+The `self_note` column already exists on `doctor_baseline_items`. This is purely UI work.
 
-**Title:** "{periodLabel} Evaluation Review"
+### Changes to `DomainAssessmentStep.tsx`
+- Add a `MessageSquare` icon button on each pro move row (right side, before the radio buttons or below the statement).
+- Clicking toggles an inline textarea below that row (animated expand/collapse).
+- Textarea value is the current `note` from `ratings[pm.action_id]?.note`.
+- On blur or after 600ms debounce, call a new `onNoteChange(actionId, noteText)` callback. This is separate from `onRatingChange` to handle the case where no rating exists yet.
 
-**Body:**
-> "Nice work completing your evaluation! Let's take a couple of minutes to look at what stood out and set yourself up for a great quarter."
->
-> Here's what we'll do together:
-> 1. **Take a look at your full evaluation** -- review all your scores and notes
-> 2. **Check out your highlights** -- see where you're shining and where you can grow
-> 3. **Pick a strength to keep crushing** -- choose one area you're already rocking
-> 4. **Choose two areas to grow** -- select competencies to focus on this quarter
-> 5. **Pick your ProMoves** -- practical actions to help you improve
-> 6. **Write a note to yourself** -- a personal reminder for the quarter ahead
->
-> "Your selections will be pinned to your Home page so they're always easy to find."
+### Changes to `BaselineWizard.tsx`
+- Add a new `saveNoteMutation` that upserts only `self_note` + `updated_at` on `doctor_baseline_items` (does not touch `self_score`). This avoids overwriting a null score.
+- Pass `onNoteChange` to `DomainAssessmentStep` alongside `onRatingChange`.
+- When a rating IS set and a note exists locally, continue sending both via the existing `saveRatingMutation`.
 
-**CTA:** "Let's Go" | "Exit to Home"
+### Changes to `DoctorBaselineResults.tsx` (doctor's view)
+- Update the query to include `self_note` in the select.
+- Add `self_note` to the `BaselineItem` interface.
+- Show a small `MessageSquare` icon on rows that have a note (`self_note?.trim()` is truthy).
+- Clicking a row already opens `DoctorMaterialsSheet` -- display the note text prominently above the materials content.
 
-### Step 1 -- View Full Evaluation (unchanged logic)
-
-**Body text update:**
-> "Before we dive in, take a moment to look through all your scores and coach notes. There's no rush -- come back whenever you're ready."
-
-**Skip text:** "I've already looked through it -- let's keep going"
-
-### Step 2 -- Highlights
-
-- Rename "Opportunities" heading to **"Opportunities for Growth"**
-- Strengths intro: "Here are a couple of areas where you really stood out."
-- Opportunities intro: "And here are a couple of areas where a little extra focus could make a big difference."
-
-### Step 3 -- Keep Crushing (NEW -- separate page, pick 1)
-
-**Title:** "Keep Crushing"
-
-**Body:**
-> "These were some of your strongest competencies this quarter. Pick one that you want to keep performing at a high level -- it's worth celebrating what you're already doing well."
-
-Show all `top_candidates` as selectable cards (radio-style).
-If `top_used_fallback`: title becomes "Your Strongest Areas" with slightly adjusted copy.
-
-**CTA:** "Next" (enabled when 1 selected)
-
-### Step 4 -- Improve This Quarter (NEW -- separate page, pick 2)
-
-**Title:** "Grow This Quarter"
-
-**Body:**
-> "These are some competencies that could really benefit from a little extra attention. Choose 2 that feel most important for you to focus on -- even small improvements here can make a real difference."
-
-Show all `bottom_candidates` as selectable cards (checkbox-style, max 2).
-
-**Progress:** "X of 2 selected"
-**CTA:** "Next" (enabled when 2 selected)
-
-### Step 5 -- ProMoves (updated copy)
-
-**Title:** "Choose Your ProMoves"
-
-**Body:**
-> "From the two areas you chose to grow in, which ProMoves feel most important for you right now? Pick 1 to 3 that you want to focus on this quarter."
-
-Same logic as current Step 4 otherwise.
-
-### Step 6 -- Note to Self (NEW)
-
-**Title:** "Note to Self"
-
-**Body:**
-> "Before you wrap up, take a moment to write yourself a quick reminder. What do you want to make sure you keep in mind this quarter?"
-
-**Placeholder:** "This quarter, I want to make sure I..."
-
-- Textarea, max 500 characters, with live character count
-- Primary CTA: "Complete My Review" (always enabled -- note is optional)
-- If they leave it blank, still completes fine
-
-### Step labels
-`['Welcome', 'Full Evaluation', 'Highlights', 'Keep Crushing', 'Grow', 'ProMoves', 'Note to Self']`
+### Changes to `ClinicalBaselineResults.tsx` (Alex's view)
+- Update the query to include `self_note`.
+- Add `self_note` to the `BaselineItem` interface.
+- Show `MessageSquare` icon on noted rows.
+- Add a "Show only noted" switch/toggle above the domain tabs. When ON, filter `sortedItems` to only those with `self_note?.trim()`. This filters within the current domain tab, not across domains.
+- When clicking a noted row, show the note text inline or in the materials sheet.
 
 ---
 
-## Back Button Fix
+## Phase 2: End-of-Assessment Reflection
 
-Store current `step` in `sessionStorage` keyed by `eval-review-step-{evalId}`. On mount, restore from storage. This way, navigating to the full evaluation page and pressing browser back returns to the correct step instead of restarting at Step 0.
+### Database Migration
+```sql
+ALTER TABLE doctor_baseline_assessments
+  ADD COLUMN reflection_original text,
+  ADD COLUMN reflection_formatted text,
+  ADD COLUMN reflection_mode text,
+  ADD COLUMN reflection_submitted_at timestamptz;
+```
+
+No `reflection_audio_path` in v1 -- audio is ephemeral (transcript-only storage).
+
+### New Edge Function: `format-reflection`
+- Follows the same pattern as `polish-note` (Lovable AI gateway, Gemini Flash).
+- System prompt enforces strict format-only constraints:
+  - "Do not add new information."
+  - "Do not remove any information."
+  - "Do not change tone or voice."
+  - "Do not paraphrase."
+  - "Only fix grammar, punctuation, and formatting."
+  - "If a sentence is unclear, keep wording but improve punctuation; do not reinterpret."
+  - "Preserve all proper nouns and clinical terms verbatim."
+  - "Output plain text only. Use bullet points if the speaker lists multiple items."
+- Guardrails:
+  - If output is >15% shorter than input (by character count), fall back to original.
+  - If output is empty/whitespace, fall back to original.
+  - If output starts with meta-commentary ("Here's", "Sure", "The cleaned"), strip first line and re-check, or fall back.
+- Returns `{ formatted: string }`.
+
+### Changes to `BaselineComplete.tsx`
+- After the success checkmark and "What happens next?" section, add a "Reflection (optional)" card.
+- Display the four guiding prompts as soft italic text (not form fields).
+- Two-tab or two-button input mode:
+  - **Type**: Textarea, character count shown.
+  - **Record**: Reuse the existing `AudioRecorder` component. On recording complete, call the existing `transcribe-audio` edge function. Show the transcript in an editable textarea.
+- "Submit Reflection" button calls:
+  1. `format-reflection` edge function with the text.
+  2. Updates `doctor_baseline_assessments` with `reflection_original`, `reflection_formatted`, `reflection_mode` ('typed' or 'voice'), and `reflection_submitted_at`.
+- After submission: show formatted text (read-only) with "View original" toggle and "Edit" button.
+- "Edit" re-opens the textarea with `reflection_original`, and re-runs formatting on submit.
+- This section never blocks the "Go to Home" button.
+
+### Changes to `DoctorBaselineResults.tsx`
+- Fetch `reflection_original`, `reflection_formatted`, `reflection_mode`, `reflection_submitted_at` from the baseline assessment query.
+- If reflection exists, show a collapsed "Reflection" section at the bottom with the formatted text and "View original" toggle.
+
+### Changes to `ClinicalBaselineResults.tsx`
+- Same as doctor view: fetch and display reflection in a collapsed section at the bottom (read-only for Alex).
 
 ---
 
-## Coach Note Toggle (CompetencyCard)
+## Phase 3: Coach Private Baseline Assessment
 
-- Rename from "Coach note" to **"View Coach Notes"**
-- Style: `text-sm font-medium text-primary` (more prominent than current `text-xs text-muted-foreground`)
-- Keep the chevron icon
+### Database Migration
+```sql
+CREATE TABLE coach_baseline_assessments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  doctor_staff_id uuid NOT NULL REFERENCES staff(id),
+  coach_staff_id uuid NOT NULL REFERENCES staff(id),
+  status text DEFAULT 'in_progress',
+  started_at timestamptz DEFAULT now(),
+  completed_at timestamptz,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE (doctor_staff_id, coach_staff_id)
+);
+
+CREATE TABLE coach_baseline_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  assessment_id uuid NOT NULL REFERENCES coach_baseline_assessments(id) ON DELETE CASCADE,
+  action_id bigint NOT NULL REFERENCES pro_moves(action_id) ON DELETE CASCADE,
+  rating int CHECK (rating >= 1 AND rating <= 4),
+  note_text text,
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE (assessment_id, action_id)
+);
+
+ALTER TABLE coach_baseline_assessments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE coach_baseline_items ENABLE ROW LEVEL SECURITY;
+```
+
+### RLS Policies
+Use a security definer function to check staff roles (avoids recursive RLS):
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_staff_id_for_user(_user_id uuid)
+RETURNS uuid
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT id FROM staff WHERE user_id = _user_id LIMIT 1;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_clinical_or_admin(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM staff
+    WHERE user_id = _user_id
+    AND (is_clinical_director = true OR is_super_admin = true)
+  );
+$$;
+
+-- coach_baseline_assessments policies
+CREATE POLICY "Clinical staff can read own assessments"
+  ON coach_baseline_assessments FOR SELECT TO authenticated
+  USING (public.is_clinical_or_admin(auth.uid()));
+
+CREATE POLICY "Coach can insert own assessments"
+  ON coach_baseline_assessments FOR INSERT TO authenticated
+  WITH CHECK (
+    coach_staff_id = public.get_staff_id_for_user(auth.uid())
+    AND public.is_clinical_or_admin(auth.uid())
+  );
+
+CREATE POLICY "Coach can update own assessments"
+  ON coach_baseline_assessments FOR UPDATE TO authenticated
+  USING (
+    coach_staff_id = public.get_staff_id_for_user(auth.uid())
+    AND public.is_clinical_or_admin(auth.uid())
+  );
+
+-- coach_baseline_items policies (same pattern)
+CREATE POLICY "Clinical staff can read own items"
+  ON coach_baseline_items FOR SELECT TO authenticated
+  USING (
+    assessment_id IN (
+      SELECT id FROM coach_baseline_assessments
+      WHERE public.is_clinical_or_admin(auth.uid())
+    )
+  );
+
+CREATE POLICY "Coach can insert own items"
+  ON coach_baseline_items FOR INSERT TO authenticated
+  WITH CHECK (
+    assessment_id IN (
+      SELECT id FROM coach_baseline_assessments
+      WHERE coach_staff_id = public.get_staff_id_for_user(auth.uid())
+    )
+  );
+
+CREATE POLICY "Coach can update own items"
+  ON coach_baseline_items FOR UPDATE TO authenticated
+  USING (
+    assessment_id IN (
+      SELECT id FROM coach_baseline_assessments
+      WHERE coach_staff_id = public.get_staff_id_for_user(auth.uid())
+    )
+  );
+```
+
+Doctors have zero policies on these tables -- no access at all.
+
+### New Component: `CoachBaselineWizard.tsx`
+- Mirrors `BaselineWizard` but targets `coach_baseline_assessments` and `coach_baseline_items`.
+- Accepts a `doctorStaffId` prop.
+- Uses the same `DomainAssessmentStep` component for the rating UI.
+- Coach's own notes are saved to `coach_baseline_items.note_text`.
+- Accessible from DoctorDetail page.
+
+### Changes to `DoctorDetail.tsx`
+- Below the existing `ClinicalBaselineResults`, add a new card: "Your Baseline Assessment (Private)".
+- Shows status: Not Started / In Progress / Complete, with "Last updated" timestamp.
+- "Start Assessment" or "Continue Assessment" button opens the `CoachBaselineWizard` (can be inline or a sub-route like `/clinical/doctors/:staffId/coach-baseline`).
+
+### Changes to `ClinicalBaselineResults.tsx`
+- Add a "Show my ratings" toggle (only visible to clinical directors).
+- When toggled ON, fetch `coach_baseline_items` for the current doctor + current coach.
+- Each pro move row shows: `Self: 3 | You: 2` side-by-side.
+- Rows where `Math.abs(selfScore - coachScore) >= 2` get a subtle amber/yellow background highlight. No "gap" label.
+- Fetch is lazy (only on toggle ON) to avoid unnecessary queries.
 
 ---
 
-## Database Migration
+## Files Summary
 
-1. **Add column:** `ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS learner_note text;`
-2. **Update RPC** `save_eval_acknowledgement_and_focus` to accept `p_learner_note text DEFAULT NULL` and store it:
-   ```text
-   UPDATE evaluations
-   SET acknowledged_at = COALESCE(acknowledged_at, now()),
-       learner_note = COALESCE(p_learner_note, learner_note)
-   WHERE id = p_eval_id;
-   ```
-
----
-
-## Home Focus Card -- Display Learner Note
-
-In `CurrentFocusCard.tsx`:
-- Add `learner_note` to the eval select query
-- If present, render it at the top of the card content as a warm callout:
-  - Left border accent, italic text, subtle background
-  - Small label: "My note" with a quote-style presentation
-
----
-
-## Completion Toast
-
-Change from "Focus saved and review completed!" to:
-> "You're all set! Your focus is pinned to Home."
-
----
-
-## Files Changed
-
-| File | Action |
+| File | Change |
 |------|--------|
-| `supabase/migrations/new.sql` | New -- add `learner_note` column, update RPC |
-| `src/pages/EvaluationReview.tsx` | Rewrite -- 7-step flow with warm copy, sessionStorage persistence |
-| `src/components/review/CompetencyCard.tsx` | Edit -- "View Coach Notes" styling |
-| `src/components/home/CurrentFocusCard.tsx` | Edit -- fetch and display `learner_note` |
-| `src/lib/reviewPayload.ts` | No changes needed |
+| `src/components/doctor/DomainAssessmentStep.tsx` | Inline note textarea per row |
+| `src/pages/doctor/BaselineWizard.tsx` | Separate `saveNoteMutation`, pass `onNoteChange` |
+| `src/pages/doctor/DoctorBaselineResults.tsx` | Include `self_note`, show indicators + reflection section |
+| `src/components/clinical/ClinicalBaselineResults.tsx` | Note indicators, "Show only noted" filter, reflection section, "Show my ratings" toggle |
+| `src/components/doctor/BaselineComplete.tsx` | Reflection input (type/record), submit, display |
+| `src/pages/clinical/DoctorDetail.tsx` | Coach baseline status card + start/continue button |
+| `src/components/clinical/CoachBaselineWizard.tsx` | New -- mirrors doctor wizard for coach tables |
+| `supabase/functions/format-reflection/index.ts` | New -- LLM formatting with guardrails |
+| Migration SQL | Alter `doctor_baseline_assessments` + create `coach_baseline_*` tables + RLS |
 

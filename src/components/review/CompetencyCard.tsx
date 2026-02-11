@@ -62,10 +62,10 @@ export function CompetencyCard({ item, selected, onSelect, disabled, readOnly }:
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setNoteOpen(o => !o); }}
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
           >
-            Coach note
-            {noteOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            View Coach Notes
+            {noteOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
           {noteOpen && (
             <p className="text-xs text-muted-foreground mt-1 pl-1 border-l-2 border-muted leading-relaxed">

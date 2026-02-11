@@ -488,6 +488,7 @@ export type Database = {
           id: string
           interview_transcript: string | null
           is_visible_to_staff: boolean
+          learner_note: string | null
           location_id: string
           observed_at: string | null
           program_year: number
@@ -516,6 +517,7 @@ export type Database = {
           id?: string
           interview_transcript?: string | null
           is_visible_to_staff?: boolean
+          learner_note?: string | null
           location_id: string
           observed_at?: string | null
           program_year: number
@@ -544,6 +546,7 @@ export type Database = {
           id?: string
           interview_transcript?: string | null
           is_visible_to_staff?: boolean
+          learner_note?: string | null
           location_id?: string
           observed_at?: string | null
           program_year?: number
@@ -3059,10 +3062,20 @@ export type Database = {
         }
         Returns: undefined
       }
-      save_eval_acknowledgement_and_focus: {
-        Args: { p_action_ids?: number[]; p_eval_id: string }
-        Returns: undefined
-      }
+      save_eval_acknowledgement_and_focus:
+        | {
+            Args: { p_action_ids?: number[]; p_eval_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_action_ids: number[]
+              p_eval_id: string
+              p_learner_note?: string
+              p_staff_id: string
+            }
+            Returns: undefined
+          }
       seq_confidence_history_18w: {
         Args: {
           p_effective_date: string

@@ -296,6 +296,7 @@ export function DomainAssessmentStep({
         proMoveId={selectedProMoveId}
         proMoveStatement={selectedProMove?.action_statement || ''}
         onClose={() => setSelectedProMoveId(null)}
+        preventClose={forceOpenProMoveId != null}
       />
     </>
   );

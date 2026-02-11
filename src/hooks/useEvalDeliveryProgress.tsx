@@ -7,6 +7,7 @@ export type StaffDeliveryStatus = 'no_eval' | 'draft' | 'not_released' | 'releas
 export interface StaffDetail {
   staffId: string;
   staffName: string;
+  roleName: string | null;
   evalId: string | null;
   status: StaffDeliveryStatus;
 }
@@ -70,7 +71,7 @@ export function useEvalDeliveryProgress(
       // 2. Get all active participants with their names
       const { data: staffRows, error: staffError } = await supabase
         .from('staff')
-        .select('id, name, primary_location_id')
+        .select('id, name, primary_location_id, role_id, roles!staff_role_id_fkey(role_name)')
         .in('primary_location_id', locationIds)
         .in('role_id', [1, 2, 3])
         .eq('is_participant', true)
@@ -79,11 +80,12 @@ export function useEvalDeliveryProgress(
       if (staffError) throw staffError;
 
       // Build staff by location
-      const staffByLocation = new Map<string, { id: string; name: string }[]>();
+      const staffByLocation = new Map<string, { id: string; name: string; roleName: string | null }[]>();
       for (const s of staffRows || []) {
         if (s.primary_location_id) {
           const list = staffByLocation.get(s.primary_location_id) || [];
-          list.push({ id: s.id, name: s.name });
+          const roleData = s.roles as { role_name: string } | null;
+          list.push({ id: s.id, name: s.name, roleName: roleData?.role_name ?? null });
           staffByLocation.set(s.primary_location_id, list);
         }
       }
@@ -137,6 +139,7 @@ export function useEvalDeliveryProgress(
             return {
               staffId: s.id,
               staffName: s.name,
+              roleName: s.roleName,
               evalId: eval_?.id ?? null,
               status,
             };

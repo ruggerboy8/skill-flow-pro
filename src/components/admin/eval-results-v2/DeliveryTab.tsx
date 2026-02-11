@@ -248,7 +248,7 @@ function LocationCard({ location, statusFilter, isPending, onBulkRelease, onSing
 
 /* ── Individual staff row ── */
 interface StaffRowProps {
-  staff: { staffId: string; staffName: string; evalId: string | null; status: StaffDeliveryStatus };
+  staff: { staffId: string; staffName: string; roleName: string | null; evalId: string | null; status: StaffDeliveryStatus };
   isPending: boolean;
   onRelease: (visible: boolean) => void;
 }
@@ -260,6 +260,7 @@ function StaffRow({ staff, isPending, onRelease }: StaffRowProps) {
   return (
     <div className="flex items-center gap-3 py-1.5 pl-7">
       <span className="text-sm flex-1 min-w-0 truncate">{staff.staffName}</span>
+      {staff.roleName && <span className="text-xs text-muted-foreground shrink-0">{staff.roleName}</span>}
       <DeliveryStatusPill status={staff.status} />
       {showRelease && (
         <Button size="sm" variant="outline" className="h-6 text-xs gap-1" disabled={isPending} onClick={() => onRelease(true)}>

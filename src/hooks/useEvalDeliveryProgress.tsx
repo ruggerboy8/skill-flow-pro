@@ -2,21 +2,27 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { EvaluationPeriod } from '@/lib/evalPeriods';
 
+export type StaffDeliveryStatus = 'no_eval' | 'draft' | 'not_released' | 'released' | 'viewed' | 'reviewed' | 'focus_set';
+
+export interface StaffDetail {
+  staffId: string;
+  staffName: string;
+  evalId: string | null;
+  status: StaffDeliveryStatus;
+}
+
 export interface LocationProgress {
   locationId: string;
   locationName: string;
   organizationId: string;
   organizationName: string;
   totalStaff: number;
-  draftCount: number;
   submittedCount: number;
   visibleCount: number;
   coveragePercent: number;
   allVisible: boolean;
-  // Delivery tracking (only counts released evals)
-  viewedCount: number;
-  acknowledgedCount: number;
-  focusSelectedCount: number;
+  draftCount: number;
+  staffDetails: StaffDetail[];
 }
 
 interface UseEvalDeliveryProgressResult {
@@ -25,10 +31,22 @@ interface UseEvalDeliveryProgressResult {
   refetch: () => void;
 }
 
-/**
- * Hook to fetch evaluation delivery progress data for ALL locations
- * Optionally filter by organization client-side
- */
+function deriveStatus(eval_: {
+  status: string;
+  is_visible_to_staff: boolean;
+  viewed_at: string | null;
+  acknowledged_at: string | null;
+  focus_selected_at: string | null;
+} | null): StaffDeliveryStatus {
+  if (!eval_) return 'no_eval';
+  if (eval_.status === 'draft') return 'draft';
+  if (!eval_.is_visible_to_staff) return 'not_released';
+  if (eval_.focus_selected_at) return 'focus_set';
+  if (eval_.acknowledged_at) return 'reviewed';
+  if (eval_.viewed_at) return 'viewed';
+  return 'released';
+}
+
 export function useEvalDeliveryProgress(
   period: EvaluationPeriod | null
 ): UseEvalDeliveryProgressResult {
@@ -37,7 +55,7 @@ export function useEvalDeliveryProgress(
     queryFn: async (): Promise<LocationProgress[]> => {
       if (!period) return [];
 
-      // 1. Get all active locations with their organization info
+      // 1. Get all active locations with org info
       const { data: locations, error: locError } = await supabase
         .from('locations')
         .select('id, name, organization_id, organizations!locations_organization_id_fkey(name)')
@@ -47,35 +65,33 @@ export function useEvalDeliveryProgress(
       if (locError) throw locError;
       if (!locations || locations.length === 0) return [];
 
-      // 2. For each location, count total active participants (role_id IN 1,2,3 = DFI, RDA, OM)
       const locationIds = locations.map(l => l.id);
-      
-      const { data: staffCounts, error: staffError } = await supabase
+
+      // 2. Get all active participants with their names
+      const { data: staffRows, error: staffError } = await supabase
         .from('staff')
-        .select('primary_location_id')
+        .select('id, name, primary_location_id')
         .in('primary_location_id', locationIds)
-        .in('role_id', [1, 2, 3]) // DFI, RDA, OM
+        .in('role_id', [1, 2, 3])
         .eq('is_participant', true)
         .eq('is_paused', false);
 
       if (staffError) throw staffError;
 
-      // Build staff count map
-      const staffCountByLocation = new Map<string, number>();
-      for (const s of staffCounts || []) {
+      // Build staff by location
+      const staffByLocation = new Map<string, { id: string; name: string }[]>();
+      for (const s of staffRows || []) {
         if (s.primary_location_id) {
-          staffCountByLocation.set(
-            s.primary_location_id, 
-            (staffCountByLocation.get(s.primary_location_id) || 0) + 1
-          );
+          const list = staffByLocation.get(s.primary_location_id) || [];
+          list.push({ id: s.id, name: s.name });
+          staffByLocation.set(s.primary_location_id, list);
         }
       }
 
-      // 3. Query evaluations for this period across all locations
-      //    Include delivery tracking fields
+      // 3. Query evaluations for this period
       let evalQuery = supabase
         .from('evaluations')
-        .select('id, location_id, status, is_visible_to_staff, viewed_at, acknowledged_at, focus_selected_at')
+        .select('id, location_id, staff_id, status, is_visible_to_staff, viewed_at, acknowledged_at, focus_selected_at')
         .in('location_id', locationIds)
         .eq('program_year', period.year);
 
@@ -88,65 +104,62 @@ export function useEvalDeliveryProgress(
       const { data: evaluations, error: evalError } = await evalQuery;
       if (evalError) throw evalError;
 
-      // Build eval counts by location
-      const evalsByLocation = new Map<string, { 
-        drafts: number; 
-        submitted: number; 
-        visible: number;
-        viewed: number;
-        acknowledged: number;
-        focusSelected: number;
-      }>();
-
+      // Index evals by staff_id within location
+      const evalByStaff = new Map<string, typeof evaluations extends (infer T)[] | null ? T : never>();
       for (const e of evaluations || []) {
-        const locId = e.location_id;
-        const current = evalsByLocation.get(locId) || { 
-          drafts: 0, submitted: 0, visible: 0, viewed: 0, acknowledged: 0, focusSelected: 0 
-        };
-        
-        if (e.status === 'draft') {
-          current.drafts++;
-        } else if (e.status === 'submitted') {
-          current.submitted++;
-          if (e.is_visible_to_staff) {
-            current.visible++;
-            // Only count delivery metrics for released (visible) evals
-            if (e.viewed_at) current.viewed++;
-            if (e.acknowledged_at) current.acknowledged++;
-            if (e.focus_selected_at) current.focusSelected++;
-          }
-        }
-        
-        evalsByLocation.set(locId, current);
+        // Key by staff_id (one eval per staff per period)
+        evalByStaff.set(e.staff_id, e);
       }
 
-      // 4. Build final result
+      // 4. Build result
       const result: LocationProgress[] = locations.map(loc => {
-        const totalStaff = staffCountByLocation.get(loc.id) || 0;
-        const evals = evalsByLocation.get(loc.id) || { 
-          drafts: 0, submitted: 0, visible: 0, viewed: 0, acknowledged: 0, focusSelected: 0 
-        };
-        const coveragePercent = totalStaff > 0 
-          ? Math.round((evals.submitted / totalStaff) * 100) 
+        const staff = staffByLocation.get(loc.id) || [];
+        const totalStaff = staff.length;
+
+        let submittedCount = 0;
+        let visibleCount = 0;
+        let draftCount = 0;
+
+        const staffDetails: StaffDetail[] = staff
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(s => {
+            const eval_ = evalByStaff.get(s.id) || null;
+            const status = deriveStatus(eval_);
+
+            if (eval_) {
+              if (eval_.status === 'draft') draftCount++;
+              if (eval_.status === 'submitted') {
+                submittedCount++;
+                if (eval_.is_visible_to_staff) visibleCount++;
+              }
+            }
+
+            return {
+              staffId: s.id,
+              staffName: s.name,
+              evalId: eval_?.id ?? null,
+              status,
+            };
+          });
+
+        const coveragePercent = totalStaff > 0
+          ? Math.round((submittedCount / totalStaff) * 100)
           : 0;
-        
-        // Extract org name from the joined data
+
         const orgData = loc.organizations as { name: string } | null;
-        
+
         return {
           locationId: loc.id,
           locationName: loc.name,
           organizationId: loc.organization_id,
           organizationName: orgData?.name || 'Unknown',
           totalStaff,
-          draftCount: evals.drafts,
-          submittedCount: evals.submitted,
-          visibleCount: evals.visible,
+          submittedCount,
+          visibleCount,
           coveragePercent,
-          allVisible: evals.submitted > 0 && evals.visible === evals.submitted,
-          viewedCount: evals.viewed,
-          acknowledgedCount: evals.acknowledged,
-          focusSelectedCount: evals.focusSelected,
+          allVisible: submittedCount > 0 && visibleCount === submittedCount,
+          draftCount,
+          staffDetails,
         };
       });
 

@@ -477,12 +477,14 @@ export type Database = {
       }
       evaluations: {
         Row: {
+          acknowledged_at: string | null
           audio_recording_path: string | null
           created_at: string
           draft_interview_audio_path: string | null
           draft_observation_audio_path: string | null
           evaluator_id: string
           extracted_insights: Json | null
+          focus_selected_at: string | null
           id: string
           interview_transcript: string | null
           is_visible_to_staff: boolean
@@ -490,6 +492,9 @@ export type Database = {
           observed_at: string | null
           program_year: number
           quarter: string | null
+          released_at: string | null
+          released_by: string | null
+          review_payload: Json | null
           role_id: number
           staff_id: string
           status: string
@@ -497,14 +502,17 @@ export type Database = {
           summary_raw_transcript: string | null
           type: string
           updated_at: string
+          viewed_at: string | null
         }
         Insert: {
+          acknowledged_at?: string | null
           audio_recording_path?: string | null
           created_at?: string
           draft_interview_audio_path?: string | null
           draft_observation_audio_path?: string | null
           evaluator_id: string
           extracted_insights?: Json | null
+          focus_selected_at?: string | null
           id?: string
           interview_transcript?: string | null
           is_visible_to_staff?: boolean
@@ -512,6 +520,9 @@ export type Database = {
           observed_at?: string | null
           program_year: number
           quarter?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          review_payload?: Json | null
           role_id: number
           staff_id: string
           status?: string
@@ -519,14 +530,17 @@ export type Database = {
           summary_raw_transcript?: string | null
           type?: string
           updated_at?: string
+          viewed_at?: string | null
         }
         Update: {
+          acknowledged_at?: string | null
           audio_recording_path?: string | null
           created_at?: string
           draft_interview_audio_path?: string | null
           draft_observation_audio_path?: string | null
           evaluator_id?: string
           extracted_insights?: Json | null
+          focus_selected_at?: string | null
           id?: string
           interview_transcript?: string | null
           is_visible_to_staff?: boolean
@@ -534,6 +548,9 @@ export type Database = {
           observed_at?: string | null
           program_year?: number
           quarter?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          review_payload?: Json | null
           role_id?: number
           staff_id?: string
           status?: string
@@ -541,8 +558,23 @@ export type Database = {
           summary_raw_transcript?: string | null
           type?: string
           updated_at?: string
+          viewed_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "evaluations_released_by_fkey"
+            columns: ["released_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluations_released_by_fkey"
+            columns: ["released_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
           {
             foreignKeyName: "evaluations_staff_id_fkey"
             columns: ["staff_id"]
@@ -1462,6 +1494,66 @@ export type Database = {
           },
         ]
       }
+      staff_quarter_focus: {
+        Row: {
+          action_id: number
+          created_at: string
+          evaluation_id: string
+          id: string
+          staff_id: string
+        }
+        Insert: {
+          action_id: number
+          created_at?: string
+          evaluation_id: string
+          id?: string
+          staff_id: string
+        }
+        Update: {
+          action_id?: number
+          created_at?: string
+          evaluation_id?: string
+          id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_quarter_focus_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "staff_quarter_focus_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_quarter_focus_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["evaluation_id"]
+          },
+          {
+            foreignKeyName: "staff_quarter_focus_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_quarter_focus_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       staging_prompts: {
         Row: {
           competency_id: number
@@ -2366,6 +2458,17 @@ export type Database = {
         }
         Returns: number
       }
+      bulk_release_evaluations: {
+        Args: {
+          p_location_id: string
+          p_period_type: string
+          p_quarter: string
+          p_released_by: string
+          p_visible: boolean
+          p_year: number
+        }
+        Returns: number
+      }
       bulk_upsert_pro_moves: { Args: { pro_moves_data: Json }; Returns: Json }
       check_sequencer_gate: {
         Args: { p_org_id: string; p_role_id?: number }
@@ -2395,6 +2498,10 @@ export type Database = {
           primary_location_id: string
           staff_id: string
         }[]
+      }
+      compute_and_store_review_payload: {
+        Args: { p_eval_id: string }
+        Returns: Json
       }
       delete_latest_week_data: { Args: { p_user_id: string }; Returns: Json }
       delete_week_data: {
@@ -2911,11 +3018,16 @@ export type Database = {
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_superadmin: { Args: never; Returns: boolean }
+      mark_eval_viewed: { Args: { p_eval_id: string }; Returns: undefined }
       needs_backfill: {
         Args: { p_role_id: number; p_staff_id: string }
         Returns: Json
       }
       recover_orphaned_scores: { Args: never; Returns: Json }
+      release_single_evaluation: {
+        Args: { p_eval_id: string; p_released_by: string; p_visible: boolean }
+        Returns: undefined
+      }
       replace_weekly_focus: {
         Args: {
           p_cycle: number
@@ -2945,6 +3057,10 @@ export type Database = {
           p_staff_id: string
           p_week: number
         }
+        Returns: undefined
+      }
+      save_eval_acknowledgement_and_focus: {
+        Args: { p_action_ids: number[]; p_eval_id: string }
         Returns: undefined
       }
       seq_confidence_history_18w: {

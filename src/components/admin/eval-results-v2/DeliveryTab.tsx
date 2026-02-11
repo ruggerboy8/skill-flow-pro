@@ -15,6 +15,7 @@ import { bulkSetVisibilityByLocation, bulkSubmitCompleteDrafts } from '@/lib/eva
 import { supabase } from '@/integrations/supabase/client';
 import type { EvaluationPeriod } from '@/lib/evalPeriods';
 import { formatEvalPeriod } from '@/lib/evalPeriods';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 
 interface DeliveryTabProps {
   period: EvaluationPeriod;
@@ -24,6 +25,7 @@ interface DeliveryTabProps {
 export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
   const queryClient = useQueryClient();
   const { locations, isLoading, refetch } = useEvalDeliveryProgress(period);
+  const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const [orgFilter, setOrgFilter] = useState<string>('all');
 
   // Get unique organizations for the filter dropdown
@@ -44,7 +46,7 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
   // Mutation for setting visibility
   const visibilityMutation = useMutation({
     mutationFn: async ({ locationId, visible }: { locationId: string; visible: boolean }) => {
-      return bulkSetVisibilityByLocation(locationId, period, visible);
+      return bulkSetVisibilityByLocation(locationId, period, visible, staffProfile?.id ?? '');
     },
     onSuccess: (result, variables) => {
       const action = variables.visible ? 'visible' : 'hidden';

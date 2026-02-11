@@ -133,7 +133,7 @@ export function BatchProcessorProvider({ children }: { children: ReactNode }) {
         // Save transcript
         const { error: updateError } = await supabase
           .from('evaluations')
-          .update({ summary_raw_transcript: transcript })
+          .update({ interview_transcript: transcript })
           .eq('id', evalItem.id);
 
         if (updateError) {

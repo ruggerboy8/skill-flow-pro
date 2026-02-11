@@ -68,7 +68,7 @@ export function BatchTranscriptProcessor() {
         .select(`
           id,
           audio_recording_path,
-          summary_raw_transcript,
+          draft_interview_audio_path,
           interview_transcript,
           extracted_insights,
           staff_id,
@@ -77,7 +77,7 @@ export function BatchTranscriptProcessor() {
           quarter,
           program_year
         `)
-        .or('and(audio_recording_path.not.is.null,summary_raw_transcript.is.null,interview_transcript.is.null),and(summary_raw_transcript.not.is.null,extracted_insights.is.null),and(interview_transcript.not.is.null,extracted_insights.is.null)');
+        .or('and(audio_recording_path.not.is.null,interview_transcript.is.null),and(draft_interview_audio_path.not.is.null,interview_transcript.is.null),and(interview_transcript.not.is.null,extracted_insights.is.null)');
 
       if (error) throw error;
 
@@ -108,15 +108,15 @@ export function BatchTranscriptProcessor() {
         const locationName = locationMap.get(row.location_id) || 'Unknown';
         const period = formatPeriod(row.type, row.quarter, row.program_year);
 
-        const transcript = row.summary_raw_transcript || row.interview_transcript;
+        const interviewAudioPath = row.audio_recording_path || row.draft_interview_audio_path;
         
-        if (row.audio_recording_path && !transcript) {
+        if (interviewAudioPath && !row.interview_transcript) {
           evals.push({
             id: row.id,
             staffName,
             locationName,
             period,
-            audioPath: row.audio_recording_path,
+            audioPath: interviewAudioPath,
             audioSize: null,
             hasTranscript: false,
             hasInsights: false,
@@ -124,17 +124,17 @@ export function BatchTranscriptProcessor() {
             issue: 'no_transcript',
             status: 'pending',
           });
-        } else if (transcript && !row.extracted_insights) {
+        } else if (row.interview_transcript && !row.extracted_insights) {
           evals.push({
             id: row.id,
             staffName,
             locationName,
             period,
-            audioPath: row.audio_recording_path,
+            audioPath: interviewAudioPath,
             audioSize: null,
             hasTranscript: true,
             hasInsights: false,
-            existingTranscript: transcript,
+            existingTranscript: row.interview_transcript,
             issue: 'no_insights',
             status: 'pending',
           });

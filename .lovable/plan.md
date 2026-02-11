@@ -1,158 +1,149 @@
 
 
-# Evaluation Review Wizard V2
+# Evaluation Review Wizard -- Final Polish
 
 ## Summary
 
-Complete rewrite of the evaluation review wizard from a 3-step "derived insights" flow to a 4-step "scan, choose, commit" flow. The server payload is simplified to candidate lists (top/bottom), the user selects their own focus competencies, and ProMoves are fetched from those selections. Ana Soto Bernal's existing review data will be cleared.
+Expand the wizard from 5 steps to 7, with each step having its own page and a warm, encouraging narrative. Add a "Note to Self" free-response step and display it on the Home focus card. Polish the coach note toggle and fix back-button behavior.
 
 ---
 
-## Pre-work: Clear Ana Soto Bernal's test data
+## Step-by-Step Flow (7 Steps)
 
-Reset her evaluation (`706152be-...`) so the V2 flow can be tested fresh:
-- Set `review_payload = NULL`, `viewed_at = NULL` on that evaluation
-- Delete any rows in `staff_quarter_focus` for that evaluation
+### Step 0 -- Welcome
 
----
+**Title:** "{periodLabel} Evaluation Review"
 
-## 1. New migration: V2 `compute_and_store_review_payload` RPC
+**Body:**
+> "Nice work completing your evaluation! Let's take a couple of minutes to look at what stood out and set yourself up for a great quarter."
+>
+> Here's what we'll do together:
+> 1. **Take a look at your full evaluation** -- review all your scores and notes
+> 2. **Check out your highlights** -- see where you're shining and where you can grow
+> 3. **Pick a strength to keep crushing** -- choose one area you're already rocking
+> 4. **Choose two areas to grow** -- select competencies to focus on this quarter
+> 5. **Pick your ProMoves** -- practical actions to help you improve
+> 6. **Write a note to yourself** -- a personal reminder for the quarter ahead
+>
+> "Your selections will be pinned to your Home page so they're always easy to find."
 
-Replace the existing RPC with a V2 payload structure.
+**CTA:** "Let's Go" | "Exit to Home"
 
-**Output shape:**
-```text
-{
-  version: 2,
-  computed_at: "2026-02-11T18:00:00Z",   (ISO string)
-  sparse: false,
-  domain_summaries: [ { domain_name, observer_avg, self_avg, count_scored } ],
-  top_candidates: [ { competency_id, competency_name, domain_name, observer_score, self_score, gap, observer_note, self_note } ],
-  bottom_candidates: [ ...same shape... ],
-  top_used_fallback: false
-}
-```
+### Step 1 -- View Full Evaluation (unchanged logic)
 
-**Key logic:**
-- **Version cache**: if stored payload has `version = 2`, return it; otherwise recompute and overwrite
-- **sparse**: `true` if fewer than 4 scored items; candidate arrays empty
-- **domain_summaries**: aggregated from scored items (excluding `observer_is_na` and `self_is_na` for self_avg)
-- **top_candidates**: `observer_score >= 3`, sorted by `observer_score DESC`, then `abs(gap) ASC`, then `competency_id ASC`. Limit 4
-- **Fallback**: if top_candidates is empty after the >= 3 filter, take the 4 highest-scored items regardless and set `top_used_fallback = true`
-- **bottom_candidates**: exclude items already in top_candidates, sort by `observer_score ASC`, then `gap DESC` (self - observer), then `competency_id ASC`. Exclude `observer_score = 4`. Limit 6
-- **gap**: always `self_score - observer_score` (null if self_score is null)
-- **observer_note and self_note**: included in item output
-- **computed_at**: stored as ISO string via `to_char(now() at time zone 'utc', ...)`
-- **Authorization**: same as current (owner or super admin), plus enforce `status = 'submitted'` and `is_visible_to_staff = true` for non-admin callers
-- Remove domain_avg tie-break (simplify -- not worth the CTE complexity)
+**Body text update:**
+> "Before we dive in, take a moment to look through all your scores and coach notes. There's no rush -- come back whenever you're ready."
 
----
+**Skip text:** "I've already looked through it -- let's keep going"
 
-## 2. Update `src/lib/reviewPayload.ts`
+### Step 2 -- Highlights
 
-**Replace entirely** with V2 types (no V1 backward compat needed):
+- Rename "Opportunities" heading to **"Opportunities for Growth"**
+- Strengths intro: "Here are a couple of areas where you really stood out."
+- Opportunities intro: "And here are a couple of areas where a little extra focus could make a big difference."
 
-```text
-ReviewPayloadV2 {
-  version: number
-  computed_at: string
-  sparse: boolean
-  domain_summaries: DomainSummary[]
-  top_candidates: ReviewPayloadItem[]
-  bottom_candidates: ReviewPayloadItem[]
-  top_used_fallback: boolean
-}
+### Step 3 -- Keep Crushing (NEW -- separate page, pick 1)
 
-ReviewPayloadItem -- same fields plus gap: number | null
-```
+**Title:** "Keep Crushing"
 
-- `parseReviewPayload` checks for `top_candidates` key; returns null if missing
-- `CURRENT_PAYLOAD_VERSION = 2`
-- Remove `recommended_competency_ids`, `priorities`, `strengths`, `alignment`, `gaps`
-- Keep `quarterNum` and `compareEvalsByPeriod` helpers (used elsewhere)
+**Body:**
+> "These were some of your strongest competencies this quarter. Pick one that you want to keep performing at a high level -- it's worth celebrating what you're already doing well."
 
----
+Show all `top_candidates` as selectable cards (radio-style).
+If `top_used_fallback`: title becomes "Your Strongest Areas" with slightly adjusted copy.
 
-## 3. Rewrite `src/pages/EvaluationReview.tsx`
+**CTA:** "Next" (enabled when 1 selected)
 
-### State
+### Step 4 -- Improve This Quarter (NEW -- separate page, pick 2)
 
-```text
-step: 0-3  (Intro, Highlights, Choose Competencies, ProMoves)
-keepCrushingId: number | null
-improveIds: Set<number> (max 2)
-selectedActionIds: Set<number> (max 3)
-```
+**Title:** "Grow This Quarter"
 
-No reflection field in V2 (not persisted yet, so skip to avoid "disappearing into the void").
+**Body:**
+> "These are some competencies that could really benefit from a little extra attention. Choose 2 that feel most important for you to focus on -- even small improvements here can make a real difference."
 
-### Step 0 -- Intro
+Show all `bottom_candidates` as selectable cards (checkbox-style, max 2).
 
-- Title: `{periodLabel} Evaluation Review`
-- Body: "This review takes about 2 minutes." + 3 bullet points explaining the steps + "Your focus will be pinned on Home."
-- Primary CTA: "Start"
-- Secondary links: "View full evaluation" + "Exit to Home"
+**Progress:** "X of 2 selected"
+**CTA:** "Next" (enabled when 2 selected)
 
-### Step 1 -- Highlights
+### Step 5 -- ProMoves (updated copy)
 
-- If `sparse`: show `domain_summaries` with "limited data" note
-- Otherwise: show up to 2 items from `top_candidates` as "Strengths We Saw" and up to 2 from `bottom_candidates` as "Opportunities"
-- Each item: competency name, domain badge (outline), observer/self scores, expandable "Coach note" toggle (collapsed by default; only show toggle if note exists)
-- If `self_note` exists, show under "Your note" label (separate from coach note)
-- Link: "See full scores" to `/evaluation/{evalId}`
+**Title:** "Choose Your ProMoves"
 
-### Step 2 -- Choose Focus Competencies
+**Body:**
+> "From the two areas you chose to grow in, which ProMoves feel most important for you right now? Pick 1 to 3 that you want to focus on this quarter."
 
-- Title: "Choose 3 Focus Competencies"
-- Instruction: "Pick 1 to keep crushing and 2 to improve this quarter."
-- **Panel A -- "Keep Crushing (pick 1)"**: all `top_candidates` (up to 4). If `top_used_fallback`, label as "Strongest Areas"
-- **Panel B -- "Improve This Quarter (pick 2)"**: all `bottom_candidates` (up to 6)
-- Each card: competency name, domain badge, observer/self scores, expandable coach note
-- Selection: radio-like for Panel A (1 max), checkbox for Panel B (2 max). Inline message when not yet complete: "Select 1 above and 2 below to continue"
-- Progress: "X of 3 selected" inline
-- Edge case: if bottom_candidates < 2 items, relax by allowing selection from a "Browse all" modal (fetch all evaluation_items)
-- Auto-scroll nudge: after selecting keep crushing item, smooth scroll to Panel B
+Same logic as current Step 4 otherwise.
 
-### Step 3 -- Choose ProMoves and Complete
+### Step 6 -- Note to Self (NEW)
 
-- Fetch ProMoves for the 3 selected competency IDs (query `pro_moves` where `competency_id IN (...)` and `active = true`)
-- Group by competency. For "Improve" competencies with an observer_note, show a small "Coach context" callout above that competency's ProMoves
-- Checkboxes, 1-3 ProMoves max. Count display: "X of 3 ProMoves selected"
-- Primary CTA: "Save focus and complete review" (disabled until >= 1 ProMove selected)
-- Secondary: "Complete review without selecting focus" (always available)
+**Title:** "Note to Self"
 
-### Navigation
+**Body:**
+> "Before you wrap up, take a moment to write yourself a quick reminder. What do you want to make sure you keep in mind this quarter?"
 
-- Back button on all steps; Step 0 back = navigate(-1)
-- Progress: "Step X of 4 -- {label}" at top right
-- Selections preserved when navigating back
+**Placeholder:** "This quarter, I want to make sure I..."
 
-### Completion
+- Textarea, max 500 characters, with live character count
+- Primary CTA: "Complete My Review" (always enabled -- note is optional)
+- If they leave it blank, still completes fine
 
-- Calls existing `save_eval_acknowledgement_and_focus` RPC with selected action_ids (unchanged)
-- Invalidates queries and navigates to home
+### Step labels
+`['Welcome', 'Full Evaluation', 'Highlights', 'Keep Crushing', 'Grow', 'ProMoves', 'Note to Self']`
 
 ---
 
-## 4. Shared competency card component
+## Back Button Fix
 
-Extract a reusable `CompetencyCard` component used in Steps 1, 2, and 3:
-- Competency name, domain badge (outline, small), observer/self score display
-- Optional expandable coach note (collapsed by default, "Coach note" toggle)
-- Optional "Your note" section for self_note
-- Optional selection state (selected/unselected border treatment)
-
-This keeps layout consistent across all wizard steps.
+Store current `step` in `sessionStorage` keyed by `eval-review-step-{evalId}`. On mount, restore from storage. This way, navigating to the full evaluation page and pressing browser back returns to the correct step instead of restarting at Step 0.
 
 ---
 
-## 5. Files changed
+## Coach Note Toggle (CompetencyCard)
+
+- Rename from "Coach note" to **"View Coach Notes"**
+- Style: `text-sm font-medium text-primary` (more prominent than current `text-xs text-muted-foreground`)
+- Keep the chevron icon
+
+---
+
+## Database Migration
+
+1. **Add column:** `ALTER TABLE evaluations ADD COLUMN IF NOT EXISTS learner_note text;`
+2. **Update RPC** `save_eval_acknowledgement_and_focus` to accept `p_learner_note text DEFAULT NULL` and store it:
+   ```text
+   UPDATE evaluations
+   SET acknowledged_at = COALESCE(acknowledged_at, now()),
+       learner_note = COALESCE(p_learner_note, learner_note)
+   WHERE id = p_eval_id;
+   ```
+
+---
+
+## Home Focus Card -- Display Learner Note
+
+In `CurrentFocusCard.tsx`:
+- Add `learner_note` to the eval select query
+- If present, render it at the top of the card content as a warm callout:
+  - Left border accent, italic text, subtle background
+  - Small label: "My note" with a quote-style presentation
+
+---
+
+## Completion Toast
+
+Change from "Focus saved and review completed!" to:
+> "You're all set! Your focus is pinned to Home."
+
+---
+
+## Files Changed
 
 | File | Action |
 |------|--------|
-| `supabase/migrations/new_migration.sql` | New -- V2 RPC + clear Ana's test data |
-| `src/lib/reviewPayload.ts` | Rewrite -- V2 types and parser |
-| `src/pages/EvaluationReview.tsx` | Rewrite -- 4-step wizard |
-
-No changes needed to `evaluations.ts`, `EvalReadyCard.tsx`, `CurrentFocusCard.tsx`, or `save_eval_acknowledgement_and_focus` RPC.
+| `supabase/migrations/new.sql` | New -- add `learner_note` column, update RPC |
+| `src/pages/EvaluationReview.tsx` | Rewrite -- 7-step flow with warm copy, sessionStorage persistence |
+| `src/components/review/CompetencyCard.tsx` | Edit -- "View Coach Notes" styling |
+| `src/components/home/CurrentFocusCard.tsx` | Edit -- fetch and display `learner_note` |
+| `src/lib/reviewPayload.ts` | No changes needed |
 

@@ -44,18 +44,29 @@ export const CURRENT_PAYLOAD_VERSION = 1;
 export function parseReviewPayload(raw: unknown): ReviewPayload | null {
   if (!raw || typeof raw !== 'object') return null;
   const payload = raw as Record<string, unknown>;
-  if (payload.version !== CURRENT_PAYLOAD_VERSION) return null;
-  // Trust the server-computed structure but ensure required arrays exist
+
+  // Accept both versioned payloads and raw RPC output (which lacks `version`)
+  const hasRequiredArrays = Array.isArray(payload.priorities) || Array.isArray(payload.strengths);
+  if (!hasRequiredArrays) return null;
+
+  // RPC returns `domain_averages` but our type expects `domain_summaries`
+  const domainSummaries = (payload.domain_summaries ?? payload.domain_averages ?? []) as DomainSummary[];
+
+  // Derive recommended_competency_ids from priorities if not explicitly provided
+  const recommendedIds = Array.isArray(payload.recommended_competency_ids)
+    ? payload.recommended_competency_ids as number[]
+    : ((payload.priorities as ReviewPayloadItem[]) ?? []).map(p => p.competency_id);
+
   return {
-    version: payload.version as number,
+    version: (payload.version as number) ?? CURRENT_PAYLOAD_VERSION,
     computed_at: (payload.computed_at as string) ?? '',
     sparse: (payload.sparse as boolean) ?? false,
     priorities: (payload.priorities as ReviewPayloadItem[]) ?? [],
     strengths: (payload.strengths as ReviewPayloadItem[]) ?? [],
     alignment: (payload.alignment as ReviewPayloadItem[]) ?? [],
     gaps: (payload.gaps as ReviewPayloadItem[]) ?? [],
-    domain_summaries: (payload.domain_summaries as DomainSummary[]) ?? [],
-    recommended_competency_ids: (payload.recommended_competency_ids as number[]) ?? [],
+    domain_summaries: domainSummaries,
+    recommended_competency_ids: recommendedIds,
   };
 }
 

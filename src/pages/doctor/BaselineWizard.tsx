@@ -6,6 +6,7 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { BaselineWelcome } from '@/components/doctor/BaselineWelcome';
 import { DomainAssessmentStep } from '@/components/doctor/DomainAssessmentStep';
 import { BaselineComplete } from '@/components/doctor/BaselineComplete';
+import { BaselineTutorial } from '@/components/doctor/BaselineTutorial';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 
@@ -32,6 +33,7 @@ export default function BaselineWizard() {
   const [currentDomainIndex, setCurrentDomainIndex] = useState(0);
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<Record<number, { score: number | null; note: string }>>({});
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // Fetch existing assessment
   const { data: existingAssessment } = useQuery({
@@ -90,21 +92,13 @@ export default function BaselineWizard() {
       
       if (error) throw error;
       
-      console.log('BaselineWizard pro_moves data:', data);
-      
-      // Group by domain
       const domainMap = new Map<number, DomainGroup>();
       
       data?.forEach((pm: any) => {
         const competency = pm.competencies;
         const domain = competency?.domains;
         
-        console.log('Processing pm:', pm.action_id, 'competency:', competency, 'domain:', domain);
-        
-        if (!domain?.domain_id) {
-          console.warn('Skipping pm without domain:', pm.action_id);
-          return;
-        }
+        if (!domain?.domain_id) return;
         
         if (!domainMap.has(domain.domain_id)) {
           domainMap.set(domain.domain_id, {
@@ -122,9 +116,7 @@ export default function BaselineWizard() {
         });
       });
       
-      const result = Array.from(domainMap.values());
-      console.log('BaselineWizard domains result:', result);
-      return result;
+      return Array.from(domainMap.values());
     },
   });
 
@@ -151,6 +143,18 @@ export default function BaselineWizard() {
       setRatings(loadedRatings);
     }
   }, [existingItems]);
+
+  // Show tutorial when entering assessment for the first time
+  useEffect(() => {
+    if (currentStep === 'assessment' && domains?.length) {
+      const seen = localStorage.getItem('baseline-tutorial-seen');
+      if (!seen) {
+        // Small delay to let DOM render
+        const timer = setTimeout(() => setShowTutorial(true), 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [currentStep, domains]);
 
   // Create assessment mutation
   const createAssessmentMutation = useMutation({
@@ -247,11 +251,10 @@ export default function BaselineWizard() {
       [actionId]: { score, note: note || existingNote },
     }));
     
-    // Auto-save
     saveRatingMutation.mutate({ actionId, score, note: note || existingNote });
   };
 
-  // Separate note-only save (doesn't touch self_score)
+  // Separate note-only save
   const saveNoteMutation = useMutation({
     mutationFn: async ({ actionId, note }: { actionId: number; note: string }) => {
       if (!assessmentId) throw new Error('No assessment ID');
@@ -278,7 +281,6 @@ export default function BaselineWizard() {
       [actionId]: { score: prev[actionId]?.score ?? null, note: noteText },
     }));
     
-    // If a rating already exists, use the full save; otherwise note-only
     const existingScore = ratings[actionId]?.score;
     if (existingScore !== null && existingScore !== undefined) {
       saveRatingMutation.mutate({ actionId, score: existingScore, note: noteText });
@@ -290,12 +292,14 @@ export default function BaselineWizard() {
   const handleNextDomain = () => {
     if (domains && currentDomainIndex < domains.length - 1) {
       setCurrentDomainIndex(prev => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handlePrevDomain = () => {
     if (currentDomainIndex > 0) {
       setCurrentDomainIndex(prev => prev - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -307,6 +311,11 @@ export default function BaselineWizard() {
     navigate('/doctor');
   };
 
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    localStorage.setItem('baseline-tutorial-seen', 'true');
+  };
+
   if (domainsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -315,7 +324,6 @@ export default function BaselineWizard() {
     );
   }
 
-  // Handle empty domains - show welcome with error message
   if (!domains || domains.length === 0) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -331,6 +339,9 @@ export default function BaselineWizard() {
   const progressPct = totalProMoves > 0 ? Math.round((ratedCount / totalProMoves) * 100) : 0;
   const isLastDomain = domains ? currentDomainIndex === domains.length - 1 : false;
   const allRated = ratedCount === totalProMoves;
+
+  // Get first pro move ID for tutorial targeting
+  const firstProMove = domains[0]?.proMoves[0];
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -370,6 +381,14 @@ export default function BaselineWizard() {
 
       {currentStep === 'complete' && (
         <BaselineComplete onFinish={handleFinish} assessmentId={assessmentId} />
+      )}
+
+      {/* Tutorial overlay */}
+      {showTutorial && firstProMove && (
+        <BaselineTutorial
+          firstActionId={firstProMove.action_id}
+          onComplete={handleTutorialComplete}
+        />
       )}
     </div>
   );

@@ -30,6 +30,7 @@ interface DomainAssessmentStepProps {
   onComplete?: () => void;
   isCompleting?: boolean;
   forceOpenProMoveId?: number | null;
+  showNaOption?: boolean;
 }
 
 const SCORE_LABELS = [
@@ -56,6 +57,7 @@ export function DomainAssessmentStep({
   onComplete,
   isCompleting,
   forceOpenProMoveId,
+  showNaOption,
 }: DomainAssessmentStepProps) {
   const [selectedProMoveId, setSelectedProMoveId] = useState<number | null>(null);
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
@@ -142,6 +144,9 @@ export function DomainAssessmentStep({
                     {s.short}
                   </div>
                 ))}
+                {showNaOption && (
+                  <div className="w-10 text-center text-xs">N/A</div>
+                )}
               </div>
             </div>
 
@@ -197,35 +202,55 @@ export function DomainAssessmentStep({
                           </button>
                           
                           {/* Score buttons */}
-                          <RadioGroup
-                            value={currentRating?.toString() || ''}
-                            onValueChange={(val) => onRatingChange(pm.action_id, parseInt(val))}
-                            className="flex gap-2"
-                            id={`score-btns-${pm.action_id}`}
-                          >
-                            {SCORE_LABELS.map((s) => (
-                              <div key={s.value} className="w-10 flex justify-center">
-                                <Label
-                                  htmlFor={`${pm.action_id}-${s.value}`}
+                          <div className="flex gap-2" id={`score-btns-${pm.action_id}`}>
+                            <RadioGroup
+                              value={currentRating !== null && currentRating !== undefined && currentRating > 0 ? currentRating.toString() : ''}
+                              onValueChange={(val) => onRatingChange(pm.action_id, parseInt(val))}
+                              className="flex gap-2"
+                            >
+                              {SCORE_LABELS.map((s) => (
+                                <div key={s.value} className="w-10 flex justify-center">
+                                  <Label
+                                    htmlFor={`${pm.action_id}-${s.value}`}
+                                    className={`
+                                      w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer
+                                      transition-all
+                                      ${currentRating === s.value 
+                                        ? SCORE_COLORS[s.value].selected
+                                        : 'border-muted-foreground/30 hover:border-primary/50'
+                                      }
+                                    `}
+                                  >
+                                    <RadioGroupItem
+                                      value={s.value.toString()}
+                                      id={`${pm.action_id}-${s.value}`}
+                                      className="sr-only"
+                                    />
+                                    <span className="text-xs font-medium">{s.value}</span>
+                                  </Label>
+                                </div>
+                              ))}
+                            </RadioGroup>
+                            {showNaOption && (
+                              <div className="w-10 flex justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => onRatingChange(pm.action_id, 0)}
                                   className={`
                                     w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer
-                                    transition-all
-                                    ${currentRating === s.value 
-                                      ? SCORE_COLORS[s.value].selected
-                                      : 'border-muted-foreground/30 hover:border-primary/50'
+                                    transition-all text-xs font-medium
+                                    ${currentRating === 0
+                                      ? 'bg-muted border-muted-foreground text-foreground'
+                                      : 'border-muted-foreground/30 hover:border-primary/50 text-muted-foreground'
                                     }
                                   `}
+                                  title="Not applicable / Haven't observed"
                                 >
-                                  <RadioGroupItem
-                                    value={s.value.toString()}
-                                    id={`${pm.action_id}-${s.value}`}
-                                    className="sr-only"
-                                  />
-                                  <span className="text-xs font-medium">{s.value}</span>
-                                </Label>
+                                  N/A
+                                </button>
                               </div>
-                            ))}
-                          </RadioGroup>
+                            )}
+                          </div>
                         </div>
 
                         {/* Inline note textarea */}

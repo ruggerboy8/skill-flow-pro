@@ -503,7 +503,8 @@ export function ClinicalBaselineResults({
                       {sortedItems.map((item) => {
                         const colors = SCORE_COLORS[item.score];
                         const coachScore = coachRatingsMap.get(item.action_id);
-                        const hasBigDiff = coachScore !== undefined && Math.abs(item.self_score - coachScore) >= 2;
+                        const isCoachNa = coachScore === 0;
+                        const hasBigDiff = coachScore !== undefined && !isCoachNa && Math.abs(item.self_score - coachScore) >= 2;
                         const hasNote = !!item.self_note?.trim();
                         const isExpanded = expandedNoteId === item.action_id;
 
@@ -527,8 +528,8 @@ export function ClinicalBaselineResults({
                                 {item.score}
                               </div>
                               {showCoachRatings && (
-                                <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border bg-background border-border text-foreground">
-                                  {coachScore !== undefined ? coachScore : '–'}
+                                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold border bg-background border-border text-foreground ${isCoachNa ? 'text-[10px]' : 'text-sm'}`}>
+                                  {coachScore !== undefined ? (isCoachNa ? 'N/A' : coachScore) : '–'}
                                 </div>
                               )}
                               {hasNote && (

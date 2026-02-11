@@ -64,7 +64,9 @@ export default function EvaluationReview() {
         .single();
       if (error) throw error;
       if (!evaluation) throw new Error('Evaluation not found');
-      if (evaluation.staff_id !== staffId) throw new Error('Not your evaluation');
+      // Allow super admins to masquerade
+      const isSuperAdmin = staffProfile?.is_super_admin || false;
+      if (evaluation.staff_id !== staffId && !isSuperAdmin) throw new Error('Not your evaluation');
       if (evaluation.status !== 'submitted') throw new Error('Evaluation is not submitted');
       if (!evaluation.is_visible_to_staff) throw new Error('Evaluation is not released');
       return { evaluation, staffId };
@@ -382,7 +384,7 @@ export default function EvaluationReview() {
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {payload.bottom_candidates.slice(0, 2).map(item => (
+                    {payload.bottom_candidates.slice(0, 3).map(item => (
                       <CompetencyCard key={item.competency_id} item={item} readOnly />
                     ))}
                   </CardContent>

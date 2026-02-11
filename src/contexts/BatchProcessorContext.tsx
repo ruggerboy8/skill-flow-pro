@@ -112,9 +112,12 @@ export function BatchProcessorProvider({ children }: { children: ReactNode }) {
           return { status: 'skipped', message: 'Audio file too large (>25MB)', audioSize: audioBlob.size };
         }
 
-        // Send to transcribe-audio - use correct filename extension from path
+        // Send to transcribe-audio - ensure valid audio extension for Whisper API
         const formData = new FormData();
-        const fileName = evalItem.audioPath.split('/').pop() || 'audio.webm';
+        const rawName = evalItem.audioPath.split('/').pop() || 'audio.webm';
+        const validExts = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm'];
+        const ext = rawName.split('.').pop()?.toLowerCase();
+        const fileName = ext && validExts.includes(ext) ? rawName : `${rawName}.webm`;
         formData.append('audio', audioBlob, fileName);
 
         const { data: transcriptResult, error: transcribeError } = await supabase.functions

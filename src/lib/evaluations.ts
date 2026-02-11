@@ -665,45 +665,48 @@ export async function bulkSubmitCompleteDrafts(
 }
 
 /**
- * Set visibility of a single evaluation for staff members
+ * Set visibility of a single evaluation for staff members.
+ * Routes through release_single_evaluation RPC to enforce COALESCE invariant
+ * on released_at/released_by.
  */
-export async function setEvaluationVisibility(evalId: string, visible: boolean) {
-  const { error } = await supabase
-    .from('evaluations')
-    .update({ is_visible_to_staff: visible })
-    .eq('id', evalId);
-  
+export async function setEvaluationVisibility(
+  evalId: string,
+  visible: boolean,
+  releasedByStaffId: string
+) {
+  const { error } = await supabase.rpc('release_single_evaluation', {
+    p_eval_id: evalId,
+    p_visible: visible,
+    p_released_by: releasedByStaffId,
+  });
+
   if (error) {
     throw new Error(`Failed to update visibility: ${error.message}`);
   }
 }
 
 /**
- * Bulk set visibility for all submitted evaluations at a location for a given period
+ * Bulk set visibility for all submitted evaluations at a location for a given period.
+ * Routes through bulk_release_evaluations RPC to enforce COALESCE invariant.
  */
 export async function bulkSetVisibilityByLocation(
   locationId: string,
   period: { type: 'Baseline' | 'Quarterly'; quarter?: string; year: number },
-  visible: boolean
+  visible: boolean,
+  releasedByStaffId: string
 ): Promise<{ updatedCount: number }> {
-  let query = supabase
-    .from('evaluations')
-    .update({ is_visible_to_staff: visible })
-    .eq('location_id', locationId)
-    .eq('status', 'submitted')
-    .eq('program_year', period.year);
-  
-  if (period.type === 'Quarterly' && period.quarter) {
-    query = query.eq('quarter', period.quarter).eq('type', 'Quarterly');
-  } else {
-    query = query.eq('type', 'Baseline');
-  }
-  
-  const { data, error } = await query.select('id');
-  
+  const { data, error } = await supabase.rpc('bulk_release_evaluations', {
+    p_location_id: locationId,
+    p_period_type: period.type,
+    p_quarter: period.quarter ?? null,
+    p_year: period.year,
+    p_visible: visible,
+    p_released_by: releasedByStaffId,
+  });
+
   if (error) {
     throw new Error(`Failed to update visibility: ${error.message}`);
   }
-  
-  return { updatedCount: data?.length || 0 };
+
+  return { updatedCount: (data as number) || 0 };
 }

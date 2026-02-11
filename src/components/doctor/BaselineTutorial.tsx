@@ -15,7 +15,8 @@ interface TutorialStep {
   description: string;
   position: 'bottom' | 'top' | 'right' | 'left-center';
   waitForUserClick?: boolean;
-  closeDrawerOnAdvance?: boolean;
+  /** Auto-advance when the drawer closes (user closes it naturally) */
+  waitForDrawerClose?: boolean;
 }
 
 export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMaterials, onCloseMaterials }: BaselineTutorialProps) {
@@ -40,9 +41,9 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     {
       targetSelector: '[data-tutorial-drawer]',
       title: 'Learning materials',
-      description: "This is where you'll find everything you need — why this Pro Move matters, scripts you can use, and what great looks like. You can open this for any Pro Move anytime.",
+      description: "This is where you'll find everything you need — why this Pro Move matters, scripts you can use, and what great looks like. You can open this for any Pro Move anytime.\n\nClose the drawer to continue.",
       position: 'left-center',
-      closeDrawerOnAdvance: true,
+      waitForDrawerClose: true,
     },
     {
       targetSelector: `#note-btn-${firstActionId}`,
@@ -59,10 +60,9 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     if (el) {
       setTargetRect(el.getBoundingClientRect());
     }
-    // Don't set null — keep last known rect to avoid flicker during transitions
+    // Don't null out — keep last rect to avoid flicker
   }, [currentStep]);
 
-  // Keep polling continuously (no 5s cutoff) so tutorial never strands
   useEffect(() => {
     updatePosition();
     const interval = setInterval(updatePosition, 150);
@@ -75,7 +75,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     };
   }, [updatePosition]);
 
-  // For the "waitForUserClick" step: listen for the pro move click directly
+  // For "waitForUserClick": listen for the pro move click
   useEffect(() => {
     const step = steps[currentStep];
     if (!step?.waitForUserClick) return;
@@ -86,8 +86,7 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     const handler = () => {
       drawerOpen.current = true;
       const poll = setInterval(() => {
-        const drawerEl = document.querySelector('[data-tutorial-drawer]');
-        if (drawerEl) {
+        if (document.querySelector('[data-tutorial-drawer]')) {
           clearInterval(poll);
           setCurrentStep(prev => prev + 1);
         }
@@ -99,37 +98,43 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     return () => el.removeEventListener('click', handler);
   }, [currentStep]);
 
-  const advanceStep = () => {
+  // For "waitForDrawerClose": auto-advance when drawer disappears from DOM
+  useEffect(() => {
     const step = steps[currentStep];
-    if (step?.closeDrawerOnAdvance) {
-      onCloseMaterials();
-      drawerOpen.current = false;
-      const nextIndex = currentStep + 1;
-      const nextSelector = steps[nextIndex]?.targetSelector;
-      // Poll for next target to exist before advancing (drawer close animation)
-      if (nextSelector) {
-        const poll = setInterval(() => {
-          const el = document.querySelector(nextSelector);
-          if (el) {
-            clearInterval(poll);
-            setCurrentStep(nextIndex);
-          }
-        }, 50);
-        setTimeout(() => clearInterval(poll), 2000);
+    if (!step?.waitForDrawerClose) return;
+
+    const poll = setInterval(() => {
+      const drawerEl = document.querySelector('[data-tutorial-drawer]');
+      if (!drawerEl) {
+        // Drawer has closed — advance to next step
+        clearInterval(poll);
+        drawerOpen.current = false;
+        const nextIndex = currentStep + 1;
+        const nextSelector = steps[nextIndex]?.targetSelector;
+        // Poll for next target to appear
+        if (nextSelector) {
+          const poll2 = setInterval(() => {
+            if (document.querySelector(nextSelector)) {
+              clearInterval(poll2);
+              setCurrentStep(nextIndex);
+            }
+          }, 50);
+          setTimeout(() => clearInterval(poll2), 2000);
+        }
       }
-      return;
-    }
+    }, 100);
+
+    return () => clearInterval(poll);
+  }, [currentStep]);
+
+  const handleNext = () => {
+    const step = steps[currentStep];
+    if (step?.waitForUserClick || step?.waitForDrawerClose) return;
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
       onComplete();
     }
-  };
-
-  const handleNext = () => {
-    const step = steps[currentStep];
-    if (step?.waitForUserClick) return;
-    advanceStep();
   };
 
   const handleSkip = () => {
@@ -172,18 +177,23 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
     pointerEvents: 'none',
   };
 
+  // Determine button display
+  const showHint = step.waitForUserClick || step.waitForDrawerClose;
+  const hintText = step.waitForUserClick
+    ? 'Tap the Pro Move above ↑'
+    : 'Close the drawer to continue →';
+
   return createPortal(
     <>
       <div style={highlightStyle} />
 
-      {/* Tooltip */}
       <div
         data-tutorial-tooltip
         style={tooltipStyle}
         className="bg-popover border rounded-lg shadow-lg p-4 max-w-xs"
       >
         <p className="font-semibold text-sm mb-1">{step.title}</p>
-        <p className="text-sm text-muted-foreground mb-3">{step.description}</p>
+        <p className="text-sm text-muted-foreground mb-3 whitespace-pre-line">{step.description}</p>
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -192,8 +202,8 @@ export function BaselineTutorial({ firstActionId, onComplete, onForceOpenMateria
           >
             Skip
           </button>
-          {step.waitForUserClick ? (
-            <span className="text-xs text-muted-foreground italic">Tap the Pro Move above ↑</span>
+          {showHint ? (
+            <span className="text-xs text-muted-foreground italic">{hintText}</span>
           ) : (
             <Button size="sm" onClick={handleNext}>
               {currentStep < steps.length - 1 ? 'Next' : 'Got it'}

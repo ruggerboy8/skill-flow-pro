@@ -24,10 +24,12 @@ function WeekOfHeader() {
 
 function RoleSection({ roleId, label }: { roleId: number; label: string }) {
   const [open, setOpen] = useState(true);
-  const { data: assignments, isLoading } = useWeeklyAssignments({
+  const { data: assignments, isLoading, error } = useWeeklyAssignments({
     roleId,
     onboardingActive: false,
   });
+
+  console.log(`[TeamWeeklyFocus] role=${roleId} (${label}): assignments=${assignments?.length ?? 'null'}, loading=${isLoading}, error=`, error);
 
   if (isLoading) {
     return (

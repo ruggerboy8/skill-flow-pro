@@ -65,6 +65,9 @@ import BaselineWizard from "@/pages/doctor/BaselineWizard";
 import DoctorBaselineResults from "@/pages/doctor/DoctorBaselineResults";
 import DoctorReviewPrep from "@/pages/doctor/DoctorReviewPrep";
 import DoctorCoachingHistory from "@/pages/doctor/DoctorCoachingHistory";
+import DoctorMyTeam from "@/pages/doctor/DoctorMyTeam";
+import DoctorTeamRoleDetail from "@/pages/doctor/DoctorTeamRoleDetail";
+import DoctorTeamDomainDetail from "@/pages/doctor/DoctorTeamDomainDetail";
 
 // App routes with pre-routing checks for public pages
 function AppRoutes() {
@@ -148,6 +151,9 @@ function AppRoutes() {
           <Route path="baseline-results" element={<DoctorBaselineResults />} />
           <Route path="review-prep/:sessionId" element={<DoctorReviewPrep />} />
           <Route path="coaching-history" element={<DoctorCoachingHistory />} />
+          <Route path="my-team" element={<DoctorMyTeam />} />
+          <Route path="my-team/role/:roleSlug" element={<DoctorTeamRoleDetail />} />
+          <Route path="my-team/role/:roleSlug/domain/:domainSlug" element={<DoctorTeamDomainDetail />} />
         </Route>
 
         <Route path="admin" element={<AdminPage />} />

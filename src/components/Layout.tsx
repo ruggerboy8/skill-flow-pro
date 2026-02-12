@@ -59,6 +59,7 @@ export default function Layout() {
     // Doctor-specific navigation
     { name: 'Home', href: '/doctor', icon: Home },
     { name: 'My Role', href: '/doctor/my-role', icon: BookOpen },
+    { name: 'My Team', href: '/doctor/my-team', icon: Users },
     { name: 'Coaching History', href: '/doctor/coaching-history', icon: ClipboardList },
   ] : [
     // Standard navigation

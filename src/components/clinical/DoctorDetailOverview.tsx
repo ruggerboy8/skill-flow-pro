@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, CalendarPlus, FileText, Video } from 'lucide-react';
+import { CalendarPlus, FileText, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { MeetingScheduleDialog } from '@/components/clinical/MeetingScheduleDialog';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
@@ -31,20 +32,17 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   const { data: myStaff } = useStaffProfile();
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [prepSessionId, setPrepSessionId] = useState<string | null>(null);
+  const [showPrepSheet, setShowPrepSheet] = useState(false);
 
   const upcomingSession = sessions
     .filter(s => ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(s.status))
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())[0];
 
-  // Check if there's a session that needs prep (just scheduled, no prep yet)
   const needsPrepSession = sessions.find(s => s.status === 'scheduled');
-  // Session with combined prep ready to view
   const viewablePrepSession = sessions.find(s => ['director_prep_ready', 'doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(s.status));
 
-  // Doctor has submitted — director should see read-only summary, not edit
   const isDoctorPrepSubmitted = viewablePrepSession && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(viewablePrepSession.status);
 
-  // Fetch selections for viewable prep (two-step: selections + pro_moves)
   const { data: prepSelections } = useQuery({
     queryKey: ['session-selections-all', viewablePrepSession?.id],
     queryFn: async () => {
@@ -76,7 +74,6 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     enabled: !!viewablePrepSession?.id,
   });
 
-  // Fetch session full data for combined view
   const { data: viewableSessionFull } = useQuery({
     queryKey: ['coaching-session', viewablePrepSession?.id],
     queryFn: async () => {
@@ -92,7 +89,6 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     enabled: !!viewablePrepSession?.id,
   });
 
-  // Show prep composer if we're actively composing
   if (prepSessionId) {
     return (
       <DirectorPrepComposer
@@ -103,29 +99,15 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     );
   }
 
-  // Can schedule if baseline complete AND no active session in progress
   const hasActiveSession = sessions.some(s => 
     ['scheduled', 'director_prep_ready', 'doctor_prep_submitted', 'meeting_pending', 'doctor_revision_requested'].includes(s.status)
   );
   const canSchedule = baseline?.status === 'completed' && !hasActiveSession;
-
-  // Determine button label based on whether there are confirmed sessions
   const hasConfirmedSession = sessions.some(s => s.status === 'doctor_confirmed');
   const scheduleLabel = hasConfirmedSession ? 'Schedule Follow-up' : 'Schedule Baseline Review';
 
   return (
     <div className="space-y-4">
-      {/* Location Card */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Location</CardTitle>
-          <MapPin className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-lg font-semibold">{doctor.locations?.name || 'Roaming'}</div>
-        </CardContent>
-      </Card>
-
       {/* Schedule Button */}
       {canSchedule && (
         <Card className="border-dashed">
@@ -194,7 +176,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
                   variant="outline"
                   size="sm"
                   className="gap-1.5"
-                  onClick={() => document.getElementById('meeting-prep-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => setShowPrepSheet(true)}
                 >
                   <FileText className="h-3.5 w-3.5" />
                   View Prep Summary
@@ -213,18 +195,27 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </Card>
       )}
 
-      {/* Combined Prep View */}
-      {viewableSessionFull && prepSelections && (
-        <div className="space-y-3" id="meeting-prep-section">
-          <h3 className="text-base font-semibold">Meeting Prep</h3>
-          <CombinedPrepView
-            session={viewableSessionFull}
-            selections={prepSelections as any}
-            coachName={myStaff?.name || 'Alex'}
-            doctorName={doctor.name}
-          />
-        </div>
-      )}
+      {/* Prep Summary Sheet */}
+      <Sheet open={showPrepSheet} onOpenChange={setShowPrepSheet}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Meeting Prep Summary</SheetTitle>
+            {viewableSessionFull && (
+              <p className="text-sm text-muted-foreground">
+                {format(new Date(viewableSessionFull.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
+              </p>
+            )}
+          </SheetHeader>
+          {viewableSessionFull && prepSelections && (
+            <CombinedPrepView
+              session={viewableSessionFull}
+              selections={prepSelections as any}
+              coachName={myStaff?.name || 'Alex'}
+              doctorName={doctor.name}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
 
       {myStaff && (
         <MeetingScheduleDialog

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MapPin } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
@@ -127,11 +127,12 @@ export default function DoctorDetail() {
             <h1 className="text-2xl font-bold">{doctor.name}</h1>
             <DoctorJourneyStatusPill status={journeyStatus} />
           </div>
-          <p className="text-muted-foreground">{doctor.email}</p>
+          <p className="text-sm text-muted-foreground flex items-center gap-1">
+            <MapPin className="h-3.5 w-3.5" />
+            {(doctor.locations as any)?.name || 'Roaming'}
+          </p>
         </div>
       </div>
-
-      <DoctorNextActionPanel status={journeyStatus} />
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
@@ -140,6 +141,8 @@ export default function DoctorDetail() {
           <TabsTrigger value="baseline">Baseline</TabsTrigger>
           <TabsTrigger value="thread">Coaching Thread</TabsTrigger>
         </TabsList>
+
+        <DoctorNextActionPanel status={journeyStatus} />
 
         <TabsContent value="overview">
           <DoctorDetailOverview

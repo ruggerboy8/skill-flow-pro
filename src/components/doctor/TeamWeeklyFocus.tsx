@@ -6,7 +6,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 
 const ROLES = [
   { id: 1, label: 'DFI' },
@@ -39,53 +38,36 @@ function WeekOfHeader() {
 }
 
 /**
- * For each role, find the first staff member at the doctor's location,
- * then look up their weekly_scores for this week to get assigned (non-self-select) pro moves.
+ * Fetch global weekly_assignments using flat (non-nested) queries to avoid PGRST200.
+ * Filters out self_select assignments. Fetches all 3 roles in one batch.
  */
-function useTeamAssignmentsByLocation(locationId: string | null) {
+function useAllRoleAssignments() {
   return useQuery({
-    queryKey: ['team-weekly-by-location', locationId],
+    queryKey: ['team-weekly-all-roles'],
     queryFn: async (): Promise<Record<number, SimpleAssignment[]>> => {
-      if (!locationId) return { 1: [], 2: [], 3: [] };
-
       const mondayStr = getThisMonday();
       const result: Record<number, SimpleAssignment[]> = { 1: [], 2: [], 3: [] };
 
-      // 1. Find one staff member per role at this location
-      const { data: staffRows } = await supabase
-        .from('staff')
-        .select('id, role_id')
-        .eq('primary_location_id', locationId)
-        .eq('is_participant', true)
-        .eq('is_paused', false)
-        .in('role_id', [1, 2, 3]);
+      // 1. Get locked global assignments for all 3 roles, exclude self_select
+      const { data: rows, error } = await supabase
+        .from('weekly_assignments')
+        .select('id, action_id, display_order, role_id, self_select')
+        .eq('source', 'global')
+        .in('role_id', [1, 2, 3])
+        .eq('week_start_date', mondayStr)
+        .eq('status', 'locked')
+        .eq('self_select', false)
+        .is('org_id', null)
+        .is('superseded_at', null)
+        .order('display_order');
 
-      if (!staffRows?.length) return result;
+      if (error) throw error;
+      if (!rows?.length) return result;
 
-      // Pick first staff per role
-      const staffByRole: Record<number, string> = {};
-      for (const s of staffRows) {
-        if (s.role_id && !staffByRole[s.role_id]) {
-          staffByRole[s.role_id] = s.id;
-        }
-      }
+      // 2. Get unique action_ids and fetch pro_move details (flat queries)
+      const actionIds = [...new Set(rows.map(r => r.action_id).filter((id): id is number => id != null))];
+      if (!actionIds.length) return result;
 
-      const staffIds = Object.values(staffByRole);
-      if (!staffIds.length) return result;
-
-      // 2. Get weekly_scores for these staff members this week, only site-assigned (site_action_id not null)
-      const { data: scores } = await supabase
-        .from('weekly_scores')
-        .select('staff_id, site_action_id, weekly_focus_id')
-        .in('staff_id', staffIds)
-        .eq('week_of', mondayStr)
-        .not('site_action_id', 'is', null);
-
-      if (!scores?.length) return result;
-
-      // 3. Collect unique action_ids and fetch pro_move details
-      const actionIds = [...new Set(scores.map(s => s.site_action_id!))];
-      
       const { data: moves } = await supabase
         .from('pro_moves')
         .select('action_id, action_statement, competency_id')
@@ -111,50 +93,23 @@ function useTeamAssignmentsByLocation(locationId: string | null) {
         domain: compDomainMap.get(m.competency_id!) || '',
       }]));
 
-      // 4. Group by role via staffByRole mapping
-      const staffIdToRole = new Map(Object.entries(staffByRole).map(([role, sid]) => [sid, Number(role)]));
-      const seen = new Map<string, Set<number>>(); // per role, track unique action_ids
-
-      for (const score of scores) {
-        const roleId = staffIdToRole.get(score.staff_id!);
-        if (!roleId || !score.site_action_id) continue;
-
-        if (!seen.has(String(roleId))) seen.set(String(roleId), new Set());
-        if (seen.get(String(roleId))!.has(score.site_action_id)) continue;
-        seen.get(String(roleId))!.add(score.site_action_id);
-
-        const meta = moveMap.get(score.site_action_id);
+      // 3. Group by role
+      for (const r of rows) {
+        const roleId = r.role_id;
+        if (!roleId || !r.action_id) continue;
+        const meta = moveMap.get(r.action_id);
         result[roleId].push({
-          id: `${score.staff_id}-${score.site_action_id}`,
-          action_id: score.site_action_id,
+          id: r.id,
+          action_id: r.action_id,
           action_statement: meta?.statement || '',
           domain_name: meta?.domain || '',
-          display_order: result[roleId].length,
+          display_order: r.display_order,
         });
       }
 
       return result;
     },
-    enabled: !!locationId,
     staleTime: 2 * 60 * 1000,
-  });
-}
-
-function useDoctorLocation() {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ['doctor-location', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data } = await supabase
-        .from('staff')
-        .select('primary_location_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      return data?.primary_location_id || null;
-    },
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -195,7 +150,7 @@ function AssignmentCard({ assignment }: { assignment: SimpleAssignment }) {
   const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
 
   return (
-    <div className="flex bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-border/50 shadow-sm">
+    <div className="flex bg-card rounded-xl overflow-hidden border border-border/50 shadow-sm">
       <div
         className="w-8 shrink-0 flex flex-col items-center justify-center"
         style={{ backgroundColor: domainColor }}
@@ -217,10 +172,7 @@ function AssignmentCard({ assignment }: { assignment: SimpleAssignment }) {
 }
 
 export default function TeamWeeklyFocus() {
-  const { data: locationId, isLoading: locLoading } = useDoctorLocation();
-  const { data: assignmentsByRole, isLoading: assignLoading } = useTeamAssignmentsByLocation(locationId ?? null);
-
-  const isLoading = locLoading || assignLoading;
+  const { data: assignmentsByRole, isLoading } = useAllRoleAssignments();
 
   return (
     <div className="space-y-2 mt-4">

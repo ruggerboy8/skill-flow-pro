@@ -7,6 +7,10 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Link } from 'react-router-dom';
 import { ClipboardCheck, CheckCircle2, Eye, Calendar, FileText, ChevronDown, FlaskConical, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+
+const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const MEETING_FMT = "EEEE, MMMM d 'at' h:mm a zzz";
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -65,7 +69,7 @@ export default function DoctorHome() {
               <div>
                 <CardTitle>Complete Your Meeting Prep</CardTitle>
                 <CardDescription>
-                  Meeting on {format(new Date(prepSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
+                  Meeting on {formatInTimeZone(new Date(prepSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}
                 </CardDescription>
               </div>
             </div>
@@ -93,7 +97,7 @@ export default function DoctorHome() {
               <div>
                 <CardTitle>Prep Submitted</CardTitle>
                 <CardDescription>
-                  Meeting on {format(new Date(submittedPrepSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
+                  Meeting on {formatInTimeZone(new Date(submittedPrepSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}
                 </CardDescription>
               </div>
             </div>
@@ -124,7 +128,7 @@ export default function DoctorHome() {
               <div>
                 <CardTitle>Meeting Scheduled</CardTitle>
                 <CardDescription>
-                  {format(new Date(scheduledSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
+                  {formatInTimeZone(new Date(scheduledSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}
                 </CardDescription>
               </div>
             </div>
@@ -292,7 +296,7 @@ export default function DoctorHome() {
                     {session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${session.sequence_number - 1}`}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(session.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
+                    {formatInTimeZone(new Date(session.scheduled_at), LOCAL_TZ, MEETING_FMT)}
                   </p>
                 </div>
               </CardContent>

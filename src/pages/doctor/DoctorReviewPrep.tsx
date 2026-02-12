@@ -14,6 +14,10 @@ import { DomainBadge } from '@/components/ui/domain-badge';
 import { ArrowLeft, Send, Calendar, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+
+const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const MEETING_FMT = "EEEE, MMMM d 'at' h:mm a zzz";
 import { getDomainColorRaw } from '@/lib/domainColors';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 import { MeetingConfirmationCard } from '@/components/doctor/MeetingConfirmationCard';
@@ -276,7 +280,7 @@ export default function DoctorReviewPrep() {
           <h2 className="text-xl font-bold">Prepare for Your {meetingTypeLabel}</h2>
           <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
             <Calendar className="h-3.5 w-3.5" />
-            {format(new Date(session.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
+            {formatInTimeZone(new Date(session.scheduled_at), LOCAL_TZ, MEETING_FMT)}
           </div>
         </div>
       </div>

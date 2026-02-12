@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2 } from 'lucide-react';
 import { MeetingOutcomeCapture } from '@/components/clinical/MeetingOutcomeCapture';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
@@ -159,7 +160,7 @@ function SessionCard({
               <div>
                 <CardTitle className="text-base">{typeLabel}</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(session.scheduled_at), 'EEEE, MMMM d, yyyy \'at\' h:mm a')}
+                  {formatInTimeZone(new Date(session.scheduled_at), Intl.DateTimeFormat().resolvedOptions().timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a zzz")}
                 </p>
               </div>
             </div>

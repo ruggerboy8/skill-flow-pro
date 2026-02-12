@@ -144,27 +144,8 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
         </Select>
       </div>
 
-      {/* Status filter chips */}
-      <div className="flex flex-wrap gap-2">
-        {([
-          { value: 'all', label: 'All' },
-          { value: 'not_released', label: 'Not released' },
-          { value: 'released', label: 'Released' },
-          { value: 'viewed', label: 'Viewed' },
-          { value: 'reviewed', label: 'Reviewed' },
-          { value: 'focus_set', label: 'Focus set' },
-        ] as { value: string; label: string }[]).map(chip => (
-          <Button
-            key={chip.value}
-            variant={statusFilter === chip.value ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatusFilter(chip.value)}
-            className="text-xs"
-          >
-            {chip.label}
-          </Button>
-        ))}
-      </div>
+
+
 
       {/* Delivery summary strip */}
       <DeliverySummary locations={filteredLocations} />

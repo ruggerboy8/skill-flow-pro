@@ -116,8 +116,8 @@ export function getDoctorJourneyStatus(
     }
   }
 
-  // Check coach baseline status
-  if (baseline?.status === 'completed' && coachBaseline?.status !== 'completed') {
+  // Check coach baseline status (only when coachBaseline info is actually provided)
+  if (baseline?.status === 'completed' && coachBaseline !== null && coachBaseline !== undefined && coachBaseline?.status !== 'completed') {
     return {
       stage: 'director_baseline_pending',
       label: 'Your Review Needed',

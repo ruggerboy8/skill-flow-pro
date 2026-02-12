@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, CheckCircle2, Eye, Calendar, FileText, ChevronDown, FlaskConical, Sparkles } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Eye, Calendar, FileText, Sparkles, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -13,7 +12,7 @@ const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const MEETING_FMT = "EEEE, MMMM d 'at' h:mm a zzz";
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
 
 export default function DoctorHome() {
   const { data: staff } = useStaffProfile();
@@ -266,9 +265,8 @@ export default function DoctorHome() {
     ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(s.status)
   ).sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()) || [];
 
-  // Completed sessions
-  const completedSessions = sessions?.filter(s => s.status === 'doctor_confirmed')
-    .sort((a, b) => b.sequence_number - a.sequence_number) || [];
+  // Most recent confirmed session for "Current Focus"
+  const latestConfirmed = sessions?.find(s => s.status === 'doctor_confirmed');
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -282,6 +280,9 @@ export default function DoctorHome() {
 
       {/* Primary CTA */}
       {renderPrimaryCTA()}
+
+      {/* Current Focus — action steps from latest confirmed session */}
+      {latestConfirmed && <CurrentFocusCard sessionId={latestConfirmed.id} />}
 
       {/* Upcoming Meetings */}
       {upcomingSessions.length > 0 && (
@@ -304,90 +305,45 @@ export default function DoctorHome() {
           ))}
         </div>
       )}
-
-      {/* Completed Records */}
-      {completedSessions.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Past Coaching Sessions</h2>
-          {completedSessions.map(session => (
-            <CompletedSessionCard key={session.id} session={session} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
-function CompletedSessionCard({ session }: { session: { id: string; session_type: string; sequence_number: number; scheduled_at: string } }) {
-  const [open, setOpen] = useState(false);
-
+function CurrentFocusCard({ sessionId }: { sessionId: string }) {
   const { data: meetingRecord } = useQuery({
-    queryKey: ['meeting-record', session.id],
+    queryKey: ['meeting-record', sessionId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('coaching_meeting_records')
-        .select('*')
-        .eq('session_id', session.id)
+        .select('experiments')
+        .eq('session_id', sessionId)
         .maybeSingle();
       if (error) throw error;
       return data;
     },
-    enabled: open,
   });
 
-  const experiments = (meetingRecord?.experiments as any[] | null) || [];
-  const typeLabel = session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${session.sequence_number - 1}`;
+  const actionSteps = (meetingRecord?.experiments as any[] | null) || [];
+  if (actionSteps.length === 0) return null;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <Card className="transition-colors">
-        <CollapsibleTrigger asChild>
-          <CardContent className="flex items-center justify-between py-4 cursor-pointer hover:bg-muted/30">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
-              <div>
-                <p className="text-sm font-medium">{typeLabel}</p>
-                <p className="text-sm text-muted-foreground">
-                  {format(new Date(session.scheduled_at), 'MMMM d, yyyy')}
-                </p>
-              </div>
-            </div>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
-          </CardContent>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent className="pt-0 space-y-3">
-            {meetingRecord ? (
-              <>
-                {meetingRecord.summary && (
-                  <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3">
-                    {meetingRecord.summary}
-                  </div>
-                )}
-                {experiments.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <FlaskConical className="h-3.5 w-3.5" />
-                      Action Steps
-                    </p>
-                    {experiments.map((exp: any, i: number) => (
-                      <div key={i} className="p-2 rounded-md bg-muted/30 border mb-1.5">
-                        <p className="text-sm font-medium">{exp.title}</p>
-                        {exp.description && <p className="text-xs text-muted-foreground mt-0.5">{exp.description}</p>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">Loading...</p>
+    <Card className="border-primary/20">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <Target className="h-5 w-5 text-primary" />
+          <CardTitle className="text-base">Current Focus</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {actionSteps.map((step: any, i: number) => (
+          <div key={i} className="p-3 rounded-lg bg-primary/5 border border-primary/10">
+            <p className="text-sm font-medium">{step.title}</p>
+            {step.description && (
+              <p className="text-sm text-muted-foreground mt-0.5">{step.description}</p>
             )}
-            <Link to={`/doctor/review-prep/${session.id}`}>
-              <Button variant="ghost" size="sm" className="w-full">View Full Record</Button>
-            </Link>
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

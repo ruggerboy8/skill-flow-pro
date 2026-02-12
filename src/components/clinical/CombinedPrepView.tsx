@@ -83,10 +83,11 @@ export function CombinedPrepView({ session, selections, coachName = 'Alex', doct
 
           {session.coach_note && (
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Notes</p>
-              <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3">
-                {session.coach_note}
-              </div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Agenda</p>
+              <div
+                className="text-sm bg-muted/30 rounded-md p-3 prose prose-sm max-w-none dark:prose-invert"
+                dangerouslySetInnerHTML={{ __html: session.coach_note }}
+              />
             </div>
           )}
         </CardContent>

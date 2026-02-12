@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
@@ -8,16 +8,23 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Send } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { ArrowLeft, Send, Calendar, FileText } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 import { MeetingConfirmationCard } from '@/components/doctor/MeetingConfirmationCard';
 
+const SCORE_LABELS: Record<number, string> = {
+  1: 'Rarely',
+  2: 'Developing',
+  3: 'Consistent',
+  4: 'Master',
+};
+
 export default function DoctorReviewPrep() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { data: staff } = useStaffProfile();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [doctorNote, setDoctorNote] = useState('');
@@ -102,7 +109,7 @@ export default function DoctorReviewPrep() {
     enabled: !!session?.doctor_staff_id,
   });
 
-  // Fetch coach + doctor names
+  // Fetch coach name
   const { data: coachName } = useQuery({
     queryKey: ['staff-name', session?.coach_staff_id],
     queryFn: async () => {
@@ -123,7 +130,7 @@ export default function DoctorReviewPrep() {
     setSelectedActions(prev => {
       if (prev.includes(actionId)) return prev.filter(id => id !== actionId);
       if (prev.length >= 2) {
-        toast({ title: 'Maximum 2 discussion topics', description: 'Deselect one before adding another.', variant: 'destructive' });
+        toast({ title: 'Maximum 2', description: 'Deselect one before adding another.', variant: 'destructive' });
         return prev;
       }
       return [...prev, actionId];
@@ -132,9 +139,8 @@ export default function DoctorReviewPrep() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (selectedActions.length === 0) throw new Error('Select at least one discussion topic.');
+      if (selectedActions.length === 0) throw new Error('Select at least one Pro Move.');
 
-      // Insert doctor selections
       const selections = selectedActions.map((actionId, i) => ({
         session_id: sessionId!,
         action_id: actionId,
@@ -147,7 +153,6 @@ export default function DoctorReviewPrep() {
         .insert(selections);
       if (selErr) throw selErr;
 
-      // Update session with doctor note and status
       const { error: sessErr } = await supabase
         .from('coaching_sessions')
         .update({
@@ -161,7 +166,7 @@ export default function DoctorReviewPrep() {
       queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['session-selections-all', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['my-coaching-sessions'] });
-      toast({ title: 'Prep submitted', description: 'Both sides are now ready for the meeting.' });
+      toast({ title: 'Prep submitted!', description: 'You\'re all set for the meeting.' });
     },
     onError: (err: any) => {
       toast({ title: 'Error submitting prep', description: err.message, variant: 'destructive' });
@@ -213,7 +218,7 @@ export default function DoctorReviewPrep() {
           </Link>
           <div>
             <h2 className="text-xl font-bold">Meeting Prep</h2>
-            <Badge className="bg-emerald-100 text-emerald-800 mt-1">Prep Complete</Badge>
+            <Badge className="bg-emerald-100 text-emerald-800 mt-1">✓ Prep Complete</Badge>
           </div>
         </div>
         <CombinedPrepView
@@ -226,7 +231,7 @@ export default function DoctorReviewPrep() {
     );
   }
 
-  // Doctor prep form
+  // Doctor prep form — clear, step-by-step layout
   const groupedItems = (baselineItems || []).reduce((acc, item) => {
     const pm = item.pro_moves as any;
     const domainName = pm?.competencies?.domains?.domain_name || 'Other';
@@ -235,57 +240,77 @@ export default function DoctorReviewPrep() {
     return acc;
   }, {} as Record<string, typeof baselineItems>);
 
+  const meetingTypeLabel = session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up`;
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <Link to="/doctor">
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div>
-          <h2 className="text-xl font-bold">Baseline Review Prep</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl font-bold">Prepare for Your {meetingTypeLabel}</h2>
+          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5" />
             {format(new Date(session.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
-          </p>
+          </div>
         </div>
       </div>
 
-      {/* Coach's Note */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">From {coachName || 'Alex'}</CardTitle>
-          <CardDescription>Read through these notes before adding your own.</CardDescription>
+      {/* Step 1: Meeting Agenda from Coach */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">1</div>
+            <CardTitle className="text-base">Meeting Agenda from {coachName || 'Alex'}</CardTitle>
+          </div>
+          <CardDescription>Here's what {coachName || 'Alex'} has planned for your conversation.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Coach's selected Pro Moves */}
           {coachSelections.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Discussion Topics</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                {coachName || 'Alex'}'s Focus Areas
+              </p>
               <div className="space-y-2">
                 {coachSelections.map(sel => (
-                  <div key={sel.action_id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
-                    <Badge variant="outline" className="text-xs">
+                  <div key={sel.action_id} className="flex items-center gap-2 p-2.5 rounded-md bg-primary/5 border border-primary/10">
+                    <Badge variant="outline" className="text-xs shrink-0">
                       {(sel as any).pro_moves?.competencies?.domains?.domain_name || '—'}
                     </Badge>
-                    <span className="text-sm">{(sel as any).pro_moves?.action_statement || `Action #${sel.action_id}`}</span>
+                    <span className="text-sm font-medium">{(sel as any).pro_moves?.action_statement || `Action #${sel.action_id}`}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
+          {/* Coach's agenda notes (rendered as HTML) */}
           {session.coach_note && (
-            <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3">
-              {session.coach_note}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Agenda Notes</p>
+              <div
+                className="text-sm bg-muted/30 rounded-md p-3 prose prose-sm max-w-none dark:prose-invert"
+                dangerouslySetInnerHTML={{ __html: session.coach_note }}
+              />
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Doctor ProMove Picker */}
+      <Separator />
+
+      {/* Step 2: Doctor picks Pro Moves */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Your Discussion Topics</CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">2</div>
+            <CardTitle className="text-base">Your Focus Areas</CardTitle>
+          </div>
           <CardDescription>
-            Select 1–2 Pro Moves you'd like to discuss ({selectedActions.length}/2 selected)
+            <strong>Choose up to 2 Pro Moves</strong> that you'd like to focus on during the meeting.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -301,7 +326,11 @@ export default function DoctorReviewPrep() {
                     <label
                       key={item.action_id}
                       className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        isSelected ? 'border-primary bg-primary/5' : isSuggested ? 'border-amber-300 bg-amber-50/50' : 'hover:bg-muted/50'
+                        isSelected
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                          : isSuggested
+                          ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20'
+                          : 'hover:bg-muted/50'
                       }`}
                     >
                       <Checkbox
@@ -310,16 +339,16 @@ export default function DoctorReviewPrep() {
                         className="mt-0.5"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-medium">{pm?.action_statement || `Action #${item.action_id}`}</p>
                           {isSuggested && (
-                            <Badge className="bg-amber-100 text-amber-800 text-xs">Suggested</Badge>
+                            <Badge className="bg-amber-100 text-amber-800 text-xs">{coachName}'s pick</Badge>
                           )}
                         </div>
                         {item.self_score != null && (
-                          <Badge variant="secondary" className="mt-1 text-xs">
-                            Self-score: {item.self_score}
-                          </Badge>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Your self-rating: <span className="font-medium">{SCORE_LABELS[item.self_score] || item.self_score}</span>
+                          </p>
                         )}
                       </div>
                     </label>
@@ -328,22 +357,32 @@ export default function DoctorReviewPrep() {
               </div>
             </div>
           ))}
+          {selectedActions.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {selectedActions.length}/2 selected
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      {/* Doctor Note */}
+      <Separator />
+
+      {/* Step 3: Doctor's comments */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Your Notes & Questions</CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">3</div>
+            <CardTitle className="text-base">Your Thoughts</CardTitle>
+          </div>
           <CardDescription>
-            Anything you'd like to discuss, ask about, or clarify during the meeting.
+            Any comments, concerns, or questions you'd like to cover at the meeting? (Optional)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea
             value={doctorNote}
             onChange={(e) => setDoctorNote(e.target.value)}
-            placeholder="Share your thoughts, questions, or areas you'd like to explore..."
+            placeholder="Anything on your mind — wins, challenges, questions for discussion..."
             rows={4}
             className="resize-y"
           />
@@ -355,12 +394,13 @@ export default function DoctorReviewPrep() {
         className="w-full gap-2"
         onClick={() => submitMutation.mutate()}
         disabled={selectedActions.length === 0 || submitMutation.isPending}
+        size="lg"
       >
         <Send className="h-4 w-4" />
-        {submitMutation.isPending ? 'Submitting...' : 'Submit Prep'}
+        {submitMutation.isPending ? 'Submitting...' : 'Submit My Prep'}
       </Button>
-      <p className="text-xs text-muted-foreground text-center">
-        Submitting locks your prep and creates a shared meeting agenda.
+      <p className="text-xs text-muted-foreground text-center pb-4">
+        This locks your selections and creates a shared meeting agenda for both of you.
       </p>
     </div>
   );

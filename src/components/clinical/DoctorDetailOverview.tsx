@@ -174,14 +174,10 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
                   variant="outline"
                   size="sm"
                   className="gap-1.5"
-                  onClick={() => {
-                    // Scroll down to prep view or open it
-                    const el = document.getElementById('meeting-prep-section');
-                    el?.scrollIntoView({ behavior: 'smooth' });
-                  }}
+                  onClick={() => setPrepSessionId(viewablePrepSession.id)}
                 >
                   <FileText className="h-3.5 w-3.5" />
-                  View Prep
+                  View / Edit Prep
                 </Button>
               )}
               {upcomingSession.meeting_link && (

@@ -12,6 +12,7 @@ import { ArrowLeft, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
+import { MeetingConfirmationCard } from '@/components/doctor/MeetingConfirmationCard';
 
 export default function DoctorReviewPrep() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -115,7 +116,8 @@ export default function DoctorReviewPrep() {
   const coachSelections = allSelections?.filter(s => s.selected_by === 'coach') || [];
   const coachActionIds = coachSelections.map(s => s.action_id);
 
-  const isReadOnly = session?.status === 'doctor_prep_submitted' || session?.status === 'doctor_confirmed' || session?.status === 'meeting_pending';
+  const isReadOnly = session?.status === 'doctor_prep_submitted' || session?.status === 'doctor_confirmed';
+  const isMeetingPending = session?.status === 'meeting_pending';
 
   const toggleAction = (actionId: number) => {
     setSelectedActions(prev => {
@@ -179,6 +181,24 @@ export default function DoctorReviewPrep() {
       <div className="text-center py-12">
         <p className="text-muted-foreground">Session not found</p>
         <Link to="/doctor"><Button variant="link">Back to Home</Button></Link>
+      </div>
+    );
+  }
+
+  // Meeting pending — show confirmation card
+  if (isMeetingPending) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <div className="flex items-center gap-3">
+          <Link to="/doctor">
+            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+          </Link>
+          <div>
+            <h2 className="text-xl font-bold">Review Meeting Summary</h2>
+            <Badge className="bg-purple-100 text-purple-800 mt-1">Awaiting Your Confirmation</Badge>
+          </div>
+        </div>
+        <MeetingConfirmationCard sessionId={sessionId!} />
       </div>
     );
   }

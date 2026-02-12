@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, ClipboardEdit } from 'lucide-react';
+import { MeetingOutcomeCapture } from '@/components/clinical/MeetingOutcomeCapture';
 
 interface Session {
   id: string;
@@ -25,6 +28,17 @@ interface Props {
 }
 
 export function DoctorDetailThread({ sessions }: Props) {
+  const [captureSessionId, setCaptureSessionId] = useState<string | null>(null);
+
+  if (captureSessionId) {
+    return (
+      <MeetingOutcomeCapture
+        sessionId={captureSessionId}
+        onBack={() => setCaptureSessionId(null)}
+      />
+    );
+  }
+
   if (sessions.length === 0) {
     return (
       <Card className="border-dashed">
@@ -40,6 +54,9 @@ export function DoctorDetailThread({ sessions }: Props) {
   }
 
   const sorted = [...sessions].sort((a, b) => a.sequence_number - b.sequence_number);
+
+  // Sessions ready for outcome capture (prep complete or revision requested)
+  const canCapture = (status: string) => ['doctor_prep_submitted', 'doctor_revision_requested'].includes(status);
 
   return (
     <div className="space-y-3">
@@ -58,9 +75,17 @@ export function DoctorDetailThread({ sessions }: Props) {
                   {format(new Date(session.scheduled_at), 'EEEE, MMMM d, yyyy \'at\' h:mm a')}
                 </p>
               </div>
-              <Badge className={`${statusInfo.className} hover:${statusInfo.className}`}>
-                {statusInfo.label}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {canCapture(session.status) && (
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setCaptureSessionId(session.id)}>
+                    <ClipboardEdit className="h-3.5 w-3.5" />
+                    Capture Outcome
+                  </Button>
+                )}
+                <Badge className={`${statusInfo.className} hover:${statusInfo.className}`}>
+                  {statusInfo.label}
+                </Badge>
+              </div>
             </CardHeader>
           </Card>
         );

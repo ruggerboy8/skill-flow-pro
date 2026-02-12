@@ -280,6 +280,12 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     },
   });
 
+  // Guard: if doctor has already submitted, don't allow editing — redirect back
+  if (session && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
+    onBack();
+    return null;
+  }
+
   if (published) {
     return (
       <div className="space-y-6 max-w-2xl mx-auto">

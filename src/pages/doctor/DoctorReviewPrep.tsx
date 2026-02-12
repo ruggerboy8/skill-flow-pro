@@ -9,18 +9,32 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Send, Calendar, FileText } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DomainBadge } from '@/components/ui/domain-badge';
+import { ArrowLeft, Send, Calendar, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { getDomainColorRaw } from '@/lib/domainColors';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 import { MeetingConfirmationCard } from '@/components/doctor/MeetingConfirmationCard';
 
-const SCORE_LABELS: Record<number, string> = {
-  1: 'Rarely',
-  2: 'Developing',
-  3: 'Consistent',
-  4: 'Master',
+const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+
+const SCORE_COLORS: Record<number, string> = {
+  4: 'bg-emerald-500',
+  3: 'bg-blue-500',
+  2: 'bg-amber-500',
+  1: 'bg-orange-500',
 };
+
+function ScoreCircle({ score }: { score: number | null | undefined }) {
+  if (score == null) return null;
+  return (
+    <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
+      {score}
+    </span>
+  );
+}
 
 export default function DoctorReviewPrep() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -231,7 +245,7 @@ export default function DoctorReviewPrep() {
     );
   }
 
-  // Doctor prep form — clear, step-by-step layout
+  // Group baseline items by domain
   const groupedItems = (baselineItems || []).reduce((acc, item) => {
     const pm = item.pro_moves as any;
     const domainName = pm?.competencies?.domains?.domain_name || 'Other';
@@ -239,6 +253,11 @@ export default function DoctorReviewPrep() {
     acc[domainName].push(item);
     return acc;
   }, {} as Record<string, typeof baselineItems>);
+
+  const availableDomains = DOMAIN_ORDER.filter(d => groupedItems[d]?.length);
+
+  // Get full item data for selected actions
+  const selectedItemData = (baselineItems || []).filter(item => selectedActions.includes(item.action_id));
 
   const meetingTypeLabel = session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up`;
 
@@ -268,7 +287,6 @@ export default function DoctorReviewPrep() {
           <CardDescription>Here's what {coachName || 'Alex'} has planned for your conversation.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Coach's selected Pro Moves */}
           {coachSelections.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -277,9 +295,7 @@ export default function DoctorReviewPrep() {
               <div className="space-y-2">
                 {coachSelections.map(sel => (
                   <div key={sel.action_id} className="flex items-center gap-2 p-2.5 rounded-md bg-primary/5 border border-primary/10">
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      {(sel as any).pro_moves?.competencies?.domains?.domain_name || '—'}
-                    </Badge>
+                    <DomainBadge domain={(sel as any).pro_moves?.competencies?.domains?.domain_name} />
                     <span className="text-sm font-medium">{(sel as any).pro_moves?.action_statement || `Action #${sel.action_id}`}</span>
                   </div>
                 ))}
@@ -287,7 +303,6 @@ export default function DoctorReviewPrep() {
             </div>
           )}
 
-          {/* Coach's agenda notes (rendered as HTML) */}
           {session.coach_note && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Agenda Notes</p>
@@ -302,7 +317,7 @@ export default function DoctorReviewPrep() {
 
       <Separator />
 
-      {/* Step 2: Doctor picks Pro Moves */}
+      {/* Step 2: Doctor picks Pro Moves — domain tabbed */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
@@ -313,54 +328,103 @@ export default function DoctorReviewPrep() {
             <strong>Choose up to 2 Pro Moves</strong> that you'd like to focus on during the meeting.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {Object.entries(groupedItems).map(([domain, items]) => (
-            <div key={domain}>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{domain}</p>
-              <div className="space-y-2">
-                {(items || []).map((item) => {
-                  const pm = item.pro_moves as any;
-                  const isSelected = selectedActions.includes(item.action_id);
-                  const isSuggested = coachActionIds.includes(item.action_id);
-                  return (
-                    <label
-                      key={item.action_id}
-                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        isSelected
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                          : isSuggested
-                          ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20'
-                          : 'hover:bg-muted/50'
-                      }`}
+        <CardContent>
+          {availableDomains.length > 0 ? (
+            <Tabs defaultValue={availableDomains[0]}>
+              <TabsList className="w-full h-auto flex-wrap gap-1 bg-transparent p-0 mb-3">
+                {availableDomains.map(domain => (
+                  <TabsTrigger
+                    key={domain}
+                    value={domain}
+                    className="text-xs data-[state=active]:shadow-sm rounded-full px-3 py-1.5 border transition-colors"
+                    style={{
+                      backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.15)`,
+                      borderColor: `hsl(${getDomainColorRaw(domain)} / 0.3)`,
+                    }}
+                  >
+                    {domain}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {availableDomains.map(domain => (
+                <TabsContent key={domain} value={domain} className="mt-0">
+                  <div
+                    className="rounded-lg border p-3 space-y-1"
+                    style={{ backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.06)` }}
+                  >
+                    {(groupedItems[domain] || []).map(item => {
+                      const pm = item.pro_moves as any;
+                      const isSelected = selectedActions.includes(item.action_id);
+                      const isSuggested = coachActionIds.includes(item.action_id);
+                      return (
+                        <label
+                          key={item.action_id}
+                          className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-primary/10 ring-1 ring-primary/30'
+                              : 'hover:bg-background/60'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleAction(item.action_id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
+                              {isSuggested && (
+                                <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0">{coachName}'s pick</Badge>
+                              )}
+                            </div>
+                            {pm?.competencies?.name && (
+                              <p className="text-xs text-muted-foreground italic mt-0.5">{pm.competencies.name}</p>
+                            )}
+                          </div>
+                          <ScoreCircle score={item.self_score} />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          ) : (
+            <p className="text-sm text-muted-foreground">No baseline items found.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Selected "Your Picks" — snatched out */}
+      <Card className={selectedActions.length > 0 ? 'border-primary/30 bg-primary/5' : 'border-dashed'}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Your Picks ({selectedActions.length}/2)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {selectedActions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Select 1–2 Pro Moves above to discuss at the meeting.</p>
+          ) : (
+            <div className="space-y-2">
+              {selectedItemData.map(item => {
+                const pm = item.pro_moves as any;
+                const domainName = pm?.competencies?.domains?.domain_name;
+                return (
+                  <div key={item.action_id} className="flex items-center gap-2 p-2.5 rounded-md bg-background border">
+                    <DomainBadge domain={domainName} />
+                    <span className="text-sm font-medium flex-1">{pm?.action_statement}</span>
+                    <ScoreCircle score={item.self_score} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => toggleAction(item.action_id)}
                     >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleAction(item.action_id)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium">{pm?.action_statement || `Action #${item.action_id}`}</p>
-                          {isSuggested && (
-                            <Badge className="bg-amber-100 text-amber-800 text-xs">{coachName}'s pick</Badge>
-                          )}
-                        </div>
-                        {item.self_score != null && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Your self-rating: <span className="font-medium">{SCORE_LABELS[item.self_score] || item.self_score}</span>
-                          </p>
-                        )}
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-          {selectedActions.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {selectedActions.length}/2 selected
-            </p>
           )}
         </CardContent>
       </Card>

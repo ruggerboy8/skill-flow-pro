@@ -1,13 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DomainBadge } from '@/components/ui/domain-badge';
+import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -17,12 +20,26 @@ interface Props {
   onBack: () => void;
 }
 
-const SCORE_LABELS: Record<number, string> = {
-  1: 'Rarely',
-  2: 'Developing',
-  3: 'Consistent',
-  4: 'Master',
+const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+
+const SCORE_COLORS: Record<number, string> = {
+  4: 'bg-emerald-500',
+  3: 'bg-blue-500',
+  2: 'bg-amber-500',
+  1: 'bg-orange-500',
 };
+
+function ScoreCircle({ score, label }: { score: number | null | undefined; label: string }) {
+  if (score == null) return null;
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
+        {score}
+      </span>
+    </div>
+  );
+}
 
 export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props) {
   const queryClient = useQueryClient();
@@ -291,6 +308,11 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     return acc;
   }, {} as Record<string, typeof baselineItems>);
 
+  const availableDomains = DOMAIN_ORDER.filter(d => groupedItems[d]?.length);
+
+  // Get full item data for selected actions
+  const selectedItemData = (baselineItems || []).filter(item => selectedActions.includes(item.action_id));
+
   const quillModules = {
     toolbar: [
       [{ header: [3, false] }],
@@ -337,68 +359,114 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
         </Card>
       )}
 
-      {/* ProMove Picker with scores and descriptions */}
+      {/* Domain-Tabbed ProMove Picker */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Discussion Topics</CardTitle>
           <CardDescription>
-            Select 1–2 Pro Moves to focus on during the meeting ({selectedActions.length}/2 selected)
+            Select 1–2 Pro Moves to focus on during the meeting
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {Object.entries(groupedItems).map(([domain, items]) => (
-            <div key={domain}>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{domain}</p>
-              <div className="space-y-2">
-                {(items || []).map((item) => {
-                  const pm = item.pro_moves as any;
-                  const competency = pm?.competencies;
-                  const isSelected = selectedActions.includes(item.action_id);
-                  const coachScore = coachRatingMap[item.action_id];
-                  return (
-                    <label
-                      key={item.action_id}
-                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
-                      }`}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleAction(item.action_id)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{pm?.action_statement || `Action #${item.action_id}`}</p>
-                        {competency?.name && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {competency.name}
-                            {competency.friendly_description && (
-                              <span className="italic"> — {competency.friendly_description}</span>
+        <CardContent>
+          {availableDomains.length > 0 ? (
+            <Tabs defaultValue={availableDomains[0]}>
+              <TabsList className="w-full h-auto flex-wrap gap-1 bg-transparent p-0 mb-3">
+                {availableDomains.map(domain => (
+                  <TabsTrigger
+                    key={domain}
+                    value={domain}
+                    className="text-xs data-[state=active]:shadow-sm rounded-full px-3 py-1.5 border transition-colors"
+                    style={{
+                      backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.15)`,
+                      borderColor: `hsl(${getDomainColorRaw(domain)} / 0.3)`,
+                    }}
+                  >
+                    {domain}
+                    <span className="ml-1 text-muted-foreground">({(groupedItems[domain] || []).length})</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {availableDomains.map(domain => (
+                <TabsContent key={domain} value={domain} className="mt-0">
+                  <div
+                    className="rounded-lg border p-3 space-y-1"
+                    style={{ backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.06)` }}
+                  >
+                    {(groupedItems[domain] || []).map(item => {
+                      const pm = item.pro_moves as any;
+                      const competency = pm?.competencies;
+                      const isSelected = selectedActions.includes(item.action_id);
+                      const coachScore = coachRatingMap[item.action_id];
+                      return (
+                        <label
+                          key={item.action_id}
+                          className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-primary/10 ring-1 ring-primary/30'
+                              : 'hover:bg-background/60'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleAction(item.action_id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
+                            {competency?.name && (
+                              <p className="text-xs text-muted-foreground italic mt-0.5">{competency.name}</p>
                             )}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          {item.self_score != null && (
-                            <Badge variant="secondary" className="text-xs">
-                              Doctor: {SCORE_LABELS[item.self_score] || item.self_score}
-                            </Badge>
-                          )}
-                          {coachScore != null && (
-                            <Badge variant="outline" className="text-xs">
-                              Your rating: {SCORE_LABELS[coachScore] || coachScore}
-                            </Badge>
-                          )}
-                          {item.self_score != null && coachScore != null && item.self_score !== coachScore && (
-                            <Badge className="bg-amber-100 text-amber-800 text-xs">Gap</Badge>
-                          )}
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <ScoreCircle score={item.self_score} label="Self" />
+                            <ScoreCircle score={coachScore} label="You" />
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          ) : (
+            <p className="text-sm text-muted-foreground">No baseline items found.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Selected for Discussion — "snatched" items */}
+      <Card className={selectedActions.length > 0 ? 'border-primary/30 bg-primary/5' : 'border-dashed'}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Selected for Discussion ({selectedActions.length}/2)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {selectedActions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Select 1–2 Pro Moves above to discuss at the meeting.</p>
+          ) : (
+            <div className="space-y-2">
+              {selectedItemData.map(item => {
+                const pm = item.pro_moves as any;
+                const domainName = pm?.competencies?.domains?.domain_name;
+                const coachScore = coachRatingMap[item.action_id];
+                return (
+                  <div key={item.action_id} className="flex items-center gap-2 p-2.5 rounded-md bg-background border">
+                    <DomainBadge domain={domainName} />
+                    <span className="text-sm font-medium flex-1">{pm?.action_statement}</span>
+                    <ScoreCircle score={item.self_score} label="Self" />
+                    <ScoreCircle score={coachScore} label="You" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => toggleAction(item.action_id)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          )}
         </CardContent>
       </Card>
 

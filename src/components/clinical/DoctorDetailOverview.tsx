@@ -94,9 +94,15 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     );
   }
 
-  const canSchedule = baseline?.status === 'completed' && !sessions.some(s => 
-    ['scheduled', 'director_prep_ready', 'doctor_prep_submitted', 'meeting_pending'].includes(s.status)
+  // Can schedule if baseline complete AND no active session in progress
+  const hasActiveSession = sessions.some(s => 
+    ['scheduled', 'director_prep_ready', 'doctor_prep_submitted', 'meeting_pending', 'doctor_revision_requested'].includes(s.status)
   );
+  const canSchedule = baseline?.status === 'completed' && !hasActiveSession;
+
+  // Determine button label based on whether there are confirmed sessions
+  const hasConfirmedSession = sessions.some(s => s.status === 'doctor_confirmed');
+  const scheduleLabel = hasConfirmedSession ? 'Schedule Follow-up' : 'Schedule Baseline Review';
 
   return (
     <div className="space-y-4">
@@ -143,11 +149,15 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
           <CardContent className="flex items-center justify-between py-4">
             <div>
               <p className="text-sm font-medium">Ready to schedule</p>
-              <p className="text-xs text-muted-foreground">The baseline is complete. Schedule the review meeting.</p>
+              <p className="text-xs text-muted-foreground">
+                {hasConfirmedSession
+                  ? 'Schedule the next follow-up check-in.'
+                  : 'The baseline is complete. Schedule the review meeting.'}
+              </p>
             </div>
             <Button onClick={() => setScheduleOpen(true)} className="gap-2">
               <CalendarPlus className="h-4 w-4" />
-              Schedule Baseline Review
+              {scheduleLabel}
             </Button>
           </CardContent>
         </Card>

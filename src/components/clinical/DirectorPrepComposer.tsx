@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Send, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, FlaskConical } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -86,6 +86,34 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
       if (error) throw error;
       return data?.map(s => s.action_id) || [];
     },
+  });
+
+  // Fetch prior session experiments for follow-ups
+  const { data: priorExperiments } = useQuery({
+    queryKey: ['prior-experiments', sessionId, session?.doctor_staff_id],
+    queryFn: async () => {
+      if (!session?.doctor_staff_id || !session?.sequence_number || session.sequence_number <= 1) return [];
+      // Get the previous confirmed session's meeting record
+      const { data: priorSessions } = await supabase
+        .from('coaching_sessions')
+        .select('id')
+        .eq('doctor_staff_id', session.doctor_staff_id)
+        .eq('status', 'doctor_confirmed')
+        .lt('sequence_number', session.sequence_number)
+        .order('sequence_number', { ascending: false })
+        .limit(1);
+
+      if (!priorSessions?.length) return [];
+
+      const { data: record } = await supabase
+        .from('coaching_meeting_records')
+        .select('experiments')
+        .eq('session_id', priorSessions[0].id)
+        .maybeSingle();
+
+      return (record?.experiments as any[] | null) || [];
+    },
+    enabled: !!session?.doctor_staff_id && (session?.sequence_number ?? 0) > 1,
   });
 
   // Initialize from existing data
@@ -221,6 +249,27 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
           )}
         </div>
       </div>
+
+      {/* Prior Experiments (for follow-ups) */}
+      {priorExperiments && priorExperiments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FlaskConical className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Prior Experiments</CardTitle>
+            </div>
+            <CardDescription>From the previous session — discuss progress on these.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {priorExperiments.map((exp: any, i: number) => (
+              <div key={i} className="p-2 rounded-md bg-muted/30 border">
+                <p className="text-sm font-medium">{exp.title}</p>
+                {exp.description && <p className="text-xs text-muted-foreground mt-0.5">{exp.description}</p>}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ProMove Picker */}
       <Card>

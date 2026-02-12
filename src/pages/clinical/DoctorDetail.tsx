@@ -160,7 +160,7 @@ export default function DoctorDetail() {
         </TabsContent>
 
         <TabsContent value="thread">
-          <DoctorDetailThread sessions={sessions || []} />
+          <DoctorDetailThread sessions={sessions || []} coachName={myStaff?.name} doctorName={doctor.name} />
         </TabsContent>
       </Tabs>
     </div>

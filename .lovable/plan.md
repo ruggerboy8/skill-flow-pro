@@ -1,52 +1,67 @@
 
 
-## Doctor Detail Layout + Meeting Prep Summary Redesign
+## Batch of UI/UX Improvements
 
-### 1. Header Layout Change (DoctorDetail.tsx)
+This plan covers 8 distinct changes across multiple files.
 
-**Current:** Name + Status Pill on first line, email on second line, then NextActionPanel, then Tabs.
+### 1. Rename Tabs in Doctor Detail (DoctorDetail.tsx)
+- "Overview" becomes "Up Next"
+- "Coaching Thread" becomes "Coaching" and moves to the second tab position (before Baseline)
 
-**New:**
-- Name + Status Pill on first line
-- Location (with MapPin icon) on second line (replacing email)
-- Tabs come next
-- NextActionPanel moves **below** the TabsList but **above** the TabsContent (inside the Tabs block)
+### 2. Fix Doctor "View My Prep" Not Showing Selections (DoctorReviewPrep.tsx)
+The read-only view uses `CombinedPrepView` which expects `selections` with nested `pro_moves` data. But when the doctor views their submitted prep, the `allSelections` query joins via `pro_moves:action_id(...)` which may not resolve. The same two-step fetch pattern used in `DoctorDetailOverview` needs to be applied here -- fetch selections first, then fetch pro_moves separately and merge.
 
-This also means removing the Location Card from `DoctorDetailOverview.tsx` since it's now in the header.
+### 3. Rename "Capture Outcome" to "Start Meeting" (DoctorDetailThread.tsx)
+- Button label changes from "Capture Outcome" to "Start Meeting"
+- Icon stays `ClipboardEdit`
 
-### 2. Meeting Prep as a Dialog (Sheet/Drawer)
+### 4. Remove Calibration Checkbox from MeetingOutcomeCapture (MeetingOutcomeCapture.tsx)
+- Remove the calibration Card (lines 189-206)
+- Remove `calibrationConfirmed` state variable
+- Still pass `calibration_confirmed: false` in the insert (or remove it entirely)
 
-Replace the inline `CombinedPrepView` and the scroll-to-section approach with a **Sheet (slide-over panel)** that opens when "View Prep Summary" is clicked. This gives it a dedicated, focused feel without navigating away.
+### 5. Simplify MeetingConfirmationCard for Doctor Review (MeetingConfirmationCard.tsx)
+- Remove "Request Edit" button and revision form entirely
+- Remove "Confirming locks this record permanently" helper text
+- Remove "By {coachName}" CardDescription from the summary card
+- Change toast from "Meeting confirmed / The record is now locked." to something friendlier like "All set! Your meeting record has been saved."
 
-The sheet will contain a redesigned prep summary with:
-- **Meeting date and link** at the top
-- **Your Agenda** section -- the coach's formatted HTML agenda with `prose` styling
-- **Your Pro Move Picks** -- domain-colored badges + action statements
-- **Doctor's Pro Move Picks** -- same treatment
-- **Doctor's Notes & Questions** -- the doctor's text
+### 6. Doctor Home Post-Confirmation State (DoctorHome.tsx)
+Currently after confirming, the doctor falls through to the "Baseline Complete" card. Instead:
+- Add a check for `doctor_confirmed` sessions. If the most recent session is confirmed and the baseline is complete, show a friendly static message instead of the baseline card.
+- The message: a warm card like "You're on track" with a brief note about the coaching journey continuing.
+- Change "Completed Records" heading to "Past Coaching Sessions"
+- The baseline-complete card should only show if there are NO coaching sessions at all (i.e., the coaching journey hasn't started yet).
 
-Each section uses domain-colored accents for the Pro Move items and clear section headers. If the doctor hasn't submitted yet, a subtle "Waiting for doctor" placeholder appears in those sections.
+### 7. Pro Move Color Improvements in MeetingOutcomeCapture
+- Use `DomainBadge` component instead of plain `Badge variant="outline"` for domain labels in the discussion topics list.
 
-### Technical Changes
+### Technical Changes Summary
 
-**File: `src/pages/clinical/DoctorDetail.tsx`**
-- Remove email line (line 130), replace with location: `<p className="text-sm text-muted-foreground flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {doctor.locations?.name || 'Roaming'}</p>`
-- Move `<DoctorNextActionPanel>` from before `<Tabs>` to inside `<Tabs>`, between `<TabsList>` and the first `<TabsContent>`
-- Import `MapPin` from lucide-react
+**DoctorDetail.tsx (lines 139-167)**
+- Rename tab triggers and reorder: "Up Next", "Coaching", "Baseline"
+- Reorder TabsContent accordingly
 
-**File: `src/components/clinical/DoctorDetailOverview.tsx`**
-- Remove the Location Card entirely (lines 118-127)
-- Replace scroll-to-section button with a Sheet trigger
-- Import `Sheet, SheetContent, SheetHeader, SheetTitle` from UI
-- Add state `showPrepSheet` boolean
-- Button opens the sheet; sheet contains the redesigned prep summary
-- Remove the inline `CombinedPrepView` render at the bottom (lines 216-227)
+**DoctorDetailThread.tsx (line ~172)**
+- Change "Capture Outcome" text to "Start Meeting"
 
-**File: `src/components/clinical/CombinedPrepView.tsx`**
-- Redesign with better visual hierarchy:
-  - Remove the outer meeting-details Card (date/link moves to sheet header)
-  - Replace generic "Coach's Prep" / "Doctor's Prep" Cards with cleaner labeled sections
-  - Use domain-colored backgrounds on Pro Move items (using `getDomainColor`)
-  - Section order: Agenda, Your Picks, Doctor's Picks, Doctor's Notes
-  - Add `DomainBadge` component for each Pro Move item
-  - Keep `prose` class on agenda HTML for rich formatting
+**MeetingOutcomeCapture.tsx**
+- Remove calibration checkbox Card (lines 189-206)
+- Remove `calibrationConfirmed` state (line 26)
+- Remove `calibration_confirmed` from insert or set to false
+- Import and use `DomainBadge` instead of plain Badge for domain display
+
+**MeetingConfirmationCard.tsx**
+- Remove lines 131-137 (calibration badge)
+- Remove line 143 (CardDescription "By {coachName}")
+- Remove lines 218-235 (Request Edit button, revision form, helper text) -- just keep the Confirm button
+- Remove revision mutation, revisionNote state, showRevisionForm state
+- Update toast to friendlier message
+
+**DoctorReviewPrep.tsx (lines 62-86)**
+- Refactor `allSelections` query to use two-step fetch: get selections, then fetch pro_moves by action_id, then merge -- matching the pattern in DoctorDetailOverview
+
+**DoctorHome.tsx**
+- Reorder the `renderPrimaryCTA` logic: after checking for meeting_pending, check if there's a confirmed session and baseline is complete -- show a friendly "You're on track" message instead of the baseline complete card
+- Only show baseline-complete if no coaching sessions exist
+- Rename "Completed Records" to "Past Coaching Sessions" (line 287)

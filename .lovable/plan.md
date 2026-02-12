@@ -1,45 +1,34 @@
 
+## Fix HTML Formatting + Post-Submission Summary View
 
-## Redesign ProMove Picker for Clinical Director and Doctor Prep
+### Problem 1: Bullets and Headings Not Rendering
 
-### What's Changing
+The `@tailwindcss/typography` plugin is installed as a dependency but **not included** in `tailwind.config.ts` plugins array. This means `prose prose-sm` classes on the agenda HTML have no effect -- bullets, headings, and indentation are all ignored.
 
-**1. Clinical Director ProMove Picker (DirectorPrepComposer.tsx)**
-- Replace the flat white list with **domain tabs** (Clinical, Clerical, Cultural, Case Acceptance) matching the baseline results view style
-- Each tab tinted with the domain's color using `getDomainColorRaw`
-- Scores shown as **numeric** (1-4) in small colored circles matching the semantic score colors, not verbal labels
-- Remove the "Gap" badge
-- Show both Self and Coach score circles side-by-side on each row
-- **Selected items "snatch" out** of the tab list and appear in a **"Selected for Discussion"** card pinned below the picker, with domain badge and scores visible
+**Fix:** Add `require("@tailwindcss/typography")` to the plugins array in `tailwind.config.ts`.
 
-**2. Doctor ProMove Picker (DoctorReviewPrep.tsx)**
-- Same domain-tabbed layout with domain-colored tab headers
-- Numeric scores (self-score only, since doctors don't see coach scores)
-- Coach's picks highlighted with a subtle badge
-- Selected items similarly appear in a "Your Picks" section below the tab panel
+### Problem 2: Clinical Director Can't See Doctor's Submitted Prep
 
-**3. Hide Tabs During Prep Editing (DoctorDetail.tsx)**
-- When `prepSessionId` is set (DirectorPrepComposer is active), the entire `Tabs` block (Overview/Baseline/Coaching Thread) is already replaced by the composer via early return
-- **Bug**: The current code does this correctly at line 87-94, but the composer's `onBack` returns to the overview tab only. Need to verify the tab shell is indeed hidden. Based on the code, it already is -- the `if (prepSessionId)` early return on line 87 renders only the composer. No change needed here.
+After the doctor submits their prep, the clinical director still sees the "View / Edit Prep" button which opens the editable `DirectorPrepComposer`. Instead, once the doctor has submitted (`doctor_prep_submitted` status), the director should:
 
-### Technical Details
+- No longer be able to edit their prep
+- See a read-only **Combined Prep Summary** showing the agenda, coach's selected Pro Moves, doctor's selected Pro Moves, and the doctor's notes/questions
 
-**DirectorPrepComposer.tsx changes:**
-- Import `Tabs, TabsContent, TabsList, TabsTrigger` from UI
-- Import `getDomainColorRaw` and `getDomainColor` from domainColors
-- Remove `SCORE_LABELS` map; use numeric display instead
-- Define `SCORE_COLORS` (matching ClinicalBaselineResults: 4=emerald, 3=blue, 2=amber, 1=orange)
-- Define `DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance']`
-- Replace the single Card with domain tabs, each tab background tinted
-- Each ProMove row: checkbox, action statement, competency name italic, two small score circles (Self: N, Coach: N)
-- New "Selected for Discussion" card rendered between the picker and the agenda card. Shows selected items with domain badge, statement, and an X button to deselect. Empty state: "Select 1-2 Pro Moves above"
+**Fix in `DoctorDetailOverview.tsx`:**
+- When clicking "View / Edit Prep" on a session with status `doctor_prep_submitted`, show the `CombinedPrepView` inline instead of opening `DirectorPrepComposer`
+- Change the button label from "View / Edit Prep" to just "View Prep" when status is `doctor_prep_submitted`
+- Keep "View / Edit Prep" label and composer behavior only for `director_prep_ready` status (doctor hasn't responded yet)
 
-**DoctorReviewPrep.tsx changes:**
-- Same domain tab treatment for Step 2
-- Numeric scores instead of verbal labels
-- Selected items displayed in a summary card below the tabs
-- Coach's picks get a subtle "{coachName}'s pick" badge
+### Technical Changes
 
-**Files to modify:**
-- `src/components/clinical/DirectorPrepComposer.tsx` -- major rework of the picker section
-- `src/pages/doctor/DoctorReviewPrep.tsx` -- same tab treatment for doctor's picker
+**File: `tailwind.config.ts`**
+- Line 138: Change `plugins: [require("tailwindcss-animate")]` to `plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")]`
+
+**File: `src/components/clinical/DoctorDetailOverview.tsx`**
+- Add a state variable like `showPrepSummary` for inline combined view
+- When `viewablePrepSession.status === 'doctor_prep_submitted'`, the button says "View Prep Summary" and toggles an inline `CombinedPrepView` rather than opening the composer
+- When status is `director_prep_ready`, keep current behavior (opens composer for editing)
+- The `CombinedPrepView` is already being rendered below, so adjust the button to scroll to it or simply ensure it's prominent enough
+
+**File: `src/components/clinical/DirectorPrepComposer.tsx`**
+- Add a read-only guard: if the session status is `doctor_prep_submitted` or later, redirect back via `onBack()` (defensive, since the overview should no longer open it in this state)

@@ -312,6 +312,159 @@ export type Database = {
           },
         ]
       }
+      coaching_meeting_records: {
+        Row: {
+          calibration_confirmed: boolean
+          created_at: string
+          doctor_confirmed_at: string | null
+          doctor_revision_note: string | null
+          experiments: Json | null
+          id: string
+          session_id: string
+          submitted_at: string | null
+          summary: string
+        }
+        Insert: {
+          calibration_confirmed?: boolean
+          created_at?: string
+          doctor_confirmed_at?: string | null
+          doctor_revision_note?: string | null
+          experiments?: Json | null
+          id?: string
+          session_id: string
+          submitted_at?: string | null
+          summary?: string
+        }
+        Update: {
+          calibration_confirmed?: boolean
+          created_at?: string
+          doctor_confirmed_at?: string | null
+          doctor_revision_note?: string | null
+          experiments?: Json | null
+          id?: string
+          session_id?: string
+          submitted_at?: string | null
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_meeting_records_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_session_selections: {
+        Row: {
+          action_id: number
+          created_at: string
+          display_order: number
+          id: string
+          selected_by: string
+          session_id: string
+        }
+        Insert: {
+          action_id: number
+          created_at?: string
+          display_order: number
+          id?: string
+          selected_by: string
+          session_id: string
+        }
+        Update: {
+          action_id?: number
+          created_at?: string
+          display_order?: number
+          id?: string
+          selected_by?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_session_selections_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_sessions: {
+        Row: {
+          coach_note: string
+          coach_staff_id: string
+          created_at: string
+          doctor_note: string | null
+          doctor_staff_id: string
+          id: string
+          meeting_link: string | null
+          scheduled_at: string
+          sequence_number: number
+          session_type: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          coach_note?: string
+          coach_staff_id: string
+          created_at?: string
+          doctor_note?: string | null
+          doctor_staff_id: string
+          id?: string
+          meeting_link?: string | null
+          scheduled_at: string
+          sequence_number?: number
+          session_type?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          coach_note?: string
+          coach_staff_id?: string
+          created_at?: string
+          doctor_note?: string | null
+          doctor_staff_id?: string
+          id?: string
+          meeting_link?: string | null
+          scheduled_at?: string
+          sequence_number?: number
+          session_type?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_sessions_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_sessions_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "coaching_sessions_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_sessions_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       competencies: {
         Row: {
           code: string | null

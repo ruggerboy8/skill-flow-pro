@@ -50,3 +50,6 @@ verify_jwt = true
 
 [functions.format-reflection]
 verify_jwt = false
+
+[functions.map-observation-notes]
+verify_jwt = true

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText, Eye, User, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, FileText, User, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getEvaluation } from '@/lib/evaluations';
@@ -306,10 +306,9 @@ export default function EvaluationViewer() {
 
   // Get insights perspectives
   const extractedInsights = evaluation.extracted_insights;
-  const observerPerspective = extractedInsights?.observer || null;
   // Check for self-assessment insights - either in unified structure or legacy format
   const selfAssessmentPerspective = extractedInsights?.self_assessment || getLegacyAsSelfAssessment(extractedInsights || {});
-  const hasAnyInsights = observerPerspective || selfAssessmentPerspective || (evaluation as any).summary_feedback;
+  const hasAnyInsights = selfAssessmentPerspective || (evaluation as any).summary_feedback;
 
   return (
     <div className="space-y-6">
@@ -478,7 +477,7 @@ export default function EvaluationViewer() {
           {hasAnyInsights ? (
             <>
               {/* Legacy summary feedback display */}
-              {(evaluation as any).summary_feedback && !observerPerspective && (
+              {(evaluation as any).summary_feedback && !selfAssessmentPerspective && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -493,15 +492,6 @@ export default function EvaluationViewer() {
                     />
                   </CardContent>
                 </Card>
-              )}
-
-              {/* Coach Observations */}
-              {observerPerspective && (
-                <PerspectiveCard 
-                  title="Coach Observations" 
-                  icon={Eye}
-                  perspective={observerPerspective}
-                />
               )}
 
               {/* Self-Assessment Insights */}
@@ -528,7 +518,7 @@ export default function EvaluationViewer() {
               <CardContent className="py-12 text-center">
                 <AlertCircle className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
                 <p className="text-muted-foreground">
-                  No insights are available for this evaluation.
+                  Complete the self-assessment interview to see insights here.
                 </p>
               </CardContent>
             </Card>

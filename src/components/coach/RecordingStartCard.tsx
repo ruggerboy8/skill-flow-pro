@@ -25,11 +25,12 @@ interface RecordingStartCardProps {
   hasDraftRecording?: boolean;
   isLoadingDraft?: boolean;
   hasExistingInsights?: boolean;
+  activeCompetencyLabel?: string;
 }
 
 export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardProps>(
   function RecordingStartCard(
-    { isRecording, isPaused, recordingTime, isSavingDraft, onStartRecording, onPauseToggle, disabled, hasDraftRecording, isLoadingDraft, hasExistingInsights },
+    { isRecording, isPaused, recordingTime, isSavingDraft, onStartRecording, onPauseToggle, disabled, hasDraftRecording, isLoadingDraft, hasExistingInsights, activeCompetencyLabel },
     ref
   ) {
     const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
@@ -103,6 +104,11 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                   ) : isRecording ? (
                     <p className="text-xs text-muted-foreground">
                       {isPaused ? "Paused" : "Recording"}: {formatTime(recordingTime)}
+                      {activeCompetencyLabel && !isPaused && (
+                        <span className="block text-[10px] text-primary/70 mt-0.5 truncate max-w-[200px]">
+                          Recording for: {activeCompetencyLabel}
+                        </span>
+                      )}
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">

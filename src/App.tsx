@@ -63,6 +63,7 @@ import DoctorMyRole from "@/pages/doctor/DoctorMyRole";
 import DoctorDomainDetail from "@/pages/doctor/DoctorDomainDetail";
 import BaselineWizard from "@/pages/doctor/BaselineWizard";
 import DoctorBaselineResults from "@/pages/doctor/DoctorBaselineResults";
+import DoctorReviewPrep from "@/pages/doctor/DoctorReviewPrep";
 
 // App routes with pre-routing checks for public pages
 function AppRoutes() {
@@ -144,6 +145,7 @@ function AppRoutes() {
           <Route path="my-role/domain/:domainSlug" element={<DoctorDomainDetail />} />
           <Route path="baseline" element={<BaselineWizard />} />
           <Route path="baseline-results" element={<DoctorBaselineResults />} />
+          <Route path="review-prep/:sessionId" element={<DoctorReviewPrep />} />
         </Route>
 
         <Route path="admin" element={<AdminPage />} />

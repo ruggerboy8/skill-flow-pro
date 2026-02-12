@@ -1,8 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Link as LinkIcon, User } from 'lucide-react';
-import { format } from 'date-fns';
+import { DomainBadge } from '@/components/ui/domain-badge';
+import { Link as LinkIcon } from 'lucide-react';
 
 interface Selection {
   action_id: number;
@@ -34,108 +32,88 @@ export function CombinedPrepView({ session, selections, coachName = 'Alex', doct
   const doctorSelections = selections.filter(s => s.selected_by === 'doctor');
 
   return (
-    <div className="space-y-6">
-      {/* Meeting Details */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-4 py-4">
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{format(new Date(session.scheduled_at), 'EEEE, MMMM d, yyyy \'at\' h:mm a')}</span>
-          </div>
-          {session.meeting_link && (
-            <a
-              href={session.meeting_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-primary underline"
-            >
-              <LinkIcon className="h-4 w-4" />
-              Join Meeting
-            </a>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Coach Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">{coachName}'s Prep</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {coachSelections.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Discussion Topics</p>
-              <div className="space-y-2">
-                {coachSelections.map(sel => (
-                  <div key={sel.action_id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
-                    <Badge variant="outline" className="text-xs">
-                      {(sel.pro_moves as any)?.competencies?.domains?.domain_name || '—'}
-                    </Badge>
-                    <span className="text-sm">{(sel.pro_moves as any)?.action_statement || `Action #${sel.action_id}`}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {session.coach_note && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Agenda</p>
-              <div
-                className="text-sm bg-muted/30 rounded-md p-3 prose prose-sm max-w-none dark:prose-invert"
-                dangerouslySetInnerHTML={{ __html: session.coach_note }}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Doctor Section */}
-      {(doctorSelections.length > 0 || session.doctor_note) ? (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">{doctorName}'s Prep</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {doctorSelections.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Discussion Topics</p>
-                <div className="space-y-2">
-                  {doctorSelections.map(sel => (
-                    <div key={sel.action_id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
-                      <Badge variant="outline" className="text-xs">
-                        {(sel.pro_moves as any)?.competencies?.domains?.domain_name || '—'}
-                      </Badge>
-                      <span className="text-sm">{(sel.pro_moves as any)?.action_statement || `Action #${sel.action_id}`}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {session.doctor_note && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Notes & Questions</p>
-                <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3">
-                  {session.doctor_note}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="border-dashed">
-          <CardContent className="py-8 text-center text-muted-foreground">
-            <p>Waiting for the doctor to complete their prep.</p>
-          </CardContent>
-        </Card>
+    <div className="space-y-6 pt-4">
+      {/* Meeting Link */}
+      {session.meeting_link && (
+        <a
+          href={session.meeting_link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 text-sm text-primary underline"
+        >
+          <LinkIcon className="h-4 w-4" />
+          Join Meeting
+        </a>
       )}
+
+      {/* Your Agenda */}
+      {session.coach_note && (
+        <section>
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Your Agenda</h4>
+          <div
+            className="text-sm bg-muted/30 rounded-lg p-4 prose prose-sm max-w-none dark:prose-invert"
+            dangerouslySetInnerHTML={{ __html: session.coach_note }}
+          />
+        </section>
+      )}
+
+      <Separator />
+
+      {/* Your Pro Move Picks */}
+      <section>
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Your Picks</h4>
+        {coachSelections.length > 0 ? (
+          <div className="space-y-2">
+            {coachSelections.map(sel => (
+              <ProMoveItem key={sel.action_id} sel={sel} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">No picks selected.</p>
+        )}
+      </section>
+
+      <Separator />
+
+      {/* Doctor's Pro Move Picks */}
+      <section>
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{doctorName}'s Picks</h4>
+        {doctorSelections.length > 0 ? (
+          <div className="space-y-2">
+            {doctorSelections.map(sel => (
+              <ProMoveItem key={sel.action_id} sel={sel} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">Waiting for {doctorName} to submit picks.</p>
+        )}
+      </section>
+
+      <Separator />
+
+      {/* Doctor's Notes */}
+      <section>
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{doctorName}'s Notes & Questions</h4>
+        {session.doctor_note ? (
+          <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-lg p-4">
+            {session.doctor_note}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">No notes submitted yet.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ProMoveItem({ sel }: { sel: Selection }) {
+  const domain = (sel.pro_moves as any)?.competencies?.domains?.domain_name;
+  const statement = (sel.pro_moves as any)?.action_statement || `Action #${sel.action_id}`;
+
+  return (
+    <div className="flex items-start gap-2.5 p-2.5 rounded-md bg-muted/40">
+      <DomainBadge domain={domain} className="mt-0.5" />
+      <span className="text-sm">{statement}</span>
     </div>
   );
 }

@@ -66,26 +66,26 @@ export function getDoctorJourneyStatus(
       case 'director_prep_ready':
         return {
           stage: 'waiting_for_doctor_prep',
-          label: 'Waiting for Doctor Prep',
+          label: 'Prep Ready — Waiting on Doctor',
           variant: 'secondary',
           colorClass: 'bg-amber-100 text-amber-800',
-          nextAction: 'Doctor needs to complete prep',
+          nextAction: 'Doctor needs to complete their prep',
         };
       case 'doctor_prep_submitted':
         return {
           stage: 'prep_complete',
-          label: 'Prep Complete',
+          label: 'Ready for Meeting',
           variant: 'default',
           colorClass: 'bg-emerald-100 text-emerald-800',
-          nextAction: 'Ready for meeting',
+          nextAction: 'Both sides are prepped — time to meet!',
         };
       case 'meeting_pending':
         return {
           stage: 'meeting_pending',
-          label: 'Awaiting Confirmation',
+          label: 'Awaiting Doctor Sign-off',
           variant: 'secondary',
           colorClass: 'bg-purple-100 text-purple-800',
-          nextAction: 'Doctor to confirm meeting summary',
+          nextAction: 'Doctor needs to review and confirm the meeting summary',
         };
       case 'doctor_confirmed':
         // Check if all sessions are confirmed — if latest is confirmed, check if it's a follow-up
@@ -95,7 +95,7 @@ export function getDoctorJourneyStatus(
             label: `Follow-up ${latest.sequence_number - 1} Complete`,
             variant: 'default',
             colorClass: 'bg-green-100 text-green-800',
-            nextAction: 'Schedule next follow-up',
+            nextAction: 'Schedule next follow-up when ready',
           };
         }
         return {
@@ -103,15 +103,15 @@ export function getDoctorJourneyStatus(
           label: 'Baseline Review Complete',
           variant: 'default',
           colorClass: 'bg-green-100 text-green-800',
-          nextAction: 'Schedule follow-up',
+          nextAction: 'Schedule a follow-up to check on progress',
         };
       case 'doctor_revision_requested':
         return {
           stage: 'meeting_pending',
-          label: 'Revision Requested',
+          label: 'Edit Requested by Doctor',
           variant: 'destructive',
           colorClass: 'bg-red-100 text-red-800',
-          nextAction: 'Review doctor feedback and update',
+          nextAction: 'Review the doctor\'s feedback and update the summary',
         };
     }
   }
@@ -120,10 +120,10 @@ export function getDoctorJourneyStatus(
   if (baseline?.status === 'completed' && coachBaseline?.status !== 'completed') {
     return {
       stage: 'director_baseline_pending',
-      label: 'Director Baseline Pending',
+      label: 'Your Review Needed',
       variant: 'secondary',
       colorClass: 'bg-amber-100 text-amber-800',
-      nextAction: 'Complete your private baseline assessment',
+      nextAction: 'Complete your private baseline assessment before scheduling',
     };
   }
 
@@ -131,10 +131,10 @@ export function getDoctorJourneyStatus(
   if (baseline?.status === 'completed' && coachBaseline?.status === 'completed') {
     return {
       stage: 'baseline_submitted',
-      label: 'Ready for Review',
+      label: 'Ready to Schedule',
       variant: 'outline',
       colorClass: 'bg-blue-100 text-blue-800',
-      nextAction: 'Schedule baseline review',
+      nextAction: 'Schedule the baseline review meeting',
     };
   }
 
@@ -155,7 +155,7 @@ export function getDoctorJourneyStatus(
       label: 'Baseline In Progress',
       variant: 'secondary',
       colorClass: 'bg-amber-100 text-amber-800',
-      nextAction: 'Waiting for doctor to complete baseline',
+      nextAction: 'Doctor is working on their baseline',
     };
   }
 
@@ -165,6 +165,6 @@ export function getDoctorJourneyStatus(
     label: 'Invited',
     variant: 'secondary',
     colorClass: 'bg-muted text-muted-foreground',
-    nextAction: 'Waiting for doctor to start baseline',
+    nextAction: 'Waiting for doctor to begin their baseline',
   };
 }

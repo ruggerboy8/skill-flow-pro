@@ -5,7 +5,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+
+const TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern (ET)' },
+  { value: 'America/Chicago', label: 'Central (CT)' },
+  { value: 'America/Denver', label: 'Mountain (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
+  { value: 'America/Phoenix', label: 'Arizona (MST)' },
+  { value: 'America/Anchorage', label: 'Alaska (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii (HST)' },
+];
+
+function guessTimezone(): string {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return TIMEZONES.find(t => t.value === tz)?.value || 'America/Chicago';
+}
 
 interface Props {
   open: boolean;
@@ -18,13 +34,31 @@ interface Props {
 export function MeetingScheduleDialog({ open, onOpenChange, doctorStaffId, coachStaffId, onCreated }: Props) {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('10:00');
+  const [timezone, setTimezone] = useState(guessTimezone);
   const [meetingLink, setMeetingLink] = useState('');
   const queryClient = useQueryClient();
 
   const createSession = useMutation({
     mutationFn: async () => {
-      const scheduledAt = new Date(`${date}T${time}`).toISOString();
-      
+      // Build an ISO string that respects the chosen timezone
+      // We create a date string and let the backend store UTC
+      const dateTimeStr = `${date}T${time}:00`;
+      // Use Intl to get the UTC offset for the chosen timezone at that date/time
+      const localDate = new Date(dateTimeStr);
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        timeZoneName: 'longOffset',
+      });
+      // Get offset string like "GMT-05:00"
+      const parts = formatter.formatToParts(localDate);
+      const offsetPart = parts.find(p => p.type === 'timeZoneName');
+      let offsetStr = '+00:00';
+      if (offsetPart?.value) {
+        const match = offsetPart.value.match(/GMT([+-]\d{2}:\d{2})/);
+        if (match) offsetStr = match[1];
+      }
+      const scheduledAt = `${dateTimeStr}${offsetStr}`;
+
       // Check existing sessions to determine sequence number
       const { data: existing } = await supabase
         .from('coaching_sessions')
@@ -55,7 +89,7 @@ export function MeetingScheduleDialog({ open, onOpenChange, doctorStaffId, coach
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
-      toast({ title: 'Meeting scheduled', description: 'You can now prepare your discussion notes.' });
+      toast({ title: 'Meeting scheduled', description: 'You can now prepare your meeting agenda.' });
       onOpenChange(false);
       onCreated(data.id);
     },
@@ -66,13 +100,16 @@ export function MeetingScheduleDialog({ open, onOpenChange, doctorStaffId, coach
 
   const canSubmit = date && time;
 
+  // Preview the selected time in the chosen timezone
+  const selectedTzLabel = TIMEZONES.find(t => t.value === timezone)?.label || timezone;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Schedule Baseline Review</DialogTitle>
+          <DialogTitle>Schedule Meeting</DialogTitle>
           <DialogDescription>
-            Pick a date and time for the meeting. You'll prepare your discussion notes next.
+            Pick a date, time, and timezone. You'll prepare the agenda next.
           </DialogDescription>
         </DialogHeader>
 
@@ -86,14 +123,29 @@ export function MeetingScheduleDialog({ open, onOpenChange, doctorStaffId, coach
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="meeting-time">Time</Label>
-            <Input
-              id="meeting-time"
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="meeting-time">Time</Label>
+              <Input
+                id="meeting-time"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Timezone</Label>
+              <Select value={timezone} onValueChange={setTimezone}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMEZONES.map(tz => (
+                    <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="meeting-link">Meeting Link (optional)</Label>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Calendar, ClipboardCheck, CalendarPlus } from 'lucide-react';
+import { MapPin, CalendarPlus, FileText, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { MeetingScheduleDialog } from '@/components/clinical/MeetingScheduleDialog';
@@ -106,42 +106,16 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
 
   return (
     <div className="space-y-4">
-      {/* Info Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Location</CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">{doctor.locations?.name || 'Roaming'}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Invited</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">
-              {doctor.created_at ? format(new Date(doctor.created_at), 'MMM d, yyyy') : '—'}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Baseline</CardTitle>
-            <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">
-              {baseline?.completed_at
-                ? format(new Date(baseline.completed_at), 'MMM d, yyyy')
-                : baseline?.started_at ? 'In Progress' : 'Not Started'}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Location Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Location</CardTitle>
+          <MapPin className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-lg font-semibold">{doctor.locations?.name || 'Roaming'}</div>
+        </CardContent>
+      </Card>
 
       {/* Schedule Button */}
       {canSchedule && (
@@ -170,23 +144,23 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
             <div>
               <p className="text-sm font-medium">Meeting scheduled</p>
               <p className="text-xs text-muted-foreground">
-                {format(new Date(needsPrepSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')} — Complete your prep notes.
+                {format(new Date(needsPrepSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')} — Build your agenda.
               </p>
             </div>
             <Button onClick={() => setPrepSessionId(needsPrepSession.id)}>
-              Prepare Discussion Notes
+              Build Meeting Agenda
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Upcoming Meeting */}
+      {/* Upcoming Meeting with quick actions */}
       {upcomingSession && upcomingSession.status !== 'scheduled' && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Upcoming Meeting</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <p className="text-sm">
               <span className="font-medium">
                 {upcomingSession.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${upcomingSession.sequence_number - 1}`}
@@ -194,18 +168,38 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
               {' — '}
               {format(new Date(upcomingSession.scheduled_at), 'EEEE, MMMM d, yyyy \'at\' h:mm a')}
             </p>
-            {upcomingSession.meeting_link && (
-              <a href={upcomingSession.meeting_link} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline mt-1 inline-block">
-                Join Meeting
-              </a>
-            )}
+            <div className="flex gap-2">
+              {viewablePrepSession && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    // Scroll down to prep view or open it
+                    const el = document.getElementById('meeting-prep-section');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  View Prep
+                </Button>
+              )}
+              {upcomingSession.meeting_link && (
+                <a href={upcomingSession.meeting_link} target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <Video className="h-3.5 w-3.5" />
+                    Join Meeting
+                  </Button>
+                </a>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* Combined Prep View */}
       {viewableSessionFull && prepSelections && (
-        <div className="space-y-3">
+        <div className="space-y-3" id="meeting-prep-section">
           <h3 className="text-base font-semibold">Meeting Prep</h3>
           <CombinedPrepView
             session={viewableSessionFull}

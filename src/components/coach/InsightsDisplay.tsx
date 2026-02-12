@@ -1,19 +1,13 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Eye, User, AlertCircle } from 'lucide-react';
+import { User, AlertCircle, FileText } from 'lucide-react';
 import { getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import type { ExtractedInsights, DomainInsight, InsightsPerspective } from '@/lib/evaluations';
 
 interface InsightsDisplayProps {
   summaryFeedback: string | null;
   extractedInsights: ExtractedInsights | null;
-}
-
-// Helper to check if insights has the new unified structure
-function hasUnifiedStructure(insights: ExtractedInsights | null): boolean {
-  if (!insights) return false;
-  return !!(insights.observer || insights.self_assessment);
 }
 
 // Helper to get legacy structure as self_assessment perspective
@@ -28,21 +22,12 @@ function getLegacyAsSelfAssessment(insights: ExtractedInsights): InsightsPerspec
 }
 
 function PerspectiveCard({ 
-  title, 
-  icon: Icon, 
   perspective 
 }: { 
-  title: string; 
-  icon: React.ElementType;
   perspective: InsightsPerspective;
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-        <Icon className="w-4 h-4" />
-        {title}
-      </div>
-      
       {/* Summary */}
       {perspective.summary_html && (
         <div 
@@ -119,23 +104,21 @@ function PerspectiveCard({
 }
 
 export function InsightsDisplay({ summaryFeedback, extractedInsights }: InsightsDisplayProps) {
-  const hasObservationSummary = !!summaryFeedback;
-  
-  // Determine perspectives to display
-  const observerPerspective = extractedInsights?.observer || null;
+  // Self-assessment insights (unified or legacy)
   const selfAssessmentPerspective = extractedInsights?.self_assessment || 
     (extractedInsights ? getLegacyAsSelfAssessment(extractedInsights) : null);
-  
-  const hasAnyInsights = observerPerspective || selfAssessmentPerspective;
+
+  // Legacy observation summary - only show for old evals that have summary_feedback but no self-assessment insights
+  const hasLegacySummary = !!summaryFeedback && !selfAssessmentPerspective;
 
   return (
     <div className="space-y-6">
-      {/* Legacy Observation Summary - shown if no observer insights but summary_feedback exists */}
-      {hasObservationSummary && !observerPerspective && (
+      {/* Legacy Observation Summary - historical fallback only */}
+      {hasLegacySummary && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Eye className="w-5 h-5" />
+              <FileText className="w-5 h-5" />
               Observation Summary
             </CardTitle>
           </CardHeader>
@@ -148,54 +131,25 @@ export function InsightsDisplay({ summaryFeedback, extractedInsights }: Insights
         </Card>
       )}
 
-      {/* Side-by-Side Insights Display */}
-      {hasAnyInsights ? (
+      {/* Self-Assessment Insights */}
+      {selfAssessmentPerspective ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Insights</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Self-Assessment Insights
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Observer Perspective */}
-              <div className="space-y-4">
-                {observerPerspective ? (
-                  <PerspectiveCard 
-                    title="Coach Observations" 
-                    icon={Eye}
-                    perspective={observerPerspective}
-                  />
-                ) : (
-                  <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg text-muted-foreground">
-                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                    <p className="text-sm">Complete observation recording to see coach insights here.</p>
-                  </div>
-                )}
-              </div>
-              
-              {/* Self-Assessment Perspective */}
-              <div className="space-y-4">
-                {selfAssessmentPerspective ? (
-                  <PerspectiveCard 
-                    title="Self-Assessment" 
-                    icon={User}
-                    perspective={selfAssessmentPerspective}
-                  />
-                ) : (
-                  <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg text-muted-foreground">
-                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                    <p className="text-sm">Complete self-assessment interview to see insights here.</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            <PerspectiveCard perspective={selfAssessmentPerspective} />
           </CardContent>
         </Card>
-      ) : (
+      ) : !hasLegacySummary && (
         <Card>
           <CardContent className="py-8">
             <div className="flex items-center gap-3 justify-center text-muted-foreground">
               <AlertCircle className="w-5 h-5" />
-              <p>Complete the observation and self-assessment recordings to see insights here.</p>
+              <p>Complete the self-assessment interview to see insights here.</p>
             </div>
           </CardContent>
         </Card>

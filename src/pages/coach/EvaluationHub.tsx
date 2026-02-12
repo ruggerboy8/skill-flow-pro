@@ -122,7 +122,8 @@ export function EvaluationHub() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [showFloatingPill, setShowFloatingPill] = useState(false);
   const [transcriptionJustCompleted, setTranscriptionJustCompleted] = useState(false);
-  const [analysisJustCompleted, setAnalysisJustCompleted] = useState(false);
+  const [isMappingToNotes, setIsMappingToNotes] = useState(false);
+  const [mappingJustCompleted, setMappingJustCompleted] = useState(false);
   const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(null);
   const startCardRef = useRef<HTMLDivElement>(null);
   const processSectionRef = useRef<HTMLDivElement>(null);
@@ -130,8 +131,14 @@ export function EvaluationHub() {
   
   // Segment transcript tracking for large recordings
   const [segmentTranscripts, setSegmentTranscripts] = useState<string[]>([]);
-  
-  // Sidebar control
+
+  // Viewport tracking for competency-aware recording
+  const [activeCompetencyId, setActiveCompetencyId] = useState<number | null>(null);
+  const [competencyTimeline, setCompetencyTimeline] = useState<{ competency_id: number; t_start_ms: number }[]>([]);
+  const rowRefs = useRef(new Map<number, HTMLElement>());
+  const recordingStartTimeRef = useRef<number>(0);
+  const activeCompetencyIdRef = useRef<number | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { setOpen: setSidebarOpen } = useSidebar();
 
   // Segment upload callback for observer notes
@@ -261,41 +268,96 @@ export function EvaluationHub() {
     return () => observer.disconnect();
   }, [recordingState.isRecording]);
 
-
-  // Auto-collapse sidebar when recording starts
+  // Auto-collapse sidebar when recording starts + track recording start time
   useEffect(() => {
     if (recordingState.isRecording) {
       setSidebarOpen(false);
+      if (recordingStartTimeRef.current === 0) {
+        recordingStartTimeRef.current = Date.now();
+        setCompetencyTimeline([]);
+        setActiveCompetencyId(null);
+      }
+    } else {
+      recordingStartTimeRef.current = 0;
     }
   }, [recordingState.isRecording, setSidebarOpen]);
+
+  // IntersectionObserver for competency-aware recording
+  useEffect(() => {
+    if (!recordingState.isRecording || recordingState.isPaused || activeTab !== 'observation') {
+      return;
+    }
+
+    const visibilityMap = new Map<number, { ratio: number; top: number }>();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = Number((entry.target as HTMLElement).dataset.competencyId);
+          if (!Number.isFinite(id)) continue;
+          if (entry.isIntersecting) {
+            visibilityMap.set(id, { ratio: entry.intersectionRatio, top: entry.boundingClientRect.top });
+          } else {
+            visibilityMap.delete(id);
+          }
+        }
+
+        // Pick best: highest ratio, tie-break by closest to top
+        let bestId: number | null = null;
+        let bestRatio = 0;
+        let bestTop = Infinity;
+
+        visibilityMap.forEach(({ ratio, top }, id) => {
+          if (ratio > bestRatio || (ratio === bestRatio && Math.abs(top) < Math.abs(bestTop))) {
+            bestId = id;
+            bestRatio = ratio;
+            bestTop = top;
+          }
+        });
+
+        // Debounce updates
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(() => {
+          if (bestId !== activeCompetencyIdRef.current) {
+            activeCompetencyIdRef.current = bestId;
+            setActiveCompetencyId(bestId);
+            if (bestId !== null && recordingStartTimeRef.current > 0) {
+              setCompetencyTimeline(prev => [...prev, {
+                competency_id: bestId!,
+                t_start_ms: Date.now() - recordingStartTimeRef.current,
+              }]);
+            }
+          }
+        }, 200);
+      },
+      { threshold: [0, 0.2, 0.5, 0.8, 1], rootMargin: '-10% 0px -35% 0px' }
+    );
+
+    rowRefs.current.forEach(el => observer.observe(el));
+
+    return () => {
+      observer.disconnect();
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [recordingState.isRecording, recordingState.isPaused, activeTab, evaluation?.items]);
 
   // Scroll to process section when "Done?" is clicked
   const scrollToProcessSection = useCallback(() => {
     processSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // Calculate insights summary for success state
-  const insightsSummary = React.useMemo(() => {
-    const observer = evaluation?.extracted_insights?.observer;
-    if (!observer?.domain_insights) return null;
-    
-    let strengthCount = 0;
-    let growthCount = 0;
-    
-    observer.domain_insights.forEach((d: any) => {
-      strengthCount += d.strengths?.length || 0;
-      growthCount += d.growth_areas?.length || 0;
-    });
-    
-    return { strengthCount, growthCount };
-  }, [evaluation?.extracted_insights]);
+  // Check if any observer notes exist (for "Re-record" vs "Start" label)
+  const hasExistingObserverNotes = React.useMemo(() => {
+    if (!evaluation) return false;
+    return evaluation.items.some(item => item.observer_note && item.observer_note.trim());
+  }, [evaluation]);
 
-  // Handler for View Insights button
-  const handleViewInsights = useCallback(() => {
-    setAnalysisJustCompleted(false);
-    setActiveTab('summary');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  // Get active competency label for display in recorder UI
+  const activeCompetencyLabel = React.useMemo(() => {
+    if (activeCompetencyId == null || !evaluation) return undefined;
+    const item = evaluation.items.find(i => i.competency_id === activeCompetencyId);
+    return item?.competency_name_snapshot || undefined;
+  }, [activeCompetencyId, evaluation]);
 
   // Handler for Edit Transcript button
   const handleEditTranscript = useCallback(() => {
@@ -463,7 +525,7 @@ export function EvaluationHub() {
       
       toast({
         title: 'Transcription Complete',
-        description: 'Review and edit the transcript, then click "Analyze" to extract insights.',
+        description: 'Review the transcript, then click "Map to Notes" to populate competency notes.',
       });
     } catch (error) {
       console.error('[EvaluationHub] Transcription error:', error);
@@ -478,56 +540,76 @@ export function EvaluationHub() {
     }
   };
 
-  // Step 3: Analyze transcript to extract insights (separate from transcription)
-  const handleAnalyzeObservation = async () => {
-    if (!evalId || !summaryRawTranscript) return;
+  // Map transcript to per-competency notes via AI
+  const handleMapToNotes = async () => {
+    if (!evalId || !summaryRawTranscript || !evaluation) return;
     
-    setIsAnalyzingObservation(true);
-    setProcessingStep('Extracting insights...');
+    setIsMappingToNotes(true);
+    setProcessingStep('Mapping transcript to notes...');
 
     try {
-      const extractResponse = await supabase.functions.invoke('extract-insights', {
-        body: { transcript: summaryRawTranscript, staffName, source: 'observation' },
+      const competencies = evaluation.items.map(item => ({
+        id: item.competency_id,
+        name: item.competency_name_snapshot,
+        domain: item.domain_name || 'General',
+      }));
+
+      const response = await supabase.functions.invoke('map-observation-notes', {
+        body: { 
+          transcript: summaryRawTranscript, 
+          timeline: competencyTimeline,
+          competencies,
+        },
       });
 
-      if (extractResponse.error) {
-        throw new Error(extractResponse.error.message || 'Insight extraction failed');
+      if (response.error) {
+        throw new Error(response.error.message || 'Mapping failed');
       }
 
-      const insights = extractResponse.data?.insights as InsightsPerspective;
-      if (!insights) {
-        throw new Error('No insights returned');
+      const notes = response.data?.notes as Array<{ competency_id: number; note_text: string }>;
+      if (!notes || notes.length === 0) {
+        toast({
+          title: 'No Notes Mapped',
+          description: 'The AI could not identify competency-specific feedback in the transcript.',
+        });
+        return;
       }
 
-      // Save to database - merge with existing insights
-      const updatedInsights: ExtractedInsights = {
-        ...evaluation?.extracted_insights,
-        observer: insights
-      };
-      
-      await updateExtractedInsights(evalId, updatedInsights);
+      // Populate each competency's observer_note
+      let populatedCount = 0;
+      for (const { competency_id, note_text } of notes) {
+        const existingNote = pendingObserverNotes[competency_id] ?? 
+          evaluation.items.find(i => i.competency_id === competency_id)?.observer_note ?? '';
+        
+        const finalNote = existingNote.trim() 
+          ? `${existingNote.trim()}\n---\n${note_text}` 
+          : note_text;
 
-      // Update local state
-      handleSummaryFeedbackChange(insights.summary_html || '');
-      setEvaluation(prev => prev ? { ...prev, extracted_insights: updatedInsights } : prev);
+        // Update local state immediately
+        setPendingObserverNotes(prev => ({ ...prev, [competency_id]: finalNote }));
+        setShowObserverNotes(prev => ({ ...prev, [competency_id]: true }));
+        
+        // Persist to DB
+        await handleObserverNoteChange(competency_id, finalNote);
+        populatedCount++;
+      }
 
-      // Show analysis complete state
       setTranscriptionJustCompleted(false);
-      setAnalysisJustCompleted(true);
-      
+      setMappingJustCompleted(true);
+
       toast({
-        title: 'Analysis Complete',
-        description: 'Insights have been extracted from your observation.',
+        title: 'Notes Mapped',
+        description: `${populatedCount} competency note${populatedCount !== 1 ? 's' : ''} populated from your observation.`,
       });
     } catch (error) {
-      console.error('[EvaluationHub] Analysis error:', error);
+      console.error('[EvaluationHub] Mapping error:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to analyze transcript',
+        description: error instanceof Error ? error.message : 'Failed to map transcript to notes',
         variant: 'destructive',
       });
     } finally {
-      setIsAnalyzingObservation(false);
+      setIsMappingToNotes(false);
       setProcessingStep('');
     }
   };
@@ -1729,6 +1811,7 @@ export function EvaluationHub() {
               isPaused={recordingState.isPaused}
               onPauseToggle={recordingControls.togglePause}
               onDoneClick={scrollToProcessSection}
+              activeCompetencyLabel={activeCompetencyLabel}
             />
           )}
 
@@ -1742,10 +1825,11 @@ export function EvaluationHub() {
               isSavingDraft={isSavingDraft}
               onStartRecording={recordingControls.startRecording}
               onPauseToggle={recordingControls.togglePause}
-              disabled={isTranscribingObservation || isAnalyzingObservation}
+              disabled={isTranscribingObservation || isMappingToNotes}
               hasDraftRecording={!!restoredAudioUrl}
               isLoadingDraft={isLoadingDraft}
-              hasExistingInsights={!!insightsSummary}
+              hasExistingInsights={hasExistingObserverNotes}
+              activeCompetencyLabel={activeCompetencyLabel}
             />
           )}
           
@@ -1757,7 +1841,15 @@ export function EvaluationHub() {
               {evaluation.items.map((item) => (
                 <div 
                   key={item.competency_id} 
-                  className="border rounded-lg p-4 space-y-4"
+                  data-competency-id={item.competency_id}
+                  ref={(el) => {
+                    if (el) rowRefs.current.set(item.competency_id, el);
+                    else rowRefs.current.delete(item.competency_id);
+                  }}
+                  className={cn(
+                    "border rounded-lg p-4 space-y-4 transition-shadow",
+                    recordingState.isRecording && activeCompetencyId === item.competency_id && "ring-2 ring-primary/30"
+                  )}
                 >
                   <div className="flex items-center gap-3 mb-1">
                     <h4 className="font-medium">{item.competency_name_snapshot}</h4>
@@ -1931,59 +2023,41 @@ export function EvaluationHub() {
                       </p>
                     )}
                     
-                    {/* Analyze button - only show if not read-only */}
+                    {/* Map to Notes button - only show if not read-only */}
                     {!isReadOnly && (
                       <div className="pt-3 border-t flex items-center justify-between">
-                        {analysisJustCompleted ? (
+                        {mappingJustCompleted ? (
                           <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                             <Check className="w-4 h-4" />
-                            <span className="text-sm font-medium">Insights extracted</span>
+                            <span className="text-sm font-medium">Notes populated</span>
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            Ready to extract insights from your observation?
+                            Ready to populate competency notes from your observation?
                           </p>
                         )}
                         <Button 
-                          onClick={handleAnalyzeObservation}
-                          disabled={isAnalyzingObservation || !summaryRawTranscript}
+                          onClick={handleMapToNotes}
+                          disabled={isMappingToNotes || !summaryRawTranscript}
                           className="gap-2"
                         >
-                          {isAnalyzingObservation ? (
+                          {isMappingToNotes ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              Analyzing...
+                              Mapping...
                             </>
-                          ) : analysisJustCompleted ? (
+                          ) : mappingJustCompleted ? (
                             <>
                               <Sparkles className="w-4 h-4" />
-                              Re-analyze
+                              Re-map Notes
                             </>
                           ) : (
                             <>
                               <Sparkles className="w-4 h-4" />
-                              Analyze & Extract Insights
+                              Map to Notes
                             </>
                           )}
                         </Button>
-                      </div>
-                    )}
-                    
-                    {/* View Insights link after analysis */}
-                    {analysisJustCompleted && insightsSummary && (
-                      <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
-                            <span className="text-sm text-green-800 dark:text-green-200">
-                              Found {insightsSummary.strengthCount} strength{insightsSummary.strengthCount !== 1 ? 's' : ''} and {insightsSummary.growthCount} growth area{insightsSummary.growthCount !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={handleViewInsights} className="gap-1.5">
-                            View Insights
-                            <ArrowRight className="w-3 h-3" />
-                          </Button>
-                        </div>
                       </div>
                     )}
                   </div>

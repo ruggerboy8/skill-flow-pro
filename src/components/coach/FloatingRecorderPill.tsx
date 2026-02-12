@@ -9,6 +9,7 @@ interface FloatingRecorderPillProps {
   isPaused: boolean;
   onPauseToggle: () => void;
   onDoneClick?: () => void;
+  activeCompetencyLabel?: string;
 }
 
 export function FloatingRecorderPill({
@@ -17,6 +18,7 @@ export function FloatingRecorderPill({
   isPaused,
   onPauseToggle,
   onDoneClick,
+  activeCompetencyLabel,
 }: FloatingRecorderPillProps) {
   const isMobile = useIsMobile();
 
@@ -67,6 +69,11 @@ export function FloatingRecorderPill({
           {isPaused && (
             <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
               paused
+            </span>
+          )}
+          {activeCompetencyLabel && !isPaused && (
+            <span className="text-[10px] text-muted-foreground max-w-[120px] text-center leading-tight truncate">
+              {activeCompetencyLabel}
             </span>
           )}
         </button>

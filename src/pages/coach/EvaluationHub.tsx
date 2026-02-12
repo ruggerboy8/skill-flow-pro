@@ -258,7 +258,7 @@ export function EvaluationHub() {
         // Show pill when start card is out of view AND recording is active
         setShowFloatingPill(!entry.isIntersecting);
       },
-      { threshold: 0.1 }
+      { threshold: 0.9 }
     );
     
     if (startCardRef.current) {
@@ -1817,7 +1817,7 @@ export function EvaluationHub() {
 
           {/* Recording Start Card at TOP - minimal trigger */}
           {!isReadOnly && (
-            <RecordingStartCard
+             <RecordingStartCard
               ref={startCardRef}
               isRecording={recordingState.isRecording}
               isPaused={recordingState.isPaused}
@@ -1825,6 +1825,12 @@ export function EvaluationHub() {
               isSavingDraft={isSavingDraft}
               onStartRecording={recordingControls.startRecording}
               onPauseToggle={recordingControls.togglePause}
+              onStartOver={() => {
+                recordingControls.resetRecording();
+                setActiveCompetencyId(null);
+                setCompetencyTimeline([]);
+                recordingStartTimeRef.current = 0;
+              }}
               disabled={isTranscribingObservation || isMappingToNotes}
               hasDraftRecording={!!restoredAudioUrl}
               isLoadingDraft={isLoadingDraft}
@@ -1976,6 +1982,12 @@ export function EvaluationHub() {
                 onTranscribeAudio={handleTranscribeObservation}
                 onDiscardRestored={handleDiscardRestoredAudio}
                 onFinishAndTranscribe={handleFinishAndTranscribe}
+                onStartOver={() => {
+                  recordingControls.resetRecording();
+                  setActiveCompetencyId(null);
+                  setCompetencyTimeline([]);
+                  recordingStartTimeRef.current = 0;
+                }}
                 transcriptionComplete={transcriptionJustCompleted}
                 onEditTranscript={handleEditTranscript}
               />

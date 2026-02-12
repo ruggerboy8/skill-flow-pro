@@ -16,6 +16,7 @@ interface RecordingProcessCardProps {
   onTranscribeAudio: (blob: Blob) => void;
   onDiscardRestored: () => void;
   onFinishAndTranscribe?: () => Promise<void>;
+  onStartOver?: () => void;
   // Transcription complete state
   transcriptionComplete?: boolean;
   onEditTranscript?: () => void;
@@ -32,6 +33,7 @@ export function RecordingProcessCard({
   onTranscribeAudio,
   onDiscardRestored,
   onFinishAndTranscribe,
+  onStartOver,
   transcriptionComplete,
   onEditTranscript,
 }: RecordingProcessCardProps) {
@@ -118,11 +120,11 @@ export function RecordingProcessCard({
                 <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
               </div>
               <div className="flex-1">
-                <p className="font-medium text-green-800 dark:text-green-200">
+                 <p className="font-medium text-green-800 dark:text-green-200">
                   Your observation has been transcribed
                 </p>
                 <p className="text-sm text-green-700 dark:text-green-300">
-                  Review the transcript below, then click "Analyze" to extract insights.
+                  Your recording has been processed and mapped to competency notes below.
                 </p>
               </div>
             </div>
@@ -175,13 +177,26 @@ export function RecordingProcessCard({
               </div>
             )}
             
-            <Button
-              onClick={onFinishAndTranscribe}
-              className="w-full gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              Finish & Transcribe
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={onFinishAndTranscribe}
+                className="flex-1 gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Finish & Add Notes
+              </Button>
+              {onStartOver && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onStartOver}
+                  className="gap-1.5 text-muted-foreground"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Start Over
+                </Button>
+              )}
+            </div>
           </div>
         ) : hasRestoredRecording ? (
           <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">

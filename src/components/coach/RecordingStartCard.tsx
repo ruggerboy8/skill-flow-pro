@@ -1,7 +1,7 @@
 import React, { forwardRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mic, Loader2, Pause, Play, CheckCircle2 } from 'lucide-react';
+import { Mic, Loader2, Pause, Play, CheckCircle2, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -21,6 +21,7 @@ interface RecordingStartCardProps {
   isSavingDraft: boolean;
   onStartRecording: () => void;
   onPauseToggle?: () => void;
+  onStartOver?: () => void;
   disabled?: boolean;
   hasDraftRecording?: boolean;
   isLoadingDraft?: boolean;
@@ -30,7 +31,7 @@ interface RecordingStartCardProps {
 
 export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardProps>(
   function RecordingStartCard(
-    { isRecording, isPaused, recordingTime, isSavingDraft, onStartRecording, onPauseToggle, disabled, hasDraftRecording, isLoadingDraft, hasExistingInsights, activeCompetencyLabel },
+    { isRecording, isPaused, recordingTime, isSavingDraft, onStartRecording, onPauseToggle, onStartOver, disabled, hasDraftRecording, isLoadingDraft, hasExistingInsights, activeCompetencyLabel },
     ref
   ) {
     const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
@@ -99,7 +100,7 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                     </p>
                   ) : hasExistingInsights && !isRecording ? (
                     <p className="text-xs text-green-600 dark:text-green-400">
-                      Insights have been extracted — view in Summary tab
+                      Notes have been mapped to competencies below
                     </p>
                   ) : isRecording ? (
                     <p className="text-xs text-muted-foreground">
@@ -112,7 +113,7 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Speak naturally — we'll organize by domain
+                      Record verbal feedback as you scroll through competencies
                     </p>
                   )}
                 </div>
@@ -159,7 +160,7 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                       {isPaused ? "Paused" : "Recording"}
                     </span>
                     
-                    {/* Pause/Resume button - always visible when recording */}
+                    {/* Pause/Resume button */}
                     {onPauseToggle && (
                       <Button
                         variant="outline"
@@ -180,20 +181,32 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                         )}
                       </Button>
                     )}
+
+                    {/* Start Over button */}
+                    {onStartOver && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onStartOver}
+                        className="gap-1.5 text-muted-foreground"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        Start Over
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Observation starters - show when recording or paused */}
+            {/* How this works - show when recording */}
             {isRecording && (
               <div className="mt-4 pt-3 border-t text-sm text-muted-foreground space-y-1.5">
-                <p className="font-medium text-foreground text-xs">Observation starters:</p>
+                <p className="font-medium text-foreground text-xs">How this works:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-xs">
-                  <li>"I liked when you..."</li>
-                  <li>"Don't forget to..."</li>
-                  <li>"Instead of ___, try..."</li>
-                  <li>"I noticed that when ___, you..."</li>
+                  <li>The recorder follows you as you scroll</li>
+                  <li>Speak clearly about strengths and growth areas for each competency</li>
+                  <li>Your feedback will be automatically mapped to each competency's notes</li>
                 </ul>
               </div>
             )}
@@ -206,7 +219,7 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
             <AlertDialogHeader>
               <AlertDialogTitle>Replace Existing Feedback?</AlertDialogTitle>
               <AlertDialogDescription>
-                This evaluation already has verbal feedback that has been processed. Recording new audio will replace the existing insights. Are you sure you want to continue?
+                This evaluation already has verbal feedback that has been processed. Recording new audio will replace the existing notes. Are you sure you want to continue?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

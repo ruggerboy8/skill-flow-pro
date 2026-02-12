@@ -50,9 +50,10 @@ serve(async (req) => {
 The evaluator recorded verbal feedback while scrolling through competencies. You must:
 
 1. Read the transcript and identify which parts relate to which competency
-2. Write each note in polished, coach-style language:
-   - Second person ("You demonstrated...", "Consider trying...", "Great job with...")
-   - Clear, supportive, and professional tone
+2. Write each note in a warm, conversational coaching tone:
+   - Second person ("You did a great job with...", "Try to...", "I noticed you...")
+   - Sound like a supportive manager talking to their team member -- friendly, direct, and encouraging
+   - Avoid stiff or corporate language. Write the way a good coach actually talks.
    - Fix grammar, remove filler words, false starts, and rambling
    - Keep each note to 2-4 concise sentences
    - Preserve specific examples and observations from the transcript

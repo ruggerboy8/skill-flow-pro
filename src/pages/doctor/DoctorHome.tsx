@@ -54,7 +54,7 @@ export default function DoctorHome() {
 
   // Determine primary CTA
   const renderPrimaryCTA = () => {
-    // Active prep needed
+    // Active prep needed — doctor needs to complete their side
     const prepSession = sessions?.find(s => s.status === 'director_prep_ready');
     if (prepSession) {
       return (
@@ -63,20 +63,45 @@ export default function DoctorHome() {
             <div className="flex items-center gap-3">
               <FileText className="h-8 w-8 text-primary" />
               <div>
-                <CardTitle>Baseline Review Prep</CardTitle>
+                <CardTitle>Complete Your Meeting Prep</CardTitle>
                 <CardDescription>
-                  Meeting scheduled for {format(new Date(prepSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
+                  Meeting on {format(new Date(prepSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-3">
-              Alex has shared discussion notes. Complete your prep before the meeting.
+              Your agenda and discussion topics are ready for review. Add your own input before the meeting.
             </p>
             <Link to={`/doctor/review-prep/${prepSession.id}`}>
               <Button className="w-full">Start Prep</Button>
             </Link>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Meeting scheduled but director hasn't prepped yet — show informational card
+    const scheduledSession = sessions?.find(s => s.status === 'scheduled');
+    if (scheduledSession) {
+      return (
+        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              <div>
+                <CardTitle>Meeting Scheduled</CardTitle>
+                <CardDescription>
+                  {format(new Date(scheduledSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Your meeting is coming up. You'll get a notification when the agenda is ready for your review.
+            </p>
           </CardContent>
         </Card>
       );
@@ -127,7 +152,7 @@ export default function DoctorHome() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Alex will reach out to schedule your baseline review conversation.
+              Your clinical director will reach out to schedule a review conversation.
             </p>
             <Link to="/doctor/baseline-results">
               <Button variant="outline" className="w-full gap-2">

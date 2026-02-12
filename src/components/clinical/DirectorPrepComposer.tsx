@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Send, CheckCircle2, FlaskConical } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 interface Props {
   sessionId: string;
@@ -16,11 +17,19 @@ interface Props {
   onBack: () => void;
 }
 
+const SCORE_LABELS: Record<number, string> = {
+  1: 'Rarely',
+  2: 'Developing',
+  3: 'Consistent',
+  4: 'Master',
+};
+
 export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props) {
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [coachNote, setCoachNote] = useState('');
   const [published, setPublished] = useState(false);
+  const [isFormatting, setIsFormatting] = useState(false);
 
   // Fetch session details
   const { data: session } = useQuery({
@@ -40,7 +49,6 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
   const { data: baselineItems } = useQuery({
     queryKey: ['doctor-baseline-items-for-prep', doctorStaffId],
     queryFn: async () => {
-      // Get the doctor's baseline assessment
       const { data: assessment } = await supabase
         .from('doctor_baseline_assessments')
         .select('id')
@@ -56,8 +64,10 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
           self_score,
           pro_moves!doctor_baseline_items_action_id_fkey (
             action_statement,
+            description,
             competencies!fk_pro_moves_competency_id (
               name,
+              friendly_description,
               domains!competencies_domain_id_fkey (
                 domain_name,
                 color_hex
@@ -73,6 +83,35 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     },
     enabled: !!doctorStaffId,
   });
+
+  // Fetch coach baseline items for coach scores
+  const { data: coachItems } = useQuery({
+    queryKey: ['coach-baseline-items-for-prep', doctorStaffId],
+    queryFn: async () => {
+      const { data: assessment } = await supabase
+        .from('coach_baseline_assessments')
+        .select('id')
+        .eq('doctor_staff_id', doctorStaffId)
+        .maybeSingle();
+
+      if (!assessment?.id) return [];
+
+      const { data, error } = await supabase
+        .from('coach_baseline_items')
+        .select('action_id, rating')
+        .eq('assessment_id', assessment.id);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!doctorStaffId,
+  });
+
+  // Build a map of action_id -> coach rating
+  const coachRatingMap = (coachItems || []).reduce((acc, item) => {
+    acc[item.action_id] = item.rating;
+    return acc;
+  }, {} as Record<number, number | null>);
 
   // Fetch existing selections if editing
   const { data: existingSelections } = useQuery({
@@ -93,7 +132,6 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     queryKey: ['prior-experiments', sessionId, session?.doctor_staff_id],
     queryFn: async () => {
       if (!session?.doctor_staff_id || !session?.sequence_number || session.sequence_number <= 1) return [];
-      // Get the previous confirmed session's meeting record
       const { data: priorSessions } = await supabase
         .from('coaching_sessions')
         .select('id')
@@ -137,11 +175,32 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     });
   };
 
+  const handleMagicFormat = async () => {
+    if (!coachNote.trim() || coachNote === '<p><br></p>') {
+      toast({ title: 'Nothing to format', description: 'Write your agenda first.', variant: 'destructive' });
+      return;
+    }
+    setIsFormatting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('format-agenda', {
+        body: { html: coachNote },
+      });
+      if (error) throw error;
+      if (data?.formatted) {
+        setCoachNote(data.formatted);
+        toast({ title: 'Agenda formatted ✨' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Formatting failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsFormatting(false);
+    }
+  };
+
   const publishMutation = useMutation({
     mutationFn: async () => {
       if (selectedActions.length === 0) throw new Error('Select at least one discussion topic.');
 
-      // Delete existing selections and re-insert
       await supabase
         .from('coaching_session_selections')
         .delete()
@@ -176,10 +235,8 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     },
   });
 
-  // Save draft without publishing
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
-      // Save selections
       await supabase
         .from('coaching_session_selections')
         .delete()
@@ -214,7 +271,7 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
             <CheckCircle2 className="h-12 w-12 text-green-600 mb-4" />
             <h2 className="text-xl font-bold">Prep Published</h2>
             <p className="text-muted-foreground mt-2">
-              The doctor can now see your notes and complete their prep before the meeting.
+              The doctor can now see your agenda and complete their prep before the meeting.
             </p>
             <Button variant="outline" className="mt-6" onClick={onBack}>
               Back to Doctor Detail
@@ -234,6 +291,15 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     return acc;
   }, {} as Record<string, typeof baselineItems>);
 
+  const quillModules = {
+    toolbar: [
+      [{ header: [3, false] }],
+      ['bold', 'italic', 'underline'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['clean'],
+    ],
+  };
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center gap-3">
@@ -241,7 +307,7 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-xl font-bold">Prepare Discussion Notes</h2>
+          <h2 className="text-xl font-bold">Build Meeting Agenda</h2>
           {session && (
             <p className="text-sm text-muted-foreground">
               Meeting: {format(new Date(session.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
@@ -271,7 +337,7 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
         </Card>
       )}
 
-      {/* ProMove Picker */}
+      {/* ProMove Picker with scores and descriptions */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Discussion Topics</CardTitle>
@@ -286,7 +352,9 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
               <div className="space-y-2">
                 {(items || []).map((item) => {
                   const pm = item.pro_moves as any;
+                  const competency = pm?.competencies;
                   const isSelected = selectedActions.includes(item.action_id);
+                  const coachScore = coachRatingMap[item.action_id];
                   return (
                     <label
                       key={item.action_id}
@@ -301,11 +369,29 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{pm?.action_statement || `Action #${item.action_id}`}</p>
-                        {item.self_score != null && (
-                          <Badge variant="secondary" className="mt-1 text-xs">
-                            Self-score: {item.self_score}
-                          </Badge>
+                        {competency?.name && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {competency.name}
+                            {competency.friendly_description && (
+                              <span className="italic"> — {competency.friendly_description}</span>
+                            )}
+                          </p>
                         )}
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {item.self_score != null && (
+                            <Badge variant="secondary" className="text-xs">
+                              Doctor: {SCORE_LABELS[item.self_score] || item.self_score}
+                            </Badge>
+                          )}
+                          {coachScore != null && (
+                            <Badge variant="outline" className="text-xs">
+                              Your rating: {SCORE_LABELS[coachScore] || coachScore}
+                            </Badge>
+                          )}
+                          {item.self_score != null && coachScore != null && item.self_score !== coachScore && (
+                            <Badge className="bg-amber-100 text-amber-800 text-xs">Gap</Badge>
+                          )}
+                        </div>
                       </div>
                     </label>
                   );
@@ -316,21 +402,35 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
         </CardContent>
       </Card>
 
-      {/* Coach Note */}
+      {/* Meeting Agenda (Quill) */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Your Discussion Notes</CardTitle>
-          <CardDescription>
-            What did you notice? What do you want to explore together?
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Meeting Agenda</CardTitle>
+              <CardDescription>
+                Build your agenda for the meeting. Use the magic button to auto-format.
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleMagicFormat}
+              disabled={isFormatting}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {isFormatting ? 'Formatting...' : 'Magic Format'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <Textarea
+          <ReactQuill
             value={coachNote}
-            onChange={(e) => setCoachNote(e.target.value)}
-            placeholder="Share your observations and what you'd like to discuss..."
-            rows={6}
-            className="resize-y"
+            onChange={setCoachNote}
+            modules={quillModules}
+            placeholder="Type your meeting agenda here..."
+            className="bg-background rounded-md"
           />
         </CardContent>
       </Card>
@@ -354,7 +454,7 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
         </Button>
       </div>
       <p className="text-xs text-muted-foreground text-center">
-        Publishing makes your notes visible to the doctor so they can complete their prep.
+        Publishing makes your agenda visible to the doctor so they can complete their prep.
       </p>
     </div>
   );

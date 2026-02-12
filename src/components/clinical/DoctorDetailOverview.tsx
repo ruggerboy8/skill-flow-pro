@@ -41,6 +41,9 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   // Session with combined prep ready to view
   const viewablePrepSession = sessions.find(s => ['director_prep_ready', 'doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(s.status));
 
+  // Doctor has submitted — director should see read-only summary, not edit
+  const isDoctorPrepSubmitted = viewablePrepSession && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(viewablePrepSession.status);
+
   // Fetch selections for viewable prep
   const { data: prepSelections } = useQuery({
     queryKey: ['session-selections-all', viewablePrepSession?.id],
@@ -169,7 +172,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
               {format(new Date(upcomingSession.scheduled_at), 'EEEE, MMMM d, yyyy \'at\' h:mm a')}
             </p>
             <div className="flex gap-2">
-              {viewablePrepSession && (
+              {viewablePrepSession && !isDoctorPrepSubmitted && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -178,6 +181,17 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
                 >
                   <FileText className="h-3.5 w-3.5" />
                   View / Edit Prep
+                </Button>
+              )}
+              {viewablePrepSession && isDoctorPrepSubmitted && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => document.getElementById('meeting-prep-section')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  View Prep Summary
                 </Button>
               )}
               {upcomingSession.meeting_link && (

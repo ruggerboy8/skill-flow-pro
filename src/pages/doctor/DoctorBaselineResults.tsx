@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RatingBandCollapsible } from '@/components/doctor/RatingBandCollapsible';
-import { GutCheckPrompt } from '@/components/doctor/GutCheckPrompt';
+
 import { DoctorMaterialsSheet } from '@/components/doctor/DoctorMaterialsSheet';
 import { ReflectionSection } from '@/components/doctor/ReflectionSection';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -303,13 +303,6 @@ export default function DoctorBaselineResults() {
                     </span>
                   </div>
 
-                  {/* Gut Check Prompt */}
-                  <GutCheckPrompt
-                    domainName={domain}
-                    hasFoursInDomain={hasFours}
-                    isAlreadyFlagged={flaggedDomains.includes(domain)}
-                    onFlag={async (d) => flagMutation.mutateAsync(d)}
-                  />
 
                   {/* Rating Bands - 4, 3, 2, 1 order */}
                   {[4, 3, 2, 1].map((score) => (

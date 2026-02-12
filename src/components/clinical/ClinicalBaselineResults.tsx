@@ -354,14 +354,6 @@ export function ClinicalBaselineResults({
               </div>
               <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
             </div>
-            {flaggedDomains.length > 0 && (
-              <div className="flex items-center gap-2 mt-3 ml-14 text-amber-700 dark:text-amber-400">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-sm">
-                  Flagged {flaggedDomains.length} domain{flaggedDomains.length > 1 ? 's' : ''} for discussion: {flaggedDomains.join(', ')}
-                </span>
-              </div>
-            )}
           </div>
         </CollapsibleTrigger>
 
@@ -434,7 +426,6 @@ export function ClinicalBaselineResults({
                 <TabsList className="flex-1 h-auto p-0 bg-transparent rounded-none">
                   {orderedDomains.map((domain) => {
                     const domainColor = getDomainColorRichRaw(domain);
-                    const isFlagged = flaggedDomains.includes(domain);
                     return (
                       <TabsTrigger
                         key={domain}
@@ -443,7 +434,6 @@ export function ClinicalBaselineResults({
                       >
                         <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: `hsl(${domainColor})` }} />
                         {domain}
-                        {isFlagged && <AlertCircle className="h-3.5 w-3.5 ml-1.5 text-amber-500" />}
                       </TabsTrigger>
                     );
                   })}
@@ -482,17 +472,8 @@ export function ClinicalBaselineResults({
 
               {orderedDomains.map((domain) => {
                 const sortedItems = getSortedDomainItems(domain);
-                const isFlagged = flaggedDomains.includes(domain);
-
                 return (
                   <TabsContent key={domain} value={domain} className="mt-0 p-0">
-                    {isFlagged && (
-                      <div className="px-4 py-2 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-200 dark:border-amber-800">
-                        <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm">
-                          <AlertCircle className="h-4 w-4" />Doctor flagged this domain for discussion
-                        </div>
-                      </div>
-                    )}
                     {/* Column headers with sortable Self/Coach */}
                     <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/10 text-xs text-muted-foreground">
                       <button

@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,11 +42,30 @@ interface DeliveryTabProps {
 }
 
 export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { locations, isLoading, refetch } = useEvalDeliveryProgress(period);
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
-  const [orgFilter, setOrgFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  const orgFilter = searchParams.get('org') || 'all';
+  const statusFilter = searchParams.get('status') || 'all';
+
+  const updateParam = useCallback((key: string, value: string) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (value === 'all') {
+        next.delete(key);
+      } else {
+        next.set(key, value);
+      }
+      // Preserve tab param
+      if (!next.has('tab')) next.set('tab', 'delivery');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const setOrgFilter = (v: string) => updateParam('org', v);
+  const setStatusFilter = (v: string) => updateParam('status', v);
 
   const organizations = useMemo(() => {
     const orgMap = new Map<string, string>();

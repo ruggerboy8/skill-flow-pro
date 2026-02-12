@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, CheckCircle2, Eye, Calendar, FileText, ChevronDown, FlaskConical } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Eye, Calendar, FileText, ChevronDown, FlaskConical, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
@@ -163,7 +163,27 @@ export default function DoctorHome() {
       );
     }
 
-    // Baseline states
+    // Post-confirmation: show friendly "on track" message if coaching has started
+    const hasConfirmedSession = sessions?.some(s => s.status === 'doctor_confirmed');
+    if (hasConfirmedSession && baseline?.status === 'completed') {
+      return (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-8 w-8 text-primary" />
+              <div>
+                <CardTitle>You're on Track</CardTitle>
+                <CardDescription>
+                  Your coaching journey is underway. Keep practicing your experiments and check back for your next session.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+      );
+    }
+
+    // Baseline states — only show if no coaching sessions exist
     if (baseline?.status === 'completed') {
       return (
         <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
@@ -284,7 +304,7 @@ export default function DoctorHome() {
       {/* Completed Records */}
       {completedSessions.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Completed Records</h2>
+          <h2 className="text-lg font-semibold">Past Coaching Sessions</h2>
           {completedSessions.map(session => (
             <CompletedSessionCard key={session.id} session={session} />
           ))}

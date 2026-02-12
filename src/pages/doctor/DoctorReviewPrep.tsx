@@ -62,25 +62,29 @@ export default function DoctorReviewPrep() {
   const { data: allSelections } = useQuery({
     queryKey: ['session-selections-all', sessionId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: sels, error: selErr } = await supabase
         .from('coaching_session_selections')
+        .select('action_id, selected_by, display_order')
+        .eq('session_id', sessionId);
+      if (selErr) throw selErr;
+      if (!sels?.length) return [];
+
+      const actionIds = sels.map(s => s.action_id);
+      const { data: moves, error: movErr } = await supabase
+        .from('pro_moves')
         .select(`
           action_id,
-          selected_by,
-          display_order,
-          pro_moves:action_id (
-            action_statement,
-            competencies!fk_pro_moves_competency_id (
-              name,
-              domains!competencies_domain_id_fkey (
-                domain_name
-              )
-            )
+          action_statement,
+          competencies!fk_pro_moves_competency_id (
+            name,
+            domains!competencies_domain_id_fkey (domain_name)
           )
         `)
-        .eq('session_id', sessionId);
-      if (error) throw error;
-      return data || [];
+        .in('action_id', actionIds);
+      if (movErr) throw movErr;
+
+      const moveMap = (moves || []).reduce((acc: any, m: any) => { acc[m.action_id] = m; return acc; }, {});
+      return sels.map(s => ({ ...s, pro_moves: moveMap[s.action_id] || null }));
     },
     enabled: !!sessionId,
   });

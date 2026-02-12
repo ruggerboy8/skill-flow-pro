@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { DomainBadge } from '@/components/ui/domain-badge';
 import { ArrowLeft, Plus, Trash2, Send, Calendar } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -23,7 +23,6 @@ interface Props {
 
 export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const queryClient = useQueryClient();
-  const [calibrationConfirmed, setCalibrationConfirmed] = useState(false);
   const [summary, setSummary] = useState('');
   const [experiments, setExperiments] = useState<Experiment[]>([{ title: '', description: '' }]);
 
@@ -108,7 +107,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
         .from('coaching_meeting_records')
         .insert([{
           session_id: sessionId,
-          calibration_confirmed: calibrationConfirmed,
+          calibration_confirmed: false,
           summary: summary.trim(),
           experiments: validExperiments as any,
           submitted_at: new Date().toISOString(),
@@ -167,9 +166,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                 key={`${sel.action_id}-${sel.selected_by}`}
                 className={`flex items-center gap-2 p-2 rounded-md ${isOverlap ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}
               >
-                <Badge variant="outline" className="text-xs shrink-0">
-                  {pm?.competencies?.domains?.domain_name || '—'}
-                </Badge>
+                <DomainBadge domain={pm?.competencies?.domains?.domain_name} />
                 <span className="text-sm flex-1">{pm?.action_statement || `Action #${sel.action_id}`}</span>
                 {isOverlap && <Badge className="bg-primary/20 text-primary text-xs">Both</Badge>}
                 {!isOverlap && (
@@ -183,25 +180,6 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           {allTopics.length === 0 && (
             <p className="text-sm text-muted-foreground">No discussion topics selected.</p>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Calibration */}
-      <Card>
-        <CardContent className="py-4">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <Checkbox
-              checked={calibrationConfirmed}
-              onCheckedChange={(v) => setCalibrationConfirmed(v === true)}
-              className="mt-0.5"
-            />
-            <div>
-              <p className="text-sm font-medium">Calibration confirmed</p>
-              <p className="text-xs text-muted-foreground">
-                Both parties discussed and aligned on current performance levels.
-              </p>
-            </div>
-          </label>
         </CardContent>
       </Card>
 

@@ -172,7 +172,7 @@ function SessionCard({
                   onClick={(e) => { e.stopPropagation(); onCapture(); }}
                 >
                   <ClipboardEdit className="h-3.5 w-3.5" />
-                  Capture Outcome
+                  Start Meeting
                 </Button>
               )}
               <Badge className={`${statusInfo.className} hover:${statusInfo.className}`}>

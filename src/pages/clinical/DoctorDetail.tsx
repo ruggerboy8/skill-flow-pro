@@ -137,9 +137,9 @@ export default function DoctorDetail() {
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="overview">Up Next</TabsTrigger>
+          <TabsTrigger value="thread">Coaching</TabsTrigger>
           <TabsTrigger value="baseline">Baseline</TabsTrigger>
-          <TabsTrigger value="thread">Coaching Thread</TabsTrigger>
         </TabsList>
 
         <DoctorNextActionPanel status={journeyStatus} />
@@ -153,6 +153,10 @@ export default function DoctorDetail() {
           />
         </TabsContent>
 
+        <TabsContent value="thread">
+          <DoctorDetailThread sessions={sessions || []} coachName={myStaff?.name} doctorName={doctor.name} />
+        </TabsContent>
+
         <TabsContent value="baseline">
           <DoctorDetailBaseline
             staffId={staffId!}
@@ -160,10 +164,6 @@ export default function DoctorDetail() {
             coachAssessment={coachAssessment}
             onStartCoachWizard={() => setShowCoachWizard(true)}
           />
-        </TabsContent>
-
-        <TabsContent value="thread">
-          <DoctorDetailThread sessions={sessions || []} coachName={myStaff?.name} doctorName={doctor.name} />
         </TabsContent>
       </Tabs>
     </div>

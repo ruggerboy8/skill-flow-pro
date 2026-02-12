@@ -215,7 +215,7 @@ function SessionCard({
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
                       <FlaskConical className="h-3.5 w-3.5" />
-                      Experiments
+                      Action Steps
                     </p>
                     <div className="space-y-2">
                       {experiments.map((exp: any, i: number) => (

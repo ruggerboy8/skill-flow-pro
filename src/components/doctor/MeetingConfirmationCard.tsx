@@ -101,7 +101,7 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
           <CardHeader>
             <div className="flex items-center gap-2">
               <FlaskConical className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Experiments to Try</CardTitle>
+              <CardTitle className="text-base">Action Steps</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">

@@ -84,7 +84,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
   const addExperiment = () => {
     if (experiments.length >= 3) {
-      toast({ title: 'Maximum 3 experiments', variant: 'destructive' });
+      toast({ title: 'Maximum 3 action steps', variant: 'destructive' });
       return;
     }
     setExperiments(prev => [...prev, { title: '', description: '' }]);
@@ -188,7 +188,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-base">Experiments to Try</CardTitle>
+              <CardTitle className="text-base">Action Steps</CardTitle>
               <CardDescription>Specific actions to practice before the next check-in.</CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={addExperiment} disabled={experiments.length >= 3}>
@@ -201,7 +201,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           {experiments.map((exp, i) => (
             <div key={i} className="space-y-2 p-3 rounded-lg border bg-muted/20">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-muted-foreground uppercase">Experiment {i + 1}</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Action Step {i + 1}</p>
                 {experiments.length > 1 && (
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeExperiment(i)}>
                     <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />

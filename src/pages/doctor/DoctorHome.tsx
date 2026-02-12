@@ -178,7 +178,7 @@ export default function DoctorHome() {
               <div>
                 <CardTitle>You're on Track</CardTitle>
                 <CardDescription>
-                  Your coaching journey is underway. Keep practicing your experiments and check back for your next session.
+                  Your coaching journey is underway. Keep practicing your action steps and check back for your next session.
                 </CardDescription>
               </div>
             </div>
@@ -368,7 +368,7 @@ function CompletedSessionCard({ session }: { session: { id: string; session_type
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
                       <FlaskConical className="h-3.5 w-3.5" />
-                      Experiments
+                      Action Steps
                     </p>
                     {experiments.map((exp: any, i: number) => (
                       <div key={i} className="p-2 rounded-md bg-muted/30 border mb-1.5">

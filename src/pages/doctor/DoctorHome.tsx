@@ -1,13 +1,15 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, CheckCircle2, Eye, Calendar, FileText } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Eye, Calendar, FileText, ChevronDown, FlaskConical } from 'lucide-react';
 import { format } from 'date-fns';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export default function DoctorHome() {
   const { data: staff } = useStaffProfile();
@@ -228,27 +230,84 @@ export default function DoctorHome() {
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Completed Records</h2>
           {completedSessions.map(session => (
-            <Card key={session.id} className="hover:bg-muted/30 transition-colors">
-              <CardContent className="flex items-center justify-between py-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">
-                      {session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${session.sequence_number - 1}`}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(session.scheduled_at), 'MMMM d, yyyy')}
-                    </p>
-                  </div>
-                </div>
-                <Link to={`/doctor/review-prep/${session.id}`}>
-                  <Button variant="ghost" size="sm">View</Button>
-                </Link>
-              </CardContent>
-            </Card>
+            <CompletedSessionCard key={session.id} session={session} />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function CompletedSessionCard({ session }: { session: { id: string; session_type: string; sequence_number: number; scheduled_at: string } }) {
+  const [open, setOpen] = useState(false);
+
+  const { data: meetingRecord } = useQuery({
+    queryKey: ['meeting-record', session.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('coaching_meeting_records')
+        .select('*')
+        .eq('session_id', session.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  const experiments = (meetingRecord?.experiments as any[] | null) || [];
+  const typeLabel = session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${session.sequence_number - 1}`;
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <Card className="transition-colors">
+        <CollapsibleTrigger asChild>
+          <CardContent className="flex items-center justify-between py-4 cursor-pointer hover:bg-muted/30">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+              <div>
+                <p className="text-sm font-medium">{typeLabel}</p>
+                <p className="text-sm text-muted-foreground">
+                  {format(new Date(session.scheduled_at), 'MMMM d, yyyy')}
+                </p>
+              </div>
+            </div>
+            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+          </CardContent>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0 space-y-3">
+            {meetingRecord ? (
+              <>
+                {meetingRecord.summary && (
+                  <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3">
+                    {meetingRecord.summary}
+                  </div>
+                )}
+                {experiments.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <FlaskConical className="h-3.5 w-3.5" />
+                      Experiments
+                    </p>
+                    {experiments.map((exp: any, i: number) => (
+                      <div key={i} className="p-2 rounded-md bg-muted/30 border mb-1.5">
+                        <p className="text-sm font-medium">{exp.title}</p>
+                        {exp.description && <p className="text-xs text-muted-foreground mt-0.5">{exp.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            )}
+            <Link to={`/doctor/review-prep/${session.id}`}>
+              <Button variant="ghost" size="sm" className="w-full">View Full Record</Button>
+            </Link>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }

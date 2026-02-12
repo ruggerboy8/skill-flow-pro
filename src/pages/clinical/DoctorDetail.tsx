@@ -2,14 +2,17 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MapPin, Calendar, ClipboardCheck, ShieldCheck } from 'lucide-react';
-import { format } from 'date-fns';
-import { ClinicalBaselineResults } from '@/components/clinical/ClinicalBaselineResults';
-import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
+import { ArrowLeft } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
+import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
+import { DoctorNextActionPanel } from '@/components/clinical/DoctorNextActionPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DoctorDetailOverview } from '@/components/clinical/DoctorDetailOverview';
+import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';
+import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
+import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
 
 export default function DoctorDetail() {
   const { staffId } = useParams<{ staffId: string }>();
@@ -45,7 +48,6 @@ export default function DoctorDetail() {
     enabled: !!staffId,
   });
 
-  // Fetch coach's own assessment status
   const { data: coachAssessment } = useQuery({
     queryKey: ['coach-baseline-assessment', staffId, myStaff?.id],
     queryFn: async () => {
@@ -60,6 +62,20 @@ export default function DoctorDetail() {
       return data;
     },
     enabled: !!staffId && !!myStaff?.id,
+  });
+
+  const { data: sessions } = useQuery({
+    queryKey: ['coaching-sessions', staffId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('coaching_sessions')
+        .select('id, session_type, sequence_number, status, scheduled_at, meeting_link')
+        .eq('doctor_staff_id', staffId)
+        .order('sequence_number', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!staffId,
   });
 
   const isLoading = doctorLoading || baselineLoading;
@@ -93,16 +109,11 @@ export default function DoctorDetail() {
     );
   }
 
-  const getStatusBadge = () => {
-    if (!baseline) return <Badge variant="secondary">Invited</Badge>;
-    if (baseline.status === 'completed') return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Baseline Complete</Badge>;
-    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Baseline In Progress</Badge>;
-  };
-
-  const coachStatus = coachAssessment?.status;
-  const coachStatusLabel = !coachAssessment ? 'Not Started' : coachStatus === 'completed' ? 'Complete' : 'In Progress';
-  const coachButtonLabel = !coachAssessment ? 'Start Assessment' : coachStatus === 'completed' ? 'View Assessment' : 'Continue Assessment';
-  const coachLastUpdated = coachAssessment?.updated_at;
+  const journeyStatus = getDoctorJourneyStatus(
+    baseline ? { status: baseline.status, completed_at: baseline.completed_at } : null,
+    coachAssessment ? { status: coachAssessment.status } : null,
+    sessions || [],
+  );
 
   return (
     <div className="space-y-6">
@@ -114,90 +125,44 @@ export default function DoctorDetail() {
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">{doctor.name}</h1>
-            {getStatusBadge()}
+            <DoctorJourneyStatusPill status={journeyStatus} />
           </div>
           <p className="text-muted-foreground">{doctor.email}</p>
         </div>
       </div>
 
-      {/* Info Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Location</CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">{(doctor.locations as any)?.name || 'Roaming'}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Invited</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">
-              {doctor.created_at ? format(new Date(doctor.created_at), 'MMM d, yyyy') : '—'}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Baseline</CardTitle>
-            <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">
-              {baseline?.completed_at
-                ? format(new Date(baseline.completed_at), 'MMM d, yyyy')
-                : baseline?.started_at ? 'In Progress' : 'Not Started'}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <DoctorNextActionPanel status={journeyStatus} />
 
-      {/* Baseline Results */}
-      <ClinicalBaselineResults
-        staffId={staffId!}
-        assessmentId={baseline?.id}
-        status={baseline?.status}
-        completedAt={baseline?.completed_at}
-      />
+      {/* Tabs */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="baseline">Baseline</TabsTrigger>
+          <TabsTrigger value="thread">Coaching Thread</TabsTrigger>
+        </TabsList>
 
-      {/* Coach Private Assessment Card */}
-      <Card className="border-dashed">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-3">
-            <ShieldCheck className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <CardTitle className="text-base">Your Baseline Assessment (Private)</CardTitle>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Visible only to clinical directors
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <Badge variant={coachStatus === 'completed' ? 'default' : 'secondary'}>
-                {coachStatusLabel}
-              </Badge>
-              {coachLastUpdated && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Updated {format(new Date(coachLastUpdated), 'MMM d, yyyy')}
-                </p>
-              )}
-            </div>
-            <Button
-              size="sm"
-              variant={coachStatus === 'completed' ? 'outline' : 'default'}
-              onClick={() => setShowCoachWizard(true)}
-            >
-              {coachButtonLabel}
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
+        <TabsContent value="overview">
+          <DoctorDetailOverview
+            doctor={doctor}
+            baseline={baseline}
+            sessions={sessions || []}
+            journeyStatus={journeyStatus}
+          />
+        </TabsContent>
+
+        <TabsContent value="baseline">
+          <DoctorDetailBaseline
+            staffId={staffId!}
+            baseline={baseline}
+            coachAssessment={coachAssessment}
+            onStartCoachWizard={() => setShowCoachWizard(true)}
+          />
+        </TabsContent>
+
+        <TabsContent value="thread">
+          <DoctorDetailThread sessions={sessions || []} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

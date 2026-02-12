@@ -11,7 +11,7 @@ import { useRoutePersistence } from '@/hooks/useRoutePersistence';
 import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
-import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Stethoscope } from 'lucide-react';
+import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Stethoscope, ClipboardList } from 'lucide-react';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -59,6 +59,7 @@ export default function Layout() {
     // Doctor-specific navigation
     { name: 'Home', href: '/doctor', icon: Home },
     { name: 'My Role', href: '/doctor/my-role', icon: BookOpen },
+    { name: 'Coaching History', href: '/doctor/coaching-history', icon: ClipboardList },
   ] : [
     // Standard navigation
     { name: 'Home', href: '/', icon: Home },

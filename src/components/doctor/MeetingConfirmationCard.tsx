@@ -1,12 +1,9 @@
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, MessageSquareWarning, Calendar, FlaskConical } from 'lucide-react';
+import { CheckCircle2, Calendar, FlaskConical } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -17,8 +14,6 @@ interface Props {
 
 export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
   const queryClient = useQueryClient();
-  const [showRevisionForm, setShowRevisionForm] = useState(false);
-  const [revisionNote, setRevisionNote] = useState('');
 
   const { data: session } = useQuery({
     queryKey: ['coaching-session', sessionId],
@@ -47,16 +42,6 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
     enabled: !!sessionId,
   });
 
-  const { data: coachName } = useQuery({
-    queryKey: ['staff-name', session?.coach_staff_id],
-    queryFn: async () => {
-      if (!session?.coach_staff_id) return 'Alex';
-      const { data } = await supabase.from('staff').select('name').eq('id', session.coach_staff_id).single();
-      return data?.name || 'Alex';
-    },
-    enabled: !!session?.coach_staff_id,
-  });
-
   const confirmMutation = useMutation({
     mutationFn: async () => {
       const { error: recErr } = await supabase
@@ -75,39 +60,11 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
       queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['meeting-record', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['my-coaching-sessions'] });
-      toast({ title: 'Meeting confirmed', description: 'The record is now locked.' });
+      toast({ title: 'All set!', description: 'Your meeting record has been saved.' });
       onConfirmed?.();
     },
     onError: (err: any) => {
-      toast({ title: 'Error confirming', description: err.message, variant: 'destructive' });
-    },
-  });
-
-  const revisionMutation = useMutation({
-    mutationFn: async () => {
-      if (!revisionNote.trim()) throw new Error('Please explain what needs revision.');
-
-      const { error: recErr } = await supabase
-        .from('coaching_meeting_records')
-        .update({ doctor_revision_note: revisionNote.trim() })
-        .eq('session_id', sessionId);
-      if (recErr) throw recErr;
-
-      const { error: sessErr } = await supabase
-        .from('coaching_sessions')
-        .update({ status: 'doctor_revision_requested' })
-        .eq('id', sessionId);
-      if (sessErr) throw sessErr;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
-      queryClient.invalidateQueries({ queryKey: ['meeting-record', sessionId] });
-      queryClient.invalidateQueries({ queryKey: ['my-coaching-sessions'] });
-      toast({ title: 'Revision requested', description: `${coachName} will update the summary.` });
-      setShowRevisionForm(false);
-    },
-    onError: (err: any) => {
-      toast({ title: 'Error requesting revision', description: err.message, variant: 'destructive' });
+      toast({ title: 'Something went wrong', description: err.message, variant: 'destructive' });
     },
   });
 
@@ -128,19 +85,10 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
         </span>
       </div>
 
-      {/* Calibration */}
-      {meetingRecord.calibration_confirmed && (
-        <Badge className="bg-emerald-100 text-emerald-800">
-          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-          Calibration Confirmed
-        </Badge>
-      )}
-
       {/* Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Meeting Summary</CardTitle>
-          <CardDescription>By {coachName}</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm whitespace-pre-wrap">{meetingRecord.summary}</p>
@@ -179,61 +127,20 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
               <p className="text-xs text-muted-foreground">
                 {meetingRecord.doctor_confirmed_at
                   ? `Confirmed on ${format(new Date(meetingRecord.doctor_confirmed_at), 'MMMM d, yyyy')}`
-                  : 'This record has been confirmed and locked.'}
+                  : 'This record has been confirmed.'}
               </p>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {showRevisionForm ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Request a Revision</CardTitle>
-                <CardDescription>Explain what needs to be changed or added.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Textarea
-                  value={revisionNote}
-                  onChange={(e) => setRevisionNote(e.target.value)}
-                  placeholder="Describe what's inaccurate or missing..."
-                  rows={3}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    variant="destructive"
-                    className="flex-1 gap-2"
-                    onClick={() => revisionMutation.mutate()}
-                    disabled={!revisionNote.trim() || revisionMutation.isPending}
-                  >
-                    <MessageSquareWarning className="h-4 w-4" />
-                    {revisionMutation.isPending ? 'Sending...' : 'Send Revision Request'}
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowRevisionForm(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="flex gap-2">
-              <Button
-                className="flex-1 gap-2"
-                onClick={() => confirmMutation.mutate()}
-                disabled={confirmMutation.isPending}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                {confirmMutation.isPending ? 'Confirming...' : 'Confirm Summary'}
-              </Button>
-              <Button variant="outline" onClick={() => setShowRevisionForm(true)}>
-                Request Edit
-              </Button>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground text-center">
-            Confirming locks this record permanently.
-          </p>
-        </div>
+        <Button
+          className="w-full gap-2"
+          onClick={() => confirmMutation.mutate()}
+          disabled={confirmMutation.isPending}
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {confirmMutation.isPending ? 'Confirming...' : 'Confirm Summary'}
+        </Button>
       )}
     </div>
   );

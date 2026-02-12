@@ -82,6 +82,37 @@ export default function DoctorHome() {
       );
     }
 
+    // Doctor already submitted prep — let them review it
+    const submittedPrepSession = sessions?.find(s => s.status === 'doctor_prep_submitted');
+    if (submittedPrepSession) {
+      return (
+        <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <div>
+                <CardTitle>Prep Submitted</CardTitle>
+                <CardDescription>
+                  Meeting on {format(new Date(submittedPrepSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Your prep is submitted. You can review it anytime before the meeting.
+            </p>
+            <Link to={`/doctor/review-prep/${submittedPrepSession.id}`}>
+              <Button variant="outline" className="w-full gap-2">
+                <Eye className="h-4 w-4" />
+                View My Prep
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      );
+    }
+
     // Meeting scheduled but director hasn't prepped yet — show informational card
     const scheduledSession = sessions?.find(s => s.status === 'scheduled');
     if (scheduledSession) {

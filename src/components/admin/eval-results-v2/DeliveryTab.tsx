@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useEvalDeliveryProgress, type LocationProgress, type StaffDeliveryStatus } from '@/hooks/useEvalDeliveryProgress';
 import { EvalPeriodSelector } from './EvalPeriodSelector';
@@ -320,14 +321,32 @@ interface StaffRowProps {
 }
 
 function StaffRow({ staff, isPending, onRelease }: StaffRowProps) {
+  const navigate = useNavigate();
   const showRelease = staff.status === 'not_released';
   const showHide = ['released', 'viewed', 'reviewed', 'focus_set'].includes(staff.status);
+  const hasEval = !!staff.evalId && staff.status !== 'no_eval';
+
+  const handleNameClick = () => {
+    if (hasEval && staff.evalId) {
+      const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+      navigate(`/evaluation/${staff.evalId}?returnTo=${returnTo}`);
+    }
+  };
 
   return (
     <div className="grid grid-cols-[minmax(280px,1fr)_160px_120px] items-center gap-3 pl-10 py-1.5 px-4">
       {/* Left: name + role */}
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-sm truncate">{staff.staffName}</span>
+        {hasEval ? (
+          <button
+            onClick={handleNameClick}
+            className="text-sm truncate text-primary hover:underline text-left"
+          >
+            {staff.staffName}
+          </button>
+        ) : (
+          <span className="text-sm truncate">{staff.staffName}</span>
+        )}
         {staff.roleName && <span className="text-xs text-muted-foreground shrink-0">{staff.roleName}</span>}
       </div>
 

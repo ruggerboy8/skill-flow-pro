@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -151,6 +151,8 @@ function PerspectiveCard({
 export default function EvaluationViewer() {
   const { evalId } = useParams<{ evalId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
   const { user, isCoach, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
@@ -261,7 +263,7 @@ export default function EvaluationViewer() {
           <Button 
             variant="outline" 
             className="mt-4"
-            onClick={() => navigate(-1)}
+            onClick={() => returnTo ? navigate(returnTo) : navigate(-1)}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -316,7 +318,7 @@ export default function EvaluationViewer() {
         <Button 
           variant="outline" 
           size="sm"
-          onClick={() => navigate(-1)}
+          onClick={() => returnTo ? navigate(returnTo) : navigate(-1)}
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back

@@ -1,57 +1,49 @@
 
 
-## "My Team" Tab for Doctors
+## Doctor Onboarding Flow Adjustments
 
-A new navigation tab that gives doctors visibility into what their staff is focused on each week and lets them explore role expectations for DFIs, RDAs, and Office Managers.
+### Overview
+Two changes: (1) Replace the auto-baseline prompt on the Doctor Home page with a friendly welcome message that encourages exploration, and (2) add a learning materials drawer to each pro move card in the "My Team" tab.
 
-### What the Doctor Will See
+---
 
-**New "My Team" tab in the doctor sidebar navigation** (between "My Role" and "Coaching History")
+### 1. Doctor Home -- Welcome Message (no baseline auto-prompt)
 
-The tab has a sub-tabbed interface with two sections:
+**File: `src/pages/doctor/DoctorHome.tsx`**
 
-**1. "This Week" sub-tab (default)**
-- Shows the current week's Pro Moves assigned to staff at the doctor's location
-- Three collapsible sections: DFI, RDA, Office Manager (role_id 1, 2, 3)
-- Each section lists the locked weekly assignments for that role, showing the Pro Move statement with domain color spine (reusing the same visual pattern from `ThisWeekPanel`)
-- Read-only -- no CTA buttons, no scores, no confidence/performance deltas
-- Shows "Week of [date]" header
-- If no assignments exist for a role, shows a subtle "No assignments this week" message
+Currently, when no baseline exists or it hasn't been started, the Home page shows a "Complete Your Baseline" / "Start Baseline Assessment" card linking to `/doctor/baseline`. This will be replaced with a welcoming card:
 
-**2. "Role Guides" sub-tab**
-- Three cards/buttons: "DFI", "RDA", "Office Manager"
-- Tapping a role opens a read-only version of the RoleRadar/domain overview for that role
-- From there, the doctor can drill into domain detail pages to see competencies and pro moves
-- This reuses the existing `RoleRadar` component logic but parameterized by role_id instead of reading from the doctor's own staff profile
+- Title: "Welcome, [Name]"
+- Body: Friendly message explaining that their baseline self-assessment will be initiated by their clinical director when the time comes. In the meantime, they're encouraged to explore "My Role" (to see Doctor Pro Moves) and "My Team" (to see their team's weekly Pro Moves).
+- Include navigation links/buttons to `/doctor/my-role` and `/doctor/my-team`.
+- Remove the "in_progress" auto-resume card as well -- the baseline should only be accessible once the clinical director initiates it (or we can keep the resume card if they've already started; depends on your preference, but the default fallback will no longer push them to start).
+
+The existing cards for active coaching sessions (prep, meetings, etc.) remain unchanged.
+
+### 2. Learning Materials Drawer in "My Team" Tab
+
+**File: `src/components/doctor/TeamWeeklyFocus.tsx`**
+
+Each `AssignmentCard` currently shows the pro move name and domain color strip. We will:
+
+- Add a `GraduationCap` icon button on the right side of each card.
+- Clicking it opens the `LearnerLearnDrawer` (from `src/components/learner/LearnerLearnDrawer.tsx`), which is the standard learning materials sheet used by staff. It fetches description, video, script, audio, and links for the given `action_id`.
+- Track the currently-open `action_id` via state in the parent `TeamWeeklyFocus` component and pass it down.
+- The drawer will show in read-only "Study Mode" without the "Your History" stats section (since doctors won't have personal practice history for staff pro moves). We'll pass placeholder values for `lastPracticed` and `avgConfidence` (null) so that section shows "Not yet" / "-".
+
+---
 
 ### Technical Details
 
-**New files:**
-- `src/pages/doctor/DoctorMyTeam.tsx` -- Main page with "This Week" / "Role Guides" sub-tabs
-- `src/components/doctor/TeamWeeklyFocus.tsx` -- Fetches and displays weekly assignments for all 3 roles at the doctor's location (uses `useWeeklyAssignments` hook for each role_id)
-- `src/components/doctor/TeamRoleExplorer.tsx` -- Shows 3 role cards; clicking one navigates to a read-only domain overview
-- `src/pages/doctor/DoctorTeamRoleDetail.tsx` -- Read-only role overview page (reuses domain data fetching from `useDomainDetail` but for a specified role_id, no scores)
-- `src/pages/doctor/DoctorTeamDomainDetail.tsx` -- Read-only domain detail page showing competencies and pro moves for the selected role
+**DoctorHome.tsx changes:**
+- Replace the bottom two return blocks in `renderPrimaryCTA()` (the "no baseline" and "in_progress" cases, lines ~222-260) with a single welcoming card containing:
+  - Warm greeting text
+  - Two `Link` buttons to `/doctor/my-role` and `/doctor/my-team`
+- Keep all coaching-session CTAs (prep, meeting, confirmed, etc.) as-is
 
-**Modified files:**
-- `src/components/Layout.tsx` -- Add "My Team" nav item for doctors (icon: `Users`)
-- `src/App.tsx` -- Register routes: `/doctor/my-team`, `/doctor/my-team/role/:roleSlug`, `/doctor/my-team/role/:roleSlug/domain/:domainSlug`
+**TeamWeeklyFocus.tsx changes:**
+- Import `LearnerLearnDrawer` and `GraduationCap` icon
+- Add `useState` for `openDrawer: { actionId: number; statement: string; domain: string } | null`
+- In `AssignmentCard`, add a clickable `GraduationCap` icon
+- Render `LearnerLearnDrawer` once at the `TeamWeeklyFocus` level, controlled by the state
 
-**Data flow for "This Week":**
-- Get doctor's `primary_location_id` from `useStaffProfile`
-- For each role (DFI=1, RDA=2, OM=3), call `useWeeklyAssignments({ roleId })` to get the current week's locked global assignments
-- Display in read-only spine cards grouped by role
-
-**Data flow for "Role Guides":**
-- Reuse `ROLE_CONTENT` from `roleDefinitions.ts` for descriptions
-- Fetch competencies and pro moves from `competencies` and `pro_moves` tables filtered by role_id
-- No scores or evaluation data shown -- purely structural/educational content
-
-**Route structure:**
-```text
-/doctor/my-team                              -- Main page (This Week + Role Guides tabs)
-/doctor/my-team/role/dfi                     -- DFI domain overview (read-only RoleRadar)
-/doctor/my-team/role/rda                     -- RDA domain overview
-/doctor/my-team/role/om                      -- OM domain overview
-/doctor/my-team/role/:roleSlug/domain/:domainSlug  -- Domain detail (competencies + pro moves)
-```

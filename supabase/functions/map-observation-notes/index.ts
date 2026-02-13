@@ -55,6 +55,8 @@ The evaluator recorded verbal feedback while scrolling through competencies. You
    - Sound like a supportive manager talking to their team member -- friendly, direct, and encouraging
    - Avoid stiff or corporate language. Write the way a good coach actually talks.
    - Fix grammar, remove filler words, false starts, and rambling
+   - Expand shorthand and abbreviations into clear, complete thoughts. If a coach says something brief like "good pt comm" or "needs work on handoffs", flesh it out into a full, natural-sounding coaching sentence while staying true to their intent.
+   - If the coach's observation is terse or clipped, add just enough context so the note reads well on its own -- but don't pad or over-explain.
    - Keep each note to 2-4 concise sentences
    - Preserve specific examples and observations from the transcript
    - Do NOT fabricate information not present in the transcript

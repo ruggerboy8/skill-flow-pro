@@ -219,42 +219,38 @@ export default function DoctorHome() {
       );
     }
 
-    if (baseline?.status === 'in_progress') {
-      return (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <ClipboardCheck className="h-8 w-8 text-primary" />
-              <div>
-                <CardTitle>Continue Your Baseline</CardTitle>
-                <CardDescription>You have an assessment in progress.</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Link to="/doctor/baseline">
-              <Button className="w-full">Continue Assessment</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      );
-    }
-
+    // Default: friendly welcome — baseline will be initiated by clinical director
     return (
-      <Card>
+      <Card className="border-primary/20 bg-primary/5">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <ClipboardCheck className="h-8 w-8 text-primary" />
+            <Sparkles className="h-8 w-8 text-primary" />
             <div>
-              <CardTitle>Complete Your Baseline</CardTitle>
-              <CardDescription>Start your self-assessment to begin your development journey.</CardDescription>
+              <CardTitle>Welcome to Your Portal</CardTitle>
+              <CardDescription>
+                Your clinical director will let you know when it's time to complete your baseline self-assessment.
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Link to="/doctor/baseline">
-            <Button className="w-full">Start Baseline Assessment</Button>
-          </Link>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            In the meantime, feel free to explore:
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Link to="/doctor/my-role" className="flex-1">
+              <Button variant="outline" className="w-full gap-2">
+                <Target className="h-4 w-4" />
+                My Role
+              </Button>
+            </Link>
+            <Link to="/doctor/my-team" className="flex-1">
+              <Button variant="outline" className="w-full gap-2">
+                <ClipboardCheck className="h-4 w-4" />
+                My Team
+              </Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
     );

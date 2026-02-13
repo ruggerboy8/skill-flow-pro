@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 
 const ROLES = [
   { id: 1, label: 'DFI' },
@@ -113,7 +114,7 @@ function useAllRoleAssignments() {
   });
 }
 
-function RoleSection({ roleId, label, assignments, isLoading }: { roleId: number; label: string; assignments: SimpleAssignment[]; isLoading: boolean }) {
+function RoleSection({ roleId, label, assignments, isLoading, onOpenDrawer }: { roleId: number; label: string; assignments: SimpleAssignment[]; isLoading: boolean; onOpenDrawer: (a: SimpleAssignment) => void }) {
   const [open, setOpen] = useState(true);
 
   if (isLoading) {
@@ -137,14 +138,14 @@ function RoleSection({ roleId, label, assignments, isLoading }: { roleId: number
         {assignments.length === 0 ? (
           <p className="text-sm text-muted-foreground italic pl-6">No assignments this week</p>
         ) : (
-          assignments.map((a) => <AssignmentCard key={a.id} assignment={a} />)
+          assignments.map((a) => <AssignmentCard key={a.id} assignment={a} onOpenDrawer={() => onOpenDrawer(a)} />)
         )}
       </CollapsibleContent>
     </Collapsible>
   );
 }
 
-function AssignmentCard({ assignment }: { assignment: SimpleAssignment }) {
+function AssignmentCard({ assignment, onOpenDrawer }: { assignment: SimpleAssignment; onOpenDrawer: () => void }) {
   const domainName = assignment.domain_name;
   const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
   const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
@@ -162,10 +163,17 @@ function AssignmentCard({ assignment }: { assignment: SimpleAssignment }) {
           {domainName}
         </span>
       </div>
-      <div className="flex-1 p-3">
+      <div className="flex-1 p-3 flex items-center justify-between gap-2">
         <p className="text-sm font-medium leading-relaxed text-foreground/90">
           {assignment.action_statement || 'Untitled Pro Move'}
         </p>
+        <button
+          onClick={onOpenDrawer}
+          className="shrink-0 p-1.5 rounded-md hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+          aria-label="View learning materials"
+        >
+          <GraduationCap className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
@@ -173,6 +181,7 @@ function AssignmentCard({ assignment }: { assignment: SimpleAssignment }) {
 
 export default function TeamWeeklyFocus() {
   const { data: assignmentsByRole, isLoading } = useAllRoleAssignments();
+  const [drawerItem, setDrawerItem] = useState<SimpleAssignment | null>(null);
 
   return (
     <div className="space-y-2 mt-4">
@@ -184,8 +193,21 @@ export default function TeamWeeklyFocus() {
           label={r.label}
           assignments={assignmentsByRole?.[r.id] || []}
           isLoading={isLoading}
+          onOpenDrawer={setDrawerItem}
         />
       ))}
+
+      {drawerItem && (
+        <LearnerLearnDrawer
+          open={!!drawerItem}
+          onOpenChange={(open) => { if (!open) setDrawerItem(null); }}
+          actionId={drawerItem.action_id}
+          proMoveTitle={drawerItem.action_statement}
+          domainName={drawerItem.domain_name}
+          lastPracticed={null}
+          avgConfidence={null}
+        />
+      )}
     </div>
   );
 }

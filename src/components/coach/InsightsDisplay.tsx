@@ -1,4 +1,5 @@
 import React from 'react';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { User, AlertCircle, FileText } from 'lucide-react';
@@ -32,7 +33,7 @@ function PerspectiveCard({
       {perspective.summary_html && (
         <div 
           className="prose prose-sm max-w-none text-sm"
-          dangerouslySetInnerHTML={{ __html: perspective.summary_html }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(perspective.summary_html) }}
         />
       )}
       
@@ -125,7 +126,7 @@ export function InsightsDisplay({ summaryFeedback, extractedInsights }: Insights
           <CardContent>
             <div 
               className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: summaryFeedback }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(summaryFeedback || '') }}
             />
           </CardContent>
         </Card>

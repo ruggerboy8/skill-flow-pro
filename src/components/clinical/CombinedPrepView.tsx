@@ -1,6 +1,7 @@
 import { Separator } from '@/components/ui/separator';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Link as LinkIcon } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface Selection {
   action_id: number;
@@ -52,7 +53,7 @@ export function CombinedPrepView({ session, selections, coachName = 'Alex', doct
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Your Agenda</h4>
           <div
             className="text-sm bg-muted/30 rounded-lg p-4 prose prose-sm max-w-none dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: session.coach_note }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(session.coach_note) }}
           />
         </section>
       )}

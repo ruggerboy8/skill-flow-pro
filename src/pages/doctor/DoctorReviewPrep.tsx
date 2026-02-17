@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { ArrowLeft, Send, Calendar, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import DOMPurify from 'dompurify';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -316,7 +317,7 @@ export default function DoctorReviewPrep() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Agenda Notes</p>
               <div
                 className="text-sm bg-muted/30 rounded-md p-3 prose prose-sm max-w-none dark:prose-invert"
-                dangerouslySetInnerHTML={{ __html: session.coach_note }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(session.coach_note) }}
               />
             </div>
           )}

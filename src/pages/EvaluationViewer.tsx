@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -77,7 +78,7 @@ function PerspectiveCard({
       {perspective.summary_html && (
         <div 
           className="prose prose-sm max-w-none text-sm"
-          dangerouslySetInnerHTML={{ __html: perspective.summary_html }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(perspective.summary_html) }}
         />
       )}
       
@@ -488,7 +489,7 @@ export default function EvaluationViewer() {
                   <CardContent>
                     <div 
                       className="prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: (evaluation as any).summary_feedback }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize((evaluation as any).summary_feedback || '') }}
                     />
                   </CardContent>
                 </Card>

@@ -1,6 +1,6 @@
 import { addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
-import { getSubmissionPolicy } from '@/lib/submissionPolicy';
+import { getSubmissionPolicy, type PolicyOffsets } from '@/lib/submissionPolicy';
 
 export const CT_TZ = 'America/Chicago';
 
@@ -12,9 +12,10 @@ export function nowUtc(): Date {
 /**
  * Enhanced anchors with all time windows for current week.
  * Delegates to the canonical submissionPolicy module.
+ * Optional offsets parameter for per-location deadline overrides.
  */
-export function getWeekAnchors(now: Date = nowUtc(), tz: string = CT_TZ) {
-  const policy = getSubmissionPolicy(now, tz);
+export function getWeekAnchors(now: Date = nowUtc(), tz: string = CT_TZ, offsets?: PolicyOffsets) {
+  const policy = getSubmissionPolicy(now, tz, offsets);
 
   return {
     // Canonical policy values

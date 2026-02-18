@@ -1,8 +1,8 @@
-import { getSubmissionPolicy } from '@/lib/submissionPolicy';
+import { getSubmissionPolicy, type PolicyOffsets } from '@/lib/submissionPolicy';
 
 export interface V2Anchors {
   mondayZ: Date;
-  checkin_open: Date;            // Mon 00:00 local tz
+  checkin_open: Date;            // Mon 00:01 local tz
   checkin_due: Date;             // Tue 14:00 local tz
   checkout_open: Date;           // Thu 00:01 local tz
   checkout_due: Date;            // Fri 17:00 local tz
@@ -11,9 +11,10 @@ export interface V2Anchors {
 
 /**
  * Delegates to the canonical submissionPolicy module.
+ * Optional offsets parameter for per-location deadline overrides.
  */
-export function getWeekAnchors(now: Date, tz: string): V2Anchors {
-  const policy = getSubmissionPolicy(now, tz);
+export function getWeekAnchors(now: Date, tz: string, offsets?: PolicyOffsets): V2Anchors {
+  const policy = getSubmissionPolicy(now, tz, offsets);
   return {
     mondayZ: policy.mondayZ,
     checkin_open: policy.checkin_open,

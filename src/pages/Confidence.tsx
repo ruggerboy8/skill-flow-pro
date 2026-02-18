@@ -11,7 +11,7 @@ import { useWeeklyAssignments } from '@/hooks/useWeeklyAssignments';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, nextMondayStr } from '@/lib/centralTime';
-import { getSubmissionPolicy } from '@/lib/submissionPolicy';
+import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getDomainColor } from '@/lib/domainColors';
 
@@ -39,7 +39,9 @@ export default function Confidence() {
   const loading = staffLoading || assignmentsLoading;
 
 const now = nowUtc();
-const policy = getSubmissionPolicy(now, 'America/Chicago');
+const staffTz = staff?.locations?.timezone || 'America/Chicago';
+const staffOffsets = staff?.locations ? getPolicyOffsetsForLocation(staff.locations) : undefined;
+const policy = getSubmissionPolicy(now, staffTz, staffOffsets);
 const beforeCheckIn = !policy.isConfidenceVisible(now);
 const afterTueNoon = policy.isConfidenceLate(now);
 const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.length;
@@ -53,7 +55,7 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
   // Route guards with toasts for deep-links
   useEffect(() => {
     if (!loading && weeklyFocus.length > 0 && beforeCheckIn) {
-      toast({ title: 'Confidence opens at 9:00 a.m. CT.' });
+      toast({ title: 'Confidence opens at 6:00 AM.' });
       navigate('/');
     }
   }, [loading, weeklyFocus, beforeCheckIn, navigate]);
@@ -160,7 +162,7 @@ setSubmitting(true);
     // Hard guard: block late submissions after confidence deadline
     {
       const now = nowUtc();
-      const submitPolicy = getSubmissionPolicy(now, 'America/Chicago');
+      const submitPolicy = getSubmissionPolicy(now, staffTz, staffOffsets);
       if (submitPolicy.isConfidenceLate(now) && !hasConfidence) {
         toast({
           title: "Confidence window closed",
@@ -251,9 +253,9 @@ setSubmitting(true);
           <>
             <Card>
               <CardHeader>
-                <CardTitle className="text-center">Opens at 9:00 a.m. CT</CardTitle>
+                <CardTitle className="text-center">Opens at 6:00 AM</CardTitle>
                 <CardDescription className="text-center">
-                  Confidence ratings open Monday at 9:00 a.m. Central Time.
+                  Confidence ratings open Monday at 6:00 AM.
                 </CardDescription>
               </CardHeader>
             </Card>

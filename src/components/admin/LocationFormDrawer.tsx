@@ -21,7 +21,21 @@ interface Location {
   program_start_date: string;
   cycle_length_weeks: number;
   onboarding_active?: boolean;
+  conf_due_day?: number | null;
+  conf_due_time?: string | null;
+  perf_due_day?: number | null;
+  perf_due_time?: string | null;
 }
+
+const DAY_OPTIONS = [
+  { value: 0, label: 'Monday' },
+  { value: 1, label: 'Tuesday' },
+  { value: 2, label: 'Wednesday' },
+  { value: 3, label: 'Thursday' },
+  { value: 4, label: 'Friday' },
+  { value: 5, label: 'Saturday' },
+  { value: 6, label: 'Sunday' },
+];
 
 interface Organization {
   id: string;
@@ -56,6 +70,10 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
     program_start_date: new Date(),
     cycle_length_weeks: 6,
     skipOnboarding: false,
+    conf_due_day: 1,
+    conf_due_time: "14:00",
+    perf_due_day: 4,
+    perf_due_time: "17:00",
   });
 
   const isEditing = !!location?.id;
@@ -74,6 +92,10 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         program_start_date: dateObj,
         cycle_length_weeks: location.cycle_length_weeks,
         skipOnboarding: location.onboarding_active === false,
+        conf_due_day: location.conf_due_day ?? 1,
+        conf_due_time: (location.conf_due_time ?? "14:00:00").slice(0, 5),
+        perf_due_day: location.perf_due_day ?? 4,
+        perf_due_time: (location.perf_due_time ?? "17:00:00").slice(0, 5),
       });
     } else if (open) {
       setFormData({
@@ -83,6 +105,10 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         program_start_date: new Date(),
         cycle_length_weeks: 6,
         skipOnboarding: false,
+        conf_due_day: 1,
+        conf_due_time: "14:00",
+        perf_due_day: 4,
+        perf_due_time: "17:00",
       });
     }
   }, [location, open]);
@@ -115,6 +141,10 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         cycle_length_weeks: formData.cycle_length_weeks,
         active: true,
         onboarding_active: !formData.skipOnboarding,
+        conf_due_day: formData.conf_due_day,
+        conf_due_time: formData.conf_due_time + ":00",
+        perf_due_day: formData.perf_due_day,
+        perf_due_time: formData.perf_due_time + ":00",
       };
 
       let error;
@@ -256,6 +286,61 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
             <p className="text-sm text-muted-foreground">
               Number of weeks in each program cycle (typically 6)
             </p>
+          </div>
+
+          <div className="space-y-3 border-t pt-4">
+            <Label className="text-sm font-semibold">Submission Deadlines</Label>
+            <p className="text-xs text-muted-foreground">Submissions after this time are flagged as late</p>
+            
+            <div className="space-y-2">
+              <Label className="text-xs">Confidence due</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={formData.conf_due_day.toString()}
+                  onValueChange={(v) => setFormData({ ...formData, conf_due_day: parseInt(v) })}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DAY_OPTIONS.map(d => (
+                      <SelectItem key={d.value} value={d.value.toString()}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="time"
+                  value={formData.conf_due_time}
+                  onChange={(e) => setFormData({ ...formData, conf_due_time: e.target.value })}
+                  className="w-32"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Performance due</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={formData.perf_due_day.toString()}
+                  onValueChange={(v) => setFormData({ ...formData, perf_due_day: parseInt(v) })}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DAY_OPTIONS.map(d => (
+                      <SelectItem key={d.value} value={d.value.toString()}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="time"
+                  value={formData.perf_due_time}
+                  onChange={(e) => setFormData({ ...formData, perf_due_time: e.target.value })}
+                  className="w-32"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3 pt-2">

@@ -1,4 +1,5 @@
 import { getWeekAnchors } from '@/v2/time';
+import { getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { supabase } from '@/integrations/supabase/client';
 import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 import { format } from 'date-fns';
@@ -46,12 +47,13 @@ export async function getLocationWeekContext(locationId: string, now: Date = new
   const programStartDate = new Date(location.program_start_date);
   const cycleLength = location.cycle_length_weeks;
   
-  // Get time anchors for this location's timezone to find Monday of current week
-  const anchors = getWeekAnchors(now, location.timezone);
+  // Get time anchors for this location's timezone with per-location deadline offsets
+  const offsets = getPolicyOffsetsForLocation(location);
+  const anchors = getWeekAnchors(now, location.timezone, offsets);
   const currentMonday = new Date(anchors.mondayZ);
   
   // Get the Monday of the week containing program start date
-  const programStartAnchors = getWeekAnchors(programStartDate, location.timezone);
+  const programStartAnchors = getWeekAnchors(programStartDate, location.timezone, offsets);
   const programStartMonday = new Date(programStartAnchors.mondayZ);
   
   // Calculate week index from program start Monday
@@ -114,7 +116,7 @@ export async function assembleWeek(params: {
   // Fetch location timezone
   const { data: locationData } = await supabase
     .from('locations')
-    .select('timezone, organization_id')
+    .select('timezone, organization_id, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
     .eq('id', locationId)
     .maybeSingle();
 
@@ -123,8 +125,8 @@ export async function assembleWeek(params: {
   const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
     ? new Date(params.simOverrides.nowISO) 
     : new Date();
-  
-  const anchors = getWeekAnchors(now, locationData.timezone);
+  const offsets2 = getPolicyOffsetsForLocation(locationData);
+  const anchors = getWeekAnchors(now, locationData.timezone, offsets2);
   const mondayStr = formatInTimeZone(anchors.mondayZ, locationData.timezone, 'yyyy-MM-dd');
 
   console.info(`[assembleWeek] Using weekly_assignments for role=${roleId} week=${mondayStr}`);

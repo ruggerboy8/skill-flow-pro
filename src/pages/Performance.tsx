@@ -11,7 +11,7 @@ import { useWeeklyAssignments } from '@/hooks/useWeeklyAssignments';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc } from '@/lib/centralTime';
-import { getSubmissionPolicy } from '@/lib/submissionPolicy';
+import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 
 interface WeeklyScore {
   id: string;
@@ -46,9 +46,11 @@ export default function Performance() {
 
   const loading = staffLoading || assignmentsLoading;
 
-// Central Time gating for Performance (opens Thu 00:01 CT; allowed anytime for past weeks)
+// Gating for Performance using staff's location timezone
   const now = nowUtc();
-  const policy = getSubmissionPolicy(now, 'America/Chicago');
+  const staffTz = staff?.locations?.timezone || 'America/Chicago';
+  const staffOffsets = staff?.locations ? getPolicyOffsetsForLocation(staff.locations) : undefined;
+  const policy = getSubmissionPolicy(now, staffTz, staffOffsets);
   let beforeThursday = !policy.isPerformanceOpen(now);
   const beforeThursdayEffective = beforeThursday && !isCarryoverWeek;
 

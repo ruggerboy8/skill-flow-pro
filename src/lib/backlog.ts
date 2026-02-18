@@ -150,8 +150,10 @@ export async function saveUserSelection(
 }
 
 // Check if selections are allowed based on time locks
-export function areSelectionsLocked(): boolean {
+// Note: This uses system defaults since it's a quick check.
+// For per-location accuracy, callers should use location-specific offsets.
+export function areSelectionsLocked(tz: string = 'America/Chicago'): boolean {
   const now = nowUtc();
-  const policy = getSubmissionPolicy(now, 'America/Chicago');
+  const policy = getSubmissionPolicy(now, tz);
   return policy.isConfidenceLate(now); // Locked after confidence deadline
 }

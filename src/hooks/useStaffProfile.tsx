@@ -30,6 +30,11 @@ export interface StaffProfile {
     organization_id: string;
     program_start_date: string;
     cycle_length_weeks: number;
+    timezone?: string;
+    conf_due_day?: number;
+    conf_due_time?: string;
+    perf_due_day?: number;
+    perf_due_time?: string;
   } | null;
   coach_scopes: {
     scope_type: 'org' | 'location';
@@ -82,7 +87,12 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           locations (
             organization_id,
             program_start_date,
-            cycle_length_weeks
+            cycle_length_weeks,
+            timezone,
+            conf_due_day,
+            conf_due_time,
+            perf_due_day,
+            perf_due_time
           ),
           coach_scopes (
             scope_type,

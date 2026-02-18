@@ -33,13 +33,41 @@ export interface PolicyOffsets {
 }
 
 export const DEFAULT_POLICY_OFFSETS: PolicyOffsets = {
-  checkin_open:    { dayOffset: 0, time: '00:00:00' },  // Mon 00:00
-  checkin_visible: { dayOffset: 0, time: '09:00:00' },  // Mon 09:00
+  checkin_open:    { dayOffset: 0, time: '00:01:00' },  // Mon 00:01
+  checkin_visible: { dayOffset: 0, time: '06:00:00' },  // Mon 06:00
   confidence_due:  { dayOffset: 1, time: '14:00:00' },  // Tue 14:00
   checkout_open:   { dayOffset: 3, time: '00:01:00' },  // Thu 00:01
   performance_due: { dayOffset: 4, time: '17:00:00' },  // Fri 17:00
   week_end:        { dayOffset: 6, time: '23:59:59' },  // Sun 23:59:59
 };
+
+// ---------------------------------------------------------------------------
+// Per-location offset builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a PolicyOffsets from location-specific deadline columns.
+ * Only confidence_due and performance_due are overridable per location.
+ * All other thresholds remain system defaults.
+ */
+export function getPolicyOffsetsForLocation(location: {
+  conf_due_day?: number | null;
+  conf_due_time?: string | null;
+  perf_due_day?: number | null;
+  perf_due_time?: string | null;
+}): PolicyOffsets {
+  return {
+    ...DEFAULT_POLICY_OFFSETS,
+    confidence_due: {
+      dayOffset: location.conf_due_day ?? DEFAULT_POLICY_OFFSETS.confidence_due.dayOffset,
+      time: location.conf_due_time ?? DEFAULT_POLICY_OFFSETS.confidence_due.time,
+    },
+    performance_due: {
+      dayOffset: location.perf_due_day ?? DEFAULT_POLICY_OFFSETS.performance_due.dayOffset,
+      time: location.perf_due_time ?? DEFAULT_POLICY_OFFSETS.performance_due.time,
+    },
+  };
+}
 
 // SQL-aligned intervals (for documentation / migration alignment)
 export const SQL_CONF_DUE_INTERVAL = '1 day 14 hours';

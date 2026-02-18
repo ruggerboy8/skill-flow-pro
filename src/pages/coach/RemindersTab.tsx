@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { formatInTimeZone } from 'date-fns-tz';
 import { addDays } from 'date-fns';
-import { getSubmissionPolicy } from '@/lib/submissionPolicy';
+import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 
 interface StaffMember {
   id: string;
@@ -33,10 +33,11 @@ function weekOfInTZ(now: Date, tz: string) {
   return formatInTimeZone(monday, tz, 'yyyy-MM-dd');
 }
 
-function deadlinesForWeek(weekOf: string, tz: string) {
+function deadlinesForWeek(weekOf: string, tz: string, loc?: { conf_due_day?: number | null; conf_due_time?: string | null; perf_due_day?: number | null; perf_due_time?: string | null }) {
   // Use canonical policy — weekOf is a Monday date string
   const mondayDate = new Date(`${weekOf}T12:00:00Z`); // rough date for policy resolution
-  const policy = getSubmissionPolicy(mondayDate, tz);
+  const offsets = loc ? getPolicyOffsetsForLocation(loc) : undefined;
+  const policy = getSubmissionPolicy(mondayDate, tz, offsets);
   return { checkinDueUtc: policy.confidence_due, checkoutOpenUtc: policy.checkout_open };
 }
 
@@ -143,7 +144,7 @@ export default function RemindersTab() {
         .from('staff')
         .select(`
           id, name, email, user_id, role_id, is_participant,
-          locations:primary_location_id(id, name, timezone, organization_id,
+          locations:primary_location_id(id, name, timezone, organization_id, conf_due_day, conf_due_time, perf_due_day, perf_due_time,
             organizations!locations_organization_id_fkey(id, name)
           ),
           roles:role_id(role_name)
@@ -169,6 +170,12 @@ export default function RemindersTab() {
           role_name: s.roles?.role_name || 'Unknown',
           location_name: s.locations?.name || 'Unknown',
           org_name: s.locations?.organizations?.name || 'Unknown',
+          loc: {
+            conf_due_day: s.locations?.conf_due_day,
+            conf_due_time: s.locations?.conf_due_time,
+            perf_due_day: s.locations?.perf_due_day,
+            perf_due_time: s.locations?.perf_due_time,
+          },
         };
       });
 
@@ -206,7 +213,7 @@ export default function RemindersTab() {
       for (const m of meta) {
         const k = m.id + '|' + m.week_of;
         const a = byKey.get(k)!;
-        const { checkinDueUtc, checkoutOpenUtc } = deadlinesForWeek(m.week_of, m.tz);
+        const { checkinDueUtc, checkoutOpenUtc } = deadlinesForWeek(m.week_of, m.tz, m.loc);
 
         const debugInfo = {
           name: m.name,

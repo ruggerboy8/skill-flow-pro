@@ -1044,36 +1044,48 @@ export type Database = {
       locations: {
         Row: {
           active: boolean | null
+          conf_due_day: number
+          conf_due_time: string
           created_at: string
           cycle_length_weeks: number
           id: string
           name: string
           onboarding_active: boolean | null
           organization_id: string
+          perf_due_day: number
+          perf_due_time: string
           program_start_date: string
           slug: string
           timezone: string
         }
         Insert: {
           active?: boolean | null
+          conf_due_day?: number
+          conf_due_time?: string
           created_at?: string
           cycle_length_weeks?: number
           id?: string
           name: string
           onboarding_active?: boolean | null
           organization_id: string
+          perf_due_day?: number
+          perf_due_time?: string
           program_start_date: string
           slug: string
           timezone?: string
         }
         Update: {
           active?: boolean | null
+          conf_due_day?: number
+          conf_due_time?: string
           created_at?: string
           cycle_length_weeks?: number
           id?: string
           name?: string
           onboarding_active?: boolean | null
           organization_id?: string
+          perf_due_day?: number
+          perf_due_time?: string
           program_start_date?: string
           slug?: string
           timezone?: string

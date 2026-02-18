@@ -10,7 +10,8 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useWeeklyAssignments } from '@/hooks/useWeeklyAssignments';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { nowUtc, getAnchors } from '@/lib/centralTime';
+import { nowUtc } from '@/lib/centralTime';
+import { getSubmissionPolicy } from '@/lib/submissionPolicy';
 
 interface WeeklyScore {
   id: string;
@@ -45,10 +46,10 @@ export default function Performance() {
 
   const loading = staffLoading || assignmentsLoading;
 
-// Central Time gating for Performance (opens Thu 00:00 CT; allowed anytime for past weeks)
+// Central Time gating for Performance (opens Thu 00:01 CT; allowed anytime for past weeks)
   const now = nowUtc();
-  const { thuStartZ, mondayZ } = getAnchors(now);
-  let beforeThursday = now < thuStartZ;
+  const policy = getSubmissionPolicy(now, 'America/Chicago');
+  let beforeThursday = !policy.isPerformanceOpen(now);
   const beforeThursdayEffective = beforeThursday && !isCarryoverWeek;
 
   useEffect(() => {

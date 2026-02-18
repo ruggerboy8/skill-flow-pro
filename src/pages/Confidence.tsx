@@ -10,7 +10,8 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useWeeklyAssignments } from '@/hooks/useWeeklyAssignments';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
+import { nowUtc, nextMondayStr } from '@/lib/centralTime';
+import { getSubmissionPolicy } from '@/lib/submissionPolicy';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getDomainColor } from '@/lib/domainColors';
 
@@ -38,9 +39,9 @@ export default function Confidence() {
   const loading = staffLoading || assignmentsLoading;
 
 const now = nowUtc();
-const { monCheckInZ, tueDueZ } = getAnchors(now);
-const beforeCheckIn = now < monCheckInZ;
-const afterTueNoon = now >= tueDueZ;
+const policy = getSubmissionPolicy(now, 'America/Chicago');
+const beforeCheckIn = !policy.isConfidenceVisible(now);
+const afterTueNoon = policy.isConfidenceLate(now);
 const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.length;
 
   useEffect(() => {
@@ -156,14 +157,14 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
 
 setSubmitting(true);
 
-    // Hard guard: block late submissions after Tue 12:00 CT
+    // Hard guard: block late submissions after confidence deadline
     {
       const now = nowUtc();
-      const { tueDueZ } = getAnchors(now);
-      if (now >= tueDueZ && !hasConfidence) {
+      const submitPolicy = getSubmissionPolicy(now, 'America/Chicago');
+      if (submitPolicy.isConfidenceLate(now) && !hasConfidence) {
         toast({
           title: "Confidence window closed",
-          description: `You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`
+          description: `You'll get a fresh start on Mon, ${nextMondayStr(now)}.`
         });
         setSubmitting(false);
         navigate('/');

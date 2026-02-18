@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mic, Play, Pause, RotateCcw, Sparkles, Check, FileText } from 'lucide-react';
+import { Loader2, Mic, Play, Pause, RotateCcw, Sparkles, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AudioRecordingState, AudioRecordingControls } from '@/hooks/useAudioRecording';
 
@@ -17,9 +17,6 @@ interface RecordingProcessCardProps {
   onDiscardRestored: () => void;
   onFinishAndTranscribe?: () => Promise<void>;
   onStartOver?: () => void;
-  // Transcription complete state
-  transcriptionComplete?: boolean;
-  onEditTranscript?: () => void;
 }
 
 export function RecordingProcessCard({
@@ -34,8 +31,6 @@ export function RecordingProcessCard({
   onDiscardRestored,
   onFinishAndTranscribe,
   onStartOver,
-  transcriptionComplete,
-  onEditTranscript,
 }: RecordingProcessCardProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingRestored, setIsPlayingRestored] = useState(false);
@@ -85,7 +80,7 @@ export function RecordingProcessCard({
   const isPausedWithRecording = recordingState.isRecording && recordingState.isPaused;
   const hasCurrentRecording = !!recordingState.audioBlob && !recordingState.isRecording;
   const hasRestoredRecording = !!restoredAudioUrl && !hasCurrentRecording && !recordingState.isRecording;
-  const showCard = isPausedWithRecording || hasCurrentRecording || hasRestoredRecording || isLoadingDraft || isTranscribing || transcriptionComplete;
+  const showCard = isPausedWithRecording || hasCurrentRecording || hasRestoredRecording || isLoadingDraft || isTranscribing;
 
   if (!showCard) {
     return null;
@@ -96,7 +91,7 @@ export function RecordingProcessCard({
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />
-          {transcriptionComplete ? 'Transcription Complete' : 'Process Recording'}
+          Process Recording
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -111,29 +106,6 @@ export function RecordingProcessCard({
             <div>
               <p className="font-medium text-sm">{processingStep}</p>
               <p className="text-xs text-muted-foreground">This may take a moment...</p>
-            </div>
-          </div>
-        ) : transcriptionComplete ? (
-          <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center shrink-0">
-                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div className="flex-1">
-                 <p className="font-medium text-green-800 dark:text-green-200">
-                  Your observation has been transcribed
-                </p>
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  Your recording has been processed and mapped to competency notes below.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2 pt-1">
-              <Button variant="outline" size="sm" onClick={onEditTranscript} className="gap-1.5">
-                <FileText className="w-4 h-4" />
-                Review Transcript
-              </Button>
             </div>
           </div>
         ) : isPausedWithRecording ? (

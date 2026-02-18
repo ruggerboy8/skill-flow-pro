@@ -121,7 +121,6 @@ export function EvaluationHub() {
   const [processingStep, setProcessingStep] = useState<string>('');
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [showFloatingPill, setShowFloatingPill] = useState(false);
-  const [transcriptionJustCompleted, setTranscriptionJustCompleted] = useState(false);
   const [isMappingToNotes, setIsMappingToNotes] = useState(false);
   const [mappingJustCompleted, setMappingJustCompleted] = useState(false);
   const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(null);
@@ -359,9 +358,8 @@ export function EvaluationHub() {
     return item?.competency_name_snapshot || undefined;
   }, [activeCompetencyId, evaluation]);
 
-  // Handler for Edit Transcript button
-  const handleEditTranscript = useCallback(() => {
-    setTranscriptionJustCompleted(false);
+  // Handler for scrolling to transcript section
+  const handleScrollToTranscript = useCallback(() => {
     transcriptSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
@@ -519,14 +517,10 @@ export function EvaluationHub() {
         setRestoredAudioBlob(null);
       }
 
-      // Show transcription complete state and auto-expand transcript
-      setTranscriptionJustCompleted(true);
+      // Auto-expand transcript for reference
       setIsObservationTranscriptExpanded(true);
       
-      toast({
-        title: 'Transcription Complete',
-        description: 'Review the transcript, then click "Map to Notes" to populate competency notes.',
-      });
+      return transcript;
     } catch (error) {
       console.error('[EvaluationHub] Transcription error:', error);
       toast({
@@ -541,8 +535,9 @@ export function EvaluationHub() {
   };
 
   // Map transcript to per-competency notes via AI
-  const handleMapToNotes = async () => {
-    if (!evalId || !summaryRawTranscript || !evaluation) return;
+  const handleMapToNotes = async (transcriptOverride?: string) => {
+    const transcriptToMap = transcriptOverride || summaryRawTranscript;
+    if (!evalId || !transcriptToMap || !evaluation) return;
     
     setIsMappingToNotes(true);
     setProcessingStep('Mapping transcript to notes...');
@@ -556,7 +551,7 @@ export function EvaluationHub() {
 
       const response = await supabase.functions.invoke('map-observation-notes', {
         body: { 
-          transcript: summaryRawTranscript, 
+          transcript: transcriptToMap, 
           timeline: competencyTimeline,
           competencies,
         },
@@ -594,7 +589,6 @@ export function EvaluationHub() {
         populatedCount++;
       }
 
-      setTranscriptionJustCompleted(false);
       setMappingJustCompleted(true);
 
       toast({
@@ -614,13 +608,16 @@ export function EvaluationHub() {
     }
   };
 
-  // Combined handler: stop recording and immediately transcribe (not analyze)
+  // Combined handler: stop recording, transcribe, and auto-map to notes
   const handleFinishAndTranscribe = async () => {
     // Stop the recording and get blob directly (avoids stale closure)
     const audioBlob = await recordingControls.stopAndGetBlob();
     
     if (audioBlob) {
-      await handleTranscribeObservation(audioBlob);
+      const transcript = await handleTranscribeObservation(audioBlob);
+      if (transcript) {
+        await handleMapToNotes(transcript);
+      }
     }
   };
 
@@ -1977,7 +1974,7 @@ export function EvaluationHub() {
                 restoredAudioUrl={restoredAudioUrl}
                 restoredAudioBlob={restoredAudioBlob}
                 isLoadingDraft={isLoadingDraft}
-                isTranscribing={isTranscribingObservation}
+                isTranscribing={isTranscribingObservation || isMappingToNotes}
                 processingStep={processingStep}
                 onTranscribeAudio={handleTranscribeObservation}
                 onDiscardRestored={handleDiscardRestoredAudio}
@@ -1988,8 +1985,6 @@ export function EvaluationHub() {
                   setCompetencyTimeline([]);
                   recordingStartTimeRef.current = 0;
                 }}
-                transcriptionComplete={transcriptionJustCompleted}
-                onEditTranscript={handleEditTranscript}
               />
             </div>
           )}
@@ -2049,7 +2044,7 @@ export function EvaluationHub() {
                           </p>
                         )}
                         <Button 
-                          onClick={handleMapToNotes}
+                          onClick={() => handleMapToNotes()}
                           disabled={isMappingToNotes || !summaryRawTranscript}
                           className="gap-2"
                         >

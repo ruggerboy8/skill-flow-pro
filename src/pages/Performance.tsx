@@ -9,7 +9,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useWeeklyAssignments } from '@/hooks/useWeeklyAssignments';
 import { useToast } from '@/hooks/use-toast';
-import { useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors } from '@/lib/centralTime';
 
@@ -34,7 +33,7 @@ export default function Performance() {
   const navigate = useNavigate();
   const location = useLocation();
   const [showCarryoverBanner, setShowCarryoverBanner] = useState<boolean>(Boolean((location.state as any)?.carryover));
-  const v2Enabled = useWeeklyAssignmentsV2Enabled;
+  
 
   const weekNum = Number(week); // week param is now just "1", "2", etc.
 

@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { MonthView } from './MonthView';
-import { useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
+
 
 interface WeekSlot {
   displayOrder: 1 | 2 | 3;
@@ -99,182 +99,94 @@ export function WeekBuilderPanel({
       startMonday,
       roleId,
       mondays,
-      useV2: useWeeklyAssignmentsV2Enabled
     });
 
-    if (useWeeklyAssignmentsV2Enabled) {
-      // V2: Use weekly_assignments table
-      const { data: assignmentRows, error: assignmentError } = await supabase
-        .from('weekly_assignments')
-        .select('id, display_order, action_id, status, week_start_date')
-        .is('org_id', null)
-        .is('location_id', null)
-        .eq('role_id', roleId)
-        .in('week_start_date', mondays)
-        .is('superseded_at', null)
-        .order('week_start_date')
-        .order('display_order');
+    // Use weekly_assignments table
+    const { data: assignmentRows, error: assignmentError } = await supabase
+      .from('weekly_assignments')
+      .select('id, display_order, action_id, status, week_start_date')
+      .is('org_id', null)
+      .is('location_id', null)
+      .eq('role_id', roleId)
+      .in('week_start_date', mondays)
+      .is('superseded_at', null)
+      .order('week_start_date')
+      .order('display_order');
 
-      console.log('📊 [WeekBuilder] V2 Query result:', {
-        assignmentRowsCount: assignmentRows?.length || 0,
-        assignmentRows,
-        assignmentError
-      });
+    console.log('📊 [WeekBuilder] Query result:', {
+      assignmentRowsCount: assignmentRows?.length || 0,
+      assignmentRows,
+      assignmentError
+    });
 
-      // Check which slots are locked
-      const assignmentIds = (assignmentRows || []).map(r => r.id);
-      const scoresBySlot = new Map<string, boolean>();
-      
-      if (assignmentIds.length > 0) {
-        const { data: scores } = await supabase
-          .from('weekly_scores')
-          .select('assignment_id')
-          .in('assignment_id', assignmentIds.map(id => `assign:${id}`));
+    // Check which slots are locked
+    const assignmentIds = (assignmentRows || []).map(r => r.id);
+    const scoresBySlot = new Map<string, boolean>();
+    
+    if (assignmentIds.length > 0) {
+      const { data: scores } = await supabase
+        .from('weekly_scores')
+        .select('assignment_id')
+        .in('assignment_id', assignmentIds.map(id => `assign:${id}`));
 
-        (scores || []).forEach((s: any) => {
-          const assignmentId = s.assignment_id.replace('assign:', '');
-          const row = assignmentRows?.find(r => r.id === assignmentId);
-          if (row) {
-            const key = `${row.week_start_date}-${row.display_order}`;
-            scoresBySlot.set(key, true);
-          }
-        });
-      }
-
-      // Collect all action IDs for batch fetch
-      const allActionIds = new Set<number>();
-      (assignmentRows || []).forEach(row => {
-        if (row.action_id) allActionIds.add(row.action_id);
-      });
-
-      // Build week structures
-      const weeks: WeekAssignment[] = mondays.map(monday => ({
-        weekStart: monday,
-        slots: [1, 2, 3].map(order => ({
-          displayOrder: order as 1 | 2 | 3,
-          actionId: null,
-          actionStatement: '',
-          domainName: '',
-          status: 'empty',
-          isLocked: false,
-          planId: null,
-        })),
-      }));
-
-      // Fill in from assignmentRows
-      (assignmentRows || []).forEach(row => {
-        const week = weeks.find(w => w.weekStart === row.week_start_date);
-        if (week && row.display_order >= 1 && row.display_order <= 3) {
-          const slot = week.slots[row.display_order - 1];
-          slot.actionId = row.action_id || null;
-          slot.status = row.status || 'proposed';
-          slot.planId = row.id;
+      (scores || []).forEach((s: any) => {
+        const assignmentId = s.assignment_id.replace('assign:', '');
+        const row = assignmentRows?.find(r => r.id === assignmentId);
+        if (row) {
           const key = `${row.week_start_date}-${row.display_order}`;
-          slot.isLocked = scoresBySlot.has(key);
+          scoresBySlot.set(key, true);
         }
       });
-
-      // Fetch pro-move meta for all action_ids
-      if (allActionIds.size > 0) {
-        const meta = await fetchProMoveMetaByIds(Array.from(allActionIds));
-        weeks.forEach(week => {
-          week.slots.forEach(slot => {
-            if (slot.actionId && meta.has(slot.actionId)) {
-              const moveData = meta.get(slot.actionId);
-              slot.actionStatement = moveData?.statement || '';
-              slot.domainName = moveData?.domain || '';
-            }
-          });
-        });
-      }
-
-      setWeeks(weeks);
-    } else {
-      // Legacy: Use weekly_plan table
-      const { data: planRows, error: planError } = await supabase
-        .from('weekly_plan')
-        .select('id, display_order, action_id, status, week_start_date')
-        .is('org_id', null)
-        .eq('role_id', roleId)
-        .in('week_start_date', mondays)
-        .order('week_start_date')
-        .order('display_order');
-
-      console.log('📊 [WeekBuilder] Legacy Query result:', {
-        planRowsCount: planRows?.length || 0,
-        planRows,
-        planError
-      });
-
-      // Check which slots are locked
-      const planIds = (planRows || []).map(r => r.id);
-      const scoresBySlot = new Map<string, boolean>();
-      
-      if (planIds.length > 0) {
-        const { data: scores } = await supabase
-          .from('weekly_scores')
-          .select('weekly_focus_id')
-          .in('weekly_focus_id', planIds.map(id => `plan:${id}`));
-
-        (scores || []).forEach((s: any) => {
-          const planId = s.weekly_focus_id.replace('plan:', '');
-          const row = planRows?.find(r => r.id.toString() === planId);
-          if (row) {
-            const key = `${row.week_start_date}-${row.display_order}`;
-            scoresBySlot.set(key, true);
-          }
-        });
-      }
-
-      // Collect all action IDs for batch fetch
-      const allActionIds = new Set<number>();
-      (planRows || []).forEach(row => {
-        if (row.action_id) allActionIds.add(row.action_id);
-      });
-
-      // Build week structures
-      const weeks: WeekAssignment[] = mondays.map(monday => ({
-        weekStart: monday,
-        slots: [1, 2, 3].map(order => ({
-          displayOrder: order as 1 | 2 | 3,
-          actionId: null,
-          actionStatement: '',
-          domainName: '',
-          status: 'empty',
-          isLocked: false,
-          planId: null,
-        })),
-      }));
-
-      // Fill in from planRows
-      (planRows || []).forEach(row => {
-        const week = weeks.find(w => w.weekStart === row.week_start_date);
-        if (week && row.display_order >= 1 && row.display_order <= 3) {
-          const slot = week.slots[row.display_order - 1];
-          slot.actionId = row.action_id || null;
-          slot.status = row.status || 'proposed';
-          slot.planId = row.id;
-          const key = `${row.week_start_date}-${row.display_order}`;
-          slot.isLocked = scoresBySlot.has(key);
-        }
-      });
-
-      // Fetch pro-move meta for all action_ids
-      if (allActionIds.size > 0) {
-        const meta = await fetchProMoveMetaByIds(Array.from(allActionIds));
-        weeks.forEach(week => {
-          week.slots.forEach(slot => {
-            if (slot.actionId && meta[slot.actionId]) {
-              slot.actionStatement = meta[slot.actionId].action_statement || '';
-              slot.domainName = meta[slot.actionId].domain_name || '';
-            }
-          });
-        });
-      }
-
-      setWeeks(weeks);
     }
 
+    // Collect all action IDs for batch fetch
+    const allActionIds = new Set<number>();
+    (assignmentRows || []).forEach(row => {
+      if (row.action_id) allActionIds.add(row.action_id);
+    });
+
+    // Build week structures
+    const weeks: WeekAssignment[] = mondays.map(monday => ({
+      weekStart: monday,
+      slots: [1, 2, 3].map(order => ({
+        displayOrder: order as 1 | 2 | 3,
+        actionId: null,
+        actionStatement: '',
+        domainName: '',
+        status: 'empty',
+        isLocked: false,
+        planId: null,
+      })),
+    }));
+
+    // Fill in from assignmentRows
+    (assignmentRows || []).forEach(row => {
+      const week = weeks.find(w => w.weekStart === row.week_start_date);
+      if (week && row.display_order >= 1 && row.display_order <= 3) {
+        const slot = week.slots[row.display_order - 1];
+        slot.actionId = row.action_id || null;
+        slot.status = row.status || 'proposed';
+        slot.planId = row.id;
+        const key = `${row.week_start_date}-${row.display_order}`;
+        slot.isLocked = scoresBySlot.has(key);
+      }
+    });
+
+    // Fetch pro-move meta for all action_ids
+    if (allActionIds.size > 0) {
+      const meta = await fetchProMoveMetaByIds(Array.from(allActionIds));
+      weeks.forEach(week => {
+        week.slots.forEach(slot => {
+          if (slot.actionId && meta.has(slot.actionId)) {
+            const moveData = meta.get(slot.actionId);
+            slot.actionStatement = moveData?.statement || '';
+            slot.domainName = moveData?.domain || '';
+          }
+        });
+      });
+    }
+
+    setWeeks(weeks);
     // Load excused weeks
     const { data: excusedData } = await supabase
       .from('excused_weeks')
@@ -532,7 +444,6 @@ export function WeekBuilderPanel({
         weekStart,
         roleId,
         org_id: null,
-        useV2: useWeeklyAssignmentsV2Enabled
       });
 
       // First verify user is super admin
@@ -552,97 +463,51 @@ export function WeekBuilderPanel({
         return;
       }
 
-      if (useWeeklyAssignmentsV2Enabled) {
-        // V2: Delete from weekly_assignments
-        const { data: existingRows, error: checkError } = await supabase
-          .from('weekly_assignments')
-          .select('id, action_id, display_order, status')
-          .eq('role_id', roleId)
-          .is('org_id', null)
-          .is('location_id', null)
-          .eq('week_start_date', weekStart)
-          .is('superseded_at', null);
+      // Delete from weekly_assignments
+      const { data: existingRows, error: checkError } = await supabase
+        .from('weekly_assignments')
+        .select('id, action_id, display_order, status')
+        .eq('role_id', roleId)
+        .is('org_id', null)
+        .is('location_id', null)
+        .eq('week_start_date', weekStart)
+        .is('superseded_at', null);
 
-        if (checkError) {
-          console.error('[WeekBuilderPanel] Error checking existing rows:', checkError);
-          throw checkError;
-        }
-
-        console.log('[WeekBuilderPanel] Found rows to delete:', existingRows);
-
-        if (!existingRows || existingRows.length === 0) {
-          toast({
-            title: 'Nothing to delete',
-            description: 'No pro-moves found for this week',
-          });
-          setDeleteWeekDialogOpen(false);
-          setWeekToDelete(null);
-          return;
-        }
-
-        // Delete by IDs
-        const idsToDelete = existingRows.map(r => r.id);
-        const { error: deleteError, count } = await supabase
-          .from('weekly_assignments')
-          .delete({ count: 'exact' })
-          .in('id', idsToDelete);
-
-        if (deleteError) {
-          console.error('[WeekBuilderPanel] Delete error:', deleteError);
-          throw deleteError;
-        }
-
-        console.log('[WeekBuilderPanel] Deleted rows count:', count);
-
-        toast({
-          title: 'Week cleared',
-          description: `Removed ${count} pro-move(s) from week of ${formatDate(weekStart)}`,
-        });
-      } else {
-        // Legacy: Delete from weekly_plan
-        const { data: existingRows, error: checkError } = await supabase
-          .from('weekly_plan')
-          .select('id, action_id, display_order, status')
-          .eq('role_id', roleId)
-          .is('org_id', null)
-          .eq('week_start_date', weekStart);
-
-        if (checkError) {
-          console.error('[WeekBuilderPanel] Error checking existing rows:', checkError);
-          throw checkError;
-        }
-
-        console.log('[WeekBuilderPanel] Found rows to delete:', existingRows);
-
-        if (!existingRows || existingRows.length === 0) {
-          toast({
-            title: 'Nothing to delete',
-            description: 'No pro-moves found for this week',
-          });
-          setDeleteWeekDialogOpen(false);
-          setWeekToDelete(null);
-          return;
-        }
-
-        // Delete by IDs
-        const idsToDelete = existingRows.map(r => r.id);
-        const { error: deleteError, count } = await supabase
-          .from('weekly_plan')
-          .delete({ count: 'exact' })
-          .in('id', idsToDelete);
-
-        if (deleteError) {
-          console.error('[WeekBuilderPanel] Delete error:', deleteError);
-          throw deleteError;
-        }
-
-        console.log('[WeekBuilderPanel] Deleted rows count:', count);
-
-        toast({
-          title: 'Week cleared',
-          description: `Removed ${count} pro-move(s) from week of ${formatDate(weekStart)}`,
-        });
+      if (checkError) {
+        console.error('[WeekBuilderPanel] Error checking existing rows:', checkError);
+        throw checkError;
       }
+
+      console.log('[WeekBuilderPanel] Found rows to delete:', existingRows);
+
+      if (!existingRows || existingRows.length === 0) {
+        toast({
+          title: 'Nothing to delete',
+          description: 'No pro-moves found for this week',
+        });
+        setDeleteWeekDialogOpen(false);
+        setWeekToDelete(null);
+        return;
+      }
+
+      // Delete by IDs
+      const idsToDelete = existingRows.map(r => r.id);
+      const { error: deleteError, count } = await supabase
+        .from('weekly_assignments')
+        .delete({ count: 'exact' })
+        .in('id', idsToDelete);
+
+      if (deleteError) {
+        console.error('[WeekBuilderPanel] Delete error:', deleteError);
+        throw deleteError;
+      }
+
+      console.log('[WeekBuilderPanel] Deleted rows count:', count);
+
+      toast({
+        title: 'Week cleared',
+        description: `Removed ${count} pro-move(s) from week of ${formatDate(weekStart)}`,
+      });
 
       // Reload weeks
       await loadWeeks(selectedMonday);
@@ -662,57 +527,29 @@ export function WeekBuilderPanel({
     if (!slotToUnlock?.planId) return;
 
     try {
-      if (useWeeklyAssignmentsV2Enabled) {
-        // V2: Use assign: prefix
-        const assignIdStr = `assign:${slotToUnlock.planId}`;
-        
-        console.log('[WeekBuilderPanel] Force unlocking slot (V2):', {
-          planId: slotToUnlock.planId,
-          assignIdStr,
-          weekStart: slotToUnlock.weekStart,
-          displayOrder: slotToUnlock.displayOrder,
-        });
+      const assignIdStr = `assign:${slotToUnlock.planId}`;
+      
+      console.log('[WeekBuilderPanel] Force unlocking slot:', {
+        planId: slotToUnlock.planId,
+        assignIdStr,
+        weekStart: slotToUnlock.weekStart,
+        displayOrder: slotToUnlock.displayOrder,
+      });
 
-        // Delete all scores for this assignment ID
-        const { error: deleteError, count } = await supabase
-          .from('weekly_scores')
-          .delete({ count: 'exact' })
-          .eq('assignment_id', assignIdStr);
+      // Delete all scores for this assignment ID
+      const { error: deleteError, count } = await supabase
+        .from('weekly_scores')
+        .delete({ count: 'exact' })
+        .eq('assignment_id', assignIdStr);
 
-        if (deleteError) throw deleteError;
+      if (deleteError) throw deleteError;
 
-        console.log('[WeekBuilderPanel] Deleted scores count:', count);
+      console.log('[WeekBuilderPanel] Deleted scores count:', count);
 
-        toast({
-          title: 'Slot unlocked',
-          description: `Removed ${count || 0} score(s) from slot #${slotToUnlock.displayOrder}`,
-        });
-      } else {
-        // Legacy: Use plan: prefix
-        const planIdStr = `plan:${slotToUnlock.planId}`;
-        
-        console.log('[WeekBuilderPanel] Force unlocking slot (Legacy):', {
-          planId: slotToUnlock.planId,
-          planIdStr,
-          weekStart: slotToUnlock.weekStart,
-          displayOrder: slotToUnlock.displayOrder,
-        });
-
-        // Delete all scores for this plan ID
-        const { error: deleteError, count } = await supabase
-          .from('weekly_scores')
-          .delete({ count: 'exact' })
-          .eq('weekly_focus_id', planIdStr);
-
-        if (deleteError) throw deleteError;
-
-        console.log('[WeekBuilderPanel] Deleted scores count:', count);
-
-        toast({
-          title: 'Slot unlocked',
-          description: `Removed ${count || 0} score(s) from slot #${slotToUnlock.displayOrder}`,
-        });
-      }
+      toast({
+        title: 'Slot unlocked',
+        description: `Removed ${count || 0} score(s) from slot #${slotToUnlock.displayOrder}`,
+      });
 
       // Reload weeks
       await loadWeeks(selectedMonday);

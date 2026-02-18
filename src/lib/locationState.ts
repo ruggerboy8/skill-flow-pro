@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
-import { useWeeklyAssignmentsV2Enabled } from './featureFlags';
+
 
 export type WeekState = 'onboarding' | 'missed_checkin' | 'can_checkin' | 'wait_for_thu' | 'can_checkout' | 'done' | 'missed_checkout' | 'no_assignments';
 
@@ -25,7 +25,7 @@ export interface StaffStatus {
   selectionPending: boolean;
   lastActivity?: { kind: 'confidence' | 'performance'; at: Date };
   onboardingWeeksLeft?: number;
-  source?: 'weekly_plan' | 'weekly_focus';
+  source?: 'assignments';
   weekLabel?: string;
 }
 
@@ -111,366 +111,87 @@ export async function assembleWeek(params: {
 }): Promise<any[]> {
   const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
-  // Fetch location to check onboarding_active flag
+  // Fetch location timezone
   const { data: locationData } = await supabase
     .from('locations')
-    .select('timezone, organization_id, onboarding_active')
+    .select('timezone, organization_id')
     .eq('id', locationId)
     .maybeSingle();
 
   if (!locationData) return [];
 
-  // Use global plan if cycle >= 4 OR onboarding is disabled
-  const useGlobalPlan = cycleNumber >= 4 || locationData.onboarding_active === false;
-
-  // ----- GRADUATION CHECK: Cycle 4+ OR skip onboarding uses global plan -----
-  console.info(`[assembleWeek] cycle=${cycleNumber}, week=${weekInCycle}, onboarding_active=${locationData.onboarding_active}, using ${useGlobalPlan ? 'weekly_assignments/weekly_plan' : 'weekly_focus'}`);
-  
-  if (useGlobalPlan) {
-    const location = locationData;
-
-    const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
-      ? new Date(params.simOverrides.nowISO) 
-      : new Date();
-    
-    const anchors = getWeekAnchors(now, location.timezone);
-    const mondayStr = formatInTimeZone(anchors.mondayZ, location.timezone, 'yyyy-MM-dd');
-
-    // Check feature flag to determine data source
-    if (useWeeklyAssignmentsV2Enabled) {
-      console.info('🚀 [assembleWeek] Using weekly_assignments V2 (feature flag ON)');
-      
-      // Query weekly_assignments (global only: org_id null)
-      const { data: assignData, error: assignErr } = await supabase
-        .from('weekly_assignments')
-        .select('id, display_order, action_id, self_select')
-        .eq('source', 'global')
-        .eq('role_id', roleId)
-        .eq('week_start_date', mondayStr)
-        .eq('status', 'locked')
-        .is('org_id', null)
-        .order('display_order');
-
-      if (!assignErr && assignData && assignData.length > 0) {
-        console.info('[assembleWeek] ✅ Using weekly_assignments for Cycle 4+ role=%d week=%s (found %d locked rows)', 
-          roleId, mondayStr, assignData.length);
-        
-        // Fetch with joins
-        const { data: enrichedAssign, error: enrichErr } = await supabase
-          .from('weekly_assignments')
-          .select(`
-            id,
-            action_id,
-            display_order,
-            self_select,
-            pro_moves!weekly_assignments_action_id_fkey (
-              action_statement,
-              intervention_text,
-              competencies!fk_pro_moves_competency_id (
-                name,
-                domains!competencies_domain_id_fkey (
-                  domain_name
-                )
-              )
-            )
-          `)
-          .eq('source', 'global')
-          .eq('role_id', roleId)
-          .eq('week_start_date', mondayStr)
-          .eq('status', 'locked')
-          .is('org_id', null)
-          .order('display_order');
-
-        if (enrichErr || !enrichedAssign) {
-          console.error('[assembleWeek] Failed to fetch enriched assignments:', enrichErr);
-          return [];
-        }
-
-        const result: any[] = enrichedAssign.map((assign: any) => ({
-          weekly_focus_id: `assign:${assign.id}`,
-          type: 'site',
-          pro_move_id: assign.action_id,
-          action_statement: assign.pro_moves?.action_statement || 'Pro Move',
-          intervention_text: assign.pro_moves?.intervention_text || null,
-          competency_name: assign.pro_moves?.competencies?.name || 'General',
-          domain_name: assign.pro_moves?.competencies?.domains?.domain_name || 'General',
-          required: true,
-          locked: !!assign.action_id,
-          display_order: assign.display_order,
-          source: 'assignments',
-          weekLabel: `Week of ${mondayStr}`
-        }));
-        
-        console.info('[assembleWeek] Returning %d weekly_assignments', result.length);
-        return result;
-      } else {
-        console.warn('[assembleWeek] ❌ No weekly_assignments for Cycle 4+ (week %s, role %d) - found %d rows', 
-          mondayStr, roleId, assignData?.length || 0);
-        return [];
-      }
-    }
-
-    // Legacy path: weekly_plan
-    console.info('📚 [assembleWeek] Using legacy weekly_plan (V2 flag OFF)');
-    const { data: planData, error: planErr } = await supabase
-      .from('weekly_plan')
-      .select('id, display_order, action_id, self_select')
-      .is('org_id', null)
-      .eq('role_id', roleId)
-      .eq('week_start_date', mondayStr)
-      .eq('status', 'locked')
-      .order('display_order');
-
-
-    // Check if we have locked rows (at least 1)
-    if (!planErr && planData && planData.length > 0) {
-      console.info('[assembleWeek] ✅ Using global weekly_plan for Cycle 4+ role=%d week=%s (found %d locked rows)', 
-        roleId, mondayStr, planData.length);
-      
-      // Fetch with joins to get all metadata in one query
-      const { data: enrichedPlan, error: enrichErr } = await supabase
-        .from('weekly_plan')
-        .select(`
-          id,
-          action_id,
-          display_order,
-          self_select,
-          pro_moves!weekly_plan_action_id_fkey (
-            action_statement,
-            intervention_text,
-            competencies!fk_pro_moves_competency_id (
-              name,
-              domains!competencies_domain_id_fkey (
-                domain_name
-              )
-            )
-          )
-        `)
-        .is('org_id', null)
-        .eq('role_id', roleId)
-        .eq('week_start_date', mondayStr)
-        .eq('status', 'locked')
-        .order('display_order');
-
-      if (enrichErr || !enrichedPlan) {
-        console.error('[assembleWeek] Failed to fetch enriched plan data:', enrichErr);
-        return [];
-      }
-
-      const result: any[] = enrichedPlan.map((plan: any) => ({
-        weekly_focus_id: `plan:${plan.id}`,
-        type: 'site',
-        pro_move_id: plan.action_id,
-        action_statement: plan.pro_moves?.action_statement || 'Pro Move',
-        intervention_text: plan.pro_moves?.intervention_text || null,
-        competency_name: plan.pro_moves?.competencies?.name || 'General',
-        domain_name: plan.pro_moves?.competencies?.domains?.domain_name || 'General',
-        required: true,
-        locked: !!plan.action_id,
-        display_order: plan.display_order,
-        source: 'plan',
-        weekLabel: `Week of ${mondayStr}`
-      }));
-      
-      console.info('[assembleWeek] Returning %d weekly_plan assignments', result.length);
-      return result;
-    } else {
-      console.warn('[assembleWeek] ❌ No global plan for graduated location (week %s, role %d) - found %d rows with error: %s', 
-        mondayStr, roleId, planData?.length || 0, planErr?.message || 'none');
-      
-      // For global plan mode, if no plan data exists, return empty instead of falling back
-      console.warn('[assembleWeek] No global plan for graduated location - returning empty assignments');
-      return [];
-    }
-  }
-
-  // ----- CYCLES 1-3 with onboarding enabled: Use weekly_assignments with source='onboarding' -----
-  console.info('[assembleWeek] Using weekly_assignments for Cycles 1-3: cycle=%d week=%d role=%d location=%s', 
-    cycleNumber, weekInCycle, roleId, locationId);
-
-  // We already have location data from above
-  const timezone = locationData.timezone;
-  const cycleLength = 6; // Default if not fetched
-
-  // Get cycle_length_weeks from a separate query if needed
-  const { data: locDetails } = await supabase
-    .from('locations')
-    .select('cycle_length_weeks')
-    .eq('id', locationId)
-    .maybeSingle();
-  
-  const actualCycleLength = locDetails?.cycle_length_weeks || cycleLength;
-
-  // Use current week's Monday (same approach as global plan) instead of calculating from program_start_date
-  // This ensures we find assignments for new hires whose onboarding starts mid-location-cycle
   const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
     ? new Date(params.simOverrides.nowISO) 
     : new Date();
-  const anchors = getWeekAnchors(now, timezone);
-  const weekStartStr = formatInTimeZone(anchors.mondayZ, timezone, 'yyyy-MM-dd');
+  
+  const anchors = getWeekAnchors(now, locationData.timezone);
+  const mondayStr = formatInTimeZone(anchors.mondayZ, locationData.timezone, 'yyyy-MM-dd');
 
-  console.info('[assembleWeek] Using current Monday for onboarding lookup:', weekStartStr);
-
-  const { data: weeklyAssignments } = await supabase
+  console.info(`[assembleWeek] Using weekly_assignments for role=${roleId} week=${mondayStr}`);
+  
+  // Query weekly_assignments (global only: org_id null)
+  const { data: assignData, error: assignErr } = await supabase
     .from('weekly_assignments')
-    .select('id, display_order, self_select, action_id, competency_id')
+    .select('id, display_order, action_id, self_select')
+    .eq('source', 'global')
     .eq('role_id', roleId)
-    .eq('location_id', locationId)
-    .eq('week_start_date', weekStartStr)
-    .eq('source', 'onboarding')
+    .eq('week_start_date', mondayStr)
     .eq('status', 'locked')
+    .is('org_id', null)
     .order('display_order');
 
-  if (!weeklyAssignments || weeklyAssignments.length === 0) return [];
+  if (!assignErr && assignData && assignData.length > 0) {
+    console.info('[assembleWeek] ✅ Found %d locked rows for week=%s', assignData.length, mondayStr);
+    
+    // Fetch with joins
+    const { data: enrichedAssign, error: enrichErr } = await supabase
+      .from('weekly_assignments')
+      .select(`
+        id,
+        action_id,
+        display_order,
+        self_select,
+        pro_moves!weekly_assignments_action_id_fkey (
+          action_statement,
+          intervention_text,
+          competencies!fk_pro_moves_competency_id (
+            name,
+            domains!competencies_domain_id_fkey (
+              domain_name
+            )
+          )
+        )
+      `)
+      .eq('source', 'global')
+      .eq('role_id', roleId)
+      .eq('week_start_date', mondayStr)
+      .eq('status', 'locked')
+      .is('org_id', null)
+      .order('display_order');
 
-  const isFoundation = cycleNumber === 1;
+    if (enrichErr || !enrichedAssign) {
+      console.error('[assembleWeek] Failed to fetch enriched assignments:', enrichErr);
+      return [];
+    }
 
-  // 2) Build set of "already assigned" action_ids (site moves first)
-  const assignedActionIds = new Set<number>();
-  const siteAssignments = weeklyAssignments.filter(wa => !wa.self_select && wa.action_id);
-  if (siteAssignments.length) {
-    const { data: siteMoves } = await supabase
-      .from('pro_moves')
-      .select('action_id')
-      .in('action_id', siteAssignments.map(wa => wa.action_id as number));
-    (siteMoves || []).forEach(m => assignedActionIds.add(m.action_id));
+    return enrichedAssign.map((assign: any) => ({
+      weekly_focus_id: `assign:${assign.id}`,
+      type: 'site',
+      pro_move_id: assign.action_id,
+      action_statement: assign.pro_moves?.action_statement || 'Pro Move',
+      intervention_text: assign.pro_moves?.intervention_text || null,
+      competency_name: assign.pro_moves?.competencies?.name || 'General',
+      domain_name: assign.pro_moves?.competencies?.domains?.domain_name || 'General',
+      required: true,
+      locked: !!assign.action_id,
+      display_order: assign.display_order,
+      source: 'assignments',
+      weekLabel: `Week of ${mondayStr}`
+    }));
+  } else {
+    console.warn('[assembleWeek] ❌ No weekly_assignments for week=%s role=%d', mondayStr, roleId);
+    return [];
   }
-
-  // 3) Load backlog FIFO (only if not foundation)
-  let backlog: { id: string; action_id: number }[] = [];
-  if (!isFoundation) {
-    // We need staff_id for backlog; fetch once
-    const { data: staff } = await supabase
-      .from('staff')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (staff?.id) {
-      const { data: open } = await supabase
-        .from('user_backlog_v2')
-        .select('id, action_id')
-        .eq('staff_id', staff.id)
-        .is('resolved_on', null)
-        .order('assigned_on', { ascending: true });
-      backlog = (open || []) as any[];
-    }
-  }
-
-  // helper: fetch pro move + domain for a given action_id
-  async function hydrateAction(actionId: number) {
-    const { data: pm } = await supabase
-      .from('pro_moves')
-      .select('action_id, action_statement, intervention_text, competencies!inner(name, domain_id)')
-      .eq('action_id', actionId)
-      .maybeSingle();
-
-    let domainName = 'General';
-    if (pm?.competencies?.domain_id) {
-      const { data: d } = await supabase
-        .from('domains')
-        .select('domain_name')
-        .eq('domain_id', pm.competencies.domain_id)
-        .maybeSingle();
-      domainName = d?.domain_name || 'General';
-    }
-
-    return {
-      pro_move_id: pm?.action_id,
-      action_statement: pm?.action_statement || 'Pro Move',
-      intervention_text: pm?.intervention_text || null,
-      competency_name: pm?.competencies?.name || 'General',
-      domain_name: domainName
-    };
-  }
-
-  const result: any[] = [];
-
-  // 4) Build assignments slot by slot (dedup against assignedActionIds)
-  for (const wa of weeklyAssignments) {
-    if (!wa.self_select) {
-      // SITE move
-      if (wa.action_id) {
-        const info = await hydrateAction(wa.action_id);
-        result.push({
-          weekly_focus_id: `assign:${wa.id}`,
-          type: 'site',
-          ...info,
-          required: true,
-          locked: true,
-          display_order: wa.display_order
-        });
-        if (info.pro_move_id) assignedActionIds.add(info.pro_move_id);
-      }
-      continue;
-    }
-
-    // SELF-SELECT slot
-    if (isFoundation) {
-      // Foundation = force site moves only; treat as "choose later"
-      result.push({
-        weekly_focus_id: `assign:${wa.id}`,
-        type: 'selfSelect',
-        action_statement: 'Choose a pro-move',
-        domain_name: 'General',
-        required: false,
-        locked: false,
-        display_order: wa.display_order
-      });
-      continue;
-    }
-
-    // Try to consume oldest non-duplicate backlog item
-    let usedBacklog: { id: string; action_id: number } | undefined;
-    for (const item of backlog) {
-      if (!assignedActionIds.has(item.action_id)) {
-        usedBacklog = item;
-        break;
-      }
-    }
-
-    if (usedBacklog) {
-      const info = await hydrateAction(usedBacklog.action_id);
-      result.push({
-        weekly_focus_id: `assign:${wa.id}`,
-        type: 'backlog',
-        backlog_id: usedBacklog.id,
-        ...info,
-        required: false,
-        locked: true,
-        display_order: wa.display_order
-      });
-      if (info.pro_move_id) assignedActionIds.add(info.pro_move_id);
-    } else {
-      // No eligible backlog -> normal self-select
-      let domainName = 'General';
-      if (wa.competency_id) {
-        const { data: comp } = await supabase
-          .from('competencies')
-          .select('name, domain_id')
-          .eq('competency_id', wa.competency_id)
-          .maybeSingle();
-        if (comp?.domain_id) {
-          const { data: d } = await supabase
-            .from('domains')
-            .select('domain_name')
-            .eq('domain_id', comp.domain_id)
-            .maybeSingle();
-          domainName = d?.domain_name || 'General';
-        }
-      }
-      result.push({
-        weekly_focus_id: `assign:${wa.id}`,
-        type: 'selfSelect',
-        action_statement: 'Choose a pro-move',
-        domain_name: domainName,
-        required: false,
-        locked: false,
-        display_order: wa.display_order
-      });
-    }
-  }
-
-  return result.sort((a, b) => a.display_order - b.display_order);
 }
 
 /**

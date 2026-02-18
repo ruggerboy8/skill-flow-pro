@@ -9,7 +9,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useWeeklyAssignments } from '@/hooks/useWeeklyAssignments';
 import { useToast } from '@/hooks/use-toast';
-import { useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc, getAnchors, nextMondayStr } from '@/lib/centralTime';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -26,7 +25,7 @@ export default function Confidence() {
   const { data: staff, isLoading: staffLoading } = useStaffProfile();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const v2Enabled = useWeeklyAssignmentsV2Enabled;
+  
 
   const weekNum = Number(week); // week param is now just "1", "2", etc.
 
@@ -180,18 +179,15 @@ setSubmitting(true);
         confidence_score: scores[focus.id]
       };
       
-      // Add assignment_id with 'assign:' prefix when V2 enabled
-      if (v2Enabled) {
-        base.assignment_id = `assign:${focus.id}`;
-      }
+      // Add assignment_id with 'assign:' prefix
+      base.assignment_id = `assign:${focus.id}`;
       
       if (focus.self_select && selectedActions[focus.id]) {
         base.selected_action_id = selectedActions[focus.id];
       }
       return base;
     });
-    // Use assignment_id conflict when V2 enabled, otherwise weekly_focus_id
-    const conflictColumns = v2Enabled ? 'staff_id,assignment_id' : 'staff_id,weekly_focus_id';
+    const conflictColumns = 'staff_id,assignment_id';
     
     const { error } = await supabase
       .from('weekly_scores')

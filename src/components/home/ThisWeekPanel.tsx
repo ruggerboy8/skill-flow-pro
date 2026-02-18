@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CT_TZ } from '@/lib/centralTime';
 import { getWeekAnchors } from '@/v2/time';
-import { isV2, useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
+import { isV2 } from '@/lib/featureFlags';
 import { useNow } from '@/providers/NowProvider';
 import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
 import { assembleCurrentWeek, WeekAssignment } from '@/lib/weekAssembly';
@@ -40,7 +40,7 @@ export default function ThisWeekPanel() {
   const navigate = useNavigate();
   const now = useNow();
   const { overrides } = useSim();
-  const v2Enabled = useWeeklyAssignmentsV2Enabled;
+  
 
   const [weekContext, setWeekContext] = useState<StaffStatus | null>(null);
   const [locationWeekContext, setLocationWeekContext] = useState<LocationWeekContext | null>(null);

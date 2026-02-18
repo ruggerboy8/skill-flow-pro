@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { useWeeklyAssignmentsV2Enabled } from '@/lib/featureFlags';
+
 
 type ScoreUpdate = {
   staff_id: string;
@@ -46,7 +46,7 @@ const JITTER = 300;
 
 export function useReliableSubmission() {
   const { user } = useAuth();
-  const v2Enabled = useWeeklyAssignmentsV2Enabled;
+  
   const STORAGE_KEY = user ? `pending_submissions:${user.id}` : 'pending_submissions:anon';
   const [pending, setPending] = useState<SubmissionItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getAnchors, nowUtc } from "@/lib/centralTime";
+import { nowUtc } from "@/lib/centralTime";
+import { getSubmissionPolicy } from "@/lib/submissionPolicy";
 
 // Updated backlog interfaces for v2
 export interface BacklogItemV2 {
@@ -151,6 +152,6 @@ export async function saveUserSelection(
 // Check if selections are allowed based on time locks
 export function areSelectionsLocked(): boolean {
   const now = nowUtc();
-  const { tueDueZ } = getAnchors(now);
-  return now > tueDueZ; // Locked after Tuesday 12:00 CT
+  const policy = getSubmissionPolicy(now, 'America/Chicago');
+  return policy.isConfidenceLate(now); // Locked after confidence deadline
 }

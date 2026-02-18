@@ -1,7 +1,8 @@
 import { StaffWeekSummary } from '@/types/coachV2';
 
 interface WeekAnchors {
-  confidence_deadline: Date;
+  confidence_deadline?: Date;
+  confidence_due?: Date;
   checkout_open: Date;
 }
 
@@ -11,8 +12,9 @@ export interface SubmissionGates {
 }
 
 export function getSubmissionGates(now: Date, anchors: WeekAnchors): SubmissionGates {
+  const confDeadline = anchors.confidence_deadline ?? anchors.confidence_due;
   return {
-    isPastConfidenceDeadline: now >= anchors.confidence_deadline,
+    isPastConfidenceDeadline: confDeadline ? now >= confDeadline : false,
     isPerformanceOpen: now >= anchors.checkout_open,
   };
 }

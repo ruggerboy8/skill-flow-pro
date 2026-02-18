@@ -9,8 +9,9 @@ import { Mail, CheckCircle2, X, Send, Edit2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
-import { addDays, addHours } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { addDays } from 'date-fns';
+import { getSubmissionPolicy } from '@/lib/submissionPolicy';
 
 interface StaffMember {
   id: string;
@@ -33,10 +34,10 @@ function weekOfInTZ(now: Date, tz: string) {
 }
 
 function deadlinesForWeek(weekOf: string, tz: string) {
-  const mondayLocalMidnightUtc = fromZonedTime(`${weekOf}T00:00:00`, tz);
-  const checkinDueUtc = addHours(addDays(mondayLocalMidnightUtc, 1), 12); // Tue 12:00 local
-  const checkoutOpenUtc = addHours(addDays(mondayLocalMidnightUtc, 3), 0); // Thu 00:00 local
-  return { checkinDueUtc, checkoutOpenUtc };
+  // Use canonical policy — weekOf is a Monday date string
+  const mondayDate = new Date(`${weekOf}T12:00:00Z`); // rough date for policy resolution
+  const policy = getSubmissionPolicy(mondayDate, tz);
+  return { checkinDueUtc: policy.confidence_due, checkoutOpenUtc: policy.checkout_open };
 }
 
 function dedup(arr: StaffMember[]) {

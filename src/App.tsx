@@ -33,9 +33,6 @@ import EvalResultsV2 from "@/pages/admin/EvalResultsV2";
 import EvaluationViewer from "@/pages/EvaluationViewer";
 import EvaluationReview from "@/pages/EvaluationReview";
 import AdminBuilder from "@/pages/AdminBuilder";
-import CycleList from "@/pages/admin/CycleList";
-import WeekList from "@/pages/admin/WeekList";
-import WeekEditor from "@/pages/admin/WeekEditor";
 import PlannerPage from "@/pages/planner/PlannerPage";
 import NotFound from "@/pages/NotFound";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
@@ -164,9 +161,10 @@ function AppRoutes() {
         <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
         <Route path="evaluation/:evalId/review" element={<EvaluationReview />} />
         <Route path="builder" element={<AdminBuilder />} />
-        <Route path="builder/:roleId" element={<CycleList />} />
-        <Route path="builder/:roleId/:cycle" element={<WeekList />} />
-        <Route path="builder/:roleId/:cycle/week/:week" element={<WeekEditor />} />
+        {/* Legacy builder routes redirect to planner */}
+        <Route path="builder/:roleId" element={<Navigate to="/builder" replace />} />
+        <Route path="builder/:roleId/:cycle" element={<Navigate to="/builder" replace />} />
+        <Route path="builder/:roleId/:cycle/week/:week" element={<Navigate to="/builder" replace />} />
         
         <Route path="planner/dfi" element={<PlannerPage roleId={1} roleName="DFI" />} />
         <Route path="planner/rda" element={<PlannerPage roleId={2} roleName="RDA" />} />

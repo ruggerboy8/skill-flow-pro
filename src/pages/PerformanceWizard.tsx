@@ -10,6 +10,7 @@ import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
 import { getAnchors } from '@/lib/centralTime';
 import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
@@ -78,6 +79,7 @@ export default function PerformanceWizard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isCarryoverWeek, setIsCarryoverWeek] = useState(false);
+  const [isConfidenceExcused, setIsConfidenceExcused] = useState(false);
   const [showVictory, setShowVictory] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -445,21 +447,72 @@ export default function PerformanceWizard() {
 
     setAssignments(weekAssignments);
 
-    // Load existing confidence scores with selected action IDs (check both assignment_id and weekly_focus_id)
+    // Check if confidence is excused for this staff member this week
+    const staffTz = staffData.locations?.timezone || 'America/Chicago';
+    const weekAnchors = getWeekAnchors(effectiveNow, staffTz);
+    const mondayStr = formatInTimeZone(weekAnchors.mondayZ, staffTz, 'yyyy-MM-dd');
+    const effectiveMondayStr = isRepair && weekOf ? weekOf : mondayStr;
+
+    const [{ data: excusedSubs }, { data: locationExcuses }] = await Promise.all([
+      supabase
+        .from('excused_submissions')
+        .select('metric')
+        .eq('staff_id', staffData.id)
+        .eq('week_of', effectiveMondayStr),
+      supabase
+        .from('excused_locations')
+        .select('metric')
+        .eq('location_id', staffData.primary_location_id)
+        .eq('week_of', effectiveMondayStr),
+    ]);
+
+    const excusedMetrics = new Set([
+      ...(excusedSubs || []).map(e => e.metric),
+      ...(locationExcuses || []).map(e => e.metric),
+    ]);
+    const confidenceExcused = excusedMetrics.has('confidence');
+    setIsConfidenceExcused(confidenceExcused);
+
+    // Load existing scores - if confidence is excused, don't require confidence_score
     const focusIds = weekAssignments.map(a => a.weekly_focus_id);
-    const { data: scoresData, error: scoresError } = await supabase
+    let scoresQuery = supabase
       .from('weekly_scores')
       .select('id, weekly_focus_id, assignment_id, confidence_score, confidence_date, selected_action_id')
       .eq('staff_id', staffData.id)
-      .or(focusIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','))
-      .not('confidence_score', 'is', null);
+      .or(focusIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','));
+
+    // Only require confidence scores when confidence is NOT excused
+    if (!confidenceExcused) {
+      scoresQuery = scoresQuery.not('confidence_score', 'is', null);
+    }
+
+    const { data: scoresData, error: scoresError } = await scoresQuery;
     
     // Match scores by either assignment_id or weekly_focus_id
     const matchedScores = scoresData?.filter(score =>
       focusIds.some(id => id === score.assignment_id || id === score.weekly_focus_id)
     ) || [];
 
-    if (scoresError || matchedScores.length !== weekAssignments.length && !isRepair) {
+    if (confidenceExcused) {
+      // When confidence is excused, create synthetic score entries for any assignments
+      // that don't have score rows yet, so the performance submit handler can upsert them
+      const existingFocusIds = new Set(
+        matchedScores.map(s => s.assignment_id || s.weekly_focus_id)
+      );
+      const syntheticScores: WeeklyScore[] = focusIds
+        .filter(id => !existingFocusIds.has(id))
+        .map(id => ({
+          id: '', // Will be created via upsert
+          weekly_focus_id: id,
+          assignment_id: id,
+          confidence_score: 0, // placeholder - excused
+          confidence_date: null,
+          selected_action_id: null,
+        }));
+      
+      matchedScores.push(...(syntheticScores as any[]));
+      console.log('[PerformanceWizard] Confidence excused - using', matchedScores.length, 'score entries (', syntheticScores.length, 'synthetic)');
+    } else if (scoresError || matchedScores.length !== weekAssignments.length) {
       if (isRepair) {
         toast({
           title: "Error",
@@ -562,9 +615,8 @@ export default function PerformanceWizard() {
     const perfScore = performanceScores[currentFocus.id]; // Today
     const confScore = getConfidenceScore(currentFocus.id); // Monday
 
-    // Trigger: Low Start + High Finish
-    // We ALLOW this in Repair Mode because celebrating past wins is good.
-    if (perfScore >= 3 && confScore > 0 && confScore <= 2) {
+    // Trigger: Low Start + High Finish (skip when confidence was excused)
+    if (!isConfidenceExcused && perfScore >= 3 && confScore > 0 && confScore <= 2) {
       setShowVictory(true);
     } else {
       proceed();
@@ -837,9 +889,15 @@ export default function PerformanceWizard() {
           {/* Content Area */}
           <div className="flex-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm p-4 sm:p-6 space-y-4">
             {/* Confidence Context Badge */}
-            <Badge variant="secondary" className="text-xs bg-muted/50">
-              Your confidence: {getConfidenceScore(currentFocus.id)}
-            </Badge>
+            {isConfidenceExcused ? (
+              <Badge variant="secondary" className="text-xs bg-muted/50">
+                Confidence: Excused
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="text-xs bg-muted/50">
+                Your confidence: {getConfidenceScore(currentFocus.id)}
+              </Badge>
+            )}
 
             {/* Pro Move Hero Text */}
             <p className="text-xl md:text-2xl font-semibold leading-relaxed text-foreground tracking-tight">

@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { nowUtc } from '@/lib/centralTime';
 import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
+import { getWeekAnchors } from '@/v2/time';
+import { formatInTimeZone } from 'date-fns-tz';
 
 interface WeeklyScore {
   id: string;
@@ -28,6 +30,7 @@ export default function Performance() {
   const [performanceScores, setPerformanceScores] = useState<{ [key: string]: number }>({});
   const [submitting, setSubmitting] = useState(false);
   const [isCarryoverWeek, setIsCarryoverWeek] = useState(false);
+  const [isConfidenceExcused, setIsConfidenceExcused] = useState(false);
   const { user } = useAuth();
   const { data: staff, isLoading: staffLoading } = useStaffProfile();
   const { toast } = useToast();
@@ -65,25 +68,71 @@ export default function Performance() {
   const loadScoresData = async () => {
     if (!staff || !user || weeklyFocus.length === 0) return;
 
+    // Check if confidence is excused
+    const staffTz = staff?.locations?.timezone || 'America/Chicago';
+    const weekAnchors = getWeekAnchors(nowUtc(), staffTz);
+    const mondayStr = formatInTimeZone(weekAnchors.mondayZ, staffTz, 'yyyy-MM-dd');
+
+    const [{ data: excusedSubs }, { data: locationExcuses }] = await Promise.all([
+      supabase
+        .from('excused_submissions')
+        .select('metric')
+        .eq('staff_id', staff.id)
+        .eq('week_of', mondayStr),
+      supabase
+        .from('excused_locations')
+        .select('metric')
+        .eq('location_id', staff.primary_location_id)
+        .eq('week_of', mondayStr),
+    ]);
+
+    const excusedMetrics = new Set([
+      ...(excusedSubs || []).map(e => e.metric),
+      ...(locationExcuses || []).map(e => e.metric),
+    ]);
+    const confidenceExcused = excusedMetrics.has('confidence');
+    setIsConfidenceExcused(confidenceExcused);
+
     const focusIds = weeklyFocus.map(f => f.id);
     
-    // Query scores by both assignment_id and weekly_focus_id to handle V2 + legacy fallback
-    // Note: assignment_id is stored with 'assign:' prefix in V2
-    const { data: scoresData, error: scoresError } = await supabase
+    // Build score query - skip confidence_score filter when excused
+    let scoresQuery = supabase
       .from('weekly_scores')
       .select('id, weekly_focus_id, assignment_id, confidence_score, confidence_date')
       .eq('staff_id', staff.id)
-      .or(focusIds.map(id => `assignment_id.eq.assign:${id},weekly_focus_id.eq.${id}`).join(','))
-      .not('confidence_score', 'is', null);
+      .or(focusIds.map(id => `assignment_id.eq.assign:${id},weekly_focus_id.eq.${id}`).join(','));
+
+    if (!confidenceExcused) {
+      scoresQuery = scoresQuery.not('confidence_score', 'is', null);
+    }
+
+    const { data: scoresData, error: scoresError } = await scoresQuery;
 
     // Check we have scores for all assignments
-    // Note: strip 'assign:' prefix when matching assignment_id
     const matchedScores = scoresData?.filter(score => {
       const assignIdWithoutPrefix = score.assignment_id?.replace('assign:', '');
       return weeklyFocus.some(f => f.id === assignIdWithoutPrefix || f.id === score.weekly_focus_id);
     }) || [];
     
-    if (scoresError || matchedScores.length !== weeklyFocus.length) {
+    if (confidenceExcused) {
+      // Create synthetic entries for missing scores
+      const existingFocusIds = new Set(
+        matchedScores.map(s => {
+          const assignId = s.assignment_id?.replace('assign:', '');
+          return assignId || s.weekly_focus_id;
+        })
+      );
+      const syntheticScores = weeklyFocus
+        .filter(f => !existingFocusIds.has(f.id))
+        .map(f => ({
+          id: '',
+          weekly_focus_id: f.id,
+          assignment_id: `assign:${f.id}`,
+          confidence_score: 0,
+          confidence_date: null,
+        }));
+      matchedScores.push(...(syntheticScores as any[]));
+    } else if (scoresError || matchedScores.length !== weeklyFocus.length) {
       toast({ title: "Error", description: "Complete confidence ratings first (Monday)", variant: "destructive" });
       navigate('/week');
       return;

@@ -12,7 +12,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { LocationFormDrawer } from "./LocationFormDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getLocationWeekContext } from "@/lib/locationState";
 import { format, parseISO } from "date-fns";
 
 interface Location {
@@ -26,8 +25,6 @@ interface Location {
   organization?: {
     name: string;
   };
-  currentWeek?: number;
-  currentCycle?: number;
 }
 
 interface Organization {
@@ -56,26 +53,7 @@ export function AdminLocationsTab() {
 
       if (error) throw error;
 
-      // Calculate current week/cycle for each location
-      const locationsWithWeekInfo = await Promise.all(
-        (data || []).map(async (location: any) => {
-          try {
-            const context = await getLocationWeekContext(location.id);
-            return {
-              ...location,
-              currentWeek: context.weekInCycle,
-              currentCycle: context.cycleNumber,
-            } as Location;
-          } catch (error) {
-            console.error(`Error getting context for location ${location.id}:`, error);
-            return {
-              ...location,
-            } as Location;
-          }
-        })
-      );
-
-      setLocations(locationsWithWeekInfo);
+      setLocations((data || []) as Location[]);
     } catch (error) {
       console.error("Error loading locations:", error);
       toast({
@@ -254,9 +232,6 @@ export function AdminLocationsTab() {
                    <SortableTableHead sortKey="program_start_date" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
                      Program Start
                    </SortableTableHead>
-                   <SortableTableHead sortKey="currentWeek" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                     Current Week
-                   </SortableTableHead>
                    <SortableTableHead sortKey="active" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
                      Status
                    </SortableTableHead>
@@ -266,7 +241,7 @@ export function AdminLocationsTab() {
                <TableBody>
                  {sortedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No locations found
                     </TableCell>
                   </TableRow>
@@ -279,30 +254,6 @@ export function AdminLocationsTab() {
                       </TableCell>
                       <TableCell>{formatTimezone(location.timezone)}</TableCell>
                       <TableCell>{formatDate(location.program_start_date)}</TableCell>
-                      <TableCell>
-                        {(() => {
-                          const today = new Date();
-                          const startDate = new Date(location.program_start_date);
-                          
-                          if (startDate > today) {
-                            return (
-                              <Badge variant="secondary" className="text-xs">
-                                Not Started
-                              </Badge>
-                            );
-                          }
-                          
-                          if (location.currentWeek && location.currentCycle) {
-                            return (
-                              <Badge variant="outline" className="text-xs">
-                                C:{location.currentCycle} W:{location.currentWeek}
-                              </Badge>
-                            );
-                          }
-                          
-                          return <span className="text-muted-foreground">—</span>;
-                        })()}
-                      </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Switch

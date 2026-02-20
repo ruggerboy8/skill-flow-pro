@@ -182,7 +182,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="sm:max-w-md">
+      <SheetContent className="w-[500px] sm:max-w-[500px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Edit Location" : "New Location"}</SheetTitle>
           <SheetDescription>
@@ -190,7 +190,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-6 overflow-y-auto flex-1 pr-1">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div className="space-y-2">
             <Label htmlFor="location-name">Location name *</Label>
             <Input

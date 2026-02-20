@@ -126,7 +126,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
           intervention_text,
           active,
           roles!fk_pro_moves_role_id(role_name),
-          competencies!fk_pro_moves_competency_id(name)
+          competencies!fk_pro_moves_competency_id(name, domains!fk_competencies_domain_id(domain_name))
         `);
 
       // Filter by active status if enabled
@@ -163,6 +163,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
       const csvRows = proMovesData.map(pm => ({
         action_id: pm.action_id,
         role_name: (pm.roles as any)?.role_name || '',
+        domain: (pm.competencies as any)?.domains?.domain_name || '',
         competency_name: (pm.competencies as any)?.name || '',
         text: pm.action_statement || '',
         description: pm.description || '',
@@ -173,7 +174,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
       }));
 
       // Generate CSV content
-      const headers = ['action_id', 'role_name', 'competency_name', 'text', 'description', 'resources_url', 'intervention_text', 'script', 'active'];
+      const headers = ['action_id', 'role_name', 'domain', 'competency_name', 'text', 'description', 'resources_url', 'intervention_text', 'script', 'active'];
       const csvContent = [
         headers.join(','),
         ...csvRows.map(row => 

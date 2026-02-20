@@ -272,21 +272,6 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
             </Popover>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="cycle-length">Cycle length (weeks) *</Label>
-            <Input
-              id="cycle-length"
-              type="number"
-              min="1"
-              max="52"
-              value={formData.cycle_length_weeks}
-              onChange={(e) => setFormData({ ...formData, cycle_length_weeks: parseInt(e.target.value) || 6 })}
-              required
-            />
-            <p className="text-sm text-muted-foreground">
-              Number of weeks in each program cycle (typically 6)
-            </p>
-          </div>
 
           <div className="space-y-3 border-t pt-4">
             <Label className="text-sm font-semibold">Submission Deadlines</Label>

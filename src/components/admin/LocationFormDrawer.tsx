@@ -354,8 +354,8 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
           {isEditing && (
             <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
               <p className="text-sm text-amber-800">
-                <strong>Warning:</strong> Changing the program start date or cycle length may affect 
-                existing weekly calculations and staff progress tracking.
+              <strong>Warning:</strong> Changing the program start date or submission deadlines may affect 
+              existing weekly calculations and late-flag tracking.
               </p>
             </div>
           )}

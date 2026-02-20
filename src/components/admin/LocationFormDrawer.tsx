@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { CalendarIcon, Loader2, AlertTriangle } from "lucide-react";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -69,7 +69,6 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
     timezone: "America/Chicago",
     program_start_date: new Date(),
     cycle_length_weeks: 6,
-    skipOnboarding: false,
     conf_due_day: 1,
     conf_due_time: "14:00",
     perf_due_day: 4,
@@ -91,7 +90,6 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         timezone: location.timezone,
         program_start_date: dateObj,
         cycle_length_weeks: location.cycle_length_weeks,
-        skipOnboarding: location.onboarding_active === false,
         conf_due_day: location.conf_due_day ?? 1,
         conf_due_time: (location.conf_due_time ?? "14:00:00").slice(0, 5),
         perf_due_day: location.perf_due_day ?? 4,
@@ -104,7 +102,6 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         timezone: "America/Chicago",
         program_start_date: new Date(),
         cycle_length_weeks: 6,
-        skipOnboarding: false,
         conf_due_day: 1,
         conf_due_time: "14:00",
         perf_due_day: 4,
@@ -140,7 +137,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
         program_start_date: formData.program_start_date.toISOString().split('T')[0],
         cycle_length_weeks: formData.cycle_length_weeks,
         active: true,
-        onboarding_active: !formData.skipOnboarding,
+        onboarding_active: false,
         conf_due_day: formData.conf_due_day,
         conf_due_time: formData.conf_due_time + ":00",
         perf_due_day: formData.perf_due_day,
@@ -328,28 +325,6 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
             </div>
           </div>
 
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="skip-onboarding" className="flex-1 cursor-pointer">
-                Skip Onboarding Sequence
-              </Label>
-              <Switch
-                id="skip-onboarding"
-                checked={formData.skipOnboarding}
-                onCheckedChange={(checked) => setFormData({ ...formData, skipOnboarding: checked })}
-              />
-            </div>
-            {formData.skipOnboarding && (
-              <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-800">
-                  This location will use global weekly pro moves from day one instead of the 
-                  18-week onboarding curriculum (Cycles 1-3). Only enable for locations where 
-                  staff have prior experience with the program.
-                </p>
-              </div>
-            )}
-          </div>
 
           {isEditing && (
             <div className="bg-amber-50 border border-amber-200 rounded-md p-3">

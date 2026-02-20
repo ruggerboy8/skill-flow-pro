@@ -190,7 +190,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-6 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2">
             <Label htmlFor="location-name">Location name *</Label>
             <Input

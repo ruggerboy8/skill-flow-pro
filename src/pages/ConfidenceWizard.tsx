@@ -10,6 +10,7 @@ import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
 import { getAnchors } from '@/lib/centralTime';
 import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { getWeekAnchors } from '@/v2/time';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
@@ -190,6 +191,38 @@ export default function ConfidenceWizard() {
     }
 
     setStaff(staffData);
+
+    // --- Excuse gate: block submission if confidence is excused ---
+    const staffTz = (staffData.locations as any)?.timezone || 'America/Chicago';
+    const excuseWeekAnchors = getWeekAnchors(effectiveNow, staffTz);
+    const excuseMondayStr = isRepair && weekOf ? weekOf : formatInTimeZone(excuseWeekAnchors.mondayZ, staffTz, 'yyyy-MM-dd');
+
+    const [{ data: locExcuse }, { data: indivExcuse }] = await Promise.all([
+      supabase
+        .from('excused_locations')
+        .select('id')
+        .eq('location_id', staffData.primary_location_id)
+        .eq('week_of', excuseMondayStr)
+        .eq('metric', 'confidence')
+        .limit(1),
+      supabase
+        .from('excused_submissions')
+        .select('id')
+        .eq('staff_id', staffData.id)
+        .eq('week_of', excuseMondayStr)
+        .eq('metric', 'confidence')
+        .limit(1),
+    ]);
+
+    if ((locExcuse && locExcuse.length > 0) || (indivExcuse && indivExcuse.length > 0)) {
+      toast({
+        title: 'Excused',
+        description: "This week's confidence check-in has been excused.",
+      });
+      navigate('/');
+      return;
+    }
+    // --- End excuse gate ---
 
     // Use the unified site-based approach to get assignments
     let assignments, cycleNumber, weekInCycle;
@@ -700,6 +733,38 @@ export default function ConfidenceWizard() {
 
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
+
+    // --- Submit-time excuse re-check ---
+    const submitStaffTz = (staff as any).locations?.timezone || 'America/Chicago';
+    const submitWeekAnchors = getWeekAnchors(effectiveNow, submitStaffTz);
+    const submitMondayStr = isRepair && weekOf ? weekOf : formatInTimeZone(submitWeekAnchors.mondayZ, submitStaffTz, 'yyyy-MM-dd');
+
+    const [{ data: submitLocExcuse }, { data: submitIndivExcuse }] = await Promise.all([
+      supabase
+        .from('excused_locations')
+        .select('id')
+        .eq('location_id', (staff as any).primary_location_id)
+        .eq('week_of', submitMondayStr)
+        .eq('metric', 'confidence')
+        .limit(1),
+      supabase
+        .from('excused_submissions')
+        .select('id')
+        .eq('staff_id', staff.id)
+        .eq('week_of', submitMondayStr)
+        .eq('metric', 'confidence')
+        .limit(1),
+    ]);
+
+    if ((submitLocExcuse && submitLocExcuse.length > 0) || (submitIndivExcuse && submitIndivExcuse.length > 0)) {
+      toast({
+        title: 'Excused',
+        description: "This submission was excused while you were working.",
+      });
+      navigate('/');
+      return;
+    }
+    // --- End submit-time excuse re-check ---
 
     // Check if all scores are filled with valid values (1-4)
     const missingScores = weeklyFocus.filter(focus => {

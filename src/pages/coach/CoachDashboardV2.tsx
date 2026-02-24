@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronLeft, ChevronRight, RotateCw, CalendarOff, X } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -540,8 +541,10 @@ export default function CoachDashboardV2({
                           <TableCell>{row.role_name}</TableCell>
                           <TableCell>{row.location_name}</TableCell>
                           <TableCell className={`text-center font-medium ${getRateColor(sixWeekRate)}`}>
-                            {ratesLoading || sixWeekRate === null ? (
-                              <span className="text-muted-foreground">—</span>
+                            {ratesLoading ? (
+                              <Skeleton className="h-4 w-10 mx-auto" />
+                            ) : sixWeekRate === null ? (
+                              <span className="text-muted-foreground text-xs">N/A</span>
                             ) : (
                               `${Math.round(sixWeekRate)}%`
                             )}

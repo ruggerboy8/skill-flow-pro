@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
-import { Clock, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Clock, TrendingUp, AlertCircle, CheckCircle2, Minus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { calculateSubmissionStats, calculateCutoffDate, type SubmissionWindow } from '@/lib/submissionRateCalc';
 
 interface OnTimeRateWidgetProps {
   staffId: string;
@@ -17,117 +18,6 @@ const TIME_FILTER_LABELS: Record<TimeFilter, string> = {
   '6weeks': 'Previous 6 Weeks',
   'all': 'All Time',
 };
-
-interface SubmissionStats {
-  totalSubmissions: number;
-  completedSubmissions: number;
-  completionRate: number;
-  onTimeSubmissions: number;
-  onTimeRate: number;
-  late: number;
-  missing: number;
-}
-
-function calculateCutoffDate(filter: TimeFilter): string | null {
-  if (filter === '3weeks') {
-    const date = new Date();
-    date.setDate(date.getDate() - 21);
-    return date.toISOString().split('T')[0];
-  } else if (filter === '6weeks') {
-    const date = new Date();
-    date.setDate(date.getDate() - 42);
-    return date.toISOString().split('T')[0];
-  }
-  return null;
-}
-
-function calculateStats(data: any[]): SubmissionStats {
-  const now = new Date();
-  const pastDueWindows = data.filter((w: any) => new Date(w.due_at) <= now);
-
-  // Group by week_of and metric
-  const weekMetricMap = new Map<string, { 
-    conf_submitted: boolean, 
-    perf_submitted: boolean, 
-    conf_on_time: boolean, 
-    perf_on_time: boolean,
-    conf_exists: boolean, 
-    perf_exists: boolean 
-  }>();
-  
-  pastDueWindows.forEach((w: any) => {
-    const key = w.week_of;
-    if (!weekMetricMap.has(key)) {
-      weekMetricMap.set(key, { 
-        conf_submitted: false, 
-        perf_submitted: false, 
-        conf_on_time: false, 
-        perf_on_time: false,
-        conf_exists: false, 
-        perf_exists: false 
-      });
-    }
-    const weekData = weekMetricMap.get(key)!;
-    
-    if (w.metric === 'confidence') {
-      weekData.conf_exists = true;
-      if (w.status === 'submitted') {
-        weekData.conf_submitted = true;
-        if (w.on_time === true) {
-          weekData.conf_on_time = true;
-        }
-      }
-    } else if (w.metric === 'performance') {
-      weekData.perf_exists = true;
-      if (w.status === 'submitted') {
-        weekData.perf_submitted = true;
-        if (w.on_time === true) {
-          weekData.perf_on_time = true;
-        }
-      }
-    }
-  });
-
-  // Calculate week-level stats
-  let confCompleted = 0, confOnTime = 0, confTotal = 0;
-  let perfCompleted = 0, perfOnTime = 0, perfTotal = 0;
-  
-  weekMetricMap.forEach((weekData) => {
-    if (weekData.conf_exists) {
-      confTotal++;
-      if (weekData.conf_submitted) {
-        confCompleted++;
-        if (weekData.conf_on_time) confOnTime++;
-      }
-    }
-    if (weekData.perf_exists) {
-      perfTotal++;
-      if (weekData.perf_submitted) {
-        perfCompleted++;
-        if (weekData.perf_on_time) perfOnTime++;
-      }
-    }
-  });
-
-  const totalExpected = confTotal + perfTotal;
-  const completed = confCompleted + perfCompleted;
-  const onTime = confOnTime + perfOnTime;
-  const late = completed - onTime;
-  const missing = totalExpected - completed;
-
-  const completionRate = totalExpected > 0 ? (completed / totalExpected) * 100 : 0;
-  const onTimeRate = totalExpected > 0 ? (onTime / totalExpected) * 100 : 0;
-
-  return {
-    totalSubmissions: totalExpected,
-    completedSubmissions: completed,
-    completionRate,
-    onTimeSubmissions: onTime,
-    onTimeRate,
-    late,
-    missing
-  };
-}
 
 export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
   const [filter, setFilter] = useState<TimeFilter>('all');
@@ -142,20 +32,12 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
         p_since: cutoffDate,
       });
 
-      console.debug('OnTimeRateWidget: submission windows', {
-        staffId,
-        cutoffDate,
-        rowCount: data?.length || 0,
-        error: error?.message,
-        sampleRow: data?.[0]
-      });
-
       if (error) throw error;
       
-      return calculateStats(data ?? []);
+      return calculateSubmissionStats((data ?? []) as SubmissionWindow[]);
     },
     enabled: !!staffId,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 30 * 1000,
   });
 
   const getHealthColor = (rate: number) => {
@@ -174,7 +56,40 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
     return <Skeleton className="h-24 w-full rounded-2xl bg-white/40 dark:bg-slate-800/40" />;
   }
 
-  const rate = stats?.completionRate || 0;
+  // No-data state: neutral gray card instead of misleading red 0%
+  if (!stats?.hasData) {
+    return (
+      <div className="rounded-2xl border p-4 backdrop-blur-sm transition-all bg-muted/30 border-border/50">
+        <div className="flex items-center justify-between gap-4 mb-1">
+          <span className="text-xs font-medium text-muted-foreground">
+            {TIME_FILTER_LABELS[filter]}
+          </span>
+          <ToggleGroup 
+            type="single" 
+            value={filter} 
+            onValueChange={(v) => v && setFilter(v as TimeFilter)} 
+            size="sm"
+            className="bg-white/50 dark:bg-slate-800/50 p-1 rounded-lg border border-border/30"
+          >
+            <ToggleGroupItem value="3weeks" className="text-xs px-2 h-6 rounded-md">3w</ToggleGroupItem>
+            <ToggleGroupItem value="6weeks" className="text-xs px-2 h-6 rounded-md">6w</ToggleGroupItem>
+            <ToggleGroupItem value="all" className="text-xs px-2 h-6 rounded-md">All</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
+            <Minus className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">Completion Rate</p>
+            <p className="text-sm text-muted-foreground">No submission data yet</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const rate = stats.completionRate;
 
   return (
     <div className={cn(
@@ -213,40 +128,34 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
           <p className="text-xs text-muted-foreground font-medium">Completion Rate</p>
           <div className="flex items-baseline gap-2">
             <span className={cn("text-2xl font-bold", getHealthColor(rate))}>
-              {stats?.completionRate.toFixed(0)}%
+              {stats.completionRate.toFixed(0)}%
             </span>
             <span className="text-xs text-muted-foreground">
-              ({stats?.completedSubmissions}/{stats?.totalSubmissions})
+              ({stats.completed}/{stats.totalExpected})
             </span>
           </div>
         </div>
       </div>
 
       {/* Stats Row */}
-      {stats && stats.totalSubmissions > 0 && (
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/30">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="w-3.5 h-3.5 text-blue-500" />
-            <span>On Time: <span className="font-semibold text-foreground">{stats.onTimeRate.toFixed(0)}%</span></span>
-          </div>
-          {stats.late > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-              <span>Late: <span className="font-semibold text-foreground">{stats.late}</span></span>
-            </div>
-          )}
-          {stats.missing > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CheckCircle2 className="w-3.5 h-3.5 text-rose-500" />
-              <span>Missing: <span className="font-semibold text-foreground">{stats.missing}</span></span>
-            </div>
-          )}
+      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/30">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Clock className="w-3.5 h-3.5 text-blue-500" />
+          <span>On Time: <span className="font-semibold text-foreground">{stats.onTimeRate.toFixed(0)}%</span></span>
         </div>
-      )}
-
-      {stats && stats.totalSubmissions === 0 && (
-        <p className="text-xs text-muted-foreground mt-2">No submissions found for this period.</p>
-      )}
+        {stats.late > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+            <span>Late: <span className="font-semibold text-foreground">{stats.late}</span></span>
+          </div>
+        )}
+        {stats.missing > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CheckCircle2 className="w-3.5 h-3.5 text-rose-500" />
+            <span>Missing: <span className="font-semibold text-foreground">{stats.missing}</span></span>
+          </div>
+        )}
+      </div>
 
       {/* Disclaimer */}
       <p className="text-[10px] italic text-muted-foreground mt-3">

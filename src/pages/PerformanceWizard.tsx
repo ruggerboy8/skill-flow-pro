@@ -473,6 +473,18 @@ export default function PerformanceWizard() {
     const confidenceExcused = excusedMetrics.has('confidence');
     setIsConfidenceExcused(confidenceExcused);
 
+    // --- Performance excuse gate: block if performance itself is excused ---
+    const performanceExcused = excusedMetrics.has('performance');
+    if (performanceExcused) {
+      toast({
+        title: 'Excused',
+        description: "This week's performance check-in has been excused.",
+      });
+      navigate('/');
+      return;
+    }
+    // --- End performance excuse gate ---
+
     // Load existing scores - if confidence is excused, don't require confidence_score
     const focusIds = weekAssignments.map(a => a.weekly_focus_id);
     let scoresQuery = supabase
@@ -641,6 +653,38 @@ export default function PerformanceWizard() {
 
   const handleSubmit = async () => {
     if (!staff || !currentFocus) return;
+
+    // --- Submit-time performance excuse re-check ---
+    const submitStaffTz = staff.locations?.timezone || 'America/Chicago';
+    const submitWeekAnchors = getWeekAnchors(effectiveNow, submitStaffTz);
+    const submitMondayStr = isRepair && weekOf ? weekOf : formatInTimeZone(submitWeekAnchors.mondayZ, submitStaffTz, 'yyyy-MM-dd');
+
+    const [{ data: submitLocExcuse }, { data: submitIndivExcuse }] = await Promise.all([
+      supabase
+        .from('excused_locations')
+        .select('id')
+        .eq('location_id', staff.primary_location_id)
+        .eq('week_of', submitMondayStr)
+        .eq('metric', 'performance')
+        .limit(1),
+      supabase
+        .from('excused_submissions')
+        .select('id')
+        .eq('staff_id', staff.id)
+        .eq('week_of', submitMondayStr)
+        .eq('metric', 'performance')
+        .limit(1),
+    ]);
+
+    if ((submitLocExcuse && submitLocExcuse.length > 0) || (submitIndivExcuse && submitIndivExcuse.length > 0)) {
+      toast({
+        title: 'Excused',
+        description: "This submission was excused while you were working.",
+      });
+      navigate('/');
+      return;
+    }
+    // --- End submit-time excuse re-check ---
 
     // Check if all performance scores are filled with valid values (1-4)
     const missingScores = existingScores.filter(score => {

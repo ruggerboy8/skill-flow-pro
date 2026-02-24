@@ -22,6 +22,13 @@ export function useTableSort<T>(data: T[], initialSortKey?: string) {
       const aValue = getNestedValue(a, sortConfig.key);
       const bValue = getNestedValue(b, sortConfig.key);
 
+      // Null-to-bottom: null values always sort below real values
+      const aIsNull = aValue === null || aValue === undefined;
+      const bIsNull = bValue === null || bValue === undefined;
+      if (aIsNull && bIsNull) return 0;
+      if (aIsNull) return 1;  // a goes to bottom
+      if (bIsNull) return -1; // b goes to bottom
+
       if (aValue < bValue) {
         return sortConfig.order === 'asc' ? -1 : 1;
       }

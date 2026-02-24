@@ -1,131 +1,113 @@
 
 
-## Phase 2: Location-Based Deadline Configuration
+# Submission System and On-Time Widget Overhaul
 
-### What Changes
+## Problems
 
-**1. Database: Add 4 columns to `locations`**
-
-| Column | Type | Default |
-|--------|------|---------|
-| `conf_due_day` | smallint | 1 (Tuesday) |
-| `conf_due_time` | time | 14:00:00 |
-| `perf_due_day` | smallint | 4 (Friday) |
-| `perf_due_time` | time | 17:00:00 |
-
-Day offset from Monday: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun. All existing locations get defaults automatically.
-
-**2. SQL view update**
-
-`view_staff_submission_windows` will read the 4 new columns instead of hardcoded intervals:
-
-```sql
--- Confidence due (currently hardcoded '1 day 14 hours'):
-(ad.week_of + (COALESCE(l.conf_due_day, 1) || ' days')::interval
-            + COALESCE(l.conf_due_time, '14:00:00'::time))
-  AT TIME ZONE ad.timezone
-
--- Performance due (currently hardcoded '4 days 17 hours'):
-(ad.week_of + (COALESCE(l.perf_due_day, 4) || ' days')::interval
-            + COALESCE(l.perf_due_time, '17:00:00'::time))
-  AT TIME ZONE ad.timezone
-```
-
-The view already joins `locations` via `base_staff`, so the columns are available. The join just needs to carry the 4 new columns through each CTE.
-
-**3. Fix canonical defaults in `submissionPolicy.ts`**
-
-Two values need correcting per your earlier direction:
-
-| Threshold | Current | Corrected |
-|-----------|---------|-----------|
-| `checkin_open` | Mon 00:00 | Mon 00:01 |
-| `checkin_visible` | Mon 09:00 | Mon 06:00 |
-
-This also updates the toast in `Confidence.tsx` (line 56) from "9:00 a.m." to "6:00 AM" since it should derive from the policy value rather than a hardcoded string.
-
-**4. Add `getPolicyOffsetsForLocation()` to `submissionPolicy.ts`**
-
-```typescript
-export function getPolicyOffsetsForLocation(location: {
-  conf_due_day?: number | null;
-  conf_due_time?: string | null;
-  perf_due_day?: number | null;
-  perf_due_time?: string | null;
-}): PolicyOffsets {
-  return {
-    ...DEFAULT_POLICY_OFFSETS,
-    confidence_due: {
-      dayOffset: location.conf_due_day ?? DEFAULT_POLICY_OFFSETS.confidence_due.dayOffset,
-      time: location.conf_due_time ?? DEFAULT_POLICY_OFFSETS.confidence_due.time,
-    },
-    performance_due: {
-      dayOffset: location.perf_due_day ?? DEFAULT_POLICY_OFFSETS.performance_due.dayOffset,
-      time: location.perf_due_time ?? DEFAULT_POLICY_OFFSETS.performance_due.time,
-    },
-  };
-}
-```
-
-Only `confidence_due` and `performance_due` are overridable. `checkin_open`, `checkin_visible`, `checkout_open`, and `week_end` stay system defaults.
-
-**5. Thread offsets through wrappers**
-
-- `src/v2/time.ts` `getWeekAnchors(now, tz)` -- add optional `offsets?: PolicyOffsets` parameter, pass through to `getSubmissionPolicy`
-- `src/lib/centralTime.ts` `getWeekAnchors(now, tz)` -- same optional `offsets` parameter
-
-Existing callers without `offsets` continue to use defaults (backward compatible).
-
-**6. Update callers to pass location-specific offsets**
-
-- `src/lib/locationState.ts` `getLocationWeekContext` -- already fetches the location record; read the 4 new columns and pass `getPolicyOffsetsForLocation(loc)` to `getWeekAnchors`
-- `src/pages/Confidence.tsx` -- currently hardcodes `'America/Chicago'`; fetch user's location to get timezone + offsets
-- `src/pages/Performance.tsx` -- same pattern
-- `src/pages/ConfidenceWizard.tsx` -- already has staff location; pass offsets
-- `src/pages/PerformanceWizard.tsx` -- same
-- `src/pages/coach/RemindersTab.tsx` -- already iterates per-location; pass offsets from location data
-- `src/lib/backlog.ts` `areSelectionsLocked` -- fetch user's location for offsets
-
-**7. LocationFormDrawer -- add Submission Deadlines section**
-
-Add a "Submission Deadlines" section below the cycle length field with:
-
-- **Confidence due**: Day-of-week dropdown (Monday-Sunday) + time input (HH:MM). Default: Tuesday 2:00 PM
-- **Performance due**: Day-of-week dropdown (Monday-Sunday) + time input (HH:MM). Default: Friday 5:00 PM
-- Helper text: "Submissions after this time are flagged as late"
-- Validation: performance due must be later in the week than confidence due
-
-The Location interface in the drawer gets 4 new optional fields. The `useEffect` populates them from the location record when editing; defaults apply for new locations.
-
-No changes to `AdminLocationsTab.tsx` -- deadlines are only visible/editable from the drawer.
-
-**8. Update Supabase types**
-
-Add the 4 new columns to the `locations` type in `src/integrations/supabase/types.ts`.
+1. **Confidence Wizard has zero excuse gating** -- Daisy Lopez submitted scores 18 minutes after being excused because `ConfidenceWizard.loadData()` never checks `excused_locations` or `excused_submissions`.
+2. **Performance Wizard checks excuses only for confidence-skip logic** -- it queries excuses to decide whether to skip the confidence prerequisite, but never blocks performance submission when *performance* itself is excused.
+3. **Triplicated rate math** drifts across `OnTimeRateWidget`, `useStaffSubmissionRates`, and `LocationSubmissionWidget`, with contradictory zero-data defaults (0% vs 100%).
+4. **N+1 RPC pattern** -- both `LocationSubmissionWidget` and `useStaffSubmissionRates` call `get_staff_submission_windows` once per staff member.
+5. **`LocationSubmissionWidget` is `@ts-nocheck`** -- untyped and high-risk for drift.
 
 ---
 
-### Files Summary
+## Execution Order
 
-| Action | File | Notes |
-|--------|------|-------|
-| Migration | SQL | Add 4 columns to `locations`, update `view_staff_submission_windows` |
-| Edit | `src/lib/submissionPolicy.ts` | Fix 2 defaults, add `getPolicyOffsetsForLocation` |
-| Edit | `src/v2/time.ts` | Accept optional offsets param |
-| Edit | `src/lib/centralTime.ts` | Accept optional offsets param |
-| Edit | `src/components/admin/LocationFormDrawer.tsx` | Add deadline day/time fields |
-| Edit | `src/lib/locationState.ts` | Pass location offsets to policy |
-| Edit | `src/pages/Confidence.tsx` | Fetch location offsets + fix toast text |
-| Edit | `src/pages/Performance.tsx` | Fetch location offsets |
-| Edit | `src/pages/ConfidenceWizard.tsx` | Pass location offsets |
-| Edit | `src/pages/PerformanceWizard.tsx` | Pass location offsets |
-| Edit | `src/pages/coach/RemindersTab.tsx` | Pass location offsets |
-| Edit | `src/lib/backlog.ts` | Fetch location offsets |
-| Edit | `src/integrations/supabase/types.ts` | Add 4 columns to locations type |
+### Step 1: Shared calculation utility with strong types
 
-### What Does NOT Change
+**New file:** `src/lib/submissionRateCalc.ts`
 
-- `checkin_open`, `checkin_visible`, `checkout_open`, and `week_end` remain system-wide (not per-location)
-- Historical `confidence_late` / `performance_late` values already in `weekly_scores` are untouched
-- `AdminLocationsTab.tsx` table layout unchanged
-- `get_staff_all_weekly_scores` reads late flags from `weekly_scores` (write-time), not recomputed -- no change needed
+- Define a typed `SubmissionWindow` interface matching the RPC return shape (no more `any`).
+- Single `calculateSubmissionStats(windows: SubmissionWindow[], now?: Date): SubmissionStats` function.
+- `SubmissionStats` includes a `hasData: boolean` field (true when `totalExpected > 0`).
+- Accept `now` as a parameter for testability -- defaults to `new Date()`.
+- Group by `week_of`, bucket by metric (`confidence` / `performance`), matching existing week-grouping logic.
+
+### Step 2: Switch OnTimeRateWidget to shared utility
+
+**File:** `src/components/coach/OnTimeRateWidget.tsx`
+
+- Import and call `calculateSubmissionStats` instead of the inline `calculateStats` function (delete it).
+- When `hasData === false`, render a neutral gray card ("No submission data yet") instead of red 0%.
+- Rename the primary KPI label to "Completion Rate" consistently (the component name `OnTimeRateWidget` stays for now, but the displayed headline is already "Completion Rate" -- just make sure color/health functions branch on `hasData` first before evaluating the numeric rate).
+
+### Step 3: Switch useStaffSubmissionRates to shared utility
+
+**File:** `src/hooks/useStaffSubmissionRates.tsx`
+
+- Import and call `calculateSubmissionStats`.
+- Change map value type: `Map<string, number | null>` where `null` = no countable windows (instead of defaulting to `100`).
+- Distinguish errors: `catch` block returns `0` currently -- change to `null` as well (query failure should not masquerade as poor performance; the dashboard already renders `null` as a gray dash).
+- Update `UseStaffSubmissionRatesResult` interface to reflect `Map<string, number | null>`.
+
+### Step 4: Update Coach Dashboard sort/render for null rates
+
+**File:** `src/pages/coach/CoachDashboardV2.tsx`
+
+- The dashboard already renders `null` as `"--"` and uses `text-muted-foreground` -- this is correct.
+- Fix: currently the condition is `ratesLoading || sixWeekRate === null` which conflates loading with no-data. Split to:
+  - While `ratesLoading`: show a small skeleton or spinner.
+  - When `sixWeekRate === null` and not loading: show `"N/A"` in muted text.
+- Sorting: in `useTableSort`, null values already sort as empty string via `getNestedValue`. Add explicit null-to-bottom logic: treat `null` as `-1` when sorting `sixWeekRate` so no-data staff sort below real rates.
+
+### Step 5: Refactor LocationSubmissionWidget to shared utility
+
+**File:** `src/components/dashboard/LocationSubmissionWidget.tsx`
+
+- Remove `@ts-nocheck`.
+- Replace the `sb: any = supabase` workaround with proper typed Supabase calls.
+- Replace the inline per-staff window processing with `calculateSubmissionStats`.
+- Apply same `hasData` neutral state rendering.
+
+### Step 6: Wizard excuse gates (both load and submit paths)
+
+**Files:** `src/pages/ConfidenceWizard.tsx`, `src/pages/PerformanceWizard.tsx`
+
+**Load-time gate (both wizards):**
+After loading staff and computing `effectiveMondayStr` (which already handles repair mode's `weekOf` parameter):
+
+```
+Query excused_locations for staff's primary_location_id + effectiveMondayStr + metric
+Query excused_submissions for staff's id + effectiveMondayStr + metric
+If either returns a match:
+  -> toast("This week's [metric] has been excused")
+  -> navigate home
+  -> return early
+```
+
+For the Confidence Wizard, `metric = 'confidence'`. For the Performance Wizard, `metric = 'performance'` (separate from the existing confidence-excused check which handles prerequisite skipping).
+
+**Submit-time gate (both wizards):**
+Re-check excusal status immediately before the upsert in `handleSubmit()`:
+- Run the same two queries.
+- If excused, show a toast ("This submission was excused while you were working") and navigate home without upserting.
+- This closes the race condition where an admin excuses a location while a staff member has the wizard open.
+
+**Repair mode handling:**
+Both wizards already compute `effectiveMondayStr` correctly for repair mode (using the `weekOf` query param when in repair, current Monday otherwise). The excuse check will use this same value, so historical repair weeks will only block if that specific historical week was excused -- no false blocks.
+
+---
+
+## Files Changed Summary
+
+| File | Change |
+|------|--------|
+| `src/lib/submissionRateCalc.ts` | **New** -- typed `SubmissionWindow`, `SubmissionStats`, `calculateSubmissionStats()` |
+| `src/components/coach/OnTimeRateWidget.tsx` | Use shared calc, neutral no-data state |
+| `src/hooks/useStaffSubmissionRates.tsx` | Use shared calc, return `null` for no-data and errors |
+| `src/pages/coach/CoachDashboardV2.tsx` | Split loading vs no-data display, null-to-bottom sort |
+| `src/components/dashboard/LocationSubmissionWidget.tsx` | Remove `@ts-nocheck`, use shared calc, typed Supabase calls |
+| `src/pages/ConfidenceWizard.tsx` | Add excuse gate in `loadData()` and `handleSubmit()` |
+| `src/pages/PerformanceWizard.tsx` | Add performance-metric excuse gate in `loadData()` and `handleSubmit()` |
+| `src/hooks/useTableSort.tsx` | Add explicit null-handling in comparator |
+
+No database migrations needed. All fixes are frontend-only.
+
+---
+
+## Out of Scope (Follow-up)
+
+- **Backend enforcement**: A server-side trigger or RPC validation that rejects `weekly_scores` inserts/updates for excused staff+week+metric combinations. This is the strongest guarantee but requires a migration and is tracked separately.
+- **Batch RPC**: Replacing the N+1 `get_staff_submission_windows` calls with a single batch RPC accepting multiple staff IDs. Important for performance but independent of correctness fixes.
+

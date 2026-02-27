@@ -168,6 +168,7 @@ export default function RemindersTab() {
           week_of,
           role_id: s.role_id,
           role_name: s.roles?.role_name || 'Unknown',
+          location_id: s.locations?.id || '',
           location_name: s.locations?.name || 'Unknown',
           org_name: s.locations?.organizations?.name || 'Unknown',
           loc: {
@@ -190,6 +191,29 @@ export default function RemindersTab() {
         .in('week_of', weekKeys);
       if (wsErr) throw wsErr;
 
+      // 2b) Pull excused_locations for all relevant location+week combos
+      const locationIds = Array.from(new Set(meta.map(m => m.location_id).filter(Boolean)));
+      const { data: locExcuseRows } = await supabase
+        .from('excused_locations')
+        .select('location_id, metric')
+        .in('week_of', weekKeys)
+        .in('location_id', locationIds);
+      
+      const locExcuseSet = new Set(
+        (locExcuseRows ?? []).map(e => `${e.location_id}:${e.metric}`)
+      );
+
+      // 2c) Pull excused_submissions for all relevant staff+week combos
+      const { data: staffExcuseRows } = await supabase
+        .from('excused_submissions')
+        .select('staff_id, metric, week_of')
+        .in('staff_id', staffIds)
+        .in('week_of', weekKeys);
+      
+      const staffExcuseSet = new Set(
+        (staffExcuseRows ?? []).map(e => `${e.staff_id}:${e.week_of}:${e.metric}`)
+      );
+
       // 3) Reduce to booleans (has_conf / has_perf) for the current week
       const byKey = new Map<string, { has_conf: boolean; has_perf: boolean }>();
       for (const m of meta) byKey.set(m.id + '|' + m.week_of, { has_conf: false, has_perf: false });
@@ -201,7 +225,7 @@ export default function RemindersTab() {
         if (r.performance_score !== null) a.has_perf = true;
       }
 
-      // 4) Build reminder sets based on local deadlines
+      // 4) Build reminder sets based on local deadlines — exclude excused staff
       const nowUtc = new Date();
       const needConfidence: StaffMember[] = [];
       const needPerformance: StaffMember[] = [];
@@ -215,6 +239,12 @@ export default function RemindersTab() {
         const a = byKey.get(k)!;
         const { checkinDueUtc, checkoutOpenUtc } = deadlinesForWeek(m.week_of, m.tz, m.loc);
 
+        // Check if excused (location-level OR individual)
+        const confExcused = locExcuseSet.has(`${m.location_id}:confidence`) ||
+          staffExcuseSet.has(`${m.id}:${m.week_of}:confidence`);
+        const perfExcused = locExcuseSet.has(`${m.location_id}:performance`) ||
+          staffExcuseSet.has(`${m.id}:${m.week_of}:performance`);
+
         const debugInfo = {
           name: m.name,
           has_conf: a.has_conf,
@@ -223,10 +253,12 @@ export default function RemindersTab() {
           checkoutOpen: checkoutOpenUtc.toISOString(),
           isPastConfDeadline: nowUtc >= checkinDueUtc,
           isPastPerfDeadline: nowUtc >= checkoutOpenUtc,
+          confExcused,
+          perfExcused,
         };
         if (meta.indexOf(m) < 3) console.log('📧 Staff check:', debugInfo);
 
-        if (!a.has_conf && nowUtc >= checkinDueUtc) {
+        if (!confExcused && !a.has_conf && nowUtc >= checkinDueUtc) {
           needConfidence.push({
             id: m.id,
             name: m.name,
@@ -236,7 +268,7 @@ export default function RemindersTab() {
           });
         }
 
-        if (!a.has_perf && nowUtc >= checkoutOpenUtc) {
+        if (!perfExcused && !a.has_perf && nowUtc >= checkoutOpenUtc) {
           needPerformance.push({
             id: m.id,
             name: m.name,

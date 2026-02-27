@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,6 +81,28 @@ export default function CoachDashboardV2({
   // Location excuses for this week
   const { excuses } = useLocationExcuses(weekOfString);
   
+  // Individual staff excuses for this week
+  const [staffExcuseMap, setStaffExcuseMap] = useState<Map<string, { confExcused: boolean; perfExcused: boolean }>>(new Map());
+  
+  useEffect(() => {
+    if (!weekOfString) return;
+    const fetchStaffExcuses = async () => {
+      const { data } = await supabase
+        .from('excused_submissions')
+        .select('staff_id, metric')
+        .eq('week_of', weekOfString);
+      const map = new Map<string, { confExcused: boolean; perfExcused: boolean }>();
+      (data ?? []).forEach(e => {
+        const existing = map.get(e.staff_id) || { confExcused: false, perfExcused: false };
+        if (e.metric === 'confidence') existing.confExcused = true;
+        if (e.metric === 'performance') existing.perfExcused = true;
+        map.set(e.staff_id, existing);
+      });
+      setStaffExcuseMap(map);
+    };
+    fetchStaffExcuses();
+  }, [weekOfString]);
+  
   // Build lookup map: locationId -> { confExcused, perfExcused }
   const locationExcuseMap = useMemo(() => {
     const map = new Map<string, { confExcused: boolean; perfExcused: boolean }>();
@@ -92,6 +114,16 @@ export default function CoachDashboardV2({
     });
     return map;
   }, [excuses]);
+  
+  // Helper: check if a staff member's metric is excused (location OR individual)
+  const isMetricExcused = useCallback((staffId: string, locationId: string, metric: 'confidence' | 'performance') => {
+    const locExcuse = locationExcuseMap.get(locationId);
+    const staffExcuse = staffExcuseMap.get(staffId);
+    if (metric === 'confidence') {
+      return !!(locExcuse?.confExcused || staffExcuse?.confExcused);
+    }
+    return !!(locExcuse?.perfExcused || staffExcuse?.perfExcused);
+  }, [locationExcuseMap, staffExcuseMap]);
 
   // Week navigation
   const handlePreviousWeek = () => {
@@ -252,22 +284,19 @@ export default function CoachDashboardV2({
 
   // Missing counts for reminder buttons - exclude staff at excused locations
   const missingConfCount = sortedRows.filter(s => {
-    const excuse = locationExcuseMap.get(s.location_id);
-    if (excuse?.confExcused) return false;
+    if (isMetricExcused(s.staff_id, s.location_id, 'confidence')) return false;
     return s.conf_count < s.assignment_count;
   }).length;
   
   const missingPerfCount = sortedRows.filter(s => {
-    const excuse = locationExcuseMap.get(s.location_id);
-    if (excuse?.perfExcused) return false;
+    if (isMetricExcused(s.staff_id, s.location_id, 'performance')) return false;
     return s.perf_count < s.assignment_count;
   }).length;
 
   // Open reminder modals - filter out excused locations
   const openConfidenceReminder = () => {
     const missing = sortedRows.filter(s => {
-      const excuse = locationExcuseMap.get(s.location_id);
-      if (excuse?.confExcused) return false;
+      if (isMetricExcused(s.staff_id, s.location_id, 'confidence')) return false;
       return s.conf_count < s.assignment_count;
     });
     const recipients = missing.map(s => ({
@@ -284,8 +313,7 @@ export default function CoachDashboardV2({
 
   const openPerformanceReminder = () => {
     const missing = sortedRows.filter(s => {
-      const excuse = locationExcuseMap.get(s.location_id);
-      if (excuse?.perfExcused) return false;
+      if (isMetricExcused(s.staff_id, s.location_id, 'performance')) return false;
       return s.perf_count < s.assignment_count;
     });
     const recipients = missing.map(s => ({
@@ -553,14 +581,14 @@ export default function CoachDashboardV2({
                             <StatusPill
                               hasAll={hasAllConf}
                               hasAnyLate={row.scores.some(s => s.confidence_late)}
-                              isExcused={locationExcuseMap.get(row.location_id)?.confExcused}
+                              isExcused={isMetricExcused(row.staff_id, row.location_id, 'confidence')}
                             />
                           </TableCell>
                           <TableCell className="text-center">
                             <StatusPill
                               hasAll={hasAllPerf}
                               hasAnyLate={row.scores.some(s => s.performance_late)}
-                              isExcused={locationExcuseMap.get(row.location_id)?.perfExcused}
+                              isExcused={isMetricExcused(row.staff_id, row.location_id, 'performance')}
                             />
                           </TableCell>
                         </TableRow>

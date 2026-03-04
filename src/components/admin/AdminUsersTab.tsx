@@ -61,6 +61,7 @@ export function AdminUsersTab() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [organizations, setOrganizations] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -77,7 +78,7 @@ export function AdminUsersTab() {
 
   const loadUsers = async (page = 1, search = searchTerm) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) setLoading(true);
       
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: { 
@@ -105,6 +106,7 @@ export function AdminUsersTab() {
       });
     } finally {
       setLoading(false);
+      setIsInitialLoad(false);
     }
   };
 

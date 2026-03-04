@@ -1614,6 +1614,8 @@ export type Database = {
       staff: {
         Row: {
           allow_backfill_until: string | null
+          baseline_released_at: string | null
+          baseline_released_by: string | null
           coach_scope_id: string | null
           coach_scope_type: string | null
           created_at: string | null
@@ -1644,6 +1646,8 @@ export type Database = {
         }
         Insert: {
           allow_backfill_until?: string | null
+          baseline_released_at?: string | null
+          baseline_released_by?: string | null
           coach_scope_id?: string | null
           coach_scope_type?: string | null
           created_at?: string | null
@@ -1674,6 +1678,8 @@ export type Database = {
         }
         Update: {
           allow_backfill_until?: string | null
+          baseline_released_at?: string | null
+          baseline_released_by?: string | null
           coach_scope_id?: string | null
           coach_scope_type?: string | null
           created_at?: string | null

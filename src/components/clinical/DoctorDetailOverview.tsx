@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarPlus, FileText, Video } from 'lucide-react';
+import { CalendarPlus, FileText, Video, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { MeetingScheduleDialog } from '@/components/clinical/MeetingScheduleDialog';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useToast } from '@/hooks/use-toast';
 
 interface Session {
   id: string;
@@ -30,9 +31,28 @@ interface Props {
 
 export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus }: Props) {
   const { data: myStaff } = useStaffProfile();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [prepSessionId, setPrepSessionId] = useState<string | null>(null);
   const [showPrepSheet, setShowPrepSheet] = useState(false);
+
+  const releaseMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('staff')
+        .update({ baseline_released_at: new Date().toISOString(), baseline_released_by: user.id } as any)
+        .eq('id', doctor.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
+      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment.` });
+    },
+    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
 
   const upcomingSession = sessions
     .filter(s => ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(s.status))
@@ -106,8 +126,32 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   const hasConfirmedSession = sessions.some(s => s.status === 'doctor_confirmed');
   const scheduleLabel = hasConfirmedSession ? 'Schedule Follow-up' : 'Schedule Baseline Review';
 
+  const isNotReleased = journeyStatus.stage === 'invited';
+
   return (
     <div className="space-y-4">
+      {/* Release Baseline Button */}
+      {isNotReleased && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex items-center justify-between py-4">
+            <div>
+              <p className="text-sm font-medium">Ready to release baseline?</p>
+              <p className="text-xs text-muted-foreground">
+                This will allow {doctor.name} to begin their self-assessment.
+              </p>
+            </div>
+            <Button
+              onClick={() => releaseMutation.mutate()}
+              disabled={releaseMutation.isPending}
+              className="gap-2"
+            >
+              <Send className="h-4 w-4" />
+              {releaseMutation.isPending ? 'Releasing…' : 'Release Baseline'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Schedule Button */}
       {canSchedule && (
         <Card className="border-dashed">

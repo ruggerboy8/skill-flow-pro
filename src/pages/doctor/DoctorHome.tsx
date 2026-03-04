@@ -51,6 +51,7 @@ export default function DoctorHome() {
     baseline ? { status: baseline.status, completed_at: baseline.completed_at } : null,
     null, // doctor doesn't see coach baseline
     sessions || [],
+    staff?.baseline_released_at,
   );
 
   const displayName = staff?.name || 'Doctor';
@@ -213,6 +214,33 @@ export default function DoctorHome() {
                 <Eye className="h-4 w-4" />
                 View My Baseline
               </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Baseline released but not started — show CTA to begin
+    if (staff?.baseline_released_at && !baseline) {
+      return (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <ClipboardCheck className="h-8 w-8 text-primary" />
+              <div>
+                <CardTitle>Your Baseline Is Ready</CardTitle>
+                <CardDescription>
+                  Your clinical director has opened your baseline self-assessment.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Take 15–20 minutes to rate yourself on each Pro Move. Your responses are private and help guide your coaching journey.
+            </p>
+            <Link to="/doctor/baseline">
+              <Button className="w-full">Start Baseline Assessment</Button>
             </Link>
           </CardContent>
         </Card>

@@ -2,6 +2,7 @@
 
 export type DoctorJourneyStage =
   | 'invited'
+  | 'baseline_released'
   | 'baseline_in_progress'
   | 'baseline_submitted'
   | 'director_baseline_pending'
@@ -42,7 +43,8 @@ interface SessionInfo {
 export function getDoctorJourneyStatus(
   baseline: BaselineInfo | null | undefined,
   coachBaseline: CoachBaselineInfo | null | undefined,
-  sessions: SessionInfo[] | null | undefined
+  sessions: SessionInfo[] | null | undefined,
+  baselineReleasedAt?: string | null,
 ): DoctorJourneyStatus {
   // Check sessions first (highest priority — active coaching cycle)
   if (sessions && sessions.length > 0) {
@@ -159,12 +161,23 @@ export function getDoctorJourneyStatus(
     };
   }
 
+  // Baseline released but not started yet
+  if (baselineReleasedAt && !baseline) {
+    return {
+      stage: 'baseline_released',
+      label: 'Baseline Available',
+      variant: 'secondary',
+      colorClass: 'bg-blue-100 text-blue-800',
+      nextAction: 'Doctor can now start their baseline self-assessment',
+    };
+  }
+
   // Default: invited
   return {
     stage: 'invited',
     label: 'Invited',
     variant: 'secondary',
     colorClass: 'bg-muted text-muted-foreground',
-    nextAction: 'Waiting for doctor to begin their baseline',
+    nextAction: 'Release the baseline when ready for the doctor to begin',
   };
 }

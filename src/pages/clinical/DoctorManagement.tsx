@@ -35,7 +35,7 @@ export default function DoctorManagement() {
     queryFn: async (): Promise<DoctorRow[]> => {
       const { data: staffData, error: staffErr } = await supabase
         .from('staff')
-        .select(`id, name, email, created_at, locations (name)`)
+        .select(`id, name, email, created_at, baseline_released_at, locations (name)`)
         .eq('is_doctor', true)
         .order('name');
       
@@ -83,6 +83,7 @@ export default function DoctorManagement() {
           baseline ? { status: baseline.status, completed_at: baseline.completed_at } : null,
           coachBaseline ? { status: coachBaseline.status } : null,
           sessions,
+          (s as any).baseline_released_at,
         );
 
         // Find next upcoming meeting

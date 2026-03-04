@@ -24,7 +24,7 @@ export default function DoctorDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('staff')
-        .select(`id, name, email, created_at, locations (name)`)
+        .select(`id, name, email, created_at, baseline_released_at, locations (name)`)
         .eq('id', staffId)
         .eq('is_doctor', true)
         .single();
@@ -113,6 +113,7 @@ export default function DoctorDetail() {
     baseline ? { status: baseline.status, completed_at: baseline.completed_at } : null,
     coachAssessment ? { status: coachAssessment.status } : null,
     sessions || [],
+    (doctor as any)?.baseline_released_at,
   );
 
   return (

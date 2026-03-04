@@ -128,17 +128,17 @@ export function ClinicalBaselineResults({
     enabled: !!assessmentId,
   });
 
-  // Always fetch coach ratings (needed for tally cards)
+  // Always fetch coach ratings (needed for tally cards) - find any completed coach assessment for this doctor
   const { data: coachItems } = useQuery({
-    queryKey: ['coach-baseline-items-compare', staffId, myStaff?.id],
+    queryKey: ['coach-baseline-items-compare', staffId],
     queryFn: async () => {
-      if (!myStaff?.id) return [];
       const { data: assessment, error: aErr } = await supabase
         .from('coach_baseline_assessments')
         .select('id')
         .eq('doctor_staff_id', staffId)
-        .eq('coach_staff_id', myStaff.id)
         .eq('status', 'completed')
+        .order('completed_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
       if (aErr) throw aErr;
       if (!assessment) return [];
@@ -146,12 +146,11 @@ export function ClinicalBaselineResults({
       const { data, error } = await supabase
         .from('coach_baseline_items')
         .select('action_id, rating, note_text')
-        .eq('assessment_id', assessment.id)
-        .not('rating', 'is', null);
+        .eq('assessment_id', assessment.id);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!myStaff?.id,
+    enabled: !!staffId,
   });
 
   // Build coach ratings + notes lookup

@@ -79,7 +79,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
             action: 'invite_doctor',
             email: email.trim(),
             name: name.trim(),
-            organization_id: groupId,
+            group_id: groupId,
             location_id: locationId === '__roaming__' ? null : locationId,
           }),
         }

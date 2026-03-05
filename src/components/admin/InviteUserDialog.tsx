@@ -16,7 +16,7 @@ interface Role {
 interface Location {
   id: string;
   name: string;
-  organization_id?: string;
+  group_id?: string;
 }
 
 interface Organization {
@@ -41,7 +41,7 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
   const [formData, setFormData] = useState({
     email: "",
     name: "",
-    organization_id: "",
+    group_id: "",
     role_id: "",
     location_id: "",
     participation_start_at: "",
@@ -49,12 +49,12 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
 
   // Filter locations based on selected organization
   const filteredLocations = useMemo(() => {
-    if (!formData.organization_id) return [];
-    return locations.filter(loc => loc.organization_id === formData.organization_id);
-  }, [formData.organization_id, locations]);
+    if (!formData.group_id) return [];
+    return locations.filter(loc => loc.group_id === formData.group_id);
+  }, [formData.group_id, locations]);
 
   // Check if form is valid (all required fields filled)
-  const isFormValid = formData.email && formData.name && formData.organization_id && formData.role_id && formData.location_id;
+  const isFormValid = formData.email && formData.name && formData.group_id && formData.role_id && formData.location_id;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +108,7 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
     setFormData({
       email: "",
       name: "",
-      organization_id: "",
+      group_id: "",
       role_id: "",
       location_id: "",
       participation_start_at: "",
@@ -127,7 +127,7 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
   const handleOrganizationChange = (orgId: string) => {
     setFormData({ 
       ...formData, 
-      organization_id: orgId,
+      group_id: orgId,
       location_id: "" // Clear location when org changes
     });
   };
@@ -196,7 +196,7 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
 
           <div className="space-y-2">
             <Label htmlFor="organization">Group *</Label>
-            <Select value={formData.organization_id} onValueChange={handleOrganizationChange}>
+            <Select value={formData.group_id} onValueChange={handleOrganizationChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Select group" />
               </SelectTrigger>
@@ -215,10 +215,10 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
             <Select 
               value={formData.location_id} 
               onValueChange={(value) => setFormData({ ...formData, location_id: value })}
-              disabled={!formData.organization_id}
+              disabled={!formData.group_id}
             >
               <SelectTrigger>
-                <SelectValue placeholder={formData.organization_id ? "Select a location" : "Select group first"} />
+                <SelectValue placeholder={formData.group_id ? "Select a location" : "Select group first"} />
               </SelectTrigger>
               <SelectContent>
                 {filteredLocations.map((location) => (

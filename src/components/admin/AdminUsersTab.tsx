@@ -29,7 +29,7 @@ interface User {
   role_name?: string;
   location_id?: string;
   location_name?: string;
-  organization_id?: string;
+  group_id?: string;
   is_super_admin: boolean;
   is_org_admin: boolean;
   is_coach: boolean;

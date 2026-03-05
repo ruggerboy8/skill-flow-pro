@@ -222,7 +222,7 @@ export async function computeWeekState(params: {
   // Support masquerade: if staffId is passed, query by id; otherwise query by user_id
   let staffQuery = supabase
     .from('staff')
-    .select('*, locations!inner(organization_id, timezone)');
+    .select('*, locations!inner(group_id, timezone)');
   
   if (passedStaffId) {
     staffQuery = staffQuery.eq('id', passedStaffId);
@@ -237,7 +237,7 @@ export async function computeWeekState(params: {
   }
 
   const roleId = params.roleId || staff.role_id;
-  const orgId = (staff.locations as any)?.organization_id;
+  const orgId = (staff.locations as any)?.group_id;
   const orgTz = (staff.locations as any)?.timezone || 'America/Chicago';
 
   // Check eligibility (onboarding status)

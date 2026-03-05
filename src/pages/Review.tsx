@@ -13,7 +13,7 @@ type Staff = {
   id: string; 
   role_id: number;
   locations?: {
-    organization_id: string;
+    group_id: string;
   };
 };
 type FocusRow = {

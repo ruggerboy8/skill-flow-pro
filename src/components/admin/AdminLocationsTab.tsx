@@ -47,7 +47,7 @@ export function AdminLocationsTab() {
         .from("locations")
         .select(`
           id, name, group_id, timezone, program_start_date, cycle_length_weeks, active,
-          practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
+          practice_group:practice_groups!locations_org_fkey(name)
         `)
         .order("name");
 

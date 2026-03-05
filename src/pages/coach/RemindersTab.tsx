@@ -145,7 +145,7 @@ export default function RemindersTab() {
         .select(`
           id, name, email, user_id, role_id, is_participant,
           locations:primary_location_id(id, name, timezone, group_id, conf_due_day, conf_due_time, perf_due_day, perf_due_time,
-            practice_group:practice_groups!locations_group_id_fkey(id, name)
+            practice_group:practice_groups!locations_org_fkey(id, name)
           ),
           roles:role_id(role_name)
         `)

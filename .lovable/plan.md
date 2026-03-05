@@ -1,65 +1,43 @@
 
 
-## Plan: Rename `organizations` → `groups` in Database and Code
+## Comprehensive FK Join Hint Audit
 
-### The Problem
-The database table is called `organizations` with `organization_id` foreign keys everywhere. When enterprise multi-tenancy is built, "organization" will mean the top-level tenant (e.g., "Alcan"). The current `organizations` table represents sub-groups (e.g., "Big Apple", "Kids Tooth Team MI"). Keeping both as "organization" in code will cause persistent confusion.
+### Problem Found
 
-### Scope Assessment
+The database has **two** FK constraints from `locations` to `practice_groups`:
+1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
+2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
 
-This is a large but mechanical rename touching:
-- **1 table**: `organizations` → `groups`
-- **1 column on `locations`**: `organization_id` → `group_id`
-- **~5 RPC functions** that return `organization_id`/`organization_name` columns
-- **~10 views/functions** in SQL that JOIN on `organizations`
-- **~42 TypeScript/TSX files** referencing `organization_id`, `organizationId`, `organization_name`
-- **1 edge function** (`admin-users`) referencing `organization_id`
-- **Types file** (`types.ts`) auto-regenerates from schema
+Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
 
-### Recommended Approach: Phased Migration
+### Issues to Fix
 
-**Phase 1 — Database rename (single migration)**
-```sql
--- Rename table
-ALTER TABLE organizations RENAME TO groups;
+**1. Wrong FK hint name (will fail at runtime)**
+These files reference `locations_group_id_fkey` which does not exist as a constraint:
 
--- Rename FK column on locations
-ALTER TABLE locations RENAME COLUMN organization_id TO group_id;
+| File | Line |
+|------|------|
+| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
+| `src/pages/coach/RemindersTab.tsx` | 148 |
 
--- Rename FK constraint
-ALTER TABLE locations RENAME CONSTRAINT locations_organization_id_fkey TO locations_group_id_fkey;
+Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
 
--- Recreate/update all affected RPC functions to use new names
--- (each function that references organizations or organization_id)
+**2. Corrupted select syntax (double alias, double parentheses)**
+`src/components/admin/AdminLocationsTab.tsx` line 50 has:
+```
+practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
+```
+This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
+```
+practice_group:practice_groups!locations_org_fkey(name)
 ```
 
-All RPC functions that return `organization_id`/`organization_name` columns need updating. Since RPCs define their own return types, the column aliases change too (e.g., `o.name AS group_name`).
+**3. No issues (already correct)**
+- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
+- All `scope_organization_id` references — intentional audit table column ✓
+- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
 
-**Phase 2 — Frontend code rename**
-- All `.ts`/`.tsx` files: `organization_id` → `group_id`, `organizationId` → `groupId`, `organization_name` → `group_name`
-- Type interfaces in `coachV2.ts`, `analytics.ts`, `evalMetricsV2.ts`, hooks, etc.
-- Supabase query strings: `.from("organizations")` → `.from("groups")`
-- Edge function `admin-users/index.ts`
+### Summary
 
-**Phase 3 — Types regeneration**
-After migration runs, `types.ts` auto-regenerates to reflect the new schema.
-
-### Risk Assessment
-
-| Risk | Mitigation |
-|------|-----------|
-| Breaking RPC return types | Update all RPCs in the same migration |
-| Missing a reference | Systematic grep-based search; TypeScript compiler will catch mismatches after types regenerate |
-| RLS policies reference old names | Migration updates all policies |
-| Edge function references | Update in same PR |
-| Sequencer/planner functions use `org_id` | These already use `org_id` (not `organization_id`), so they're unaffected unless they JOIN `organizations` by name |
-
-### Recommendation
-
-This is worth doing **now**, before enterprise work begins. The migration is mechanical but large. I'd suggest we tackle it in two implementation messages:
-
-1. **Database migration**: One SQL migration that renames the table, column, constraints, RLS policies, and all affected RPC functions
-2. **Code update**: Rename all TypeScript references across ~42 files
-
-Want me to proceed with this plan?
+3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
 

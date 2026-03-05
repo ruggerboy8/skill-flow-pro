@@ -81,7 +81,7 @@ export type Database = {
             foreignKeyName: "admin_audit_scope_organization_id_fkey"
             columns: ["scope_organization_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
@@ -1022,7 +1022,7 @@ export type Database = {
             foreignKeyName: "learning_resources_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
@@ -1048,10 +1048,10 @@ export type Database = {
           conf_due_time: string
           created_at: string
           cycle_length_weeks: number
+          group_id: string
           id: string
           name: string
           onboarding_active: boolean | null
-          organization_id: string
           perf_due_day: number
           perf_due_time: string
           program_start_date: string
@@ -1064,10 +1064,10 @@ export type Database = {
           conf_due_time?: string
           created_at?: string
           cycle_length_weeks?: number
+          group_id: string
           id?: string
           name: string
           onboarding_active?: boolean | null
-          organization_id: string
           perf_due_day?: number
           perf_due_time?: string
           program_start_date: string
@@ -1080,10 +1080,10 @@ export type Database = {
           conf_due_time?: string
           created_at?: string
           cycle_length_weeks?: number
+          group_id?: string
           id?: string
           name?: string
           onboarding_active?: boolean | null
-          organization_id?: string
           perf_due_day?: number
           perf_due_time?: string
           program_start_date?: string
@@ -1093,16 +1093,16 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "locations_org_fkey"
-            columns: ["organization_id"]
+            columns: ["group_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "locations_organization_id_fkey"
-            columns: ["organization_id"]
+            columns: ["group_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -1159,33 +1159,6 @@ export type Database = {
           },
         ]
       }
-      organizations: {
-        Row: {
-          active: boolean | null
-          created_at: string
-          id: string
-          is_sandbox: boolean | null
-          name: string
-          slug: string
-        }
-        Insert: {
-          active?: boolean | null
-          created_at?: string
-          id?: string
-          is_sandbox?: boolean | null
-          name: string
-          slug: string
-        }
-        Update: {
-          active?: boolean | null
-          created_at?: string
-          id?: string
-          is_sandbox?: boolean | null
-          name?: string
-          slug?: string
-        }
-        Relationships: []
-      }
       orphaned_scores_log: {
         Row: {
           action_id: number | null
@@ -1213,6 +1186,33 @@ export type Database = {
           score_id?: string | null
           staff_id?: string | null
           week_of?: string | null
+        }
+        Relationships: []
+      }
+      practice_groups: {
+        Row: {
+          active: boolean | null
+          created_at: string
+          id: string
+          is_sandbox: boolean | null
+          name: string
+          slug: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string
+          id?: string
+          is_sandbox?: boolean | null
+          name: string
+          slug: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string
+          id?: string
+          is_sandbox?: boolean | null
+          name?: string
+          slug?: string
         }
         Relationships: []
       }
@@ -1576,7 +1576,7 @@ export type Database = {
             foreignKeyName: "sequencer_runs_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -2164,7 +2164,7 @@ export type Database = {
             foreignKeyName: "weekly_plan_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
@@ -2417,14 +2417,14 @@ export type Database = {
             foreignKeyName: "locations_org_fkey"
             columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "locations_organization_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -2437,9 +2437,9 @@ export type Database = {
           evaluation_at: string | null
           evaluation_id: string | null
           evaluation_type: string | null
+          group_id: string | null
           location_name: string | null
           observer_score: number | null
-          organization_id: string | null
           primary_location_id: string | null
           program_year: number | null
           quarter: string | null
@@ -2479,16 +2479,16 @@ export type Database = {
           },
           {
             foreignKeyName: "locations_org_fkey"
-            columns: ["organization_id"]
+            columns: ["group_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "locations_organization_id_fkey"
-            columns: ["organization_id"]
+            columns: ["group_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
@@ -2578,14 +2578,14 @@ export type Database = {
             foreignKeyName: "locations_org_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "locations_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
@@ -2654,7 +2654,7 @@ export type Database = {
           created_at: string | null
           domain_id: number | null
           domain_name: string | null
-          organization_id: string | null
+          group_id: string | null
           performance_score: number | null
           primary_location_id: string | null
           role_id: number | null
@@ -2666,16 +2666,16 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "locations_org_fkey"
-            columns: ["organization_id"]
+            columns: ["group_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "locations_organization_id_fkey"
-            columns: ["organization_id"]
+            columns: ["group_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "practice_groups"
             referencedColumns: ["id"]
           },
           {
@@ -2839,12 +2839,12 @@ export type Database = {
           backlog_count: number
           conf_late_count: number
           conf_submitted_count: number
+          group_id: string
+          group_name: string
           last_conf_at: string
           last_perf_at: string
           location_id: string
           location_name: string
-          organization_id: string
-          organization_name: string
           perf_late_count: number
           perf_submitted_count: number
           required_count: number
@@ -3007,10 +3007,10 @@ export type Database = {
           confidence_late: boolean
           confidence_score: number
           domain_name: string
+          group_id: string
+          group_name: string
           location_id: string
           location_name: string
-          organization_id: string
-          organization_name: string
           performance_date: string
           performance_late: boolean
           performance_score: number
@@ -3076,11 +3076,11 @@ export type Database = {
           display_order: number
           domain_id: number
           domain_name: string
+          group_id: string
+          group_name: string
           is_self_select: boolean
           location_id: string
           location_name: string
-          organization_id: string
-          organization_name: string
           performance_date: string
           performance_late: boolean
           performance_score: number
@@ -3205,10 +3205,10 @@ export type Database = {
           display_order: number
           domain_id: number
           domain_name: string
+          group_id: string
+          group_name: string
           location_id: string
           location_name: string
-          organization_id: string
-          organization_name: string
           performance_date: string
           performance_late: boolean
           performance_score: number

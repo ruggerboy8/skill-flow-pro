@@ -45,7 +45,7 @@ const GRAIN_OPTIONS: { value: ExportGrain; label: string; description: string; i
 ];
 
 interface OrgOption { id: string; name: string; }
-interface LocOption { id: string; name: string; organization_id: string; }
+interface LocOption { id: string; name: string; group_id: string; }
 interface RoleOption { role_id: number; role_name: string; }
 
 // ── Component ──────────────────────────────────────────────────
@@ -67,7 +67,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
     queryKey: ['export-all-orgs'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('organizations')
+        .from('practice_groups')
         .select('id, name')
         .eq('active', true)
         .order('name');
@@ -92,8 +92,8 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
       if (selectedOrgIds.length === 0) return [];
       const { data, error } = await supabase
         .from('locations')
-        .select('id, name, organization_id')
-        .in('organization_id', selectedOrgIds)
+        .select('id, name, group_id')
+        .in('group_id', selectedOrgIds)
         .eq('active', true)
         .order('name');
       if (error) throw error;
@@ -194,7 +194,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
       for (const orgId of selectedOrgIds) {
         // Get locations for org (filtered by selectedLocationIds)
         const orgLocationIds = allLocations
-          .filter(l => l.organization_id === orgId && selectedLocationIds.includes(l.id))
+          .filter(l => l.group_id === orgId && selectedLocationIds.includes(l.id))
           .map(l => l.id);
         if (orgLocationIds.length === 0) continue;
 
@@ -275,7 +275,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
         const orgName = orgNameMap.get(orgId) || '';
 
         // 1. Resolve scope for this org (use selected locations)
-        const orgLocs = allLocations.filter(l => l.organization_id === orgId && selectedLocationIds.includes(l.id));
+        const orgLocs = allLocations.filter(l => l.group_id === orgId && selectedLocationIds.includes(l.id));
         const scopeLocationIds = orgLocs.map(l => l.id);
 
         if (scopeLocationIds.length === 0) continue;

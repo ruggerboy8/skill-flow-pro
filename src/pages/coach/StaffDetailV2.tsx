@@ -117,7 +117,7 @@ export default function StaffDetailV2() {
       role_name: firstSummary.role_name,
       location_id: firstSummary.location_id,
       location_name: firstSummary.location_name,
-      organization_name: firstSummary.organization_name,
+      organization_name: firstSummary.group_name,
     };
   }, [weekSummaries]);
 

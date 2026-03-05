@@ -19,7 +19,7 @@ interface Location {
   timezone: string;
   program_start_date: string;
   cycle_length_weeks: number;
-  organization_id: string;
+  group_id: string;
   organization?: {
     name: string;
   };
@@ -48,7 +48,7 @@ export function LocationDialog({ open, onClose, location }: LocationDialogProps)
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
-    organization_id: '',
+    group_id: '',
     timezone: 'America/Chicago',
     program_start_date: '',
     cycle_length_weeks: 6
@@ -63,7 +63,7 @@ export function LocationDialog({ open, onClose, location }: LocationDialogProps)
       setFormData({
         name: location.name,
         slug: location.slug,
-        organization_id: location.organization_id,
+        group_id: location.group_id,
         timezone: location.timezone,
         program_start_date: location.program_start_date.split('T')[0], // Convert to YYYY-MM-DD format
         cycle_length_weeks: location.cycle_length_weeks
@@ -72,7 +72,7 @@ export function LocationDialog({ open, onClose, location }: LocationDialogProps)
       setFormData({
         name: '',
         slug: '',
-        organization_id: '',
+        group_id: '',
         timezone: 'America/Chicago',
         program_start_date: '',
         cycle_length_weeks: 6
@@ -94,7 +94,7 @@ export function LocationDialog({ open, onClose, location }: LocationDialogProps)
   async function loadOrganizations() {
     try {
       const { data, error } = await supabase
-        .from('organizations')
+        .from('practice_groups')
         .select('id, name')
         .order('name');
 
@@ -136,7 +136,7 @@ export function LocationDialog({ open, onClose, location }: LocationDialogProps)
           .update({
             name: formData.name,
             slug: formData.slug,
-            organization_id: formData.organization_id,
+            group_id: formData.group_id,
             timezone: formData.timezone,
             program_start_date: formData.program_start_date,
             cycle_length_weeks: formData.cycle_length_weeks
@@ -156,7 +156,7 @@ export function LocationDialog({ open, onClose, location }: LocationDialogProps)
           .insert({
             name: formData.name,
             slug: formData.slug,
-            organization_id: formData.organization_id,
+            group_id: formData.group_id,
             timezone: formData.timezone,
             program_start_date: formData.program_start_date,
             cycle_length_weeks: formData.cycle_length_weeks
@@ -201,10 +201,10 @@ export function LocationDialog({ open, onClose, location }: LocationDialogProps)
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="organization">Organization</Label>
+              <Label htmlFor="organization">Group</Label>
               <Select
-                value={formData.organization_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, organization_id: value }))}
+                value={formData.group_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, group_id: value }))}
                 required
               >
                 <SelectTrigger>

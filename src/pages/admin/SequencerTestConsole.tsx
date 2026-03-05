@@ -42,7 +42,7 @@ export function SequencerTestConsole() {
             id, 
             role_id, 
             primary_location_id, 
-            locations!inner(organization_id, name),
+            locations!inner(group_id, name),
             roles!inner(role_name)
           `)
           .eq('user_id', user.id)
@@ -54,14 +54,14 @@ export function SequencerTestConsole() {
           
           // Get org name separately to avoid deep nesting
           const { data: org } = await supabase
-            .from('organizations')
+            .from('practice_groups')
             .select('name')
-            .eq('id', loc.organization_id)
+            .eq('id', loc.group_id)
             .single();
 
           setUserOrgInfo({
             staffId: staff.id,
-            orgId: loc.organization_id,
+            orgId: loc.group_id,
             orgName: org?.name || 'Unknown',
             locationName: loc.name,
             roleId: staff.role_id,
@@ -81,7 +81,7 @@ export function SequencerTestConsole() {
       setLoadingOrgs(true);
       try {
         const { data } = await supabase
-          .from('organizations')
+          .from('practice_groups')
           .select('id, name')
           .eq('active', true)
           .order('name');
@@ -157,7 +157,7 @@ export function SequencerTestConsole() {
       const { data: locations } = await supabase
         .from('locations')
         .select('timezone')
-        .eq('organization_id', orgId)
+        .eq('group_id', orgId)
         .limit(1);
 
       const tz = locations?.[0]?.timezone || 'America/Chicago';
@@ -248,7 +248,7 @@ export function SequencerTestConsole() {
       const { data: locations } = await supabase
         .from('locations')
         .select('timezone')
-        .eq('organization_id', orgId)
+        .eq('group_id', orgId)
         .limit(1);
 
       const tz = locations?.[0]?.timezone || 'America/Chicago';

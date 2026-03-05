@@ -60,12 +60,12 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization 
 
       if (isEditing) {
         ({ error } = await supabase
-          .from("organizations")
+          .from("practice_groups")
           .update(organizationData)
           .eq("id", organization.id));
       } else {
         ({ error } = await supabase
-          .from("organizations")
+          .from("practice_groups")
           .insert([organizationData]));
       }
 

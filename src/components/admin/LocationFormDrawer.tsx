@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface Location {
   id?: string;
   name: string;
-  organization_id: string | null;
+  group_id: string | null;
   timezone: string;
   program_start_date: string;
   cycle_length_weeks: number;
@@ -65,7 +65,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    organization_id: "",
+    group_id: "",
     timezone: "America/Chicago",
     program_start_date: new Date(),
     cycle_length_weeks: 6,
@@ -86,7 +86,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
       
       setFormData({
         name: location.name,
-        organization_id: location.organization_id || "",
+        group_id: location.group_id || "",
         timezone: location.timezone,
         program_start_date: dateObj,
         cycle_length_weeks: location.cycle_length_weeks,
@@ -98,7 +98,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
     } else if (open) {
       setFormData({
         name: "",
-        organization_id: "",
+        group_id: "",
         timezone: "America/Chicago",
         program_start_date: new Date(),
         cycle_length_weeks: 6,
@@ -132,7 +132,7 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
       const locationData = {
         name: formData.name,
         slug: slug,
-        organization_id: formData.organization_id === "none" ? null : (formData.organization_id || null),
+        group_id: formData.group_id === "none" ? null : (formData.group_id || null),
         timezone: formData.timezone,
         program_start_date: formData.program_start_date.toISOString().split('T')[0],
         cycle_length_weeks: formData.cycle_length_weeks,
@@ -202,8 +202,8 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
           <div className="space-y-2">
             <Label htmlFor="organization">Group</Label>
             <Select 
-              value={formData.organization_id} 
-              onValueChange={(value) => setFormData({ ...formData, organization_id: value })}
+              value={formData.group_id} 
+              onValueChange={(value) => setFormData({ ...formData, group_id: value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a group" />

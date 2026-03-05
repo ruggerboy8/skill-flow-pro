@@ -31,7 +31,7 @@ export function AdminOrganizationsTab() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from("organizations")
+        .from("practice_groups")
         .select("*")
         .order("name");
 
@@ -78,7 +78,7 @@ export function AdminOrganizationsTab() {
       const { count } = await supabase
         .from("locations")
         .select("*", { count: "exact", head: true })
-        .eq("organization_id", organization.id)
+        .eq("group_id", organization.id)
         .eq("active", true);
 
       if (count && count > 0) {
@@ -93,7 +93,7 @@ export function AdminOrganizationsTab() {
 
     try {
       const { error } = await supabase
-        .from("organizations")
+        .from("practice_groups")
         .update({ active: !organization.active })
         .eq("id", organization.id);
 

@@ -116,7 +116,7 @@ export async function assembleWeek(params: {
   // Fetch location timezone
   const { data: locationData } = await supabase
     .from('locations')
-    .select('timezone, organization_id, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
+    .select('timezone, group_id, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
     .eq('id', locationId)
     .maybeSingle();
 

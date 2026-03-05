@@ -28,7 +28,7 @@ export interface StaffProfile {
   allow_backfill_until: string | null;
   baseline_released_at: string | null;
   locations: {
-    organization_id: string;
+    group_id: string;
     program_start_date: string;
     cycle_length_weeks: number;
     timezone?: string;
@@ -87,7 +87,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           allow_backfill_until,
           baseline_released_at,
           locations (
-            organization_id,
+            group_id,
             program_start_date,
             cycle_length_weeks,
             timezone,

@@ -10,8 +10,8 @@ interface MyWeeklyScore {
   role_name: string;
   location_id: string;
   location_name: string;
-  organization_id: string;
-  organization_name: string;
+  group_id: string;
+  group_name: string;
   week_of: string;
   action_id: number;
   action_statement: string;
@@ -83,8 +83,8 @@ export function useMyWeeklyScores(options: UseMyWeeklyScoresOptions = {}) {
             role_name: row.role_name,
             location_id: row.location_id,
             location_name: row.location_name,
-            organization_id: row.organization_id,
-            organization_name: row.organization_name,
+            group_id: row.group_id,
+            group_name: row.group_name,
             week_of: weekKey,
             assignment_count: 0,
             conf_count: 0,

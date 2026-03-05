@@ -8,8 +8,8 @@ export interface RawScoreRow {
   role_name: string;
   location_id: string;
   location_name: string;
-  organization_id: string;
-  organization_name: string;
+  group_id: string;
+  group_name: string;
   score_id: string | null;
   week_of: string | null;
   assignment_id: string | null;
@@ -40,8 +40,8 @@ export interface StaffWeekSummary {
   role_name: string;
   location_id: string;
   location_name: string;
-  organization_id: string;
-  organization_name: string;
+  group_id: string;
+  group_name: string;
   week_of: string;
   assignment_count: number;
   conf_count: number;
@@ -60,8 +60,8 @@ export interface StaffWithScores {
     role_name: string;
     location_id: string;
     location_name: string;
-    organization_id: string;
-    organization_name: string;
+    group_id: string;
+    group_name: string;
   };
   scores: RawScoreRow[];
 }

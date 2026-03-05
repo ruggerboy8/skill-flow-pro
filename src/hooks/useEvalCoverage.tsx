@@ -25,7 +25,7 @@ export function useEvalCoverage(filters: EvalFilters): EvalCoverageResult {
       const locationsResult = await supabase
         .from('locations')
         .select('id')
-        .eq('organization_id', organizationId)
+        .eq('group_id', organizationId)
         .eq('active', true);
       
       if (locationsResult.error) throw locationsResult.error;

@@ -57,7 +57,7 @@ export default function RegionalDashboard() {
       // Only super admins get truly unrestricted access
       if (!isSuperAdmin) {
         // Check if user has access via org scope OR location scope
-        const hasOrgAccess = managedOrgIds.includes(s.organization_id);
+        const hasOrgAccess = managedOrgIds.includes(s.group_id);
         const hasLocationAccess = managedLocationIds.includes(s.location_id);
         
         if (!hasOrgAccess && !hasLocationAccess) {

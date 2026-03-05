@@ -59,7 +59,7 @@ export function useEvalDeliveryProgress(
       // 1. Get all active locations with org info
       const { data: locations, error: locError } = await supabase
         .from('locations')
-        .select('id, name, organization_id, organizations!locations_organization_id_fkey(name)')
+        .select('id, name, group_id, practice_group:practice_groups!locations_group_id_fkey(name)')
         .eq('active', true)
         .order('name');
 
@@ -149,12 +149,12 @@ export function useEvalDeliveryProgress(
           ? Math.round((submittedCount / totalStaff) * 100)
           : 0;
 
-        const orgData = loc.organizations as { name: string } | null;
+        const orgData = (loc as any).practice_group as { name: string } | null;
 
         return {
           locationId: loc.id,
           locationName: loc.name,
-          organizationId: loc.organization_id,
+          organizationId: (loc as any).group_id,
           organizationName: orgData?.name || 'Unknown',
           totalStaff,
           submittedCount,

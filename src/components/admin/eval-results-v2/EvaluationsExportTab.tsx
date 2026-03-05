@@ -11,8 +11,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { StepBar } from '@/components/admin/StepBar';
-import { FilterBar } from '@/components/admin/eval-results/FilterBar';
 import { downloadCSV } from '@/lib/csvExport';
 import { calculateSubmissionStats, calculateCutoffDate } from '@/lib/submissionRateCalc';
 import { getPeriodLabel } from '@/types/analytics';
@@ -42,10 +42,9 @@ const GRAIN_OPTIONS: { value: ExportGrain; label: string; description: string; i
   { value: 'organization', label: 'Organization', description: 'One row per organization (aggregated)', icon: <Building2 className="h-5 w-5" /> },
 ];
 
-interface OrgOption {
-  id: string;
-  name: string;
-}
+interface OrgOption { id: string; name: string; }
+interface LocOption { id: string; name: string; organization_id: string; }
+interface RoleOption { role_id: number; role_name: string; }
 
 // ── Component ──────────────────────────────────────────────────
 export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsExportTabProps) {
@@ -54,6 +53,8 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
   const [config, setConfig] = useState<ExportConfig>(DEFAULT_EXPORT_CONFIG);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>([]);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
 
   const isBaseline = filters.evaluationPeriod.type === 'Baseline';
   const hasAnyMetric = config.includeCompletionRate || config.includeOnTimeRate
@@ -81,6 +82,51 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
     }
   }, [allOrgs]);
 
+  // ── Fetch locations for selected orgs ──────────────────────
+  const sortedSelectedOrgIdsForLoc = useMemo(() => [...selectedOrgIds].sort().join(','), [selectedOrgIds]);
+  const { data: allLocations = [], isLoading: locsLoading } = useQuery({
+    queryKey: ['export-locations-for-orgs', sortedSelectedOrgIdsForLoc],
+    queryFn: async () => {
+      if (selectedOrgIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name, organization_id')
+        .in('organization_id', selectedOrgIds)
+        .eq('active', true)
+        .order('name');
+      if (error) throw error;
+      return (data || []) as LocOption[];
+    },
+    enabled: selectedOrgIds.length > 0,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Auto-select all locations when they change
+  useEffect(() => {
+    setSelectedLocationIds(allLocations.map(l => l.id));
+  }, [allLocations]);
+
+  // ── Fetch all roles ────────────────────────────────────────
+  const { data: allRoles = [], isLoading: rolesLoading } = useQuery({
+    queryKey: ['export-all-roles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('roles')
+        .select('role_id, role_name')
+        .order('role_name');
+      if (error) throw error;
+      return (data || []) as RoleOption[];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+
+  // Initialize selectedRoleIds to all roles once loaded
+  useEffect(() => {
+    if (allRoles.length > 0 && selectedRoleIds.length === 0) {
+      setSelectedRoleIds(allRoles.map(r => r.role_id));
+    }
+  }, [allRoles]);
+
   const toggleOrg = (orgId: string) => {
     setSelectedOrgIds(prev =>
       prev.includes(orgId) ? prev.filter(id => id !== orgId) : [...prev, orgId]
@@ -95,9 +141,38 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
     }
   };
 
+  const toggleLocation = (locId: string) => {
+    setSelectedLocationIds(prev =>
+      prev.includes(locId) ? prev.filter(id => id !== locId) : [...prev, locId]
+    );
+  };
+
+  const toggleAllLocations = () => {
+    if (selectedLocationIds.length === allLocations.length) {
+      setSelectedLocationIds([]);
+    } else {
+      setSelectedLocationIds(allLocations.map(l => l.id));
+    }
+  };
+
+  const toggleRole = (roleId: number) => {
+    setSelectedRoleIds(prev =>
+      prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
+    );
+  };
+
+  const toggleAllRoles = () => {
+    if (selectedRoleIds.length === allRoles.length) {
+      setSelectedRoleIds([]);
+    } else {
+      setSelectedRoleIds(allRoles.map(r => r.role_id));
+    }
+  };
+
   // ── Row estimate query ───────────────────────────────────────
   const sortedSelectedOrgIds = useMemo(() => [...selectedOrgIds].sort().join(','), [selectedOrgIds]);
-  const sortedRoleIds = useMemo(() => [...filters.roleIds].sort().join(','), [filters.roleIds]);
+  const sortedRoleIds = useMemo(() => [...selectedRoleIds].sort().join(','), [selectedRoleIds]);
+  const sortedLocationIds = useMemo(() => [...selectedLocationIds].sort().join(','), [selectedLocationIds]);
 
   const { data: rowEstimate, isLoading: estimateLoading } = useQuery({
     queryKey: [
@@ -108,16 +183,17 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
       filters.evaluationPeriod.type === 'Quarterly' ? filters.evaluationPeriod.quarter : 'baseline',
       filters.evaluationPeriod.type,
       sortedRoleIds,
+      sortedLocationIds,
     ],
     queryFn: async () => {
       if (selectedOrgIds.length === 0) return 0;
 
       let totalRows = 0;
       for (const orgId of selectedOrgIds) {
-        // Get locations for org
-        const { data: locData } = await supabase.from('locations').select('id')
-          .eq('organization_id', orgId).eq('active', true);
-        const orgLocationIds = (locData || []).map(l => l.id);
+        // Get locations for org (filtered by selectedLocationIds)
+        const orgLocationIds = allLocations
+          .filter(l => l.organization_id === orgId && selectedLocationIds.includes(l.id))
+          .map(l => l.id);
         if (orgLocationIds.length === 0) continue;
 
         // Get staff count
@@ -125,8 +201,8 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
           .in('primary_location_id', orgLocationIds)
           .eq('is_participant', true)
           .eq('is_paused', false);
-        if (filters.roleIds.length > 0) {
-          staffQuery = staffQuery.in('role_id', filters.roleIds);
+        if (selectedRoleIds.length > 0 && selectedRoleIds.length < allRoles.length) {
+          staffQuery = staffQuery.in('role_id', selectedRoleIds);
         }
         const { count } = await staffQuery;
         const staffCount = count || 0;
@@ -171,10 +247,10 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
   // ── Navigation ───────────────────────────────────────────────
   const canNext = useCallback(() => {
     if (currentStep === 0) return true;
-    if (currentStep === 1) return selectedOrgIds.length > 0;
+    if (currentStep === 1) return selectedOrgIds.length > 0 && selectedLocationIds.length > 0;
     if (currentStep === 2) return hasAnyMetric;
     return false;
-  }, [currentStep, selectedOrgIds.length, hasAnyMetric]);
+  }, [currentStep, selectedOrgIds.length, selectedLocationIds.length, hasAnyMetric]);
 
   // ── Export handler (loops over selected orgs) ────────────────
   const handleExport = async () => {
@@ -196,23 +272,21 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
       for (const orgId of selectedOrgIds) {
         const orgName = orgNameMap.get(orgId) || '';
 
-        // 1. Resolve scope for this org
-        const { data: locData } = await supabase.from('locations').select('id, name')
-          .eq('organization_id', orgId).eq('active', true);
-        const allLocations = locData || [];
-        const scopeLocationIds = allLocations.map(l => l.id);
+        // 1. Resolve scope for this org (use selected locations)
+        const orgLocs = allLocations.filter(l => l.organization_id === orgId && selectedLocationIds.includes(l.id));
+        const scopeLocationIds = orgLocs.map(l => l.id);
 
         if (scopeLocationIds.length === 0) continue;
 
-        const locationMap = new Map(allLocations.map(l => [l.id, l.name]));
+        const locationMap = new Map(orgLocs.map(l => [l.id, l.name]));
 
         // Get staff in scope
         let staffQuery = supabase.from('staff').select('id, name, primary_location_id, role_id')
           .in('primary_location_id', scopeLocationIds)
           .eq('is_participant', true)
           .eq('is_paused', false);
-        if (filters.roleIds.length > 0) {
-          staffQuery = staffQuery.in('role_id', filters.roleIds);
+        if (selectedRoleIds.length > 0 && selectedRoleIds.length < allRoles.length) {
+          staffQuery = staffQuery.in('role_id', selectedRoleIds);
         }
         const { data: staffData } = await staffQuery;
         const staff = staffData || [];
@@ -253,8 +327,8 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
             p_types: types,
             p_program_year: filters.evaluationPeriod.year,
             p_quarter: quarter || null,
-            p_location_ids: null,
-            p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
+            p_location_ids: scopeLocationIds,
+            p_role_ids: selectedRoleIds.length > 0 && selectedRoleIds.length < allRoles.length ? selectedRoleIds : null,
           });
           domainRows = (data || []) as EvalDistributionRow[];
         }
@@ -277,8 +351,8 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
               query = query.eq('evaluations.quarter', filters.evaluationPeriod.quarter);
             }
           }
-          if (filters.roleIds.length > 0) {
-            query = query.in('evaluations.role_id', filters.roleIds);
+          if (selectedRoleIds.length > 0 && selectedRoleIds.length < allRoles.length) {
+            query = query.in('evaluations.role_id', selectedRoleIds);
           }
 
           const { data } = await query;
@@ -349,7 +423,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
               exportVersion: EXPORT_FORMAT.version,
               grain: config.grain,
               period: filters.evaluationPeriod,
-              filtersApplied: { organizationIds: selectedOrgIds, roleIds: filters.roleIds },
+              filtersApplied: { organizationIds: selectedOrgIds, locationIds: selectedLocationIds, roleIds: selectedRoleIds },
               metricFlags: config,
               rowCount: rowEstimate || 0,
               downloadedFiles,
@@ -407,67 +481,114 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
 
       {/* Step 1: Scope */}
       {currentStep === 1 && (
-        <div className="space-y-4">
-          {/* Organization multi-select */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Organizations */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between">
-                <span>Organizations</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleAllOrgs}
-                  className="text-sm font-normal"
-                >
-                  {selectedOrgIds.length === allOrgs.length ? 'Deselect all' : 'Select all'}
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4" />
+                  Organizations
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {selectedOrgIds.length}/{allOrgs.length}
+                  </Badge>
+                </span>
+                <Button variant="ghost" size="sm" onClick={toggleAllOrgs} className="text-xs h-7 px-2">
+                  {selectedOrgIds.length === allOrgs.length ? 'None' : 'All'}
                 </Button>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               {orgsLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-6 w-48" />
-                  <Skeleton className="h-6 w-40" />
-                  <Skeleton className="h-6 w-52" />
-                </div>
-              ) : allOrgs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No organizations found.</p>
+                <div className="space-y-2"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-3/4" /></div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {allOrgs.map(org => (
-                    <div key={org.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`org-${org.id}`}
-                        checked={selectedOrgIds.includes(org.id)}
-                        onCheckedChange={() => toggleOrg(org.id)}
-                      />
-                      <Label htmlFor={`org-${org.id}`} className="cursor-pointer text-sm">
-                        {org.name}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="space-y-1.5 pr-3">
+                    {allOrgs.map(org => (
+                      <div key={org.id} className="flex items-center space-x-2">
+                        <Checkbox id={`org-${org.id}`} checked={selectedOrgIds.includes(org.id)} onCheckedChange={() => toggleOrg(org.id)} />
+                        <Label htmlFor={`org-${org.id}`} className="cursor-pointer text-sm leading-tight">{org.name}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               )}
               {selectedOrgIds.length === 0 && !orgsLoading && (
-                <p className="text-sm text-destructive mt-3">
-                  Select at least one organization to continue.
-                </p>
-              )}
-              {selectedOrgIds.length > 0 && selectedOrgIds.length < allOrgs.length && (
-                <p className="text-sm text-muted-foreground mt-3">
-                  {selectedOrgIds.length} of {allOrgs.length} organizations selected
-                </p>
+                <p className="text-xs text-destructive mt-2">Select at least one.</p>
               )}
             </CardContent>
           </Card>
 
-          {/* Period & role filters (reuse FilterBar) */}
+          {/* Locations */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Period & Role Filters</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4" />
+                  Locations
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {selectedLocationIds.length}/{allLocations.length}
+                  </Badge>
+                </span>
+                <Button variant="ghost" size="sm" onClick={toggleAllLocations} className="text-xs h-7 px-2">
+                  {selectedLocationIds.length === allLocations.length ? 'None' : 'All'}
+                </Button>
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <FilterBar filters={filters} onFiltersChange={onFiltersChange} />
+            <CardContent className="pt-0">
+              {locsLoading ? (
+                <div className="space-y-2"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-3/4" /></div>
+              ) : allLocations.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No locations for selected orgs.</p>
+              ) : (
+                <ScrollArea className="h-[200px]">
+                  <div className="space-y-1.5 pr-3">
+                    {allLocations.map(loc => (
+                      <div key={loc.id} className="flex items-center space-x-2">
+                        <Checkbox id={`loc-${loc.id}`} checked={selectedLocationIds.includes(loc.id)} onCheckedChange={() => toggleLocation(loc.id)} />
+                        <Label htmlFor={`loc-${loc.id}`} className="cursor-pointer text-sm leading-tight">{loc.name}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+              {selectedLocationIds.length === 0 && allLocations.length > 0 && (
+                <p className="text-xs text-destructive mt-2">Select at least one.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Roles */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4" />
+                  Roles
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {selectedRoleIds.length}/{allRoles.length}
+                  </Badge>
+                </span>
+                <Button variant="ghost" size="sm" onClick={toggleAllRoles} className="text-xs h-7 px-2">
+                  {selectedRoleIds.length === allRoles.length ? 'None' : 'All'}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {rolesLoading ? (
+                <div className="space-y-2"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-3/4" /></div>
+              ) : (
+                <ScrollArea className="h-[200px]">
+                  <div className="space-y-1.5 pr-3">
+                    {allRoles.map(role => (
+                      <div key={role.role_id} className="flex items-center space-x-2">
+                        <Checkbox id={`role-${role.role_id}`} checked={selectedRoleIds.includes(role.role_id)} onCheckedChange={() => toggleRole(role.role_id)} />
+                        <Label htmlFor={`role-${role.role_id}`} className="cursor-pointer text-sm leading-tight">{role.role_name}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -574,7 +695,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
               <CardTitle className="text-lg">Export Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Grain</span>
                   <p className="font-medium capitalize">{config.grain}</p>
@@ -585,6 +706,22 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                     {selectedOrgIds.length === allOrgs.length
                       ? `All (${allOrgs.length})`
                       : `${selectedOrgIds.length} of ${allOrgs.length}`}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Locations</span>
+                  <p className="font-medium">
+                    {selectedLocationIds.length === allLocations.length
+                      ? `All (${allLocations.length})`
+                      : `${selectedLocationIds.length} of ${allLocations.length}`}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Roles</span>
+                  <p className="font-medium">
+                    {selectedRoleIds.length === allRoles.length
+                      ? `All (${allRoles.length})`
+                      : `${selectedRoleIds.length} of ${allRoles.length}`}
                   </p>
                 </div>
                 <div>

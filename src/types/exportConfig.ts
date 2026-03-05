@@ -32,7 +32,7 @@ export const MAX_EXPORT_ROWS = 100_000;
 
 // Deterministic column names -- single source of truth
 export const COLUMN_NAMES = {
-  organization: 'Organization',
+  organization: 'Group',
   location: 'Location',
   staffName: 'Staff Name',
   role: 'Role',

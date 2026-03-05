@@ -257,7 +257,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
           onValueChange={(value) => onFiltersChange({ ...filters, organizationId: value })}
         >
           <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select organization..." />
+            <SelectValue placeholder="Select group..." />
           </SelectTrigger>
           <SelectContent>
             {organizations.map((org) => (
@@ -319,7 +319,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
                   </p>
                   {availablePeriods.length === 0 ? (
                     <p className="text-sm text-muted-foreground px-2 py-2">
-                      No evaluations found for this organization
+                      No evaluations found for this group
                     </p>
                   ) : (
                     availablePeriods.map((period, idx) => (

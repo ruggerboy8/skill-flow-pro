@@ -94,7 +94,7 @@ export default function AdminPage() {
         <div>
           <h1 className="text-3xl font-bold">Administration</h1>
           <p className="text-muted-foreground">
-            Manage users, locations, and organizational settings
+            Manage users, locations, and group settings
           </p>
         </div>
       </div>
@@ -111,7 +111,7 @@ export default function AdminPage() {
           </TabsTrigger>
           <TabsTrigger value="organizations" className="flex items-center space-x-2">
             <Building className="h-4 w-4" />
-            <span>Organizations</span>
+            <span>Groups</span>
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center space-x-2">
             <Settings className="h-4 w-4" />

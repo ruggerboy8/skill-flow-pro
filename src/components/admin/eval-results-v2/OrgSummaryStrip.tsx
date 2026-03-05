@@ -65,7 +65,7 @@ export function OrgSummaryStrip({ filters }: OrgSummaryStripProps) {
     return (
       <Card className="border-dashed">
         <CardContent className="py-8 text-center text-muted-foreground">
-          Select an organization to view metrics
+          Select a group to view metrics
         </CardContent>
       </Card>
     );

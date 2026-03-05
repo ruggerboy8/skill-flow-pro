@@ -166,13 +166,13 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="organization">Organization *</Label>
+            <Label htmlFor="organization">Group *</Label>
             <Select value={organizationId} onValueChange={(val) => {
               setOrganizationId(val);
               setLocationId('__roaming__'); // Reset location when org changes
             }}>
               <SelectTrigger>
-                <SelectValue placeholder="Select organization" />
+                <SelectValue placeholder="Select group" />
               </SelectTrigger>
               <SelectContent>
                 {organizations?.map((org) => (

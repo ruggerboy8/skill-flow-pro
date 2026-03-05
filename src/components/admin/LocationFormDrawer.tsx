@@ -200,16 +200,16 @@ export function LocationFormDrawer({ open, onClose, onSuccess, location, organiz
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="organization">Organization</Label>
+            <Label htmlFor="organization">Group</Label>
             <Select 
               value={formData.organization_id} 
               onValueChange={(value) => setFormData({ ...formData, organization_id: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select an organization" />
+                <SelectValue placeholder="Select a group" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No organization</SelectItem>
+                <SelectItem value="none">No group</SelectItem>
                 {organizations.map((org) => (
                   <SelectItem key={org.id} value={org.id}>
                     {org.name}

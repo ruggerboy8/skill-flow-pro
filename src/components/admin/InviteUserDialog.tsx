@@ -195,10 +195,10 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="organization">Organization *</Label>
+            <Label htmlFor="organization">Group *</Label>
             <Select value={formData.organization_id} onValueChange={handleOrganizationChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Select organization" />
+                <SelectValue placeholder="Select group" />
               </SelectTrigger>
               <SelectContent>
                 {organizations.map((org) => (
@@ -218,7 +218,7 @@ export function InviteUserDialog({ open, onClose, onSuccess, roles, locations, o
               disabled={!formData.organization_id}
             >
               <SelectTrigger>
-                <SelectValue placeholder={formData.organization_id ? "Select a location" : "Select organization first"} />
+                <SelectValue placeholder={formData.organization_id ? "Select a location" : "Select group first"} />
               </SelectTrigger>
               <SelectContent>
                 {filteredLocations.map((location) => (

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -42,61 +42,102 @@ const GRAIN_OPTIONS: { value: ExportGrain; label: string; description: string; i
   { value: 'organization', label: 'Organization', description: 'One row per organization (aggregated)', icon: <Building2 className="h-5 w-5" /> },
 ];
 
+interface OrgOption {
+  id: string;
+  name: string;
+}
+
 // ── Component ──────────────────────────────────────────────────
 export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsExportTabProps) {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [config, setConfig] = useState<ExportConfig>(DEFAULT_EXPORT_CONFIG);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>([]);
 
   const isBaseline = filters.evaluationPeriod.type === 'Baseline';
   const hasAnyMetric = config.includeCompletionRate || config.includeOnTimeRate
     || config.includeDomainAverages || config.includeCompetencyAverages;
 
+  // ── Fetch all active organizations ───────────────────────────
+  const { data: allOrgs = [], isLoading: orgsLoading } = useQuery({
+    queryKey: ['export-all-orgs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .eq('active', true)
+        .order('name');
+      if (error) throw error;
+      return (data || []) as OrgOption[];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+
+  // Initialize selectedOrgIds to all orgs once loaded
+  useEffect(() => {
+    if (allOrgs.length > 0 && selectedOrgIds.length === 0) {
+      setSelectedOrgIds(allOrgs.map(o => o.id));
+    }
+  }, [allOrgs]);
+
+  const toggleOrg = (orgId: string) => {
+    setSelectedOrgIds(prev =>
+      prev.includes(orgId) ? prev.filter(id => id !== orgId) : [...prev, orgId]
+    );
+  };
+
+  const toggleAllOrgs = () => {
+    if (selectedOrgIds.length === allOrgs.length) {
+      setSelectedOrgIds([]);
+    } else {
+      setSelectedOrgIds(allOrgs.map(o => o.id));
+    }
+  };
+
   // ── Row estimate query ───────────────────────────────────────
-  const sortedLocationIds = useMemo(() => [...filters.locationIds].sort().join(','), [filters.locationIds]);
+  const sortedSelectedOrgIds = useMemo(() => [...selectedOrgIds].sort().join(','), [selectedOrgIds]);
   const sortedRoleIds = useMemo(() => [...filters.roleIds].sort().join(','), [filters.roleIds]);
 
   const { data: rowEstimate, isLoading: estimateLoading } = useQuery({
     queryKey: [
       'export-row-estimate',
       config.grain,
-      filters.organizationId,
+      sortedSelectedOrgIds,
       filters.evaluationPeriod.year,
       filters.evaluationPeriod.type === 'Quarterly' ? filters.evaluationPeriod.quarter : 'baseline',
       filters.evaluationPeriod.type,
-      sortedLocationIds,
       sortedRoleIds,
     ],
     queryFn: async () => {
-      if (!filters.organizationId) return 0;
+      if (selectedOrgIds.length === 0) return 0;
 
-      // Get locations for org
-      const locQuery = supabase.from('locations').select('id').eq('organization_id', filters.organizationId).eq('active', true);
-      const { data: locData } = await locQuery;
-      const orgLocationIds = (locData || []).map(l => l.id);
-      const scopeLocationIds = filters.locationIds.length > 0
-        ? orgLocationIds.filter(id => filters.locationIds.includes(id))
-        : orgLocationIds;
+      let totalRows = 0;
+      for (const orgId of selectedOrgIds) {
+        // Get locations for org
+        const { data: locData } = await supabase.from('locations').select('id')
+          .eq('organization_id', orgId).eq('active', true);
+        const orgLocationIds = (locData || []).map(l => l.id);
+        if (orgLocationIds.length === 0) continue;
 
-      if (scopeLocationIds.length === 0) return 0;
+        // Get staff count
+        let staffQuery = supabase.from('staff').select('id', { count: 'exact', head: true })
+          .in('primary_location_id', orgLocationIds)
+          .eq('is_participant', true)
+          .eq('is_paused', false);
+        if (filters.roleIds.length > 0) {
+          staffQuery = staffQuery.in('role_id', filters.roleIds);
+        }
+        const { count } = await staffQuery;
+        const staffCount = count || 0;
 
-      // Get staff count
-      let staffQuery = supabase.from('staff').select('id', { count: 'exact', head: true })
-        .in('primary_location_id', scopeLocationIds)
-        .eq('is_participant', true)
-        .eq('is_paused', false);
-      if (filters.roleIds.length > 0) {
-        staffQuery = staffQuery.in('role_id', filters.roleIds);
+        if (config.grain === 'individual') totalRows += staffCount;
+        else if (config.grain === 'location') totalRows += orgLocationIds.length;
+        else totalRows += 1; // organization grain
       }
-      const { count } = await staffQuery;
-      const staffCount = count || 0;
-
-      if (config.grain === 'individual') return staffCount;
-      if (config.grain === 'location') return scopeLocationIds.length;
-      return 1; // organization grain
+      return totalRows;
     },
-    enabled: currentStep === 3 && !!filters.organizationId,
+    enabled: currentStep === 3 && selectedOrgIds.length > 0,
   });
 
   // ── Predicted columns ────────────────────────────────────────
@@ -130,158 +171,161 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
   // ── Navigation ───────────────────────────────────────────────
   const canNext = useCallback(() => {
     if (currentStep === 0) return true;
-    if (currentStep === 1) return !!filters.organizationId;
+    if (currentStep === 1) return selectedOrgIds.length > 0;
     if (currentStep === 2) return hasAnyMetric;
     return false;
-  }, [currentStep, filters.organizationId, hasAnyMetric]);
+  }, [currentStep, selectedOrgIds.length, hasAnyMetric]);
 
-  // ── Export handler ───────────────────────────────────────────
+  // ── Export handler (loops over selected orgs) ────────────────
   const handleExport = async () => {
-    if (!filters.organizationId || !user) return;
+    if (selectedOrgIds.length === 0 || !user) return;
     setIsExporting(true);
 
     try {
-      // 1. Resolve scope
-      const { data: locData } = await supabase.from('locations').select('id, name, organization_id')
-        .eq('organization_id', filters.organizationId).eq('active', true);
-      const allLocations = locData || [];
-      const scopeLocations = filters.locationIds.length > 0
-        ? allLocations.filter(l => filters.locationIds.includes(l.id))
-        : allLocations;
-      const scopeLocationIds = scopeLocations.map(l => l.id);
-
-      if (scopeLocationIds.length === 0) {
-        toast.error('No locations match current filters');
-        setIsExporting(false);
-        return;
-      }
-
-      // Get org name
-      const { data: orgData } = await supabase.from('organizations').select('name').eq('id', filters.organizationId).single();
-      const orgName = orgData?.name || '';
-
-      // Get staff in scope
-      let staffQuery = supabase.from('staff').select('id, name, primary_location_id, role_id')
-        .in('primary_location_id', scopeLocationIds)
-        .eq('is_participant', true)
-        .eq('is_paused', false);
-      if (filters.roleIds.length > 0) {
-        staffQuery = staffQuery.in('role_id', filters.roleIds);
-      }
-      const { data: staffData } = await staffQuery;
-      const staff = staffData || [];
-
-      if (staff.length === 0) {
-        toast.error('No staff match current filters');
-        setIsExporting(false);
-        return;
-      }
-
-      // Get role names
+      // Get role names (shared across orgs)
       const { data: rolesData } = await supabase.from('roles').select('role_id, role_name');
       const roleMap = new Map((rolesData || []).map(r => [r.role_id, r.role_name || '']));
 
-      // Location name map
-      const locationMap = new Map(allLocations.map(l => [l.id, l.name]));
+      // Get all org names
+      const orgNameMap = new Map(allOrgs.map(o => [o.id, o.name]));
 
-      // 2. Build submission metrics
-      let submissionByStaff = new Map<string, { completionRate: number | null; onTimeRate: number | null }>();
+      // Accumulate rows across all selected orgs
+      let allPrimaryRows: Record<string, string>[] = [];
+      let allCompetencyRows: Record<string, string>[] = [];
 
-      if (config.includeCompletionRate || config.includeOnTimeRate) {
-        const cutoff = calculateCutoffDate(config.submissionWindow);
-        const batchSize = 20;
-        for (let i = 0; i < staff.length; i += batchSize) {
-          const batch = staff.slice(i, i + batchSize);
-          const results = await Promise.all(batch.map(async (s) => {
-            const params: any = { p_staff_id: s.id };
-            if (cutoff) params.p_since = cutoff;
-            const { data } = await supabase.rpc('get_staff_submission_windows', params);
-            const stats = calculateSubmissionStats((data || []) as any);
-            return {
-              staffId: s.id,
-              completionRate: stats.hasData ? stats.completionRate : null,
-              onTimeRate: stats.hasData ? stats.onTimeRate : null,
-            };
-          }));
-          for (const r of results) {
-            submissionByStaff.set(r.staffId, { completionRate: r.completionRate, onTimeRate: r.onTimeRate });
-          }
-        }
-      }
+      for (const orgId of selectedOrgIds) {
+        const orgName = orgNameMap.get(orgId) || '';
 
-      // 3. Build domain metrics
-      let domainRows: EvalDistributionRow[] = [];
-      if (config.includeDomainAverages) {
-        const types = filters.evaluationPeriod.type === 'Baseline' ? ['Baseline'] : ['Quarterly'];
-        const quarter = filters.evaluationPeriod.type === 'Quarterly' ? filters.evaluationPeriod.quarter : null;
-        const { data } = await supabase.rpc('get_eval_distribution_metrics', {
-          p_org_id: filters.organizationId,
-          p_types: types,
-          p_program_year: filters.evaluationPeriod.year,
-          p_quarter: quarter || null,
-          p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : null,
-          p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
-        });
-        domainRows = (data || []) as EvalDistributionRow[];
-      }
+        // 1. Resolve scope for this org
+        const { data: locData } = await supabase.from('locations').select('id, name')
+          .eq('organization_id', orgId).eq('active', true);
+        const allLocations = locData || [];
+        const scopeLocationIds = allLocations.map(l => l.id);
 
-      // 4. Build competency metrics
-      let competencyItems: any[] = [];
-      if (config.includeCompetencyAverages) {
-        let query = supabase
-          .from('evaluation_items')
-          .select('competency_id, competency_name_snapshot, domain_name, observer_score, self_score, observer_is_na, self_is_na, evaluation_id, evaluations!inner(staff_id, location_id, role_id, type, quarter, program_year, status)')
-          .eq('evaluations.status', 'submitted')
-          .eq('evaluations.program_year', filters.evaluationPeriod.year);
+        if (scopeLocationIds.length === 0) continue;
 
-        if (filters.evaluationPeriod.type === 'Baseline') {
-          query = query.eq('evaluations.type', 'Baseline');
-        } else {
-          query = query.eq('evaluations.type', 'Quarterly');
-          if (filters.evaluationPeriod.quarter) {
-            query = query.eq('evaluations.quarter', filters.evaluationPeriod.quarter);
-          }
-        }
+        const locationMap = new Map(allLocations.map(l => [l.id, l.name]));
 
-        if (filters.locationIds.length > 0) {
-          query = query.in('evaluations.location_id', filters.locationIds);
-        } else {
-          query = query.in('evaluations.location_id', scopeLocationIds);
-        }
+        // Get staff in scope
+        let staffQuery = supabase.from('staff').select('id, name, primary_location_id, role_id')
+          .in('primary_location_id', scopeLocationIds)
+          .eq('is_participant', true)
+          .eq('is_paused', false);
         if (filters.roleIds.length > 0) {
-          query = query.in('evaluations.role_id', filters.roleIds);
+          staffQuery = staffQuery.in('role_id', filters.roleIds);
+        }
+        const { data: staffData } = await staffQuery;
+        const staff = staffData || [];
+        if (staff.length === 0) continue;
+
+        // 2. Build submission metrics for this org
+        let submissionByStaff = new Map<string, { completionRate: number | null; onTimeRate: number | null }>();
+
+        if (config.includeCompletionRate || config.includeOnTimeRate) {
+          const cutoff = calculateCutoffDate(config.submissionWindow);
+          const batchSize = 20;
+          for (let i = 0; i < staff.length; i += batchSize) {
+            const batch = staff.slice(i, i + batchSize);
+            const results = await Promise.all(batch.map(async (s) => {
+              const params: any = { p_staff_id: s.id };
+              if (cutoff) params.p_since = cutoff;
+              const { data } = await supabase.rpc('get_staff_submission_windows', params);
+              const stats = calculateSubmissionStats((data || []) as any);
+              return {
+                staffId: s.id,
+                completionRate: stats.hasData ? stats.completionRate : null,
+                onTimeRate: stats.hasData ? stats.onTimeRate : null,
+              };
+            }));
+            for (const r of results) {
+              submissionByStaff.set(r.staffId, { completionRate: r.completionRate, onTimeRate: r.onTimeRate });
+            }
+          }
         }
 
-        const { data } = await query;
-        competencyItems = data || [];
+        // 3. Build domain metrics for this org
+        let domainRows: EvalDistributionRow[] = [];
+        if (config.includeDomainAverages) {
+          const types = filters.evaluationPeriod.type === 'Baseline' ? ['Baseline'] : ['Quarterly'];
+          const quarter = filters.evaluationPeriod.type === 'Quarterly' ? filters.evaluationPeriod.quarter : null;
+          const { data } = await supabase.rpc('get_eval_distribution_metrics', {
+            p_org_id: orgId,
+            p_types: types,
+            p_program_year: filters.evaluationPeriod.year,
+            p_quarter: quarter || null,
+            p_location_ids: null,
+            p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : null,
+          });
+          domainRows = (data || []) as EvalDistributionRow[];
+        }
+
+        // 4. Build competency metrics for this org
+        let competencyItems: any[] = [];
+        if (config.includeCompetencyAverages) {
+          let query = supabase
+            .from('evaluation_items')
+            .select('competency_id, competency_name_snapshot, domain_name, observer_score, self_score, observer_is_na, self_is_na, evaluation_id, evaluations!inner(staff_id, location_id, role_id, type, quarter, program_year, status)')
+            .eq('evaluations.status', 'submitted')
+            .eq('evaluations.program_year', filters.evaluationPeriod.year)
+            .in('evaluations.location_id', scopeLocationIds);
+
+          if (filters.evaluationPeriod.type === 'Baseline') {
+            query = query.eq('evaluations.type', 'Baseline');
+          } else {
+            query = query.eq('evaluations.type', 'Quarterly');
+            if (filters.evaluationPeriod.quarter) {
+              query = query.eq('evaluations.quarter', filters.evaluationPeriod.quarter);
+            }
+          }
+          if (filters.roleIds.length > 0) {
+            query = query.in('evaluations.role_id', filters.roleIds);
+          }
+
+          const { data } = await query;
+          competencyItems = data || [];
+        }
+
+        // 5. Build rows for this org
+        if (config.includeCompletionRate || config.includeOnTimeRate || config.includeDomainAverages) {
+          const rows = buildPrimaryRows(
+            config, staff, orgName, locationMap, roleMap,
+            submissionByStaff, domainRows
+          );
+          allPrimaryRows.push(...rows);
+        }
+
+        if (config.includeCompetencyAverages && competencyItems.length > 0) {
+          const rows = buildCompetencyRows(
+            config, staff, orgName, locationMap, roleMap, competencyItems
+          );
+          allCompetencyRows.push(...rows);
+        }
       }
 
-      // 5. Assemble CSV rows
+      // 6. Download assembled files
       const periodLabel = getPeriodLabel(filters.evaluationPeriod).replace(/\s+/g, '_');
       const dateStr = new Date().toISOString().slice(0, 10);
       let downloadedFiles = 0;
 
-      // ── Primary file (submission + domain metrics) ──
-      if (config.includeCompletionRate || config.includeOnTimeRate || config.includeDomainAverages) {
-        const rows = buildPrimaryRows(
-          config, staff, orgName, locationMap, roleMap,
-          submissionByStaff, domainRows
+      if (allPrimaryRows.length > 0) {
+        // Sort across orgs: org name, then location, then staff
+        allPrimaryRows.sort((a, b) =>
+          (a[COLUMN_NAMES.organization] || '').localeCompare(b[COLUMN_NAMES.organization] || '')
+          || (a[COLUMN_NAMES.location] || '').localeCompare(b[COLUMN_NAMES.location] || '')
+          || (a[COLUMN_NAMES.staffName] || '').localeCompare(b[COLUMN_NAMES.staffName] || '')
         );
-        if (rows.length > 0) {
-          downloadCSV(rows, `eval_export_${config.grain}_${periodLabel}_${dateStr}`);
-          downloadedFiles++;
-        }
+        downloadCSV(allPrimaryRows, `eval_export_${config.grain}_${periodLabel}_${dateStr}`);
+        downloadedFiles++;
       }
 
-      // ── Competency file (separate) ──
-      if (config.includeCompetencyAverages && competencyItems.length > 0) {
-        const rows = buildCompetencyRows(
-          config, staff, orgName, locationMap, roleMap, competencyItems
+      if (allCompetencyRows.length > 0) {
+        allCompetencyRows.sort((a, b) =>
+          (a[COLUMN_NAMES.organization] || '').localeCompare(b[COLUMN_NAMES.organization] || '')
+          || (a[COLUMN_NAMES.location] || '').localeCompare(b[COLUMN_NAMES.location] || '')
+          || (a[COLUMN_NAMES.competencyName] || '').localeCompare(b[COLUMN_NAMES.competencyName] || '')
         );
-        if (rows.length > 0) {
-          downloadCSV(rows, `eval_export_${config.grain}_competencies_${periodLabel}_${dateStr}`);
-          downloadedFiles++;
-        }
+        downloadCSV(allCompetencyRows, `eval_export_${config.grain}_competencies_${periodLabel}_${dateStr}`);
+        downloadedFiles++;
       }
 
       if (downloadedFiles === 0) {
@@ -292,7 +336,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
         toast.success('Export downloaded');
       }
 
-      // 6. Audit trail
+      // 7. Audit trail
       try {
         const { data: myStaff } = await supabase.from('staff').select('id').eq('user_id', user.id).single();
         if (myStaff) {
@@ -300,12 +344,12 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
             action: 'evaluations_export_downloaded',
             changed_by: myStaff.id,
             staff_id: myStaff.id,
-            scope_organization_id: filters.organizationId || null,
+            scope_organization_id: selectedOrgIds.length === 1 ? selectedOrgIds[0] : null,
             new_values: {
               exportVersion: EXPORT_FORMAT.version,
               grain: config.grain,
               period: filters.evaluationPeriod,
-              filtersApplied: { locationIds: filters.locationIds, roleIds: filters.roleIds },
+              filtersApplied: { organizationIds: selectedOrgIds, roleIds: filters.roleIds },
               metricFlags: config,
               rowCount: rowEstimate || 0,
               downloadedFiles,
@@ -364,17 +408,66 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
       {/* Step 1: Scope */}
       {currentStep === 1 && (
         <div className="space-y-4">
+          {/* Organization multi-select */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Select scope</CardTitle>
+              <CardTitle className="text-lg flex items-center justify-between">
+                <span>Organizations</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleAllOrgs}
+                  className="text-sm font-normal"
+                >
+                  {selectedOrgIds.length === allOrgs.length ? 'Deselect all' : 'Select all'}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {orgsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-6 w-40" />
+                  <Skeleton className="h-6 w-52" />
+                </div>
+              ) : allOrgs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No organizations found.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {allOrgs.map(org => (
+                    <div key={org.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`org-${org.id}`}
+                        checked={selectedOrgIds.includes(org.id)}
+                        onCheckedChange={() => toggleOrg(org.id)}
+                      />
+                      <Label htmlFor={`org-${org.id}`} className="cursor-pointer text-sm">
+                        {org.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {selectedOrgIds.length === 0 && !orgsLoading && (
+                <p className="text-sm text-destructive mt-3">
+                  Select at least one organization to continue.
+                </p>
+              )}
+              {selectedOrgIds.length > 0 && selectedOrgIds.length < allOrgs.length && (
+                <p className="text-sm text-muted-foreground mt-3">
+                  {selectedOrgIds.length} of {allOrgs.length} organizations selected
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Period & role filters (reuse FilterBar) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Period & Role Filters</CardTitle>
             </CardHeader>
             <CardContent>
               <FilterBar filters={filters} onFiltersChange={onFiltersChange} />
-              {!filters.organizationId && (
-                <p className="text-sm text-muted-foreground mt-3">
-                  Please select an organization to continue.
-                </p>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -476,7 +569,6 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
       {/* Step 3: Preview & Download */}
       {currentStep === 3 && (
         <div className="space-y-4">
-          {/* Config summary */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Export Summary</CardTitle>
@@ -486,6 +578,14 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                 <div>
                   <span className="text-muted-foreground">Grain</span>
                   <p className="font-medium capitalize">{config.grain}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Organizations</span>
+                  <p className="font-medium">
+                    {selectedOrgIds.length === allOrgs.length
+                      ? `All (${allOrgs.length})`
+                      : `${selectedOrgIds.length} of ${allOrgs.length}`}
+                  </p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Period</span>
@@ -504,17 +604,17 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                     </p>
                   )}
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Files</span>
-                  <p className="font-medium">
-                    {(config.includeDomainAverages || config.includeCompletionRate || config.includeOnTimeRate) && config.includeCompetencyAverages
-                      ? '2 CSVs'
-                      : '1 CSV'}
-                  </p>
-                </div>
               </div>
 
-              {/* Column preview */}
+              <div>
+                <span className="text-sm text-muted-foreground">Files</span>
+                <p className="text-sm font-medium">
+                  {(config.includeDomainAverages || config.includeCompletionRate || config.includeOnTimeRate) && config.includeCompetencyAverages
+                    ? '2 CSVs'
+                    : '1 CSV'}
+                </p>
+              </div>
+
               <div>
                 <span className="text-sm text-muted-foreground">Columns</span>
                 <div className="flex flex-wrap gap-1.5 mt-1">
@@ -528,7 +628,6 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
             </CardContent>
           </Card>
 
-          {/* Warnings */}
           {(rowEstimate ?? 0) > MAX_EXPORT_ROWS && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -545,14 +644,13 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
             </Alert>
           )}
 
-          {/* Download button */}
           <Button
             size="lg"
             className="w-full sm:w-auto"
             disabled={
               isExporting
               || estimateLoading
-              || !filters.organizationId
+              || selectedOrgIds.length === 0
               || (rowEstimate ?? 0) === 0
               || (rowEstimate ?? 0) > MAX_EXPORT_ROWS
             }
@@ -608,11 +706,9 @@ function buildPrimaryRows(
   submissionByStaff: Map<string, { completionRate: number | null; onTimeRate: number | null }>,
   domainRows: EvalDistributionRow[],
 ): Record<string, string>[] {
-  // Discover unique domain names in canonical order
   const domainNames = [...new Set(domainRows.map(r => r.domain_name))].sort();
 
   if (config.grain === 'individual') {
-    // Build domain lookup: staffId -> domainName -> { obsMean, selfMean }
     const domainByStaff = new Map<string, Map<string, { obsSum: number; selfSum: number; obsN: number; selfN: number }>>();
     for (const r of domainRows) {
       if (!domainByStaff.has(r.staff_id)) domainByStaff.set(r.staff_id, new Map());
@@ -653,18 +749,10 @@ function buildPrimaryRows(
       }
       rows.push(row);
     }
-
-    // Sort: org, location, staff name
-    rows.sort((a, b) =>
-      (a[COLUMN_NAMES.location] || '').localeCompare(b[COLUMN_NAMES.location] || '')
-      || (a[COLUMN_NAMES.staffName] || '').localeCompare(b[COLUMN_NAMES.staffName] || '')
-    );
     return rows;
   }
 
-  // Location or org grain
   if (config.grain === 'location') {
-    // Group staff by location
     const locStaffMap = new Map<string, typeof staff>();
     for (const s of staff) {
       const lid = s.primary_location_id || '';
@@ -672,7 +760,6 @@ function buildPrimaryRows(
       locStaffMap.get(lid)!.push(s);
     }
 
-    // Group domain rows by location + domain
     const locDomainMap = new Map<string, Map<string, { obsSum: number; selfSum: number; obsN: number; selfN: number }>>();
     for (const r of domainRows) {
       if (!locDomainMap.has(r.location_id)) locDomainMap.set(r.location_id, new Map());
@@ -696,8 +783,6 @@ function buildPrimaryRows(
         for (const s of locStaff) {
           const sub = submissionByStaff.get(s.id);
           if (sub?.completionRate !== null && sub?.completionRate !== undefined) {
-            // Approximate: we stored rates, not raw counts. For true aggregation we'd need raw counts.
-            // This is an acceptable approximation for location-level exports.
             totalExp++;
             totalComp += (sub.completionRate || 0) / 100;
             totalOT += (sub.onTimeRate || 0) / 100;
@@ -723,11 +808,10 @@ function buildPrimaryRows(
       }
       rows.push(row);
     }
-    rows.sort((a, b) => (a[COLUMN_NAMES.location] || '').localeCompare(b[COLUMN_NAMES.location] || ''));
     return rows;
   }
 
-  // Organization grain: single row
+  // Organization grain: single row for this org
   const row: Record<string, string> = {
     [COLUMN_NAMES.organization]: orgName,
     [COLUMN_NAMES.staffCount]: String(staff.length),
@@ -779,14 +863,9 @@ function buildCompetencyRows(
   roleMap: Map<number, string>,
   competencyItems: any[],
 ): Record<string, string>[] {
-  const staffMap = new Map(staff.map(s => [s.id, s]));
-
   if (config.grain === 'individual') {
-    // Wide format: one row per staff, columns per competency
-    // First discover unique competency names
     const compNames = [...new Set(competencyItems.map(i => i.competency_name_snapshot as string))].sort();
 
-    // Group by staff + competency
     const staffCompMap = new Map<string, Map<string, { obsSum: number; selfSum: number; obsN: number; selfN: number }>>();
     for (const item of competencyItems) {
       const eval_ = item.evaluations as any;
@@ -803,7 +882,7 @@ function buildCompetencyRows(
     const rows: Record<string, string>[] = [];
     for (const s of staff) {
       const cm = staffCompMap.get(s.id);
-      if (!cm) continue; // Skip staff with no eval data
+      if (!cm) continue;
       const row: Record<string, string> = {
         [COLUMN_NAMES.organization]: orgName,
         [COLUMN_NAMES.location]: locationMap.get(s.primary_location_id || '') || '',
@@ -819,15 +898,11 @@ function buildCompetencyRows(
       }
       rows.push(row);
     }
-    rows.sort((a, b) =>
-      (a[COLUMN_NAMES.location] || '').localeCompare(b[COLUMN_NAMES.location] || '')
-      || (a[COLUMN_NAMES.staffName] || '').localeCompare(b[COLUMN_NAMES.staffName] || '')
-    );
     return rows;
   }
 
   // Location or org grain: long format
-  type GroupKey = string; // locationId or 'org'
+  type GroupKey = string;
   const groupMap = new Map<GroupKey, Map<string, { obsSum: number; selfSum: number; obsN: number; selfN: number; domain: string }>>();
 
   for (const item of competencyItems) {
@@ -861,14 +936,6 @@ function buildCompetencyRows(
       rows.push(row);
     }
   }
-
-  rows.sort((a, b) => {
-    if (config.grain === 'location') {
-      const locCmp = (a[COLUMN_NAMES.location] || '').localeCompare(b[COLUMN_NAMES.location] || '');
-      if (locCmp !== 0) return locCmp;
-    }
-    return (a[COLUMN_NAMES.competencyName] || '').localeCompare(b[COLUMN_NAMES.competencyName] || '');
-  });
 
   return rows;
 }

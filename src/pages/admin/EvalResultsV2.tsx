@@ -12,6 +12,7 @@ import { OrgSummaryStrip } from '@/components/admin/eval-results-v2/OrgSummarySt
 import { LocationCardGrid } from '@/components/admin/eval-results-v2/LocationCardGrid';
 import { LocationDetailV2 } from '@/components/admin/eval-results-v2/LocationDetailV2';
 import { DeliveryTab } from '@/components/admin/eval-results-v2/DeliveryTab';
+import { EvaluationsExportTab } from '@/components/admin/eval-results-v2/EvaluationsExportTab';
 import { bulkSubmitCompleteDrafts } from '@/lib/evaluations';
 import { toast } from 'sonner';
 import type { EvalFilters } from '@/types/analytics';
@@ -183,6 +184,7 @@ export default function EvalResultsV2() {
         <TabsList>
           <TabsTrigger value="results">Results</TabsTrigger>
           <TabsTrigger value="delivery">Delivery</TabsTrigger>
+          <TabsTrigger value="export">Export</TabsTrigger>
         </TabsList>
 
         <TabsContent value="results" className="space-y-6">
@@ -213,6 +215,9 @@ export default function EvalResultsV2() {
             period={deliveryPeriod}
             onPeriodChange={handleDeliveryPeriodChange}
           />
+        </TabsContent>
+        <TabsContent value="export" className="space-y-6">
+          <EvaluationsExportTab filters={filters} onFiltersChange={setFilters} />
         </TabsContent>
       </Tabs>
     </div>

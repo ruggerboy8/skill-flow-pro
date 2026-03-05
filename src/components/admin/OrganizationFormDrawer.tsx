@@ -73,7 +73,7 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization 
 
       toast({
         title: "Success",
-        description: `Organization ${isEditing ? "updated" : "created"} successfully`,
+        description: `Group ${isEditing ? "updated" : "created"} successfully`,
       });
 
       onSuccess();
@@ -81,7 +81,7 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization 
       console.error("Error saving organization:", error);
       toast({
         title: "Error",
-        description: error.message || `Failed to ${isEditing ? "update" : "create"} organization`,
+        description: error.message || `Failed to ${isEditing ? "update" : "create"} group`,
         variant: "destructive",
       });
     } finally {
@@ -93,15 +93,15 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization 
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>{isEditing ? "Edit Organization" : "New Organization"}</SheetTitle>
+          <SheetTitle>{isEditing ? "Edit Group" : "New Group"}</SheetTitle>
           <SheetDescription>
-            {isEditing ? "Update organization information" : "Create a new organization"}
+            {isEditing ? "Update group information" : "Create a new group"}
           </SheetDescription>
         </SheetHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div className="space-y-2">
-            <Label htmlFor="org-name">Organization name *</Label>
+            <Label htmlFor="org-name">Group name *</Label>
             <Input
               id="org-name"
               value={formData.name}
@@ -117,7 +117,7 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization 
             </Button>
             <Button type="submit" disabled={loading || !formData.name.trim()}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Update Organization" : "Create Organization"}
+              {isEditing ? "Update Group" : "Create Group"}
             </Button>
           </SheetFooter>
         </form>

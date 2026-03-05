@@ -71,7 +71,7 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
 
         toast({
           title: 'Success',
-          description: 'Organization updated successfully'
+          description: 'Group updated successfully'
         });
       } else {
         // Create new organization
@@ -86,7 +86,7 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
 
         toast({
           title: 'Success',
-          description: 'Organization created successfully'
+          description: 'Group created successfully'
         });
       }
 
@@ -95,7 +95,7 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
       console.error('Error saving organization:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to save organization',
+        description: error.message || 'Failed to save group',
         variant: 'destructive'
       });
     } finally {
@@ -109,24 +109,24 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
-              {organization ? 'Edit Organization' : 'Create Organization'}
+              {organization ? 'Edit Group' : 'Create Group'}
             </DialogTitle>
             <DialogDescription>
               {organization 
-                ? 'Update the organization details below.'
-                : 'Create a new organization to manage locations and staff.'
+                ? 'Update the group details below.'
+                : 'Create a new group to manage locations and staff.'
               }
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Organization Name</Label>
+              <Label htmlFor="name">Group Name</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter organization name"
+                placeholder="Enter group name"
                 required
               />
             </div>
@@ -137,7 +137,7 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
                 id="slug"
                 value={formData.slug}
                 onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                placeholder="organization-slug"
+                placeholder="group-slug"
                 pattern="[a-z0-9-]+"
                 title="Only lowercase letters, numbers, and dashes allowed"
                 required

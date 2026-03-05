@@ -223,9 +223,9 @@ export function AdminLocationsTab() {
                    <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
                      Name
                    </SortableTableHead>
-                   <SortableTableHead sortKey="organization.name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
-                     Organization
-                   </SortableTableHead>
+                    <SortableTableHead sortKey="organization.name" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
+                      Group
+                    </SortableTableHead>
                    <SortableTableHead sortKey="timezone" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort}>
                      Timezone
                    </SortableTableHead>
@@ -250,7 +250,7 @@ export function AdminLocationsTab() {
                     <TableRow key={location.id}>
                       <TableCell className="font-medium">{location.name}</TableCell>
                       <TableCell>
-                        {location.organization?.name || "No organization"}
+                        {location.organization?.name || "No group"}
                       </TableCell>
                       <TableCell>{formatTimezone(location.timezone)}</TableCell>
                       <TableCell>{formatDate(location.program_start_date)}</TableCell>

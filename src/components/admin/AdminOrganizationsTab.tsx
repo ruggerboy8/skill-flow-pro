@@ -42,7 +42,7 @@ export function AdminOrganizationsTab() {
       console.error("Error loading organizations:", error);
       toast({
         title: "Error",
-        description: "Failed to load organizations",
+        description: "Failed to load groups",
         variant: "destructive",
       });
     } finally {
@@ -84,7 +84,7 @@ export function AdminOrganizationsTab() {
       if (count && count > 0) {
         toast({
           title: "Cannot Archive",
-          description: "This organization has active locations. Please reassign or remove them first.",
+          description: "This group has active locations. Please reassign or remove them first.",
           variant: "destructive",
         });
         return;
@@ -101,7 +101,7 @@ export function AdminOrganizationsTab() {
 
       toast({
         title: "Success",
-        description: `Organization ${organization.active ? "archived" : "activated"} successfully`,
+        description: `Group ${organization.active ? "archived" : "activated"} successfully`,
       });
 
       loadOrganizations();
@@ -109,7 +109,7 @@ export function AdminOrganizationsTab() {
       console.error("Error updating organization:", error);
       toast({
         title: "Error",
-        description: "Failed to update organization",
+        description: "Failed to update group",
         variant: "destructive",
       });
     }
@@ -127,8 +127,8 @@ export function AdminOrganizationsTab() {
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle>Organizations</CardTitle>
-              <CardDescription>Manage organizations and their settings</CardDescription>
+              <CardTitle>Groups</CardTitle>
+              <CardDescription>Manage groups and their settings</CardDescription>
             </div>
             <Skeleton className="h-10 w-32" />
           </div>
@@ -150,12 +150,12 @@ export function AdminOrganizationsTab() {
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle>Organizations</CardTitle>
-              <CardDescription>Manage organizations and their settings</CardDescription>
+              <CardTitle>Groups</CardTitle>
+              <CardDescription>Manage groups and their settings</CardDescription>
             </div>
             <Button onClick={handleNewOrganization}>
               <Plus className="h-4 w-4 mr-2" />
-              New Organization
+              New Group
             </Button>
           </div>
         </CardHeader>
@@ -180,7 +180,7 @@ export function AdminOrganizationsTab() {
                  {sortedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      No organizations found
+                      No groups found
                     </TableCell>
                   </TableRow>
                  ) : (

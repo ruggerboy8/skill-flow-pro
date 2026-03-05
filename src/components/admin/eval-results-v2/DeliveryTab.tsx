@@ -133,10 +133,10 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
         <EvalPeriodSelector value={period} onChange={onPeriodChange} className="w-48" />
         <Select value={orgFilter} onValueChange={setOrgFilter}>
           <SelectTrigger className="w-56">
-            <SelectValue placeholder="Filter by organization" />
+            <SelectValue placeholder="Filter by group" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Organizations</SelectItem>
+            <SelectItem value="all">All Groups</SelectItem>
             {organizations.map(([id, name]) => (
               <SelectItem key={id} value={id}>{name}</SelectItem>
             ))}

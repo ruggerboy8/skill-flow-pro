@@ -41,7 +41,7 @@ const STEPS = ['Report Type', 'Scope', 'Metrics', 'Download'];
 const GRAIN_OPTIONS: { value: ExportGrain; label: string; description: string; icon: React.ReactNode }[] = [
   { value: 'individual', label: 'Individual', description: 'One row per staff member', icon: <Users className="h-5 w-5" /> },
   { value: 'location', label: 'Location', description: 'One row per location (aggregated)', icon: <MapPin className="h-5 w-5" /> },
-  { value: 'organization', label: 'Organization', description: 'One row per organization (aggregated)', icon: <Building2 className="h-5 w-5" /> },
+  { value: 'organization', label: 'Group', description: 'One row per group (aggregated)', icon: <Building2 className="h-5 w-5" /> },
 ];
 
 interface OrgOption { id: string; name: string; }
@@ -504,7 +504,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
               <CardTitle className="text-sm font-medium flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" />
-                  Organizations
+                   Groups
                   <Badge variant="secondary" className="text-xs ml-1">
                     {selectedOrgIds.length}/{allOrgs.length}
                   </Badge>
@@ -555,7 +555,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
               {locsLoading ? (
                 <div className="space-y-2"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-3/4" /></div>
               ) : allLocations.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No locations for selected orgs.</p>
+                <p className="text-sm text-muted-foreground">No locations for selected groups.</p>
               ) : (
                 <ScrollArea className="h-[200px]">
                   <div className="space-y-1.5 pr-3">
@@ -718,7 +718,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                   <p className="font-medium capitalize">{config.grain}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Organizations</span>
+                  <span className="text-muted-foreground">Groups</span>
                   <p className="font-medium">
                     {selectedOrgIds.length === allOrgs.length
                       ? `All (${allOrgs.length})`

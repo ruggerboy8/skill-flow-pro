@@ -226,7 +226,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
       : scopeIds.map(id => locations.find(l => l.id === id)?.name).filter(Boolean).join(', ');
     
     const scopeText = scopeCount > 0 ? scopeNames : '[select scopes]';
-    const scopeLabel = scopeType === 'org' ? 'organization(s)' : 'location(s)';
+    const scopeLabel = scopeType === 'org' ? 'group(s)' : 'location(s)';
     
     switch (selectedAction) {
       case 'participant':
@@ -447,7 +447,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                     <SelectValue placeholder="Select scope type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="org">Organizations (includes all locations in each org)</SelectItem>
+                    <SelectItem value="org">Groups (includes all locations in each group)</SelectItem>
                     <SelectItem value="location">Specific Locations</SelectItem>
                   </SelectContent>
                 </Select>
@@ -455,7 +455,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
               
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">
-                  {scopeType === 'org' ? 'Select Organizations' : 'Select Locations'} (multiple)
+                  {scopeType === 'org' ? 'Select Groups' : 'Select Locations'} (multiple)
                 </Label>
                 <div className="space-y-2 max-h-48 overflow-y-auto p-2 border rounded-md bg-background">
                   {scopeType === 'org' 
@@ -476,7 +476,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                           <span className="text-sm">{org.name}</span>
                         </label>
                       )) : (
-                        <p className="text-sm text-muted-foreground p-2">No organizations available</p>
+                        <p className="text-sm text-muted-foreground p-2">No groups available</p>
                       ))
                     : (locations.length > 0 ? locations.map((location) => (
                         <label key={location.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">

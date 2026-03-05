@@ -433,7 +433,7 @@ export default function CoachDashboardV2({
               options={organizationOptions}
               selected={selectedOrganizations}
               onChange={setSelectedOrganizations}
-              placeholder="All Organizations"
+              placeholder="All Groups"
               searchPlaceholder="Search orgs..."
               className="min-w-[200px]"
             />

@@ -21,8 +21,10 @@ import {
   Download, ChevronLeft, ChevronRight, AlertTriangle, FileSpreadsheet,
   Users, Building2, MapPin, Loader2,
 } from 'lucide-react';
-import type { EvalFilters } from '@/types/analytics';
+import type { EvalFilters, EvaluationPeriod } from '@/types/analytics';
 import type { EvalDistributionRow } from '@/types/evalMetricsV2';
+import { EvalPeriodSelector } from '@/components/admin/eval-results-v2/EvalPeriodSelector';
+import { formatEvalPeriod } from '@/lib/evalPeriods';
 import {
   type ExportConfig, type ExportGrain, type TimeWindow,
   DEFAULT_EXPORT_CONFIG, EXPORT_FORMAT, MAX_EXPORT_ROWS, COLUMN_NAMES,
@@ -479,9 +481,23 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
         </Card>
       )}
 
-      {/* Step 1: Scope */}
       {currentStep === 1 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-4">
+          {/* Evaluation Period Selector */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Evaluation Period</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <EvalPeriodSelector
+                value={filters.evaluationPeriod}
+                onChange={(period) => onFiltersChange({ ...filters, evaluationPeriod: period as any })}
+                className="w-full max-w-xs"
+              />
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Organizations */}
           <Card>
             <CardHeader className="pb-2">
@@ -591,6 +607,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
 

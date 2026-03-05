@@ -159,10 +159,17 @@ export function AdminUsersTab() {
     setEditDrawerOpen(true);
   };
 
+  const handleCloseEditDrawer = () => {
+    setEditDrawerOpen(false);
+    window.setTimeout(() => setSelectedUser(null), 0);
+  };
+
   const handleEditSuccess = () => {
     setEditDrawerOpen(false);
-    setSelectedUser(null);
-    loadUsers();
+    window.setTimeout(() => {
+      setSelectedUser(null);
+      loadUsers(currentPage, debouncedSearch);
+    }, 0);
   };
 
   const handleDeleteUser = (user: User) => {
@@ -528,10 +535,7 @@ const handleResendInvite = async (user: User) => {
 
       <EditUserDrawer
         open={editDrawerOpen}
-        onClose={() => {
-          setEditDrawerOpen(false);
-          setSelectedUser(null);
-        }}
+        onClose={handleCloseEditDrawer}
         onSuccess={handleEditSuccess}
         user={selectedUser}
         roles={roles}

@@ -255,8 +255,13 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') && scopeIds.length === 0);
 
   return (
-    <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="w-[500px] sm:max-w-[500px] overflow-y-auto">
+    <Sheet open={open} onOpenChange={(nextOpen) => {
+      if (!nextOpen) onClose();
+    }}>
+      <SheetContent
+        className="w-[500px] sm:max-w-[500px] overflow-y-auto"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
         <SheetHeader>
           <SheetTitle>Edit User</SheetTitle>
           <SheetDescription>

@@ -883,9 +883,10 @@ serve(async (req: Request) => {
           return json({ error: "Only Clinical Directors can invite doctors" }, 403);
         }
         
-        const { email, name, location_id, organization_id } = payload ?? {};
-        if (!email || !name || !organization_id) {
-          return json({ error: "Missing required fields: email, name, and organization_id are required" }, 400);
+        const { email, name, location_id, group_id, organization_id } = payload ?? {};
+        const resolvedGroupId = group_id || organization_id;
+        if (!email || !name || !resolvedGroupId) {
+          return json({ error: "Missing required fields: email, name, and group_id are required" }, 400);
         }
 
         // 1) Send invite first to get the user_id

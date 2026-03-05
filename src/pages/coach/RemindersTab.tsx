@@ -144,8 +144,8 @@ export default function RemindersTab() {
         .from('staff')
         .select(`
           id, name, email, user_id, role_id, is_participant,
-          locations:primary_location_id(id, name, timezone, organization_id, conf_due_day, conf_due_time, perf_due_day, perf_due_time,
-            organizations!locations_organization_id_fkey(id, name)
+          locations:primary_location_id(id, name, timezone, group_id, conf_due_day, conf_due_time, perf_due_day, perf_due_time,
+            practice_group:practice_groups!locations_group_id_fkey(id, name)
           ),
           roles:role_id(role_name)
         `)
@@ -170,7 +170,7 @@ export default function RemindersTab() {
           role_name: s.roles?.role_name || 'Unknown',
           location_id: s.locations?.id || '',
           location_name: s.locations?.name || 'Unknown',
-          org_name: s.locations?.organizations?.name || 'Unknown',
+          org_name: s.locations?.practice_group?.name || 'Unknown',
           loc: {
             conf_due_day: s.locations?.conf_due_day,
             conf_due_time: s.locations?.conf_due_time,

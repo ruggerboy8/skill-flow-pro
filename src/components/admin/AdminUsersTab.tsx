@@ -114,7 +114,7 @@ export function AdminUsersTab() {
     try {
       const [rolesResult, locationsResult, orgsResult] = await Promise.all([
         supabase.from("roles").select("role_id, role_name").order("role_name"),
-        supabase.from("locations").select("id, name, group_id, practice_group:practice_groups!locations_group_id_fkey(name)").eq("active", true).order("name"),
+        supabase.from("locations").select("id, name, group_id, practice_group:practice_groups!locations_org_fkey(name)").eq("active", true).order("name"),
         supabase.from("practice_groups").select("id, name").eq("active", true).order("name"),
       ]);
 

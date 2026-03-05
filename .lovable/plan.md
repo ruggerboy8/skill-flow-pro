@@ -1,113 +1,270 @@
 
 
-# Submission System and On-Time Widget Overhaul
+# Export Tab -- Final Implementation Plan
 
-## Problems
+## Files to Create/Modify
 
-1. **Confidence Wizard has zero excuse gating** -- Daisy Lopez submitted scores 18 minutes after being excused because `ConfidenceWizard.loadData()` never checks `excused_locations` or `excused_submissions`.
-2. **Performance Wizard checks excuses only for confidence-skip logic** -- it queries excuses to decide whether to skip the confidence prerequisite, but never blocks performance submission when *performance* itself is excused.
-3. **Triplicated rate math** drifts across `OnTimeRateWidget`, `useStaffSubmissionRates`, and `LocationSubmissionWidget`, with contradictory zero-data defaults (0% vs 100%).
-4. **N+1 RPC pattern** -- both `LocationSubmissionWidget` and `useStaffSubmissionRates` call `get_staff_submission_windows` once per staff member.
-5. **`LocationSubmissionWidget` is `@ts-nocheck`** -- untyped and high-risk for drift.
-
----
-
-## Execution Order
-
-### Step 1: Shared calculation utility with strong types
-
-**New file:** `src/lib/submissionRateCalc.ts`
-
-- Define a typed `SubmissionWindow` interface matching the RPC return shape (no more `any`).
-- Single `calculateSubmissionStats(windows: SubmissionWindow[], now?: Date): SubmissionStats` function.
-- `SubmissionStats` includes a `hasData: boolean` field (true when `totalExpected > 0`).
-- Accept `now` as a parameter for testability -- defaults to `new Date()`.
-- Group by `week_of`, bucket by metric (`confidence` / `performance`), matching existing week-grouping logic.
-
-### Step 2: Switch OnTimeRateWidget to shared utility
-
-**File:** `src/components/coach/OnTimeRateWidget.tsx`
-
-- Import and call `calculateSubmissionStats` instead of the inline `calculateStats` function (delete it).
-- When `hasData === false`, render a neutral gray card ("No submission data yet") instead of red 0%.
-- Rename the primary KPI label to "Completion Rate" consistently (the component name `OnTimeRateWidget` stays for now, but the displayed headline is already "Completion Rate" -- just make sure color/health functions branch on `hasData` first before evaluating the numeric rate).
-
-### Step 3: Switch useStaffSubmissionRates to shared utility
-
-**File:** `src/hooks/useStaffSubmissionRates.tsx`
-
-- Import and call `calculateSubmissionStats`.
-- Change map value type: `Map<string, number | null>` where `null` = no countable windows (instead of defaulting to `100`).
-- Distinguish errors: `catch` block returns `0` currently -- change to `null` as well (query failure should not masquerade as poor performance; the dashboard already renders `null` as a gray dash).
-- Update `UseStaffSubmissionRatesResult` interface to reflect `Map<string, number | null>`.
-
-### Step 4: Update Coach Dashboard sort/render for null rates
-
-**File:** `src/pages/coach/CoachDashboardV2.tsx`
-
-- The dashboard already renders `null` as `"--"` and uses `text-muted-foreground` -- this is correct.
-- Fix: currently the condition is `ratesLoading || sixWeekRate === null` which conflates loading with no-data. Split to:
-  - While `ratesLoading`: show a small skeleton or spinner.
-  - When `sixWeekRate === null` and not loading: show `"N/A"` in muted text.
-- Sorting: in `useTableSort`, null values already sort as empty string via `getNestedValue`. Add explicit null-to-bottom logic: treat `null` as `-1` when sorting `sixWeekRate` so no-data staff sort below real rates.
-
-### Step 5: Refactor LocationSubmissionWidget to shared utility
-
-**File:** `src/components/dashboard/LocationSubmissionWidget.tsx`
-
-- Remove `@ts-nocheck`.
-- Replace the `sb: any = supabase` workaround with proper typed Supabase calls.
-- Replace the inline per-staff window processing with `calculateSubmissionStats`.
-- Apply same `hasData` neutral state rendering.
-
-### Step 6: Wizard excuse gates (both load and submit paths)
-
-**Files:** `src/pages/ConfidenceWizard.tsx`, `src/pages/PerformanceWizard.tsx`
-
-**Load-time gate (both wizards):**
-After loading staff and computing `effectiveMondayStr` (which already handles repair mode's `weekOf` parameter):
-
-```
-Query excused_locations for staff's primary_location_id + effectiveMondayStr + metric
-Query excused_submissions for staff's id + effectiveMondayStr + metric
-If either returns a match:
-  -> toast("This week's [metric] has been excused")
-  -> navigate home
-  -> return early
-```
-
-For the Confidence Wizard, `metric = 'confidence'`. For the Performance Wizard, `metric = 'performance'` (separate from the existing confidence-excused check which handles prerequisite skipping).
-
-**Submit-time gate (both wizards):**
-Re-check excusal status immediately before the upsert in `handleSubmit()`:
-- Run the same two queries.
-- If excused, show a toast ("This submission was excused while you were working") and navigate home without upserting.
-- This closes the race condition where an admin excuses a location while a staff member has the wizard open.
-
-**Repair mode handling:**
-Both wizards already compute `effectiveMondayStr` correctly for repair mode (using the `weekOf` query param when in repair, current Monday otherwise). The excuse check will use this same value, so historical repair weeks will only block if that specific historical week was excused -- no false blocks.
-
----
-
-## Files Changed Summary
-
-| File | Change |
+| File | Action |
 |------|--------|
-| `src/lib/submissionRateCalc.ts` | **New** -- typed `SubmissionWindow`, `SubmissionStats`, `calculateSubmissionStats()` |
-| `src/components/coach/OnTimeRateWidget.tsx` | Use shared calc, neutral no-data state |
-| `src/hooks/useStaffSubmissionRates.tsx` | Use shared calc, return `null` for no-data and errors |
-| `src/pages/coach/CoachDashboardV2.tsx` | Split loading vs no-data display, null-to-bottom sort |
-| `src/components/dashboard/LocationSubmissionWidget.tsx` | Remove `@ts-nocheck`, use shared calc, typed Supabase calls |
-| `src/pages/ConfidenceWizard.tsx` | Add excuse gate in `loadData()` and `handleSubmit()` |
-| `src/pages/PerformanceWizard.tsx` | Add performance-metric excuse gate in `loadData()` and `handleSubmit()` |
-| `src/hooks/useTableSort.tsx` | Add explicit null-handling in comparator |
+| `src/types/exportConfig.ts` | Create -- types + constants |
+| `src/components/admin/eval-results-v2/EvaluationsExportTab.tsx` | Create -- wizard component |
+| `src/pages/admin/EvalResultsV2.tsx` | Modify -- add tab trigger + content (3 lines) |
 
-No database migrations needed. All fixes are frontend-only.
+No database migrations. No new RPCs. No edge functions.
 
 ---
 
-## Out of Scope (Follow-up)
+## 1. Type File: `src/types/exportConfig.ts`
 
-- **Backend enforcement**: A server-side trigger or RPC validation that rejects `weekly_scores` inserts/updates for excused staff+week+metric combinations. This is the strongest guarantee but requires a migration and is tracked separately.
-- **Batch RPC**: Replacing the N+1 `get_staff_submission_windows` calls with a single batch RPC accepting multiple staff IDs. Important for performance but independent of correctness fixes.
+```typescript
+export type ExportGrain = 'individual' | 'location' | 'organization';
+export type TimeWindow = '3weeks' | '6weeks' | 'all';
+
+export interface ExportConfig {
+  grain: ExportGrain;
+  includeCompletionRate: boolean;
+  includeOnTimeRate: boolean;
+  submissionWindow: TimeWindow;
+  includeDomainAverages: boolean;
+  includeCompetencyAverages: boolean;
+  includeObserverAndSelf: boolean;
+}
+
+export const EXPORT_FORMAT = {
+  version: 'v1',
+  percentDecimals: 0,
+  meanDecimals: 2,
+  nullToken: '',
+} as const;
+
+export const MAX_EXPORT_ROWS = 100_000;
+
+// Deterministic column names -- single source of truth
+export const COLUMN_NAMES = {
+  organization: 'Organization',
+  location: 'Location',
+  staffName: 'Staff Name',
+  role: 'Role',
+  staffCount: 'Staff Count',
+  completionRate: 'Completion %',
+  onTimeRate: 'On-Time %',
+  competencyName: 'Competency',
+  domainName: 'Domain',
+  obsMean: 'Observer Mean',
+  selfMean: 'Self Mean',
+  obsScore: 'Observer Score',
+  selfScore: 'Self Score',
+  nItems: 'N Items',
+} as const;
+```
+
+---
+
+## 2. Component: `EvaluationsExportTab`
+
+Props: `{ filters: EvalFilters; onFiltersChange: (f: EvalFilters) => void }`
+
+### Wizard State
+- `currentStep: number` -- 0-based (matches StepBar which uses 0-based index comparison)
+- Steps array: `['Report Type', 'Scope', 'Metrics', 'Download']`
+- `exportConfig: ExportConfig` with defaults (all false, window '6weeks', grain 'individual')
+
+### Step 0 -- Grain
+Radio group: Individual / Location / Organization. Simple RadioGroup from existing UI.
+
+### Step 1 -- Scope
+Render `<FilterBar filters={filters} onFiltersChange={onFiltersChange} hidePeriodSelector={false} />`. Already pre-populated from page state.
+
+### Step 2 -- Metrics
+Two card groups:
+
+**ProMove Submission** (disabled when period.type === 'Baseline'):
+- Checkbox: Completion %
+- Checkbox: On-Time %
+- ToggleGroup: 3wk / 6wk / all (using existing ToggleGroup component)
+
+**Eval Performance:**
+- Checkbox: Domain averages
+- Checkbox: Competency averages
+- Checkbox: Include observer + self columns (default checked)
+
+Validation: at least one metric must be selected to proceed.
+
+### Step 3 -- Preview and Download
+- Summary text: grain, period label, scope description
+- Column list preview (built from config + COLUMN_NAMES constant)
+- Row count (fetched via lightweight query)
+- If count > MAX_EXPORT_ROWS: warning alert, download blocked
+- If count === 0: "No rows match current filters"
+- "Download CSV" button with loading spinner during assembly
+- On successful download: insert audit row
+
+**Mixed wide+long handling:** If both domain averages (wide) and competency averages (long) are selected, produce two separate CSV files with toast explaining both downloads.
+
+### Navigation
+- Back/Next buttons at bottom
+- Back always allowed
+- Next on Step 2 validates at least one metric selected
+- Step 3 re-fetches row estimate on entry
+
+---
+
+## 3. Data Adapters
+
+### 3a. Submission Metrics
+
+Pattern: identical to `useOrgAccountability` (proven, batched).
+
+1. Fetch staff for scope: `staff` table filtered by `primary_location_id` in scope locations, `is_participant = true`, `is_paused = false`
+2. Batch staff IDs (chunks of 20)
+3. Call `supabase.rpc('get_staff_submission_windows', { p_staff_id, p_since })` per staff
+4. `p_since`: use `calculateCutoffDate(config.submissionWindow)` -- 21 days for 3wk, 42 days for 6wk, omit for all
+5. Filter returned rows to `due_at <= now` (past-due only, matching existing semantics)
+6. Per staff: count expected/completed/onTime from filtered rows
+7. For individual grain: one row per staff with rates
+8. For location/org grain: sum across staff, recompute rates
+9. Staff with 0 expected: rates = `null` (exported as empty string per EXPORT_FORMAT.nullToken)
+
+### 3b. Domain Metrics
+
+Use `get_eval_distribution_metrics` RPC with same params as existing V2 components:
+```typescript
+supabase.rpc('get_eval_distribution_metrics', {
+  p_org_id: filters.organizationId,
+  p_types: types, // ['Quarterly'] or ['Baseline']
+  p_program_year: filters.evaluationPeriod.year,
+  p_quarter: filters.evaluationPeriod.quarter,
+  p_location_ids: filters.locationIds.length > 0 ? filters.locationIds : undefined,
+  p_role_ids: filters.roleIds.length > 0 ? filters.roleIds : undefined,
+})
+```
+
+- RPC returns per-staff per-domain rows with `obs_mean`, `self_mean`, `n_items`
+- Individual grain: pivot domains to columns per staff (wide format). Column per domain: `{DomainName} Observer Mean`, `{DomainName} Self Mean`
+- Location grain: group by `location_id` + domain, **weighted mean** = `sum(obs_mean * n_items) / sum(n_items)`
+- Org grain: group by domain only, same weighted mean
+- If `includeObserverAndSelf === false`: omit self columns
+
+### 3c. Competency Metrics
+
+Query `evaluation_items` joined with `evaluations` (period/scope/status='submitted'):
+```typescript
+supabase
+  .from('evaluation_items')
+  .select('competency_id, competency_name_snapshot, domain_name, observer_score, self_score, observer_is_na, self_is_na, evaluation_id, evaluations!inner(staff_id, location_id, role_id, type, quarter, program_year, status, staff!inner(name, primary_location_id))')
+  .eq('evaluations.status', 'submitted')
+  .eq('evaluations.program_year', year)
+  // + type/quarter/location/role filters
+```
+
+- Individual grain: wide format -- one row per staff, columns per competency
+- Location/org grain: **long format** -- one row per grouping + competency with averaged scores. Columns: `Organization, Location, Competency, Domain, Observer Mean, Self Mean, N Items`
+- Multiple evals per staff in period: average all submitted items per competency
+- If `includeObserverAndSelf === false`: omit self columns
+- Use explicit FK hint for competency->domain joins if needed (per architecture memory)
+
+---
+
+## 4. CSV Assembly
+
+### Row Sort Order (deterministic)
+- Individual: organization name, location name, staff name, role
+- Location: organization name, location name
+- Organization: organization name
+
+### Formatting
+- Rates: `Math.round(rate)` -- integer, no % symbol
+- Means: `.toFixed(2)` -- 2 decimal places
+- Nulls: empty string `''` (not em dash)
+- Column order follows `COLUMN_NAMES` constant order
+
+### File Naming
+- Domain/submission: `eval_export_{grain}_{periodLabel}_{YYYY-MM-DD}.csv`
+- Competency (separate file): `eval_export_{grain}_competencies_{periodLabel}_{YYYY-MM-DD}.csv`
+
+### Download
+Use existing `downloadCSV()` from `lib/csvExport.ts`. It already handles null/undefined as empty string, comma escaping, and blob download.
+
+---
+
+## 5. Audit Trail
+
+After successful download, insert via client:
+```typescript
+const { data: myStaff } = await supabase
+  .from('staff')
+  .select('id')
+  .eq('user_id', user.id)
+  .single();
+
+await supabase.from('admin_audit').insert({
+  action: 'evaluations_export_downloaded',
+  changed_by: myStaff.id,   // staff UUID, not auth UUID
+  staff_id: myStaff.id,     // self-action, same staff
+  scope_organization_id: filters.organizationId || null,
+  scope_location_id: null,
+  new_values: {
+    exportVersion: 'v1',
+    grain: config.grain,
+    period: filters.evaluationPeriod,
+    filtersApplied: { locationIds: filters.locationIds, roleIds: filters.roleIds },
+    metricFlags: config,
+    rowCount,
+    filename,
+  },
+});
+```
+
+RLS: `admin_audit` has INSERT policy `WITH CHECK (true)` for authenticated users, so client-side insert works.
+
+---
+
+## 6. Query Keys (primitive-based, stable)
+
+```typescript
+// Row estimate
+['export-row-estimate', grain, orgId, year, quarter, type, sortedLocationIds, sortedRoleIds, ...metricFlags]
+
+// Submission data (only fetched during export build, not cached long)
+['export-submission-build', sortedStaffIds, submissionWindow]
+
+// Domain data
+['export-domain-build', orgId, year, quarter, type, sortedLocationIds, sortedRoleIds]
+
+// Competency data
+['export-competency-build', orgId, year, quarter, type, sortedLocationIds, sortedRoleIds]
+```
+
+---
+
+## 7. UX Guardrails
+
+- Download button disabled until: org selected AND at least one metric checked AND row estimate resolved AND count > 0 AND count <= MAX_EXPORT_ROWS
+- Loading state with spinner during CSV assembly
+- If both domain + competency selected: two sequential downloads with toast: "2 files downloaded: metrics and competencies"
+- Empty state: "No rows match current filters" with specific reason
+- Submission metrics disabled for Baseline periods (no submission windows exist)
+- Step 3 revalidates (re-fetches row estimate) on entry
+
+---
+
+## 8. Integration into EvalResultsV2.tsx
+
+Three lines:
+1. `import { EvaluationsExportTab } from '@/components/admin/eval-results-v2/EvaluationsExportTab';`
+2. `<TabsTrigger value="export">Export</TabsTrigger>` in TabsList
+3. `<TabsContent value="export" className="space-y-6"><EvaluationsExportTab filters={filters} onFiltersChange={setFilters} /></TabsContent>`
+
+---
+
+## Implementation Order
+
+1. Create `src/types/exportConfig.ts` (types + constants)
+2. Create `EvaluationsExportTab.tsx` -- wizard UI shell with StepBar, grain selector, metric checkboxes, preview panel (no data wiring yet, disabled download)
+3. Wire submission metrics adapter (reuse `get_staff_submission_windows` + `calculateSubmissionStats` pattern from `useOrgAccountability`)
+4. Wire domain metrics adapter (reuse `get_eval_distribution_metrics` call pattern from `OrgSummaryStrip`)
+5. Wire competency metrics adapter (query `evaluation_items` + `evaluations`)
+6. CSV assembly with deterministic column order + formatting rules
+7. Audit trail insert on successful download
+8. Add Export tab to `EvalResultsV2.tsx`
 

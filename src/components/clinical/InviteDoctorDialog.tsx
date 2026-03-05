@@ -28,15 +28,15 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
   
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [organizationId, setOrganizationId] = useState('');
+  const [groupId, setGroupId] = useState('');
   const [locationId, setLocationId] = useState('__roaming__');
 
-  // Fetch organizations
-  const { data: organizations } = useQuery({
-    queryKey: ['organizations-for-invite'],
+  // Fetch practice groups
+  const { data: practiceGroups } = useQuery({
+    queryKey: ['practice-groups-for-invite'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('organizations')
+        .from('practice_groups')
         .select('id, name')
         .eq('active', true)
         .order('name');
@@ -45,21 +45,21 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
     },
   });
 
-  // Fetch locations for selected org
+  // Fetch locations for selected group
   const { data: locations } = useQuery({
-    queryKey: ['locations-for-invite', organizationId],
+    queryKey: ['locations-for-invite', groupId],
     queryFn: async () => {
-      if (!organizationId) return [];
+      if (!groupId) return [];
       const { data, error } = await supabase
         .from('locations')
         .select('id, name')
-        .eq('organization_id', organizationId)
+        .eq('group_id', groupId)
         .eq('active', true)
         .order('name');
       if (error) throw error;
       return data;
     },
-    enabled: !!organizationId,
+    enabled: !!groupId,
   });
 
   const inviteMutation = useMutation({
@@ -79,7 +79,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
             action: 'invite_doctor',
             email: email.trim(),
             name: name.trim(),
-            organization_id: organizationId,
+            organization_id: groupId,
             location_id: locationId === '__roaming__' ? null : locationId,
           }),
         }
@@ -114,13 +114,13 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
   const resetForm = () => {
     setEmail('');
     setName('');
-    setOrganizationId('');
+    setGroupId('');
     setLocationId('__roaming__');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !name.trim() || !organizationId) {
+    if (!email.trim() || !name.trim() || !groupId) {
       toast({
         title: 'Missing fields',
         description: 'Please fill in all required fields',
@@ -167,15 +167,15 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
 
           <div className="space-y-2">
             <Label htmlFor="organization">Group *</Label>
-            <Select value={organizationId} onValueChange={(val) => {
-              setOrganizationId(val);
-              setLocationId('__roaming__'); // Reset location when org changes
+            <Select value={groupId} onValueChange={(val) => {
+              setGroupId(val);
+              setLocationId('__roaming__'); // Reset location when group changes
             }}>
               <SelectTrigger>
                 <SelectValue placeholder="Select group" />
               </SelectTrigger>
               <SelectContent>
-                {organizations?.map((org) => (
+                {practiceGroups?.map((org) => (
                   <SelectItem key={org.id} value={org.id}>
                     {org.name}
                   </SelectItem>
@@ -186,7 +186,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
 
           <div className="space-y-2">
             <Label htmlFor="location">Location (Optional)</Label>
-            <Select value={locationId} onValueChange={setLocationId} disabled={!organizationId}>
+            <Select value={locationId} onValueChange={setLocationId} disabled={!groupId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>

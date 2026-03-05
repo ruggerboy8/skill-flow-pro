@@ -51,7 +51,7 @@ interface Role {
 interface Location {
   id: string;
   name: string;
-  organization?: { name: string };
+  practice_group?: { name: string };
 }
 
 export function AdminUsersTab() {
@@ -114,8 +114,8 @@ export function AdminUsersTab() {
     try {
       const [rolesResult, locationsResult, orgsResult] = await Promise.all([
         supabase.from("roles").select("role_id, role_name").order("role_name"),
-        supabase.from("locations").select("id, name, organization_id, organization:organizations!locations_organization_id_fkey(name)").eq("active", true).order("name"),
-        supabase.from("organizations").select("id, name").eq("active", true).order("name"),
+        supabase.from("locations").select("id, name, group_id, practice_group:practice_groups!locations_group_id_fkey(name)").eq("active", true).order("name"),
+        supabase.from("practice_groups").select("id, name").eq("active", true).order("name"),
       ]);
 
       if (rolesResult.error) throw rolesResult.error;
@@ -123,8 +123,8 @@ export function AdminUsersTab() {
       if (orgsResult.error) throw orgsResult.error;
 
       setRoles(rolesResult.data || []);
-      setLocations(locationsResult.data || []);
-      setOrganizations(orgsResult.data || []);
+      setLocations((locationsResult.data || []) as unknown as Location[]);
+      setOrganizations((orgsResult.data || []) as unknown as Array<{ id: string; name: string }>);
     } catch (error) {
       console.error("Error loading roles/locations/orgs:", error);
     }

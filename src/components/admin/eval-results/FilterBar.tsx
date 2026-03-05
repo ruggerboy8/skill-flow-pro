@@ -54,7 +54,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
       const { data: locations, error: locError } = await supabase
         .from('locations')
         .select('id')
-        .eq('organization_id', filters.organizationId)
+        .eq('group_id', filters.organizationId)
         .eq('active', true);
       
       if (locError) throw locError;
@@ -139,7 +139,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   async function loadOrganizations() {
     try {
       const { data, error } = await supabase
-        .from('organizations')
+        .from('practice_groups')
         .select('id, name')
         .eq('active', true)
         .order('name');
@@ -156,7 +156,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
       const { data, error } = await supabase
         .from('locations')
         .select('id, name')
-        .eq('organization_id', filters.organizationId)
+        .eq('group_id', filters.organizationId)
         .eq('active', true)
         .order('name');
 

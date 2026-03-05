@@ -59,12 +59,12 @@ export function ExcuseSubmissionsDialog({
     queryFn: async () => {
       let query = supabase
         .from('locations')
-        .select('id, name, organization_id')
+        .select('id, name, group_id')
         .eq('active', true)
         .order('name');
       
       if (!isSuperAdmin && managedOrgIds.length > 0) {
-        query = query.in('organization_id', managedOrgIds);
+        query = query.in('group_id', managedOrgIds);
       }
       
       const { data, error } = await query;

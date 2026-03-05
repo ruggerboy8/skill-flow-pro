@@ -60,7 +60,7 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
       if (organization) {
         // Update existing organization
         const { error } = await supabase
-          .from('organizations')
+          .from('practice_groups')
           .update({
             name: formData.name,
             slug: formData.slug
@@ -76,7 +76,7 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
       } else {
         // Create new organization
         const { error } = await supabase
-          .from('organizations')
+          .from('practice_groups')
           .insert({
             name: formData.name,
             slug: formData.slug

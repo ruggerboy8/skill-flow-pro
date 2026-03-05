@@ -160,14 +160,14 @@ export default function CoachDashboardV2({
 
   // Unique filter options
   const organizationOptions = useMemo(() => {
-    const orgs = Array.from(new Set(summaries.map(s => s.organization_name))).sort();
+    const orgs = Array.from(new Set(summaries.map(s => s.group_name))).sort();
     return orgs.map(org => ({ value: org, label: org }));
   }, [summaries]);
 
   const locationOptions = useMemo(() => {
     const filtered = selectedOrganizations.length === 0
       ? summaries
-      : summaries.filter(s => selectedOrganizations.includes(s.organization_name));
+      : summaries.filter(s => selectedOrganizations.includes(s.group_name));
     const locs = Array.from(new Set(filtered.map(s => s.location_name))).sort();
     return locs.map(loc => ({ value: loc, label: loc }));
   }, [summaries, selectedOrganizations]);
@@ -186,7 +186,7 @@ export default function CoachDashboardV2({
       filtered = filtered.filter(s => s.location_id === forcedLocationId);
     } else {
       if (selectedOrganizations.length > 0) {
-        filtered = filtered.filter(s => selectedOrganizations.includes(s.organization_name));
+        filtered = filtered.filter(s => selectedOrganizations.includes(s.group_name));
       }
 
       if (selectedLocations.length > 0) {

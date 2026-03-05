@@ -79,7 +79,7 @@ export function SummaryMetrics({ filters }: SummaryMetricsProps) {
       const { data: locationsData, error: locError } = await supabase
         .from('locations')
         .select('id')
-        .eq('organization_id', filters.organizationId)
+        .eq('group_id', filters.organizationId)
         .eq('active', true);
 
       if (locError) throw locError;

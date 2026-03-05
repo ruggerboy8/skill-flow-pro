@@ -93,7 +93,7 @@ serve(async (req: Request) => {
 
         let q = admin
           .from("staff")
-          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,is_paused,paused_at,pause_reason,coach_scope_type,coach_scope_id,hire_date,allow_backfill_until,is_doctor,is_clinical_director,roles(role_name),locations(name,organization_id)", {
+          .select("id,name,user_id,role_id,primary_location_id,is_super_admin,is_org_admin,is_coach,is_lead,is_participant,is_paused,paused_at,pause_reason,coach_scope_type,coach_scope_id,hire_date,allow_backfill_until,is_doctor,is_clinical_director,roles(role_name),locations(name,group_id)", {
             count: "exact",
           })
           .order("name", { ascending: true });
@@ -110,7 +110,7 @@ serve(async (req: Request) => {
             const locationScopes = callerScopes.filter((s: any) => s.scope_type === 'location').map((s: any) => s.scope_id);
             
             if (orgScopes.length > 0) {
-              q = q.in('locations.organization_id', orgScopes);
+              q = q.in('locations.group_id', orgScopes);
             } else if (locationScopes.length > 0) {
               q = q.in('primary_location_id', locationScopes);
             }
@@ -186,7 +186,7 @@ serve(async (req: Request) => {
             role_name: s.roles?.role_name ?? null,
             location_id: s.primary_location_id,
             location_name: s.locations?.name ?? null,
-            organization_id: s.locations?.organization_id ?? null,
+            organization_id: s.locations?.group_id ?? null,
             is_super_admin: s.is_super_admin ?? false,
             is_org_admin: s.is_org_admin ?? false,
             is_coach: s.is_coach ?? false,
@@ -392,7 +392,7 @@ serve(async (req: Request) => {
         
         // Validate scope IDs exist
         if (coach_scope_type && coach_scope_ids && Array.isArray(coach_scope_ids) && coach_scope_ids.length > 0) {
-          const scopeTable = coach_scope_type === 'org' ? 'organizations' : 'locations';
+          const scopeTable = coach_scope_type === 'org' ? 'practice_groups' : 'locations';
           const { data: scopeData, error: scopeErr } = await admin
             .from(scopeTable)
             .select("id")

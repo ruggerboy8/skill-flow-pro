@@ -11,8 +11,8 @@ export interface RosterStaff {
   role_name: string;
   location_id: string;
   location_name: string;
-  organization_id: string;
-  organization_name: string;
+  group_id: string;
+  group_name: string;
   tz: string;
   week_of: string;
 }

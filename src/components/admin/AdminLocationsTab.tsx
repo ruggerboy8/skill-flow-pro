@@ -17,12 +17,12 @@ import { format, parseISO } from "date-fns";
 interface Location {
   id: string;
   name: string;
-  organization_id: string | null;
+  group_id: string | null;
   timezone: string;
   program_start_date: string;
   cycle_length_weeks: number;
   active: boolean;
-  organization?: {
+  practice_group?: {
     name: string;
   };
 }
@@ -46,14 +46,14 @@ export function AdminLocationsTab() {
       const { data, error } = await supabase
         .from("locations")
         .select(`
-          id, name, organization_id, timezone, program_start_date, cycle_length_weeks, active,
-          organization:organizations!locations_organization_id_fkey ( id, name )
+          id, name, group_id, timezone, program_start_date, cycle_length_weeks, active,
+          practice_group:practice_groups!locations_group_id_fkey ( name )
         `)
         .order("name");
 
       if (error) throw error;
 
-      setLocations((data || []) as Location[]);
+      setLocations((data || []) as unknown as Location[]);
     } catch (error) {
       console.error("Error loading locations:", error);
       toast({
@@ -71,7 +71,7 @@ export function AdminLocationsTab() {
   const loadOrganizations = async () => {
     try {
       const { data, error } = await supabase
-        .from("organizations")
+        .from("practice_groups")
         .select("id, name")
         .eq("active", true)
         .order("name");
@@ -250,7 +250,7 @@ export function AdminLocationsTab() {
                     <TableRow key={location.id}>
                       <TableCell className="font-medium">{location.name}</TableCell>
                       <TableCell>
-                        {location.organization?.name || "No group"}
+                        {location.practice_group?.name || "No group"}
                       </TableCell>
                       <TableCell>{formatTimezone(location.timezone)}</TableCell>
                       <TableCell>{formatDate(location.program_start_date)}</TableCell>

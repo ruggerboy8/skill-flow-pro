@@ -23,7 +23,7 @@ export type Database = {
           new_values: Json | null
           old_values: Json | null
           scope_location_id: string | null
-          scope_group_id: string | null
+          scope_organization_id: string | null
           staff_id: string
         }
         Insert: {
@@ -34,7 +34,7 @@ export type Database = {
           new_values?: Json | null
           old_values?: Json | null
           scope_location_id?: string | null
-          scope_group_id?: string | null
+          scope_organization_id?: string | null
           staff_id: string
         }
         Update: {
@@ -45,7 +45,7 @@ export type Database = {
           new_values?: Json | null
           old_values?: Json | null
           scope_location_id?: string | null
-          scope_group_id?: string | null
+          scope_organization_id?: string | null
           staff_id?: string
         }
         Relationships: [
@@ -78,8 +78,8 @@ export type Database = {
             referencedColumns: ["location_id"]
           },
           {
-            foreignKeyName: "admin_audit_scope_group_id_fkey"
-            columns: ["scope_group_id"]
+            foreignKeyName: "admin_audit_scope_organization_id_fkey"
+            columns: ["scope_organization_id"]
             isOneToOne: false
             referencedRelation: "practice_groups"
             referencedColumns: ["id"]
@@ -1189,68 +1189,6 @@ export type Database = {
         }
         Relationships: []
       }
-      organization_role_names: {
-        Row: {
-          id: string
-          org_id: string
-          role_id: number
-          display_name: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          id?: string
-          org_id: string
-          role_id: number
-          display_name: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          id?: string
-          org_id?: string
-          role_id?: number
-          display_name?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organization_role_names_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      organizations: {
-        Row: {
-          id: string
-          name: string
-          slug: string
-          practice_type: string
-          created_at: string
-          created_by: string | null
-        }
-        Insert: {
-          id?: string
-          name: string
-          slug: string
-          practice_type?: string
-          created_at?: string
-          created_by?: string | null
-        }
-        Update: {
-          id?: string
-          name?: string
-          slug?: string
-          practice_type?: string
-          created_at?: string
-          created_by?: string | null
-        }
-        Relationships: []
-      }
       practice_groups: {
         Row: {
           active: boolean | null
@@ -1258,7 +1196,6 @@ export type Database = {
           id: string
           is_sandbox: boolean | null
           name: string
-          organization_id: string
           slug: string
         }
         Insert: {
@@ -1267,7 +1204,6 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           name: string
-          organization_id: string
           slug: string
         }
         Update: {
@@ -1276,18 +1212,9 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           name?: string
-          organization_id?: string
           slug?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "practice_groups_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
       pro_move_resources: {
         Row: {

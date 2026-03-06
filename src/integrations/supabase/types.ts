@@ -1159,6 +1159,96 @@ export type Database = {
           },
         ]
       }
+      organization_role_names: {
+        Row: {
+          display_name: string
+          id: string
+          org_id: string
+          role_id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          display_name: string
+          id?: string
+          org_id: string
+          role_id: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          display_name?: string
+          id?: string
+          org_id?: string
+          role_id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_role_names_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_role_names_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "organization_role_names_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "organization_role_names_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_role_names_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          practice_type: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          practice_type?: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          practice_type?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       orphaned_scores_log: {
         Row: {
           action_id: number | null
@@ -1503,14 +1593,17 @@ export type Database = {
       }
       roles: {
         Row: {
+          role_code: string | null
           role_id: number
           role_name: string | null
         }
         Insert: {
+          role_code?: string | null
           role_id: number
           role_name?: string | null
         }
         Update: {
+          role_code?: string | null
           role_id?: number
           role_name?: string | null
         }
@@ -3332,6 +3425,10 @@ export type Database = {
       resolve_backlog_item: {
         Args: { p_action_id: number; p_staff_id: string }
         Returns: undefined
+      }
+      resolve_role_display_name: {
+        Args: { p_org_id: string; p_role_id: number }
+        Returns: string
       }
       retime_backfill_cycle:
         | {

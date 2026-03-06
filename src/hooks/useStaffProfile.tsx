@@ -36,6 +36,9 @@ export interface StaffProfile {
     conf_due_time?: string;
     perf_due_day?: number;
     perf_due_time?: string;
+    practice_groups?: {
+      organization_id: string | null;
+    } | null;
   } | null;
   coach_scopes: {
     scope_type: 'org' | 'location';
@@ -94,7 +97,10 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
             conf_due_day,
             conf_due_time,
             perf_due_day,
-            perf_due_time
+            perf_due_time,
+            practice_groups!locations_organization_id_fkey (
+              organization_id
+            )
           ),
           coach_scopes (
             scope_type,

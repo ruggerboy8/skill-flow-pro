@@ -4,12 +4,13 @@ export function useUserRole() {
   const { data: staff, isLoading, error } = useStaffProfile();
 
   if (isLoading || !staff) {
-    return { 
-      isLoading: true, 
+    return {
+      isLoading: true,
       staffId: undefined,
+      organizationId: undefined as string | undefined,
       isSuperAdmin: false,
       isOrgAdmin: false,
-      isRegional: false, 
+      isRegional: false,
       isCoach: false,
       isParticipant: false,
       isLead: false,
@@ -77,9 +78,13 @@ export function useUserRole() {
     homeRoute = '/dashboard';
   }
 
+  // Resolve organization_id through the location → practice_group chain
+  const organizationId = (staff.locations as any)?.practice_groups?.organization_id ?? undefined;
+
   return {
     isLoading: false,
     staffId: staff.id,
+    organizationId,
     isSuperAdmin: staff.is_super_admin,
     isOrgAdmin,
     isRegional,

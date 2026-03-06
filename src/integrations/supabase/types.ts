@@ -1286,7 +1286,7 @@ export type Database = {
           id: string
           is_sandbox: boolean | null
           name: string
-          organization_id: string | null
+          organization_id: string
           slug: string
         }
         Insert: {
@@ -1295,7 +1295,7 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           name: string
-          organization_id?: string | null
+          organization_id: string
           slug: string
         }
         Update: {
@@ -1304,7 +1304,7 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           name?: string
-          organization_id?: string | null
+          organization_id?: string
           slug?: string
         }
         Relationships: [
@@ -1415,6 +1415,7 @@ export type Database = {
           date_added: string | null
           description: string | null
           intervention_text: string | null
+          practice_type: string
           resources_url: string | null
           retired_at: string | null
           retired_by: string | null
@@ -1433,6 +1434,7 @@ export type Database = {
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
+          practice_type?: string
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null
@@ -1451,6 +1453,7 @@ export type Database = {
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
+          practice_type?: string
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null

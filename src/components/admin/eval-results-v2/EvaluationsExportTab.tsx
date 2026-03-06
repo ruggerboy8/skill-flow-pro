@@ -420,7 +420,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
             action: 'evaluations_export_downloaded',
             changed_by: myStaff.id,
             staff_id: myStaff.id,
-            scope_organization_id: selectedOrgIds.length === 1 ? selectedOrgIds[0] : null,
+            scope_group_id: selectedOrgIds.length === 1 ? selectedOrgIds[0] : null,
             new_values: {
               exportVersion: EXPORT_FORMAT.version,
               grain: config.grain,

@@ -117,7 +117,7 @@ export default function StaffDetailV2() {
       role_name: firstSummary.role_name,
       location_id: firstSummary.location_id,
       location_name: firstSummary.location_name,
-      organization_name: firstSummary.group_name,
+      group_name: firstSummary.group_name,
     };
   }, [weekSummaries]);
 
@@ -332,7 +332,7 @@ export default function StaffDetailV2() {
             <span>•</span>
             <span>{staffInfo.location_name}</span>
             <span>•</span>
-            <span>{staffInfo.organization_name}</span>
+            <span>{staffInfo.group_name}</span>
           </div>
         </div>
       </div>

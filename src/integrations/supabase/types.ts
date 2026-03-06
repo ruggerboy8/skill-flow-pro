@@ -23,7 +23,7 @@ export type Database = {
           new_values: Json | null
           old_values: Json | null
           scope_location_id: string | null
-          scope_organization_id: string | null
+          scope_group_id: string | null
           staff_id: string
         }
         Insert: {
@@ -34,7 +34,7 @@ export type Database = {
           new_values?: Json | null
           old_values?: Json | null
           scope_location_id?: string | null
-          scope_organization_id?: string | null
+          scope_group_id?: string | null
           staff_id: string
         }
         Update: {
@@ -45,7 +45,7 @@ export type Database = {
           new_values?: Json | null
           old_values?: Json | null
           scope_location_id?: string | null
-          scope_organization_id?: string | null
+          scope_group_id?: string | null
           staff_id?: string
         }
         Relationships: [
@@ -78,8 +78,8 @@ export type Database = {
             referencedColumns: ["location_id"]
           },
           {
-            foreignKeyName: "admin_audit_scope_organization_id_fkey"
-            columns: ["scope_organization_id"]
+            foreignKeyName: "admin_audit_scope_group_id_fkey"
+            columns: ["scope_group_id"]
             isOneToOne: false
             referencedRelation: "practice_groups"
             referencedColumns: ["id"]

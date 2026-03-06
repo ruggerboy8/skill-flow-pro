@@ -78,6 +78,15 @@ Multi-tenant SaaS coaching platform for dental practices.
 - docs/progress.md in the worktree — master reference for status and decisions
 - Update at end of every session
 
-## Open Design Question (Session 2)
-- Super-admin view: Option A (separate /platform-admin page) vs Option B (org switcher/masquerade)
-- Awaiting user decision before building
+## Key Decisions (Session 2)
+- Super-admin view: Option A (separate /platform-admin page) — DECIDED
+- App name: "Pro Moves" (Skill Flow Pro is repo name artifact)
+- White labeling: per-org logo + name in header — important feature
+- UK prototype: single location, general practice, known partner, GDPR deferred
+- UK roles: Receptionist, Dental Nurse, Office Manager, Doctor
+- Permissions: toggle-based, someone can be both participant AND coach
+- Org admins: can create locations, invite users, change pro move visibility
+- Doctor features: least defined area, design session needed before building
+- Doctor cadence: instructional coaching model (observe → Calendly → review → next steps)
+- GDPR: deferred until public launch
+- Billing: out of scope

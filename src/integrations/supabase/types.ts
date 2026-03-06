@@ -1286,6 +1286,7 @@ export type Database = {
           id: string
           is_sandbox: boolean | null
           name: string
+          organization_id: string | null
           slug: string
         }
         Insert: {
@@ -1294,6 +1295,7 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           name: string
+          organization_id?: string | null
           slug: string
         }
         Update: {
@@ -1302,9 +1304,18 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           name?: string
+          organization_id?: string | null
           slug?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "practice_groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pro_move_resources: {
         Row: {
@@ -2886,6 +2897,7 @@ export type Database = {
         Args: { p_eval_id: string }
         Returns: Json
       }
+      current_user_org_id: { Args: never; Returns: string }
       delete_latest_week_data: { Args: { p_user_id: string }; Returns: Json }
       delete_week_data: {
         Args: {

@@ -78,13 +78,10 @@ export function useUserRole() {
     homeRoute = '/dashboard';
   }
 
-  // Resolve organization_id through the location → practice_group chain
-  const organizationId = (staff.locations as any)?.practice_groups?.organization_id ?? undefined;
-
   return {
     isLoading: false,
     staffId: staff.id,
-    organizationId,
+    organizationId: undefined as string | undefined, // populated after migrations + join re-enabled
     isSuperAdmin: staff.is_super_admin,
     isOrgAdmin,
     isRegional,

@@ -97,10 +97,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
             conf_due_day,
             conf_due_time,
             perf_due_day,
-            perf_due_time,
-            practice_groups!locations_organization_id_fkey (
-              organization_id
-            )
+            perf_due_time
           ),
           coach_scopes (
             scope_type,

@@ -54,6 +54,7 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization 
         name: formData.name.trim(),
         slug: slug,
         active: true,
+        organization_id: 'a1ca0000-0000-0000-0000-000000000001',
       };
 
       let error;

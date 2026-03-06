@@ -79,7 +79,8 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
           .from('practice_groups')
           .insert({
             name: formData.name,
-            slug: formData.slug
+            slug: formData.slug,
+            organization_id: 'a1ca0000-0000-0000-0000-000000000001',
           });
 
         if (error) throw error;

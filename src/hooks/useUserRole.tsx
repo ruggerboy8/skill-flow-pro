@@ -4,12 +4,13 @@ export function useUserRole() {
   const { data: staff, isLoading, error } = useStaffProfile();
 
   if (isLoading || !staff) {
-    return { 
-      isLoading: true, 
+    return {
+      isLoading: true,
       staffId: undefined,
+      organizationId: undefined as string | undefined,
       isSuperAdmin: false,
       isOrgAdmin: false,
-      isRegional: false, 
+      isRegional: false,
       isCoach: false,
       isParticipant: false,
       isLead: false,
@@ -80,6 +81,7 @@ export function useUserRole() {
   return {
     isLoading: false,
     staffId: staff.id,
+    organizationId: undefined as string | undefined, // populated after migrations + join re-enabled
     isSuperAdmin: staff.is_super_admin,
     isOrgAdmin,
     isRegional,

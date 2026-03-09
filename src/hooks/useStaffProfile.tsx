@@ -36,6 +36,9 @@ export interface StaffProfile {
     conf_due_time?: string;
     perf_due_day?: number;
     perf_due_time?: string;
+    practice_groups?: {
+      organization_id: string | null;
+    } | null;
   } | null;
   coach_scopes: {
     scope_type: 'org' | 'location';

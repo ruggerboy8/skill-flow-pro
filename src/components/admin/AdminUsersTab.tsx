@@ -59,7 +59,7 @@ export function AdminUsersTab() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [organizations, setOrganizations] = useState<Array<{ id: string; name: string }>>([]);
+  const [groups, setGroups] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -124,7 +124,7 @@ export function AdminUsersTab() {
 
       setRoles(rolesResult.data || []);
       setLocations((locationsResult.data || []) as unknown as Location[]);
-      setOrganizations((orgsResult.data || []) as unknown as Array<{ id: string; name: string }>);
+      setGroups((orgsResult.data || []) as unknown as Array<{ id: string; name: string }>);
     } catch (error) {
       console.error("Error loading roles/locations/orgs:", error);
     }
@@ -530,7 +530,7 @@ const handleResendInvite = async (user: User) => {
         onSuccess={handleInviteSuccess}
         roles={roles}
         locations={locations}
-        organizations={organizations}
+        organizations={groups}
       />
 
       <EditUserDrawer
@@ -540,7 +540,7 @@ const handleResendInvite = async (user: User) => {
         user={selectedUser}
         roles={roles}
         locations={locations}
-        organizations={organizations}
+        organizations={groups}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

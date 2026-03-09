@@ -50,24 +50,21 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization 
       // Generate slug from name
       const slug = formData.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       
-      const organizationData = {
-        name: formData.name.trim(),
-        slug: slug,
-        active: true,
-        organization_id: 'a1ca0000-0000-0000-0000-000000000001',
-      };
 
       let error;
 
       if (isEditing) {
         ({ error } = await supabase
           .from("practice_groups")
-          .update(organizationData)
+          .update({ name: formData.name.trim(), slug, active: true })
           .eq("id", organization.id));
       } else {
+        const { data: orgs } = await supabase.from("organizations").select("id").limit(1).single();
+        if (!orgs) throw new Error("No parent organization found");
+
         ({ error } = await supabase
           .from("practice_groups")
-          .insert([organizationData]));
+          .insert([{ name: formData.name.trim(), slug, active: true, organization_id: orgs.id }]));
       }
 
       if (error) throw error;

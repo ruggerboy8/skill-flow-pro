@@ -74,12 +74,15 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
           description: 'Group updated successfully'
         });
       } else {
-        // Create new organization
+        const { data: orgs } = await supabase.from('organizations').select('id').limit(1).single();
+        if (!orgs) throw new Error('No parent organization found');
+
         const { error } = await supabase
           .from('practice_groups')
           .insert({
             name: formData.name,
-            slug: formData.slug
+            slug: formData.slug,
+            organization_id: orgs.id,
           });
 
         if (error) throw error;

@@ -1,48 +1,39 @@
-## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
-**Status: ✅ Complete**
 
-### What changed
+## Fix: Count submitted-but-not-yet-due windows in completion rate
 
-1. **Practice types expanded** to three region-specific values: `pediatric_us`, `general_us`, `general_uk`
-2. **`roles.practice_type`** column added — each role belongs to one practice type
-3. **`pro_moves.practice_type`** converted to **`pro_moves.practice_types TEXT[]`** — array-based multi-select
-4. All existing data backfilled (`pediatric` → `pediatric_us`, `general` → `general_us`, `all` → all three)
+### Problem
+`calculateSubmissionStats` in `src/lib/submissionRateCalc.ts` filters windows with `new Date(w.due_at) <= now` (line 39). This means on Monday morning, a staff member who has already submitted confidence scores for the current week shows 0% because the confidence deadline (Tuesday) hasn't passed yet. Only historical (past-due) windows are counted, and if those are all missing, the rate is 0%.
 
-### Files changed
+### Root cause
+The filter assumes "only count windows whose deadline has passed." But a window where `status === 'submitted'` and `due_at > now` represents a valid early completion that should count positively.
 
-| File | Change |
-|------|--------|
-| Migration SQL | Schema: expanded CHECK on orgs, added practice_types array on pro_moves, added practice_type on roles |
-| `RoleFormDrawer.tsx` | Added practice type Select (3 options) |
-| `PlatformRolesTab.tsx` | Shows practice type badge on role cards, fetches practice_type |
-| `ProMoveForm.tsx` | Replaced single Select with multi-checkbox for practice_types |
-| `DoctorProMoveForm.tsx` | Defaults practice_types to `['pediatric_us']` |
-| `OrgBootstrapDrawer.tsx` | 3 radio options with new labels |
-| `PlatformOrgsTab.tsx` | Badge display for all 3 practice types |
-| `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
-| `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
-| `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
+### Solution
+Change the filter in `calculateSubmissionStats` to include windows that are **either** past-due **or** already submitted. This is a one-line change:
 
-## Enterprise Isolation Fix
+```typescript
+// Before:
+const pastDueWindows = windows.filter(w => new Date(w.due_at) <= now);
 
-**Status: ✅ Complete**
+// After:
+const countableWindows = windows.filter(w => 
+  new Date(w.due_at) <= now || w.status === 'submitted'
+);
+```
 
-### What changed
+Then rename `pastDueWindows` → `countableWindows` in the loop below.
 
-1. **`get_user_org_id()` SECURITY DEFINER function** — resolves a user's `organization_id` via `staff → locations → practice_groups`, used in all org-scoped RLS policies
-2. **Alcan backfill** — 96 legacy `source='global', org_id=NULL` assignments updated to `source='org', org_id=<alcan_id>`
-3. **`weekly_assignments` RLS** — dropped permissive global-read policy (bleedover source), added org-scoped SELECT and org-admin ALL policies
-4. **`practice_groups` RLS** — added org-admin write policy (INSERT/UPDATE/DELETE within own org)
-5. **`locations` RLS** — added org-admin write policy (within own org's groups)
-6. **CHECK constraints** — `weekly_assignments_source_check` updated to allow `'org'`; combo check updated for `source='org'` requiring `org_id IS NOT NULL`
-7. **`assembleWeek()`** — resolves `organization_id` from location's practice_group, queries by `org_id` with no fallback
-8. **`GlobalAssignmentBuilder`** — saves with `org_id` from `useUserRole()` and `source: 'org'`
+### Why this is correct
+- **Submitted before deadline**: Already done — should count as completed (and on-time)
+- **Pending (not yet due)**: Still excluded — no penalty for not-yet-due work
+- **Missing (past due)**: Still included — correctly penalized
+
+This matches the user's expectation: if you've done the work, it counts, regardless of whether the deadline has technically passed.
 
 ### Files changed
+1. **`src/lib/submissionRateCalc.ts`** — Update the filter on line 39 and rename the variable for clarity
 
-| File | Change |
-|------|--------|
-| Migration SQL | `get_user_org_id()`, CHECK constraints, RLS policies, backfill |
-| `src/lib/locationState.ts` | `assembleWeek()` queries by `org_id`, no fallback |
-| `src/components/admin/GlobalAssignmentBuilder.tsx` | Uses `useUserRole().organizationId`, saves with `source: 'org'` |
+### No other changes needed
+- `OnTimeRateWidget`, `useStaffSubmissionRates`, `LocationSubmissionWidget` all call `calculateSubmissionStats` — they'll automatically pick up the fix.
+- The SQL view/RPC already returns current-week windows with `status = 'submitted'` and correct `on_time` values, so no DB changes needed.
+

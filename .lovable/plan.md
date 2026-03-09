@@ -1,43 +1,39 @@
 
 
-## Comprehensive FK Join Hint Audit
+## Fix: Count submitted-but-not-yet-due windows in completion rate
 
-### Problem Found
+### Problem
+`calculateSubmissionStats` in `src/lib/submissionRateCalc.ts` filters windows with `new Date(w.due_at) <= now` (line 39). This means on Monday morning, a staff member who has already submitted confidence scores for the current week shows 0% because the confidence deadline (Tuesday) hasn't passed yet. Only historical (past-due) windows are counted, and if those are all missing, the rate is 0%.
 
-The database has **two** FK constraints from `locations` to `practice_groups`:
-1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
-2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
+### Root cause
+The filter assumes "only count windows whose deadline has passed." But a window where `status === 'submitted'` and `due_at > now` represents a valid early completion that should count positively.
 
-Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
+### Solution
+Change the filter in `calculateSubmissionStats` to include windows that are **either** past-due **or** already submitted. This is a one-line change:
 
-### Issues to Fix
+```typescript
+// Before:
+const pastDueWindows = windows.filter(w => new Date(w.due_at) <= now);
 
-**1. Wrong FK hint name (will fail at runtime)**
-These files reference `locations_group_id_fkey` which does not exist as a constraint:
-
-| File | Line |
-|------|------|
-| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
-| `src/pages/coach/RemindersTab.tsx` | 148 |
-
-Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
-
-**2. Corrupted select syntax (double alias, double parentheses)**
-`src/components/admin/AdminLocationsTab.tsx` line 50 has:
-```
-practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
-```
-This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
-```
-practice_group:practice_groups!locations_org_fkey(name)
+// After:
+const countableWindows = windows.filter(w => 
+  new Date(w.due_at) <= now || w.status === 'submitted'
+);
 ```
 
-**3. No issues (already correct)**
-- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
-- All `scope_organization_id` references — intentional audit table column ✓
-- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
+Then rename `pastDueWindows` → `countableWindows` in the loop below.
 
-### Summary
+### Why this is correct
+- **Submitted before deadline**: Already done — should count as completed (and on-time)
+- **Pending (not yet due)**: Still excluded — no penalty for not-yet-due work
+- **Missing (past due)**: Still included — correctly penalized
 
-3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
+This matches the user's expectation: if you've done the work, it counts, regardless of whether the deadline has technically passed.
+
+### Files changed
+1. **`src/lib/submissionRateCalc.ts`** — Update the filter on line 39 and rename the variable for clarity
+
+### No other changes needed
+- `OnTimeRateWidget`, `useStaffSubmissionRates`, `LocationSubmissionWidget` all call `calculateSubmissionStats` — they'll automatically pick up the fix.
+- The SQL view/RPC already returns current-week windows with `status = 'submitted'` and correct `on_time` values, so no DB changes needed.
 

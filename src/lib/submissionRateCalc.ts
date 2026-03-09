@@ -36,7 +36,11 @@ export function calculateSubmissionStats(
   windows: SubmissionWindow[],
   now: Date = new Date()
 ): SubmissionStats {
-  const pastDueWindows = windows.filter(w => new Date(w.due_at) <= now);
+  // Include past-due windows AND submitted-but-not-yet-due windows
+  // so early completions count positively instead of being ignored
+  const countableWindows = windows.filter(w =>
+    new Date(w.due_at) <= now || w.status === 'submitted'
+  );
 
   // Group by week_of, bucket by metric
   const weekMap = new Map<string, {
@@ -48,7 +52,7 @@ export function calculateSubmissionStats(
     perf_on_time: boolean;
   }>();
 
-  for (const w of pastDueWindows) {
+  for (const w of countableWindows) {
     const key = w.week_of;
     if (!weekMap.has(key)) {
       weekMap.set(key, {

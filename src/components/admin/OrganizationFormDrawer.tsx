@@ -50,7 +50,6 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization,
     try {
       // Generate slug from name
       const slug = formData.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      
 
       let error;
 

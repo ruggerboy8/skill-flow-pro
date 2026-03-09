@@ -83,7 +83,6 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
             name: formData.name,
             slug: formData.slug,
             organization_id: orgs.id,
-
           });
 
         if (error) throw error;

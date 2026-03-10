@@ -57,85 +57,24 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   // Anchor top for the floating pill (tracks active card position)
   const [pillAnchorTop, setPillAnchorTop] = useState<number | null>(null);
 
-  // IntersectionObserver-based tracking for pro-move during recording
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const visibilityMapRef = useRef<Map<number, { ratio: number; top: number }>>(new Map());
-
-  useEffect(() => {
-    if (!recState.isRecording) {
-      visibilityMapRef.current.clear();
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
+  // Click-to-select: handle tapping a pro move card during recording
+  const handleCardTap = useCallback((actionId: number) => {
+    if (!recState.isRecording) return;
+    const newId = activeActionId === actionId ? null : actionId;
+    setActiveActionId(newId);
+    if (newId !== null) {
+      proMoveTimeline.current.push({ action_id: newId, t_start_ms: recState.recordingTime * 1000 });
+      const el = proMoveRefs.current.get(newId);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setPillAnchorTop(rect.top + rect.height / 2);
       }
-      return;
+    } else {
+      // Deselected — push a null segment for general notes
+      proMoveTimeline.current.push({ action_id: 0, t_start_ms: recState.recordingTime * 1000 });
+      setPillAnchorTop(null);
     }
-
-    const IO_THRESHOLDS = [0, 0.2, 0.5, 0.8, 1];
-    const IO_ROOT_MARGIN = '-10% 0px -35% 0px';
-    const DEBOUNCE_MS = 200;
-
-    const pickBest = () => {
-      let bestId: number | null = null;
-      let bestRatio = 0;
-      let bestTop = Infinity;
-
-      visibilityMapRef.current.forEach(({ ratio, top }, actionId) => {
-        if (ratio > bestRatio || (ratio === bestRatio && top < bestTop)) {
-          bestRatio = ratio;
-          bestTop = top;
-          bestId = actionId;
-        }
-      });
-
-      if (bestId !== null && bestRatio > 0) {
-        const el = proMoveRefs.current.get(bestId);
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          setPillAnchorTop(rect.top + rect.height / 2);
-        }
-
-        setActiveActionId(prev => {
-          if (prev !== bestId) {
-            proMoveTimeline.current.push({
-              action_id: bestId!,
-              t_start_ms: recState.recordingTime * 1000,
-            });
-          }
-          return bestId;
-        });
-      }
-    };
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          const actionId = Number((entry.target as HTMLElement).dataset.actionId);
-          if (isNaN(actionId)) return;
-
-          if (entry.intersectionRatio > 0) {
-            visibilityMapRef.current.set(actionId, {
-              ratio: entry.intersectionRatio,
-              top: entry.boundingClientRect.top,
-            });
-          } else {
-            visibilityMapRef.current.delete(actionId);
-          }
-        });
-
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = setTimeout(pickBest, DEBOUNCE_MS);
-      },
-      { threshold: IO_THRESHOLDS, rootMargin: IO_ROOT_MARGIN }
-    );
-
-    proMoveRefs.current.forEach((el) => observer.observe(el));
-
-    return () => {
-      observer.disconnect();
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
-  }, [recState.isRecording]);
+  }, [recState.isRecording, recState.recordingTime, activeActionId]);
 
   // Fetch or create assessment
   const { data: existingAssessment } = useQuery({
@@ -217,15 +156,11 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   // Get flat list of all action_ids for "first pro move" logic
   const allActionIds = domains?.flatMap(d => d.proMoves.map(pm => pm.action_id)) ?? [];
 
-  // When recording starts, immediately highlight the first pro move
+  // When recording stops, clear highlight
   useEffect(() => {
-    if (recState.isRecording && activeActionId === null && allActionIds.length > 0) {
-      const firstId = allActionIds[0];
-      setActiveActionId(firstId);
-      proMoveTimeline.current.push({ action_id: firstId, t_start_ms: 0 });
-    }
     if (!recState.isRecording) {
       setActiveActionId(null);
+      setPillAnchorTop(null);
     }
   }, [recState.isRecording]);
 
@@ -462,12 +397,13 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
 
   // Get active pro move's label for the floating pill
   const getActiveLabel = () => {
-    if (!activeActionId || !domains) return undefined;
+    if (!recState.isRecording) return undefined;
+    if (!activeActionId || !domains) return 'Tap a Pro Move…';
     for (const d of domains) {
       const pm = d.proMoves.find(p => p.action_id === activeActionId);
       if (pm) return pm.action_statement.slice(0, 60);
     }
-    return undefined;
+    return 'Tap a Pro Move…';
   };
 
   if (domainsLoading || !domains) {
@@ -535,7 +471,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
               <div>
                 <p className="text-sm font-medium">Record Verbal Feedback</p>
                 <p className="text-xs text-muted-foreground">
-                  Narrate your assessment while scrolling through Pro Moves. Notes will be auto-mapped when done.
+                  Tap a Pro Move card, then speak your feedback. Tap the next card when you move on.
                 </p>
               </div>
               <Button
@@ -592,9 +528,11 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                   key={pm.action_id}
                   ref={el => { if (el) proMoveRefs.current.set(pm.action_id, el); }}
                   data-action-id={pm.action_id}
+                  onClick={() => handleCardTap(pm.action_id)}
                   className={cn(
                     "border rounded-md p-3 space-y-2 transition-all duration-300",
-                    isActive && "ring-[3px] ring-primary shadow-[0_0_12px_hsl(var(--primary)/0.3)] border-primary"
+                    isActive && "ring-[3px] ring-primary shadow-[0_0_12px_hsl(var(--primary)/0.3)] border-primary",
+                    recState.isRecording && !isActive && "border-dashed border-muted-foreground/40 cursor-pointer hover:border-primary/50 hover:bg-muted/30"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock } from 'lucide-react';
+import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';
@@ -214,6 +214,7 @@ export default function DoctorManagement() {
                   <TableHead>Location</TableHead>
                   <TableHead>Stage</TableHead>
                   <TableHead>Next Step</TableHead>
+                  <TableHead>Action</TableHead>
                   <TableHead>Next Meeting</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
@@ -241,6 +242,9 @@ export default function DoctorManagement() {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">{doctor.journeyStatus.nextAction}</span>
+                    </TableCell>
+                    <TableCell>
+                      <InlineAction stage={doctor.journeyStatus.stage} doctorId={doctor.id} navigate={navigate} />
                     </TableCell>
                     <TableCell>
                       {doctor.nextMeeting
@@ -284,4 +288,34 @@ export default function DoctorManagement() {
       />
     </div>
   );
+}
+
+function InlineAction({ stage, doctorId, navigate }: { stage: string; doctorId: string; navigate: (path: string) => void }) {
+  const goToDetail = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/clinical/doctors/${doctorId}`);
+  };
+
+  if (['baseline_submitted', 'ready_for_prep', 'prep_complete'].includes(stage)) {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Build Prep <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'meeting_pending') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Schedule Next <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'doctor_confirmed' || stage === 'followup_completed') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Start Follow-up <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  return <span className="text-xs text-muted-foreground">—</span>;
 }

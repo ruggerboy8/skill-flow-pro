@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MapPin, ChevronDown, FlaskConical } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronDown, FlaskConical, TrendingUp } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
@@ -12,6 +12,7 @@ import { DoctorDetailOverview } from '@/components/clinical/DoctorDetailOverview
 import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
 import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
+import { DoctorGrowthTimeline } from '@/components/clinical/DoctorGrowthTimeline';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ export default function DoctorDetail() {
   const { data: myStaff } = useStaffProfile();
   const [showCoachWizard, setShowCoachWizard] = useState(false);
   const [baselineOpen, setBaselineOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   const { data: doctor, isLoading: doctorLoading } = useQuery({
     queryKey: ['doctor-detail', staffId],
@@ -148,6 +150,20 @@ export default function DoctorDetail() {
         </h2>
         <DoctorDetailThread sessions={sessions || []} coachName={myStaff?.name} doctorName={doctor.name} />
       </div>
+
+      {/* Growth Timeline — collapsible */}
+      <Collapsible open={timelineOpen} onOpenChange={setTimelineOpen}>
+        <CollapsibleTrigger asChild>
+          <button className="flex items-center gap-3 w-full py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", timelineOpen && "rotate-180")} />
+            <TrendingUp className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-lg font-semibold">Growth Timeline</h2>
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-2">
+          <DoctorGrowthTimeline doctorStaffId={staffId!} />
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Baseline — collapsible section */}
       <Collapsible open={baselineOpen} onOpenChange={setBaselineOpen}>

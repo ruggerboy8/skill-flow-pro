@@ -7,7 +7,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Plus, Trash2, Send, Calendar } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -25,6 +27,9 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const queryClient = useQueryClient();
   const [summary, setSummary] = useState('');
   const [experiments, setExperiments] = useState<Experiment[]>([{ title: '', description: '' }]);
+  const [transcriptMode, setTranscriptMode] = useState(false);
+  const [rawTranscript, setRawTranscript] = useState('');
+  const [aiProcessing, setAiProcessing] = useState(false);
 
   const { data: session } = useQuery({
     queryKey: ['coaching-session', sessionId],
@@ -75,7 +80,6 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const coachSelections = selections?.filter(s => s.selected_by === 'coach') || [];
   const doctorSelections = selections?.filter(s => s.selected_by === 'doctor') || [];
 
-  // Find overlapping action_ids
   const coachIds = new Set(coachSelections.map(s => s.action_id));
   const doctorIds = new Set(doctorSelections.map(s => s.action_id));
   const overlapIds = new Set([...coachIds].filter(id => doctorIds.has(id)));
@@ -96,6 +100,56 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
   const updateExperiment = (index: number, field: keyof Experiment, value: string) => {
     setExperiments(prev => prev.map((e, i) => i === index ? { ...e, [field]: value } : e));
+  };
+
+  const generateFromTranscript = async () => {
+    if (!rawTranscript.trim()) {
+      toast({ title: 'Paste a transcript first', variant: 'destructive' });
+      return;
+    }
+    setAiProcessing(true);
+    try {
+      // Step 1: Format transcript
+      const { data: fmtData, error: fmtErr } = await supabase.functions.invoke('format-transcript', {
+        body: { transcript: rawTranscript, source: 'coaching' },
+      });
+      if (fmtErr) throw fmtErr;
+      const formatted = fmtData?.formatted || rawTranscript;
+
+      // Step 2: Extract insights
+      const { data: insData, error: insErr } = await supabase.functions.invoke('extract-insights', {
+        body: { transcript: formatted, source: 'observation' },
+      });
+      if (insErr) throw insErr;
+
+      // Pre-fill summary
+      if (insData?.summary_html) {
+        const plainText = insData.summary_html.replace(/<[^>]*>/g, '').trim();
+        if (plainText) setSummary(plainText);
+      }
+
+      // Pre-fill action steps from growth areas
+      const domainInsights = insData?.domain_insights as any[] | undefined;
+      if (domainInsights?.length) {
+        const newExperiments: Experiment[] = [];
+        for (const di of domainInsights) {
+          const growthAreas = di.growth_areas as string[] | undefined;
+          if (growthAreas) {
+            for (const ga of growthAreas.slice(0, 3 - newExperiments.length)) {
+              newExperiments.push({ title: ga, description: '' });
+            }
+          }
+          if (newExperiments.length >= 3) break;
+        }
+        if (newExperiments.length > 0) setExperiments(newExperiments);
+      }
+
+      toast({ title: 'AI summary generated', description: 'Review and edit the pre-filled fields below.' });
+    } catch (err: any) {
+      toast({ title: 'AI processing failed', description: err.message || 'Try again or enter manually.', variant: 'destructive' });
+    } finally {
+      setAiProcessing(false);
+    }
   };
 
   const submitMutation = useMutation({
@@ -181,6 +235,45 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
             <p className="text-sm text-muted-foreground">No discussion topics selected.</p>
           )}
         </CardContent>
+      </Card>
+
+      {/* AI Transcript Assist */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                AI Transcript Assist
+              </CardTitle>
+              <CardDescription>Paste a meeting transcript to auto-generate summary and action steps.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="transcript-mode" className="text-xs text-muted-foreground">Use Transcript</Label>
+              <Switch id="transcript-mode" checked={transcriptMode} onCheckedChange={setTranscriptMode} />
+            </div>
+          </div>
+        </CardHeader>
+        {transcriptMode && (
+          <CardContent className="space-y-3">
+            <Textarea
+              value={rawTranscript}
+              onChange={(e) => setRawTranscript(e.target.value)}
+              placeholder="Paste your meeting transcript here..."
+              rows={6}
+              className="resize-y text-sm"
+            />
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={generateFromTranscript}
+              disabled={aiProcessing || !rawTranscript.trim()}
+            >
+              {aiProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {aiProcessing ? 'Processing...' : 'Generate Summary'}
+            </Button>
+          </CardContent>
+        )}
       </Card>
 
       {/* Experiments */}

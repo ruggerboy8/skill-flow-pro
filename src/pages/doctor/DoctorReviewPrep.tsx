@@ -11,11 +11,20 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, Calendar, X } from 'lucide-react';
+import { ArrowLeft, Send, Calendar, X, CheckCircle2, Circle, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DOMPurify from 'dompurify';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
+
+type ProgressStatus = 'going_well' | 'working_on_it' | 'not_started';
+interface ProgressEntry { title: string; status: ProgressStatus; note: string; }
+
+const PROGRESS_OPTIONS: { value: ProgressStatus; label: string; icon: typeof CheckCircle2; color: string }[] = [
+  { value: 'going_well', label: 'Going well', icon: CheckCircle2, color: 'text-emerald-600' },
+  { value: 'working_on_it', label: 'Working on it', icon: Clock, color: 'text-amber-600' },
+  { value: 'not_started', label: "Haven't started", icon: Circle, color: 'text-muted-foreground' },
+];
 
 const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const MEETING_FMT = "EEEE, MMMM d 'at' h:mm a zzz";
@@ -47,6 +56,7 @@ export default function DoctorReviewPrep() {
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [doctorNote, setDoctorNote] = useState('');
+  const [progressEntries, setProgressEntries] = useState<ProgressEntry[]>([]);
 
   // Fetch session
   const { data: session, isLoading: sessionLoading } = useQuery({
@@ -132,6 +142,50 @@ export default function DoctorReviewPrep() {
     enabled: !!session?.doctor_staff_id,
   });
 
+  // Fetch prior session experiments for progress notes (follow-ups only)
+  const { data: priorExperiments } = useQuery({
+    queryKey: ['prior-experiments-doctor', sessionId, session?.doctor_staff_id],
+    queryFn: async () => {
+      if (!session?.doctor_staff_id || !session?.sequence_number || session.sequence_number <= 1) return [];
+      const { data: priorSessions } = await supabase
+        .from('coaching_sessions')
+        .select('id')
+        .eq('doctor_staff_id', session.doctor_staff_id)
+        .in('status', ['doctor_confirmed', 'meeting_pending'])
+        .lt('sequence_number', session.sequence_number)
+        .order('sequence_number', { ascending: false })
+        .limit(1);
+      if (!priorSessions?.length) return [];
+      const { data: record } = await supabase
+        .from('coaching_meeting_records')
+        .select('experiments')
+        .eq('session_id', priorSessions[0].id)
+        .maybeSingle();
+      return (record?.experiments as any[] | null) || [];
+    },
+    enabled: !!session?.doctor_staff_id && (session?.sequence_number ?? 0) > 1,
+  });
+
+  // Initialize progress entries from prior experiments
+  const isFollowUp = (session?.sequence_number ?? 0) > 1;
+  const hasPriorSteps = (priorExperiments?.length ?? 0) > 0;
+
+  // Seed progress entries once when priorExperiments loads
+  useState(() => {
+    // This runs once on mount — we update via effect below
+  });
+
+  // Use effect-like pattern: if priorExperiments changed and entries empty, seed them
+  if (hasPriorSteps && progressEntries.length === 0 && priorExperiments) {
+    const seeded = priorExperiments.map((exp: any) => ({
+      title: exp.title || '',
+      status: 'not_started' as ProgressStatus,
+      note: '',
+    }));
+    // Batched set via timeout to avoid render-during-render
+    setTimeout(() => setProgressEntries(seeded), 0);
+  }
+
   // Fetch coach name
   const { data: coachName } = useQuery({
     queryKey: ['staff-name', session?.coach_staff_id],
@@ -176,10 +230,15 @@ export default function DoctorReviewPrep() {
         .insert(selections);
       if (selErr) throw selErr;
 
+      // Serialize progress + freeNote into doctor_note as JSON
+      const notePayload = (isFollowUp && progressEntries.length > 0)
+        ? JSON.stringify({ progress: progressEntries, freeNote: doctorNote || '' })
+        : (doctorNote || null);
+
       const { error: sessErr } = await supabase
         .from('coaching_sessions')
         .update({
-          doctor_note: doctorNote || null,
+          doctor_note: notePayload,
           status: 'doctor_prep_submitted',
         })
         .eq('id', sessionId);
@@ -285,6 +344,58 @@ export default function DoctorReviewPrep() {
           </div>
         </div>
       </div>
+
+      {/* Step 0: Prior Action Steps Progress (follow-ups only) */}
+      {isFollowUp && hasPriorSteps && (
+        <>
+          <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/30">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center h-6 w-6 rounded-full bg-amber-500 text-white text-xs font-bold">✓</div>
+                <CardTitle className="text-base">How are your action steps going?</CardTitle>
+              </div>
+              <CardDescription>Quick update on the goals from your last session.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {progressEntries.map((entry, i) => (
+                <div key={i} className="space-y-2 p-3 rounded-lg border bg-background">
+                  <p className="text-sm font-medium">{entry.title}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {PROGRESS_OPTIONS.map(opt => {
+                      const Icon = opt.icon;
+                      const isActive = entry.status === opt.value;
+                      return (
+                        <Button
+                          key={opt.value}
+                          variant={isActive ? 'default' : 'outline'}
+                          size="sm"
+                          className={`gap-1.5 text-xs ${isActive ? '' : opt.color}`}
+                          onClick={() => {
+                            setProgressEntries(prev => prev.map((e, j) => j === i ? { ...e, status: opt.value } : e));
+                          }}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {opt.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Textarea
+                    placeholder="Any quick notes? (optional)"
+                    value={entry.note}
+                    onChange={(e) => {
+                      setProgressEntries(prev => prev.map((pe, j) => j === i ? { ...pe, note: e.target.value } : pe));
+                    }}
+                    rows={2}
+                    className="resize-none text-sm"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Separator />
+        </>
+      )}
 
       {/* Step 1: Meeting Agenda from Coach */}
       <Card className="border-primary/20">

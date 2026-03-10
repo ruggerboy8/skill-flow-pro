@@ -139,7 +139,7 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
           disabled={confirmMutation.isPending}
         >
           <CheckCircle2 className="h-4 w-4" />
-          {confirmMutation.isPending ? 'Confirming...' : 'Confirm Summary'}
+          {confirmMutation.isPending ? 'Acknowledging...' : 'Acknowledge Summary'}
         </Button>
       )}
     </div>

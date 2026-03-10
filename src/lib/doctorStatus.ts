@@ -5,7 +5,6 @@ export type DoctorJourneyStage =
   | 'baseline_released'
   | 'baseline_in_progress'
   | 'baseline_submitted'
-  | 'director_baseline_pending'
   | 'ready_for_prep'
   | 'prep_complete'
   | 'scheduling_invite_sent'
@@ -22,6 +21,8 @@ export interface DoctorJourneyStatus {
   colorClass: string;
   nextAction: string;
   nextActionUrl?: string;
+  /** Non-blocking nudge shown as info banner, not a gate */
+  nudge?: string;
 }
 
 interface BaselineInfo {
@@ -49,7 +50,6 @@ export function getDoctorJourneyStatus(
 ): DoctorJourneyStatus {
   // Check sessions first (highest priority — active coaching cycle)
   if (sessions && sessions.length > 0) {
-    // Sort by sequence_number desc to get latest session
     const sorted = [...sessions].sort((a, b) => b.sequence_number - a.sequence_number);
     const latest = sorted[0];
 
@@ -63,7 +63,7 @@ export function getDoctorJourneyStatus(
           label: 'Pending Scheduling',
           variant: 'outline',
           colorClass: 'bg-blue-100 text-blue-800',
-          nextAction: 'Waiting for doctor to schedule via Calendly link',
+          nextAction: 'Waiting for doctor to schedule via the link you sent',
         };
       case 'scheduled':
         return {
@@ -82,12 +82,13 @@ export function getDoctorJourneyStatus(
           nextAction: 'Send scheduling invite to doctor',
         };
       case 'meeting_pending':
+        // R1.5: Softened — no longer a blocking gate
         return {
           stage: 'meeting_pending',
-          label: 'Awaiting Doctor Sign-off',
+          label: 'Summary Shared',
           variant: 'secondary',
           colorClass: 'bg-purple-100 text-purple-800',
-          nextAction: 'Doctor needs to review and confirm the meeting summary',
+          nextAction: 'Doctor can review the summary. You can schedule the next session.',
         };
       case 'doctor_confirmed':
         if (isFollowup) {
@@ -107,28 +108,32 @@ export function getDoctorJourneyStatus(
           nextAction: 'Schedule a follow-up to check on progress',
         };
       case 'doctor_revision_requested':
+        // R1.5: Softened — treat same as meeting_pending with a note
         return {
           stage: 'meeting_pending',
-          label: 'Edit Requested by Doctor',
-          variant: 'destructive',
-          colorClass: 'bg-red-100 text-red-800',
-          nextAction: 'Review the doctor\'s feedback and update the summary',
+          label: 'Summary Shared — Doctor Left a Note',
+          variant: 'secondary',
+          colorClass: 'bg-amber-100 text-amber-800',
+          nextAction: 'Review the doctor\'s note. You can still schedule the next session.',
         };
     }
   }
 
-  // Check coach baseline status (only when coachBaseline info is actually provided)
+  // R1.3: Removed the coach baseline scheduling gate
+  // When doctor baseline is complete but coach baseline isn't,
+  // show ready_for_prep with a soft nudge instead of blocking
   if (baseline?.status === 'completed' && coachBaseline !== null && coachBaseline !== undefined && coachBaseline?.status !== 'completed') {
     return {
-      stage: 'director_baseline_pending',
-      label: 'Your Review Needed',
-      variant: 'secondary',
-      colorClass: 'bg-amber-100 text-amber-800',
-      nextAction: 'Complete your private baseline assessment before scheduling',
+      stage: 'ready_for_prep',
+      label: 'Ready for Prep',
+      variant: 'outline',
+      colorClass: 'bg-blue-100 text-blue-800',
+      nextAction: 'Build your meeting agenda before inviting to schedule',
+      nudge: 'Tip: Complete your private baseline assessment before the meeting for better prep.',
     };
   }
 
-  // Check if both baselines done but no session yet → ready for prep
+  // Both baselines done but no session yet → ready for prep
   if (baseline?.status === 'completed' && coachBaseline?.status === 'completed') {
     return {
       stage: 'ready_for_prep',
@@ -139,7 +144,7 @@ export function getDoctorJourneyStatus(
     };
   }
 
-  // Check doctor baseline
+  // Doctor baseline submitted (no coach baseline info provided)
   if (baseline?.status === 'completed') {
     return {
       stage: 'baseline_submitted',

@@ -53,7 +53,7 @@ export function DoctorDetailThread({ sessions, coachName = 'Alex', doctorName = 
           <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
           <p className="text-muted-foreground">No coaching sessions yet.</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Complete your prep from the Overview tab to begin the coaching thread.
+            Complete your prep above to begin the coaching thread.
           </p>
         </CardContent>
       </Card>

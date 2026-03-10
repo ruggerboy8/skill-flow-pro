@@ -249,10 +249,10 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
         disabled={!summary.trim() || submitMutation.isPending}
       >
         <Send className="h-4 w-4" />
-        {submitMutation.isPending ? 'Submitting...' : 'Submit for Doctor Review'}
+        {submitMutation.isPending ? 'Submitting...' : 'Submit & Share with Doctor'}
       </Button>
       <p className="text-xs text-muted-foreground text-center pb-4">
-        The doctor will be able to review and confirm this summary.
+        The doctor will be able to review and acknowledge this summary.
       </p>
     </div>
   );

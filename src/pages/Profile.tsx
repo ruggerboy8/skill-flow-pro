@@ -65,6 +65,8 @@ export default function Profile() {
         ...data,
         role_name: (data.roles as any)?.role_name || null,
         scheduling_link: data.scheduling_link,
+        is_clinical_director: Boolean(data.is_clinical_director),
+        is_super_admin: Boolean(data.is_super_admin),
       });
     } catch (error) {
       console.error('Error loading profile:', error);

@@ -133,6 +133,7 @@ export function SchedulingInviteComposer({
           session_id: sessionId || null,
           custom_subject: subject,
           custom_body: body,
+          prep_link: sessionId ? `${window.location.origin}/doctor/review-prep/${sessionId}` : undefined,
         },
       });
       if (error) throw error;

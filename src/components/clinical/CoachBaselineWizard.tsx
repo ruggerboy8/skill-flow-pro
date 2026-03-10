@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw, FileText, Sparkles } from 'lucide-react';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
 
@@ -34,7 +34,6 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<Record<number, { score: number | null; note: string }>>({});
   const [isComplete, setIsComplete] = useState(false);
-  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
   const [activeActionId, setActiveActionId] = useState<number | null>(null);
 
   // Track which pro-move note textareas are open
@@ -44,10 +43,16 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const proMoveTimeline = useRef<{ action_id: number; t_start_ms: number }[]>([]);
 
   const proMoveRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  
 
   const { state: recState, controls: recControls } = useAudioRecording();
 
+  // Two-step pipeline state
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isMappingNotes, setIsMappingNotes] = useState(false);
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
+  const [mappingJustCompleted, setMappingJustCompleted] = useState(false);
+  const [processingStep, setProcessingStep] = useState('');
 
   // Anchor top for the floating pill (tracks active card position)
   const [pillAnchorTop, setPillAnchorTop] = useState<number | null>(null);
@@ -66,7 +71,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       return;
     }
 
-    const READING_LINE = 0.30; // 30% from viewport top
+    const READING_LINE = 0.30;
     const DEBOUNCE_MS = 150;
 
     const updateTracking = () => {
@@ -87,12 +92,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         }
       });
 
-      // Update pill anchor to track the active card
       if (closestId !== null) {
         setPillAnchorTop(closestTop);
       }
 
-      // Debounced switch — only change active card after 150ms of stability
       if (closestId !== null && closestId !== activeActionId) {
         if (pendingSwitchRef.current?.actionId === closestId) {
           // Already waiting for this one
@@ -123,7 +126,6 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       rafRef.current = requestAnimationFrame(updateTracking);
     };
 
-    // Run once immediately to position pill on first card
     updateTracking();
 
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -230,6 +232,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     if (existingAssessment?.id) {
       setAssessmentId(existingAssessment.id);
       if (existingAssessment.status === 'completed') setIsComplete(true);
+      if (existingAssessment.recording_transcript) setTranscript(existingAssessment.recording_transcript);
     }
   }, [existingAssessment]);
 
@@ -277,6 +280,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         }, { onConflict: 'assessment_id,action_id' });
       if (error) throw error;
     },
+    onError: (e: Error) => {
+      console.error('Failed to save rating:', e);
+      toast({ title: 'Save failed', description: e.message, variant: 'destructive' });
+    },
   });
 
   // Complete
@@ -322,30 +329,52 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     });
   };
 
-  // Audio recording pipeline
-  const handleFinishRecording = useCallback(async () => {
-    if (!domains || !assessmentId) return;
-    setIsProcessingAudio(true);
+  // ── Step 1: Stop recording & transcribe ──
+  const handleStopAndTranscribe = useCallback(async () => {
+    if (!assessmentId) return;
+    setIsTranscribing(true);
+    setProcessingStep('Stopping recording...');
 
     try {
       const blob = await recControls.stopAndGetBlob();
       if (!blob) throw new Error('No audio captured');
 
-      // 1. Transcribe
+      setProcessingStep('Transcribing audio...');
       const formData = new FormData();
       formData.append('audio', blob, 'recording.webm');
+
       const { data: transcriptData, error: transcriptErr } = await supabase.functions.invoke('transcribe-audio', { body: formData });
       if (transcriptErr) throw transcriptErr;
-      const transcript = transcriptData?.text || transcriptData?.transcript;
-      if (!transcript) throw new Error('No transcript returned');
 
-      // Save transcript
-      await supabase
+      const text = transcriptData?.text || transcriptData?.transcript;
+      if (!text) throw new Error('No transcript returned');
+
+      // Save transcript to DB
+      const { error: saveErr } = await supabase
         .from('coach_baseline_assessments')
-        .update({ recording_transcript: transcript, updated_at: new Date().toISOString() })
+        .update({ recording_transcript: text, updated_at: new Date().toISOString() })
         .eq('id', assessmentId);
+      if (saveErr) console.error('Failed to save transcript:', saveErr);
 
-      // 2. Map to pro-move notes
+      setTranscript(text);
+      setIsTranscriptExpanded(true);
+      toast({ title: 'Transcription complete', description: 'Review the transcript below, then map to notes.' });
+    } catch (e: any) {
+      console.error('Transcription error:', e);
+      toast({ title: 'Transcription error', description: e.message, variant: 'destructive' });
+    } finally {
+      setIsTranscribing(false);
+      setProcessingStep('');
+    }
+  }, [assessmentId, recControls]);
+
+  // ── Step 2: Map transcript to pro-move notes ──
+  const handleMapToNotes = useCallback(async () => {
+    if (!domains || !assessmentId || !transcript) return;
+    setIsMappingNotes(true);
+    setProcessingStep('Mapping transcript to notes...');
+
+    try {
       const domainPayload = domains.map(d => ({
         domain_id: d.domain_id,
         domain_name: d.domain_name,
@@ -358,42 +387,68 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       if (mapErr) throw mapErr;
 
       const newNotes = mappedData?.pro_move_notes || {};
+      if (Object.keys(newNotes).length === 0) {
+        toast({ title: 'No notes mapped', description: 'The AI could not identify Pro Move-specific feedback in the transcript.' });
+        return;
+      }
 
       // Merge AI notes into ratings and save each
       const updatedRatings = { ...ratings };
       const nowOpenNotes = new Set(openNotes);
+      let populatedCount = 0;
 
       for (const [actionIdStr, noteText] of Object.entries(newNotes)) {
         const actionId = Number(actionIdStr);
         if (isNaN(actionId) || typeof noteText !== 'string' || !noteText.trim()) continue;
 
         const existing = updatedRatings[actionId] || { score: null, note: '' };
-        const mergedNote = existing.note ? `${existing.note}\n\n${noteText}` : noteText;
+        const mergedNote = existing.note ? `${existing.note}\n---\n${noteText}` : noteText as string;
         updatedRatings[actionId] = { ...existing, note: mergedNote };
         nowOpenNotes.add(actionId);
 
-        // Save to DB
-        saveRatingMutation.mutate({ actionId, score: existing.score, note: mergedNote });
+        // Save to DB with await for reliability
+        const { error } = await supabase
+          .from('coach_baseline_items')
+          .upsert({
+            assessment_id: assessmentId,
+            action_id: actionId,
+            rating: existing.score,
+            note_text: mergedNote || null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'assessment_id,action_id' });
+        
+        if (error) {
+          console.error(`Failed to save note for action ${actionId}:`, error);
+        } else {
+          populatedCount++;
+        }
       }
 
       setRatings(updatedRatings);
       setOpenNotes(nowOpenNotes);
+      setMappingJustCompleted(true);
       proMoveTimeline.current = [];
 
-      toast({ title: 'Recording processed', description: 'Pro Move notes have been populated from your feedback.' });
+      toast({
+        title: 'Notes Mapped',
+        description: `${populatedCount} Pro Move note${populatedCount !== 1 ? 's' : ''} populated from your recording.`,
+      });
     } catch (e: any) {
-      console.error('Audio processing error:', e);
-      toast({ title: 'Processing error', description: e.message, variant: 'destructive' });
+      console.error('Mapping error:', e);
+      toast({ title: 'Mapping error', description: e.message, variant: 'destructive' });
     } finally {
-      setIsProcessingAudio(false);
+      setIsMappingNotes(false);
+      setProcessingStep('');
     }
-  }, [domains, assessmentId, ratings, openNotes, recControls]);
+  }, [domains, assessmentId, transcript, ratings, openNotes]);
 
   // Start over / delete recording
   const handleStartOver = useCallback(() => {
     recControls.stopAndGetBlob(); // discard
     proMoveTimeline.current = [];
     setActiveActionId(null);
+    setTranscript(null);
+    setMappingJustCompleted(false);
     toast({ title: 'Recording discarded', description: 'You can start a new recording.' });
   }, [recControls]);
 
@@ -448,6 +503,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const progressPct = totalProMoves > 0 ? Math.round((ratedCount / totalProMoves) * 100) : 0;
   const allRated = ratedCount === totalProMoves;
 
+  const isProcessing = isTranscribing || isMappingNotes;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Button variant="ghost" onClick={onBack} className="gap-2">
@@ -468,44 +525,6 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         </div>
         <Progress value={progressPct} className="h-2" />
       </div>
-
-      {/* Recording controls — only shows Start button when not recording */}
-      {!recState.isRecording && !isProcessingAudio && (
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Record Verbal Feedback</p>
-                <p className="text-xs text-muted-foreground">
-                  Narrate your assessment while scrolling through Pro Moves. Notes will be auto-mapped to each Pro Move.
-                </p>
-              </div>
-              <Button
-                onClick={() => {
-                  proMoveTimeline.current = [];
-                  recControls.startRecording();
-                }}
-                variant="outline"
-                className="gap-2"
-              >
-                <Mic className="h-4 w-4" />
-                Start Recording
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {isProcessingAudio && (
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center gap-3 justify-center py-2">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Processing recording into Pro Move notes…</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Floating pill — always visible on left when recording */}
       {recState.isRecording && (
@@ -611,28 +630,147 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         </div>
       ))}
 
-      {/* Sticky bottom bar — Complete or Finish Recording */}
-      <div className="sticky bottom-4 flex justify-end gap-3">
-        {recState.isRecording && (
-          <Button
-            variant="destructive"
-            size="lg"
-            onClick={handleFinishRecording}
-            className="shadow-lg gap-2"
-          >
-            <MicOff className="h-4 w-4" />
-            Finish & Map Notes
-          </Button>
+      {/* ── Bottom section: Recording controls, transcript, and actions ── */}
+      <div className="space-y-4 pt-4 border-t">
+        {/* Recording controls */}
+        {!recState.isRecording && !isProcessing && !transcript && (
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Record Verbal Feedback</p>
+                  <p className="text-xs text-muted-foreground">
+                    Narrate your assessment while scrolling through Pro Moves. Notes will be auto-mapped when done.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => {
+                    proMoveTimeline.current = [];
+                    recControls.startRecording();
+                  }}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Mic className="h-4 w-4" />
+                  Start Recording
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
-        {!recState.isRecording && (
-          <Button
-            onClick={() => completeMutation.mutate()}
-            disabled={!allRated || completeMutation.isPending}
-            size="lg"
-            className="shadow-lg"
-          >
-            {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
-          </Button>
+
+        {/* Stop & Transcribe button (while recording) */}
+        {recState.isRecording && (
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                  </span>
+                  <span className="text-sm font-medium">Recording in progress</span>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={handleStopAndTranscribe}
+                  className="gap-2"
+                >
+                  <MicOff className="h-4 w-4" />
+                  Stop & Transcribe
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Processing indicator */}
+        {isProcessing && (
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex items-center gap-3 justify-center py-2">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">{processingStep}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Transcript display + Map to Notes */}
+        {transcript && !isProcessing && (
+          <Card>
+            <CardContent className="py-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Transcript</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
+                  >
+                    {isTranscriptExpanded ? 'Collapse' : 'Expand'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setTranscript(null); setMappingJustCompleted(false); }}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                    New Recording
+                  </Button>
+                </div>
+              </div>
+
+              {isTranscriptExpanded && (
+                <div className="bg-muted/30 border rounded-md p-3 text-sm whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+                  {transcript}
+                </div>
+              )}
+
+              {!mappingJustCompleted && (
+                <Button
+                  onClick={handleMapToNotes}
+                  disabled={isMappingNotes}
+                  className="w-full gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Map to Pro Move Notes
+                </Button>
+              )}
+
+              {mappingJustCompleted && (
+                <div className="flex items-center gap-2 text-sm text-emerald-600 justify-center py-1">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Notes mapped successfully
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setMappingJustCompleted(false); }}
+                    className="ml-2 text-xs"
+                  >
+                    Re-map
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Complete Assessment */}
+        {!recState.isRecording && !isProcessing && (
+          <div className="flex justify-end">
+            <Button
+              onClick={() => completeMutation.mutate()}
+              disabled={!allRated || completeMutation.isPending}
+              size="lg"
+              className="shadow-lg"
+            >
+              {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
+            </Button>
+          </div>
         )}
       </div>
     </div>

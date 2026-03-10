@@ -22,9 +22,9 @@ const statusLabels: Record<string, { label: string; className: string }> = {
   scheduled: { label: 'Scheduled', className: 'bg-blue-100 text-blue-800' },
   director_prep_ready: { label: 'Prep Sent', className: 'bg-amber-100 text-amber-800' },
   scheduling_invite_sent: { label: 'Pending Scheduling', className: 'bg-blue-100 text-blue-800' },
-  meeting_pending: { label: 'Awaiting Confirmation', className: 'bg-purple-100 text-purple-800' },
+  meeting_pending: { label: 'Summary Shared', className: 'bg-purple-100 text-purple-800' },
   doctor_confirmed: { label: 'Confirmed', className: 'bg-green-100 text-green-800' },
-  doctor_revision_requested: { label: 'Revision Requested', className: 'bg-red-100 text-red-800' },
+  doctor_revision_requested: { label: 'Doctor Left a Note', className: 'bg-amber-100 text-amber-800' },
 };
 
 interface Props {

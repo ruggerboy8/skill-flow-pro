@@ -944,6 +944,45 @@ serve(async (req: Request) => {
         return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true });
       }
 
+      case "delete_user": {
+        const { user_id } = payload ?? {};
+        if (!user_id) return json({ error: "user_id required" }, 400);
+
+        // Only super admins can delete users
+        if (!me.is_super_admin) {
+          return json({ error: "Only super admins can delete users" }, 403);
+        }
+
+        // Get staff record
+        const { data: staffToDelete, error: fetchErr } = await admin
+          .from("staff")
+          .select("id")
+          .eq("user_id", user_id)
+          .maybeSingle();
+
+        if (fetchErr) throw fetchErr;
+
+        // Delete staff record first (cascades will handle related records with FK constraints)
+        if (staffToDelete) {
+          // Delete coach_scopes
+          await admin.from("coach_scopes").delete().eq("staff_id", staffToDelete.id);
+          
+          // Delete the staff record
+          const { error: delStaffErr } = await admin
+            .from("staff")
+            .delete()
+            .eq("id", staffToDelete.id);
+          if (delStaffErr) throw delStaffErr;
+        }
+
+        // Delete the auth user
+        const { error: delAuthErr } = await admin.auth.admin.deleteUser(user_id);
+        if (delAuthErr) throw delAuthErr;
+
+        console.log(`✅ Deleted user ${user_id}`);
+        return json({ ok: true });
+      }
+
       default:
         return json({ error: "Unknown action" }, 400);
     }

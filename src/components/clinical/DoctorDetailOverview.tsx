@@ -6,14 +6,12 @@ import { format } from 'date-fns';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
+import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 interface Session {
   id: string;

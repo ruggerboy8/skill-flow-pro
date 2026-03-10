@@ -47,6 +47,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log("[map-baseline] v2 — dwell-filter + deterministic prompt");
     const { transcript, domains, timeline } = await req.json();
 
     console.log("[map-baseline] Received:", {

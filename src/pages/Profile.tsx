@@ -30,6 +30,7 @@ export default function Profile() {
   const [editMode, setEditMode] = useState(false);
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const qc = useQueryClient();
 
   useEffect(() => {
     if (user) {

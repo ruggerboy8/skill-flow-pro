@@ -425,15 +425,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         <Progress value={progressPct} className="h-2" />
       </div>
 
-      {/* Recording controls */}
-      <Card ref={recorderCardRef}>
-        <CardContent className="py-4">
-          {isProcessingAudio ? (
-            <div className="flex items-center gap-3 justify-center py-2">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Processing recording into Pro Move notes…</span>
-            </div>
-          ) : !recState.isRecording ? (
+      {/* Recording controls — only shows Start button when not recording */}
+      {!recState.isRecording && !isProcessingAudio && (
+        <Card>
+          <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Record Verbal Feedback</p>
@@ -453,48 +448,32 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                 Start Recording
               </Button>
             </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className={cn("w-3 h-3 rounded-full", recState.isPaused ? "bg-amber-500" : "bg-destructive animate-pulse")} />
-                <span className="text-sm font-mono tabular-nums">
-                  {Math.floor(recState.recordingTime / 60)}:{(recState.recordingTime % 60).toString().padStart(2, '0')}
-                </span>
-                {activeActionId && domains && (
-                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                    {getActiveLabel()}
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={handleStartOver} className="gap-1.5 text-muted-foreground">
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Start Over
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => recControls.togglePause()}>
-                  {recState.isPaused ? 'Resume' : 'Pause'}
-                </Button>
-                <Button variant="destructive" size="sm" onClick={handleFinishRecording} className="gap-1.5">
-                  <MicOff className="h-3.5 w-3.5" />
-                  Finish & Map Notes
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Floating pill */}
-      {showFloatingPill && (
+      {isProcessingAudio && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3 justify-center py-2">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Processing recording into Pro Move notes…</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Floating pill — always visible on left when recording */}
+      {recState.isRecording && (
         <FloatingRecorderPill
           recordingTime={recState.recordingTime}
           isRecording={recState.isRecording}
           isPaused={recState.isPaused}
           onPauseToggle={recControls.togglePause}
-          onDoneClick={handleFinishRecording}
           onStartOver={handleStartOver}
           activeCompetencyLabel={getActiveLabel()}
           showArrow
+          alwaysShowStartOver
         />
       )}
 

@@ -48,6 +48,7 @@ const SCORE_COLORS: Record<number, { bg: string; border: string; text: string; a
   3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)', activeBorder: 'hsl(210 70% 45%)' },
   2: { bg: 'hsl(38 90% 95%)', border: 'hsl(38 70% 75%)', text: 'hsl(38 80% 30%)', activeBorder: 'hsl(38 80% 45%)' },
   1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)', activeBorder: 'hsl(0 65% 45%)' },
+  0: { bg: 'hsl(0 0% 95%)', border: 'hsl(0 0% 80%)', text: 'hsl(0 0% 40%)', activeBorder: 'hsl(0 0% 50%)' },
 };
 
 const SCORE_LABELS: Record<number, string> = {
@@ -55,6 +56,7 @@ const SCORE_LABELS: Record<number, string> = {
   3: 'Consistent',
   2: 'Developing',
   1: 'Rarely',
+  0: 'N/A',
 };
 
 type SortBy = 'self' | 'coach';
@@ -186,9 +188,9 @@ export function ClinicalBaselineResults({
     const grouped: GroupedData = {};
     items.forEach((item) => {
       const domain = item.domain_name;
-      if (!grouped[domain]) grouped[domain] = { 4: [], 3: [], 2: [], 1: [] };
+      if (!grouped[domain]) grouped[domain] = { 4: [], 3: [], 2: [], 1: [], 0: [] };
       const score = item.self_score;
-      if (score >= 1 && score <= 4) grouped[domain][score].push(item);
+      if (score >= 0 && score <= 4) grouped[domain][score].push(item);
     });
     return grouped;
   }, [items]);
@@ -532,10 +534,10 @@ export function ClinicalBaselineResults({
                                 return (
                                   <>
                                     <div
-                                      className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border"
+                                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold border ${item.score === 0 ? 'text-[10px]' : 'text-sm'}`}
                                       style={{ backgroundColor: selfColors.bg, borderColor: selfColors.border, color: selfColors.text }}
                                     >
-                                      {item.score}
+                                      {item.score === 0 ? 'N/A' : item.score}
                                     </div>
                                     {showCoachRatings && (
                                       <div

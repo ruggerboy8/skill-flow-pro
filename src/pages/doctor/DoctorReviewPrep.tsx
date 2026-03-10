@@ -345,6 +345,58 @@ export default function DoctorReviewPrep() {
         </div>
       </div>
 
+      {/* Step 0: Prior Action Steps Progress (follow-ups only) */}
+      {isFollowUp && hasPriorSteps && (
+        <>
+          <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800/30">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center h-6 w-6 rounded-full bg-amber-500 text-white text-xs font-bold">✓</div>
+                <CardTitle className="text-base">How are your action steps going?</CardTitle>
+              </div>
+              <CardDescription>Quick update on the goals from your last session.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {progressEntries.map((entry, i) => (
+                <div key={i} className="space-y-2 p-3 rounded-lg border bg-background">
+                  <p className="text-sm font-medium">{entry.title}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {PROGRESS_OPTIONS.map(opt => {
+                      const Icon = opt.icon;
+                      const isActive = entry.status === opt.value;
+                      return (
+                        <Button
+                          key={opt.value}
+                          variant={isActive ? 'default' : 'outline'}
+                          size="sm"
+                          className={`gap-1.5 text-xs ${isActive ? '' : opt.color}`}
+                          onClick={() => {
+                            setProgressEntries(prev => prev.map((e, j) => j === i ? { ...e, status: opt.value } : e));
+                          }}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {opt.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Textarea
+                    placeholder="Any quick notes? (optional)"
+                    value={entry.note}
+                    onChange={(e) => {
+                      setProgressEntries(prev => prev.map((pe, j) => j === i ? { ...pe, note: e.target.value } : pe));
+                    }}
+                    rows={2}
+                    className="resize-none text-sm"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Separator />
+        </>
+      )}
+
       {/* Step 1: Meeting Agenda from Coach */}
       <Card className="border-primary/20">
         <CardHeader className="pb-3">

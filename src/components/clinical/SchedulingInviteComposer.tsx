@@ -20,6 +20,14 @@ const DEFAULT_BODY = `Hi {{first_name}},
 Please use the link below to schedule a time that works for you:
 {{scheduling_link}}
 
+Before the meeting, please complete your meeting prep on the Pro Moves site:
+{{prep_link}}
+
+In your prep, you'll:
+  • Review the meeting agenda your coach has prepared
+  • Select 1–2 Pro Moves you'd like to focus on
+  • Add any questions or topics you want to discuss
+
 Looking forward to connecting!
 — {{coach_name}}`;
 
@@ -101,6 +109,10 @@ export function SchedulingInviteComposer({
     }
   }
 
+  const prepLink = sessionId
+    ? `${window.location.origin}/doctor/review-prep/${sessionId}`
+    : '[prep link — generated after session is created]';
+
   function getPreview(template: string) {
     const coachName = myStaff?.name || 'Coach';
     const firstName = doctorName.split(' ')[0];
@@ -108,7 +120,8 @@ export function SchedulingInviteComposer({
       .replace(/\{\{coach_name\}\}/g, coachName)
       .replace(/\{\{first_name\}\}/g, firstName)
       .replace(/\{\{doctor_name\}\}/g, doctorName)
-      .replace(/\{\{scheduling_link\}\}/g, myStaff?.scheduling_link || '[scheduling link]');
+      .replace(/\{\{scheduling_link\}\}/g, myStaff?.scheduling_link || '[scheduling link]')
+      .replace(/\{\{prep_link\}\}/g, prepLink);
   }
 
   async function sendInvite() {
@@ -120,6 +133,7 @@ export function SchedulingInviteComposer({
           session_id: sessionId || null,
           custom_subject: subject,
           custom_body: body,
+          prep_link: sessionId ? `${window.location.origin}/doctor/review-prep/${sessionId}` : undefined,
         },
       });
       if (error) throw error;
@@ -171,7 +185,7 @@ export function SchedulingInviteComposer({
             <Label className="mb-2 block">
               Body
               <span className="text-muted-foreground font-normal ml-2 text-xs">
-                {'{{first_name}}'} {'{{coach_name}}'} {'{{scheduling_link}}'}
+                {'{{first_name}}'} {'{{coach_name}}'} {'{{scheduling_link}}'} {'{{prep_link}}'}
               </span>
             </Label>
             <Textarea

@@ -47,6 +47,7 @@ export function getDoctorJourneyStatus(
   coachBaseline: CoachBaselineInfo | null | undefined,
   sessions: SessionInfo[] | null | undefined,
   baselineReleasedAt?: string | null,
+  perspective: 'coach' | 'doctor' = 'coach',
 ): DoctorJourneyStatus {
   // Check sessions first (highest priority — active coaching cycle)
   if (sessions && sessions.length > 0) {
@@ -58,6 +59,16 @@ export function getDoctorJourneyStatus(
 
     switch (latest.status) {
       case 'scheduling_invite_sent':
+        if (perspective === 'doctor') {
+          return {
+            stage: 'scheduling_invite_sent',
+            label: 'Prep Available',
+            variant: 'default',
+            colorClass: 'bg-primary/10 text-primary',
+            nextAction: 'Complete your meeting prep and schedule your session',
+            nextActionUrl: `/doctor/review-prep/${latest.id}`,
+          };
+        }
         return {
           stage: 'scheduling_invite_sent',
           label: 'Pending Scheduling',

@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, Calendar, X, CheckCircle2, Circle, Clock } from 'lucide-react';
+import { ArrowLeft, Send, Calendar, X, CheckCircle2, Circle, Clock, ExternalLink } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DOMPurify from 'dompurify';
 import { format } from 'date-fns';
@@ -57,6 +57,7 @@ export default function DoctorReviewPrep() {
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [doctorNote, setDoctorNote] = useState('');
   const [progressEntries, setProgressEntries] = useState<ProgressEntry[]>([]);
+  const [hasScheduled, setHasScheduled] = useState(false);
 
   // Fetch session
   const { data: session, isLoading: sessionLoading } = useQuery({
@@ -186,21 +187,25 @@ export default function DoctorReviewPrep() {
     setTimeout(() => setProgressEntries(seeded), 0);
   }
 
-  // Fetch coach name
-  const { data: coachName } = useQuery({
-    queryKey: ['staff-name', session?.coach_staff_id],
+  // Fetch coach info (name + scheduling_link)
+  const { data: coachInfo } = useQuery({
+    queryKey: ['coach-info', session?.coach_staff_id],
     queryFn: async () => {
-      if (!session?.coach_staff_id) return 'Alex';
-      const { data } = await supabase.from('staff').select('name').eq('id', session.coach_staff_id).single();
-      return data?.name || 'Alex';
+      if (!session?.coach_staff_id) return { name: 'Alex', scheduling_link: null };
+      const { data } = await supabase.from('staff').select('name, scheduling_link').eq('id', session.coach_staff_id).single();
+      return { name: data?.name || 'Alex', scheduling_link: data?.scheduling_link || null };
     },
     enabled: !!session?.coach_staff_id,
   });
+
+  const coachName = coachInfo?.name || 'Alex';
+  const coachSchedulingLink = coachInfo?.scheduling_link;
 
   const coachSelections = allSelections?.filter(s => s.selected_by === 'coach') || [];
   const coachActionIds = coachSelections.map(s => s.action_id);
 
   const isReadOnly = session?.status === 'doctor_prep_submitted' || session?.status === 'doctor_confirmed';
+  const isSchedulingInviteSent = session?.status === 'scheduling_invite_sent';
   const isMeetingPending = session?.status === 'meeting_pending';
 
   const toggleAction = (actionId: number) => {
@@ -338,10 +343,14 @@ export default function DoctorReviewPrep() {
         </Link>
         <div>
           <h2 className="text-xl font-bold">Prepare for Your {meetingTypeLabel}</h2>
-          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-            <Calendar className="h-3.5 w-3.5" />
-            {formatInTimeZone(new Date(session.scheduled_at), LOCAL_TZ, MEETING_FMT)}
-          </div>
+          {session.scheduled_at ? (
+            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+              <Calendar className="h-3.5 w-3.5" />
+              {formatInTimeZone(new Date(session.scheduled_at), LOCAL_TZ, MEETING_FMT)}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-1">Complete your prep, then schedule when ready.</p>
+          )}
         </div>
       </div>
 
@@ -572,6 +581,46 @@ export default function DoctorReviewPrep() {
           />
         </CardContent>
       </Card>
+
+      {/* Step 4: Scheduling confirmation (only when invite was sent but no date yet) */}
+      {isSchedulingInviteSent && (
+        <>
+          <Separator />
+          <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-950/10 dark:border-blue-800/30">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                <CardTitle className="text-base">Have You Scheduled Your Meeting?</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={hasScheduled}
+                  onCheckedChange={(checked) => setHasScheduled(checked === true)}
+                />
+                <span className="text-sm">Yes, I've already scheduled my meeting</span>
+              </label>
+              {!hasScheduled && coachSchedulingLink && (
+                <div className="p-3 rounded-lg bg-background border">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Haven't scheduled yet? Use the link below to find a time:
+                  </p>
+                  <a
+                    href={coachSchedulingLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Schedule with {coachName}
+                  </a>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Submit */}
       <Button

@@ -52,6 +52,7 @@ export default function DoctorHome() {
     null, // doctor doesn't see coach baseline
     sessions || [],
     staff?.baseline_released_at,
+    'doctor',
   );
 
   const displayName = staff?.name || 'Doctor';
@@ -59,7 +60,7 @@ export default function DoctorHome() {
   // Determine primary CTA
   const renderPrimaryCTA = () => {
     // Active prep needed — doctor needs to complete their side
-    const prepSession = sessions?.find(s => s.status === 'director_prep_ready');
+    const prepSession = sessions?.find(s => s.status === 'director_prep_ready' || s.status === 'scheduling_invite_sent');
     if (prepSession) {
       return (
         <Card className="border-primary/30 bg-primary/5">
@@ -69,7 +70,10 @@ export default function DoctorHome() {
               <div>
                 <CardTitle>Complete Your Meeting Prep</CardTitle>
                 <CardDescription>
-                  Meeting on {formatInTimeZone(new Date(prepSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}
+                  {prepSession.scheduled_at
+                    ? `Meeting on ${formatInTimeZone(new Date(prepSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}`
+                    : 'Your coach is ready to meet — prep before scheduling.'
+                  }
                 </CardDescription>
               </div>
             </div>
@@ -286,8 +290,13 @@ export default function DoctorHome() {
 
   // Upcoming meetings
   const upcomingSessions = sessions?.filter(s => 
-    ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(s.status)
-  ).sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()) || [];
+    ['scheduled', 'director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted'].includes(s.status)
+  ).sort((a, b) => {
+    if (!a.scheduled_at && !b.scheduled_at) return 0;
+    if (!a.scheduled_at) return 1;
+    if (!b.scheduled_at) return -1;
+    return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
+  }) || [];
 
   // All sessions with active action steps (confirmed or meeting_pending, not yet superseded)
   const activeSessionIds = sessions?.filter(s => 

@@ -127,6 +127,15 @@ export function SchedulingInviteComposer({
   async function sendInvite() {
     try {
       setSending(true);
+
+      // Store coach's scheduling link on the session so the doctor can see it
+      if (sessionId && myStaff?.scheduling_link) {
+        await supabase
+          .from('coaching_sessions')
+          .update({ meeting_link: myStaff.scheduling_link })
+          .eq('id', sessionId);
+      }
+
       const { data, error } = await supabase.functions.invoke('invite-to-schedule', {
         body: {
           doctor_staff_id: doctorStaffId,

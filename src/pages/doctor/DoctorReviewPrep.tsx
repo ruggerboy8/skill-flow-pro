@@ -187,19 +187,20 @@ export default function DoctorReviewPrep() {
     setTimeout(() => setProgressEntries(seeded), 0);
   }
 
-  // Fetch coach info (name + scheduling_link)
+  // Fetch coach info (name only — scheduling link comes from session.meeting_link)
   const { data: coachInfo } = useQuery({
     queryKey: ['coach-info', session?.coach_staff_id],
     queryFn: async () => {
-      if (!session?.coach_staff_id) return { name: 'Your Coach', scheduling_link: null };
-      const { data } = await supabase.from('staff').select('name, scheduling_link').eq('id', session.coach_staff_id).single();
-      return { name: data?.name || 'Your Coach', scheduling_link: data?.scheduling_link || null };
+      if (!session?.coach_staff_id) return { name: 'Your Coach' };
+      const { data } = await supabase.from('staff').select('name').eq('id', session.coach_staff_id).single();
+      return { name: data?.name || 'Your Coach' };
     },
     enabled: !!session?.coach_staff_id,
   });
 
   const coachName = coachInfo?.name || 'Your Coach';
-  const coachSchedulingLink = coachInfo?.scheduling_link;
+  // Use meeting_link from session (set when invite was sent) — avoids RLS issues
+  const coachSchedulingLink = session?.meeting_link;
 
   const coachSelections = allSelections?.filter(s => s.selected_by === 'coach') || [];
   const coachActionIds = coachSelections.map(s => s.action_id);

@@ -147,7 +147,7 @@ ${proMoveList.join("\n")}${timelineContext}`;
 
     const result = JSON.parse(toolCall.function.arguments);
     console.log("[map-baseline] Raw AI result keys:", Object.keys(result.pro_move_notes || {}));
-    console.log("[map-baseline] Raw AI result:", JSON.stringify(result.pro_move_notes).slice(0, 500));
+    console.log("[map-baseline] Raw AI result:", JSON.stringify(result.pro_move_notes || {}).slice(0, 500));
 
     // Validate: only keep valid action IDs
     const validNotes: Record<string, string> = {};

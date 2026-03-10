@@ -33,7 +33,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
         .from('coaching_sessions')
         .select('id, session_type, sequence_number, status, scheduled_at')
         .eq('doctor_staff_id', doctorStaffId)
-        .order('sequence_number', { ascending: true });
+        .order('sequence_number', { ascending: false });
       if (sessErr) throw sessErr;
       if (!sessions?.length) return [];
 
@@ -118,7 +118,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
         {timeline.map((entry, i) => {
           const experiments = (entry.record?.experiments as any[]) || [];
           const priorStatuses = (entry.record?.prior_action_status as any[]) || [];
-          const typeLabel = entry.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up #${entry.sequence_number}`;
+          const typeLabel = entry.session_type === 'baseline_review' ? 'Baseline Review' : `Check-in ${entry.sequence_number - 1}`;
           const statusConfig = SESSION_STATUS_CONFIG[entry.status] || SESSION_STATUS_CONFIG.scheduled;
 
           return (

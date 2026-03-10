@@ -6,6 +6,41 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const MIN_DWELL_MS = 3000;
+
+interface TimelineEntry {
+  action_id: number;
+  t_start_ms: number;
+}
+
+interface DomainInput {
+  domain_name: string;
+  pro_moves?: { action_id: number; action_statement: string }[];
+}
+
+/**
+ * Filter timeline entries to only those where the coach paused ≥ MIN_DWELL_MS.
+ * The last entry is always included (coach stopped recording while on it).
+ */
+function filterByDwell(timeline: TimelineEntry[]): TimelineEntry[] {
+  if (timeline.length === 0) return [];
+  if (timeline.length === 1) return timeline;
+
+  const kept: TimelineEntry[] = [];
+  for (let i = 0; i < timeline.length; i++) {
+    if (i === timeline.length - 1) {
+      // Last entry — always include (coach was on this when they stopped)
+      kept.push(timeline[i]);
+    } else {
+      const dwell = timeline[i + 1].t_start_ms - timeline[i].t_start_ms;
+      if (dwell >= MIN_DWELL_MS) {
+        kept.push(timeline[i]);
+      }
+    }
+  }
+  return kept;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -32,37 +67,93 @@ serve(async (req) => {
       throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    // Build a flat list of pro moves with domain context
-    const proMoveList: string[] = [];
-    const validActionIds = new Set<string>();
-
-    for (const d of domains) {
-      for (const pm of (d.pro_moves || [])) {
-        const id = String(pm.action_id);
-        validActionIds.add(id);
-        proMoveList.push(`- Action ${id}: "${pm.action_statement}" (Domain: ${d.domain_name})`);
+    // Build a lookup of all valid action_ids → their info
+    const actionLookup = new Map<string, { action_statement: string; domain_name: string }>();
+    for (const d of domains as DomainInput[]) {
+      for (const pm of d.pro_moves || []) {
+        actionLookup.set(String(pm.action_id), {
+          action_statement: pm.action_statement,
+          domain_name: d.domain_name,
+        });
       }
     }
 
-    console.log("[map-baseline] Valid action IDs:", [...validActionIds]);
+    console.log("[map-baseline] Total valid action IDs:", actionLookup.size);
 
-    // Build timeline context if available
-    let timelineContext = "";
+    // -----------------------------------------------------------
+    // Determine which pro moves to send to the AI
+    // -----------------------------------------------------------
+    let useTimeline = false;
+    let filteredTimeline: TimelineEntry[] = [];
+    const targetActionIds = new Set<string>();
+    let proMoveList: string[] = [];
+
     if (timeline && timeline.length > 0) {
-      const timelineEntries = timeline
-        .map((t: { action_id: number; t_start_ms: number }, i: number) => {
-          const startSec = Math.round(t.t_start_ms / 1000);
-          const endSec = i < timeline.length - 1 ? Math.round(timeline[i + 1].t_start_ms / 1000) : null;
-          return `- ~${startSec}s${endSec ? `-${endSec}s` : "+"}: Action ${t.action_id}`;
-        })
-        .join("\n");
-      timelineContext = `\n\nThe clinical director was viewing these Pro Moves at these approximate times during the recording:\n${timelineEntries}\n\nUse these timeline hints to help attribute parts of the transcript to the right Pro Move, but rely primarily on content matching. The timeline is approximate.`;
-      console.log("[map-baseline] Timeline context:", timelineContext);
-    } else {
-      console.log("[map-baseline] No timeline provided");
+      filteredTimeline = filterByDwell(timeline as TimelineEntry[]);
+      console.log("[map-baseline] Timeline entries:", timeline.length, "→ after dwell filter:", filteredTimeline.length);
+
+      // Collect unique action IDs from filtered timeline
+      for (const t of filteredTimeline) {
+        const id = String(t.action_id);
+        if (actionLookup.has(id)) {
+          targetActionIds.add(id);
+        }
+      }
+
+      if (targetActionIds.size > 0) {
+        useTimeline = true;
+        // Build ordered pro move list from filtered timeline (preserving discussion order)
+        const seen = new Set<string>();
+        for (const t of filteredTimeline) {
+          const id = String(t.action_id);
+          if (!seen.has(id) && actionLookup.has(id)) {
+            seen.add(id);
+            const info = actionLookup.get(id)!;
+            proMoveList.push(`${proMoveList.length + 1}. Action ${id}: "${info.action_statement}" (Domain: ${info.domain_name})`);
+          }
+        }
+        console.log("[map-baseline] Timeline-driven mode — sending", targetActionIds.size, "pro moves to AI");
+      }
     }
 
-    const systemPrompt = `You are a coaching notes assistant for a clinical director performing a baseline assessment of a doctor. Your job is to split an assessment transcript into per-Pro-Move coaching notes.
+    // Fallback: no usable timeline — send all pro moves (legacy behavior)
+    if (!useTimeline) {
+      console.log("[map-baseline] Fallback mode — no usable timeline, sending all pro moves");
+      for (const [id, info] of actionLookup) {
+        targetActionIds.add(id);
+        proMoveList.push(`- Action ${id}: "${info.action_statement}" (Domain: ${info.domain_name})`);
+      }
+    }
+
+    // -----------------------------------------------------------
+    // Build prompt
+    // -----------------------------------------------------------
+    let systemPrompt: string;
+
+    if (useTimeline) {
+      // Deterministic prompt: we know exactly which pro moves were discussed, in order
+      systemPrompt = `You are a coaching notes assistant. A clinical director recorded verbal feedback while viewing specific Pro Moves in order. Your job is to split the transcript into per-Pro-Move coaching notes.
+
+The coach discussed these Pro Moves in this order:
+${proMoveList.join("\n")}
+
+Instructions:
+1. The transcript follows the same order as the list above. Split the transcript so each segment maps to the corresponding Pro Move.
+2. Write each note in a warm, conversational coaching tone:
+   - Second person ("You showed strong skills in...", "I noticed you...")
+   - Sound like a supportive clinical director — professional, encouraging, constructive
+   - Fix grammar, remove filler words, false starts
+   - Expand shorthand into clear sentences
+   - Keep each note to 1-3 sentences
+   - Preserve specific observations from the transcript
+   - Do NOT fabricate information not in the transcript
+3. If feedback for two adjacent Pro Moves blends together, use content meaning to determine the split
+4. Each Pro Move should appear at most once in the output
+5. Maximum 500 characters per note
+6. Only use the action IDs listed above — do not invent new ones`;
+    } else {
+      // Legacy fallback prompt when no timeline is available
+      systemPrompt = `You are a coaching notes assistant for a clinical director performing a baseline assessment of a doctor. Your job is to split an assessment transcript into per-Pro-Move coaching notes.
 
 The clinical director recorded verbal feedback while scrolling through Pro Moves. You must:
 
@@ -75,14 +166,15 @@ The clinical director recorded verbal feedback while scrolling through Pro Moves
    - Keep each note to 1-3 sentences
    - Preserve specific observations from the transcript
    - Do NOT fabricate information not in the transcript
-3. If a part of the transcript seems relevant to a Pro Move even loosely, include it — err on the side of mapping content rather than discarding it
-4. If the transcript is general feedback not clearly tied to one Pro Move, distribute it to the most relevant Pro Move(s)
-5. Each Pro Move should appear at most once in the output
-6. Maximum 500 characters per note
+3. If a part of the transcript seems relevant to a Pro Move even loosely, include it
+4. Each Pro Move should appear at most once in the output
+5. Maximum 500 characters per note
 
 Available Pro Moves:
-${proMoveList.join("\n")}${timelineContext}`;
+${proMoveList.join("\n")}`;
+    }
 
+    console.log("[map-baseline] Prompt mode:", useTimeline ? "timeline-driven" : "fallback");
     console.log("[map-baseline] Transcript preview:", transcript.slice(0, 200));
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -147,15 +239,14 @@ ${proMoveList.join("\n")}${timelineContext}`;
 
     const result = JSON.parse(toolCall.function.arguments);
     console.log("[map-baseline] Raw AI result keys:", Object.keys(result.pro_move_notes || {}));
-    console.log("[map-baseline] Raw AI result:", JSON.stringify(result.pro_move_notes || {}).slice(0, 500));
 
-    // Validate: only keep valid action IDs
+    // Validate: only keep action IDs that were in our target set
     const validNotes: Record<string, string> = {};
     for (const [key, value] of Object.entries(result.pro_move_notes || {})) {
-      if (validActionIds.has(key) && typeof value === "string" && value.trim()) {
+      if (targetActionIds.has(key) && typeof value === "string" && value.trim()) {
         validNotes[key] = (value as string).slice(0, 500);
       } else {
-        console.log("[map-baseline] Filtered out key:", key, "valid?", validActionIds.has(key), "type:", typeof value);
+        console.log("[map-baseline] Filtered out key:", key, "inTarget?", targetActionIds.has(key));
       }
     }
 

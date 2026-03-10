@@ -119,16 +119,16 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
 
   return (
     <div className="space-y-3">
-      {/* Add Check-in button */}
-      {sessions.length > 0 && !hasMidFlow && (
+      {/* Always-visible Add Coaching Session button above the thread */}
+      {sessions.length > 0 && (
         <Button
           variant="outline"
-          className="w-full gap-2 border-dashed"
+          className="w-full h-12 gap-2 border-dashed text-base font-medium"
           onClick={() => addCheckinMutation.mutate()}
           disabled={addCheckinMutation.isPending}
         >
-          <Plus className="h-4 w-4" />
-          {addCheckinMutation.isPending ? 'Creating…' : 'Add Check-in'}
+          <Plus className="h-5 w-5" />
+          {addCheckinMutation.isPending ? 'Creating…' : 'Add Coaching Session'}
         </Button>
       )}
 

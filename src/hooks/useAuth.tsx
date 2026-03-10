@@ -67,6 +67,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // Skip TOKEN_REFRESHED events — these fire on tab return and cause
+        // unnecessary re-renders that close modals and reset scroll position
+        if (event === 'TOKEN_REFRESHED') return;
+
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -81,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Check user roles
             checkUserStatus(session.user.id);
           }
-        } else {
+        } else if (event === 'SIGNED_OUT') {
           setNeedsPasswordSetup(false);
           setIsCoach(false);
           setIsSuperAdmin(false);

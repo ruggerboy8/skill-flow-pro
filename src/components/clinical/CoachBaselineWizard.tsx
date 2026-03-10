@@ -13,6 +13,13 @@ import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw, 
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
 
+const SCORE_CONFIG = [
+  { value: 1, selected: 'bg-orange-100 border-orange-400 text-orange-800' },
+  { value: 2, selected: 'bg-amber-100 border-amber-400 text-amber-800' },
+  { value: 3, selected: 'bg-blue-100 border-blue-400 text-blue-800' },
+  { value: 4, selected: 'bg-emerald-100 border-emerald-400 text-emerald-800' },
+];
+
 interface DomainGroup {
   domain_id: number;
   domain_name: string;

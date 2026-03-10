@@ -657,35 +657,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         </div>
       ))}
 
-      {/* ── Bottom section: Recording controls, transcript, and actions ── */}
+      {/* ── Bottom section: processing, transcript, and actions ── */}
       <div className="space-y-4 pt-4 border-t">
-        {/* Recording controls */}
-        {!recState.isRecording && !isProcessing && !transcript && (
-          <Card>
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Record Verbal Feedback</p>
-                  <p className="text-xs text-muted-foreground">
-                    Narrate your assessment while scrolling through Pro Moves. Notes will be auto-mapped when done.
-                  </p>
-                </div>
-                <Button
-                  onClick={() => {
-                    proMoveTimeline.current = [];
-                    recControls.startRecording();
-                  }}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <Mic className="h-4 w-4" />
-                  Start Recording
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Stop & Transcribe button (while recording) */}
         {recState.isRecording && (
           <Card>

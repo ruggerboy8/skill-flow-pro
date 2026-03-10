@@ -136,7 +136,7 @@ export function useUserRole() {
   return {
     isLoading: false,
     staffId: staff.id,
-    organizationId: undefined as string | undefined, // populated after migrations + join re-enabled
+    organizationId: staff.locations?.practice_groups?.organization_id ?? undefined,
     isSuperAdmin,
     isOrgAdmin,
     isRegional,

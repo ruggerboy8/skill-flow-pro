@@ -76,7 +76,7 @@ serve(async (req: Request) => {
   try {
     switch (action) {
       case "list_users": {
-        const { page = 1, limit = 20, search = "", location_id, role_id, super_admin } = payload ?? {};
+        const { page = 1, limit = 20, search = "", location_id, role_id, super_admin, organization_id } = payload ?? {};
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
@@ -114,6 +114,21 @@ serve(async (req: Request) => {
             } else if (locationScopes.length > 0) {
               q = q.in('primary_location_id', locationScopes);
             }
+          }
+        }
+
+        // Org-level scoping: resolve group IDs for the given organization and filter
+        if (organization_id) {
+          const { data: orgGroups } = await admin
+            .from("practice_groups")
+            .select("id")
+            .eq("organization_id", organization_id);
+          const orgGroupIds = (orgGroups ?? []).map((g: any) => g.id);
+          if (orgGroupIds.length > 0) {
+            q = q.in("locations.group_id", orgGroupIds);
+          } else {
+            // Org has no groups — return empty result set
+            q = q.eq("id", "00000000-0000-0000-0000-000000000000");
           }
         }
 

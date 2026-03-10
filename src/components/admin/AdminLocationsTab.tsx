@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTableSort } from "@/hooks/useTableSort";
@@ -24,6 +25,7 @@ interface Location {
   active: boolean;
   practice_group?: {
     name: string;
+    organization_id?: string | null;
   };
 }
 
@@ -34,6 +36,7 @@ interface Organization {
 
 export function AdminLocationsTab() {
   const { toast } = useToast();
+  const { isSuperAdmin, organizationId } = useUserRole();
   const [locations, setLocations] = useState<Location[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,13 +50,19 @@ export function AdminLocationsTab() {
         .from("locations")
         .select(`
           id, name, group_id, timezone, program_start_date, cycle_length_weeks, active,
-          practice_group:practice_groups!locations_org_fkey(name)
+          practice_group:practice_groups!locations_org_fkey(name, organization_id)
         `)
         .order("name");
 
       if (error) throw error;
 
-      setLocations((data || []) as unknown as Location[]);
+      const allLocations = (data || []) as unknown as Location[];
+      // Scope to the admin's org when they're not a platform admin
+      const filtered = !isSuperAdmin && organizationId
+        ? allLocations.filter(l => l.practice_group?.organization_id === organizationId)
+        : allLocations;
+
+      setLocations(filtered);
     } catch (error) {
       console.error("Error loading locations:", error);
       toast({
@@ -70,12 +79,18 @@ export function AdminLocationsTab() {
 
   const loadOrganizations = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("practice_groups")
         .select("id, name")
         .eq("active", true)
         .order("name");
 
+      // Scope to the admin's org when they're not a platform admin
+      if (!isSuperAdmin && organizationId) {
+        query = query.eq("organization_id", organizationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
 
       setOrganizations(data || []);
@@ -84,10 +99,12 @@ export function AdminLocationsTab() {
     }
   };
 
+  // Re-run when role info loads (isSuperAdmin/organizationId start as defaults until profile resolves)
   useEffect(() => {
     loadLocations();
     loadOrganizations();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin, organizationId]);
 
   const handleNewLocation = () => {
     setSelectedLocation(null);
@@ -172,6 +189,7 @@ export function AdminLocationsTab() {
       'America/Toronto': 'Eastern',
       'America/Edmonton': 'Mountain',
       'America/Vancouver': 'Pacific',
+      'Europe/London': 'London (GMT/BST)',
     };
     
     return timezoneMap[timezone] || timezone;

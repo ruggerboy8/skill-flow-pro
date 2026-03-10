@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
 import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
 import ReactQuill from 'react-quill';
@@ -41,12 +42,69 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   );
 }
 
-export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props) {
+export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffId, onBack }: Props) {
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [coachNote, setCoachNote] = useState('');
   const [published, setPublished] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
+  const [realSessionId, setRealSessionId] = useState<string | null>(initialSessionId === 'new' ? null : initialSessionId);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+
+  const sessionId = realSessionId ?? '';
+
+  // Auto-create session when sessionId is 'new'
+  const { data: myStaff } = useStaffProfile();
+  useEffect(() => {
+    if (initialSessionId !== 'new' || realSessionId || isCreatingSession || !myStaff?.id) return;
+    setIsCreatingSession(true);
+    (async () => {
+      try {
+        // Check for existing incomplete sessions first
+        const { data: existing } = await supabase
+          .from('coaching_sessions')
+          .select('id')
+          .eq('doctor_staff_id', doctorStaffId)
+          .eq('coach_staff_id', myStaff.id)
+          .eq('status', 'scheduled')
+          .maybeSingle();
+
+        if (existing?.id) {
+          setRealSessionId(existing.id);
+          return;
+        }
+
+        // Get next sequence number
+        const { data: sessions } = await supabase
+          .from('coaching_sessions')
+          .select('sequence_number')
+          .eq('doctor_staff_id', doctorStaffId)
+          .order('sequence_number', { ascending: false })
+          .limit(1);
+
+        const nextSeq = (sessions?.[0]?.sequence_number ?? 0) + 1;
+        const sessionType = nextSeq === 1 ? 'baseline_review' : 'follow_up';
+
+        const { data: created, error } = await supabase
+          .from('coaching_sessions')
+          .insert({
+            doctor_staff_id: doctorStaffId,
+            coach_staff_id: myStaff.id,
+            session_type: sessionType,
+            sequence_number: nextSeq,
+            status: 'scheduled',
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        setRealSessionId(created.id);
+      } catch (err: any) {
+        toast({ title: 'Error creating session', description: err.message, variant: 'destructive' });
+      } finally {
+        setIsCreatingSession(false);
+      }
+    })();
+  }, [initialSessionId, realSessionId, isCreatingSession, myStaff?.id, doctorStaffId]);
 
   // Fetch session details
   const { data: session } = useQuery({
@@ -60,6 +118,7 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
       if (error) throw error;
       return data;
     },
+    enabled: !!sessionId,
   });
 
   // Fetch doctor's baseline items as the ProMove pool
@@ -280,6 +339,15 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     },
   });
 
+  // Show loading while creating session
+  if (!sessionId || isCreatingSession) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   // Guard: if doctor has already submitted, don't allow editing — redirect back
   if (session && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
     onBack();
@@ -336,7 +404,7 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
         </Button>
         <div>
           <h2 className="text-xl font-bold">Build Meeting Agenda</h2>
-          {session && (
+          {session?.scheduled_at && (
             <p className="text-sm text-muted-foreground">
               Meeting: {format(new Date(session.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
             </p>

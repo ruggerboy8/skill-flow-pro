@@ -607,22 +607,30 @@ export default function DoctorReviewPrep() {
                   checked={hasScheduled}
                   onCheckedChange={(checked) => setHasScheduled(checked === true)}
                 />
-                <span className="text-sm">Yes, I've already scheduled my meeting</span>
+                <span className="text-sm font-medium">Yes, I've already scheduled my meeting</span>
               </label>
-              {!hasScheduled && coachSchedulingLink && (
+              {!hasScheduled && (
                 <div className="p-3 rounded-lg bg-background border">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Haven't scheduled yet? Use the link below to find a time:
-                  </p>
-                  <a
-                    href={coachSchedulingLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Schedule with {coachName}
-                  </a>
+                  {coachSchedulingLink ? (
+                    <>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        If not, click below to find a time with {coachName}:
+                      </p>
+                      <a
+                        href={coachSchedulingLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Schedule with {coachName}
+                      </a>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Please reach out to {coachName} to schedule your meeting before submitting.
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -634,7 +642,7 @@ export default function DoctorReviewPrep() {
       <Button
         className="w-full gap-2"
         onClick={() => submitMutation.mutate()}
-        disabled={selectedActions.length === 0 || submitMutation.isPending}
+        disabled={selectedActions.length === 0 || submitMutation.isPending || (isSchedulingInviteSent && !hasScheduled)}
         size="lg"
       >
         <Send className="h-4 w-4" />

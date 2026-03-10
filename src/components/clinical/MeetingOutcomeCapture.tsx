@@ -170,7 +170,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
       const { error: statusErr } = await supabase
         .from('coaching_sessions')
-        .update({ status: 'meeting_pending' })
+        .update({ status: 'meeting_pending', scheduled_at: new Date().toISOString() })
         .eq('id', sessionId);
       if (statusErr) throw statusErr;
     },

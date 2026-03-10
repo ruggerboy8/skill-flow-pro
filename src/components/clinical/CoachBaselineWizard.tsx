@@ -605,7 +605,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
 
                   {/* Rating buttons */}
                   <div className="flex gap-1.5">
-                    {[1, 2, 3, 4, 5].map(val => (
+                    {[1, 2, 3, 4].map(val => (
                       <button
                         key={val}
                         onClick={() => handleRatingChange(pm.action_id, r.score === val ? null : val)}

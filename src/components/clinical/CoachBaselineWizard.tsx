@@ -13,6 +13,13 @@ import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw, 
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
 
+const SCORE_CONFIG = [
+  { value: 1, selected: 'bg-orange-100 border-orange-400 text-orange-800' },
+  { value: 2, selected: 'bg-amber-100 border-amber-400 text-amber-800' },
+  { value: 3, selected: 'bg-blue-100 border-blue-400 text-blue-800' },
+  { value: 4, selected: 'bg-emerald-100 border-emerald-400 text-emerald-800' },
+];
+
 interface DomainGroup {
   domain_id: number;
   domain_name: string;
@@ -506,18 +513,24 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       )}
 
       {/* All domains — scrollable */}
-      {domains.map(domain => (
-        <div key={domain.domain_id} className="rounded-lg border p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: domain.color_hex || 'hsl(var(--primary))' }}
+      {domains.map(domain => {
+        const domainColor = domain.color_hex || 'hsl(var(--primary))';
+        return (
+        <div key={domain.domain_id} className="rounded-lg border overflow-hidden space-y-0">
+          {/* Domain header with tinted background */}
+          <div className="px-4 py-3 flex items-center gap-3" style={{ backgroundColor: `${domainColor}15` }}>
+            <div
+              className="w-5 h-5 rounded-full shrink-0"
+              style={{ backgroundColor: domainColor }}
             />
-            <h3 className="text-lg font-semibold">{domain.domain_name}</h3>
+            <h3 className="text-lg font-bold">{domain.domain_name}</h3>
+            <span className="text-sm text-muted-foreground ml-auto">
+              {domain.proMoves.filter(pm => ratings[pm.action_id]?.score != null).length}/{domain.proMoves.length} rated
+            </span>
           </div>
 
           {/* Pro Move ratings */}
-          <div className="space-y-2">
+          <div className="p-4 space-y-2">
             {domain.proMoves.map(pm => {
               const r = ratings[pm.action_id] || { score: null, note: '' };
               const isActive = recState.isRecording && activeActionId === pm.action_id;
@@ -531,9 +544,14 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                   onClick={() => handleCardTap(pm.action_id)}
                   className={cn(
                     "border rounded-md p-3 space-y-2 transition-all duration-300",
-                    isActive && "ring-[3px] ring-primary shadow-[0_0_12px_hsl(var(--primary)/0.3)] border-primary",
                     recState.isRecording && !isActive && "border-dashed border-muted-foreground/40 cursor-pointer hover:border-primary/50 hover:bg-muted/30"
                   )}
+                  style={isActive ? {
+                    borderColor: domainColor,
+                    boxShadow: `0 0 12px ${domainColor}4D`,
+                    outline: `3px solid ${domainColor}`,
+                    outlineOffset: '-1px',
+                  } : undefined}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -542,29 +560,29 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                     </div>
                   </div>
 
-                  {/* Rating buttons */}
-                  <div className="flex gap-1.5">
-                    {[1, 2, 3, 4].map(val => (
+                  {/* Rating buttons — circular, semantic colors matching doctor wizard */}
+                  <div className="flex gap-2">
+                    {SCORE_CONFIG.map(({ value, selected }) => (
                       <button
-                        key={val}
-                        onClick={() => handleRatingChange(pm.action_id, r.score === val ? null : val)}
+                        key={value}
+                        onClick={(e) => { e.stopPropagation(); handleRatingChange(pm.action_id, r.score === value ? null : value); }}
                         className={cn(
-                          "w-8 h-8 rounded-md text-sm font-medium transition-colors border",
-                          r.score === val
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background hover:bg-muted border-border"
+                          "w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-medium transition-all",
+                          r.score === value
+                            ? selected
+                            : "border-muted-foreground/30 hover:border-primary/50"
                         )}
                       >
-                        {val}
+                        {value}
                       </button>
                     ))}
                     <button
-                      onClick={() => handleRatingChange(pm.action_id, -1)}
+                      onClick={(e) => { e.stopPropagation(); handleRatingChange(pm.action_id, r.score === -1 ? null : -1); }}
                       className={cn(
-                        "px-2 h-8 rounded-md text-xs font-medium transition-colors border",
+                        "w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-medium transition-all",
                         r.score === -1
-                          ? "bg-muted-foreground text-background border-muted-foreground"
-                          : "bg-background hover:bg-muted border-border"
+                          ? "bg-muted border-muted-foreground text-foreground"
+                          : "border-muted-foreground/30 hover:border-primary/50 text-muted-foreground"
                       )}
                     >
                       N/A
@@ -574,7 +592,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                   {/* Collapsible note */}
                   <Collapsible open={noteIsOpen} onOpenChange={() => toggleNoteOpen(pm.action_id)}>
                     <CollapsibleTrigger asChild>
-                      <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
                         <ChevronDown className={cn("h-3 w-3 transition-transform", noteIsOpen && "rotate-180")} />
                         {r.note ? 'View note' : 'Add note'}
                       </button>
@@ -584,6 +605,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                         value={r.note}
                         onChange={(e) => handleNoteChange(pm.action_id, e.target.value)}
                         onBlur={() => handleNoteBlur(pm.action_id)}
+                        onClick={(e) => e.stopPropagation()}
                         placeholder="Add a note…"
                         className="min-h-[60px] text-sm mt-1.5"
                       />
@@ -594,7 +616,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
             })}
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {/* ── Bottom section: processing, transcript, and actions ── */}
       <div className="space-y-4 pt-4 border-t">

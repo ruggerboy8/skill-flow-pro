@@ -411,9 +411,9 @@ export default function DoctorReviewPrep() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">1</div>
-            <CardTitle className="text-base">Meeting Agenda from {coachName || 'Alex'}</CardTitle>
+            <CardTitle className="text-base">Meeting Agenda from {coachName}</CardTitle>
           </div>
-          <CardDescription>Here's what {coachName || 'Alex'} has planned for your conversation.</CardDescription>
+          <CardDescription>Here's what {coachName} has planned for your conversation.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {coachSelections.length > 0 && (

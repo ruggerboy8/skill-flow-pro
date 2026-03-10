@@ -336,6 +336,32 @@ function SessionCard({
               <Badge className={`${statusInfo.className} hover:${statusInfo.className}`}>
                 {statusInfo.label}
               </Badge>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete {typeLabel}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently remove this session and all its prep data, selections, and meeting records.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </CardHeader>
         </CollapsibleTrigger>

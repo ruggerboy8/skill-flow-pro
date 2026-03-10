@@ -311,7 +311,7 @@ export default function DoctorReviewPrep() {
         <CombinedPrepView
           session={session}
           selections={(allSelections || []) as any}
-          coachName={coachName || 'Alex'}
+          coachName={coachName || 'Your Coach'}
           doctorName={staff?.name || 'Doctor'}
         />
       </div>

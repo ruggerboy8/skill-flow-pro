@@ -27,7 +27,7 @@ interface Session {
 const statusLabels: Record<string, { label: string; className: string }> = {
   scheduled: { label: 'Draft', className: 'bg-muted text-muted-foreground' },
   director_prep_ready: { label: 'Agenda Ready', className: 'bg-amber-100 text-amber-800' },
-  scheduling_invite_sent: { label: 'Pending Scheduling', className: 'bg-blue-100 text-blue-800' },
+  scheduling_invite_sent: { label: 'Invite Sent', className: 'bg-blue-100 text-blue-800' },
   doctor_prep_submitted: { label: 'Doctor Prepped', className: 'bg-emerald-100 text-emerald-800' },
   meeting_pending: { label: 'Summary Shared', className: 'bg-purple-100 text-purple-800' },
   doctor_confirmed: { label: 'Confirmed', className: 'bg-green-100 text-green-800' },
@@ -217,20 +217,6 @@ function SessionCard({
   const showBuildAgenda = canBuildAgenda(session.status);
   const showInvite = canInvite(session.status);
 
-  // Eager lightweight queries for collapsed summary
-  const { data: selectionCount } = useQuery({
-    queryKey: ['session-selection-count', session.id],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('coaching_session_selections')
-        .select('*', { count: 'exact', head: true })
-        .eq('session_id', session.id);
-      if (error) throw error;
-      return count ?? 0;
-    },
-    enabled: ['director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted'].includes(session.status),
-  });
-
   const { data: meetingSummary } = useQuery({
     queryKey: ['meeting-summary', session.id],
     queryFn: async () => {
@@ -249,12 +235,10 @@ function SessionCard({
 
   // Build subtitle
   let subtitle: string | null = null;
-  if (session.status === 'director_prep_ready' && selectionCount != null) {
-    subtitle = `${selectionCount} focus area${selectionCount !== 1 ? 's' : ''} selected`;
-  } else if (session.status === 'scheduling_invite_sent' && selectionCount != null) {
-    subtitle = `${selectionCount} focus area${selectionCount !== 1 ? 's' : ''} · Awaiting doctor's response`;
-  } else if (session.status === 'doctor_prep_submitted' && selectionCount != null) {
-    subtitle = `Doctor submitted prep · ${selectionCount} focus area${selectionCount !== 1 ? 's' : ''}`;
+  if (session.status === 'scheduling_invite_sent') {
+    subtitle = 'Awaiting doctor\'s response';
+  } else if (session.status === 'doctor_prep_submitted') {
+    subtitle = 'Doctor submitted prep';
   } else if ((session.status === 'meeting_pending' || session.status === 'doctor_confirmed') && meetingSummary) {
     subtitle = experimentCount > 0 ? `${experimentCount} action step${experimentCount !== 1 ? 's' : ''}` : null;
   } else if (session.status === 'doctor_revision_requested') {
@@ -323,7 +307,7 @@ function SessionCard({
                 <CardTitle className="text-base">{typeLabel}</CardTitle>
                 <p className="text-sm text-muted-foreground">
                   {session.scheduled_at
-                    ? formatInTimeZone(new Date(session.scheduled_at), Intl.DateTimeFormat().resolvedOptions().timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a zzz")
+                    ? `${['meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(session.status) ? 'Met on ' : ''}${formatInTimeZone(new Date(session.scheduled_at), Intl.DateTimeFormat().resolvedOptions().timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a zzz")}`
                     : (
                       <span className="flex items-center gap-1">
                         <Clock className="h-3.5 w-3.5" />

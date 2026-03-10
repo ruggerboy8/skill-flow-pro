@@ -142,6 +142,50 @@ export default function DoctorReviewPrep() {
     enabled: !!session?.doctor_staff_id,
   });
 
+  // Fetch prior session experiments for progress notes (follow-ups only)
+  const { data: priorExperiments } = useQuery({
+    queryKey: ['prior-experiments-doctor', sessionId, session?.doctor_staff_id],
+    queryFn: async () => {
+      if (!session?.doctor_staff_id || !session?.sequence_number || session.sequence_number <= 1) return [];
+      const { data: priorSessions } = await supabase
+        .from('coaching_sessions')
+        .select('id')
+        .eq('doctor_staff_id', session.doctor_staff_id)
+        .in('status', ['doctor_confirmed', 'meeting_pending'])
+        .lt('sequence_number', session.sequence_number)
+        .order('sequence_number', { ascending: false })
+        .limit(1);
+      if (!priorSessions?.length) return [];
+      const { data: record } = await supabase
+        .from('coaching_meeting_records')
+        .select('experiments')
+        .eq('session_id', priorSessions[0].id)
+        .maybeSingle();
+      return (record?.experiments as any[] | null) || [];
+    },
+    enabled: !!session?.doctor_staff_id && (session?.sequence_number ?? 0) > 1,
+  });
+
+  // Initialize progress entries from prior experiments
+  const isFollowUp = (session?.sequence_number ?? 0) > 1;
+  const hasPriorSteps = (priorExperiments?.length ?? 0) > 0;
+
+  // Seed progress entries once when priorExperiments loads
+  useState(() => {
+    // This runs once on mount — we update via effect below
+  });
+
+  // Use effect-like pattern: if priorExperiments changed and entries empty, seed them
+  if (hasPriorSteps && progressEntries.length === 0 && priorExperiments) {
+    const seeded = priorExperiments.map((exp: any) => ({
+      title: exp.title || '',
+      status: 'not_started' as ProgressStatus,
+      note: '',
+    }));
+    // Batched set via timeout to avoid render-during-render
+    setTimeout(() => setProgressEntries(seeded), 0);
+  }
+
   // Fetch coach name
   const { data: coachName } = useQuery({
     queryKey: ['staff-name', session?.coach_staff_id],

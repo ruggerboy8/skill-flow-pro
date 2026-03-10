@@ -156,7 +156,14 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           competency_name: pm.competencies?.name || '',
         });
       });
-      return Array.from(domainMap.values());
+      const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+      const allDomains = Array.from(domainMap.values());
+      allDomains.sort((a, b) => {
+        const ai = DOMAIN_ORDER.indexOf(a.domain_name);
+        const bi = DOMAIN_ORDER.indexOf(b.domain_name);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      });
+      return allDomains;
     },
   });
 

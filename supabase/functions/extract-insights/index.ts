@@ -200,42 +200,69 @@ ${transcript}
             type: 'function',
             function: {
               name: 'extract_insights',
-              description: 'Extract structured insights from the transcript',
-              parameters: {
-                type: 'object',
-                properties: {
-                  summary_html: {
-                    type: 'string',
-                    description: '3-5 sentence HTML paragraph summarizing the key observations or self-assessment'
-                  },
-                  domain_insights: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        domain: {
-                          type: 'string',
-                          enum: ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'],
-                          description: 'The domain this insight relates to'
-                        },
-                        strengths: {
-                          type: 'array',
-                          items: { type: 'string' },
-                          description: 'Strengths identified in this domain'
-                        },
-                        growth_areas: {
-                          type: 'array',
-                          items: { type: 'string' },
-                          description: 'Growth opportunities identified in this domain'
-                        }
+              description: source === 'coaching' 
+                ? 'Extract summary and agreed-upon action steps from a coaching meeting'
+                : 'Extract structured insights from the transcript',
+              parameters: source === 'coaching'
+                ? {
+                    type: 'object',
+                    properties: {
+                      summary_html: {
+                        type: 'string',
+                        description: 'Warm 3-5 sentence HTML summary of the coaching conversation'
                       },
-                      required: ['domain', 'strengths', 'growth_areas']
+                      action_steps: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            title: {
+                              type: 'string',
+                              description: 'A specific, concrete action step the doctor agreed to practice — written conversationally, like a coach jotting a reminder'
+                            }
+                          },
+                          required: ['title']
+                        },
+                        description: 'Up to 3 specific action steps agreed upon during the meeting'
+                      }
                     },
-                    description: 'Insights organized by domain'
+                    required: ['summary_html', 'action_steps']
                   }
-                },
-                required: ['summary_html', 'domain_insights']
-              }
+                : {
+                    type: 'object',
+                    properties: {
+                      summary_html: {
+                        type: 'string',
+                        description: '3-5 sentence HTML paragraph summarizing the key observations or self-assessment'
+                      },
+                      domain_insights: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            domain: {
+                              type: 'string',
+                              enum: ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'],
+                              description: 'The domain this insight relates to'
+                            },
+                            strengths: {
+                              type: 'array',
+                              items: { type: 'string' },
+                              description: 'Strengths identified in this domain'
+                            },
+                            growth_areas: {
+                              type: 'array',
+                              items: { type: 'string' },
+                              description: 'Growth opportunities identified in this domain'
+                            }
+                          },
+                          required: ['domain', 'strengths', 'growth_areas']
+                        },
+                        description: 'Insights organized by domain'
+                      }
+                    },
+                    required: ['summary_html', 'domain_insights']
+                  }
             }
           }
         ],

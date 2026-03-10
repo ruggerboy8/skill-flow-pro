@@ -116,6 +116,8 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
       <DirectorPrepComposer
         sessionId={prepSessionId}
         doctorStaffId={doctor.id}
+        doctorName={doctor.name}
+        doctorEmail={doctor.email}
         onBack={() => setPrepSessionId(null)}
       />
     );

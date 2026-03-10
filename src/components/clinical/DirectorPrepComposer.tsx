@@ -12,12 +12,15 @@ import { toast } from '@/hooks/use-toast';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
 import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
+import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
 interface Props {
   sessionId: string;
   doctorStaffId: string;
+  doctorName: string;
+  doctorEmail: string;
   onBack: () => void;
 }
 
@@ -42,11 +45,12 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   );
 }
 
-export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffId, onBack }: Props) {
+export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffId, doctorName, doctorEmail, onBack }: Props) {
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [coachNote, setCoachNote] = useState('');
   const [published, setPublished] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [realSessionId, setRealSessionId] = useState<string | null>(initialSessionId === 'new' ? null : initialSessionId);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
@@ -304,7 +308,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
       setPublished(true);
-      toast({ title: 'Prep published', description: 'The doctor can now see and complete their part.' });
+      setShowInviteDialog(true);
     },
     onError: (err: any) => {
       toast({ title: 'Error publishing prep', description: err.message, variant: 'destructive' });
@@ -360,15 +364,30 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         <Card className="border-green-200 bg-green-50/50">
           <CardContent className="flex flex-col items-center py-8 text-center">
             <CheckCircle2 className="h-12 w-12 text-green-600 mb-4" />
-            <h2 className="text-xl font-bold">Prep Published</h2>
+            <h2 className="text-xl font-bold">Prep Published & Invite Sent</h2>
             <p className="text-muted-foreground mt-2">
-              The doctor can now see your agenda and complete their prep before the meeting.
+              The doctor can now see your agenda. A scheduling invite has been sent.
             </p>
             <Button variant="outline" className="mt-6" onClick={onBack}>
               Back to Doctor Detail
             </Button>
           </CardContent>
         </Card>
+
+        <SchedulingInviteComposer
+          open={showInviteDialog}
+          onOpenChange={(open) => {
+            setShowInviteDialog(open);
+          }}
+          doctorName={doctorName}
+          doctorEmail={doctorEmail}
+          doctorStaffId={doctorStaffId}
+          sessionId={sessionId}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+            queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
+          }}
+        />
       </div>
     );
   }

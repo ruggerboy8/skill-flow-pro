@@ -49,6 +49,7 @@ export default function Profile() {
           created_at,
           scheduling_link,
           is_clinical_director,
+          is_super_admin,
           roles(role_name)
         `)
         .eq('user_id', user.id)
@@ -243,7 +244,7 @@ export default function Profile() {
           </div>
 
           {/* Scheduling Link — for clinical directors */}
-          {(profile as any).is_clinical_director && (
+          {((profile as any).is_clinical_director || (profile as any).is_super_admin) && (
             <div className="space-y-2">
               <Label htmlFor="scheduling_link">Scheduling Link (Calendly)</Label>
               <div className="flex items-center gap-2">

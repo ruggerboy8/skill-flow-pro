@@ -588,10 +588,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                       </button>
                     ))}
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleRatingChange(pm.action_id, r.score === -1 ? null : -1); }}
+                      onClick={(e) => { e.stopPropagation(); handleRatingChange(pm.action_id, r.score === 0 ? null : 0); }}
                       className={cn(
                         "w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-medium transition-all",
-                        r.score === -1
+                        r.score === 0
                           ? "bg-muted border-muted-foreground text-foreground"
                           : "border-muted-foreground/30 hover:border-primary/50 text-muted-foreground"
                       )}

@@ -364,15 +364,30 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         <Card className="border-green-200 bg-green-50/50">
           <CardContent className="flex flex-col items-center py-8 text-center">
             <CheckCircle2 className="h-12 w-12 text-green-600 mb-4" />
-            <h2 className="text-xl font-bold">Prep Published</h2>
+            <h2 className="text-xl font-bold">Prep Published & Invite Sent</h2>
             <p className="text-muted-foreground mt-2">
-              The doctor can now see your agenda and complete their prep before the meeting.
+              The doctor can now see your agenda. A scheduling invite has been sent.
             </p>
             <Button variant="outline" className="mt-6" onClick={onBack}>
               Back to Doctor Detail
             </Button>
           </CardContent>
         </Card>
+
+        <SchedulingInviteComposer
+          open={showInviteDialog}
+          onOpenChange={(open) => {
+            setShowInviteDialog(open);
+          }}
+          doctorName={doctorName}
+          doctorEmail={doctorEmail}
+          doctorStaffId={doctorStaffId}
+          sessionId={sessionId}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+            queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
+          }}
+        />
       </div>
     );
   }

@@ -44,8 +44,6 @@ const canInvite = (status: string) => status === 'director_prep_ready';
 const isExpandable = (status: string) =>
   ['director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted', 'meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(status);
 
-// Mid-flow statuses that block adding a new check-in
-const midFlowStatuses = ['scheduled', 'director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted'];
 
 interface Props {
   sessions: Session[];

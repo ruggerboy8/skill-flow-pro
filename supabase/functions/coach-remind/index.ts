@@ -13,7 +13,7 @@ interface Recipient {
 }
 
 interface RequestPayload {
-  template_key: 'confidence' | 'performance';
+  template_key: string;
   subject: string;
   body: string;
   recipients: Recipient[];

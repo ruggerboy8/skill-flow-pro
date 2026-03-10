@@ -18,6 +18,8 @@ interface ProfileData {
   created_at: string;
   role_name: string | null;
   scheduling_link: string | null;
+  is_clinical_director: boolean;
+  is_super_admin: boolean;
 }
 
 export default function Profile() {
@@ -63,6 +65,8 @@ export default function Profile() {
         ...data,
         role_name: (data.roles as any)?.role_name || null,
         scheduling_link: data.scheduling_link,
+        is_clinical_director: Boolean(data.is_clinical_director),
+        is_super_admin: Boolean(data.is_super_admin),
       });
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -244,7 +248,7 @@ export default function Profile() {
           </div>
 
           {/* Scheduling Link — for clinical directors */}
-          {((profile as any).is_clinical_director || (profile as any).is_super_admin) && (
+          {(profile.is_clinical_director || profile.is_super_admin) && (
             <div className="space-y-2">
               <Label htmlFor="scheduling_link">Scheduling Link (Calendly)</Label>
               <div className="flex items-center gap-2">

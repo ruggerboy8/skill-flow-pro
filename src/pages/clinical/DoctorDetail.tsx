@@ -7,7 +7,7 @@ import { ArrowLeft, MapPin, ChevronDown, TrendingUp } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
-import { DoctorNextActionPanel } from '@/components/clinical/DoctorNextActionPanel';
+
 import { DoctorDetailOverview } from '@/components/clinical/DoctorDetailOverview';
 import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
@@ -130,10 +130,6 @@ export default function DoctorDetail() {
           </p>
         </div>
       </div>
-
-      {/* Next Action — always visible */}
-      <DoctorNextActionPanel status={journeyStatus} />
-
       {/* Pre-session actions (release baseline, notify doctor) */}
       <DoctorDetailOverview
         doctor={doctor}

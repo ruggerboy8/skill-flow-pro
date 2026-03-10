@@ -103,6 +103,7 @@ export default function Profile() {
         title: "Success",
         description: "Profile updated successfully"
       });
+      qc.invalidateQueries({ queryKey: ['staff-profile'] });
       setEditMode(false);
     } catch (error) {
       console.error('Error updating profile:', error);

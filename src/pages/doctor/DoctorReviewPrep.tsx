@@ -205,6 +205,7 @@ export default function DoctorReviewPrep() {
   const coachActionIds = coachSelections.map(s => s.action_id);
 
   const isReadOnly = session?.status === 'doctor_prep_submitted' || session?.status === 'doctor_confirmed';
+  const isSchedulingInviteSent = session?.status === 'scheduling_invite_sent';
   const isMeetingPending = session?.status === 'meeting_pending';
 
   const toggleAction = (actionId: number) => {

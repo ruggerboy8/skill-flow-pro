@@ -15,12 +15,14 @@ const ACTION_STATUS_ICONS: Record<string, { icon: typeof CheckCircle2; color: st
   dropped: { icon: XCircle, color: 'text-muted-foreground', label: 'Dropped' },
 };
 
-const SESSION_STATUS_COLORS: Record<string, string> = {
-  doctor_confirmed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-  meeting_pending: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  doctor_prep_submitted: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  director_prep_ready: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-  scheduled: 'bg-muted text-muted-foreground',
+const SESSION_STATUS_CONFIG: Record<string, { className: string; label: string }> = {
+  doctor_confirmed: { className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400', label: 'Confirmed' },
+  meeting_pending: { className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', label: 'Awaiting Confirmation' },
+  doctor_revision_requested: { className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', label: 'Revision Requested' },
+  doctor_prep_submitted: { className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', label: 'Ready for Meeting' },
+  scheduling_invite_sent: { className: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400', label: 'Invite Sent' },
+  director_prep_ready: { className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', label: 'Send Invite' },
+  scheduled: { className: 'bg-muted text-muted-foreground', label: 'Draft' },
 };
 
 export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
@@ -117,7 +119,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
           const experiments = (entry.record?.experiments as any[]) || [];
           const priorStatuses = (entry.record?.prior_action_status as any[]) || [];
           const typeLabel = entry.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up #${entry.sequence_number}`;
-          const statusClass = SESSION_STATUS_COLORS[entry.status] || SESSION_STATUS_COLORS.scheduled;
+          const statusConfig = SESSION_STATUS_CONFIG[entry.status] || SESSION_STATUS_CONFIG.scheduled;
 
           return (
             <div key={entry.id} className="relative pb-6 last:pb-0">
@@ -130,8 +132,8 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
                 {/* Header row */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{typeLabel}</span>
-                  <Badge className={`text-[10px] ${statusClass}`}>
-                    {entry.status.replace(/_/g, ' ')}
+                  <Badge className={`text-[10px] ${statusConfig.className}`}>
+                    {statusConfig.label}
                   </Badge>
                   {entry.scheduled_at && (
                     <span className="text-xs text-muted-foreground ml-auto">

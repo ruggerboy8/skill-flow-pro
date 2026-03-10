@@ -14,6 +14,12 @@ serve(async (req) => {
   try {
     const { transcript, domains, timeline } = await req.json();
 
+    console.log("[map-baseline] Received:", {
+      transcriptLength: transcript?.length,
+      domainCount: domains?.length,
+      timelineLength: timeline?.length,
+    });
+
     if (!transcript || !domains?.length) {
       return new Response(
         JSON.stringify({ error: "transcript and domains are required" }),
@@ -38,6 +44,8 @@ serve(async (req) => {
       }
     }
 
+    console.log("[map-baseline] Valid action IDs:", [...validActionIds]);
+
     // Build timeline context if available
     let timelineContext = "";
     if (timeline && timeline.length > 0) {
@@ -49,6 +57,9 @@ serve(async (req) => {
         })
         .join("\n");
       timelineContext = `\n\nThe clinical director was viewing these Pro Moves at these approximate times during the recording:\n${timelineEntries}\n\nUse these timeline hints to help attribute parts of the transcript to the right Pro Move, but rely primarily on content matching. The timeline is approximate.`;
+      console.log("[map-baseline] Timeline context:", timelineContext);
+    } else {
+      console.log("[map-baseline] No timeline provided");
     }
 
     const systemPrompt = `You are a coaching notes assistant for a clinical director performing a baseline assessment of a doctor. Your job is to split an assessment transcript into per-Pro-Move coaching notes.
@@ -64,12 +75,15 @@ The clinical director recorded verbal feedback while scrolling through Pro Moves
    - Keep each note to 1-3 sentences
    - Preserve specific observations from the transcript
    - Do NOT fabricate information not in the transcript
-3. If no relevant content exists for a Pro Move, omit it entirely
-4. Each Pro Move should appear at most once in the output
-5. Maximum 500 characters per note
+3. If a part of the transcript seems relevant to a Pro Move even loosely, include it — err on the side of mapping content rather than discarding it
+4. If the transcript is general feedback not clearly tied to one Pro Move, distribute it to the most relevant Pro Move(s)
+5. Each Pro Move should appear at most once in the output
+6. Maximum 500 characters per note
 
 Available Pro Moves:
 ${proMoveList.join("\n")}${timelineContext}`;
+
+    console.log("[map-baseline] Transcript preview:", transcript.slice(0, 200));
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -97,7 +111,7 @@ ${proMoveList.join("\n")}${timelineContext}`;
                 properties: {
                   pro_move_notes: {
                     type: "object",
-                    description: "Object keyed by action_id (as string), with note text as value",
+                    description: "Object keyed by action_id (as string), with note text as value. Map as many notes as possible from the transcript.",
                     additionalProperties: { type: "string" },
                   },
                 },
@@ -119,7 +133,7 @@ ${proMoveList.join("\n")}${timelineContext}`;
         );
       }
       const errorText = await response.text();
-      console.error("OpenAI API error:", response.status, errorText);
+      console.error("[map-baseline] OpenAI API error:", response.status, errorText);
       throw new Error(`OpenAI API returned ${response.status}`);
     }
 
@@ -127,25 +141,31 @@ ${proMoveList.join("\n")}${timelineContext}`;
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
     if (!toolCall?.function?.arguments) {
+      console.error("[map-baseline] No tool call in response:", JSON.stringify(data.choices?.[0]?.message));
       throw new Error("No tool call response from AI");
     }
 
     const result = JSON.parse(toolCall.function.arguments);
+    console.log("[map-baseline] Raw AI result keys:", Object.keys(result.pro_move_notes || {}));
+    console.log("[map-baseline] Raw AI result:", JSON.stringify(result.pro_move_notes).slice(0, 500));
 
-    // Validate: only keep valid domain IDs
-    const validIds = new Set(domains.map((d: { domain_id: number }) => String(d.domain_id)));
+    // Validate: only keep valid action IDs
     const validNotes: Record<string, string> = {};
     for (const [key, value] of Object.entries(result.pro_move_notes || {})) {
       if (validActionIds.has(key) && typeof value === "string" && value.trim()) {
         validNotes[key] = (value as string).slice(0, 500);
+      } else {
+        console.log("[map-baseline] Filtered out key:", key, "valid?", validActionIds.has(key), "type:", typeof value);
       }
     }
+
+    console.log("[map-baseline] Final valid notes count:", Object.keys(validNotes).length);
 
     return new Response(JSON.stringify({ pro_move_notes: validNotes }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("map-baseline-domain-notes error:", e);
+    console.error("[map-baseline] error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -57,7 +57,7 @@ function parseDoctorNote(raw: string | null | undefined): ParsedDoctorNote | nul
   return null;
 }
 
-export function CombinedPrepView({ session, selections, coachName = 'Alex', doctorName = 'Doctor' }: Props) {
+export function CombinedPrepView({ session, selections, coachName = 'Your Coach', doctorName = 'Doctor' }: Props) {
   const coachSelections = selections.filter(s => s.selected_by === 'coach');
   const doctorSelections = selections.filter(s => s.selected_by === 'doctor');
   const parsedNote = parseDoctorNote(session.doctor_note);

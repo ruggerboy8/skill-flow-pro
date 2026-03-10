@@ -33,7 +33,7 @@ interface Props {
   doctorName?: string;
 }
 
-export function DoctorDetailThread({ sessions, coachName = 'Alex', doctorName = 'Doctor' }: Props) {
+export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor' }: Props) {
   const [captureSessionId, setCaptureSessionId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 

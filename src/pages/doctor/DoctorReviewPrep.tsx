@@ -191,14 +191,14 @@ export default function DoctorReviewPrep() {
   const { data: coachInfo } = useQuery({
     queryKey: ['coach-info', session?.coach_staff_id],
     queryFn: async () => {
-      if (!session?.coach_staff_id) return { name: 'Alex', scheduling_link: null };
+      if (!session?.coach_staff_id) return { name: 'Your Coach', scheduling_link: null };
       const { data } = await supabase.from('staff').select('name, scheduling_link').eq('id', session.coach_staff_id).single();
-      return { name: data?.name || 'Alex', scheduling_link: data?.scheduling_link || null };
+      return { name: data?.name || 'Your Coach', scheduling_link: data?.scheduling_link || null };
     },
     enabled: !!session?.coach_staff_id,
   });
 
-  const coachName = coachInfo?.name || 'Alex';
+  const coachName = coachInfo?.name || 'Your Coach';
   const coachSchedulingLink = coachInfo?.scheduling_link;
 
   const coachSelections = allSelections?.filter(s => s.selected_by === 'coach') || [];
@@ -311,7 +311,7 @@ export default function DoctorReviewPrep() {
         <CombinedPrepView
           session={session}
           selections={(allSelections || []) as any}
-          coachName={coachName || 'Alex'}
+          coachName={coachName || 'Your Coach'}
           doctorName={staff?.name || 'Doctor'}
         />
       </div>
@@ -411,15 +411,15 @@ export default function DoctorReviewPrep() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">1</div>
-            <CardTitle className="text-base">Meeting Agenda from {coachName || 'Alex'}</CardTitle>
+            <CardTitle className="text-base">Meeting Agenda from {coachName}</CardTitle>
           </div>
-          <CardDescription>Here's what {coachName || 'Alex'} has planned for your conversation.</CardDescription>
+          <CardDescription>Here's what {coachName} has planned for your conversation.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {coachSelections.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                {coachName || 'Alex'}'s Focus Areas
+                {coachName}'s Focus Areas
               </p>
               <div className="space-y-2">
                 {coachSelections.map(sel => (

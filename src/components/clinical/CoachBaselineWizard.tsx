@@ -49,47 +49,90 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const { state: recState, controls: recControls } = useAudioRecording();
 
 
-  // IntersectionObserver for pro-move tracking during recording
-  // Use a narrow rootMargin band around the vertical center of the viewport
+  // Anchor top for the floating pill (tracks active card position)
+  const [pillAnchorTop, setPillAnchorTop] = useState<number | null>(null);
+
+  // Scroll-based proximity tracking for pro-move during recording
+  const pendingSwitchRef = useRef<{ actionId: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const rafRef = useRef<number>(0);
+
   useEffect(() => {
-    if (!recState.isRecording) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Find the entry most centered in the viewport strip
-        let bestEntry: IntersectionObserverEntry | null = null;
-        let bestRatio = 0;
-        entries.forEach(entry => {
-          if (entry.isIntersecting && entry.intersectionRatio > bestRatio) {
-            bestRatio = entry.intersectionRatio;
-            bestEntry = entry;
-          }
-        });
-        if (bestEntry) {
-          const actionId = Number((bestEntry as any).target.dataset.actionId);
-          if (!isNaN(actionId)) {
-            setActiveActionId(prev => {
-              if (prev !== actionId) {
-                proMoveTimeline.current.push({
-                  action_id: actionId,
-                  t_start_ms: recState.recordingTime * 1000,
-                });
-              }
-              return actionId;
-            });
-          }
-        }
-      },
-      {
-        // Only consider elements that cross the center 20% band of the viewport
-        rootMargin: '-40% 0px -40% 0px',
-        threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+    if (!recState.isRecording) {
+      if (pendingSwitchRef.current) {
+        clearTimeout(pendingSwitchRef.current.timer);
+        pendingSwitchRef.current = null;
       }
-    );
+      cancelAnimationFrame(rafRef.current);
+      return;
+    }
 
-    proMoveRefs.current.forEach(el => observer.observe(el));
-    return () => observer.disconnect();
-  }, [recState.isRecording]);
+    const READING_LINE = 0.30; // 30% from viewport top
+    const DEBOUNCE_MS = 150;
+
+    const updateTracking = () => {
+      const viewportH = window.innerHeight;
+      const targetY = viewportH * READING_LINE;
+      let closestId: number | null = null;
+      let closestDist = Infinity;
+      let closestTop = targetY;
+
+      proMoveRefs.current.forEach((el, actionId) => {
+        const rect = el.getBoundingClientRect();
+        const cardCenter = rect.top + rect.height / 2;
+        const dist = Math.abs(cardCenter - targetY);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestId = actionId;
+          closestTop = rect.top + rect.height / 2;
+        }
+      });
+
+      // Update pill anchor to track the active card
+      if (closestId !== null) {
+        setPillAnchorTop(closestTop);
+      }
+
+      // Debounced switch — only change active card after 150ms of stability
+      if (closestId !== null && closestId !== activeActionId) {
+        if (pendingSwitchRef.current?.actionId === closestId) {
+          // Already waiting for this one
+        } else {
+          if (pendingSwitchRef.current) clearTimeout(pendingSwitchRef.current.timer);
+          const capturedId = closestId;
+          pendingSwitchRef.current = {
+            actionId: capturedId,
+            timer: setTimeout(() => {
+              setActiveActionId(prev => {
+                if (prev !== capturedId) {
+                  proMoveTimeline.current.push({
+                    action_id: capturedId,
+                    t_start_ms: recState.recordingTime * 1000,
+                  });
+                }
+                return capturedId;
+              });
+              pendingSwitchRef.current = null;
+            }, DEBOUNCE_MS),
+          };
+        }
+      }
+    };
+
+    const onScroll = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(updateTracking);
+    };
+
+    // Run once immediately to position pill on first card
+    updateTracking();
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(rafRef.current);
+      if (pendingSwitchRef.current) clearTimeout(pendingSwitchRef.current.timer);
+    };
+  }, [recState.isRecording, activeActionId]);
 
   // Fetch or create assessment
   const { data: existingAssessment } = useQuery({
@@ -475,6 +518,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           activeCompetencyLabel={getActiveLabel()}
           showArrow
           alwaysShowStartOver
+          anchorTop={pillAnchorTop}
         />
       )}
 

@@ -15,6 +15,8 @@ interface FloatingRecorderPillProps {
   showArrow?: boolean;
   /** Always show Start Over, not just when paused */
   alwaysShowStartOver?: boolean;
+  /** When provided, pill tracks this vertical position (px from viewport top) instead of centering */
+  anchorTop?: number | null;
 }
 
 export function FloatingRecorderPill({
@@ -27,6 +29,7 @@ export function FloatingRecorderPill({
   activeCompetencyLabel,
   showArrow,
   alwaysShowStartOver,
+  anchorTop,
 }: FloatingRecorderPillProps) {
   const isMobile = useIsMobile();
 
@@ -38,14 +41,25 @@ export function FloatingRecorderPill({
 
   if (!isRecording) return null;
 
+  // Determine if we should use dynamic anchor positioning (desktop only)
+  const useDynamicPosition = !isMobile && anchorTop != null;
+
   return (
     <div
       className={cn(
         "fixed z-50 flex items-center gap-1",
         isMobile 
           ? "bottom-20 left-1/2 -translate-x-1/2 flex-col" 
-          : "left-4 top-1/2 -translate-y-1/2 flex-row"
+          : "left-4 flex-row"
       )}
+      style={useDynamicPosition ? {
+        top: `${anchorTop}px`,
+        transform: 'translateY(-50%)',
+        transition: 'top 0.4s ease-out',
+      } : (!isMobile ? {
+        top: '50%',
+        transform: 'translateY(-50%)',
+      } : undefined)}
     >
       <div
         className={cn(

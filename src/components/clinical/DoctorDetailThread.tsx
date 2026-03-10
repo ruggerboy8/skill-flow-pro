@@ -217,21 +217,7 @@ function SessionCard({
   const showBuildAgenda = canBuildAgenda(session.status);
   const showInvite = canInvite(session.status);
 
-  // Eager lightweight queries for collapsed summary
-  const { data: selectionCount } = useQuery({
-    queryKey: ['session-selection-count', session.id],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('coaching_session_selections')
-        .select('*', { count: 'exact', head: true })
-        .eq('session_id', session.id);
-      if (error) throw error;
-      return count ?? 0;
-    },
-    enabled: ['director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted'].includes(session.status),
-  });
-
-  const { data: meetingSummary } = useQuery({
+  // Eager lightweight query for collapsed summary
     queryKey: ['meeting-summary', session.id],
     queryFn: async () => {
       const { data, error } = await supabase

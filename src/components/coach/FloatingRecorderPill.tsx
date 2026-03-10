@@ -26,6 +26,7 @@ export function FloatingRecorderPill({
   onStartOver,
   activeCompetencyLabel,
   showArrow,
+  alwaysShowStartOver,
 }: FloatingRecorderPillProps) {
   const isMobile = useIsMobile();
 

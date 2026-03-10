@@ -36,6 +36,8 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   const [showPrepSheet, setShowPrepSheet] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
 
+  const [showNotifyDialog, setShowNotifyDialog] = useState(false);
+
   const releaseMutation = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -45,10 +47,31 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         .update({ baseline_released_at: new Date().toISOString(), baseline_released_by: user.id } as any)
         .eq('id', doctor.id);
       if (error) throw error;
+
+      // Send baseline release email notification via coach-remind
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase.functions.invoke('coach-remind', {
+            body: {
+              template_key: 'baseline_release',
+              subject: 'Your baseline self-assessment is ready',
+              body: `Hi {{first_name}},\n\nYour clinical director has opened your baseline self-assessment. Log in to your portal to begin — it takes about 15–20 minutes.\n\nThis is the first step in your professional development journey. Your responses are private and will help guide your coaching conversations.\n\nBest,\n{{coach_name}}`,
+              recipients: [{
+                user_id: doctor.id,
+                email: doctor.email,
+                name: doctor.name,
+              }],
+            },
+          });
+        }
+      } catch (emailErr) {
+        console.warn('Failed to send baseline release email:', emailErr);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
-      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment.` });
+      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment. A notification email has been sent.` });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });

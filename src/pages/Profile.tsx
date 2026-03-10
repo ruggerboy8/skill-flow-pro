@@ -49,6 +49,7 @@ export default function Profile() {
           created_at,
           scheduling_link,
           is_clinical_director,
+          is_super_admin,
           roles(role_name)
         `)
         .eq('user_id', user.id)

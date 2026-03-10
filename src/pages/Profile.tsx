@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { User, Mail, Building, MapPin, Calendar } from 'lucide-react';
+import { User, Mail, Building, MapPin, Calendar, Link2 } from 'lucide-react';
 
 interface ProfileData {
   id: string;
@@ -16,6 +17,7 @@ interface ProfileData {
   location: string | null;
   created_at: string;
   role_name: string | null;
+  scheduling_link: string | null;
 }
 
 export default function Profile() {

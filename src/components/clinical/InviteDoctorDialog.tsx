@@ -83,6 +83,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
             name: name.trim(),
             group_id: groupId,
             location_id: locationId === '__roaming__' ? null : locationId,
+            release_baseline: releaseBaseline,
           }),
         }
       );

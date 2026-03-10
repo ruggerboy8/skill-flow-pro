@@ -289,3 +289,33 @@ export default function DoctorManagement() {
     </div>
   );
 }
+
+function InlineAction({ stage, doctorId, navigate }: { stage: string; doctorId: string; navigate: (path: string) => void }) {
+  const goToDetail = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/clinical/doctors/${doctorId}`);
+  };
+
+  if (['baseline_submitted', 'ready_for_prep', 'prep_complete'].includes(stage)) {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Build Prep <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'meeting_pending') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Schedule Next <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'doctor_confirmed' || stage === 'followup_completed') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Start Follow-up <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  return <span className="text-xs text-muted-foreground">—</span>;
+}

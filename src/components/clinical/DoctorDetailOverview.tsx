@@ -198,7 +198,24 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </Card>
       )}
 
-      {/* Continue prep for a scheduled session */}
+      {/* Notify Doctor — baseline complete, no sessions yet */}
+      {baseline?.status === 'completed' && sessions.length === 0 && (
+        <Card className="border-dashed border-accent">
+          <CardContent className="flex items-center justify-between py-4">
+            <div>
+              <p className="text-sm font-medium">Send a prep note to {doctor.name}</p>
+              <p className="text-xs text-muted-foreground">
+                Share a personal note and optional scheduling link before building your agenda.
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => setShowNotifyDialog(true)} className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Notify Doctor
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {needsPrepSession && (
         <Card className="border-primary/30">
           <CardContent className="flex items-center justify-between py-4">

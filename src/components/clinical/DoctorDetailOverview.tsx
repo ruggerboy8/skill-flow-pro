@@ -6,14 +6,12 @@ import { format } from 'date-fns';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
+import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 interface Session {
   id: string;
@@ -38,7 +36,6 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   const [prepSessionId, setPrepSessionId] = useState<string | null>(null);
   const [showPrepSheet, setShowPrepSheet] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [schedulingLink, setSchedulingLink] = useState('');
 
   const releaseMutation = useMutation({
     mutationFn: async () => {
@@ -57,33 +54,10 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
-  // Invite to schedule mutation
-  const inviteMutation = useMutation({
-    mutationFn: async ({ sessionId, link }: { sessionId?: string; link?: string }) => {
-      const { data, error } = await supabase.functions.invoke('invite-to-schedule', {
-        body: {
-          doctor_staff_id: doctor.id,
-          session_id: sessionId || null,
-          scheduling_link: link || null,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
-      queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
-      toast({
-        title: 'Scheduling invite sent',
-        description: data.email_sent
-          ? `An email has been sent to ${doctor.name}.`
-          : `Session created. Email could not be sent — share the link manually.`,
-      });
-      setShowInviteDialog(false);
-    },
-    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-  });
+  const handleInviteSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
+  };
 
   // Find session with prep ready (director has completed prep but hasn't invited yet)
   const prepReadySession = sessions.find(s => s.status === 'director_prep_ready');
@@ -154,11 +128,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   const hasConfirmedSession = sessions.some(s => s.status === 'doctor_confirmed');
   const isNotReleased = journeyStatus.stage === 'invited';
 
-  // Load the coach's saved scheduling link for the invite dialog
-  const handleOpenInviteDialog = () => {
-    setSchedulingLink((myStaff as any)?.scheduling_link || '');
-    setShowInviteDialog(true);
-  };
+  const handleOpenInviteDialog = () => setShowInviteDialog(true);
 
   return (
     <div className="space-y-4">
@@ -297,46 +267,16 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </SheetContent>
       </Sheet>
 
-      {/* Invite to Schedule Dialog */}
-      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send Scheduling Invite</DialogTitle>
-            <DialogDescription>
-              {doctor.name} will receive an email with instructions to schedule using the link below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="scheduling-link">Calendly / Scheduling Link (optional)</Label>
-              <Input
-                id="scheduling-link"
-                type="url"
-                placeholder="https://calendly.com/..."
-                value={schedulingLink}
-                onChange={(e) => setSchedulingLink(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                If no link is provided, the email will ask the doctor to reach out to coordinate a time.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInviteDialog(false)}>Cancel</Button>
-            <Button
-              onClick={() => inviteMutation.mutate({
-                sessionId: prepReadySession?.id,
-                link: schedulingLink || undefined,
-              })}
-              disabled={inviteMutation.isPending}
-              className="gap-2"
-            >
-              <Mail className="h-4 w-4" />
-              {inviteMutation.isPending ? 'Sending…' : 'Send Invite'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Scheduling Invite Composer */}
+      <SchedulingInviteComposer
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        doctorName={doctor.name}
+        doctorEmail={doctor.email}
+        doctorStaffId={doctor.id}
+        sessionId={prepReadySession?.id}
+        onSuccess={handleInviteSuccess}
+      />
     </div>
   );
 }

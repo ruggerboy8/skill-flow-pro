@@ -156,7 +156,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
 
   // Load the coach's saved scheduling link for the invite dialog
   const handleOpenInviteDialog = () => {
-    setSchedulingLink(myStaff?.scheduling_link || '');
+    setSchedulingLink((myStaff as any)?.scheduling_link || '');
     setShowInviteDialog(true);
   };
 

@@ -48,6 +48,7 @@ const SCORE_COLORS: Record<number, { bg: string; border: string; text: string; a
   3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)', activeBorder: 'hsl(210 70% 45%)' },
   2: { bg: 'hsl(38 90% 95%)', border: 'hsl(38 70% 75%)', text: 'hsl(38 80% 30%)', activeBorder: 'hsl(38 80% 45%)' },
   1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)', activeBorder: 'hsl(0 65% 45%)' },
+  0: { bg: 'hsl(0 0% 95%)', border: 'hsl(0 0% 80%)', text: 'hsl(0 0% 40%)', activeBorder: 'hsl(0 0% 50%)' },
 };
 
 const SCORE_LABELS: Record<number, string> = {
@@ -55,6 +56,7 @@ const SCORE_LABELS: Record<number, string> = {
   3: 'Consistent',
   2: 'Developing',
   1: 'Rarely',
+  0: 'N/A',
 };
 
 type SortBy = 'self' | 'coach';

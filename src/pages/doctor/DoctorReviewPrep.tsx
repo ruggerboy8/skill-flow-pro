@@ -198,7 +198,7 @@ export default function DoctorReviewPrep() {
     enabled: !!session?.coach_staff_id,
   });
 
-  const coachName = coachInfo?.name || 'Alex';
+  const coachName = coachInfo?.name || 'Your Coach';
   const coachSchedulingLink = coachInfo?.scheduling_link;
 
   const coachSelections = allSelections?.filter(s => s.selected_by === 'coach') || [];

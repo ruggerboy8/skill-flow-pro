@@ -47,6 +47,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log("[map-baseline] v2 — dwell-filter + deterministic prompt");
     const { transcript, domains, timeline } = await req.json();
 
     console.log("[map-baseline] Received:", {
@@ -237,6 +238,7 @@ ${proMoveList.join("\n")}`;
       throw new Error("No tool call response from AI");
     }
 
+    console.log("[map-baseline] Raw tool_call arguments:", toolCall.function.arguments.slice(0, 1000));
     const result = JSON.parse(toolCall.function.arguments);
     console.log("[map-baseline] Raw AI result keys:", Object.keys(result.pro_move_notes || {}));
 

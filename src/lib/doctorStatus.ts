@@ -47,6 +47,7 @@ export function getDoctorJourneyStatus(
   coachBaseline: CoachBaselineInfo | null | undefined,
   sessions: SessionInfo[] | null | undefined,
   baselineReleasedAt?: string | null,
+  perspective: 'coach' | 'doctor' = 'coach',
 ): DoctorJourneyStatus {
   // Check sessions first (highest priority — active coaching cycle)
   if (sessions && sessions.length > 0) {

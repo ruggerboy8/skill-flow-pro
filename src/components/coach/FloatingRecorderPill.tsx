@@ -47,7 +47,7 @@ export function FloatingRecorderPill({
   return (
     <div
       className={cn(
-        "fixed z-50 flex items-center gap-1",
+        "fixed z-50 flex items-center gap-1 pointer-events-none",
         isMobile 
           ? "bottom-20 left-1/2 -translate-x-1/2 flex-col" 
           : "left-4 flex-row"

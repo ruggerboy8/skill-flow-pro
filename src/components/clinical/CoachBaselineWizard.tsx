@@ -4,11 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useAudioRecording } from '@/hooks/useAudioRecording';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2 } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw } from 'lucide-react';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
 
@@ -32,20 +33,28 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
 
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<Record<number, { score: number | null; note: string }>>({});
-  const [domainNotes, setDomainNotes] = useState<Record<string, string>>({});
   const [isComplete, setIsComplete] = useState(false);
   const [isProcessingAudio, setIsProcessingAudio] = useState(false);
-  const [activeDomainId, setActiveDomainId] = useState<number | null>(null);
+  const [activeActionId, setActiveActionId] = useState<number | null>(null);
 
-  const domainRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  // Track which pro-move note textareas are open
+  const [openNotes, setOpenNotes] = useState<Set<number>>(new Set());
+
+  // Timeline for recording: which pro move was in view at what time
+  const proMoveTimeline = useRef<{ action_id: number; t_start_ms: number }[]>([]);
+
+  const proMoveRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const recorderCardRef = useRef<HTMLDivElement>(null);
   const [showFloatingPill, setShowFloatingPill] = useState(false);
 
   const { state: recState, controls: recControls } = useAudioRecording();
 
-  // IntersectionObserver for domain tracking during recording
+  // IntersectionObserver for pro-move tracking during recording
   useEffect(() => {
-    if (!recState.isRecording) return;
+    if (!recState.isRecording) {
+      setActiveActionId(null);
+      return;
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -58,14 +67,24 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           }
         });
         if (bestEntry) {
-          const domainId = Number((bestEntry as any).target.dataset.domainId);
-          if (!isNaN(domainId)) setActiveDomainId(domainId);
+          const actionId = Number((bestEntry as any).target.dataset.actionId);
+          if (!isNaN(actionId)) {
+            setActiveActionId(prev => {
+              if (prev !== actionId) {
+                proMoveTimeline.current.push({
+                  action_id: actionId,
+                  t_start_ms: recState.recordingTime * 1000,
+                });
+              }
+              return actionId;
+            });
+          }
         }
       },
       { threshold: [0.1, 0.3, 0.5, 0.7, 0.9] }
     );
 
-    domainRefs.current.forEach(el => observer.observe(el));
+    proMoveRefs.current.forEach(el => observer.observe(el));
     return () => observer.disconnect();
   }, [recState.isRecording]);
 
@@ -90,7 +109,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       if (!staff?.id) return null;
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
-        .select('id, status, domain_notes, recording_transcript')
+        .select('id, status, recording_transcript')
         .eq('doctor_staff_id', doctorStaffId)
         .eq('coach_staff_id', staff.id)
         .maybeSingle();
@@ -164,19 +183,19 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     if (existingAssessment?.id) {
       setAssessmentId(existingAssessment.id);
       if (existingAssessment.status === 'completed') setIsComplete(true);
-      if (existingAssessment.domain_notes && typeof existingAssessment.domain_notes === 'object') {
-        setDomainNotes(existingAssessment.domain_notes as Record<string, string>);
-      }
     }
   }, [existingAssessment]);
 
   useEffect(() => {
     if (existingItems?.length) {
       const loaded: Record<number, { score: number | null; note: string }> = {};
+      const notesOpen = new Set<number>();
       existingItems.forEach(item => {
         loaded[item.action_id] = { score: item.rating, note: item.note_text || '' };
+        if (item.note_text) notesOpen.add(item.action_id);
       });
       setRatings(loaded);
+      setOpenNotes(notesOpen);
     }
   }, [existingItems]);
 
@@ -209,18 +228,6 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           note_text: note || null,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'assessment_id,action_id' });
-      if (error) throw error;
-    },
-  });
-
-  // Save domain notes
-  const saveDomainNotesMutation = useMutation({
-    mutationFn: async (notes: Record<string, string>) => {
-      if (!assessmentId) throw new Error('No assessment');
-      const { error } = await supabase
-        .from('coach_baseline_assessments')
-        .update({ domain_notes: notes, updated_at: new Date().toISOString() })
-        .eq('id', assessmentId);
       if (error) throw error;
     },
   });
@@ -259,15 +266,13 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     }
   };
 
-  const handleDomainNoteChange = (domainId: number, text: string) => {
-    setDomainNotes(prev => {
-      const updated = { ...prev, [String(domainId)]: text };
-      return updated;
+  const toggleNoteOpen = (actionId: number) => {
+    setOpenNotes(prev => {
+      const next = new Set(prev);
+      if (next.has(actionId)) next.delete(actionId);
+      else next.add(actionId);
+      return next;
     });
-  };
-
-  const handleDomainNoteBlur = () => {
-    saveDomainNotesMutation.mutate(domainNotes);
   };
 
   // Audio recording pipeline
@@ -293,39 +298,57 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         .update({ recording_transcript: transcript, updated_at: new Date().toISOString() })
         .eq('id', assessmentId);
 
-      // 2. Map to domain notes
+      // 2. Map to pro-move notes
       const domainPayload = domains.map(d => ({
         domain_id: d.domain_id,
         domain_name: d.domain_name,
-        pro_moves: d.proMoves.map(pm => pm.action_statement),
+        pro_moves: d.proMoves.map(pm => ({ action_id: pm.action_id, action_statement: pm.action_statement })),
       }));
 
       const { data: mappedData, error: mapErr } = await supabase.functions.invoke('map-baseline-domain-notes', {
-        body: { transcript, domains: domainPayload },
+        body: { transcript, domains: domainPayload, timeline: proMoveTimeline.current },
       });
       if (mapErr) throw mapErr;
 
-      const newNotes = mappedData?.domain_notes || {};
+      const newNotes = mappedData?.pro_move_notes || {};
 
-      // Merge with existing domain notes (AI notes appended)
-      const merged = { ...domainNotes };
-      for (const [key, value] of Object.entries(newNotes)) {
-        if (typeof value === 'string' && value.trim()) {
-          merged[key] = merged[key] ? `${merged[key]}\n\n${value}` : value as string;
-        }
+      // Merge AI notes into ratings and save each
+      const updatedRatings = { ...ratings };
+      const nowOpenNotes = new Set(openNotes);
+
+      for (const [actionIdStr, noteText] of Object.entries(newNotes)) {
+        const actionId = Number(actionIdStr);
+        if (isNaN(actionId) || typeof noteText !== 'string' || !noteText.trim()) continue;
+
+        const existing = updatedRatings[actionId] || { score: null, note: '' };
+        const mergedNote = existing.note ? `${existing.note}\n\n${noteText}` : noteText;
+        updatedRatings[actionId] = { ...existing, note: mergedNote };
+        nowOpenNotes.add(actionId);
+
+        // Save to DB
+        saveRatingMutation.mutate({ actionId, score: existing.score, note: mergedNote });
       }
 
-      setDomainNotes(merged);
-      await saveDomainNotesMutation.mutateAsync(merged);
+      setRatings(updatedRatings);
+      setOpenNotes(nowOpenNotes);
+      proMoveTimeline.current = [];
 
-      toast({ title: 'Recording processed', description: 'Domain notes have been populated from your feedback.' });
+      toast({ title: 'Recording processed', description: 'Pro Move notes have been populated from your feedback.' });
     } catch (e: any) {
       console.error('Audio processing error:', e);
       toast({ title: 'Processing error', description: e.message, variant: 'destructive' });
     } finally {
       setIsProcessingAudio(false);
     }
-  }, [domains, assessmentId, domainNotes, recControls]);
+  }, [domains, assessmentId, ratings, openNotes, recControls]);
+
+  // Start over / delete recording
+  const handleStartOver = useCallback(() => {
+    recControls.stopAndGetBlob(); // discard
+    proMoveTimeline.current = [];
+    setActiveActionId(null);
+    toast({ title: 'Recording discarded', description: 'You can start a new recording.' });
+  }, [recControls]);
 
   // Auto-create assessment if none exists
   useEffect(() => {
@@ -333,6 +356,16 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       createMutation.mutate();
     }
   }, [staff?.id, existingAssessment, assessmentId]);
+
+  // Get active pro move's label for the floating pill
+  const getActiveLabel = () => {
+    if (!activeActionId || !domains) return undefined;
+    for (const d of domains) {
+      const pm = d.proMoves.find(p => p.action_id === activeActionId);
+      if (pm) return pm.action_statement.slice(0, 60);
+    }
+    return undefined;
+  };
 
   if (domainsLoading || !domains) {
     return (
@@ -395,18 +428,21 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           {isProcessingAudio ? (
             <div className="flex items-center gap-3 justify-center py-2">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Processing recording into domain notes…</span>
+              <span className="text-sm text-muted-foreground">Processing recording into Pro Move notes…</span>
             </div>
           ) : !recState.isRecording ? (
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Record Verbal Feedback</p>
                 <p className="text-xs text-muted-foreground">
-                  Narrate your assessment while scrolling through domains. Notes will be auto-mapped.
+                  Narrate your assessment while scrolling through Pro Moves. Notes will be auto-mapped to each Pro Move.
                 </p>
               </div>
               <Button
-                onClick={() => recControls.startRecording()}
+                onClick={() => {
+                  proMoveTimeline.current = [];
+                  recControls.startRecording();
+                }}
                 variant="outline"
                 className="gap-2"
               >
@@ -421,13 +457,17 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                 <span className="text-sm font-mono tabular-nums">
                   {Math.floor(recState.recordingTime / 60)}:{(recState.recordingTime % 60).toString().padStart(2, '0')}
                 </span>
-                {activeDomainId && (
-                  <span className="text-xs text-muted-foreground">
-                    {domains.find(d => d.domain_id === activeDomainId)?.domain_name}
+                {activeActionId && domains && (
+                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                    {getActiveLabel()}
                   </span>
                 )}
               </div>
               <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={handleStartOver} className="gap-1.5 text-muted-foreground">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Start Over
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => recControls.togglePause()}>
                   {recState.isPaused ? 'Resume' : 'Pause'}
                 </Button>
@@ -449,21 +489,15 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           isPaused={recState.isPaused}
           onPauseToggle={recControls.togglePause}
           onDoneClick={handleFinishRecording}
-          activeCompetencyLabel={activeDomainId ? domains.find(d => d.domain_id === activeDomainId)?.domain_name : undefined}
+          onStartOver={handleStartOver}
+          activeCompetencyLabel={getActiveLabel()}
+          showArrow
         />
       )}
 
       {/* All domains — scrollable */}
       {domains.map(domain => (
-        <div
-          key={domain.domain_id}
-          ref={el => { if (el) domainRefs.current.set(domain.domain_id, el); }}
-          data-domain-id={domain.domain_id}
-          className={cn(
-            "rounded-lg border p-4 space-y-4 transition-all",
-            recState.isRecording && activeDomainId === domain.domain_id && "ring-2 ring-primary/50"
-          )}
-        >
+        <div key={domain.domain_id} className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span
               className="w-3 h-3 rounded-full shrink-0"
@@ -472,32 +506,30 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
             <h3 className="text-lg font-semibold">{domain.domain_name}</h3>
           </div>
 
-          {/* Domain-level notes from recording */}
-          {(domainNotes[String(domain.domain_id)] || recState.isRecording) && (
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Director Notes</p>
-              <Textarea
-                value={domainNotes[String(domain.domain_id)] || ''}
-                onChange={(e) => handleDomainNoteChange(domain.domain_id, e.target.value)}
-                onBlur={handleDomainNoteBlur}
-                placeholder="Domain-level notes will appear here after recording…"
-                className="min-h-[80px] text-sm"
-              />
-            </div>
-          )}
-
           {/* Pro Move ratings */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             {domain.proMoves.map(pm => {
               const r = ratings[pm.action_id] || { score: null, note: '' };
+              const isActive = recState.isRecording && activeActionId === pm.action_id;
+              const noteIsOpen = openNotes.has(pm.action_id);
+
               return (
-                <div key={pm.action_id} className="border rounded-md p-3 space-y-2">
+                <div
+                  key={pm.action_id}
+                  ref={el => { if (el) proMoveRefs.current.set(pm.action_id, el); }}
+                  data-action-id={pm.action_id}
+                  className={cn(
+                    "border rounded-md p-3 space-y-2 transition-all duration-300",
+                    isActive && "ring-[3px] ring-primary shadow-[0_0_12px_hsl(var(--primary)/0.3)] border-primary"
+                  )}
+                >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-medium">{pm.action_statement}</p>
                       <p className="text-xs text-muted-foreground">{pm.competency_name}</p>
                     </div>
                   </div>
+
                   {/* Rating buttons */}
                   <div className="flex gap-1.5">
                     {[1, 2, 3, 4, 5].map(val => (
@@ -526,14 +558,25 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                       N/A
                     </button>
                   </div>
-                  {/* Note */}
-                  <Textarea
-                    value={r.note}
-                    onChange={(e) => handleNoteChange(pm.action_id, e.target.value)}
-                    onBlur={() => handleNoteBlur(pm.action_id)}
-                    placeholder="Add a note…"
-                    className="min-h-[60px] text-sm"
-                  />
+
+                  {/* Collapsible note */}
+                  <Collapsible open={noteIsOpen} onOpenChange={() => toggleNoteOpen(pm.action_id)}>
+                    <CollapsibleTrigger asChild>
+                      <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                        <ChevronDown className={cn("h-3 w-3 transition-transform", noteIsOpen && "rotate-180")} />
+                        {r.note ? 'View note' : 'Add note'}
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <Textarea
+                        value={r.note}
+                        onChange={(e) => handleNoteChange(pm.action_id, e.target.value)}
+                        onBlur={() => handleNoteBlur(pm.action_id)}
+                        placeholder="Add a note…"
+                        className="min-h-[60px] text-sm mt-1.5"
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
               );
             })}

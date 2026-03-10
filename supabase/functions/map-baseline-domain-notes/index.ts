@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { transcript, domains } = await req.json();
+    const { transcript, domains, timeline } = await req.json();
 
     if (!transcript || !domains?.length) {
       return new Response(
@@ -26,32 +26,50 @@ serve(async (req) => {
       throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    // Build domain list for the prompt
-    const domainList = domains
-      .map((d: { domain_id: number; domain_name: string; pro_moves: string[] }) => {
-        const moves = d.pro_moves.length > 0 ? ` (includes: ${d.pro_moves.slice(0, 5).join(", ")}${d.pro_moves.length > 5 ? "..." : ""})` : "";
-        return `- Domain ${d.domain_id}: "${d.domain_name}"${moves}`;
-      })
-      .join("\n");
+    // Build a flat list of pro moves with domain context
+    const proMoveList: string[] = [];
+    const validActionIds = new Set<string>();
 
-    const systemPrompt = `You are a coaching notes assistant for a clinical director performing a baseline assessment of a doctor. Your job is to split an assessment transcript into domain-level coaching notes.
+    for (const d of domains) {
+      for (const pm of (d.pro_moves || [])) {
+        const id = String(pm.action_id);
+        validActionIds.add(id);
+        proMoveList.push(`- Action ${id}: "${pm.action_statement}" (Domain: ${d.domain_name})`);
+      }
+    }
 
-The clinical director recorded verbal feedback while reviewing Pro Moves across multiple domains. You must:
+    // Build timeline context if available
+    let timelineContext = "";
+    if (timeline && timeline.length > 0) {
+      const timelineEntries = timeline
+        .map((t: { action_id: number; t_start_ms: number }, i: number) => {
+          const startSec = Math.round(t.t_start_ms / 1000);
+          const endSec = i < timeline.length - 1 ? Math.round(timeline[i + 1].t_start_ms / 1000) : null;
+          return `- ~${startSec}s${endSec ? `-${endSec}s` : "+"}: Action ${t.action_id}`;
+        })
+        .join("\n");
+      timelineContext = `\n\nThe clinical director was viewing these Pro Moves at these approximate times during the recording:\n${timelineEntries}\n\nUse these timeline hints to help attribute parts of the transcript to the right Pro Move, but rely primarily on content matching. The timeline is approximate.`;
+    }
 
-1. Read the transcript and identify which parts relate to which domain
-2. Write each domain note in a warm, conversational coaching tone:
+    const systemPrompt = `You are a coaching notes assistant for a clinical director performing a baseline assessment of a doctor. Your job is to split an assessment transcript into per-Pro-Move coaching notes.
+
+The clinical director recorded verbal feedback while scrolling through Pro Moves. You must:
+
+1. Read the transcript and identify which parts relate to which Pro Move
+2. Write each note in a warm, conversational coaching tone:
    - Second person ("You showed strong skills in...", "I noticed you...")
    - Sound like a supportive clinical director — professional, encouraging, constructive
    - Fix grammar, remove filler words, false starts
    - Expand shorthand into clear sentences
-   - Keep each domain note to 2-5 sentences
+   - Keep each note to 1-3 sentences
    - Preserve specific observations from the transcript
    - Do NOT fabricate information not in the transcript
-3. If no relevant content exists for a domain, omit it entirely
-4. Each domain should appear at most once in the output
+3. If no relevant content exists for a Pro Move, omit it entirely
+4. Each Pro Move should appear at most once in the output
+5. Maximum 500 characters per note
 
-Available domains:
-${domainList}`;
+Available Pro Moves:
+${proMoveList.join("\n")}${timelineContext}`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -65,31 +83,31 @@ ${domainList}`;
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Here is the clinical director's verbal feedback to split into domain-level notes:\n\n${transcript}`,
+            content: `Here is the clinical director's verbal feedback to split into per-Pro-Move notes:\n\n${transcript}`,
           },
         ],
         tools: [
           {
             type: "function",
             function: {
-              name: "map_domain_notes",
-              description: "Return per-domain coaching notes extracted from the baseline assessment transcript.",
+              name: "map_pro_move_notes",
+              description: "Return per-Pro-Move coaching notes extracted from the baseline assessment transcript.",
               parameters: {
                 type: "object",
                 properties: {
-                  domain_notes: {
+                  pro_move_notes: {
                     type: "object",
-                    description: "Object keyed by domain_id (as string), with note text as value",
+                    description: "Object keyed by action_id (as string), with note text as value",
                     additionalProperties: { type: "string" },
                   },
                 },
-                required: ["domain_notes"],
+                required: ["pro_move_notes"],
                 additionalProperties: false,
               },
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "map_domain_notes" } },
+        tool_choice: { type: "function", function: { name: "map_pro_move_notes" } },
       }),
     });
 
@@ -117,13 +135,13 @@ ${domainList}`;
     // Validate: only keep valid domain IDs
     const validIds = new Set(domains.map((d: { domain_id: number }) => String(d.domain_id)));
     const validNotes: Record<string, string> = {};
-    for (const [key, value] of Object.entries(result.domain_notes || {})) {
-      if (validIds.has(key) && typeof value === "string" && value.trim()) {
-        validNotes[key] = (value as string).slice(0, 1000);
+    for (const [key, value] of Object.entries(result.pro_move_notes || {})) {
+      if (validActionIds.has(key) && typeof value === "string" && value.trim()) {
+        validNotes[key] = (value as string).slice(0, 500);
       }
     }
 
-    return new Response(JSON.stringify({ domain_notes: validNotes }), {
+    return new Response(JSON.stringify({ pro_move_notes: validNotes }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ChevronRight, RotateCcw } from 'lucide-react';
 
 interface FloatingRecorderPillProps {
   recordingTime: number;
@@ -9,7 +10,9 @@ interface FloatingRecorderPillProps {
   isPaused: boolean;
   onPauseToggle: () => void;
   onDoneClick?: () => void;
+  onStartOver?: () => void;
   activeCompetencyLabel?: string;
+  showArrow?: boolean;
 }
 
 export function FloatingRecorderPill({
@@ -18,7 +21,9 @@ export function FloatingRecorderPill({
   isPaused,
   onPauseToggle,
   onDoneClick,
+  onStartOver,
   activeCompetencyLabel,
+  showArrow,
 }: FloatingRecorderPillProps) {
   const isMobile = useIsMobile();
 
@@ -33,10 +38,10 @@ export function FloatingRecorderPill({
   return (
     <div
       className={cn(
-        "fixed z-50 flex flex-col items-center gap-1",
+        "fixed z-50 flex items-center gap-1",
         isMobile 
-          ? "bottom-20 left-1/2 -translate-x-1/2" 
-          : "left-4 top-1/2 -translate-y-1/2"
+          ? "bottom-20 left-1/2 -translate-x-1/2 flex-col" 
+          : "left-4 top-1/2 -translate-y-1/2 flex-row"
       )}
     >
       <div
@@ -78,6 +83,19 @@ export function FloatingRecorderPill({
           )}
         </button>
 
+        {/* Start Over button */}
+        {isPaused && onStartOver && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs px-3 text-muted-foreground"
+            onClick={onStartOver}
+          >
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Start Over
+          </Button>
+        )}
+
         {/* Done? pill - only when paused */}
         {isPaused && (
           <Button
@@ -90,6 +108,16 @@ export function FloatingRecorderPill({
           </Button>
         )}
       </div>
+
+      {/* Right-facing arrow indicator */}
+      {showArrow && !isMobile && (
+        <div className="flex items-center text-primary/60">
+          <ChevronRight className={cn(
+            "h-5 w-5 transition-opacity",
+            isPaused ? "opacity-30" : "opacity-100 animate-pulse"
+          )} />
+        </div>
+      )}
     </div>
   );
 }

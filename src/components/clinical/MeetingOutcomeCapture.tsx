@@ -116,9 +116,9 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
       if (fmtErr) throw fmtErr;
       const formatted = fmtData?.formatted || rawTranscript;
 
-      // Step 2: Extract insights
+      // Step 2: Extract insights (coaching mode for action steps)
       const { data: insData, error: insErr } = await supabase.functions.invoke('extract-insights', {
-        body: { transcript: formatted, source: 'observation' },
+        body: { transcript: formatted, source: 'coaching' },
       });
       if (insErr) throw insErr;
 
@@ -131,19 +131,13 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
         if (plainText) setSummary(plainText);
       }
 
-      // Pre-fill action steps from growth areas
-      const domainInsights = insights?.domain_insights as any[] | undefined;
-      if (domainInsights?.length) {
-        const newExperiments: Experiment[] = [];
-        for (const di of domainInsights) {
-          const growthAreas = di.growth_areas as string[] | undefined;
-          if (growthAreas) {
-            for (const ga of growthAreas.slice(0, 3 - newExperiments.length)) {
-              newExperiments.push({ title: ga, description: '' });
-            }
-          }
-          if (newExperiments.length >= 3) break;
-        }
+      // Pre-fill action steps from AI-extracted commitments
+      const actionSteps = insights?.action_steps as { title: string }[] | undefined;
+      if (actionSteps?.length) {
+        const newExperiments: Experiment[] = actionSteps.slice(0, 3).map(step => ({
+          title: step.title,
+          description: '',
+        }));
         if (newExperiments.length > 0) setExperiments(newExperiments);
       }
 

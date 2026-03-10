@@ -41,12 +41,69 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   );
 }
 
-export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props) {
+export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffId, onBack }: Props) {
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [coachNote, setCoachNote] = useState('');
   const [published, setPublished] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
+  const [realSessionId, setRealSessionId] = useState<string | null>(initialSessionId === 'new' ? null : initialSessionId);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+
+  const sessionId = realSessionId ?? '';
+
+  // Auto-create session when sessionId is 'new'
+  const { data: myStaff } = useStaffProfile();
+  useEffect(() => {
+    if (initialSessionId !== 'new' || realSessionId || isCreatingSession || !myStaff?.id) return;
+    setIsCreatingSession(true);
+    (async () => {
+      try {
+        // Check for existing incomplete sessions first
+        const { data: existing } = await supabase
+          .from('coaching_sessions')
+          .select('id')
+          .eq('doctor_staff_id', doctorStaffId)
+          .eq('coach_staff_id', myStaff.id)
+          .eq('status', 'scheduled')
+          .maybeSingle();
+
+        if (existing?.id) {
+          setRealSessionId(existing.id);
+          return;
+        }
+
+        // Get next sequence number
+        const { data: sessions } = await supabase
+          .from('coaching_sessions')
+          .select('sequence_number')
+          .eq('doctor_staff_id', doctorStaffId)
+          .order('sequence_number', { ascending: false })
+          .limit(1);
+
+        const nextSeq = (sessions?.[0]?.sequence_number ?? 0) + 1;
+        const sessionType = nextSeq === 1 ? 'baseline_review' : 'follow_up';
+
+        const { data: created, error } = await supabase
+          .from('coaching_sessions')
+          .insert({
+            doctor_staff_id: doctorStaffId,
+            coach_staff_id: myStaff.id,
+            session_type: sessionType,
+            sequence_number: nextSeq,
+            status: 'scheduled',
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        setRealSessionId(created.id);
+      } catch (err: any) {
+        toast({ title: 'Error creating session', description: err.message, variant: 'destructive' });
+      } finally {
+        setIsCreatingSession(false);
+      }
+    })();
+  }, [initialSessionId, realSessionId, isCreatingSession, myStaff?.id, doctorStaffId]);
 
   // Fetch session details
   const { data: session } = useQuery({
@@ -60,6 +117,7 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
       if (error) throw error;
       return data;
     },
+    enabled: !!sessionId,
   });
 
   // Fetch doctor's baseline items as the ProMove pool

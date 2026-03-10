@@ -1,0 +1,1 @@
+ALTER TABLE public.coach_baseline_items ADD CONSTRAINT coach_baseline_items_assessment_action_unique UNIQUE (assessment_id, action_id);

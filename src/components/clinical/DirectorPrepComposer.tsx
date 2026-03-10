@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
 import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
 import ReactQuill from 'react-quill';

@@ -217,6 +217,50 @@ function SessionCard({
   const showBuildAgenda = canBuildAgenda(session.status);
   const showInvite = canInvite(session.status);
 
+  // Eager lightweight queries for collapsed summary
+  const { data: selectionCount } = useQuery({
+    queryKey: ['session-selection-count', session.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('coaching_session_selections')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', session.id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: ['director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted'].includes(session.status),
+  });
+
+  const { data: meetingSummary } = useQuery({
+    queryKey: ['meeting-summary', session.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('coaching_meeting_records')
+        .select('experiments, doctor_revision_note')
+        .eq('session_id', session.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: ['meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(session.status),
+  });
+
+  const experimentCount = ((meetingSummary?.experiments as any[] | null) || []).length;
+
+  // Build subtitle
+  let subtitle: string | null = null;
+  if (session.status === 'director_prep_ready' && selectionCount != null) {
+    subtitle = `${selectionCount} focus area${selectionCount !== 1 ? 's' : ''} selected`;
+  } else if (session.status === 'scheduling_invite_sent' && selectionCount != null) {
+    subtitle = `${selectionCount} focus area${selectionCount !== 1 ? 's' : ''} · Awaiting doctor's response`;
+  } else if (session.status === 'doctor_prep_submitted' && selectionCount != null) {
+    subtitle = `Doctor submitted prep · ${selectionCount} focus area${selectionCount !== 1 ? 's' : ''}`;
+  } else if ((session.status === 'meeting_pending' || session.status === 'doctor_confirmed') && meetingSummary) {
+    subtitle = experimentCount > 0 ? `${experimentCount} action step${experimentCount !== 1 ? 's' : ''}` : null;
+  } else if (session.status === 'doctor_revision_requested') {
+    subtitle = 'Doctor left a note';
+  }
+
   const { data: sessionFull } = useQuery({
     queryKey: ['coaching-session', session.id],
     queryFn: async () => {

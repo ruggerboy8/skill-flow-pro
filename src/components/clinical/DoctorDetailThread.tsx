@@ -318,13 +318,17 @@ function SessionCard({
 
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-4">
-            {sessionFull && selections && selections.length > 0 && (
+            {sessionFull && selections && selections.length > 0 ? (
               <CombinedPrepView
                 session={sessionFull}
                 selections={selections as any}
                 coachName={coachName}
                 doctorName={doctorName}
               />
+            ) : (
+              !meetingRecord && (
+                <p className="text-sm text-muted-foreground italic py-2">No prep details yet for this session.</p>
+              )
             )}
 
             {meetingRecord && (

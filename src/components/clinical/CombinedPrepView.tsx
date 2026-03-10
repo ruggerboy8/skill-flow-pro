@@ -64,18 +64,8 @@ export function CombinedPrepView({ session, selections, coachName = 'Your Coach'
 
   return (
     <div className="space-y-6 pt-4">
-      {/* Meeting Link */}
-      {session.meeting_link && (
-        <a
-          href={session.meeting_link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-sm text-primary underline"
-        >
-          <LinkIcon className="h-4 w-4" />
-          Join Meeting
-        </a>
-      )}
+
+
 
       {/* Your Agenda */}
       {session.coach_note && (

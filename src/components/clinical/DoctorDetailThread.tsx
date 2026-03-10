@@ -217,7 +217,7 @@ function SessionCard({
   const showBuildAgenda = canBuildAgenda(session.status);
   const showInvite = canInvite(session.status);
 
-  // Eager lightweight query for collapsed summary
+  const { data: meetingSummary } = useQuery({
     queryKey: ['meeting-summary', session.id],
     queryFn: async () => {
       const { data, error } = await supabase

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useLocationExcuses } from '@/hooks/useLocationExcuses';
-import { CT_TZ } from '@/lib/centralTime';
+import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,8 @@ export function ExcuseSubmissionsDialog({
   initialWeekOf,
 }: ExcuseSubmissionsDialogProps) {
   const { managedOrgIds, isSuperAdmin } = useUserRole();
-  
+  const tz = useLocationTimezone();
+
   // State
   const [weekMonday, setWeekMonday] = useState(() => new Date(initialWeekOf + 'T00:00:00'));
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
@@ -45,7 +46,7 @@ export function ExcuseSubmissionsDialog({
   
   // Computed week string
   const weekOf = useMemo(() => 
-    formatInTimeZone(weekMonday, CT_TZ, 'yyyy-MM-dd'), 
+    formatInTimeZone(weekMonday, tz, 'yyyy-MM-dd'), 
     [weekMonday]
   );
   
@@ -174,7 +175,7 @@ export function ExcuseSubmissionsDialog({
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <div className="flex-1 text-center font-medium">
-                Week of {formatInTimeZone(weekMonday, CT_TZ, 'MMM d, yyyy')}
+                Week of {formatInTimeZone(weekMonday, tz, 'MMM d, yyyy')}
               </div>
               <Button variant="outline" size="icon" onClick={goToNextWeek}>
                 <ChevronRight className="h-4 w-4" />

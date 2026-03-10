@@ -11,11 +11,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertCircle, TrendingUp, CloudOff } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { StaffWeekSummary } from '@/types/coachV2';
-import { getWeekAnchors, nowUtc, CT_TZ } from '@/lib/centralTime';
+import { getWeekAnchors, nowUtc } from '@/lib/centralTime';
+import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { getSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
 
 export default function RegionalDashboard() {
   const { managedLocationIds, managedOrgIds, isSuperAdmin } = useUserRole();
+  const tz = useLocationTimezone();
   const [now, setNow] = useState(nowUtc());
   const [excuseDialogOpen, setExcuseDialogOpen] = useState(false);
 
@@ -25,9 +27,9 @@ export default function RegionalDashboard() {
     return () => clearInterval(interval);
   }, []);
   
-  // Use Central Time anchors for the correct "Week Of" date
-  const anchors = useMemo(() => getWeekAnchors(now), [now]);
-  const weekOf = formatInTimeZone(anchors.mondayZ, CT_TZ, 'yyyy-MM-dd');
+  // Use the current user's location timezone for the correct "Week Of" date
+  const anchors = useMemo(() => getWeekAnchors(now, tz), [now, tz]);
+  const weekOf = formatInTimeZone(anchors.mondayZ, tz, 'yyyy-MM-dd');
   
   // Submission gates for contextual badge display
   const submissionGates = useMemo(() => {
@@ -168,7 +170,7 @@ export default function RegionalDashboard() {
           <div>
             <h1 className="text-2xl font-bold">Regional Command Center</h1>
             <p className="text-muted-foreground text-sm">
-              Week of {formatInTimeZone(anchors.mondayZ, CT_TZ, 'MMM d, yyyy')}
+              Week of {formatInTimeZone(anchors.mondayZ, tz, 'MMM d, yyyy')}
             </p>
           </div>
           <div className="flex items-center gap-2">

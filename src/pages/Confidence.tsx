@@ -64,9 +64,9 @@ const hasConfidence = weeklyFocus.length > 0 && submittedCount >= weeklyFocus.le
     if (!loading && weeklyFocus.length > 0 && afterTueNoon && !hasConfidence) {
       toast({
         title: 'Confidence window closed',
-        description: `You’ll get a fresh start on Mon, ${nextMondayStr(now)}.`
+        description: `You’ll get a fresh start on Mon, ${nextMondayStr(now, staffTz)}.`
       });
-      navigate('/');
+      navigate(‘/’);
     }
   }, [loading, weeklyFocus, afterTueNoon, hasConfidence, navigate]);
 
@@ -166,7 +166,7 @@ setSubmitting(true);
       if (submitPolicy.isConfidenceLate(now) && !hasConfidence) {
         toast({
           title: "Confidence window closed",
-          description: `You'll get a fresh start on Mon, ${nextMondayStr(now)}.`
+          description: `You'll get a fresh start on Mon, ${nextMondayStr(now, staffTz)}.`
         });
         setSubmitting(false);
         navigate('/');
@@ -275,7 +275,7 @@ setSubmitting(true);
               <CardHeader>
                 <CardTitle className="text-center">Confidence window closed</CardTitle>
                 <CardDescription className="text-center">
-                  You’ll get a fresh start on Mon, {nextMondayStr(now)}.
+                  You’ll get a fresh start on Mon, {nextMondayStr(now, staffTz)}.
                 </CardDescription>
               </CardHeader>
             </Card>

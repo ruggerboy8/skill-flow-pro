@@ -11,7 +11,8 @@ import { LocationHealthCard, LocationStats } from '@/components/dashboard/Locati
 import { LocationSkillGaps } from '@/components/dashboard/LocationSkillGaps';
 import LocationSubmissionWidget from '@/components/dashboard/LocationSubmissionWidget';
 import CoachDashboardV2 from '@/pages/coach/CoachDashboardV2';
-import { getWeekAnchors, nowUtc, CT_TZ } from '@/lib/centralTime';
+import { getWeekAnchors, nowUtc } from '@/lib/centralTime';
+import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { getSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
 
 interface LocationDetailProps {
@@ -26,6 +27,7 @@ export default function LocationDetail({
   const { locationId: routeLocationId } = useParams<{ locationId: string }>();
   const locationId = overrideLocationId || routeLocationId;
   const navigate = useNavigate();
+  const tz = useLocationTimezone();
   const [now, setNow] = useState(nowUtc());
 
   // Keep time updated
@@ -34,8 +36,8 @@ export default function LocationDetail({
     return () => clearInterval(interval);
   }, []);
 
-  const anchors = useMemo(() => getWeekAnchors(now), [now]);
-  const weekOf = formatInTimeZone(anchors.mondayZ, CT_TZ, 'yyyy-MM-dd');
+  const anchors = useMemo(() => getWeekAnchors(now, tz), [now, tz]);
+  const weekOf = formatInTimeZone(anchors.mondayZ, tz, 'yyyy-MM-dd');
   
   const { summaries, loading, error } = useStaffWeeklyScores({ weekOf });
   
@@ -138,7 +140,7 @@ export default function LocationDetail({
             <p className="text-lg text-muted-foreground">{locationName}</p>
           )}
           <p className="text-muted-foreground text-sm mt-1">
-            Performance Insights • Week of {formatInTimeZone(anchors.mondayZ, CT_TZ, 'MMM d, yyyy')}
+            Performance Insights • Week of {formatInTimeZone(anchors.mondayZ, tz, 'MMM d, yyyy')}
           </p>
         </div>
 

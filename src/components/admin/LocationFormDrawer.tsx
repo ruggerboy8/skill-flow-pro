@@ -58,6 +58,7 @@ const TIMEZONE_OPTIONS = [
   { value: "America/Phoenix", label: "Arizona Time (MST)" },
   { value: "America/Anchorage", label: "Alaska Time (AKT)" },
   { value: "Pacific/Honolulu", label: "Hawaii Time (HST)" },
+  { value: "Europe/London", label: "London (GMT/BST)" },
 ];
 
 export function LocationFormDrawer({ open, onClose, onSuccess, location, organizations }: LocationFormDrawerProps) {

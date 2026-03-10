@@ -12,6 +12,7 @@ import { DoctorDetailOverview } from '@/components/clinical/DoctorDetailOverview
 import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
 import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
+import { DoctorGrowthTimeline } from '@/components/clinical/DoctorGrowthTimeline';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';

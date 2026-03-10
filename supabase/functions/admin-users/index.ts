@@ -962,17 +962,68 @@ serve(async (req: Request) => {
 
         if (fetchErr) throw fetchErr;
 
-        // Delete staff record first (cascades will handle related records with FK constraints)
         if (staffToDelete) {
-          // Delete coach_scopes
-          await admin.from("coach_scopes").delete().eq("staff_id", staffToDelete.id);
-          
-          // Delete the staff record
+          const sid = staffToDelete.id;
+
+          // 1) Delete coaching_meeting_records & coaching_session_selections via sessions
+          const { data: sessions } = await admin
+            .from("coaching_sessions")
+            .select("id")
+            .or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+          const sessionIds = (sessions ?? []).map((s: any) => s.id);
+          if (sessionIds.length > 0) {
+            await admin.from("coaching_meeting_records").delete().in("session_id", sessionIds);
+            await admin.from("coaching_session_selections").delete().in("session_id", sessionIds);
+          }
+          // Delete coaching_sessions themselves
+          await admin.from("coaching_sessions").delete().or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+
+          // 2) Delete coach_baseline_items via coach_baseline_assessments
+          const { data: coachBaselines } = await admin
+            .from("coach_baseline_assessments")
+            .select("id")
+            .or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+          const cbIds = (coachBaselines ?? []).map((b: any) => b.id);
+          if (cbIds.length > 0) {
+            await admin.from("coach_baseline_items").delete().in("assessment_id", cbIds);
+          }
+          await admin.from("coach_baseline_assessments").delete().or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+
+          // 3) Delete doctor_baseline_items via doctor_baseline_assessments
+          const { data: docBaselines } = await admin
+            .from("doctor_baseline_assessments")
+            .select("id")
+            .eq("doctor_staff_id", sid);
+          const dbIds = (docBaselines ?? []).map((b: any) => b.id);
+          if (dbIds.length > 0) {
+            await admin.from("doctor_baseline_items").delete().in("assessment_id", dbIds);
+          }
+          await admin.from("doctor_baseline_assessments").delete().eq("doctor_staff_id", sid);
+
+          // 4) Delete evaluation_items via evaluations, then evaluations
+          const { data: evals } = await admin
+            .from("evaluations")
+            .select("id")
+            .or(`staff_id.eq.${sid},evaluator_id.eq.${sid}`);
+          const evalIds = (evals ?? []).map((e: any) => e.id);
+          if (evalIds.length > 0) {
+            await admin.from("evaluation_items").delete().in("evaluation_id", evalIds);
+          }
+          await admin.from("evaluations").delete().or(`staff_id.eq.${sid},evaluator_id.eq.${sid}`);
+
+          // 5) Other direct FK references
+          await admin.from("coach_scopes").delete().eq("staff_id", sid);
+          await admin.from("manager_priorities").delete().eq("coach_staff_id", sid);
+          await admin.from("excused_submissions").delete().eq("staff_id", sid);
+          await admin.from("admin_audit").delete().or(`staff_id.eq.${sid},changed_by.eq.${sid}`);
+          await admin.from("resource_events").delete().eq("staff_id", sid);
+
+          // 6) Finally delete the staff record
           const { error: delStaffErr } = await admin
             .from("staff")
             .delete()
-            .eq("id", staffToDelete.id);
-          if (delStaffErr) throw delStaffErr;
+            .eq("id", sid);
+          if (delStaffErr) throw new Error(`Failed to delete staff: ${delStaffErr.message}`);
         }
 
         // Delete the auth user

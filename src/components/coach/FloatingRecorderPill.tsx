@@ -13,6 +13,8 @@ interface FloatingRecorderPillProps {
   onStartOver?: () => void;
   activeCompetencyLabel?: string;
   showArrow?: boolean;
+  /** Always show Start Over, not just when paused */
+  alwaysShowStartOver?: boolean;
 }
 
 export function FloatingRecorderPill({
@@ -24,6 +26,7 @@ export function FloatingRecorderPill({
   onStartOver,
   activeCompetencyLabel,
   showArrow,
+  alwaysShowStartOver,
 }: FloatingRecorderPillProps) {
   const isMobile = useIsMobile();
 
@@ -84,7 +87,7 @@ export function FloatingRecorderPill({
         </button>
 
         {/* Start Over button */}
-        {isPaused && onStartOver && (
+        {(isPaused || alwaysShowStartOver) && onStartOver && (
           <Button
             variant="ghost"
             size="sm"
@@ -96,8 +99,8 @@ export function FloatingRecorderPill({
           </Button>
         )}
 
-        {/* Done? pill - only when paused */}
-        {isPaused && (
+        {/* Done? pill - only when paused and no alwaysShowStartOver (bottom bar handles it) */}
+        {isPaused && !alwaysShowStartOver && (
           <Button
             variant="destructive"
             size="sm"

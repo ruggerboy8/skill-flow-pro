@@ -44,20 +44,19 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const proMoveTimeline = useRef<{ action_id: number; t_start_ms: number }[]>([]);
 
   const proMoveRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const recorderCardRef = useRef<HTMLDivElement>(null);
-  const [showFloatingPill, setShowFloatingPill] = useState(false);
+  
 
   const { state: recState, controls: recControls } = useAudioRecording();
 
+
   // IntersectionObserver for pro-move tracking during recording
+  // Use a narrow rootMargin band around the vertical center of the viewport
   useEffect(() => {
-    if (!recState.isRecording) {
-      setActiveActionId(null);
-      return;
-    }
+    if (!recState.isRecording) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
+        // Find the entry most centered in the viewport strip
         let bestEntry: IntersectionObserverEntry | null = null;
         let bestRatio = 0;
         entries.forEach(entry => {
@@ -81,24 +80,14 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           }
         }
       },
-      { threshold: [0.1, 0.3, 0.5, 0.7, 0.9] }
+      {
+        // Only consider elements that cross the center 20% band of the viewport
+        rootMargin: '-40% 0px -40% 0px',
+        threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+      }
     );
 
     proMoveRefs.current.forEach(el => observer.observe(el));
-    return () => observer.disconnect();
-  }, [recState.isRecording]);
-
-  // Floating pill visibility
-  useEffect(() => {
-    if (!recorderCardRef.current || !recState.isRecording) {
-      setShowFloatingPill(false);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => setShowFloatingPill(!entry.isIntersecting),
-      { threshold: 0.9 }
-    );
-    observer.observe(recorderCardRef.current);
     return () => observer.disconnect();
   }, [recState.isRecording]);
 
@@ -178,6 +167,21 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       return Array.from(domainMap.values());
     },
   });
+
+  // Get flat list of all action_ids for "first pro move" logic
+  const allActionIds = domains?.flatMap(d => d.proMoves.map(pm => pm.action_id)) ?? [];
+
+  // When recording starts, immediately highlight the first pro move
+  useEffect(() => {
+    if (recState.isRecording && activeActionId === null && allActionIds.length > 0) {
+      const firstId = allActionIds[0];
+      setActiveActionId(firstId);
+      proMoveTimeline.current.push({ action_id: firstId, t_start_ms: 0 });
+    }
+    if (!recState.isRecording) {
+      setActiveActionId(null);
+    }
+  }, [recState.isRecording]);
 
   useEffect(() => {
     if (existingAssessment?.id) {
@@ -422,15 +426,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         <Progress value={progressPct} className="h-2" />
       </div>
 
-      {/* Recording controls */}
-      <Card ref={recorderCardRef}>
-        <CardContent className="py-4">
-          {isProcessingAudio ? (
-            <div className="flex items-center gap-3 justify-center py-2">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Processing recording into Pro Move notes…</span>
-            </div>
-          ) : !recState.isRecording ? (
+      {/* Recording controls — only shows Start button when not recording */}
+      {!recState.isRecording && !isProcessingAudio && (
+        <Card>
+          <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Record Verbal Feedback</p>
@@ -450,48 +449,32 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                 Start Recording
               </Button>
             </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className={cn("w-3 h-3 rounded-full", recState.isPaused ? "bg-amber-500" : "bg-destructive animate-pulse")} />
-                <span className="text-sm font-mono tabular-nums">
-                  {Math.floor(recState.recordingTime / 60)}:{(recState.recordingTime % 60).toString().padStart(2, '0')}
-                </span>
-                {activeActionId && domains && (
-                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                    {getActiveLabel()}
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={handleStartOver} className="gap-1.5 text-muted-foreground">
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Start Over
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => recControls.togglePause()}>
-                  {recState.isPaused ? 'Resume' : 'Pause'}
-                </Button>
-                <Button variant="destructive" size="sm" onClick={handleFinishRecording} className="gap-1.5">
-                  <MicOff className="h-3.5 w-3.5" />
-                  Finish & Map Notes
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Floating pill */}
-      {showFloatingPill && (
+      {isProcessingAudio && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3 justify-center py-2">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Processing recording into Pro Move notes…</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Floating pill — always visible on left when recording */}
+      {recState.isRecording && (
         <FloatingRecorderPill
           recordingTime={recState.recordingTime}
           isRecording={recState.isRecording}
           isPaused={recState.isPaused}
           onPauseToggle={recControls.togglePause}
-          onDoneClick={handleFinishRecording}
           onStartOver={handleStartOver}
           activeCompetencyLabel={getActiveLabel()}
           showArrow
+          alwaysShowStartOver
         />
       )}
 
@@ -584,16 +567,29 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         </div>
       ))}
 
-      {/* Complete button */}
-      <div className="sticky bottom-4 flex justify-end">
-        <Button
-          onClick={() => completeMutation.mutate()}
-          disabled={!allRated || completeMutation.isPending}
-          size="lg"
-          className="shadow-lg"
-        >
-          {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
-        </Button>
+      {/* Sticky bottom bar — Complete or Finish Recording */}
+      <div className="sticky bottom-4 flex justify-end gap-3">
+        {recState.isRecording && (
+          <Button
+            variant="destructive"
+            size="lg"
+            onClick={handleFinishRecording}
+            className="shadow-lg gap-2"
+          >
+            <MicOff className="h-4 w-4" />
+            Finish & Map Notes
+          </Button>
+        )}
+        {!recState.isRecording && (
+          <Button
+            onClick={() => completeMutation.mutate()}
+            disabled={!allRated || completeMutation.isPending}
+            size="lg"
+            className="shadow-lg"
+          >
+            {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
+          </Button>
+        )}
       </div>
     </div>
   );

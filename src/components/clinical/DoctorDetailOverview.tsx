@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarPlus, FileText, Video, Send } from 'lucide-react';
+import { FileText, Video, Send, CalendarPlus, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
-import { MeetingScheduleDialog } from '@/components/clinical/MeetingScheduleDialog';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -12,13 +11,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 interface Session {
   id: string;
   session_type: string;
   sequence_number: number;
   status: string;
-  scheduled_at: string;
+  scheduled_at: string | null;
   meeting_link?: string | null;
 }
 
@@ -33,9 +35,10 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   const { data: myStaff } = useStaffProfile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [prepSessionId, setPrepSessionId] = useState<string | null>(null);
   const [showPrepSheet, setShowPrepSheet] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [schedulingLink, setSchedulingLink] = useState('');
 
   const releaseMutation = useMutation({
     mutationFn: async () => {
@@ -54,14 +57,39 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
-  const upcomingSession = sessions
-    .filter(s => ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(s.status))
-    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())[0];
+  // Invite to schedule mutation
+  const inviteMutation = useMutation({
+    mutationFn: async ({ sessionId, link }: { sessionId?: string; link?: string }) => {
+      const { data, error } = await supabase.functions.invoke('invite-to-schedule', {
+        body: {
+          doctor_staff_id: doctor.id,
+          session_id: sessionId || null,
+          scheduling_link: link || null,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
+      toast({
+        title: 'Scheduling invite sent',
+        description: data.email_sent
+          ? `An email has been sent to ${doctor.name}.`
+          : `Session created. Email could not be sent — share the link manually.`,
+      });
+      setShowInviteDialog(false);
+    },
+    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
 
+  // Find session with prep ready (director has completed prep but hasn't invited yet)
+  const prepReadySession = sessions.find(s => s.status === 'director_prep_ready');
+  // Find session that needs prep built (just "scheduled" — legacy, or no session yet)
   const needsPrepSession = sessions.find(s => s.status === 'scheduled');
-  const viewablePrepSession = sessions.find(s => ['director_prep_ready', 'doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(s.status));
-
-  const isDoctorPrepSubmitted = viewablePrepSession && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(viewablePrepSession.status);
+  const viewablePrepSession = sessions.find(s => ['director_prep_ready', 'scheduling_invite_sent', 'doctor_confirmed', 'meeting_pending'].includes(s.status));
 
   const { data: prepSelections } = useQuery({
     queryKey: ['session-selections-all', viewablePrepSession?.id],
@@ -119,14 +147,18 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     );
   }
 
-  const hasActiveSession = sessions.some(s => 
-    ['scheduled', 'director_prep_ready', 'doctor_prep_submitted', 'meeting_pending', 'doctor_revision_requested'].includes(s.status)
+  const hasActiveSession = sessions.some(s =>
+    ['scheduled', 'director_prep_ready', 'scheduling_invite_sent', 'meeting_pending', 'doctor_revision_requested'].includes(s.status)
   );
-  const canSchedule = baseline?.status === 'completed' && !hasActiveSession;
+  const canBuildPrep = baseline?.status === 'completed' && !hasActiveSession;
   const hasConfirmedSession = sessions.some(s => s.status === 'doctor_confirmed');
-  const scheduleLabel = hasConfirmedSession ? 'Schedule Follow-up' : 'Schedule Baseline Review';
-
   const isNotReleased = journeyStatus.stage === 'invited';
+
+  // Load the coach's saved scheduling link for the invite dialog
+  const handleOpenInviteDialog = () => {
+    setSchedulingLink((myStaff as any)?.scheduling_link || '');
+    setShowInviteDialog(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -152,21 +184,25 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </Card>
       )}
 
-      {/* Schedule Button */}
-      {canSchedule && (
+      {/* Build Prep — both baselines complete, no active session */}
+      {canBuildPrep && (
         <Card className="border-dashed">
           <CardContent className="flex items-center justify-between py-4">
             <div>
-              <p className="text-sm font-medium">Ready to schedule</p>
+              <p className="text-sm font-medium">Ready to prep</p>
               <p className="text-xs text-muted-foreground">
                 {hasConfirmedSession
-                  ? 'Schedule the next follow-up check-in.'
-                  : 'The baseline is complete. Schedule the review meeting.'}
+                  ? 'Build the agenda for the next follow-up check-in.'
+                  : 'Both baselines are complete. Build your meeting agenda before inviting to schedule.'}
               </p>
             </div>
-            <Button onClick={() => setScheduleOpen(true)} className="gap-2">
-              <CalendarPlus className="h-4 w-4" />
-              {scheduleLabel}
+            <Button onClick={() => {
+              // Create a session in "scheduled" status for prep, then open composer
+              // We'll handle this by going into prep mode directly
+              setPrepSessionId('new');
+            }} className="gap-2">
+              <FileText className="h-4 w-4" />
+              Build Meeting Agenda
             </Button>
           </CardContent>
         </Card>
@@ -177,9 +213,9 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         <Card className="border-primary/30">
           <CardContent className="flex items-center justify-between py-4">
             <div>
-              <p className="text-sm font-medium">Meeting scheduled</p>
+              <p className="text-sm font-medium">Continue building agenda</p>
               <p className="text-xs text-muted-foreground">
-                {format(new Date(needsPrepSession.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')} — Build your agenda.
+                Finish your meeting prep so you can invite the doctor to schedule.
               </p>
             </div>
             <Button onClick={() => setPrepSessionId(needsPrepSession.id)}>
@@ -189,52 +225,57 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </Card>
       )}
 
-      {/* Upcoming Meeting with quick actions */}
-      {upcomingSession && upcomingSession.status !== 'scheduled' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Upcoming Meeting</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm">
-              <span className="font-medium">
-                {upcomingSession.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${upcomingSession.sequence_number - 1}`}
-              </span>
-              {' — '}
-              {format(new Date(upcomingSession.scheduled_at), 'EEEE, MMMM d, yyyy \'at\' h:mm a')}
-            </p>
-            <div className="flex gap-2">
-              {viewablePrepSession && !isDoctorPrepSubmitted && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setPrepSessionId(viewablePrepSession.id)}
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  View / Edit Prep
-                </Button>
-              )}
-              {viewablePrepSession && isDoctorPrepSubmitted && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setShowPrepSheet(true)}
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  View Prep Summary
-                </Button>
-              )}
-              {upcomingSession.meeting_link && (
-                <a href={upcomingSession.meeting_link} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <Video className="h-3.5 w-3.5" />
-                    Join Meeting
-                  </Button>
-                </a>
-              )}
+      {/* Invite to Schedule — prep is done, ready to send invite */}
+      {prepReadySession && (
+        <Card className="border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/30">
+          <CardContent className="flex items-center justify-between py-4">
+            <div>
+              <p className="text-sm font-medium">Prep complete — invite to schedule</p>
+              <p className="text-xs text-muted-foreground">
+                Send {doctor.name} a link to schedule their {prepReadySession.session_type === 'baseline_review' ? 'baseline review' : 'follow-up'} meeting.
+              </p>
             </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPrepSessionId(prepReadySession.id)}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                Edit Prep
+              </Button>
+              <Button
+                onClick={handleOpenInviteDialog}
+                className="gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                Invite to Schedule
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending Scheduling — invite sent */}
+      {sessions.find(s => s.status === 'scheduling_invite_sent') && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30">
+          <CardContent className="flex items-center justify-between py-4">
+            <div>
+              <p className="text-sm font-medium">Pending scheduling</p>
+              <p className="text-xs text-muted-foreground">
+                Waiting for {doctor.name} to schedule via the link you sent.
+              </p>
+            </div>
+            {viewablePrepSession && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPrepSheet(true)}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                View Prep
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -244,11 +285,6 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Meeting Prep Summary</SheetTitle>
-            {viewableSessionFull && (
-              <p className="text-sm text-muted-foreground">
-                {format(new Date(viewableSessionFull.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
-              </p>
-            )}
           </SheetHeader>
           {viewableSessionFull && prepSelections && (
             <CombinedPrepView
@@ -261,15 +297,46 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </SheetContent>
       </Sheet>
 
-      {myStaff && (
-        <MeetingScheduleDialog
-          open={scheduleOpen}
-          onOpenChange={setScheduleOpen}
-          doctorStaffId={doctor.id}
-          coachStaffId={myStaff.id}
-          onCreated={(id) => setPrepSessionId(id)}
-        />
-      )}
+      {/* Invite to Schedule Dialog */}
+      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Scheduling Invite</DialogTitle>
+            <DialogDescription>
+              {doctor.name} will receive an email with instructions to schedule using the link below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="scheduling-link">Calendly / Scheduling Link (optional)</Label>
+              <Input
+                id="scheduling-link"
+                type="url"
+                placeholder="https://calendly.com/..."
+                value={schedulingLink}
+                onChange={(e) => setSchedulingLink(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                If no link is provided, the email will ask the doctor to reach out to coordinate a time.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInviteDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => inviteMutation.mutate({
+                sessionId: prepReadySession?.id,
+                link: schedulingLink || undefined,
+              })}
+              disabled={inviteMutation.isPending}
+              className="gap-2"
+            >
+              <Mail className="h-4 w-4" />
+              {inviteMutation.isPending ? 'Sending…' : 'Send Invite'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

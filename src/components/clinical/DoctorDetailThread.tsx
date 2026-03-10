@@ -5,9 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock } from 'lucide-react';
 import { MeetingOutcomeCapture } from '@/components/clinical/MeetingOutcomeCapture';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 
@@ -16,13 +15,13 @@ interface Session {
   session_type: string;
   sequence_number: number;
   status: string;
-  scheduled_at: string;
+  scheduled_at: string | null;
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   scheduled: { label: 'Scheduled', className: 'bg-blue-100 text-blue-800' },
   director_prep_ready: { label: 'Prep Sent', className: 'bg-amber-100 text-amber-800' },
-  doctor_prep_submitted: { label: 'Prep Complete', className: 'bg-emerald-100 text-emerald-800' },
+  scheduling_invite_sent: { label: 'Pending Scheduling', className: 'bg-blue-100 text-blue-800' },
   meeting_pending: { label: 'Awaiting Confirmation', className: 'bg-purple-100 text-purple-800' },
   doctor_confirmed: { label: 'Confirmed', className: 'bg-green-100 text-green-800' },
   doctor_revision_requested: { label: 'Revision Requested', className: 'bg-red-100 text-red-800' },
@@ -54,7 +53,7 @@ export function DoctorDetailThread({ sessions, coachName = 'Alex', doctorName = 
           <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
           <p className="text-muted-foreground">No coaching sessions yet.</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Schedule a baseline review from the Overview tab to begin the coaching thread.
+            Complete your prep from the Overview tab to begin the coaching thread.
           </p>
         </CardContent>
       </Card>
@@ -62,8 +61,10 @@ export function DoctorDetailThread({ sessions, coachName = 'Alex', doctorName = 
   }
 
   const sorted = [...sessions].sort((a, b) => a.sequence_number - b.sequence_number);
-  const canCapture = (status: string) => ['doctor_prep_submitted', 'doctor_revision_requested'].includes(status);
-  const isExpandable = (status: string) => ['director_prep_ready', 'doctor_prep_submitted', 'meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(status);
+  // Start Meeting is now available for scheduling_invite_sent (director is ready to meet)
+  // and doctor_revision_requested
+  const canCapture = (status: string) => ['scheduling_invite_sent', 'doctor_revision_requested'].includes(status);
+  const isExpandable = (status: string) => ['director_prep_ready', 'scheduling_invite_sent', 'meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(status);
 
   return (
     <div className="space-y-3">
@@ -108,7 +109,6 @@ function SessionCard({
     ? 'Baseline Review'
     : `Follow-up ${session.sequence_number - 1}`;
 
-  // Fetch full session + selections + meeting record when expanded
   const { data: sessionFull } = useQuery({
     queryKey: ['coaching-session', session.id],
     queryFn: async () => {
@@ -160,7 +160,15 @@ function SessionCard({
               <div>
                 <CardTitle className="text-base">{typeLabel}</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {formatInTimeZone(new Date(session.scheduled_at), Intl.DateTimeFormat().resolvedOptions().timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a zzz")}
+                  {session.scheduled_at
+                    ? formatInTimeZone(new Date(session.scheduled_at), Intl.DateTimeFormat().resolvedOptions().timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a zzz")
+                    : (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        Pending scheduling
+                      </span>
+                    )
+                  }
                 </p>
               </div>
             </div>
@@ -185,7 +193,6 @@ function SessionCard({
 
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-4">
-            {/* Prep View */}
             {sessionFull && selections && selections.length > 0 && (
               <CombinedPrepView
                 session={sessionFull}
@@ -195,7 +202,6 @@ function SessionCard({
               />
             )}
 
-            {/* Meeting Record */}
             {meetingRecord && (
               <div className="space-y-3 pt-2">
                 <h4 className="text-sm font-semibold flex items-center gap-2">

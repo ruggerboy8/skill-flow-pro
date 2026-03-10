@@ -56,3 +56,9 @@ verify_jwt = true
 
 [functions.format-agenda]
 verify_jwt = true
+
+[functions.invite-to-schedule]
+verify_jwt = true
+
+[functions.map-baseline-domain-notes]
+verify_jwt = true

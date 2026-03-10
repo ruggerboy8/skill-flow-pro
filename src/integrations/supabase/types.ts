@@ -175,7 +175,9 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           doctor_staff_id: string
+          domain_notes: Json | null
           id: string
+          recording_transcript: string | null
           started_at: string | null
           status: string | null
           updated_at: string | null
@@ -185,7 +187,9 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           doctor_staff_id: string
+          domain_notes?: Json | null
           id?: string
+          recording_transcript?: string | null
           started_at?: string | null
           status?: string | null
           updated_at?: string | null
@@ -195,7 +199,9 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           doctor_staff_id?: string
+          domain_notes?: Json | null
           id?: string
+          recording_transcript?: string | null
           started_at?: string | null
           status?: string | null
           updated_at?: string | null
@@ -400,7 +406,7 @@ export type Database = {
           doctor_staff_id: string
           id: string
           meeting_link: string | null
-          scheduled_at: string
+          scheduled_at: string | null
           sequence_number: number
           session_type: string
           status: string
@@ -414,7 +420,7 @@ export type Database = {
           doctor_staff_id: string
           id?: string
           meeting_link?: string | null
-          scheduled_at: string
+          scheduled_at?: string | null
           sequence_number?: number
           session_type?: string
           status?: string
@@ -428,7 +434,7 @@ export type Database = {
           doctor_staff_id?: string
           id?: string
           meeting_link?: string | null
-          scheduled_at?: string
+          scheduled_at?: string | null
           sequence_number?: number
           session_type?: string
           status?: string
@@ -1748,6 +1754,7 @@ export type Database = {
           primary_location_id: string | null
           role_id: number | null
           roles_updated_at: string | null
+          scheduling_link: string | null
           updated_at: string | null
           user_id: string
         }
@@ -1780,6 +1787,7 @@ export type Database = {
           primary_location_id?: string | null
           role_id?: number | null
           roles_updated_at?: string | null
+          scheduling_link?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -1812,6 +1820,7 @@ export type Database = {
           primary_location_id?: string | null
           role_id?: number | null
           roles_updated_at?: string | null
+          scheduling_link?: string | null
           updated_at?: string | null
           user_id?: string
         }

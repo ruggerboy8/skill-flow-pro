@@ -6,9 +6,10 @@ export type DoctorJourneyStage =
   | 'baseline_in_progress'
   | 'baseline_submitted'
   | 'director_baseline_pending'
-  | 'baseline_review_scheduled'
-  | 'waiting_for_doctor_prep'
+  | 'ready_for_prep'
   | 'prep_complete'
+  | 'scheduling_invite_sent'
+  | 'meeting_ready'
   | 'meeting_pending'
   | 'doctor_confirmed'
   | 'followup_scheduled'
@@ -37,7 +38,7 @@ interface SessionInfo {
   session_type: string;
   sequence_number: number;
   status: string;
-  scheduled_at: string;
+  scheduled_at: string | null;
 }
 
 export function getDoctorJourneyStatus(
@@ -56,30 +57,29 @@ export function getDoctorJourneyStatus(
     const prefix = isFollowup ? 'Follow-up' : 'Baseline review';
 
     switch (latest.status) {
+      case 'scheduling_invite_sent':
+        return {
+          stage: 'scheduling_invite_sent',
+          label: 'Pending Scheduling',
+          variant: 'outline',
+          colorClass: 'bg-blue-100 text-blue-800',
+          nextAction: 'Waiting for doctor to schedule via Calendly link',
+        };
       case 'scheduled':
         return {
-          stage: isFollowup ? 'followup_scheduled' : 'baseline_review_scheduled',
+          stage: isFollowup ? 'followup_scheduled' : 'meeting_ready',
           label: `${prefix} Scheduled`,
           variant: 'outline',
           colorClass: 'bg-blue-100 text-blue-800',
-          nextAction: 'Complete prep for meeting',
-          nextActionUrl: undefined,
+          nextAction: 'Start the meeting when ready',
         };
       case 'director_prep_ready':
         return {
-          stage: 'waiting_for_doctor_prep',
-          label: 'Prep Ready — Waiting on Doctor',
-          variant: 'secondary',
-          colorClass: 'bg-amber-100 text-amber-800',
-          nextAction: 'Doctor needs to complete their prep',
-        };
-      case 'doctor_prep_submitted':
-        return {
           stage: 'prep_complete',
-          label: 'Ready for Meeting',
+          label: 'Prep Complete — Ready to Invite',
           variant: 'default',
           colorClass: 'bg-emerald-100 text-emerald-800',
-          nextAction: 'Both sides are prepped — time to meet!',
+          nextAction: 'Send scheduling invite to doctor',
         };
       case 'meeting_pending':
         return {
@@ -90,7 +90,6 @@ export function getDoctorJourneyStatus(
           nextAction: 'Doctor needs to review and confirm the meeting summary',
         };
       case 'doctor_confirmed':
-        // Check if all sessions are confirmed — if latest is confirmed, check if it's a follow-up
         if (isFollowup) {
           return {
             stage: 'followup_completed',
@@ -129,14 +128,14 @@ export function getDoctorJourneyStatus(
     };
   }
 
-  // Check if both baselines done but no session yet
+  // Check if both baselines done but no session yet → ready for prep
   if (baseline?.status === 'completed' && coachBaseline?.status === 'completed') {
     return {
-      stage: 'baseline_submitted',
-      label: 'Ready to Schedule',
+      stage: 'ready_for_prep',
+      label: 'Ready for Prep',
       variant: 'outline',
       colorClass: 'bg-blue-100 text-blue-800',
-      nextAction: 'Schedule the baseline review meeting',
+      nextAction: 'Build your meeting agenda before inviting to schedule',
     };
   }
 

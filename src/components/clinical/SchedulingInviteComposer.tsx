@@ -20,6 +20,14 @@ const DEFAULT_BODY = `Hi {{first_name}},
 Please use the link below to schedule a time that works for you:
 {{scheduling_link}}
 
+Before the meeting, please complete your meeting prep on the Pro Moves site:
+{{prep_link}}
+
+In your prep, you'll:
+  • Review the meeting agenda your coach has prepared
+  • Select 1–2 Pro Moves you'd like to focus on
+  • Add any questions or topics you want to discuss
+
 Looking forward to connecting!
 — {{coach_name}}`;
 

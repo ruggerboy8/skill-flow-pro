@@ -1,43 +1,34 @@
 
 
-## Comprehensive FK Join Hint Audit
+## Collapsed Session Card: What to Show + Pill Reorder
 
-### Problem Found
+### What details to surface on the collapsed card
 
-The database has **two** FK constraints from `locations` to `practice_groups`:
-1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
-2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
+Given the workflow stages and available data, here's what makes sense per status:
 
-Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
+| Status | Currently shown | Add to collapsed row |
+|---|---|---|
+| `scheduled` (Draft) | Title + "Draft — build agenda" | Nothing extra — it's empty |
+| `director_prep_ready` | Title + "Pending scheduling" | Number of focus areas selected (e.g. "2 focus areas selected") |
+| `scheduling_invite_sent` | Title + "Pending scheduling" | Same as above + "Awaiting doctor's response" |
+| `doctor_prep_submitted` | Title + "Pending scheduling" | "Doctor submitted prep" — count of doctor-selected focus areas |
+| `meeting_pending` | Title + date | "Summary shared" — brief snippet or action step count (e.g. "2 action steps") |
+| `doctor_confirmed` | Title + date | "Confirmed" + action step count |
+| `doctor_revision_requested` | Title + date | "Doctor left a note" indicator |
 
-### Issues to Fix
+**Implementation**: Fetch lightweight counts (selection count, experiment count) eagerly (not only when expanded) to populate the collapsed summary line. This is a small query per session — just counts, not full records.
 
-**1. Wrong FK hint name (will fail at runtime)**
-These files reference `locations_group_id_fkey` which does not exist as a constraint:
+### Specific changes
 
-| File | Line |
-|------|------|
-| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
-| `src/pages/coach/RemindersTab.tsx` | 148 |
+**1. Add a summary subtitle to each collapsed card**
+- For `director_prep_ready` / `scheduling_invite_sent` / `doctor_prep_submitted`: fetch count of `coaching_session_selections` for this session, show "N focus areas selected"
+- For `meeting_pending` / `doctor_confirmed`: fetch `coaching_meeting_records` to get experiment count, show "N action steps"
+- For `doctor_revision_requested`: show "Doctor left a note" in the subtitle
 
-Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
+**2. Move status pill left of action buttons**
+Currently the order is: `[Action Buttons] [Badge] [Delete]`
+Change to: `[Badge] [Action Buttons] [Delete]`
 
-**2. Corrupted select syntax (double alias, double parentheses)**
-`src/components/admin/AdminLocationsTab.tsx` line 50 has:
-```
-practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
-```
-This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
-```
-practice_group:practice_groups!locations_org_fkey(name)
-```
-
-**3. No issues (already correct)**
-- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
-- All `scope_organization_id` references — intentional audit table column ✓
-- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
-
-### Summary
-
-3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
+### Files to modify
+- `src/components/clinical/DoctorDetailThread.tsx` — add summary queries (always enabled, not just when expanded), render subtitle, reorder badge/buttons
 

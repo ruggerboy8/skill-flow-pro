@@ -33,7 +33,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
         .from('coaching_sessions')
         .select('id, session_type, sequence_number, status, scheduled_at')
         .eq('doctor_staff_id', doctorStaffId)
-        .order('sequence_number', { ascending: true });
+        .order('sequence_number', { ascending: false });
       if (sessErr) throw sessErr;
       if (!sessions?.length) return [];
 

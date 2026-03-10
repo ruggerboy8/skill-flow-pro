@@ -59,13 +59,22 @@ export function getDoctorJourneyStatus(
 
     switch (latest.status) {
       case 'scheduling_invite_sent':
+        if (perspective === 'doctor') {
+          return {
+            stage: 'scheduling_invite_sent',
+            label: 'Prep Available',
+            variant: 'default',
+            colorClass: 'bg-primary/10 text-primary',
+            nextAction: 'Complete your meeting prep and schedule your session',
+            nextActionUrl: `/doctor/review-prep/${latest.id}`,
+          };
+        }
         return {
           stage: 'scheduling_invite_sent',
-          label: 'Prep Available',
-          variant: 'default',
-          colorClass: 'bg-primary/10 text-primary',
-          nextAction: 'Complete your meeting prep and schedule your session',
-          nextActionUrl: `/doctor/review-prep/${latest.id}`,
+          label: 'Pending Scheduling',
+          variant: 'outline',
+          colorClass: 'bg-blue-100 text-blue-800',
+          nextAction: 'Waiting for doctor to schedule via the link you sent',
         };
       case 'scheduled':
         return {

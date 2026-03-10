@@ -112,7 +112,6 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
     );
   }
 
-  const hasMidFlow = sessions.some(s => midFlowStatuses.includes(s.status));
   const sorted = [...sessions].sort((a, b) => b.sequence_number - a.sequence_number);
 
   return (

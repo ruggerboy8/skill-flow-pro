@@ -18,6 +18,8 @@ interface ProfileData {
   created_at: string;
   role_name: string | null;
   scheduling_link: string | null;
+  is_clinical_director: boolean;
+  is_super_admin: boolean;
 }
 
 export default function Profile() {

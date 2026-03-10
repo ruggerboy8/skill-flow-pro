@@ -471,7 +471,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
               <div>
                 <p className="text-sm font-medium">Record Verbal Feedback</p>
                 <p className="text-xs text-muted-foreground">
-                  Narrate your assessment while scrolling through Pro Moves. Notes will be auto-mapped when done.
+                  Tap a Pro Move card, then speak your feedback. Tap the next card when you move on.
                 </p>
               </div>
               <Button

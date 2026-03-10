@@ -404,7 +404,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         </Button>
         <div>
           <h2 className="text-xl font-bold">Build Meeting Agenda</h2>
-          {session && (
+          {session?.scheduled_at && (
             <p className="text-sm text-muted-foreground">
               Meeting: {format(new Date(session.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
             </p>

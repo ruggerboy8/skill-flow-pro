@@ -582,6 +582,46 @@ export default function DoctorReviewPrep() {
         </CardContent>
       </Card>
 
+      {/* Step 4: Scheduling confirmation (only when invite was sent but no date yet) */}
+      {isSchedulingInviteSent && (
+        <>
+          <Separator />
+          <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-950/10 dark:border-blue-800/30">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                <CardTitle className="text-base">Have You Scheduled Your Meeting?</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={hasScheduled}
+                  onCheckedChange={(checked) => setHasScheduled(checked === true)}
+                />
+                <span className="text-sm">Yes, I've already scheduled my meeting</span>
+              </label>
+              {!hasScheduled && coachSchedulingLink && (
+                <div className="p-3 rounded-lg bg-background border">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Haven't scheduled yet? Use the link below to find a time:
+                  </p>
+                  <a
+                    href={coachSchedulingLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Schedule with {coachName}
+                  </a>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
       {/* Submit */}
       <Button
         className="w-full gap-2"

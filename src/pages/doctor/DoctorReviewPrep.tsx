@@ -230,10 +230,15 @@ export default function DoctorReviewPrep() {
         .insert(selections);
       if (selErr) throw selErr;
 
+      // Serialize progress + freeNote into doctor_note as JSON
+      const notePayload = (isFollowUp && progressEntries.length > 0)
+        ? JSON.stringify({ progress: progressEntries, freeNote: doctorNote || '' })
+        : (doctorNote || null);
+
       const { error: sessErr } = await supabase
         .from('coaching_sessions')
         .update({
-          doctor_note: doctorNote || null,
+          doctor_note: notePayload,
           status: 'doctor_prep_submitted',
         })
         .eq('id', sessionId);

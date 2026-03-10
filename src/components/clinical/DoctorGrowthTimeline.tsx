@@ -119,7 +119,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
           const experiments = (entry.record?.experiments as any[]) || [];
           const priorStatuses = (entry.record?.prior_action_status as any[]) || [];
           const typeLabel = entry.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up #${entry.sequence_number}`;
-          const statusClass = SESSION_STATUS_COLORS[entry.status] || SESSION_STATUS_COLORS.scheduled;
+          const statusConfig = SESSION_STATUS_CONFIG[entry.status] || SESSION_STATUS_CONFIG.scheduled;
 
           return (
             <div key={entry.id} className="relative pb-6 last:pb-0">
@@ -132,8 +132,8 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
                 {/* Header row */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{typeLabel}</span>
-                  <Badge className={`text-[10px] ${statusClass}`}>
-                    {entry.status.replace(/_/g, ' ')}
+                  <Badge className={`text-[10px] ${statusConfig.className}`}>
+                    {statusConfig.label}
                   </Badge>
                   {entry.scheduled_at && (
                     <span className="text-xs text-muted-foreground ml-auto">

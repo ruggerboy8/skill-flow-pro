@@ -54,6 +54,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [isFormatting, setIsFormatting] = useState(false);
   const [realSessionId, setRealSessionId] = useState<string | null>(initialSessionId === 'new' ? null : initialSessionId);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [priorActionStatuses, setPriorActionStatuses] = useState<Record<number, 'addressed' | 'continuing' | 'dropped'>>({});
 
   const sessionId = realSessionId ?? '';
 

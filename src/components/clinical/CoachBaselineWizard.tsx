@@ -397,12 +397,13 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
 
   // Get active pro move's label for the floating pill
   const getActiveLabel = () => {
-    if (!activeActionId || !domains) return undefined;
+    if (!recState.isRecording) return undefined;
+    if (!activeActionId || !domains) return 'Tap a Pro Move…';
     for (const d of domains) {
       const pm = d.proMoves.find(p => p.action_id === activeActionId);
       if (pm) return pm.action_statement.slice(0, 60);
     }
-    return undefined;
+    return 'Tap a Pro Move…';
   };
 
   if (domainsLoading || !domains) {

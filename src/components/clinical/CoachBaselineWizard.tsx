@@ -725,9 +725,20 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
               </div>
 
               {isTranscriptExpanded && (
-                <div className="bg-muted/30 border rounded-md p-3 text-sm whitespace-pre-wrap max-h-[300px] overflow-y-auto">
-                  {transcript}
-                </div>
+                <Textarea
+                  value={transcript}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  onBlur={async () => {
+                    if (assessmentId && transcript) {
+                      await supabase
+                        .from('coach_baseline_assessments')
+                        .update({ recording_transcript: transcript, updated_at: new Date().toISOString() })
+                        .eq('id', assessmentId);
+                    }
+                  }}
+                  className="bg-muted/30 border rounded-md p-3 text-sm max-h-[300px] min-h-[100px] overflow-y-auto resize-y"
+                  placeholder="Edit transcript..."
+                />
               )}
 
               {!mappingJustCompleted && (

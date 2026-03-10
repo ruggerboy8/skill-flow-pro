@@ -47,6 +47,8 @@ export default function Profile() {
           organization,
           location,
           created_at,
+          scheduling_link,
+          is_clinical_director,
           roles(role_name)
         `)
         .eq('user_id', user.id)
@@ -58,7 +60,8 @@ export default function Profile() {
 
       setProfile({
         ...data,
-        role_name: (data.roles as any)?.role_name || null
+        role_name: (data.roles as any)?.role_name || null,
+        scheduling_link: data.scheduling_link,
       });
     } catch (error) {
       console.error('Error loading profile:', error);

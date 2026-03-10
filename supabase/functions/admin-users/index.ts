@@ -278,18 +278,9 @@ serve(async (req: Request) => {
           is_platform_admin: false,
         };
 
-        if (isParticipantUser) {
-          // Participants have no management capabilities
-          capsInsert.can_view_submissions = false;
-          capsInsert.can_submit_evals = false;
-          capsInsert.can_review_evals = false;
-          capsInsert.can_invite_users = false;
-          capsInsert.can_manage_library = false;
-          capsInsert.can_manage_locations = false;
-          capsInsert.can_manage_users = false;
-          capsInsert.is_org_admin = false;
-        } else if (capabilities) {
-          // Team member — apply capability flags from the invite dialog
+        if (capabilities) {
+          // Apply explicit capability flags from the invite dialog.
+          // Participants can also hold additional permissions (e.g. Lead RDA who reviews evals).
           capsInsert.can_view_submissions = capabilities.can_view_submissions ?? false;
           capsInsert.can_submit_evals = capabilities.can_submit_evals ?? false;
           capsInsert.can_review_evals = capabilities.can_review_evals ?? false;
@@ -303,6 +294,16 @@ serve(async (req: Request) => {
           if (capabilities.is_org_admin) {
             await admin.from("staff").update({ is_org_admin: true }).eq("id", staff.id);
           }
+        } else {
+          // No capabilities sent (legacy call) — default all to false
+          capsInsert.can_view_submissions = false;
+          capsInsert.can_submit_evals = false;
+          capsInsert.can_review_evals = false;
+          capsInsert.can_invite_users = false;
+          capsInsert.can_manage_library = false;
+          capsInsert.can_manage_locations = false;
+          capsInsert.can_manage_users = false;
+          capsInsert.is_org_admin = false;
         }
 
         const { error: capsErr } = await admin.from("user_capabilities").insert(capsInsert);
@@ -669,7 +670,50 @@ serve(async (req: Request) => {
             .delete()
             .eq("staff_id", currentStaff.id);
         }
-        
+
+        // Upsert user_capabilities — base on preset defaults, then apply any overrides
+        // sent by the client (e.g. fine-tuned capability toggles from EditUserDrawer).
+        const CAPABILITY_PRESETS: Record<string, Record<string, boolean>> = {
+          participant:       { is_participant: true,  can_view_submissions: false, can_submit_evals: false, can_review_evals: false, can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
+          lead:              { is_participant: true,  can_view_submissions: true,  can_submit_evals: false, can_review_evals: false, can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
+          coach:             { is_participant: false, can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
+          coach_participant: { is_participant: true,  can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
+          regional_manager:  { is_participant: false, can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: true,  can_manage_users: true,  can_manage_locations: true,  can_manage_library: false, is_org_admin: true,  is_platform_admin: false },
+          super_admin:       { is_participant: false, can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: true,  can_manage_users: true,  can_manage_locations: true,  can_manage_library: true,  is_org_admin: true,  is_platform_admin: true  },
+        };
+
+        const capsPreset = CAPABILITY_PRESETS[preset];
+        if (capsPreset && updatedStaff?.id) {
+          // Client may send fine-tuned overrides; merge on top of the preset
+          const capsOverride: Record<string, boolean> = {};
+          const clientCaps = payload?.capabilities ?? {};
+          const overrideKeys = [
+            'can_view_submissions', 'can_submit_evals', 'can_review_evals',
+            'can_invite_users', 'can_manage_users', 'can_manage_locations',
+            'can_manage_library', 'is_org_admin',
+          ];
+          for (const k of overrideKeys) {
+            if (typeof clientCaps[k] === 'boolean') capsOverride[k] = clientCaps[k];
+          }
+
+          const finalCaps = { ...capsPreset, ...capsOverride };
+
+          const { error: capsErr } = await admin
+            .from('user_capabilities')
+            .upsert({
+              staff_id: updatedStaff.id,
+              ...finalCaps,
+              participation_start_at: payload?.participation_start_at ?? null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'staff_id' });
+
+          if (capsErr) {
+            console.warn('user_capabilities upsert failed (non-fatal):', capsErr);
+          } else {
+            console.log(`✅ user_capabilities upserted for staff ${updatedStaff.id} (preset: ${preset})`);
+          }
+        }
+
         // Enhanced audit log
         try {
           const { data: changerStaff } = await admin

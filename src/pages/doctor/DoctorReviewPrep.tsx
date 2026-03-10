@@ -413,7 +413,7 @@ export default function DoctorReviewPrep() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">1</div>
-            <CardTitle className="text-base">Meeting Agenda from {coachName}</CardTitle>
+            <CardTitle className="text-base">Meeting Agenda</CardTitle>
           </div>
           <CardDescription>Here's what {coachName} has planned for your conversation.</CardDescription>
         </CardHeader>
@@ -421,7 +421,7 @@ export default function DoctorReviewPrep() {
           {coachSelections.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                {coachName}'s Focus Areas
+                Focus Areas
               </p>
               <div className="space-y-2">
                 {coachSelections.map(sel => (

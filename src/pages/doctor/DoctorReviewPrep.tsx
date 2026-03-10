@@ -483,6 +483,13 @@ export default function DoctorReviewPrep() {
                     className="rounded-lg border p-3 space-y-1"
                     style={{ backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.06)` }}
                   >
+                    <div className="flex items-center gap-3 px-2.5 pb-1 mb-1 border-b border-border/50">
+                      <div className="w-4" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pro Move</p>
+                      </div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Self Score</p>
+                    </div>
                     {(groupedItems[domain] || []).map(item => {
                       const pm = item.pro_moves as any;
                       const isSelected = selectedActions.includes(item.action_id);

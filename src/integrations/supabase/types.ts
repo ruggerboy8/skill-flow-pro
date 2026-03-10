@@ -326,6 +326,7 @@ export type Database = {
           doctor_revision_note: string | null
           experiments: Json | null
           id: string
+          prior_action_status: Json | null
           session_id: string
           submitted_at: string | null
           summary: string
@@ -337,6 +338,7 @@ export type Database = {
           doctor_revision_note?: string | null
           experiments?: Json | null
           id?: string
+          prior_action_status?: Json | null
           session_id: string
           submitted_at?: string | null
           summary?: string
@@ -348,6 +350,7 @@ export type Database = {
           doctor_revision_note?: string | null
           experiments?: Json | null
           id?: string
+          prior_action_status?: Json | null
           session_id?: string
           submitted_at?: string | null
           summary?: string

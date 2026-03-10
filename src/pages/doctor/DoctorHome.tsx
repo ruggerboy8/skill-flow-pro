@@ -288,15 +288,6 @@ export default function DoctorHome() {
     );
   };
 
-  // Upcoming meetings
-  const upcomingSessions = sessions?.filter(s => 
-    ['scheduled', 'director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted'].includes(s.status)
-  ).sort((a, b) => {
-    if (!a.scheduled_at && !b.scheduled_at) return 0;
-    if (!a.scheduled_at) return 1;
-    if (!b.scheduled_at) return -1;
-    return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
-  }) || [];
 
   // All sessions with active action steps (confirmed or meeting_pending, not yet superseded)
   const activeSessionIds = sessions?.filter(s => 
@@ -319,27 +310,6 @@ export default function DoctorHome() {
       {/* Current Focus — action steps from all active sessions */}
       {activeSessionIds.length > 0 && <CurrentFocusCard sessionIds={activeSessionIds} />}
 
-      {/* Upcoming Meetings */}
-      {upcomingSessions.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Upcoming Meetings</h2>
-          {upcomingSessions.map(session => (
-            <Card key={session.id}>
-              <CardContent className="flex items-center gap-3 py-4">
-                <Calendar className="h-5 w-5 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">
-                    {session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${session.sequence_number - 1}`}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatInTimeZone(new Date(session.scheduled_at), LOCAL_TZ, MEETING_FMT)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

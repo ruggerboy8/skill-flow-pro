@@ -289,8 +289,10 @@ export default function DoctorHome() {
     ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(s.status)
   ).sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()) || [];
 
-  // Most recent confirmed session for "Current Focus"
-  const latestConfirmed = sessions?.find(s => s.status === 'doctor_confirmed');
+  // All sessions with active action steps (confirmed or meeting_pending, not yet superseded)
+  const activeSessionIds = sessions?.filter(s => 
+    ['doctor_confirmed', 'meeting_pending'].includes(s.status)
+  ).map(s => s.id) || [];
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -305,8 +307,8 @@ export default function DoctorHome() {
       {/* Primary CTA */}
       {renderPrimaryCTA()}
 
-      {/* Current Focus — action steps from latest confirmed session */}
-      {latestConfirmed && <CurrentFocusCard sessionId={latestConfirmed.id} />}
+      {/* Current Focus — action steps from all active sessions */}
+      {activeSessionIds.length > 0 && <CurrentFocusCard sessionIds={activeSessionIds} />}
 
       {/* Upcoming Meetings */}
       {upcomingSessions.length > 0 && (

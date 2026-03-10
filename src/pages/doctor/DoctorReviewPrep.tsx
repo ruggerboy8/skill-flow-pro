@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, Calendar, X, CheckCircle2, Circle, Clock } from 'lucide-react';
+import { ArrowLeft, Send, Calendar, X, CheckCircle2, Circle, Clock, ExternalLink } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DOMPurify from 'dompurify';
 import { format } from 'date-fns';

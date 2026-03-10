@@ -54,6 +54,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [isFormatting, setIsFormatting] = useState(false);
   const [realSessionId, setRealSessionId] = useState<string | null>(initialSessionId === 'new' ? null : initialSessionId);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [priorActionStatuses, setPriorActionStatuses] = useState<Record<number, 'addressed' | 'continuing' | 'dropped'>>({});
 
   const sessionId = realSessionId ?? '';
 
@@ -304,6 +305,22 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         .update({ coach_note: coachNote, status: 'director_prep_ready' })
         .eq('id', sessionId);
       if (sessErr) throw sessErr;
+
+      // Save prior action statuses if any exist
+      if (priorExperiments && priorExperiments.length > 0 && Object.keys(priorActionStatuses).length > 0) {
+        const statusArray = priorExperiments.map((exp: any, i: number) => ({
+          index: i,
+          title: exp.title,
+          status: priorActionStatuses[i] || null,
+        }));
+        // Upsert into the meeting record for this session
+        await supabase
+          .from('coaching_meeting_records')
+          .upsert({
+            session_id: sessionId,
+            prior_action_status: statusArray,
+          } as any, { onConflict: 'session_id' });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
@@ -437,17 +454,39 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
           <CardHeader>
             <div className="flex items-center gap-2">
               <FlaskConical className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Prior Experiments</CardTitle>
+              <CardTitle className="text-base">Prior Action Steps</CardTitle>
             </div>
-            <CardDescription>From the previous session — discuss progress on these.</CardDescription>
+            <CardDescription>From the previous session — tag each item's status.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {priorExperiments.map((exp: any, i: number) => (
-              <div key={i} className="p-2 rounded-md bg-muted/30 border">
-                <p className="text-sm font-medium">{exp.title}</p>
-                {exp.description && <p className="text-xs text-muted-foreground mt-0.5">{exp.description}</p>}
-              </div>
-            ))}
+          <CardContent className="space-y-3">
+            {priorExperiments.map((exp: any, i: number) => {
+              const status = priorActionStatuses[i];
+              return (
+                <div key={i} className="p-3 rounded-md bg-muted/30 border space-y-2">
+                  <p className="text-sm font-medium">{exp.title}</p>
+                  {exp.description && <p className="text-xs text-muted-foreground">{exp.description}</p>}
+                  <div className="flex gap-1.5">
+                    {([
+                      { key: 'addressed' as const, label: '✓ Addressed', variant: 'default' },
+                      { key: 'continuing' as const, label: '→ Continuing', variant: 'secondary' },
+                      { key: 'dropped' as const, label: '✗ Dropped', variant: 'outline' },
+                    ] as const).map(opt => (
+                      <Badge
+                        key={opt.key}
+                        variant={status === opt.key ? 'default' : 'outline'}
+                        className={`cursor-pointer text-xs ${status === opt.key ? '' : 'opacity-60 hover:opacity-100'}`}
+                        onClick={() => setPriorActionStatuses(prev => ({
+                          ...prev,
+                          [i]: prev[i] === opt.key ? undefined! : opt.key,
+                        }))}
+                      >
+                        {opt.label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}

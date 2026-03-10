@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Send, Mail } from 'lucide-react';
+import { FileText, Send, Mail, MessageSquare } from 'lucide-react';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
+import { NotifyDoctorDialog } from '@/components/clinical/NotifyDoctorDialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +37,8 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   const [showPrepSheet, setShowPrepSheet] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
 
+  const [showNotifyDialog, setShowNotifyDialog] = useState(false);
+
   const releaseMutation = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -45,10 +48,31 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         .update({ baseline_released_at: new Date().toISOString(), baseline_released_by: user.id } as any)
         .eq('id', doctor.id);
       if (error) throw error;
+
+      // Send baseline release email notification via coach-remind
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase.functions.invoke('coach-remind', {
+            body: {
+              template_key: 'baseline_release',
+              subject: 'Your baseline self-assessment is ready',
+              body: `Hi {{first_name}},\n\nYour clinical director has opened your baseline self-assessment. Log in to your portal to begin — it takes about 15–20 minutes.\n\nThis is the first step in your professional development journey. Your responses are private and will help guide your coaching conversations.\n\nBest,\n{{coach_name}}`,
+              recipients: [{
+                user_id: doctor.id,
+                email: doctor.email,
+                name: doctor.name,
+              }],
+            },
+          });
+        }
+      } catch (emailErr) {
+        console.warn('Failed to send baseline release email:', emailErr);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
-      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment.` });
+      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment. A notification email has been sent.` });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
@@ -174,7 +198,24 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </Card>
       )}
 
-      {/* Continue prep for a scheduled session */}
+      {/* Notify Doctor — baseline complete, no sessions yet */}
+      {baseline?.status === 'completed' && sessions.length === 0 && (
+        <Card className="border-dashed border-accent">
+          <CardContent className="flex items-center justify-between py-4">
+            <div>
+              <p className="text-sm font-medium">Send a prep note to {doctor.name}</p>
+              <p className="text-xs text-muted-foreground">
+                Share a personal note and optional scheduling link before building your agenda.
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => setShowNotifyDialog(true)} className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Notify Doctor
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {needsPrepSession && (
         <Card className="border-primary/30">
           <CardContent className="flex items-center justify-between py-4">
@@ -272,6 +313,15 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         doctorStaffId={doctor.id}
         sessionId={prepReadySession?.id}
         onSuccess={handleInviteSuccess}
+      />
+
+      {/* Notify Doctor Dialog */}
+      <NotifyDoctorDialog
+        open={showNotifyDialog}
+        onOpenChange={setShowNotifyDialog}
+        doctorName={doctor.name}
+        doctorEmail={doctor.email}
+        doctorStaffId={doctor.id}
       />
     </div>
   );

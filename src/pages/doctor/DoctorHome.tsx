@@ -289,8 +289,10 @@ export default function DoctorHome() {
     ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(s.status)
   ).sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()) || [];
 
-  // Most recent confirmed session for "Current Focus"
-  const latestConfirmed = sessions?.find(s => s.status === 'doctor_confirmed');
+  // All sessions with active action steps (confirmed or meeting_pending, not yet superseded)
+  const activeSessionIds = sessions?.filter(s => 
+    ['doctor_confirmed', 'meeting_pending'].includes(s.status)
+  ).map(s => s.id) || [];
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -305,8 +307,8 @@ export default function DoctorHome() {
       {/* Primary CTA */}
       {renderPrimaryCTA()}
 
-      {/* Current Focus — action steps from latest confirmed session */}
-      {latestConfirmed && <CurrentFocusCard sessionId={latestConfirmed.id} />}
+      {/* Current Focus — action steps from all active sessions */}
+      {activeSessionIds.length > 0 && <CurrentFocusCard sessionIds={activeSessionIds} />}
 
       {/* Upcoming Meetings */}
       {upcomingSessions.length > 0 && (
@@ -333,22 +335,26 @@ export default function DoctorHome() {
   );
 }
 
-function CurrentFocusCard({ sessionId }: { sessionId: string }) {
-  const { data: meetingRecord } = useQuery({
-    queryKey: ['meeting-record', sessionId],
+function CurrentFocusCard({ sessionIds }: { sessionIds: string[] }) {
+  const { data: meetingRecords } = useQuery({
+    queryKey: ['meeting-records-focus', sessionIds],
     queryFn: async () => {
+      if (!sessionIds.length) return [];
       const { data, error } = await supabase
         .from('coaching_meeting_records')
-        .select('experiments')
-        .eq('session_id', sessionId)
-        .maybeSingle();
+        .select('session_id, experiments')
+        .in('session_id', sessionIds);
       if (error) throw error;
-      return data;
+      return data || [];
     },
+    enabled: sessionIds.length > 0,
   });
 
-  const actionSteps = (meetingRecord?.experiments as any[] | null) || [];
-  if (actionSteps.length === 0) return null;
+  const allSteps = (meetingRecords || []).flatMap(
+    r => ((r.experiments as any[] | null) || []).map((step: any) => ({ ...step, sessionId: r.session_id }))
+  );
+
+  if (allSteps.length === 0) return null;
 
   return (
     <Card className="border-primary/20">
@@ -359,7 +365,7 @@ function CurrentFocusCard({ sessionId }: { sessionId: string }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {actionSteps.map((step: any, i: number) => (
+        {allSteps.map((step: any, i: number) => (
           <div key={i} className="p-3 rounded-lg bg-primary/5 border border-primary/10">
             <p className="text-sm font-medium">{step.title}</p>
             {step.description && (

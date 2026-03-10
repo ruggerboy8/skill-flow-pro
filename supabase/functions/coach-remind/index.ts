@@ -13,7 +13,7 @@ interface Recipient {
 }
 
 interface RequestPayload {
-  template_key: 'confidence' | 'performance';
+  template_key: string;
   subject: string;
   body: string;
   recipients: Recipient[];
@@ -59,16 +59,16 @@ serve(async (req) => {
     // Admin client for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get coach/sender info
+    // Get coach/sender info — allow clinical directors too
     const { data: senderStaff, error: staffError } = await supabase
       .from('staff')
-      .select('id, name, is_coach, is_super_admin')
+      .select('id, name, is_coach, is_super_admin, is_clinical_director')
       .eq('user_id', user.id)
       .single();
 
-    if (staffError || !senderStaff || (!senderStaff.is_coach && !senderStaff.is_super_admin)) {
+    if (staffError || !senderStaff || (!senderStaff.is_coach && !senderStaff.is_super_admin && !senderStaff.is_clinical_director)) {
       return new Response(
-        JSON.stringify({ error: 'Access denied. Coaches only.' }),
+        JSON.stringify({ error: 'Access denied. Coaches or Clinical Directors only.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

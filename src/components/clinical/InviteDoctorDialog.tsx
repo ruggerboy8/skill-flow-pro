@@ -119,6 +119,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
     setName('');
     setGroupId('');
     setLocationId('__roaming__');
+    setReleaseBaseline(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

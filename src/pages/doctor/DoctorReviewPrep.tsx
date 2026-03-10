@@ -465,10 +465,11 @@ export default function DoctorReviewPrep() {
                   <TabsTrigger
                     key={domain}
                     value={domain}
-                    className="text-xs data-[state=active]:shadow-sm rounded-full px-3 py-1.5 border transition-colors"
+                    className="text-xs font-medium data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-foreground/20 rounded-full px-4 py-2 border-2 transition-all cursor-pointer hover:opacity-90"
                     style={{
-                      backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.15)`,
-                      borderColor: `hsl(${getDomainColorRaw(domain)} / 0.3)`,
+                      backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.35)`,
+                      borderColor: `hsl(${getDomainColorRaw(domain)} / 0.6)`,
+                      color: 'hsl(var(--foreground))',
                     }}
                   >
                     {domain}

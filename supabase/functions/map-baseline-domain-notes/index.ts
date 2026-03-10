@@ -151,7 +151,6 @@ Instructions:
 6. Maximum 500 characters per note
 7. Only use the action IDs listed above — do not invent new ones
 8. You MUST return at least one note if the transcript contains any substantive feedback`;
-    }
 
     console.log("[map-baseline] Prompt mode:", useTimeline ? "timeline-driven" : "fallback");
     console.log("[map-baseline] Transcript preview:", transcript.slice(0, 200));

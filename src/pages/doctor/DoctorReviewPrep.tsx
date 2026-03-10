@@ -191,9 +191,9 @@ export default function DoctorReviewPrep() {
   const { data: coachInfo } = useQuery({
     queryKey: ['coach-info', session?.coach_staff_id],
     queryFn: async () => {
-      if (!session?.coach_staff_id) return { name: 'Alex', scheduling_link: null };
+      if (!session?.coach_staff_id) return { name: 'Your Coach', scheduling_link: null };
       const { data } = await supabase.from('staff').select('name, scheduling_link').eq('id', session.coach_staff_id).single();
-      return { name: data?.name || 'Alex', scheduling_link: data?.scheduling_link || null };
+      return { name: data?.name || 'Your Coach', scheduling_link: data?.scheduling_link || null };
     },
     enabled: !!session?.coach_staff_id,
   });

@@ -84,6 +84,7 @@ export default function Profile() {
         .from('staff')
         .update({
           name: profile.name,
+          scheduling_link: profile.scheduling_link || null,
         })
         .eq('user_id', user.id);
 

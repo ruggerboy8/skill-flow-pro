@@ -192,6 +192,7 @@ function SessionCard({
   onBuildAgenda,
   onEditAgenda,
   onInvite,
+  onDelete,
   coachName,
   doctorName,
 }: {
@@ -202,6 +203,7 @@ function SessionCard({
   onBuildAgenda: () => void;
   onEditAgenda: () => void;
   onInvite: () => void;
+  onDelete: () => void;
   coachName: string;
   doctorName: string;
 }) {

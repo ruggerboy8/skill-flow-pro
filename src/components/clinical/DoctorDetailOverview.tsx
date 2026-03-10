@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Send, Mail } from 'lucide-react';
+import { FileText, Send, Mail, MessageSquare } from 'lucide-react';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
+import { NotifyDoctorDialog } from '@/components/clinical/NotifyDoctorDialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';

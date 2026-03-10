@@ -93,31 +93,32 @@ serve(async (req) => {
       filteredTimeline = filterByDwell(timeline as TimelineEntry[]);
       console.log("[map-baseline] Timeline entries:", timeline.length, "→ after dwell filter:", filteredTimeline.length);
 
-      // Collect unique action IDs from filtered timeline
+      // Identify which DOMAINS were active during recording (scroll detection is imprecise
+      // at the card level, but reliable at the domain level since domains are large sections)
+      const activeDomains = new Set<string>();
       for (const t of filteredTimeline) {
-        const id = String(t.action_id);
-        if (actionLookup.has(id)) {
-          targetActionIds.add(id);
-        }
+        const info = actionLookup.get(String(t.action_id));
+        if (info) activeDomains.add(info.domain_name);
       }
 
-      if (targetActionIds.size > 0) {
+      if (activeDomains.size > 0) {
         useTimeline = true;
-        // Build ordered pro move list from filtered timeline (preserving discussion order)
-        const seen = new Set<string>();
-        for (const t of filteredTimeline) {
-          const id = String(t.action_id);
-          if (!seen.has(id) && actionLookup.has(id)) {
-            seen.add(id);
-            const info = actionLookup.get(id)!;
-            proMoveList.push(`${proMoveList.length + 1}. Action ${id}: "${info.action_statement}" (Domain: ${info.domain_name})`);
+        console.log("[map-baseline] Active domains from timeline:", [...activeDomains]);
+
+        // Include ALL pro moves from the active domains
+        for (const d of domains as DomainInput[]) {
+          if (!activeDomains.has(d.domain_name)) continue;
+          for (const pm of d.pro_moves || []) {
+            const id = String(pm.action_id);
+            targetActionIds.add(id);
+            proMoveList.push(`- Action ${id}: "${pm.action_statement}" (Domain: ${d.domain_name})`);
           }
         }
-        console.log("[map-baseline] Timeline-driven mode — sending", targetActionIds.size, "pro moves to AI");
+        console.log("[map-baseline] Domain-scoped mode — sending", targetActionIds.size, "pro moves from", activeDomains.size, "domains");
       }
     }
 
-    // Fallback: no usable timeline — send all pro moves (legacy behavior)
+    // Fallback: no usable timeline — send all pro moves
     if (!useTimeline) {
       console.log("[map-baseline] Fallback mode — no usable timeline, sending all pro moves");
       for (const [id, info] of actionLookup) {
@@ -127,20 +128,17 @@ serve(async (req) => {
     }
 
     // -----------------------------------------------------------
-    // Build prompt
+    // Build prompt — always content-matching (timeline is too imprecise for forced splitting)
     // -----------------------------------------------------------
-    let systemPrompt: string;
+    const systemPrompt = `You are a coaching notes assistant for a clinical director performing a baseline assessment. Your job is to match parts of a verbal feedback transcript to the most relevant Pro Moves based on content.
 
-    if (useTimeline) {
-      // Deterministic prompt: we know exactly which pro moves were discussed, in order
-      systemPrompt = `You are a coaching notes assistant. A clinical director recorded verbal feedback while viewing specific Pro Moves in order. Your job is to split the transcript into per-Pro-Move coaching notes.
-
-The coach discussed these Pro Moves in this order:
+Available Pro Moves:
 ${proMoveList.join("\n")}
 
 Instructions:
-1. The transcript follows the same order as the list above. Split the transcript so each segment maps to the corresponding Pro Move.
-2. Write each note in a warm, conversational coaching tone:
+1. Read the transcript and match each part to the Pro Move whose content it most closely relates to
+2. Match based on MEANING — look for topic overlap between the feedback and each Pro Move's action statement
+3. Write each note in a warm, conversational coaching tone:
    - Second person ("You showed strong skills in...", "I noticed you...")
    - Sound like a supportive clinical director — professional, encouraging, constructive
    - Fix grammar, remove filler words, false starts
@@ -148,31 +146,11 @@ Instructions:
    - Keep each note to 1-3 sentences
    - Preserve specific observations from the transcript
    - Do NOT fabricate information not in the transcript
-3. If feedback for two adjacent Pro Moves blends together, use content meaning to determine the split
-4. Each Pro Move should appear at most once in the output
-5. Maximum 500 characters per note
-6. Only use the action IDs listed above — do not invent new ones`;
-    } else {
-      // Legacy fallback prompt when no timeline is available
-      systemPrompt = `You are a coaching notes assistant for a clinical director performing a baseline assessment of a doctor. Your job is to split an assessment transcript into per-Pro-Move coaching notes.
-
-The clinical director recorded verbal feedback while scrolling through Pro Moves. You must:
-
-1. Read the transcript and identify which parts relate to which Pro Move
-2. Write each note in a warm, conversational coaching tone:
-   - Second person ("You showed strong skills in...", "I noticed you...")
-   - Sound like a supportive clinical director — professional, encouraging, constructive
-   - Fix grammar, remove filler words, false starts
-   - Expand shorthand into clear sentences
-   - Keep each note to 1-3 sentences
-   - Preserve specific observations from the transcript
-   - Do NOT fabricate information not in the transcript
-3. If a part of the transcript seems relevant to a Pro Move even loosely, include it
-4. Each Pro Move should appear at most once in the output
-5. Maximum 500 characters per note
-
-Available Pro Moves:
-${proMoveList.join("\n")}`;
+4. Only map a note if the transcript content genuinely relates to that Pro Move
+5. Each Pro Move should appear at most once in the output
+6. Maximum 500 characters per note
+7. Only use the action IDs listed above — do not invent new ones
+8. You MUST return at least one note if the transcript contains any substantive feedback`;
     }
 
     console.log("[map-baseline] Prompt mode:", useTimeline ? "timeline-driven" : "fallback");

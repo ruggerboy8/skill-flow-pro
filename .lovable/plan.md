@@ -1,33 +1,43 @@
 
 
-## Plan: Replace scroll-distance tracking with IntersectionObserver in CoachBaselineWizard
+## Comprehensive FK Join Hint Audit
 
-### Problem
-The current tracking uses a "reading line" algorithm that picks whichever card's center is closest to 30% of viewport height. With small, tightly-stacked cards, this frequently highlights the wrong neighbor.
+### Problem Found
 
-### Solution
-Port the proven IntersectionObserver pattern from `EvaluationHub.tsx` (lines 284-341) into `CoachBaselineWizard.tsx`, replacing the `requestAnimationFrame` + center-distance logic (lines 64-137).
+The database has **two** FK constraints from `locations` to `practice_groups`:
+1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
+2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
 
-### Changes
+Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
 
-**File: `src/components/clinical/CoachBaselineWizard.tsx`**
+### Issues to Fix
 
-1. **Replace the scroll tracking effect (lines 60-137)** with an IntersectionObserver that:
-   - Maintains a `visibilityMap<number, { ratio, top }>` keyed by `action_id`
-   - Observes all pro move card refs via `proMoveRefs`
-   - Uses `data-action-id` attribute on each card element
-   - Picks the card with the highest `intersectionRatio` (tie-break by closest to top)
-   - Uses thresholds `[0, 0.2, 0.5, 0.8, 1]` and `rootMargin: '-10% 0px -35% 0px'` (same as EvaluationHub)
-   - Debounces at 200ms before committing `setActiveActionId` and pushing to `proMoveTimeline`
+**1. Wrong FK hint name (will fail at runtime)**
+These files reference `locations_group_id_fkey` which does not exist as a constraint:
 
-2. **Update pill anchor position**: After selecting the best card via IntersectionObserver, read `getBoundingClientRect()` from `proMoveRefs.current.get(bestId)` to set `pillAnchorTop` so the floating pill still tracks vertically.
+| File | Line |
+|------|------|
+| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
+| `src/pages/coach/RemindersTab.tsx` | 148 |
 
-3. **Remove stale refs**: Drop `pendingSwitchRef`, `rafRef`, and the `READING_LINE` / `DEBOUNCE_MS` constants — no longer needed.
+Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
 
-4. **No changes** to the edge function, timeline format, FloatingRecorderPill, or any other files. The `proMoveTimeline` data shape (`{ action_id, t_start_ms }[]`) stays identical.
+**2. Corrupted select syntax (double alias, double parentheses)**
+`src/components/admin/AdminLocationsTab.tsx` line 50 has:
+```
+practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
+```
+This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
+```
+practice_group:practice_groups!locations_org_fkey(name)
+```
 
-### Why this should work better
-- IntersectionObserver reports how much of each card is actually visible in the viewport, not just center proximity
-- A card that is 80% visible beats a neighbor that is only 20% visible, even if the neighbor's center is slightly closer to an arbitrary line
-- This is the same approach that works reliably for the observation recorder in EvaluationHub
+**3. No issues (already correct)**
+- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
+- All `scope_organization_id` references — intentional audit table column ✓
+- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
+
+### Summary
+
+3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
 

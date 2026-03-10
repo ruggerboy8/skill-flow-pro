@@ -64,9 +64,12 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization 
           .update(organizationData)
           .eq("id", organization.id));
       } else {
+        // Fetch parent organization_id for new groups
+        const { data: orgs } = await supabase.from('organizations').select('id').limit(1).single();
+        if (!orgs) throw new Error('No parent organization found');
         ({ error } = await supabase
           .from("practice_groups")
-          .insert([organizationData]));
+          .insert([{ ...organizationData, organization_id: orgs.id }]));
       }
 
       if (error) throw error;

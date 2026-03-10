@@ -297,7 +297,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
             <CombinedPrepView
               session={viewableSessionFull}
               selections={prepSelections as any}
-              coachName={myStaff?.name || 'Alex'}
+              coachName={myStaff?.name || 'Your Coach'}
               doctorName={doctor.name}
             />
           )}

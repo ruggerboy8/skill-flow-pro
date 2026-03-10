@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { User, Mail, Building, MapPin, Calendar } from 'lucide-react';
+import { User, Mail, Building, MapPin, Calendar, Link2 } from 'lucide-react';
 
 interface ProfileData {
   id: string;
@@ -16,6 +17,7 @@ interface ProfileData {
   location: string | null;
   created_at: string;
   role_name: string | null;
+  scheduling_link: string | null;
 }
 
 export default function Profile() {
@@ -45,6 +47,8 @@ export default function Profile() {
           organization,
           location,
           created_at,
+          scheduling_link,
+          is_clinical_director,
           roles(role_name)
         `)
         .eq('user_id', user.id)
@@ -56,7 +60,8 @@ export default function Profile() {
 
       setProfile({
         ...data,
-        role_name: (data.roles as any)?.role_name || null
+        role_name: (data.roles as any)?.role_name || null,
+        scheduling_link: data.scheduling_link,
       });
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -79,6 +84,7 @@ export default function Profile() {
         .from('staff')
         .update({
           name: profile.name,
+          scheduling_link: profile.scheduling_link || null,
         })
         .eq('user_id', user.id);
 
@@ -235,6 +241,26 @@ export default function Profile() {
               />
             </div>
           </div>
+
+          {/* Scheduling Link — for clinical directors */}
+          {(profile as any).is_clinical_director && (
+            <div className="space-y-2">
+              <Label htmlFor="scheduling_link">Scheduling Link (Calendly)</Label>
+              <div className="flex items-center gap-2">
+                <Link2 className="w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="scheduling_link"
+                  value={profile.scheduling_link || ''}
+                  onChange={(e) => setProfile({ ...profile, scheduling_link: e.target.value })}
+                  disabled={!editMode}
+                  placeholder="https://calendly.com/your-link"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This link is included in scheduling invite emails sent to doctors.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

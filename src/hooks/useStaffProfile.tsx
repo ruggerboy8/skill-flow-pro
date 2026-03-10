@@ -27,6 +27,7 @@ export interface StaffProfile {
   home_route: string | null;
   allow_backfill_until: string | null;
   baseline_released_at: string | null;
+  scheduling_link: string | null;
   locations: {
     group_id: string;
     program_start_date: string;
@@ -84,8 +85,9 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           paused_at,
           pause_reason,
           home_route,
-          allow_backfill_until,
-          baseline_released_at,
+           allow_backfill_until,
+           baseline_released_at,
+           scheduling_link,
           locations (
             group_id,
             program_start_date,

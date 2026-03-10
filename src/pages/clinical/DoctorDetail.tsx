@@ -130,10 +130,6 @@ export default function DoctorDetail() {
           </p>
         </div>
       </div>
-
-      {/* Next Action — always visible */}
-      <DoctorNextActionPanel status={journeyStatus} />
-
       {/* Pre-session actions (release baseline, notify doctor) */}
       <DoctorDetailOverview
         doctor={doctor}

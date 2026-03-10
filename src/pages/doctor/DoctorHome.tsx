@@ -289,8 +289,13 @@ export default function DoctorHome() {
 
   // Upcoming meetings
   const upcomingSessions = sessions?.filter(s => 
-    ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(s.status)
-  ).sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()) || [];
+    ['scheduled', 'director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted'].includes(s.status)
+  ).sort((a, b) => {
+    if (!a.scheduled_at && !b.scheduled_at) return 0;
+    if (!a.scheduled_at) return 1;
+    if (!b.scheduled_at) return -1;
+    return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime();
+  }) || [];
 
   // All sessions with active action steps (confirmed or meeting_pending, not yet superseded)
   const activeSessionIds = sessions?.filter(s => 

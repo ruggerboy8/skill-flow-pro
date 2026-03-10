@@ -57,85 +57,24 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   // Anchor top for the floating pill (tracks active card position)
   const [pillAnchorTop, setPillAnchorTop] = useState<number | null>(null);
 
-  // IntersectionObserver-based tracking for pro-move during recording
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const visibilityMapRef = useRef<Map<number, { ratio: number; top: number }>>(new Map());
-
-  useEffect(() => {
-    if (!recState.isRecording) {
-      visibilityMapRef.current.clear();
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
+  // Click-to-select: handle tapping a pro move card during recording
+  const handleCardTap = useCallback((actionId: number) => {
+    if (!recState.isRecording) return;
+    const newId = activeActionId === actionId ? null : actionId;
+    setActiveActionId(newId);
+    if (newId !== null) {
+      proMoveTimeline.current.push({ action_id: newId, t_start_ms: recState.recordingTime * 1000 });
+      const el = proMoveRefs.current.get(newId);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setPillAnchorTop(rect.top + rect.height / 2);
       }
-      return;
+    } else {
+      // Deselected — push a null segment for general notes
+      proMoveTimeline.current.push({ action_id: 0, t_start_ms: recState.recordingTime * 1000 });
+      setPillAnchorTop(null);
     }
-
-    const IO_THRESHOLDS = [0, 0.2, 0.5, 0.8, 1];
-    const IO_ROOT_MARGIN = '-10% 0px -35% 0px';
-    const DEBOUNCE_MS = 200;
-
-    const pickBest = () => {
-      let bestId: number | null = null;
-      let bestRatio = 0;
-      let bestTop = Infinity;
-
-      visibilityMapRef.current.forEach(({ ratio, top }, actionId) => {
-        if (ratio > bestRatio || (ratio === bestRatio && top < bestTop)) {
-          bestRatio = ratio;
-          bestTop = top;
-          bestId = actionId;
-        }
-      });
-
-      if (bestId !== null && bestRatio > 0) {
-        const el = proMoveRefs.current.get(bestId);
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          setPillAnchorTop(rect.top + rect.height / 2);
-        }
-
-        setActiveActionId(prev => {
-          if (prev !== bestId) {
-            proMoveTimeline.current.push({
-              action_id: bestId!,
-              t_start_ms: recState.recordingTime * 1000,
-            });
-          }
-          return bestId;
-        });
-      }
-    };
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          const actionId = Number((entry.target as HTMLElement).dataset.actionId);
-          if (isNaN(actionId)) return;
-
-          if (entry.intersectionRatio > 0) {
-            visibilityMapRef.current.set(actionId, {
-              ratio: entry.intersectionRatio,
-              top: entry.boundingClientRect.top,
-            });
-          } else {
-            visibilityMapRef.current.delete(actionId);
-          }
-        });
-
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = setTimeout(pickBest, DEBOUNCE_MS);
-      },
-      { threshold: IO_THRESHOLDS, rootMargin: IO_ROOT_MARGIN }
-    );
-
-    proMoveRefs.current.forEach((el) => observer.observe(el));
-
-    return () => {
-      observer.disconnect();
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
-  }, [recState.isRecording]);
+  }, [recState.isRecording, recState.recordingTime, activeActionId]);
 
   // Fetch or create assessment
   const { data: existingAssessment } = useQuery({

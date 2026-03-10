@@ -186,9 +186,9 @@ export function ClinicalBaselineResults({
     const grouped: GroupedData = {};
     items.forEach((item) => {
       const domain = item.domain_name;
-      if (!grouped[domain]) grouped[domain] = { 4: [], 3: [], 2: [], 1: [] };
+      if (!grouped[domain]) grouped[domain] = { 4: [], 3: [], 2: [], 1: [], 0: [] };
       const score = item.self_score;
-      if (score >= 1 && score <= 4) grouped[domain][score].push(item);
+      if (score >= 0 && score <= 4) grouped[domain][score].push(item);
     });
     return grouped;
   }, [items]);

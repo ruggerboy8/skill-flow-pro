@@ -198,17 +198,31 @@ ${proMoveList.join("\n")}`;
             type: "function",
             function: {
               name: "map_pro_move_notes",
-              description: "Return per-Pro-Move coaching notes extracted from the baseline assessment transcript.",
+              description: "Return coaching notes for each Pro Move discussed in the transcript. You MUST return at least one note.",
               parameters: {
                 type: "object",
                 properties: {
-                  pro_move_notes: {
-                    type: "object",
-                    description: "Object keyed by action_id (as string), with note text as value. Map as many notes as possible from the transcript.",
-                    additionalProperties: { type: "string" },
+                  notes: {
+                    type: "array",
+                    description: "Array of notes, one per Pro Move that was discussed.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        action_id: {
+                          type: "string",
+                          description: "The action_id of the Pro Move this note is for.",
+                        },
+                        note: {
+                          type: "string",
+                          description: "The coaching note for this Pro Move (1-3 sentences, max 500 chars).",
+                        },
+                      },
+                      required: ["action_id", "note"],
+                      additionalProperties: false,
+                    },
                   },
                 },
-                required: ["pro_move_notes"],
+                required: ["notes"],
                 additionalProperties: false,
               },
             },
@@ -240,15 +254,17 @@ ${proMoveList.join("\n")}`;
 
     console.log("[map-baseline] Raw tool_call arguments:", toolCall.function.arguments.slice(0, 1000));
     const result = JSON.parse(toolCall.function.arguments);
-    console.log("[map-baseline] Raw AI result keys:", Object.keys(result.pro_move_notes || {}));
+    const notesArray: { action_id: string; note: string }[] = result.notes || [];
+    console.log("[map-baseline] AI returned", notesArray.length, "notes");
 
-    // Validate: only keep action IDs that were in our target set
+    // Convert array to validated map
     const validNotes: Record<string, string> = {};
-    for (const [key, value] of Object.entries(result.pro_move_notes || {})) {
-      if (targetActionIds.has(key) && typeof value === "string" && value.trim()) {
-        validNotes[key] = (value as string).slice(0, 500);
+    for (const item of notesArray) {
+      const id = String(item.action_id);
+      if (targetActionIds.has(id) && typeof item.note === "string" && item.note.trim()) {
+        validNotes[id] = item.note.slice(0, 500);
       } else {
-        console.log("[map-baseline] Filtered out key:", key, "inTarget?", targetActionIds.has(key));
+        console.log("[map-baseline] Filtered out:", id, "inTarget?", targetActionIds.has(id));
       }
     }
 

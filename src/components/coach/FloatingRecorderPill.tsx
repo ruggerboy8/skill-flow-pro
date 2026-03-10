@@ -47,7 +47,7 @@ export function FloatingRecorderPill({
   return (
     <div
       className={cn(
-        "fixed z-50 flex items-center gap-1",
+        "fixed z-50 flex items-center gap-1 pointer-events-none",
         isMobile 
           ? "bottom-20 left-1/2 -translate-x-1/2 flex-col" 
           : "left-4 flex-row"
@@ -63,7 +63,7 @@ export function FloatingRecorderPill({
     >
       <div
         className={cn(
-          "flex flex-col items-center gap-2 p-3 rounded-2xl",
+          "flex flex-col items-center gap-2 p-3 rounded-2xl pointer-events-auto",
           "bg-background/95 backdrop-blur-sm border shadow-lg",
           isPaused 
             ? "ring-2 ring-amber-500/50" 

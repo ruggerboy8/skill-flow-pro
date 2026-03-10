@@ -156,6 +156,17 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
           onInvite={() => setInviteSessionId(session.id)}
           coachName={coachName}
           doctorName={doctorName}
+          onDelete={async () => {
+            await supabase.from('coaching_session_selections').delete().eq('session_id', session.id);
+            await supabase.from('coaching_meeting_records').delete().eq('session_id', session.id);
+            const { error } = await supabase.from('coaching_sessions').delete().eq('id', session.id);
+            if (error) {
+              toast({ title: 'Error', description: error.message, variant: 'destructive' });
+            } else {
+              queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+              toast({ title: 'Session deleted' });
+            }
+          }}
         />
       ))}
 

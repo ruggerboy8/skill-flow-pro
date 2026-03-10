@@ -267,46 +267,16 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </SheetContent>
       </Sheet>
 
-      {/* Invite to Schedule Dialog */}
-      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send Scheduling Invite</DialogTitle>
-            <DialogDescription>
-              {doctor.name} will receive an email with instructions to schedule using the link below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="scheduling-link">Calendly / Scheduling Link (optional)</Label>
-              <Input
-                id="scheduling-link"
-                type="url"
-                placeholder="https://calendly.com/..."
-                value={schedulingLink}
-                onChange={(e) => setSchedulingLink(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                If no link is provided, the email will ask the doctor to reach out to coordinate a time.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInviteDialog(false)}>Cancel</Button>
-            <Button
-              onClick={() => inviteMutation.mutate({
-                sessionId: prepReadySession?.id,
-                link: schedulingLink || undefined,
-              })}
-              disabled={inviteMutation.isPending}
-              className="gap-2"
-            >
-              <Mail className="h-4 w-4" />
-              {inviteMutation.isPending ? 'Sending…' : 'Send Invite'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Scheduling Invite Composer */}
+      <SchedulingInviteComposer
+        open={showInviteDialog}
+        onOpenChange={setShowInviteDialog}
+        doctorName={doctor.name}
+        doctorEmail={doctor.email}
+        doctorStaffId={doctor.id}
+        sessionId={prepReadySession?.id}
+        onSuccess={handleInviteSuccess}
+      />
     </div>
   );
 }

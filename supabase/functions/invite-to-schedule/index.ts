@@ -124,27 +124,43 @@ serve(async (req) => {
     let emailSent = false;
     if (resendApiKey && doctor.email) {
       const firstName = doctor.name.split(" ")[0];
-      const subject = `${callerStaff.name} would like to schedule your coaching session`;
-      const bodyParts = [
-        `Hi ${firstName},`,
-        "",
-        `${callerStaff.name} has completed their review and is ready to meet with you to discuss your baseline assessment.`,
-        "",
-      ];
+      const coachName = callerStaff.name;
 
-      if (link) {
-        bodyParts.push(`Please use the link below to schedule a time that works for you:`);
-        bodyParts.push(link);
-        bodyParts.push("");
+      // Use custom template if provided, otherwise build default
+      let subject: string;
+      let body: string;
+
+      if (custom_subject && custom_body) {
+        subject = custom_subject
+          .replace(/\{\{first_name\}\}/g, firstName)
+          .replace(/\{\{coach_name\}\}/g, coachName)
+          .replace(/\{\{doctor_name\}\}/g, doctor.name)
+          .replace(/\{\{scheduling_link\}\}/g, link || "[no link provided]");
+        body = custom_body
+          .replace(/\{\{first_name\}\}/g, firstName)
+          .replace(/\{\{coach_name\}\}/g, coachName)
+          .replace(/\{\{doctor_name\}\}/g, doctor.name)
+          .replace(/\{\{scheduling_link\}\}/g, link || "[no link provided]");
       } else {
-        bodyParts.push(`Please reach out to ${callerStaff.name} to find a time that works for your baseline review meeting.`);
-        bodyParts.push("");
+        subject = `${coachName} would like to schedule your coaching session`;
+        const bodyParts = [
+          `Hi ${firstName},`,
+          "",
+          `${coachName} has completed their review and is ready to meet with you to discuss your baseline assessment.`,
+          "",
+        ];
+        if (link) {
+          bodyParts.push("Please use the link below to schedule a time that works for you:");
+          bodyParts.push(link);
+          bodyParts.push("");
+        } else {
+          bodyParts.push(`Please reach out to ${coachName} to find a time that works for your baseline review meeting.`);
+          bodyParts.push("");
+        }
+        bodyParts.push("Looking forward to connecting!");
+        bodyParts.push(`— ${coachName}`);
+        body = bodyParts.join("\n");
       }
-
-      bodyParts.push("Looking forward to connecting!");
-      bodyParts.push(`— ${callerStaff.name}`);
-
-      const body = bodyParts.join("\n");
 
       try {
         const resendRes = await fetch("https://api.resend.com/emails", {

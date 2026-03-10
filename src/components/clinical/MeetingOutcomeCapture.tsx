@@ -122,14 +122,17 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
       });
       if (insErr) throw insErr;
 
+      // Unwrap nested insights key if present
+      const insights = insData?.insights || insData;
+
       // Pre-fill summary
-      if (insData?.summary_html) {
-        const plainText = insData.summary_html.replace(/<[^>]*>/g, '').trim();
+      if (insights?.summary_html) {
+        const plainText = insights.summary_html.replace(/<[^>]*>/g, '').trim();
         if (plainText) setSummary(plainText);
       }
 
       // Pre-fill action steps from growth areas
-      const domainInsights = insData?.domain_insights as any[] | undefined;
+      const domainInsights = insights?.domain_insights as any[] | undefined;
       if (domainInsights?.length) {
         const newExperiments: Experiment[] = [];
         for (const di of domainInsights) {

@@ -332,9 +332,15 @@ function SessionCard({
                     )
                   }
                 </p>
+                {subtitle && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Badge className={`${statusInfo.className} hover:${statusInfo.className}`}>
+                {statusInfo.label}
+              </Badge>
               {showBuildAgenda && (
                 <Button
                   size="sm"
@@ -377,9 +383,6 @@ function SessionCard({
                   Start Meeting
                 </Button>
               )}
-              <Badge className={`${statusInfo.className} hover:${statusInfo.className}`}>
-                {statusInfo.label}
-              </Badge>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button

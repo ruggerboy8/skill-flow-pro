@@ -1,43 +1,50 @@
 
 
-## Comprehensive FK Join Hint Audit
+## Phase 1 — Structural Fixes: Implementation Plan
 
-### Problem Found
+Your gap analysis is sharp and the phasing is well-considered. Phase 1 is entirely UI/flow work with no schema changes — exactly the right place to start. Here's the implementation breakdown:
 
-The database has **two** FK constraints from `locations` to `practice_groups`:
-1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
-2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
+### 1. Collapse ClinicalHome into DoctorManagement (R2.1)
 
-Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
+- Move the 4 stat cards from `ClinicalHome.tsx` into the top of `DoctorManagement.tsx`
+- Update routing in `App.tsx`: change `/clinical` index route from `ClinicalHome` to `DoctorManagement`, remove the separate `/clinical/doctors` route (or redirect it to `/clinical`)
+- Delete or deprecate `ClinicalHome.tsx`
+- Update sidebar/nav links that point to `/clinical/doctors` to point to `/clinical`
 
-### Issues to Fix
+### 2. Redesign DoctorDetail as single scrollable page (R2.3)
 
-**1. Wrong FK hint name (will fail at runtime)**
-These files reference `locations_group_id_fkey` which does not exist as a constraint:
+- Remove the `Tabs` / `TabsList` / `TabsContent` structure from `DoctorDetail.tsx`
+- Replace with a vertical layout:
+  - **Header**: doctor name, status pill, location (keep as-is)
+  - **Next Action Card**: `DoctorNextActionPanel` (keep as-is, always visible)
+  - **Overview actions**: inline the key action cards from `DoctorDetailOverview` (release baseline, build prep, invite to schedule)
+  - **Coaching Thread**: render `DoctorDetailThread` directly below
+  - **Baseline section**: render `DoctorDetailBaseline` inside a `Collapsible` component with a trigger header, so it's accessible but not dominant
 
-| File | Line |
-|------|------|
-| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
-| `src/pages/coach/RemindersTab.tsx` | 148 |
+### 3. Move CoachBaselineWizard to a Sheet (R2.4)
 
-Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
+- In `DoctorDetail.tsx`, replace the full-page conditional render (`if (showCoachWizard) return <CoachBaselineWizard />`) with a `Sheet` (side="right", full width on mobile)
+- The wizard component itself stays the same; it just renders inside a `SheetContent` with `className="sm:max-w-2xl w-full overflow-y-auto"`
+- Pass `onBack` as the sheet's `onOpenChange` handler
 
-**2. Corrupted select syntax (double alias, double parentheses)**
-`src/components/admin/AdminLocationsTab.tsx` line 50 has:
-```
-practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
-```
-This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
-```
-practice_group:practice_groups!locations_org_fkey(name)
-```
+### 4. Soften doctor confirmation (R1.5)
 
-**3. No issues (already correct)**
-- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
-- All `scope_organization_id` references — intentional audit table column ✓
-- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
+- In `doctorStatus.ts`: change `meeting_pending` to show a softer label like "Summary Shared" instead of "Awaiting Doctor Sign-off"; update `nextAction` to "Doctor can review the summary. You can schedule the next session."
+- Remove the `doctor_revision_requested` case from `getDoctorJourneyStatus` (or map it to the same soft status)
+- In `DoctorDetailOverview.tsx`: allow the "Schedule Follow-up" / "Build Prep" action to appear even when the latest session is in `meeting_pending` status
+- In `MeetingConfirmationCard.tsx`: keep the doctor's confirm button but change the copy to "Acknowledge" and don't block CD-side progression
 
-### Summary
+### 5. Remove coach baseline scheduling gate (R1.3)
 
-3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
+- In `doctorStatus.ts`: remove the `director_baseline_pending` blocking logic (lines 120-129). When doctor baseline is completed but coach baseline isn't, show `baseline_submitted` or `ready_for_prep` instead, with a soft nudge like "Tip: Complete your private assessment before the meeting"
+- In `DoctorDetailOverview.tsx`: remove any `canSchedule` gating based on coach baseline status; show the prep/schedule actions regardless
+- Keep a non-blocking info banner: "You haven't completed your private assessment yet" — but don't hide action buttons
+
+### Technical Notes
+
+- No database migrations needed
+- No edge function changes
+- All changes are in ~6 files: `App.tsx` (routing), `DoctorDetail.tsx`, `DoctorDetailOverview.tsx`, `DoctorManagement.tsx`, `doctorStatus.ts`, `ClinicalHome.tsx` (delete/deprecate)
+- The `Collapsible` component from Radix is already installed and exported
+- The `Sheet` component is already available and used elsewhere
 

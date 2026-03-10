@@ -311,7 +311,13 @@ function SessionCard({
                     : (
                       <span className="flex items-center gap-1">
                         <Clock className="h-3.5 w-3.5" />
-                        {session.status === 'scheduled' ? 'Draft — build agenda to proceed' : 'Pending scheduling'}
+                        {session.status === 'scheduled'
+                          ? 'Draft — build agenda to proceed'
+                          : session.status === 'doctor_prep_submitted'
+                          ? 'Ready for meeting'
+                          : session.status === 'director_prep_ready'
+                          ? 'Send invite to schedule'
+                          : 'Awaiting scheduling'}
                       </span>
                     )
                   }

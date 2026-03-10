@@ -249,12 +249,10 @@ function SessionCard({
 
   // Build subtitle
   let subtitle: string | null = null;
-  if (session.status === 'director_prep_ready' && selectionCount != null) {
-    subtitle = `${selectionCount} focus area${selectionCount !== 1 ? 's' : ''} selected`;
-  } else if (session.status === 'scheduling_invite_sent' && selectionCount != null) {
-    subtitle = `${selectionCount} focus area${selectionCount !== 1 ? 's' : ''} · Awaiting doctor's response`;
-  } else if (session.status === 'doctor_prep_submitted' && selectionCount != null) {
-    subtitle = `Doctor submitted prep · ${selectionCount} focus area${selectionCount !== 1 ? 's' : ''}`;
+  if (session.status === 'scheduling_invite_sent') {
+    subtitle = 'Awaiting doctor\'s response';
+  } else if (session.status === 'doctor_prep_submitted') {
+    subtitle = 'Doctor submitted prep';
   } else if ((session.status === 'meeting_pending' || session.status === 'doctor_confirmed') && meetingSummary) {
     subtitle = experimentCount > 0 ? `${experimentCount} action step${experimentCount !== 1 ? 's' : ''}` : null;
   } else if (session.status === 'doctor_revision_requested') {

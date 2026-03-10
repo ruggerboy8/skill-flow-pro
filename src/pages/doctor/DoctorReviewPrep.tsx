@@ -200,7 +200,8 @@ export default function DoctorReviewPrep() {
 
   const coachName = coachInfo?.name || 'Your Coach';
   // Use meeting_link from session (set when invite was sent) — avoids RLS issues
-  const coachSchedulingLink = session?.meeting_link;
+  const rawLink = session?.meeting_link;
+  const coachSchedulingLink = rawLink && !/^https?:\/\//i.test(rawLink) ? `https://${rawLink}` : rawLink;
 
   const coachSelections = allSelections?.filter(s => s.selected_by === 'coach') || [];
   const coachActionIds = coachSelections.map(s => s.action_id);

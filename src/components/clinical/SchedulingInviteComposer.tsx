@@ -109,6 +109,10 @@ export function SchedulingInviteComposer({
     }
   }
 
+  const prepLink = sessionId
+    ? `${window.location.origin}/doctor/review-prep/${sessionId}`
+    : '[prep link — generated after session is created]';
+
   function getPreview(template: string) {
     const coachName = myStaff?.name || 'Coach';
     const firstName = doctorName.split(' ')[0];
@@ -116,7 +120,8 @@ export function SchedulingInviteComposer({
       .replace(/\{\{coach_name\}\}/g, coachName)
       .replace(/\{\{first_name\}\}/g, firstName)
       .replace(/\{\{doctor_name\}\}/g, doctorName)
-      .replace(/\{\{scheduling_link\}\}/g, myStaff?.scheduling_link || '[scheduling link]');
+      .replace(/\{\{scheduling_link\}\}/g, myStaff?.scheduling_link || '[scheduling link]')
+      .replace(/\{\{prep_link\}\}/g, prepLink);
   }
 
   async function sendInvite() {

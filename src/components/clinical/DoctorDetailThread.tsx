@@ -44,8 +44,6 @@ const canInvite = (status: string) => status === 'director_prep_ready';
 const isExpandable = (status: string) =>
   ['director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted', 'meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(status);
 
-// Mid-flow statuses that block adding a new check-in
-const midFlowStatuses = ['scheduled', 'director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted'];
 
 interface Props {
   sessions: Session[];
@@ -114,21 +112,20 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
     );
   }
 
-  const hasMidFlow = sessions.some(s => midFlowStatuses.includes(s.status));
   const sorted = [...sessions].sort((a, b) => b.sequence_number - a.sequence_number);
 
   return (
     <div className="space-y-3">
-      {/* Add Check-in button */}
-      {sessions.length > 0 && !hasMidFlow && (
+      {/* Always-visible Add Coaching Session button above the thread */}
+      {sessions.length > 0 && (
         <Button
           variant="outline"
-          className="w-full gap-2 border-dashed"
+          className="w-full h-12 gap-2 border-dashed text-base font-medium"
           onClick={() => addCheckinMutation.mutate()}
           disabled={addCheckinMutation.isPending}
         >
-          <Plus className="h-4 w-4" />
-          {addCheckinMutation.isPending ? 'Creating…' : 'Add Check-in'}
+          <Plus className="h-5 w-5" />
+          {addCheckinMutation.isPending ? 'Creating…' : 'Add Coaching Session'}
         </Button>
       )}
 

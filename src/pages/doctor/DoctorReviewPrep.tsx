@@ -187,16 +187,19 @@ export default function DoctorReviewPrep() {
     setTimeout(() => setProgressEntries(seeded), 0);
   }
 
-  // Fetch coach name
-  const { data: coachName } = useQuery({
-    queryKey: ['staff-name', session?.coach_staff_id],
+  // Fetch coach info (name + scheduling_link)
+  const { data: coachInfo } = useQuery({
+    queryKey: ['coach-info', session?.coach_staff_id],
     queryFn: async () => {
-      if (!session?.coach_staff_id) return 'Alex';
-      const { data } = await supabase.from('staff').select('name').eq('id', session.coach_staff_id).single();
-      return data?.name || 'Alex';
+      if (!session?.coach_staff_id) return { name: 'Alex', scheduling_link: null };
+      const { data } = await supabase.from('staff').select('name, scheduling_link').eq('id', session.coach_staff_id).single();
+      return { name: data?.name || 'Alex', scheduling_link: data?.scheduling_link || null };
     },
     enabled: !!session?.coach_staff_id,
   });
+
+  const coachName = coachInfo?.name || 'Alex';
+  const coachSchedulingLink = coachInfo?.scheduling_link;
 
   const coachSelections = allSelections?.filter(s => s.selected_by === 'coach') || [];
   const coachActionIds = coachSelections.map(s => s.action_id);

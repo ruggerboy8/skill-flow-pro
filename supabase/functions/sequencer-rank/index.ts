@@ -547,7 +547,7 @@ serve(async (req) => {
 
     // Apply cooldown and pick top 6 for planner
     const eligibleNext = scored.filter(m => m.weeksSince >= config.cooldownWeeks);
-    const nextPicks = [];
+    const nextPicks: typeof scored = [];
     const usedDomains = new Set<number>();
     let relaxedConstraintNote: string | null = null;
 

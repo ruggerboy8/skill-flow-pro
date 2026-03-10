@@ -339,6 +339,15 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     },
   });
 
+  // Show loading while creating session
+  if (!sessionId || isCreatingSession) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   // Guard: if doctor has already submitted, don't allow editing — redirect back
   if (session && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
     onBack();

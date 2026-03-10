@@ -163,7 +163,13 @@ You must call the extract_insights function with structured data.
   - Clerical: Scheduling, paperwork, administrative tasks, organization
   - Cultural: Teamwork, communication, attitude, professional presence
   - Case Acceptance: Treatment presentation, patient education, financial discussions`;
-    const userPrompt = source === 'observation'
+    const userPrompt = source === 'coaching'
+      ? `Please analyze this coaching meeting transcript${staffName ? ` about ${staffName}` : ''} and extract the summary and specific agreed-upon action steps:
+
+---
+${transcript}
+---`
+      : source === 'observation'
       ? `Please analyze this coach's observation recording${staffName ? ` about ${staffName}` : ''} and extract structured, HR-safe insights. Apply the Professional Filter to elevate informal language:
 
 ---

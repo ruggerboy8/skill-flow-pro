@@ -343,10 +343,14 @@ export default function DoctorReviewPrep() {
         </Link>
         <div>
           <h2 className="text-xl font-bold">Prepare for Your {meetingTypeLabel}</h2>
-          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-            <Calendar className="h-3.5 w-3.5" />
-            {formatInTimeZone(new Date(session.scheduled_at), LOCAL_TZ, MEETING_FMT)}
-          </div>
+          {session.scheduled_at ? (
+            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+              <Calendar className="h-3.5 w-3.5" />
+              {formatInTimeZone(new Date(session.scheduled_at), LOCAL_TZ, MEETING_FMT)}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-1">Complete your prep, then schedule when ready.</p>
+          )}
         </div>
       </div>
 

@@ -1,62 +1,35 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, MapPin, Building, Settings } from "lucide-react";
+import { Shield, Users, MapPin, Building, Settings, Building2 } from "lucide-react";
 import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
 import { AdminLocationsTab } from "@/components/admin/AdminLocationsTab";
 import { AdminOrganizationsTab } from "@/components/admin/AdminOrganizationsTab";
 import { AdminGlobalSettingsTab } from "@/components/admin/AdminGlobalSettingsTab";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 export default function AdminPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
-  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { isSuperAdmin, isOrgAdmin, canAccessAdmin, isLoading } = useUserRole();
 
   const activeTab = searchParams.get("tab") || "users";
-
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) {
-        navigate("/");
-        return;
-      }
-
-      try {
-        const { data: staffData, error } = await supabase
-          .from("staff")
-          .select("is_super_admin, is_org_admin")
-          .eq("user_id", user.id)
-          .single();
-
-        // Allow access if user is super admin OR org admin
-        if (error || (!staffData?.is_super_admin && !staffData?.is_org_admin)) {
-          navigate("/");
-          return;
-        }
-
-        setIsSuperAdmin(true);
-      } catch (error) {
-        console.error("Error checking admin status:", error);
-        navigate("/");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAdminStatus();
-  }, [user, navigate]);
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
   };
 
-  if (loading) {
+  // Guard: org admins and platform admins only
+  useEffect(() => {
+    if (!isLoading && !canAccessAdmin) {
+      navigate("/");
+    }
+  }, [isLoading, canAccessAdmin, navigate]);
+
+  if (isLoading) {
     return (
       <div className="container mx-auto py-8 space-y-8">
         <div className="flex items-center space-x-3">
@@ -71,7 +44,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!isSuperAdmin) {
+  if (!canAccessAdmin) {
     return (
       <div className="container mx-auto py-8">
         <Card className="max-w-md mx-auto">
@@ -79,7 +52,7 @@ export default function AdminPage() {
             <Shield className="mx-auto h-12 w-12 text-muted-foreground" />
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>
-              This area is restricted to super administrators only.
+              This area is restricted to administrators only.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -89,14 +62,26 @@ export default function AdminPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <div className="flex items-center space-x-3">
-        <Shield className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold">Administration</h1>
-          <p className="text-muted-foreground">
-            Manage users, locations, and group settings
-          </p>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center space-x-3">
+          <Shield className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">Administration</h1>
+            <p className="text-muted-foreground">
+              Manage users, locations, and group settings
+            </p>
+          </div>
         </div>
+
+        {/* Platform Console shortcut — platform admins only */}
+        {isSuperAdmin && (
+          <Button variant="outline" asChild>
+            <Link to="/platform">
+              <Building2 className="h-4 w-4 mr-2" />
+              Platform Console
+            </Link>
+          </Button>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">

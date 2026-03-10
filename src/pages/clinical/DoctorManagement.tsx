@@ -244,6 +244,9 @@ export default function DoctorManagement() {
                       <span className="text-sm text-muted-foreground">{doctor.journeyStatus.nextAction}</span>
                     </TableCell>
                     <TableCell>
+                      <InlineAction stage={doctor.journeyStatus.stage} doctorId={doctor.id} navigate={navigate} />
+                    </TableCell>
+                    <TableCell>
                       {doctor.nextMeeting
                         ? format(new Date(doctor.nextMeeting), 'MMM d, yyyy')
                         : <span className="text-muted-foreground">—</span>

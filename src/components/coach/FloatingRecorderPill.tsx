@@ -15,6 +15,8 @@ interface FloatingRecorderPillProps {
   showArrow?: boolean;
   /** Always show Start Over, not just when paused */
   alwaysShowStartOver?: boolean;
+  /** When provided, pill tracks this vertical position (px from viewport top) instead of centering */
+  anchorTop?: number | null;
 }
 
 export function FloatingRecorderPill({

@@ -3183,6 +3183,7 @@ export type Database = {
           material_count: number
         }[]
       }
+      get_my_coach_staff_ids: { Args: { _user_id: string }; Returns: string[] }
       get_my_weekly_scores: {
         Args: { p_week_of?: string }
         Returns: {

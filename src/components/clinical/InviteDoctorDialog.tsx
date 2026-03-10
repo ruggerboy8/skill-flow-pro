@@ -31,6 +31,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
   const [name, setName] = useState('');
   const [groupId, setGroupId] = useState('');
   const [locationId, setLocationId] = useState('__roaming__');
+  const [releaseBaseline, setReleaseBaseline] = useState(true);
 
   // Fetch practice groups
   const { data: practiceGroups } = useQuery({

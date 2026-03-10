@@ -133,8 +133,8 @@ function AppRoutes() {
 
         {/* Clinical Director Routes */}
         <Route path="clinical" element={<ClinicalLayout />}>
-          <Route index element={<ClinicalHome />} />
-          <Route path="doctors" element={<DoctorManagement />} />
+          <Route index element={<DoctorManagement />} />
+          <Route path="doctors" element={<Navigate to="/clinical" replace />} />
           <Route path="doctors/:staffId" element={<DoctorDetail />} />
           <Route path="pro-moves" element={<DoctorProMoveLibrary />} />
         </Route>

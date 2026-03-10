@@ -87,7 +87,7 @@ export function FloatingRecorderPill({
         </button>
 
         {/* Start Over button */}
-        {isPaused && onStartOver && (
+        {(isPaused || alwaysShowStartOver) && onStartOver && (
           <Button
             variant="ghost"
             size="sm"
@@ -99,8 +99,8 @@ export function FloatingRecorderPill({
           </Button>
         )}
 
-        {/* Done? pill - only when paused */}
-        {isPaused && (
+        {/* Done? pill - only when paused and no alwaysShowStartOver (bottom bar handles it) */}
+        {isPaused && !alwaysShowStartOver && (
           <Button
             variant="destructive"
             size="sm"

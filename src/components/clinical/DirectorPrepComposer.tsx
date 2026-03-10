@@ -308,7 +308,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
       setPublished(true);
-      toast({ title: 'Prep published', description: 'The doctor can now see and complete their part.' });
+      setShowInviteDialog(true);
     },
     onError: (err: any) => {
       toast({ title: 'Error publishing prep', description: err.message, variant: 'destructive' });

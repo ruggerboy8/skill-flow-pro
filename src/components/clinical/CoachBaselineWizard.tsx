@@ -168,8 +168,22 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     },
   });
 
+  // Get flat list of all action_ids for "first pro move" logic
+  const allActionIds = domains?.flatMap(d => d.proMoves.map(pm => pm.action_id)) ?? [];
+
+  // When recording starts, immediately highlight the first pro move
   useEffect(() => {
-    if (existingAssessment?.id) {
+    if (recState.isRecording && activeActionId === null && allActionIds.length > 0) {
+      const firstId = allActionIds[0];
+      setActiveActionId(firstId);
+      proMoveTimeline.current.push({ action_id: firstId, t_start_ms: 0 });
+    }
+    if (!recState.isRecording) {
+      setActiveActionId(null);
+    }
+  }, [recState.isRecording]);
+
+
       setAssessmentId(existingAssessment.id);
       if (existingAssessment.status === 'completed') setIsComplete(true);
     }

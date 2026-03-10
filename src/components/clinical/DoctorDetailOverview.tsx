@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Video, Send, CalendarPlus, Mail } from 'lucide-react';
-import { format } from 'date-fns';
+import { FileText, Send, Mail } from 'lucide-react';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
@@ -59,9 +58,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
   };
 
-  // Find session with prep ready (director has completed prep but hasn't invited yet)
   const prepReadySession = sessions.find(s => s.status === 'director_prep_ready');
-  // Find session that needs prep built (just "scheduled" — legacy, or no session yet)
   const needsPrepSession = sessions.find(s => s.status === 'scheduled');
   const viewablePrepSession = sessions.find(s => ['director_prep_ready', 'scheduling_invite_sent', 'doctor_confirmed', 'meeting_pending'].includes(s.status));
 
@@ -123,10 +120,11 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     );
   }
 
-  const hasActiveSession = sessions.some(s =>
-    ['scheduled', 'director_prep_ready', 'scheduling_invite_sent', 'meeting_pending', 'doctor_revision_requested'].includes(s.status)
+  // R1.3 & R1.5: Allow prep/schedule even when meeting_pending or coach baseline incomplete
+  const hasActiveNonSoftSession = sessions.some(s =>
+    ['scheduled', 'director_prep_ready', 'scheduling_invite_sent'].includes(s.status)
   );
-  const canBuildPrep = baseline?.status === 'completed' && !hasActiveSession;
+  const canBuildPrep = baseline?.status === 'completed' && !hasActiveNonSoftSession;
   const hasConfirmedSession = sessions.some(s => s.status === 'doctor_confirmed');
   const isNotReleased = journeyStatus.stage === 'invited';
 
@@ -156,7 +154,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </Card>
       )}
 
-      {/* Build Prep — both baselines complete, no active session */}
+      {/* Build Prep — baseline complete, no active session blocking */}
       {canBuildPrep && (
         <Card className="border-dashed">
           <CardContent className="flex items-center justify-between py-4">
@@ -165,14 +163,10 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
               <p className="text-xs text-muted-foreground">
                 {hasConfirmedSession
                   ? 'Build the agenda for the next follow-up check-in.'
-                  : 'Both baselines are complete. Build your meeting agenda before inviting to schedule.'}
+                  : 'Baseline is complete. Build your meeting agenda before inviting to schedule.'}
               </p>
             </div>
-            <Button onClick={() => {
-              // Create a session in "scheduled" status for prep, then open composer
-              // We'll handle this by going into prep mode directly
-              setPrepSessionId('new');
-            }} className="gap-2">
+            <Button onClick={() => setPrepSessionId('new')} className="gap-2">
               <FileText className="h-4 w-4" />
               Build Meeting Agenda
             </Button>
@@ -197,7 +191,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         </Card>
       )}
 
-      {/* Invite to Schedule — prep is done, ready to send invite */}
+      {/* Invite to Schedule — prep is done */}
       {prepReadySession && (
         <Card className="border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/30">
           <CardContent className="flex items-center justify-between py-4">

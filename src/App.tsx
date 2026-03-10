@@ -48,7 +48,7 @@ import DomainDetail from "@/pages/my-role/DomainDetail";
 
 // Clinical Director pages
 import ClinicalLayout from "@/pages/clinical/ClinicalLayout";
-import ClinicalHome from "@/pages/clinical/ClinicalHome";
+// ClinicalHome collapsed into DoctorManagement (Phase 1 R2.1)
 import DoctorManagement from "@/pages/clinical/DoctorManagement";
 import DoctorProMoveLibrary from "@/pages/clinical/DoctorProMoveLibrary";
 import DoctorDetail from "@/pages/clinical/DoctorDetail";
@@ -133,8 +133,8 @@ function AppRoutes() {
 
         {/* Clinical Director Routes */}
         <Route path="clinical" element={<ClinicalLayout />}>
-          <Route index element={<ClinicalHome />} />
-          <Route path="doctors" element={<DoctorManagement />} />
+          <Route index element={<DoctorManagement />} />
+          <Route path="doctors" element={<Navigate to="/clinical" replace />} />
           <Route path="doctors/:staffId" element={<DoctorDetail />} />
           <Route path="pro-moves" element={<DoctorProMoveLibrary />} />
         </Route>

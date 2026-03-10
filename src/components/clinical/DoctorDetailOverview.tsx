@@ -128,11 +128,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   const hasConfirmedSession = sessions.some(s => s.status === 'doctor_confirmed');
   const isNotReleased = journeyStatus.stage === 'invited';
 
-  // Load the coach's saved scheduling link for the invite dialog
-  const handleOpenInviteDialog = () => {
-    setSchedulingLink((myStaff as any)?.scheduling_link || '');
-    setShowInviteDialog(true);
-  };
+  const handleOpenInviteDialog = () => setShowInviteDialog(true);
 
   return (
     <div className="space-y-4">

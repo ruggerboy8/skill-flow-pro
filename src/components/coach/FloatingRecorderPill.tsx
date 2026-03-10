@@ -63,7 +63,7 @@ export function FloatingRecorderPill({
     >
       <div
         className={cn(
-          "flex flex-col items-center gap-2 p-3 rounded-2xl",
+          "flex flex-col items-center gap-2 p-3 rounded-2xl pointer-events-auto",
           "bg-background/95 backdrop-blur-sm border shadow-lg",
           isPaused 
             ? "ring-2 ring-amber-500/50" 

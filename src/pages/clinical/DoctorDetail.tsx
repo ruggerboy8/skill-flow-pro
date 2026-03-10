@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MapPin, ChevronDown, FlaskConical, TrendingUp } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronDown, TrendingUp } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
@@ -13,7 +13,7 @@ import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
 import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
 import { DoctorGrowthTimeline } from '@/components/clinical/DoctorGrowthTimeline';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -134,7 +134,7 @@ export default function DoctorDetail() {
       {/* Next Action — always visible */}
       <DoctorNextActionPanel status={journeyStatus} />
 
-      {/* Overview Actions (release baseline, build prep, invite, etc.) */}
+      {/* Pre-session actions (release baseline, notify doctor) */}
       <DoctorDetailOverview
         doctor={doctor}
         baseline={baseline}
@@ -142,13 +142,16 @@ export default function DoctorDetail() {
         journeyStatus={journeyStatus}
       />
 
-      {/* Coaching Thread — inline */}
+      {/* Coaching Thread — the single hub for all session actions */}
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <FlaskConical className="h-5 w-5 text-muted-foreground" />
-          Coaching Thread
-        </h2>
-        <DoctorDetailThread sessions={sessions || []} coachName={myStaff?.name} doctorName={doctor.name} />
+        <h2 className="text-lg font-semibold">Coaching Thread</h2>
+        <DoctorDetailThread
+          sessions={sessions || []}
+          coachName={myStaff?.name}
+          doctorName={doctor.name}
+          doctorStaffId={staffId!}
+          doctorEmail={doctor.email}
+        />
       </div>
 
       {/* Growth Timeline — collapsible */}
@@ -186,7 +189,7 @@ export default function DoctorDetail() {
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Coach Baseline Wizard — Sheet instead of full-page replacement */}
+      {/* Coach Baseline Wizard */}
       <Sheet open={showCoachWizard} onOpenChange={setShowCoachWizard}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-0">
           <div className="p-6">

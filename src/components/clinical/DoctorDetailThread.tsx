@@ -1,14 +1,18 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock } from 'lucide-react';
+import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock, FileText, Mail, Plus } from 'lucide-react';
 import { MeetingOutcomeCapture } from '@/components/clinical/MeetingOutcomeCapture';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
+import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
+import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useToast } from '@/hooks/use-toast';
 
 interface Session {
   id: string;
@@ -16,27 +20,90 @@ interface Session {
   sequence_number: number;
   status: string;
   scheduled_at: string | null;
+  meeting_link?: string | null;
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
-  scheduled: { label: 'Scheduled', className: 'bg-blue-100 text-blue-800' },
-  director_prep_ready: { label: 'Prep Sent', className: 'bg-amber-100 text-amber-800' },
+  scheduled: { label: 'Draft', className: 'bg-muted text-muted-foreground' },
+  director_prep_ready: { label: 'Agenda Ready', className: 'bg-amber-100 text-amber-800' },
   scheduling_invite_sent: { label: 'Pending Scheduling', className: 'bg-blue-100 text-blue-800' },
+  doctor_prep_submitted: { label: 'Doctor Prepped', className: 'bg-emerald-100 text-emerald-800' },
   meeting_pending: { label: 'Summary Shared', className: 'bg-purple-100 text-purple-800' },
   doctor_confirmed: { label: 'Confirmed', className: 'bg-green-100 text-green-800' },
   doctor_revision_requested: { label: 'Doctor Left a Note', className: 'bg-amber-100 text-amber-800' },
 };
 
+const canCaptureStatus = (status: string) =>
+  ['scheduling_invite_sent', 'doctor_prep_submitted', 'doctor_revision_requested'].includes(status);
+
+const canBuildAgenda = (status: string) => status === 'scheduled';
+
+const canInvite = (status: string) => status === 'director_prep_ready';
+
+const isExpandable = (status: string) =>
+  ['director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted', 'meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(status);
+
+// Mid-flow statuses that block adding a new check-in
+const midFlowStatuses = ['scheduled', 'director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted'];
+
 interface Props {
   sessions: Session[];
   coachName?: string;
   doctorName?: string;
+  doctorStaffId: string;
+  doctorEmail: string;
 }
 
-export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor' }: Props) {
+export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail }: Props) {
+  const { data: myStaff } = useStaffProfile();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [captureSessionId, setCaptureSessionId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [prepSessionId, setPrepSessionId] = useState<string | null>(null);
+  const [inviteSessionId, setInviteSessionId] = useState<string | null>(null);
 
+  // Add Check-in mutation
+  const addCheckinMutation = useMutation({
+    mutationFn: async () => {
+      if (!myStaff?.id) throw new Error('Not authenticated');
+      const maxSeq = sessions.reduce((max, s) => Math.max(max, s.sequence_number), 0);
+      const { error } = await supabase.from('coaching_sessions').insert({
+        doctor_staff_id: doctorStaffId,
+        coach_staff_id: myStaff.id,
+        session_type: 'follow_up',
+        sequence_number: maxSeq + 1,
+        status: 'scheduled',
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+      toast({ title: 'Check-in added', description: 'New follow-up session created. Build your agenda to get started.' });
+    },
+    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
+
+  const handleInviteSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
+    setInviteSessionId(null);
+  };
+
+  // Full-page prep composer
+  if (prepSessionId) {
+    return (
+      <DirectorPrepComposer
+        sessionId={prepSessionId}
+        doctorStaffId={doctorStaffId}
+        doctorName={doctorName}
+        doctorEmail={doctorEmail}
+        onBack={() => setPrepSessionId(null)}
+      />
+    );
+  }
+
+  // Full-page meeting capture
   if (captureSessionId) {
     return (
       <MeetingOutcomeCapture
@@ -46,41 +113,61 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
     );
   }
 
-  if (sessions.length === 0) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
-          <p className="text-muted-foreground">No coaching sessions yet.</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Complete your prep above to begin the coaching thread.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const sorted = [...sessions].sort((a, b) => a.sequence_number - b.sequence_number);
-  // Start Meeting is now available for scheduling_invite_sent (director is ready to meet)
-  // and doctor_revision_requested
-  const canCapture = (status: string) => ['scheduling_invite_sent', 'doctor_revision_requested'].includes(status);
-  const isExpandable = (status: string) => ['director_prep_ready', 'scheduling_invite_sent', 'meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(status);
+  const hasMidFlow = sessions.some(s => midFlowStatuses.includes(s.status));
+  const sorted = [...sessions].sort((a, b) => b.sequence_number - a.sequence_number);
 
   return (
     <div className="space-y-3">
+      {/* Add Check-in button */}
+      {sessions.length > 0 && !hasMidFlow && (
+        <Button
+          variant="outline"
+          className="w-full gap-2 border-dashed"
+          onClick={() => addCheckinMutation.mutate()}
+          disabled={addCheckinMutation.isPending}
+        >
+          <Plus className="h-4 w-4" />
+          {addCheckinMutation.isPending ? 'Creating…' : 'Add Check-in'}
+        </Button>
+      )}
+
+      {sessions.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
+            <p className="text-muted-foreground">No coaching sessions yet.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Complete your prep above to begin the coaching thread.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {sorted.map((session) => (
         <SessionCard
           key={session.id}
           session={session}
           expanded={expandedId === session.id}
           onToggle={() => setExpandedId(expandedId === session.id ? null : session.id)}
-          canCapture={canCapture(session.status)}
-          isExpandable={isExpandable(session.status)}
           onCapture={() => setCaptureSessionId(session.id)}
+          onBuildAgenda={() => setPrepSessionId(session.id)}
+          onEditAgenda={() => setPrepSessionId(session.id)}
+          onInvite={() => setInviteSessionId(session.id)}
           coachName={coachName}
           doctorName={doctorName}
         />
       ))}
+
+      {/* Scheduling Invite Composer */}
+      <SchedulingInviteComposer
+        open={!!inviteSessionId}
+        onOpenChange={(open) => { if (!open) setInviteSessionId(null); }}
+        doctorName={doctorName}
+        doctorEmail={doctorEmail}
+        doctorStaffId={doctorStaffId}
+        sessionId={inviteSessionId ?? undefined}
+        onSuccess={handleInviteSuccess}
+      />
     </div>
   );
 }
@@ -89,25 +176,32 @@ function SessionCard({
   session,
   expanded,
   onToggle,
-  canCapture,
-  isExpandable,
   onCapture,
+  onBuildAgenda,
+  onEditAgenda,
+  onInvite,
   coachName,
   doctorName,
 }: {
   session: Session;
   expanded: boolean;
   onToggle: () => void;
-  canCapture: boolean;
-  isExpandable: boolean;
   onCapture: () => void;
+  onBuildAgenda: () => void;
+  onEditAgenda: () => void;
+  onInvite: () => void;
   coachName: string;
   doctorName: string;
 }) {
   const statusInfo = statusLabels[session.status] || { label: session.status, className: 'bg-muted text-muted-foreground' };
   const typeLabel = session.session_type === 'baseline_review'
     ? 'Baseline Review'
-    : `Follow-up ${session.sequence_number - 1}`;
+    : `Check-in ${session.sequence_number - 1}`;
+
+  const expandableStatus = isExpandable(session.status);
+  const showCapture = canCaptureStatus(session.status);
+  const showBuildAgenda = canBuildAgenda(session.status);
+  const showInvite = canInvite(session.status);
 
   const { data: sessionFull } = useQuery({
     queryKey: ['coaching-session', session.id],
@@ -154,7 +248,7 @@ function SessionCard({
         <CollapsibleTrigger asChild>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 py-4 cursor-pointer hover:bg-muted/30">
             <div className="flex items-center gap-3">
-              {isExpandable && (
+              {expandableStatus && (
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
               )}
               <div>
@@ -165,7 +259,7 @@ function SessionCard({
                     : (
                       <span className="flex items-center gap-1">
                         <Clock className="h-3.5 w-3.5" />
-                        Pending scheduling
+                        {session.status === 'scheduled' ? 'Draft — build agenda to proceed' : 'Pending scheduling'}
                       </span>
                     )
                   }
@@ -173,7 +267,38 @@ function SessionCard({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {canCapture && (
+              {showBuildAgenda && (
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={(e) => { e.stopPropagation(); onBuildAgenda(); }}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Build Agenda
+                </Button>
+              )}
+              {showInvite && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={(e) => { e.stopPropagation(); onEditAgenda(); }}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Edit Agenda
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={(e) => { e.stopPropagation(); onInvite(); }}
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                    Invite to Schedule
+                  </Button>
+                </>
+              )}
+              {showCapture && (
                 <Button
                   size="sm"
                   variant="outline"

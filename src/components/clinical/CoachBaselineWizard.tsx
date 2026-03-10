@@ -48,20 +48,6 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
 
   const { state: recState, controls: recControls } = useAudioRecording();
 
-  // Get flat list of all action_ids for "first pro move" logic
-  const allActionIds = domains?.flatMap(d => d.proMoves.map(pm => pm.action_id)) ?? [];
-
-  // When recording starts, immediately highlight the first pro move
-  useEffect(() => {
-    if (recState.isRecording && activeActionId === null && allActionIds.length > 0) {
-      const firstId = allActionIds[0];
-      setActiveActionId(firstId);
-      proMoveTimeline.current.push({ action_id: firstId, t_start_ms: 0 });
-    }
-    if (!recState.isRecording) {
-      setActiveActionId(null);
-    }
-  }, [recState.isRecording]);
 
   // IntersectionObserver for pro-move tracking during recording
   // Use a narrow rootMargin band around the vertical center of the viewport

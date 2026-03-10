@@ -74,12 +74,17 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
           description: 'Group updated successfully'
         });
       } else {
-        // Create new organization
+        // Fetch parent organization_id
+        const { data: orgs } = await supabase.from('organizations').select('id').limit(1).single();
+        if (!orgs) throw new Error('No parent organization found');
+
+        const slug = formData.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         const { error } = await supabase
           .from('practice_groups')
           .insert({
             name: formData.name,
-            slug: formData.slug
+            slug,
+            organization_id: orgs.id,
           });
 
         if (error) throw error;

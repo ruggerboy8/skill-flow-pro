@@ -1159,6 +1159,96 @@ export type Database = {
           },
         ]
       }
+      organization_role_names: {
+        Row: {
+          display_name: string
+          id: string
+          org_id: string
+          role_id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          display_name: string
+          id?: string
+          org_id: string
+          role_id: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          display_name?: string
+          id?: string
+          org_id?: string
+          role_id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_role_names_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_role_names_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "organization_role_names_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "organization_role_names_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_role_names_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          practice_type: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          practice_type?: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          practice_type?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       orphaned_scores_log: {
         Row: {
           action_id: number | null
@@ -1196,6 +1286,7 @@ export type Database = {
           id: string
           is_sandbox: boolean | null
           name: string
+          organization_id: string
           slug: string
         }
         Insert: {
@@ -1204,6 +1295,7 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           name: string
+          organization_id: string
           slug: string
         }
         Update: {
@@ -1212,9 +1304,18 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           name?: string
+          organization_id?: string
           slug?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "practice_groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pro_move_resources: {
         Row: {
@@ -1314,6 +1415,7 @@ export type Database = {
           date_added: string | null
           description: string | null
           intervention_text: string | null
+          practice_type: string
           resources_url: string | null
           retired_at: string | null
           retired_by: string | null
@@ -1332,6 +1434,7 @@ export type Database = {
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
+          practice_type?: string
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null
@@ -1350,6 +1453,7 @@ export type Database = {
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
+          practice_type?: string
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null
@@ -1503,14 +1607,17 @@ export type Database = {
       }
       roles: {
         Row: {
+          role_code: string | null
           role_id: number
           role_name: string | null
         }
         Insert: {
+          role_code?: string | null
           role_id: number
           role_name?: string | null
         }
         Update: {
+          role_code?: string | null
           role_id?: number
           role_name?: string | null
         }
@@ -1939,6 +2046,72 @@ export type Database = {
             foreignKeyName: "user_backlog_v2_staff_id_fkey"
             columns: ["staff_id"]
             isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
+      user_capabilities: {
+        Row: {
+          can_invite_users: boolean
+          can_manage_library: boolean
+          can_manage_locations: boolean
+          can_manage_users: boolean
+          can_review_evals: boolean
+          can_submit_evals: boolean
+          can_view_submissions: boolean
+          created_at: string
+          is_org_admin: boolean
+          is_participant: boolean
+          is_platform_admin: boolean
+          participation_start_at: string | null
+          staff_id: string
+          updated_at: string
+        }
+        Insert: {
+          can_invite_users?: boolean
+          can_manage_library?: boolean
+          can_manage_locations?: boolean
+          can_manage_users?: boolean
+          can_review_evals?: boolean
+          can_submit_evals?: boolean
+          can_view_submissions?: boolean
+          created_at?: string
+          is_org_admin?: boolean
+          is_participant?: boolean
+          is_platform_admin?: boolean
+          participation_start_at?: string | null
+          staff_id: string
+          updated_at?: string
+        }
+        Update: {
+          can_invite_users?: boolean
+          can_manage_library?: boolean
+          can_manage_locations?: boolean
+          can_manage_users?: boolean
+          can_review_evals?: boolean
+          can_submit_evals?: boolean
+          can_view_submissions?: boolean
+          created_at?: string
+          is_org_admin?: boolean
+          is_participant?: boolean
+          is_platform_admin?: boolean
+          participation_start_at?: string | null
+          staff_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_capabilities_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: true
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_capabilities_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: true
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
           },
@@ -2793,6 +2966,7 @@ export type Database = {
         Args: { p_eval_id: string }
         Returns: Json
       }
+      current_user_org_id: { Args: never; Returns: string }
       delete_latest_week_data: { Args: { p_user_id: string }; Returns: Json }
       delete_week_data: {
         Args: {
@@ -3332,6 +3506,10 @@ export type Database = {
       resolve_backlog_item: {
         Args: { p_action_id: number; p_staff_id: string }
         Returns: undefined
+      }
+      resolve_role_display_name: {
+        Args: { p_org_id: string; p_role_id: number }
+        Returns: string
       }
       retime_backfill_cycle:
         | {

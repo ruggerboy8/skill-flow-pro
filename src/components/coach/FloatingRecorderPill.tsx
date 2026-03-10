@@ -13,6 +13,8 @@ interface FloatingRecorderPillProps {
   onStartOver?: () => void;
   activeCompetencyLabel?: string;
   showArrow?: boolean;
+  /** Always show Start Over, not just when paused */
+  alwaysShowStartOver?: boolean;
 }
 
 export function FloatingRecorderPill({

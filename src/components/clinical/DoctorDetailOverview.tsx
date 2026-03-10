@@ -36,7 +36,6 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
   const [prepSessionId, setPrepSessionId] = useState<string | null>(null);
   const [showPrepSheet, setShowPrepSheet] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [schedulingLink, setSchedulingLink] = useState('');
 
   const releaseMutation = useMutation({
     mutationFn: async () => {

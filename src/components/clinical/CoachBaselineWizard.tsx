@@ -57,84 +57,85 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   // Anchor top for the floating pill (tracks active card position)
   const [pillAnchorTop, setPillAnchorTop] = useState<number | null>(null);
 
-  // Scroll-based proximity tracking for pro-move during recording
-  const pendingSwitchRef = useRef<{ actionId: number; timer: ReturnType<typeof setTimeout> } | null>(null);
-  const rafRef = useRef<number>(0);
+  // IntersectionObserver-based tracking for pro-move during recording
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibilityMapRef = useRef<Map<number, { ratio: number; top: number }>>(new Map());
 
   useEffect(() => {
     if (!recState.isRecording) {
-      if (pendingSwitchRef.current) {
-        clearTimeout(pendingSwitchRef.current.timer);
-        pendingSwitchRef.current = null;
+      visibilityMapRef.current.clear();
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
       }
-      cancelAnimationFrame(rafRef.current);
       return;
     }
 
-    const READING_LINE = 0.30;
-    const DEBOUNCE_MS = 150;
+    const IO_THRESHOLDS = [0, 0.2, 0.5, 0.8, 1];
+    const IO_ROOT_MARGIN = '-10% 0px -35% 0px';
+    const DEBOUNCE_MS = 200;
 
-    const updateTracking = () => {
-      const viewportH = window.innerHeight;
-      const targetY = viewportH * READING_LINE;
-      let closestId: number | null = null;
-      let closestDist = Infinity;
-      let closestTop = targetY;
+    const pickBest = () => {
+      let bestId: number | null = null;
+      let bestRatio = 0;
+      let bestTop = Infinity;
 
-      proMoveRefs.current.forEach((el, actionId) => {
-        const rect = el.getBoundingClientRect();
-        const cardCenter = rect.top + rect.height / 2;
-        const dist = Math.abs(cardCenter - targetY);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestId = actionId;
-          closestTop = rect.top + rect.height / 2;
+      visibilityMapRef.current.forEach(({ ratio, top }, actionId) => {
+        if (ratio > bestRatio || (ratio === bestRatio && top < bestTop)) {
+          bestRatio = ratio;
+          bestTop = top;
+          bestId = actionId;
         }
       });
 
-      if (closestId !== null) {
-        setPillAnchorTop(closestTop);
-      }
-
-      if (closestId !== null && closestId !== activeActionId) {
-        if (pendingSwitchRef.current?.actionId === closestId) {
-          // Already waiting for this one
-        } else {
-          if (pendingSwitchRef.current) clearTimeout(pendingSwitchRef.current.timer);
-          const capturedId = closestId;
-          pendingSwitchRef.current = {
-            actionId: capturedId,
-            timer: setTimeout(() => {
-              setActiveActionId(prev => {
-                if (prev !== capturedId) {
-                  proMoveTimeline.current.push({
-                    action_id: capturedId,
-                    t_start_ms: recState.recordingTime * 1000,
-                  });
-                }
-                return capturedId;
-              });
-              pendingSwitchRef.current = null;
-            }, DEBOUNCE_MS),
-          };
+      if (bestId !== null && bestRatio > 0) {
+        const el = proMoveRefs.current.get(bestId);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          setPillAnchorTop(rect.top + rect.height / 2);
         }
+
+        setActiveActionId(prev => {
+          if (prev !== bestId) {
+            proMoveTimeline.current.push({
+              action_id: bestId!,
+              t_start_ms: recState.recordingTime * 1000,
+            });
+          }
+          return bestId;
+        });
       }
     };
 
-    const onScroll = () => {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(updateTracking);
-    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          const actionId = Number((entry.target as HTMLElement).dataset.actionId);
+          if (isNaN(actionId)) return;
 
-    updateTracking();
+          if (entry.intersectionRatio > 0) {
+            visibilityMapRef.current.set(actionId, {
+              ratio: entry.intersectionRatio,
+              top: entry.boundingClientRect.top,
+            });
+          } else {
+            visibilityMapRef.current.delete(actionId);
+          }
+        });
 
-    window.addEventListener('scroll', onScroll, { passive: true });
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(pickBest, DEBOUNCE_MS);
+      },
+      { threshold: IO_THRESHOLDS, rootMargin: IO_ROOT_MARGIN }
+    );
+
+    proMoveRefs.current.forEach((el) => observer.observe(el));
+
     return () => {
-      window.removeEventListener('scroll', onScroll);
-      cancelAnimationFrame(rafRef.current);
-      if (pendingSwitchRef.current) clearTimeout(pendingSwitchRef.current.timer);
+      observer.disconnect();
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [recState.isRecording, activeActionId]);
+  }, [recState.isRecording]);
 
   // Fetch or create assessment
   const { data: existingAssessment } = useQuery({

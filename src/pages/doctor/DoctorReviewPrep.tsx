@@ -421,7 +421,7 @@ export default function DoctorReviewPrep() {
           {coachSelections.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                {coachName}'s Focus Areas
+                Focus Areas
               </p>
               <div className="space-y-2">
                 {coachSelections.map(sel => (

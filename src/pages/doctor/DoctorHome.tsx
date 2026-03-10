@@ -52,6 +52,7 @@ export default function DoctorHome() {
     null, // doctor doesn't see coach baseline
     sessions || [],
     staff?.baseline_released_at,
+    'doctor',
   );
 
   const displayName = staff?.name || 'Doctor';

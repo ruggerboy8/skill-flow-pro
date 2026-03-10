@@ -210,6 +210,20 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
             </p>
           </div>
 
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="release-baseline" className="text-sm font-medium">Release baseline immediately</Label>
+              <p className="text-xs text-muted-foreground">
+                Allow the doctor to start their self-assessment as soon as they accept the invite
+              </p>
+            </div>
+            <Switch
+              id="release-baseline"
+              checked={releaseBaseline}
+              onCheckedChange={setReleaseBaseline}
+            />
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

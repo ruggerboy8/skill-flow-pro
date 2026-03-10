@@ -518,6 +518,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           activeCompetencyLabel={getActiveLabel()}
           showArrow
           alwaysShowStartOver
+          anchorTop={pillAnchorTop}
         />
       )}
 

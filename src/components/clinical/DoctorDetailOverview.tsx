@@ -314,6 +314,15 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         sessionId={prepReadySession?.id}
         onSuccess={handleInviteSuccess}
       />
+
+      {/* Notify Doctor Dialog */}
+      <NotifyDoctorDialog
+        open={showNotifyDialog}
+        onOpenChange={setShowNotifyDialog}
+        doctorName={doctor.name}
+        doctorEmail={doctor.email}
+        doctorStaffId={doctor.id}
+      />
     </div>
   );
 }

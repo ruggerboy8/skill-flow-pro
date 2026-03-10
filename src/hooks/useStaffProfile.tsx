@@ -27,6 +27,7 @@ export interface StaffProfile {
   home_route: string | null;
   allow_backfill_until: string | null;
   baseline_released_at: string | null;
+  scheduling_link: string | null;
   locations: {
     group_id: string;
     program_start_date: string;

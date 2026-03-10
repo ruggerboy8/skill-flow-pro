@@ -307,7 +307,7 @@ function SessionCard({
                 <CardTitle className="text-base">{typeLabel}</CardTitle>
                 <p className="text-sm text-muted-foreground">
                   {session.scheduled_at
-                    ? formatInTimeZone(new Date(session.scheduled_at), Intl.DateTimeFormat().resolvedOptions().timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a zzz")
+                    ? `${['meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(session.status) ? 'Met on ' : ''}${formatInTimeZone(new Date(session.scheduled_at), Intl.DateTimeFormat().resolvedOptions().timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a zzz")}`
                     : (
                       <span className="flex items-center gap-1">
                         <Clock className="h-3.5 w-3.5" />

@@ -478,26 +478,30 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       </div>
 
       {/* Start Recording — at top, before domains */}
-      {!recState.isRecording && !isProcessing && !transcript && (
+      {!recState.isRecording && !isProcessing && (
         <Card>
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Record Verbal Feedback</p>
                 <p className="text-xs text-muted-foreground">
-                  Tap a Pro Move card, then speak your feedback. Tap the next card when you move on.
+                  {transcript
+                    ? 'You have a previous transcript. Start a new recording or scroll down to re-map it.'
+                    : 'Tap a Pro Move card, then speak your feedback. Tap the next card when you move on.'}
                 </p>
               </div>
               <Button
                 onClick={() => {
                   proMoveTimeline.current = [];
+                  setTranscript(null);
+                  setMappingJustCompleted(false);
                   recControls.startRecording();
                 }}
                 variant="outline"
                 className="gap-2"
               >
                 <Mic className="h-4 w-4" />
-                Start Recording
+                {transcript ? 'New Recording' : 'Start Recording'}
               </Button>
             </div>
           </CardContent>

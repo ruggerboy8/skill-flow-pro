@@ -44,7 +44,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const proMoveTimeline = useRef<{ action_id: number; t_start_ms: number }[]>([]);
 
   const proMoveRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
 
   const { state: recState, controls: recControls } = useAudioRecording();
 

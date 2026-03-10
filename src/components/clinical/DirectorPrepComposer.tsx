@@ -305,6 +305,22 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         .update({ coach_note: coachNote, status: 'director_prep_ready' })
         .eq('id', sessionId);
       if (sessErr) throw sessErr;
+
+      // Save prior action statuses if any exist
+      if (priorExperiments && priorExperiments.length > 0 && Object.keys(priorActionStatuses).length > 0) {
+        const statusArray = priorExperiments.map((exp: any, i: number) => ({
+          index: i,
+          title: exp.title,
+          status: priorActionStatuses[i] || null,
+        }));
+        // Upsert into the meeting record for this session
+        await supabase
+          .from('coaching_meeting_records')
+          .upsert({
+            session_id: sessionId,
+            prior_action_status: statusArray,
+          } as any, { onConflict: 'session_id' });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });

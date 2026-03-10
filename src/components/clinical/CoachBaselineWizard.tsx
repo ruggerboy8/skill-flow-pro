@@ -44,20 +44,33 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const proMoveTimeline = useRef<{ action_id: number; t_start_ms: number }[]>([]);
 
   const proMoveRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const recorderCardRef = useRef<HTMLDivElement>(null);
-  const [showFloatingPill, setShowFloatingPill] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { state: recState, controls: recControls } = useAudioRecording();
 
-  // IntersectionObserver for pro-move tracking during recording
+  // Get flat list of all action_ids for "first pro move" logic
+  const allActionIds = domains?.flatMap(d => d.proMoves.map(pm => pm.action_id)) ?? [];
+
+  // When recording starts, immediately highlight the first pro move
   useEffect(() => {
+    if (recState.isRecording && activeActionId === null && allActionIds.length > 0) {
+      const firstId = allActionIds[0];
+      setActiveActionId(firstId);
+      proMoveTimeline.current.push({ action_id: firstId, t_start_ms: 0 });
+    }
     if (!recState.isRecording) {
       setActiveActionId(null);
-      return;
     }
+  }, [recState.isRecording]);
+
+  // IntersectionObserver for pro-move tracking during recording
+  // Use a narrow rootMargin band around the vertical center of the viewport
+  useEffect(() => {
+    if (!recState.isRecording) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
+        // Find the entry most centered in the viewport strip
         let bestEntry: IntersectionObserverEntry | null = null;
         let bestRatio = 0;
         entries.forEach(entry => {
@@ -81,24 +94,14 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           }
         }
       },
-      { threshold: [0.1, 0.3, 0.5, 0.7, 0.9] }
+      {
+        // Only consider elements that cross the center 20% band of the viewport
+        rootMargin: '-40% 0px -40% 0px',
+        threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+      }
     );
 
     proMoveRefs.current.forEach(el => observer.observe(el));
-    return () => observer.disconnect();
-  }, [recState.isRecording]);
-
-  // Floating pill visibility
-  useEffect(() => {
-    if (!recorderCardRef.current || !recState.isRecording) {
-      setShowFloatingPill(false);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => setShowFloatingPill(!entry.isIntersecting),
-      { threshold: 0.9 }
-    );
-    observer.observe(recorderCardRef.current);
     return () => observer.disconnect();
   }, [recState.isRecording]);
 

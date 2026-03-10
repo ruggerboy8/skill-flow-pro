@@ -528,9 +528,11 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                   key={pm.action_id}
                   ref={el => { if (el) proMoveRefs.current.set(pm.action_id, el); }}
                   data-action-id={pm.action_id}
+                  onClick={() => handleCardTap(pm.action_id)}
                   className={cn(
                     "border rounded-md p-3 space-y-2 transition-all duration-300",
-                    isActive && "ring-[3px] ring-primary shadow-[0_0_12px_hsl(var(--primary)/0.3)] border-primary"
+                    isActive && "ring-[3px] ring-primary shadow-[0_0_12px_hsl(var(--primary)/0.3)] border-primary",
+                    recState.isRecording && !isActive && "border-dashed border-muted-foreground/40 cursor-pointer hover:border-primary/50 hover:bg-muted/30"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">

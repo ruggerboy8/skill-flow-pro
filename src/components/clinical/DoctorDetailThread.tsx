@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock, FileText, Mail, Plus } from 'lucide-react';
+import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock, FileText, Mail, Plus, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { MeetingOutcomeCapture } from '@/components/clinical/MeetingOutcomeCapture';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
@@ -155,6 +156,17 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
           onInvite={() => setInviteSessionId(session.id)}
           coachName={coachName}
           doctorName={doctorName}
+          onDelete={async () => {
+            await supabase.from('coaching_session_selections').delete().eq('session_id', session.id);
+            await supabase.from('coaching_meeting_records').delete().eq('session_id', session.id);
+            const { error } = await supabase.from('coaching_sessions').delete().eq('id', session.id);
+            if (error) {
+              toast({ title: 'Error', description: error.message, variant: 'destructive' });
+            } else {
+              queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+              toast({ title: 'Session deleted' });
+            }
+          }}
         />
       ))}
 
@@ -180,6 +192,7 @@ function SessionCard({
   onBuildAgenda,
   onEditAgenda,
   onInvite,
+  onDelete,
   coachName,
   doctorName,
 }: {
@@ -190,6 +203,7 @@ function SessionCard({
   onBuildAgenda: () => void;
   onEditAgenda: () => void;
   onInvite: () => void;
+  onDelete: () => void;
   coachName: string;
   doctorName: string;
 }) {
@@ -322,6 +336,32 @@ function SessionCard({
               <Badge className={`${statusInfo.className} hover:${statusInfo.className}`}>
                 {statusInfo.label}
               </Badge>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete {typeLabel}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently remove this session and all its prep data, selections, and meeting records.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </CardHeader>
         </CollapsibleTrigger>

@@ -55,7 +55,7 @@ serve(async (req) => {
       });
     }
 
-    const { doctor_staff_id, session_id, scheduling_link, custom_subject, custom_body } = await req.json();
+    const { doctor_staff_id, session_id, scheduling_link, custom_subject, custom_body, prep_link } = await req.json();
     if (!doctor_staff_id) {
       return new Response(JSON.stringify({ error: "doctor_staff_id required" }), {
         status: 400,
@@ -125,22 +125,24 @@ serve(async (req) => {
     if (resendApiKey && doctor.email) {
       const firstName = doctor.name.split(" ")[0];
       const coachName = callerStaff.name;
+      // Resolve prep_link: use provided value, or construct from session
+      const resolvedPrepLink = prep_link || `https://alcanskills.lovable.app/doctor/review-prep/${sessionData.id}`;
 
       // Use custom template if provided, otherwise build default
       let subject: string;
       let body: string;
 
+      const interpolate = (tmpl: string) =>
+        tmpl
+          .replace(/\{\{first_name\}\}/g, firstName)
+          .replace(/\{\{coach_name\}\}/g, coachName)
+          .replace(/\{\{doctor_name\}\}/g, doctor.name)
+          .replace(/\{\{scheduling_link\}\}/g, link || "[no link provided]")
+          .replace(/\{\{prep_link\}\}/g, resolvedPrepLink);
+
       if (custom_subject && custom_body) {
-        subject = custom_subject
-          .replace(/\{\{first_name\}\}/g, firstName)
-          .replace(/\{\{coach_name\}\}/g, coachName)
-          .replace(/\{\{doctor_name\}\}/g, doctor.name)
-          .replace(/\{\{scheduling_link\}\}/g, link || "[no link provided]");
-        body = custom_body
-          .replace(/\{\{first_name\}\}/g, firstName)
-          .replace(/\{\{coach_name\}\}/g, coachName)
-          .replace(/\{\{doctor_name\}\}/g, doctor.name)
-          .replace(/\{\{scheduling_link\}\}/g, link || "[no link provided]");
+        subject = interpolate(custom_subject);
+        body = interpolate(custom_body);
       } else {
         subject = `${coachName} would like to schedule your coaching session`;
         const bodyParts = [
@@ -157,6 +159,14 @@ serve(async (req) => {
           bodyParts.push(`Please reach out to ${coachName} to find a time that works for your baseline review meeting.`);
           bodyParts.push("");
         }
+        bodyParts.push("Before the meeting, please complete your meeting prep on the Pro Moves site:");
+        bodyParts.push(resolvedPrepLink);
+        bodyParts.push("");
+        bodyParts.push("In your prep, you'll:");
+        bodyParts.push("  • Review the meeting agenda your coach has prepared");
+        bodyParts.push("  • Select 1–2 Pro Moves you'd like to focus on");
+        bodyParts.push("  • Add any questions or topics you want to discuss");
+        bodyParts.push("");
         bodyParts.push("Looking forward to connecting!");
         bodyParts.push(`— ${coachName}`);
         body = bodyParts.join("\n");

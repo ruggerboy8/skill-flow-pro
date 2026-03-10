@@ -185,7 +185,7 @@ export function SchedulingInviteComposer({
             <Label className="mb-2 block">
               Body
               <span className="text-muted-foreground font-normal ml-2 text-xs">
-                {'{{first_name}}'} {'{{coach_name}}'} {'{{scheduling_link}}'}
+                {'{{first_name}}'} {'{{coach_name}}'} {'{{scheduling_link}}'} {'{{prep_link}}'}
               </span>
             </Label>
             <Textarea

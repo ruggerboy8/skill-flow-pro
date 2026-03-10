@@ -57,7 +57,39 @@ serve(async (req) => {
     console.log('[extract-insights] Processing transcript, source:', source, 'length:', transcript.length);
 
     // Different prompts based on source
-    const systemPrompt = source === 'observation' 
+    const systemPrompt = source === 'coaching'
+      ? `# Role & Objective
+You are an expert Dental Leadership Coach. Your task is to extract a concise summary and the specific action steps that were mutually agreed upon during a coaching check-in between a Clinical Director and a Doctor.
+
+# Input Context
+- A coaching meeting transcript between a Director/Coach and a Doctor.
+- The conversation includes reflection, feedback, and commitments for the next period.
+
+# Output Requirements
+You must call the extract_insights function with structured data.
+
+1. **summary_html**:
+   - Write a 3-5 sentence warm, conversational paragraph summarizing the key discussion themes and agreements.
+   - Use second person where natural (e.g., "You discussed...", "You both agreed...").
+   - Tone: supportive manager, not formal auditor.
+   - Format as HTML (<p> tags).
+
+2. **action_steps**:
+   - Extract ONLY specific, concrete commitments that were explicitly agreed upon or accepted by the doctor during the conversation.
+   - These should be things the doctor committed to practicing, trying, or changing before the next check-in.
+   - Do NOT include general observations or domain-level goals.
+   - Tone: conversational and direct, like a coach writing a sticky note.
+     - Good: "Pause and name the pivot out loud when a child crosses into full refusal, instead of silently trying to recover"
+     - Good: "Use short calm commands to direct the room — e.g., 'Let's pause instruments' or 'Mom, I'll explain the plan in a moment'"
+     - Bad: "Enhance explicit communication and leadership during procedures"
+     - Bad: "Focus on recognizing productive patience versus drift"
+   - Maximum 3 action steps. If fewer were agreed upon, return fewer.
+
+# Critical Rules
+- Only extract commitments that were actually discussed and accepted — do not invent.
+- Keep action steps specific enough that the doctor could check them off after a shift.
+- Strip formality. Write like a warm coach, not an HR document.`
+      : source === 'observation' 
       ? `# Role & Objective
 You are an expert Dental Leadership Coach. Your task is to transform a coach's spoken observations into a polished, professional evaluation record.
 
@@ -131,7 +163,6 @@ You must call the extract_insights function with structured data.
   - Clerical: Scheduling, paperwork, administrative tasks, organization
   - Cultural: Teamwork, communication, attitude, professional presence
   - Case Acceptance: Treatment presentation, patient education, financial discussions`;
-
     const userPrompt = source === 'observation'
       ? `Please analyze this coach's observation recording${staffName ? ` about ${staffName}` : ''} and extract structured, HR-safe insights. Apply the Professional Filter to elevate informal language:
 

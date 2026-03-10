@@ -965,60 +965,121 @@ serve(async (req: Request) => {
         if (staffToDelete) {
           const sid = staffToDelete.id;
 
-          // 1) Delete coaching_meeting_records & coaching_session_selections via sessions
-          const { data: sessions } = await admin
+          const requireDelete = async (label: string, op: Promise<{ error: { message: string } | null }>) => {
+            const { error } = await op;
+            if (error) throw new Error(`Failed to delete ${label}: ${error.message}`);
+          };
+
+          const { data: sessions, error: sessionsErr } = await admin
             .from("coaching_sessions")
             .select("id")
             .or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+          if (sessionsErr) throw new Error(`Failed to load coaching sessions: ${sessionsErr.message}`);
           const sessionIds = (sessions ?? []).map((s: any) => s.id);
-          if (sessionIds.length > 0) {
-            await admin.from("coaching_meeting_records").delete().in("session_id", sessionIds);
-            await admin.from("coaching_session_selections").delete().in("session_id", sessionIds);
-          }
-          // Delete coaching_sessions themselves
-          await admin.from("coaching_sessions").delete().or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
 
-          // 2) Delete coach_baseline_items via coach_baseline_assessments
-          const { data: coachBaselines } = await admin
+          if (sessionIds.length > 0) {
+            await requireDelete(
+              "coaching meeting records",
+              admin.from("coaching_meeting_records").delete().in("session_id", sessionIds),
+            );
+            await requireDelete(
+              "coaching session selections",
+              admin.from("coaching_session_selections").delete().in("session_id", sessionIds),
+            );
+          }
+
+          await requireDelete(
+            "coaching sessions (doctor)",
+            admin.from("coaching_sessions").delete().eq("doctor_staff_id", sid),
+          );
+          await requireDelete(
+            "coaching sessions (coach)",
+            admin.from("coaching_sessions").delete().eq("coach_staff_id", sid),
+          );
+
+          const { data: coachBaselines, error: coachBaselinesErr } = await admin
             .from("coach_baseline_assessments")
             .select("id")
             .or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+          if (coachBaselinesErr) throw new Error(`Failed to load coach baseline assessments: ${coachBaselinesErr.message}`);
           const cbIds = (coachBaselines ?? []).map((b: any) => b.id);
-          if (cbIds.length > 0) {
-            await admin.from("coach_baseline_items").delete().in("assessment_id", cbIds);
-          }
-          await admin.from("coach_baseline_assessments").delete().or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
 
-          // 3) Delete doctor_baseline_items via doctor_baseline_assessments
-          const { data: docBaselines } = await admin
+          if (cbIds.length > 0) {
+            await requireDelete(
+              "coach baseline items",
+              admin.from("coach_baseline_items").delete().in("assessment_id", cbIds),
+            );
+          }
+
+          await requireDelete(
+            "coach baseline assessments (doctor)",
+            admin.from("coach_baseline_assessments").delete().eq("doctor_staff_id", sid),
+          );
+          await requireDelete(
+            "coach baseline assessments (coach)",
+            admin.from("coach_baseline_assessments").delete().eq("coach_staff_id", sid),
+          );
+
+          const { data: doctorBaselines, error: doctorBaselinesErr } = await admin
             .from("doctor_baseline_assessments")
             .select("id")
             .eq("doctor_staff_id", sid);
-          const dbIds = (docBaselines ?? []).map((b: any) => b.id);
-          if (dbIds.length > 0) {
-            await admin.from("doctor_baseline_items").delete().in("assessment_id", dbIds);
-          }
-          await admin.from("doctor_baseline_assessments").delete().eq("doctor_staff_id", sid);
+          if (doctorBaselinesErr) throw new Error(`Failed to load doctor baseline assessments: ${doctorBaselinesErr.message}`);
+          const dbIds = (doctorBaselines ?? []).map((b: any) => b.id);
 
-          // 4) Delete evaluation_items via evaluations, then evaluations
-          const { data: evals } = await admin
+          if (dbIds.length > 0) {
+            await requireDelete(
+              "doctor baseline items",
+              admin.from("doctor_baseline_items").delete().in("assessment_id", dbIds),
+            );
+          }
+
+          await requireDelete(
+            "doctor baseline assessments",
+            admin.from("doctor_baseline_assessments").delete().eq("doctor_staff_id", sid),
+          );
+
+          const { data: evals, error: evalsErr } = await admin
             .from("evaluations")
             .select("id")
-            .or(`staff_id.eq.${sid},evaluator_id.eq.${sid}`);
+            .or(`staff_id.eq.${sid},evaluator_id.eq.${sid},released_by.eq.${sid}`);
+          if (evalsErr) throw new Error(`Failed to load evaluations: ${evalsErr.message}`);
           const evalIds = (evals ?? []).map((e: any) => e.id);
+
           if (evalIds.length > 0) {
-            await admin.from("evaluation_items").delete().in("evaluation_id", evalIds);
+            await requireDelete(
+              "evaluation items",
+              admin.from("evaluation_items").delete().in("evaluation_id", evalIds),
+            );
           }
-          await admin.from("evaluations").delete().or(`staff_id.eq.${sid},evaluator_id.eq.${sid}`);
 
-          // 5) Other direct FK references
-          await admin.from("coach_scopes").delete().eq("staff_id", sid);
-          await admin.from("manager_priorities").delete().eq("coach_staff_id", sid);
-          await admin.from("excused_submissions").delete().eq("staff_id", sid);
-          await admin.from("admin_audit").delete().or(`staff_id.eq.${sid},changed_by.eq.${sid}`);
-          await admin.from("resource_events").delete().eq("staff_id", sid);
+          await requireDelete(
+            "evaluations (staff)",
+            admin.from("evaluations").delete().eq("staff_id", sid),
+          );
+          await requireDelete(
+            "evaluations (evaluator)",
+            admin.from("evaluations").delete().eq("evaluator_id", sid),
+          );
+          await requireDelete(
+            "evaluations (released_by)",
+            admin.from("evaluations").delete().eq("released_by", sid),
+          );
 
-          // 6) Finally delete the staff record
+          await requireDelete("coach scopes", admin.from("coach_scopes").delete().eq("staff_id", sid));
+          await requireDelete("manager priorities", admin.from("manager_priorities").delete().eq("coach_staff_id", sid));
+          await requireDelete("excused submissions", admin.from("excused_submissions").delete().eq("staff_id", sid));
+          await requireDelete("admin audit (staff)", admin.from("admin_audit").delete().eq("staff_id", sid));
+          await requireDelete("admin audit (changed_by)", admin.from("admin_audit").delete().eq("changed_by", sid));
+          await requireDelete("resource events", admin.from("resource_events").delete().eq("staff_id", sid));
+          await requireDelete("organization role names", admin.from("organization_role_names").delete().eq("updated_by", sid));
+          await requireDelete("pro moves", admin.from("pro_moves").delete().eq("retired_by", sid));
+          await requireDelete("staff audit", admin.from("staff_audit").delete().eq("staff_id", sid));
+          await requireDelete("staff quarter focus", admin.from("staff_quarter_focus").delete().eq("staff_id", sid));
+          await requireDelete("user backlog", admin.from("user_backlog_v2").delete().eq("staff_id", sid));
+          await requireDelete("user capabilities", admin.from("user_capabilities").delete().eq("staff_id", sid));
+          await requireDelete("weekly scores", admin.from("weekly_scores").delete().eq("staff_id", sid));
+
           const { error: delStaffErr } = await admin
             .from("staff")
             .delete()

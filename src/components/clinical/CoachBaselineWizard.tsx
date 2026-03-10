@@ -248,6 +248,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment'] });
+      queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
       setIsComplete(true);
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),

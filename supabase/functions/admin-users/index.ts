@@ -818,7 +818,7 @@ serve(async (req: Request) => {
           return json({ error: "Only Clinical Directors can invite doctors" }, 403);
         }
         
-        const { email, name, location_id, group_id, organization_id } = payload ?? {};
+        const { email, name, location_id, group_id, organization_id, release_baseline } = payload ?? {};
         const resolvedGroupId = group_id || organization_id;
         if (!email || !name || !resolvedGroupId) {
           return json({ error: "Missing required fields: email, name, and group_id are required" }, 400);
@@ -843,19 +843,26 @@ serve(async (req: Request) => {
         }
 
         // 2) Create staff row with is_doctor = true
-        // location_id is optional for roaming doctors
+        // If release_baseline is truthy, set baseline_released_at now
+        const staffInsert: Record<string, any> = { 
+          name, 
+          email, 
+          role_id: 4,  // Doctor role
+          primary_location_id: location_id || null,  // null = roaming
+          is_participant: false,
+          is_doctor: true,
+          user_id: invite.user.id,
+          home_route: '/doctor',
+        };
+
+        if (release_baseline) {
+          staffInsert.baseline_released_at = new Date().toISOString();
+          staffInsert.baseline_released_by = authUser.user.id;
+        }
+
         const { data: staff, error: staffErr } = await admin
           .from("staff")
-          .insert({ 
-            name, 
-            email, 
-            role_id: 4,  // Doctor role
-            primary_location_id: location_id || null,  // null = roaming
-            is_participant: false,
-            is_doctor: true,
-            user_id: invite.user.id,
-            home_route: '/doctor',
-          })
+          .insert(staffInsert)
           .select("id")
           .single();
         
@@ -875,8 +882,8 @@ serve(async (req: Request) => {
           user_metadata: { staff_id: staff.id, user_type: 'doctor' }
         });
 
-        console.log(`✅ Invited doctor ${name} (${email}) - staff_id: ${staff.id}`);
-        return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true });
+        console.log(`✅ Invited doctor ${name} (${email}) - staff_id: ${staff.id}, baseline_released: ${!!release_baseline}`);
+        return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true, baseline_released: !!release_baseline });
       }
 
       case "delete_user": {

@@ -27,7 +27,7 @@ interface Session {
 const statusLabels: Record<string, { label: string; className: string }> = {
   scheduled: { label: 'Draft', className: 'bg-muted text-muted-foreground' },
   director_prep_ready: { label: 'Agenda Ready', className: 'bg-amber-100 text-amber-800' },
-  scheduling_invite_sent: { label: 'Pending Scheduling', className: 'bg-blue-100 text-blue-800' },
+  scheduling_invite_sent: { label: 'Invite Sent', className: 'bg-blue-100 text-blue-800' },
   doctor_prep_submitted: { label: 'Doctor Prepped', className: 'bg-emerald-100 text-emerald-800' },
   meeting_pending: { label: 'Summary Shared', className: 'bg-purple-100 text-purple-800' },
   doctor_confirmed: { label: 'Confirmed', className: 'bg-green-100 text-green-800' },

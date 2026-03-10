@@ -11,11 +11,20 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, Calendar, X } from 'lucide-react';
+import { ArrowLeft, Send, Calendar, X, CheckCircle2, Circle, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DOMPurify from 'dompurify';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
+
+type ProgressStatus = 'going_well' | 'working_on_it' | 'not_started';
+interface ProgressEntry { title: string; status: ProgressStatus; note: string; }
+
+const PROGRESS_OPTIONS: { value: ProgressStatus; label: string; icon: typeof CheckCircle2; color: string }[] = [
+  { value: 'going_well', label: 'Going well', icon: CheckCircle2, color: 'text-emerald-600' },
+  { value: 'working_on_it', label: 'Working on it', icon: Clock, color: 'text-amber-600' },
+  { value: 'not_started', label: "Haven't started", icon: Circle, color: 'text-muted-foreground' },
+];
 
 const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const MEETING_FMT = "EEEE, MMMM d 'at' h:mm a zzz";

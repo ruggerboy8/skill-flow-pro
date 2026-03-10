@@ -566,16 +566,29 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         </div>
       ))}
 
-      {/* Complete button */}
-      <div className="sticky bottom-4 flex justify-end">
-        <Button
-          onClick={() => completeMutation.mutate()}
-          disabled={!allRated || completeMutation.isPending}
-          size="lg"
-          className="shadow-lg"
-        >
-          {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
-        </Button>
+      {/* Sticky bottom bar — Complete or Finish Recording */}
+      <div className="sticky bottom-4 flex justify-end gap-3">
+        {recState.isRecording && (
+          <Button
+            variant="destructive"
+            size="lg"
+            onClick={handleFinishRecording}
+            className="shadow-lg gap-2"
+          >
+            <MicOff className="h-4 w-4" />
+            Finish & Map Notes
+          </Button>
+        )}
+        {!recState.isRecording && (
+          <Button
+            onClick={() => completeMutation.mutate()}
+            disabled={!allRated || completeMutation.isPending}
+            size="lg"
+            className="shadow-lg"
+          >
+            {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
+          </Button>
+        )}
       </div>
     </div>
   );

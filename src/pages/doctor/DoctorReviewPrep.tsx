@@ -642,7 +642,7 @@ export default function DoctorReviewPrep() {
       <Button
         className="w-full gap-2"
         onClick={() => submitMutation.mutate()}
-        disabled={selectedActions.length === 0 || submitMutation.isPending}
+        disabled={selectedActions.length === 0 || submitMutation.isPending || (isSchedulingInviteSent && !hasScheduled)}
         size="lg"
       >
         <Send className="h-4 w-4" />

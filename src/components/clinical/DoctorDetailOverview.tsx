@@ -54,33 +54,10 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
-  // Invite to schedule mutation
-  const inviteMutation = useMutation({
-    mutationFn: async ({ sessionId, link }: { sessionId?: string; link?: string }) => {
-      const { data, error } = await supabase.functions.invoke('invite-to-schedule', {
-        body: {
-          doctor_staff_id: doctor.id,
-          session_id: sessionId || null,
-          scheduling_link: link || null,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
-      queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
-      toast({
-        title: 'Scheduling invite sent',
-        description: data.email_sent
-          ? `An email has been sent to ${doctor.name}.`
-          : `Session created. Email could not be sent — share the link manually.`,
-      });
-      setShowInviteDialog(false);
-    },
-    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-  });
+  const handleInviteSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
+  };
 
   // Find session with prep ready (director has completed prep but hasn't invited yet)
   const prepReadySession = sessions.find(s => s.status === 'director_prep_ready');

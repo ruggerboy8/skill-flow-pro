@@ -183,7 +183,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     }
   }, [recState.isRecording]);
 
-
+  useEffect(() => {
+    if (existingAssessment?.id) {
       setAssessmentId(existingAssessment.id);
       if (existingAssessment.status === 'completed') setIsComplete(true);
     }

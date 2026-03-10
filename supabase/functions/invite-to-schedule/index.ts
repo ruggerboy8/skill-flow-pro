@@ -55,7 +55,7 @@ serve(async (req) => {
       });
     }
 
-    const { doctor_staff_id, session_id, scheduling_link } = await req.json();
+    const { doctor_staff_id, session_id, scheduling_link, custom_subject, custom_body } = await req.json();
     if (!doctor_staff_id) {
       return new Response(JSON.stringify({ error: "doctor_staff_id required" }), {
         status: 400,

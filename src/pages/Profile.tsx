@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Mail, Building, MapPin, Calendar, Link2 } from 'lucide-react';
 
@@ -29,6 +30,7 @@ export default function Profile() {
   const [editMode, setEditMode] = useState(false);
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const qc = useQueryClient();
 
   useEffect(() => {
     if (user) {
@@ -101,6 +103,7 @@ export default function Profile() {
         title: "Success",
         description: "Profile updated successfully"
       });
+      qc.invalidateQueries({ queryKey: ['staff-profile'] });
       setEditMode(false);
     } catch (error) {
       console.error('Error updating profile:', error);

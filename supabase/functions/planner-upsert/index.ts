@@ -231,7 +231,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Planner-upsert error:', error)
     return new Response(
-      JSON.stringify({ ok: false, error: error.message }),
+      JSON.stringify({ ok: false, error: (error as Error).message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }

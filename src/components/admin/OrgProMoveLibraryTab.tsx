@@ -128,7 +128,7 @@ export function OrgProMoveLibraryTab() {
     try {
       const newHidden = !row.is_hidden;
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('organization_pro_move_overrides')
         .upsert(
           {

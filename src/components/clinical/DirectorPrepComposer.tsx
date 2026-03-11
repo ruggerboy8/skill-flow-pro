@@ -605,27 +605,31 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 >
                   Low Self (1–2)
                 </Badge>
-                <Badge
-                  variant={filterLowCoach ? 'default' : 'outline'}
-                  className="cursor-pointer text-xs"
-                  onClick={() => setFilterLowCoach(v => !v)}
-                >
-                  Low Coach (1–2)
-                </Badge>
-                <Badge
-                  variant={filterGap === 'gap1' ? 'default' : 'outline'}
-                  className="cursor-pointer text-xs"
-                  onClick={() => setFilterGap(v => v === 'gap1' ? 'none' : 'gap1')}
-                >
-                  Gap ≥1
-                </Badge>
-                <Badge
-                  variant={filterGap === 'gap2' ? 'default' : 'outline'}
-                  className="cursor-pointer text-xs"
-                  onClick={() => setFilterGap(v => v === 'gap2' ? 'none' : 'gap2')}
-                >
-                  Gap ≥2
-                </Badge>
+                {isBaselineReview && (
+                  <>
+                    <Badge
+                      variant={filterLowCoach ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => setFilterLowCoach(v => !v)}
+                    >
+                      Low Coach (1–2)
+                    </Badge>
+                    <Badge
+                      variant={filterGap === 'gap1' ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => setFilterGap(v => v === 'gap1' ? 'none' : 'gap1')}
+                    >
+                      Gap ≥1
+                    </Badge>
+                    <Badge
+                      variant={filterGap === 'gap2' ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => setFilterGap(v => v === 'gap2' ? 'none' : 'gap2')}
+                    >
+                      Gap ≥2
+                    </Badge>
+                  </>
+                )}
                 {(filterLowSelf || filterLowCoach || filterGap !== 'none') && (
                   <button
                     onClick={() => { setFilterLowSelf(false); setFilterLowCoach(false); setFilterGap('none'); }}

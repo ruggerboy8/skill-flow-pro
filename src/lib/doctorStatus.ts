@@ -163,7 +163,7 @@ export function getDoctorJourneyStatus(
       label: 'Baseline Submitted',
       variant: 'default',
       colorClass: 'bg-green-100 text-green-800',
-      nextAction: 'Review baseline results',
+      nextAction: 'Complete your private assessment, then build the meeting agenda',
     };
   }
 

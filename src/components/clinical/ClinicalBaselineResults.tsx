@@ -59,7 +59,7 @@ const SCORE_LABELS: Record<number, string> = {
   0: 'N/A',
 };
 
-type SortBy = 'self' | 'coach';
+type SortConfig = { column: 'self' | 'coach'; direction: 'asc' | 'desc' };
 
 export function ClinicalBaselineResults({ 
   staffId, 
@@ -74,7 +74,7 @@ export function ClinicalBaselineResults({
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
   const [selfScoreFilters, setSelfScoreFilters] = useState<Set<number>>(new Set());
   const [coachScoreFilters, setCoachScoreFilters] = useState<Set<number>>(new Set());
-  const [sortBy, setSortBy] = useState<SortBy>('self');
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ column: 'self', direction: 'desc' });
 
   // Fetch baseline assessment with flagged domains
   const { data: baseline } = useQuery({

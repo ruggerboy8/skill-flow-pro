@@ -53,6 +53,7 @@ interface SchedulingInviteComposerProps {
   doctorEmail: string;
   doctorStaffId: string;
   sessionId?: string;
+  sessionType?: string;
   onSuccess?: () => void;
 }
 

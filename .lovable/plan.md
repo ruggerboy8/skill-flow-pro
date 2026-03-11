@@ -1,39 +1,69 @@
 
+## Platform Console Audit
 
-## Fix: Count submitted-but-not-yet-due windows in completion rate
+### Bug 1: `ImpersonationTab.tsx` — `display_name` column doesn't exist on `staff` (BUILD ERROR)
+**Line 97**: The query selects `display_name` from `staff`, but the column is actually `name`.
+- This causes the TS2589/TS2339 cascade of type errors.
+- **Fix**: Change `select('id, display_name, is_org_admin, user_capabilities(is_org_admin)')` to `select('id, name, is_org_admin, user_capabilities(is_org_admin)')`.
+- Update the `AdminStaff` interface to use `name` instead of `display_name`.
+- Update all references: line 111 (`s.display_name` → `s.name`), line 130 (`admin.display_name` → `admin.name`), line 222 (`admin.display_name` → `admin.name`).
 
-### Problem
-`calculateSubmissionStats` in `src/lib/submissionRateCalc.ts` filters windows with `new Date(w.due_at) <= now` (line 39). This means on Monday morning, a staff member who has already submitted confidence scores for the current week shows 0% because the confidence deadline (Tuesday) hasn't passed yet. Only historical (past-due) windows are counted, and if those are all missing, the rate is 0%.
+### Bug 2: `OrgBootstrapDrawer.tsx` — Missing `slug` on location insert (BUILD ERROR)
+**Line 93-104**: The `locations` insert is missing the required `slug` field. The `locations` table schema requires `slug: string` (non-nullable, no default).
+- **Fix**: Generate a slug from the org name (e.g., `toSlug(orgName)`) and include it in the insert payload.
 
-### Root cause
-The filter assumes "only count windows whose deadline has passed." But a window where `status === 'submitted'` and `due_at > now` represents a valid early completion that should count positively.
+### Bug 3: `PlatformOrgsTab.tsx` — No edit/detail action on org rows
+The organizations table is read-only display. There's no way to click into an org to manage its groups, locations, or settings. This is a functionality gap but not a crash — noting for awareness.
 
-### Solution
-Change the filter in `calculateSubmissionStats` to include windows that are **either** past-due **or** already submitted. This is a one-line change:
+### Bug 4: `OrgBootstrapDrawer.tsx` — `program_start_date` uses today's date without Monday validation
+**Line 92**: Sets `program_start_date` to today. The `LocationDialog` component validates that start dates must be Mondays, but the bootstrap drawer skips this. Could create downstream issues with cycle calculations.
+- **Fix**: Snap the date to the next Monday if today isn't a Monday.
 
-```typescript
-// Before:
-const pastDueWindows = windows.filter(w => new Date(w.due_at) <= now);
+### Implementation Plan
 
-// After:
-const countableWindows = windows.filter(w => 
-  new Date(w.due_at) <= now || w.status === 'submitted'
-);
-```
+1. **Fix ImpersonationTab** — Replace `display_name` with `name` in the query, interface, and all UI references.
+2. **Fix OrgBootstrapDrawer** — Add `slug: toSlug(orgName)` to the location insert. Snap `program_start_date` to the nearest Monday.
 
-Then rename `pastDueWindows` → `countableWindows` in the loop below.
+Both fixes are straightforward single-file edits that resolve the build errors.
 
-### Why this is correct
-- **Submitted before deadline**: Already done — should count as completed (and on-time)
-- **Pending (not yet due)**: Still excluded — no penalty for not-yet-due work
-- **Missing (past due)**: Still included — correctly penalized
+---
 
-This matches the user's expectation: if you've done the work, it counts, regardless of whether the deadline has technically passed.
+## Build Error Fixes
 
-### Files changed
-1. **`src/lib/submissionRateCalc.ts`** — Update the filter on line 39 and rename the variable for clarity
+There are 7 build errors across 4 files. All are straightforward type-safety issues.
 
-### No other changes needed
-- `OnTimeRateWidget`, `useStaffSubmissionRates`, `LocationSubmissionWidget` all call `calculateSubmissionStats` — they'll automatically pick up the fix.
-- The SQL view/RPC already returns current-week windows with `status = 'submitted'` and correct `on_time` values, so no DB changes needed.
+### 1. `coach-remind/index.ts` — `locations` is an array, not an object (lines 145-146)
+
+The `.select('primary_location_id, locations(timezone)')` join returns `locations` as `{ timezone: string }[]` (array) since the relationship isn't declared as `.single()`. The code accesses `.locations?.timezone` as if it's a single object.
+
+**Fix**: Access `staffData?.locations?.[0]?.timezone` instead of `staffData?.locations?.timezone`.
+
+### 2. `planner-upsert/index.ts` — `error` is `unknown` (line 234)
+
+**Fix**: Change `error.message` to `(error as Error).message`.
+
+### 3. `sequencer-rank/index.ts` — Three errors
+
+- **Line 477**: Parameter `e` implicitly has `any` type. **Fix**: Type the callback `(e: { competencyId: number; score?: number }) =>`.
+- **Line 550**: `nextPicks` implicitly `any[]`. **Fix**: Add explicit type `const nextPicks: typeof scored = [];`.
+- **Line 742**: `error` is `unknown`. **Fix**: `(error as Error).message`.
+
+### 4. `OrgProMoveLibraryTab.tsx` — `organization_pro_move_overrides` not in generated types (lines 80-82, 131-140)
+
+The table `organization_pro_move_overrides` doesn't exist in the auto-generated Supabase types. The typed client rejects it, causing TS2589/TS2769 cascades.
+
+**Fix**: Use `(supabase as any).from('organization_pro_move_overrides')` for both the select query (line 80) and the upsert (line 131), then type-cast the results. This matches the pattern used in `ImpersonationTab.tsx`.
+
+### Summary
+
+| File | Error | Fix |
+|------|-------|-----|
+| `coach-remind/index.ts` | `.locations.timezone` on array | `locations?.[0]?.timezone` |
+| `planner-upsert/index.ts` | `error` is `unknown` | `(error as Error).message` |
+| `sequencer-rank/index.ts` | implicit `any` on `e` | Add type annotation |
+| `sequencer-rank/index.ts` | `nextPicks` implicit `any[]` | `const nextPicks: typeof scored = []` |
+| `sequencer-rank/index.ts` | `error` is `unknown` | `(error as Error).message` |
+| `OrgProMoveLibraryTab.tsx` | table not in types | Cast to `any` for both queries |
+
+All six fixes are single-line or minimal changes. No logic or behavior changes.
 

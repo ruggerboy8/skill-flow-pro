@@ -49,7 +49,7 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
     setOrgName('');
     setSlug('');
     setSlugEdited(false);
-    setPracticeType('general');
+    setPracticeType('general_us');
     setAdminName('');
     setAdminEmail('');
     setShowAdminSection(false);

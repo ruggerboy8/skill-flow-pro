@@ -73,6 +73,7 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
         competency_id: parseInt(formData.competency_id),
         action_statement: formData.action_statement.trim(),
         description: formData.description.trim() || null,
+        practice_types: DEFAULT_PRACTICE_TYPES,
         active: true
       };
 

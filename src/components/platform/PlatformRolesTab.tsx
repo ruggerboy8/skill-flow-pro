@@ -178,7 +178,7 @@ export function PlatformRolesTab() {
               <CardContent className="p-3 flex items-center justify-between">
                 <div>
                   <p className="font-medium text-sm">{role.role_name}</p>
-                  <p className="text-xs text-muted-foreground">{role.role_code}</p>
+                  <p className="text-xs text-muted-foreground">{role.role_code} · {role.practice_type === 'pediatric_us' ? 'Pedi US' : role.practice_type === 'general_us' ? 'Gen US' : 'Gen UK'}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {!role.active && (

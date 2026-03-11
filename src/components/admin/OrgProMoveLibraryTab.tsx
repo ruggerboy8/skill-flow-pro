@@ -240,7 +240,7 @@ export function OrgProMoveLibraryTab() {
                           variant="outline"
                           className="text-xs capitalize"
                         >
-                          {row.practice_type}
+                          {row.practice_types.join(', ')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, ChevronDown, TrendingUp } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
+import { drName } from '@/lib/doctorDisplayName';
 
 import { DoctorDetailOverview } from '@/components/clinical/DoctorDetailOverview';
 import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';
@@ -119,7 +120,7 @@ export default function DoctorDetail() {
     return (
       <CoachBaselineWizard
         doctorStaffId={staffId}
-        doctorName={doctor.name}
+        doctorName={drName(doctor.name)}
         onBack={() => setShowCoachWizard(false)}
       />
     );
@@ -134,7 +135,7 @@ export default function DoctorDetail() {
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{doctor.name}</h1>
+            <h1 className="text-2xl font-bold">{drName(doctor.name)}</h1>
             <DoctorJourneyStatusPill status={journeyStatus} />
           </div>
           <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -157,7 +158,7 @@ export default function DoctorDetail() {
         <DoctorDetailThread
           sessions={sessions || []}
           coachName={myStaff?.name}
-          doctorName={doctor.name}
+          doctorName={drName(doctor.name)}
           doctorStaffId={staffId!}
           doctorEmail={doctor.email}
           doctorBaselineComplete={baseline?.status === 'completed'}

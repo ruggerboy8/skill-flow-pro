@@ -711,23 +711,44 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
       {/* Meeting Agenda (Quill) */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-base">Meeting Agenda</CardTitle>
               <CardDescription>
                 Build your agenda for the meeting. Use the magic button to auto-format.
               </CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={handleMagicFormat}
-              disabled={isFormatting}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              {isFormatting ? 'Formatting...' : 'Magic Format'}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs"
+                onClick={handleLoadTemplate}
+                title={savedTemplate ? 'Load your saved template' : 'No saved template'}
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                Load
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs"
+                onClick={handleSaveTemplate}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Save
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleMagicFormat}
+                disabled={isFormatting}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {isFormatting ? 'Formatting...' : 'Magic Format'}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

@@ -43,6 +43,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   const [roles, setRoles] = useState<Role[]>([]);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
+  const { resolve: resolveRole } = useRoleDisplayNames();
 
   // Fetch available periods for the selected organization
   // Include both submitted AND draft evaluations for period detection

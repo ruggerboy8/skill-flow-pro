@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, CheckCircle2, Clock, CircleDashed } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import DOMPurify from 'dompurify';
 
 interface Experiment {
   title: string;

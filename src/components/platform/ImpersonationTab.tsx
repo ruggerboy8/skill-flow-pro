@@ -108,7 +108,7 @@ export function ImpersonationTab() {
           return s.is_org_admin || caps?.is_org_admin;
         });
 
-        setAdmins(orgAdmins.map((s) => ({ id: s.id, display_name: s.display_name })));
+        setAdmins(orgAdmins.map((s) => ({ id: s.id, name: s.name })));
       } catch (err: any) {
         toast({
           title: 'Error',

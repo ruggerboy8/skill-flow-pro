@@ -418,22 +418,27 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
             placeholder="Write a warm note to the doctor summarizing what you discussed, what you agreed on, and what they'll focus on next. Use 'you' language (e.g., 'You mentioned that…', 'We agreed you'd try…')."
             rows={5}
             className="resize-y"
+            disabled={isReadOnly}
           />
         </CardContent>
       </Card>
 
       {/* Submit */}
-      <Button
-        className="w-full gap-2"
-        onClick={() => submitMutation.mutate()}
-        disabled={!summary.trim() || submitMutation.isPending}
-      >
-        <Send className="h-4 w-4" />
-        {submitMutation.isPending ? 'Submitting...' : 'Submit & Share with Doctor'}
-      </Button>
-      <p className="text-xs text-muted-foreground text-center pb-4">
-        The doctor will be able to review and acknowledge this summary.
-      </p>
+      {!isReadOnly && (
+        <>
+          <Button
+            className="w-full gap-2"
+            onClick={() => submitMutation.mutate()}
+            disabled={!summary.trim() || submitMutation.isPending}
+          >
+            <Send className="h-4 w-4" />
+            {submitMutation.isPending ? 'Submitting...' : 'Submit & Share with Doctor'}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center pb-4">
+            The doctor will be able to review and acknowledge this summary.
+          </p>
+        </>
+      )}
     </div>
   );
 }

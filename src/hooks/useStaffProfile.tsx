@@ -16,6 +16,7 @@ export interface UserCapabilities {
   can_manage_library: boolean;
   can_manage_locations: boolean;
   can_manage_users: boolean;
+  can_manage_assignments: boolean;
   is_org_admin: boolean;
   is_platform_admin: boolean;
 }

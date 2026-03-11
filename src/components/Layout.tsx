@@ -61,6 +61,15 @@ export default function Layout() {
     { name: 'My Role', href: '/doctor/my-role', icon: BookOpen },
     { name: 'My Team', href: '/doctor/my-team', icon: Users },
     { name: 'Coaching History', href: '/doctor/coaching-history', icon: ClipboardList },
+  ] : isSuperAdmin ? [
+    // Super admin navigation — Command Center first, no Home/My Role
+    { name: 'Command Center', href: '/dashboard', icon: Building2 },
+    { name: 'Coach', href: '/coach', icon: Users },
+    { name: 'Clinical', href: '/clinical', icon: Stethoscope },
+    { name: 'Builder', href: '/builder', icon: SettingsIcon },
+    { name: 'Evaluations', href: '/admin/evaluations', icon: TrendingUp },
+    { name: 'Admin', href: '/admin', icon: Shield },
+    { name: 'Platform', href: '/platform', icon: Globe },
   ] : [
     // Standard navigation
     { name: 'Home', href: '/', icon: Home },
@@ -73,11 +82,11 @@ export default function Layout() {
       { name: 'My Location', href: '/my-location', icon: Building2 },
     ] : []),
     // Clinical Director portal
-    ...(isClinicalDirector || isSuperAdmin ? [
+    ...(isClinicalDirector ? [
       { name: 'Clinical', href: '/clinical', icon: Stethoscope },
     ] : []),
     // Backfill nav removed - keeping function for individual score backfill only
-    ...(isCoach || isSuperAdmin || isOrgAdmin || isLead ? [
+    ...(isCoach || isOrgAdmin || isLead ? [
       { name: 'Coach', href: '/coach', icon: Users },
     ] : []),
     ...(canAccessAdmin ? [
@@ -85,10 +94,6 @@ export default function Layout() {
       { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Evaluations', href: '/admin/evaluations', icon: TrendingUp }
     ] : []),
-    ...(isSuperAdmin ? [
-      { name: 'Platform', href: '/platform', icon: Globe },
-      { name: 'Command Center', href: '/dashboard', icon: Building2 }
-    ] : [])
   ];
 
   const isActive = (href: string) => {

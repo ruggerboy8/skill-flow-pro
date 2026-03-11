@@ -57,7 +57,7 @@ interface Props {
   onStartCoachWizard?: () => void;
 }
 
-export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail }: Props) {
+export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail, doctorBaselineComplete, coachAssessment, onStartCoachWizard }: Props) {
   const { data: myStaff } = useStaffProfile();
   const { toast } = useToast();
   const queryClient = useQueryClient();

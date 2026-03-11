@@ -1,43 +1,73 @@
 
 
-## Comprehensive FK Join Hint Audit
-
-### Problem Found
-
-The database has **two** FK constraints from `locations` to `practice_groups`:
-1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
-2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
-
-Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
-
-### Issues to Fix
-
-**1. Wrong FK hint name (will fail at runtime)**
-These files reference `locations_group_id_fkey` which does not exist as a constraint:
-
-| File | Line |
-|------|------|
-| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
-| `src/pages/coach/RemindersTab.tsx` | 148 |
-
-Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
-
-**2. Corrupted select syntax (double alias, double parentheses)**
-`src/components/admin/AdminLocationsTab.tsx` line 50 has:
-```
-practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
-```
-This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
-```
-practice_group:practice_groups!locations_org_fkey(name)
-```
-
-**3. No issues (already correct)**
-- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
-- All `scope_organization_id` references — intentional audit table column ✓
-- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
+## Roles & Competency Builder — Implementation Plan
 
 ### Summary
 
-3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
+Add a 5th tab ("Roles & Competencies") to the Platform Console that lets super admins create, clone, and edit roles and their competencies. This is the foundation for supporting new organizational structures (UK practices, general dentistry) without SQL-level changes.
+
+### Database Migration
+
+One migration that does four things:
+
+1. **Auto-increment sequences** — so new records get IDs automatically:
+   - `roles.role_id`: sequence starting at 5 (current max is 4)
+   - `competencies.competency_id`: sequence starting at 500 (current max is 414)
+
+2. **`active` column on `roles`** — `boolean NOT NULL DEFAULT true` for soft-delete without breaking FK references
+
+3. **RLS write policies for `roles`** — INSERT, UPDATE, DELETE for `is_super_admin(auth.uid())`
+
+4. **RLS write policies for `competencies`** — INSERT, UPDATE, DELETE for `is_super_admin(auth.uid())`
+
+### New Components
+
+| File | Purpose |
+|------|---------|
+| `src/components/platform/PlatformRolesTab.tsx` | Two-panel layout: role list (left) + competencies grouped by domain (right). Includes new/clone/edit role actions and competency CRUD. |
+| `src/components/platform/RoleFormDrawer.tsx` | Drawer for creating or editing a role (fields: `role_name`, `role_code`). |
+| `src/components/platform/CompetencyFormDrawer.tsx` | Drawer for creating or editing a competency (fields: `name`, `tagline`, `description`, `friendly_description`, `interview_prompt`, `code`, `domain_id`). |
+| `src/components/platform/CloneRoleDialog.tsx` | Dialog to pick a source role + enter new name/code, then duplicate all competencies. |
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| `src/pages/PlatformPage.tsx` | Add 5th tab trigger + content. Update grid-cols from 4 to 5. Import `PlatformRolesTab`. |
+
+### UI Layout
+
+```text
+┌──────────────────────┬───────────────────────────────────────┐
+│  ROLES               │  COMPETENCIES for "DFI"               │
+│                      │                                       │
+│  [+ New] [Clone]     │  ▸ Clinical (4)                       │
+│                      │    Patient Flow Coordination    [Edit] │
+│  ● DFI        (16)   │    Clinical Team Communication  [Edit] │
+│  ● RDA        (16)   │    ...                                │
+│  ● Office Mgr (16)   │  ▸ Clerical (4)                       │
+│  ● Doctor     (14)   │  ▸ Cultural (4)                       │
+│                      │  ▸ Case Acceptance (4)                │
+│                      │                                       │
+│                      │  [+ Add Competency]                   │
+└──────────────────────┴───────────────────────────────────────┘
+```
+
+- Left panel: card list of roles showing name, code, competency count, active badge
+- Right panel: accordion grouped by the 4 domains, each competency row shows name + tagline + edit button
+- Clone workflow: select source role → enter new name → system creates role + duplicates all competencies with new `role_id`
+
+### Clone Logic (in `CloneRoleDialog`)
+
+1. Insert new row into `roles` (name, code)
+2. Fetch all competencies for source `role_id`
+3. Bulk insert copies with new `role_id`, adjusted `code` prefix (e.g., "DFI.CLIN 1" → "NEWCODE.CLIN 1")
+4. Refresh role list, auto-select new role
+
+### What This Does NOT Change
+
+- Domains remain fixed (4 domains, read-only in this phase)
+- `organization_role_names` aliasing is untouched
+- Pro move `practice_type` filtering is unchanged
+- Existing hardcoded `roleDefinitions.ts` content stays for backward compatibility
 

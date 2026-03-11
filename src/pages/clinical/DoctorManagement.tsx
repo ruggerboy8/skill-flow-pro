@@ -127,10 +127,16 @@ export default function DoctorManagement() {
           <h1 className="text-2xl font-bold">Clinical Director Portal</h1>
           <p className="text-muted-foreground">Manage doctor onboarding and development</p>
         </div>
-        <Button onClick={() => setInviteOpen(true)}>
-          <UserPlus className="w-4 h-4 mr-2" />
-          Invite Doctor
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate('/clinical/pro-moves')}>
+            <BookOpen className="w-4 h-4 mr-2" />
+            Pro Moves Library
+          </Button>
+          <Button onClick={() => setInviteOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invite Doctor
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

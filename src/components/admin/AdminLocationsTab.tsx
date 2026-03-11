@@ -127,7 +127,6 @@ export function AdminLocationsTab() {
   const toggleLocationActive = async (location: Location) => {
     try {
       if (location.active) {
-        // about to archive; block if staff still assigned
         const { count, error: cntErr } = await supabase
           .from("staff")
           .select("*", { count: "exact", head: true })
@@ -165,6 +164,42 @@ export function AdminLocationsTab() {
         description: "Failed to update location",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeleteLocation = async (location: Location) => {
+    try {
+      const { count, error: cntErr } = await supabase
+        .from("staff")
+        .select("*", { count: "exact", head: true })
+        .eq("primary_location_id", location.id);
+
+      if (cntErr) throw cntErr;
+
+      if ((count ?? 0) > 0) {
+        toast({
+          title: "Cannot delete",
+          description: "This location still has staff assigned. Remove or reassign all staff first.",
+          variant: "destructive",
+        });
+        setDeleteTarget(null);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("locations")
+        .delete()
+        .eq("id", location.id);
+
+      if (error) throw error;
+
+      toast({ title: "Deleted", description: `Location "${location.name}" has been permanently deleted.` });
+      setDeleteTarget(null);
+      loadLocations();
+    } catch (error) {
+      console.error("Error deleting location:", error);
+      toast({ title: "Error", description: "Failed to delete location. It may have related data.", variant: "destructive" });
+      setDeleteTarget(null);
     }
   };
 

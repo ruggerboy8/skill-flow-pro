@@ -83,11 +83,11 @@ export function getDoctorJourneyStatus(
         };
       case 'scheduled':
         return {
-          stage: isFollowup ? 'followup_scheduled' : 'meeting_ready',
-          label: `${prefix} Scheduled`,
-          variant: 'outline',
-          colorClass: 'bg-blue-100 text-blue-800',
-          nextAction: 'Start the meeting when ready',
+          stage: 'ready_for_prep',
+          label: 'Session Draft',
+          variant: 'secondary',
+          colorClass: 'bg-muted text-muted-foreground',
+          nextAction: 'Build your meeting agenda before inviting to schedule',
         };
       case 'doctor_prep_submitted':
         return {

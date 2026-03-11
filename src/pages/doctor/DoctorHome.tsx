@@ -59,6 +59,31 @@ export default function DoctorHome() {
 
   // Determine primary CTA
   const renderPrimaryCTA = () => {
+    // Meeting confirmation needed — highest priority (requires doctor action)
+    const pendingMeeting = sessions?.find(s => s.status === 'meeting_pending');
+    if (pendingMeeting) {
+      return (
+        <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/30">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-8 w-8 text-purple-600" />
+              <div>
+                <CardTitle>Review Meeting Summary</CardTitle>
+                <CardDescription>
+                  Your meeting summary is ready for review and confirmation.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Link to={`/doctor/review-prep/${pendingMeeting.id}`}>
+              <Button className="w-full" variant="outline">Review & Confirm</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      );
+    }
+
     // Active prep needed — only after invite is sent
     const prepSession = sessions?.find(s => s.status === 'scheduling_invite_sent');
     if (prepSession) {
@@ -143,31 +168,6 @@ export default function DoctorHome() {
             <p className="text-sm text-muted-foreground">
               Once your invite is sent, you'll be able to complete prep and confirm scheduling.
             </p>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // Meeting confirmation needed
-    const pendingMeeting = sessions?.find(s => s.status === 'meeting_pending');
-    if (pendingMeeting) {
-      return (
-        <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/30">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-purple-600" />
-              <div>
-                <CardTitle>Review Meeting Summary</CardTitle>
-                <CardDescription>
-                  Your meeting summary is ready for review and confirmation.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Link to={`/doctor/review-prep/${pendingMeeting.id}`}>
-              <Button className="w-full" variant="outline">Review & Confirm</Button>
-            </Link>
           </CardContent>
         </Card>
       );

@@ -6,11 +6,21 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, Clock, Tag } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useUserRole } from "@/hooks/useUserRole";
 import type { Json } from "@/integrations/supabase/types";
 
 interface SettingValue {
   enabled: boolean;
+}
+
+interface RoleAlias {
+  role_id: number;
+  role_name: string;
+  display_name: string;
 }
 
 export function AdminGlobalSettingsTab() {
@@ -18,6 +28,12 @@ export function AdminGlobalSettingsTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const { organizationId } = useUserRole();
+
+  // Role aliases state
+  const [roles, setRoles] = useState<RoleAlias[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesSaving, setRolesSaving] = useState(false);
 
   useEffect(() => {
     loadSettings();

@@ -41,12 +41,21 @@ const SCORE_COLORS: Record<number, string> = {
   1: 'bg-orange-500',
 };
 
-function ScoreCircle({ score }: { score: number | null | undefined }) {
+function ScoreCircle({ score, label }: { score: number | null | undefined; label?: string }) {
   if (score == null) return null;
+  if (score === 0) return (
+    <div className="flex flex-col items-center gap-0.5">
+      {label && <span className="text-[9px] text-muted-foreground">{label}</span>}
+      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[9px] font-bold bg-muted text-muted-foreground">N/A</span>
+    </div>
+  );
   return (
-    <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
-      {score}
-    </span>
+    <div className="flex flex-col items-center gap-0.5">
+      {label && <span className="text-[9px] text-muted-foreground">{label}</span>}
+      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
+        {score}
+      </span>
+    </div>
   );
 }
 

@@ -101,7 +101,9 @@ export default function DoctorHome() {
               <div>
                 <CardTitle>Prep Submitted</CardTitle>
                 <CardDescription>
-                  Meeting on {formatInTimeZone(new Date(submittedPrepSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}
+                  {submittedPrepSession.scheduled_at
+                    ? `Meeting on ${formatInTimeZone(new Date(submittedPrepSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}`
+                    : 'Your prep is submitted and shared with your coach.'}
                 </CardDescription>
               </div>
             </div>

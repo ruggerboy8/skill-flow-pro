@@ -29,6 +29,7 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lookback, setLookback] = useState<LookbackOption>('6');
+  const { resolve: resolveRole } = useRoleDisplayNames();
 
   useEffect(() => {
     async function fetchGaps() {

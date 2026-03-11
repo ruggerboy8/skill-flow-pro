@@ -147,45 +147,6 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
 
   return (
     <div className="space-y-3">
-      {/* Coach Private Assessment card — shown when doctor baseline is complete */}
-      {doctorBaselineComplete && sessions.length > 0 && onStartCoachWizard && (() => {
-        const isAssessmentOwner = !coachAssessment || coachAssessment.coach_staff_id === myStaff?.id;
-        const canInteract = isAssessmentOwner || (coachAssessment?.status === 'completed');
-        
-        const statusText = coachAssessment?.status === 'completed'
-          ? 'Complete — view comparison on the baseline tab'
-          : coachAssessment?.status === 'in_progress'
-          ? isAssessmentOwner
-            ? 'In progress — continue where you left off'
-            : 'In progress by another clinical director'
-          : 'Not started — record your own ratings before the meeting';
-
-        const buttonLabel = coachAssessment?.status === 'completed' ? 'View' : coachAssessment?.status === 'in_progress' ? 'Continue' : 'Start';
-
-        return (
-          <Card className="border-dashed border-accent/50">
-            <CardContent className="flex items-center justify-between py-3">
-              <div>
-                <p className="text-sm font-medium">
-                  {isAssessmentOwner ? 'Your Private Assessment' : 'Coach Private Assessment'}
-                </p>
-                <p className="text-xs text-muted-foreground">{statusText}</p>
-              </div>
-              {canInteract && (
-                <Button
-                  variant={coachAssessment?.status === 'completed' ? 'outline' : 'default'}
-                  size="sm"
-                  onClick={onStartCoachWizard}
-                  className="gap-1.5"
-                >
-                  <ClipboardEdit className="h-3.5 w-3.5" />
-                  {buttonLabel}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })()}
 
       {/* Always-visible Add Coaching Session button */}
       <Button

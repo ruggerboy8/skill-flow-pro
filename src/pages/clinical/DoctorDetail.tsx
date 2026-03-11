@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, ChevronDown, TrendingUp } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
+import { drName } from '@/lib/doctorDisplayName';
 
 import { DoctorDetailOverview } from '@/components/clinical/DoctorDetailOverview';
 import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';

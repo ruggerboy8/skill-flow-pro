@@ -41,6 +41,7 @@ export function ImpersonationTab() {
   const [admins, setAdmins] = useState<AdminStaff[]>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(true);
   const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [activeMasqueradeName, setActiveMasqueradeName] = useState<string>('');
 
   // Load org list on mount
   useEffect(() => {

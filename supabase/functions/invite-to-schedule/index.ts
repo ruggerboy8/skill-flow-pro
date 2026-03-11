@@ -140,52 +140,75 @@ serve(async (req) => {
           .replace(/\{\{scheduling_link\}\}/g, link || "[no link provided]")
           .replace(/\{\{prep_link\}\}/g, resolvedPrepLink);
 
+      let htmlBody: string | undefined;
+
       if (custom_subject && custom_body) {
         subject = interpolate(custom_subject);
         body = interpolate(custom_body);
+        // Custom templates are plain text
       } else {
         subject = `${coachName} would like to schedule your coaching session`;
-        const bodyParts = [
+
+        // HTML version with proper hyperlinks
+        const htmlParts = [
+          `<p>Hi ${firstName},</p>`,
+          `<p>${coachName} has completed their review and is ready to meet with you to discuss your baseline assessment.</p>`,
+        ];
+        if (link) {
+          htmlParts.push(`<p>Please <a href="${link}">schedule a time</a> that works for you.</p>`);
+        } else {
+          htmlParts.push(`<p>Please reach out to ${coachName} to find a time that works for your baseline review meeting.</p>`);
+        }
+        htmlParts.push(`<p>Before the meeting, please <a href="${resolvedPrepLink}">complete your meeting prep</a> on the Pro Moves site. In your prep, you'll:</p>`);
+        htmlParts.push(`<ul><li>Review the meeting agenda your coach has prepared</li><li>Select 1–2 Pro Moves you'd like to focus on</li><li>Add any questions or topics you want to discuss</li></ul>`);
+        htmlParts.push(`<p>Looking forward to connecting!<br/>— ${coachName}</p>`);
+        htmlBody = htmlParts.join("\n");
+
+        // Plain text fallback
+        const textParts = [
           `Hi ${firstName},`,
           "",
           `${coachName} has completed their review and is ready to meet with you to discuss your baseline assessment.`,
           "",
         ];
         if (link) {
-          bodyParts.push("Please use the link below to schedule a time that works for you:");
-          bodyParts.push(link);
-          bodyParts.push("");
+          textParts.push("Please use the link below to schedule a time that works for you:");
+          textParts.push(link);
+          textParts.push("");
         } else {
-          bodyParts.push(`Please reach out to ${coachName} to find a time that works for your baseline review meeting.`);
-          bodyParts.push("");
+          textParts.push(`Please reach out to ${coachName} to find a time that works for your baseline review meeting.`);
+          textParts.push("");
         }
-        bodyParts.push("Before the meeting, please complete your meeting prep on the Pro Moves site:");
-        bodyParts.push(resolvedPrepLink);
-        bodyParts.push("");
-        bodyParts.push("In your prep, you'll:");
-        bodyParts.push("  • Review the meeting agenda your coach has prepared");
-        bodyParts.push("  • Select 1–2 Pro Moves you'd like to focus on");
-        bodyParts.push("  • Add any questions or topics you want to discuss");
-        bodyParts.push("");
-        bodyParts.push("Looking forward to connecting!");
-        bodyParts.push(`— ${coachName}`);
-        body = bodyParts.join("\n");
+        textParts.push("Before the meeting, please complete your meeting prep on the Pro Moves site:");
+        textParts.push(resolvedPrepLink);
+        textParts.push("");
+        textParts.push("In your prep, you'll:");
+        textParts.push("  • Review the meeting agenda your coach has prepared");
+        textParts.push("  • Select 1–2 Pro Moves you'd like to focus on");
+        textParts.push("  • Add any questions or topics you want to discuss");
+        textParts.push("");
+        textParts.push("Looking forward to connecting!");
+        textParts.push(`— ${coachName}`);
+        body = textParts.join("\n");
       }
 
       try {
+        const emailPayload: Record<string, unknown> = {
+          from: fromEmail,
+          to: [doctor.email],
+          reply_to: replyTo,
+          subject,
+          text: body,
+        };
+        if (htmlBody) emailPayload.html = htmlBody;
+
         const resendRes = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${resendApiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            from: fromEmail,
-            to: [doctor.email],
-            reply_to: replyTo,
-            subject,
-            text: body,
-          }),
+          body: JSON.stringify(emailPayload),
         });
 
         if (resendRes.ok) {

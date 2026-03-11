@@ -96,8 +96,9 @@ Instructions:
    - Fix grammar, remove filler words and false starts
    - 1-3 sentences, max 500 characters
    - Preserve specific observations — do NOT fabricate
-3. If a time segment has no substantive content, skip it
-4. Only use the action IDs listed in the timeline`;
+3. CRITICAL: If a segment is unclear or you cannot determine specific observations, include the verbatim transcript text for that time range rather than paraphrasing or restating the Pro Move statement. Never restate the Pro Move's action statement as a note — use the actual words from the transcript.
+4. If a time segment has no substantive content at all (silence or completely unrelated), skip it
+5. Only use the action IDs listed in the timeline`;
 
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",

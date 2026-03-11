@@ -202,13 +202,19 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-xl font-bold">Capture Meeting Outcome</h2>
+          <h2 className="text-xl font-bold">{isReadOnly ? 'Meeting Outcome (Read Only)' : 'Capture Meeting Outcome'}</h2>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
             <Calendar className="h-3.5 w-3.5" />
-            {format(new Date(session.scheduled_at), 'MMMM d, yyyy')}
+            {session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}
             <span>·</span>
             <span>{doctorName}</span>
           </div>
+          {isReadOnly && (
+            <Badge variant="secondary" className="text-xs mt-1 gap-1">
+              <ShieldAlert className="h-3 w-3" />
+              Managed by another coach
+            </Badge>
+          )}
         </div>
       </div>
 

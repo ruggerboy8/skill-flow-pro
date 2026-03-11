@@ -68,6 +68,10 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [filterGap, setFilterGap] = useState<'none' | 'gap1' | 'gap2'>('none');
   const sessionId = realSessionId ?? '';
 
+  // Check ownership
+  const { data: myStaffForOwnership } = useStaffProfile();
+  const [isReadOnly, setIsReadOnly] = useState(false);
+
   // Auto-create session when sessionId is 'new'
   const { data: myStaff } = useStaffProfile();
   useEffect(() => {

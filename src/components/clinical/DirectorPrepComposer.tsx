@@ -457,9 +457,40 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   }
 
   // Guard: if doctor has already submitted, don't allow editing — redirect back
-  if (session && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
+  if (session && !isReadOnly && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
     onBack();
     return null;
+  }
+
+  // Read-only view for sessions owned by another coach
+  if (isReadOnly && session) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h2 className="text-xl font-bold">Prep for {doctorName}</h2>
+            <Badge variant="secondary" className="text-xs mt-1 gap-1">
+              <ShieldAlert className="h-3 w-3" />
+              Managed by another coach — read only
+            </Badge>
+          </div>
+        </div>
+        {session.coach_note && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Coach Agenda</CardTitle></CardHeader>
+            <CardContent>
+              <div
+                className="prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(session.coach_note) }}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
   }
 
   if (published) {

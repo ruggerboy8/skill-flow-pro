@@ -240,6 +240,9 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
 
 function SessionCard({
   session,
+  isOwner,
+  isSuperAdmin,
+  clinicalDirectors,
   expanded,
   onToggle,
   onCapture,
@@ -251,6 +254,9 @@ function SessionCard({
   doctorName,
 }: {
   session: Session;
+  isOwner: boolean;
+  isSuperAdmin: boolean;
+  clinicalDirectors?: { id: string; name: string }[];
   expanded: boolean;
   onToggle: () => void;
   onCapture: () => void;
@@ -261,15 +267,31 @@ function SessionCard({
   coachName: string;
   doctorName: string;
 }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const statusInfo = statusLabels[session.status] || { label: session.status, className: 'bg-muted text-muted-foreground' };
   const typeLabel = session.session_type === 'baseline_review'
     ? 'Baseline Review'
     : `Check-in ${session.sequence_number - 1}`;
 
   const expandableStatus = isExpandable(session.status);
-  const showCapture = canCaptureStatus(session.status);
-  const showBuildAgenda = canBuildAgenda(session.status);
-  const showInvite = canInvite(session.status);
+  const showCapture = isOwner && canCaptureStatus(session.status);
+  const showBuildAgenda = isOwner && canBuildAgenda(session.status);
+  const showInvite = isOwner && canInvite(session.status);
+  const showDelete = isOwner;
+
+  const handleReassign = async (newCoachId: string) => {
+    const { error } = await supabase
+      .from('coaching_sessions')
+      .update({ coach_staff_id: newCoachId })
+      .eq('id', session.id);
+    if (error) {
+      toast({ title: 'Reassign failed', description: error.message, variant: 'destructive' });
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+      toast({ title: 'Session reassigned' });
+    }
+  };
 
   const { data: meetingSummary } = useQuery({
     queryKey: ['meeting-summary', session.id],

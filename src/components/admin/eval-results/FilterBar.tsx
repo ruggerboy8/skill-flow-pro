@@ -235,7 +235,10 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   
   if (filters.roleIds.length > 0) {
     const roleNames = filters.roleIds
-      .map(id => roles.find(r => r.role_id === id)?.role_name)
+      .map(id => {
+        const r = roles.find(r => r.role_id === id);
+        return r ? resolveRole(r.role_id, r.role_name) : undefined;
+      })
       .filter(Boolean)
       .join(', ');
     activeFilters.push({

@@ -1,43 +1,43 @@
 
 
-# Plan: Six fixes for coaching workflow
+## Comprehensive FK Join Hint Audit
 
-## 1. Show agenda in "Capture Meeting Outcome" (`MeetingOutcomeCapture.tsx`)
+### Problem Found
 
-**Problem**: The coach's agenda (HTML from `coaching_sessions.coach_note`) and doctor's note (`doctor_note`) are not displayed during outcome capture.
+The database has **two** FK constraints from `locations` to `practice_groups`:
+1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
+2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
 
-**Fix**: After the "Discussion Topics" card, add two new sections:
-- **Coach Agenda**: Render `session.coach_note` as sanitized HTML (using DOMPurify, already in the project)
-- **Doctor's Notes**: Parse `session.doctor_note` as JSON (progress entries + freeNote) similar to `CombinedPrepView.tsx`'s `parseDoctorNote` pattern. Display progress statuses with icons and any free-text note.
+Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
 
-## 2. AI-generated summary already uses second person
+### Issues to Fix
 
-The `extract-insights` edge function's coaching prompt (lines 71-76) already instructs: "Write...as a post-meeting note FROM the coach TO the doctor" using second person. The `MeetingOutcomeCapture` summary textarea placeholder should be updated to reinforce this: "Write a warm note to the doctor summarizing what you discussed..."
+**1. Wrong FK hint name (will fail at runtime)**
+These files reference `locations_group_id_fkey` which does not exist as a constraint:
 
-**Fix**: Update the placeholder text on the summary `Textarea` in `MeetingOutcomeCapture.tsx` to guide manual entry in second person as well.
+| File | Line |
+|------|------|
+| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
+| `src/pages/coach/RemindersTab.tsx` | 148 |
 
-## 3. Remove coach column from doctor's Pro Move picker (`DoctorReviewPrep.tsx`)
+Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
 
-**Problem**: Previous edits were supposed to remove the coach column but it may have been partially left. Looking at the current code (lines 517-525), there is only a "Self" column header and line 555 shows only one `ScoreCircle`. This appears already done. Will verify no remnants remain and clean up if needed.
+**2. Corrupted select syntax (double alias, double parentheses)**
+`src/components/admin/AdminLocationsTab.tsx` line 50 has:
+```
+practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
+```
+This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
+```
+practice_group:practice_groups!locations_org_fkey(name)
+```
 
-## 4. Show doctor notes in "Capture Meeting Outcome"
+**3. No issues (already correct)**
+- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
+- All `scope_organization_id` references — intentional audit table column ✓
+- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
 
-Covered by item #1 above — parsing `session.doctor_note` JSON.
+### Summary
 
-## 5. Save meeting invite emails as templates (already implemented)
-
-The `SchedulingInviteComposer` already has session-type-aware template keys (`scheduling_invite_baseline_review` / `scheduling_invite_check_in`) and a "Save as Template" button for super admins. This is already working per the previous implementation. No changes needed.
-
-## 6. Fix DoctorCoachingHistory not rendering
-
-**Problem**: `scheduled_at` can be `null` (sessions where no meeting date was set). Line 87 calls `format(new Date(session.scheduled_at), ...)` which crashes when `scheduled_at` is null, causing the entire component to fail silently.
-
-**Fix**: 
-- Handle null `scheduled_at` with a fallback display (e.g., "Date not set")
-- Also consider showing sessions with status `meeting_pending` in addition to `doctor_confirmed`, since those have completed meetings too
-
-## Files to modify
-
-1. **`src/components/clinical/MeetingOutcomeCapture.tsx`** — Add coach agenda display (sanitized HTML) and doctor notes section after Discussion Topics card
-2. **`src/pages/doctor/DoctorCoachingHistory.tsx`** — Guard against null `scheduled_at`; broaden status filter to include `meeting_pending`
+3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
 

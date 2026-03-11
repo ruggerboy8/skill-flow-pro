@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, CheckCircle2, Clock, CircleDashed } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import DOMPurify from 'dompurify';
 
 interface Experiment {
   title: string;
@@ -234,6 +235,80 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
         </CardContent>
       </Card>
 
+      {/* Coach Agenda */}
+      {session.coach_note && session.coach_note.trim() && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              Coach Agenda
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="prose prose-sm max-w-none text-sm [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(session.coach_note) }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Doctor's Prep Notes */}
+      {session.doctor_note && (() => {
+        try {
+          const parsed = JSON.parse(session.doctor_note);
+          const progress = (parsed.progress as { title: string; status: string; note?: string }[]) || [];
+          const freeNote = parsed.freeNote as string | undefined;
+          if (progress.length === 0 && !freeNote?.trim()) return null;
+
+          const statusIcon = (s: string) => {
+            if (s === 'Going well') return <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />;
+            if (s === 'Working on it') return <Clock className="h-4 w-4 text-amber-500 shrink-0" />;
+            return <CircleDashed className="h-4 w-4 text-muted-foreground shrink-0" />;
+          };
+
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{doctorName}'s Prep Notes</CardTitle>
+                <CardDescription>Progress on prior action steps and additional notes from the doctor.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {progress.map((p, i) => (
+                  <div key={i} className="flex items-start gap-2.5 p-2 rounded-md bg-muted/30 border">
+                    {statusIcon(p.status)}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{p.title}</p>
+                        <Badge variant="secondary" className="text-[10px]">{p.status}</Badge>
+                      </div>
+                      {p.note && <p className="text-xs text-muted-foreground mt-0.5">{p.note}</p>}
+                    </div>
+                  </div>
+                ))}
+                {freeNote?.trim() && (
+                  <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3 border">
+                    {freeNote}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        } catch {
+          // doctor_note is plain text, not JSON
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{doctorName}'s Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3">{session.doctor_note}</p>
+              </CardContent>
+            </Card>
+          );
+        }
+      })()}
+
       {/* AI Transcript Assist */}
       <Card>
         <CardHeader>
@@ -325,7 +400,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           <Textarea
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            placeholder="Summarize the key discussion points, agreements, and next steps..."
+            placeholder="Write a warm note to the doctor summarizing what you discussed, what you agreed on, and what they'll focus on next. Use 'you' language (e.g., 'You mentioned that…', 'We agreed you'd try…')."
             rows={5}
             className="resize-y"
           />

@@ -39,12 +39,22 @@ const isExpandable = (status: string) =>
   ['director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted', 'meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(status);
 
 
+interface CoachAssessmentInfo {
+  id: string;
+  status: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+}
+
 interface Props {
   sessions: Session[];
   coachName?: string;
   doctorName?: string;
   doctorStaffId: string;
   doctorEmail: string;
+  doctorBaselineComplete?: boolean;
+  coachAssessment?: CoachAssessmentInfo | null;
+  onStartCoachWizard?: () => void;
 }
 
 export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail }: Props) {

@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { useLocationExcuses } from '@/hooks/useLocationExcuses';
 import { StaffWeekSummary } from '@/types/coachV2';

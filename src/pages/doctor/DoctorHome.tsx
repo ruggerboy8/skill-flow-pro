@@ -147,8 +147,6 @@ export default function DoctorHome() {
         </Card>
       );
     }
-      );
-    }
 
     // Meeting confirmation needed
     const pendingMeeting = sessions?.find(s => s.status === 'meeting_pending');

@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
@@ -55,7 +55,9 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [realSessionId, setRealSessionId] = useState<string | null>(initialSessionId === 'new' ? null : initialSessionId);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [priorActionStatuses, setPriorActionStatuses] = useState<Record<number, 'addressed' | 'continuing' | 'dropped'>>({});
-
+  const [filterLowSelf, setFilterLowSelf] = useState(false);
+  const [filterLowCoach, setFilterLowCoach] = useState(false);
+  const [filterGap, setFilterGap] = useState<'none' | 'gap1' | 'gap2'>('none');
   const sessionId = realSessionId ?? '';
 
   // Auto-create session when sessionId is 'new'
@@ -235,6 +237,23 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!session?.doctor_staff_id && (session?.sequence_number ?? 0) > 1,
   });
 
+  // Fetch saved agenda template for this session type
+  const sessionType = session?.session_type || 'baseline_review';
+  const { data: savedTemplate } = useQuery({
+    queryKey: ['agenda-template', myStaff?.id, sessionType],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('coaching_agenda_templates')
+        .select('template_html')
+        .eq('staff_id', myStaff!.id)
+        .eq('session_type', sessionType)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.template_html || null;
+    },
+    enabled: !!myStaff?.id && !!sessionType,
+  });
+
   // Initialize from existing data
   useState(() => {
     if (existingSelections?.length) {
@@ -254,6 +273,37 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
       }
       return [...prev, actionId];
     });
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!myStaff?.id || !coachNote.trim() || coachNote === '<p><br></p>') {
+      toast({ title: 'Nothing to save', description: 'Write your agenda first.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('coaching_agenda_templates')
+        .upsert({
+          staff_id: myStaff.id,
+          session_type: sessionType,
+          template_html: coachNote,
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: 'staff_id,session_type' });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['agenda-template'] });
+      toast({ title: 'Template saved ✓' });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleLoadTemplate = () => {
+    if (!savedTemplate) {
+      toast({ title: 'No saved template', description: `No template found for ${sessionType === 'baseline_review' ? 'Baseline Review' : 'Check-in'}.`, variant: 'destructive' });
+      return;
+    }
+    setCoachNote(savedTemplate);
+    toast({ title: 'Template loaded' });
   };
 
   const handleMagicFormat = async () => {
@@ -519,13 +569,69 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 ))}
               </TabsList>
 
+              {/* Filter Bar */}
+              <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                <Badge
+                  variant={filterLowSelf ? 'default' : 'outline'}
+                  className="cursor-pointer text-xs"
+                  onClick={() => setFilterLowSelf(v => !v)}
+                >
+                  Low Self (1–2)
+                </Badge>
+                <Badge
+                  variant={filterLowCoach ? 'default' : 'outline'}
+                  className="cursor-pointer text-xs"
+                  onClick={() => setFilterLowCoach(v => !v)}
+                >
+                  Low Coach (1–2)
+                </Badge>
+                <Badge
+                  variant={filterGap === 'gap1' ? 'default' : 'outline'}
+                  className="cursor-pointer text-xs"
+                  onClick={() => setFilterGap(v => v === 'gap1' ? 'none' : 'gap1')}
+                >
+                  Gap ≥1
+                </Badge>
+                <Badge
+                  variant={filterGap === 'gap2' ? 'default' : 'outline'}
+                  className="cursor-pointer text-xs"
+                  onClick={() => setFilterGap(v => v === 'gap2' ? 'none' : 'gap2')}
+                >
+                  Gap ≥2
+                </Badge>
+                {(filterLowSelf || filterLowCoach || filterGap !== 'none') && (
+                  <button
+                    onClick={() => { setFilterLowSelf(false); setFilterLowCoach(false); setFilterGap('none'); }}
+                    className="text-xs text-primary hover:underline ml-1"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
               {availableDomains.map(domain => (
                 <TabsContent key={domain} value={domain} className="mt-0">
                   <div
                     className="rounded-lg border p-3 space-y-1"
                     style={{ backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.06)` }}
                   >
-                    {(groupedItems[domain] || []).map(item => {
+                    {(groupedItems[domain] || []).filter(item => {
+                      const selfScore = item.self_score;
+                      const coachScore = coachRatingMap[item.action_id];
+                      // Low self: score 1 or 2 (exclude 0 = N/A)
+                      if (filterLowSelf && (selfScore == null || selfScore === 0 || selfScore > 2)) return false;
+                      // Low coach: score 1 or 2 (exclude 0 = N/A, null)
+                      if (filterLowCoach && (coachScore == null || coachScore === 0 || coachScore > 2)) return false;
+                      // Gap filters: both must be non-null and > 0
+                      if (filterGap !== 'none') {
+                        if (selfScore == null || selfScore === 0 || coachScore == null || coachScore === 0) return false;
+                        const gap = Math.abs(selfScore - coachScore);
+                        if (filterGap === 'gap1' && gap < 1) return false;
+                        if (filterGap === 'gap2' && gap < 2) return false;
+                      }
+                      return true;
+                    }).map(item => {
                       const pm = item.pro_moves as any;
                       const competency = pm?.competencies;
                       const isSelected = selectedActions.includes(item.action_id);
@@ -605,23 +711,44 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
       {/* Meeting Agenda (Quill) */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-base">Meeting Agenda</CardTitle>
               <CardDescription>
                 Build your agenda for the meeting. Use the magic button to auto-format.
               </CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={handleMagicFormat}
-              disabled={isFormatting}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              {isFormatting ? 'Formatting...' : 'Magic Format'}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs"
+                onClick={handleLoadTemplate}
+                title={savedTemplate ? 'Load your saved template' : 'No saved template'}
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                Load
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs"
+                onClick={handleSaveTemplate}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Save
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleMagicFormat}
+                disabled={isFormatting}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {isFormatting ? 'Formatting...' : 'Magic Format'}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

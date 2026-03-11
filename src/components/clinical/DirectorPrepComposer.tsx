@@ -275,6 +275,37 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     });
   };
 
+  const handleSaveTemplate = async () => {
+    if (!myStaff?.id || !coachNote.trim() || coachNote === '<p><br></p>') {
+      toast({ title: 'Nothing to save', description: 'Write your agenda first.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('coaching_agenda_templates')
+        .upsert({
+          staff_id: myStaff.id,
+          session_type: sessionType,
+          template_html: coachNote,
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: 'staff_id,session_type' });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['agenda-template'] });
+      toast({ title: 'Template saved ✓' });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleLoadTemplate = () => {
+    if (!savedTemplate) {
+      toast({ title: 'No saved template', description: `No template found for ${sessionType === 'baseline_review' ? 'Baseline Review' : 'Check-in'}.`, variant: 'destructive' });
+      return;
+    }
+    setCoachNote(savedTemplate);
+    toast({ title: 'Template loaded' });
+  };
+
   const handleMagicFormat = async () => {
     if (!coachNote.trim() || coachNote === '<p><br></p>') {
       toast({ title: 'Nothing to format', description: 'Write your agenda first.', variant: 'destructive' });

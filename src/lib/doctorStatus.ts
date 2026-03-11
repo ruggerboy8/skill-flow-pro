@@ -84,6 +84,14 @@ export function getDoctorJourneyStatus(
           colorClass: 'bg-blue-100 text-blue-800',
           nextAction: 'Start the meeting when ready',
         };
+      case 'doctor_prep_submitted':
+        return {
+          stage: 'meeting_ready',
+          label: 'Doctor Prep Submitted',
+          variant: 'default',
+          colorClass: 'bg-emerald-100 text-emerald-800',
+          nextAction: 'Doctor completed their prep — ready to start meeting',
+        };
       case 'director_prep_ready':
         return {
           stage: 'prep_complete',

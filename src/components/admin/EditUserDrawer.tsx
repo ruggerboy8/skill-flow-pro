@@ -85,6 +85,8 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
       // Determine current action from flags
       if (user.is_super_admin) {
         setSelectedAction('super_admin');
+      } else if ((user as any).is_clinical_director) {
+        setSelectedAction('clinical_director');
       } else if ((user as any).is_org_admin) {
         setSelectedAction('regional_manager');
       } else if (user.is_coach && user.is_participant) {

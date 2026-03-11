@@ -474,7 +474,7 @@ serve(async (req) => {
     const retestDue = false;
 
       // E (Eval) - Deficit with capped contribution
-      const evalRecord = evals.find(e => e.competencyId === move.competencyId);
+      const evalRecord = evals.find((e: { competencyId: number; score?: number }) => e.competencyId === move.competencyId);
       const evalScore01 = evalRecord?.score; // 0..1 (1=good, undefined=no data)
       const E_raw = evalScore01 == null ? 0 : Math.max(0, 1 - evalScore01); // deficit
       const eContrib = Math.min(E_raw * weights.E, config.evalCap); // cap contribution
@@ -547,7 +547,7 @@ serve(async (req) => {
 
     // Apply cooldown and pick top 6 for planner
     const eligibleNext = scored.filter(m => m.weeksSince >= config.cooldownWeeks);
-    const nextPicks = [];
+    const nextPicks: typeof scored = [];
     const usedDomains = new Set<number>();
     let relaxedConstraintNote: string | null = null;
 
@@ -739,7 +739,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

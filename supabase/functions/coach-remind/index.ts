@@ -142,8 +142,8 @@ serve(async (req) => {
             .eq('user_id', recipient.user_id)
             .single();
           
-          if (staffData?.locations?.timezone) {
-            recipientTimezone = staffData.locations.timezone;
+          if (staffData?.locations?.[0]?.timezone) {
+            recipientTimezone = staffData.locations[0].timezone;
             weekLabelForRecipient = getWeekLabelForTimezone(recipientTimezone);
           }
         }

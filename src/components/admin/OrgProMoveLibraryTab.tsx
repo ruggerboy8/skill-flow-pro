@@ -77,7 +77,7 @@ export function OrgProMoveLibraryTab() {
       if (pmErr) throw pmErr;
 
       // 3. Fetch existing overrides for this org
-      const { data: overrides, error: ovErr } = await supabase
+      const { data: overrides, error: ovErr } = await (supabase as any)
         .from('organization_pro_move_overrides')
         .select('pro_move_id, is_hidden')
         .eq('org_id', organizationId);
@@ -128,7 +128,7 @@ export function OrgProMoveLibraryTab() {
     try {
       const newHidden = !row.is_hidden;
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('organization_pro_move_overrides')
         .upsert(
           {

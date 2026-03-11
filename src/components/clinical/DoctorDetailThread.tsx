@@ -105,7 +105,12 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
       toast({ title: 'Check-in added', description: 'New follow-up session created. Build your agenda to get started.' });
     },
-    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: (e: Error) => {
+      const msg = (e as any)?.code === '23505'
+        ? 'A session with this sequence already exists for this doctor.'
+        : e.message;
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+    },
   });
 
   const handleInviteSuccess = () => {

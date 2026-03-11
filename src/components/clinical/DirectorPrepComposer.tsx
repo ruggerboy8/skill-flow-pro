@@ -176,26 +176,44 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   });
 
   // Fetch coach baseline items for coach scores
+  const isBaselineReview = (session?.session_type || 'baseline_review') === 'baseline_review';
   const { data: coachItems } = useQuery({
-    queryKey: ['coach-baseline-items-for-prep', doctorStaffId],
+    queryKey: ['coach-baseline-items-for-prep', doctorStaffId, myStaff?.id],
     queryFn: async () => {
-      const { data: assessment } = await supabase
-        .from('coach_baseline_assessments')
-        .select('id')
-        .eq('doctor_staff_id', doctorStaffId)
-        .maybeSingle();
-
-      if (!assessment?.id) return [];
+      // Try current coach's assessment first
+      let assessmentId: string | null = null;
+      if (myStaff?.id) {
+        const { data: myAssessment } = await supabase
+          .from('coach_baseline_assessments')
+          .select('id')
+          .eq('doctor_staff_id', doctorStaffId)
+          .eq('coach_staff_id', myStaff.id)
+          .maybeSingle();
+        assessmentId = myAssessment?.id ?? null;
+      }
+      // Fallback to latest completed assessment
+      if (!assessmentId) {
+        const { data: latest } = await supabase
+          .from('coach_baseline_assessments')
+          .select('id')
+          .eq('doctor_staff_id', doctorStaffId)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        assessmentId = latest?.id ?? null;
+      }
+      if (!assessmentId) return [];
 
       const { data, error } = await supabase
         .from('coach_baseline_items')
         .select('action_id, rating')
-        .eq('assessment_id', assessment.id);
+        .eq('assessment_id', assessmentId);
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!doctorStaffId,
+    enabled: !!doctorStaffId && isBaselineReview,
   });
 
   // Build a map of action_id -> coach rating
@@ -458,6 +476,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
           doctorEmail={doctorEmail}
           doctorStaffId={doctorStaffId}
           sessionId={sessionId}
+          sessionType={sessionType}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
             queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
@@ -587,27 +606,31 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 >
                   Low Self (1–2)
                 </Badge>
-                <Badge
-                  variant={filterLowCoach ? 'default' : 'outline'}
-                  className="cursor-pointer text-xs"
-                  onClick={() => setFilterLowCoach(v => !v)}
-                >
-                  Low Coach (1–2)
-                </Badge>
-                <Badge
-                  variant={filterGap === 'gap1' ? 'default' : 'outline'}
-                  className="cursor-pointer text-xs"
-                  onClick={() => setFilterGap(v => v === 'gap1' ? 'none' : 'gap1')}
-                >
-                  Gap ≥1
-                </Badge>
-                <Badge
-                  variant={filterGap === 'gap2' ? 'default' : 'outline'}
-                  className="cursor-pointer text-xs"
-                  onClick={() => setFilterGap(v => v === 'gap2' ? 'none' : 'gap2')}
-                >
-                  Gap ≥2
-                </Badge>
+                {isBaselineReview && (
+                  <>
+                    <Badge
+                      variant={filterLowCoach ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => setFilterLowCoach(v => !v)}
+                    >
+                      Low Coach (1–2)
+                    </Badge>
+                    <Badge
+                      variant={filterGap === 'gap1' ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => setFilterGap(v => v === 'gap1' ? 'none' : 'gap1')}
+                    >
+                      Gap ≥1
+                    </Badge>
+                    <Badge
+                      variant={filterGap === 'gap2' ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => setFilterGap(v => v === 'gap2' ? 'none' : 'gap2')}
+                    >
+                      Gap ≥2
+                    </Badge>
+                  </>
+                )}
                 {(filterLowSelf || filterLowCoach || filterGap !== 'none') && (
                   <button
                     onClick={() => { setFilterLowSelf(false); setFilterLowCoach(false); setFilterGap('none'); }}
@@ -671,7 +694,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <ScoreCircle score={item.self_score} label="Self" />
-                              <ScoreCircle score={coachScore} label="You" />
+                              {isBaselineReview && <ScoreCircle score={coachScore} label="You" />}
                             </div>
                           </label>
                         );
@@ -706,7 +729,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                     <DomainBadge domain={domainName} />
                     <span className="text-sm font-medium flex-1">{pm?.action_statement}</span>
                     <ScoreCircle score={item.self_score} label="Self" />
-                    <ScoreCircle score={coachScore} label="You" />
+                    {isBaselineReview && <ScoreCircle score={coachScore} label="You" />}
                     <Button
                       variant="ghost"
                       size="icon"

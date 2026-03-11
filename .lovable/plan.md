@@ -1,46 +1,43 @@
 
 
-# Fix: Coach Rating Column & Filters in DirectorPrepComposer
+## Comprehensive FK Join Hint Audit
 
-## Root Cause
+### Problem Found
 
-There are **two** `coach_baseline_assessments` for this doctor (from two different coaches). The query uses `.maybeSingle()` which fails silently when multiple rows exist, returning `null`. This means:
-1. `coachRatingMap` is always empty — no coach ratings display
-2. All coach-related filters ("Low Coach", "Gap") filter everything out since every item has `null` coach score
+The database has **two** FK constraints from `locations` to `practice_groups`:
+1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
+2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
 
-## Changes
+Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
 
-### `src/components/clinical/DirectorPrepComposer.tsx`
+### Issues to Fix
 
-**Fix 1: Coach baseline query** — Change `.maybeSingle()` to filter by the current coach's `staff_id` (from `myStaff.id`), so we get the correct coach's assessment. If none exists for the current coach, fall back to the latest completed assessment.
+**1. Wrong FK hint name (will fail at runtime)**
+These files reference `locations_group_id_fkey` which does not exist as a constraint:
 
-```ts
-// Current (broken):
-.from('coach_baseline_assessments')
-.select('id')
-.eq('doctor_staff_id', doctorStaffId)
-.maybeSingle();
+| File | Line |
+|------|------|
+| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
+| `src/pages/coach/RemindersTab.tsx` | 148 |
 
-// Fixed: filter by current coach first, fallback to latest completed
-.from('coach_baseline_assessments')
-.select('id')
-.eq('doctor_staff_id', doctorStaffId)
-.eq('coach_staff_id', myStaff.id)
-.maybeSingle();
-// If null, try latest completed:
-.from('coach_baseline_assessments')
-.select('id')
-.eq('doctor_staff_id', doctorStaffId)
-.eq('status', 'completed')
-.order('completed_at', { ascending: false })
-.limit(1)
-.maybeSingle();
+Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
+
+**2. Corrupted select syntax (double alias, double parentheses)**
+`src/components/admin/AdminLocationsTab.tsx` line 50 has:
+```
+practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
+```
+This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
+```
+practice_group:practice_groups!locations_org_fkey(name)
 ```
 
-**Fix 2: Conditionally show coach column** — Only render the coach `ScoreCircle` when `session?.session_type === 'baseline_review'` (as requested by user). Apply this in both the picker list and the "Selected for Discussion" card.
+**3. No issues (already correct)**
+- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
+- All `scope_organization_id` references — intentional audit table column ✓
+- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
 
-**Fix 3: Conditionally show coach filters** — Hide the "Low Coach" and "Gap" filter badges when session type is not `baseline_review`, and reset those filter states if session type changes.
+### Summary
 
-### Files to modify
-- `src/components/clinical/DirectorPrepComposer.tsx` — all three fixes in one file
+3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
 

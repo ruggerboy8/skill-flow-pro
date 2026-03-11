@@ -10,10 +10,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { toast } from '@/hooks/use-toast';
 
-const TEMPLATE_KEY = 'scheduling_invite';
+const DEFAULT_SUBJECTS: Record<string, string> = {
+  baseline_review: '{{coach_name}} would like to schedule your coaching session',
+  check_in: '{{coach_name}} would like to schedule a follow-up',
+};
 
-const DEFAULT_SUBJECT = '{{coach_name}} would like to schedule your coaching session';
-const DEFAULT_BODY = `Hi {{first_name}},
+const DEFAULT_BODIES: Record<string, string> = {
+  baseline_review: `Hi {{first_name}},
 
 {{coach_name}} has completed their review and is ready to meet with you to discuss your baseline assessment.
 
@@ -29,7 +32,19 @@ In your prep, you'll:
   • Add any questions or topics you want to discuss
 
 Looking forward to connecting!
-— {{coach_name}}`;
+— {{coach_name}}`,
+  check_in: `Hi {{first_name}},
+
+{{coach_name}} is ready for your next check-in.
+
+Please schedule a time:
+{{scheduling_link}}
+
+Before the meeting, complete your prep here:
+{{prep_link}}
+
+— {{coach_name}}`,
+};
 
 interface SchedulingInviteComposerProps {
   open: boolean;
@@ -38,6 +53,7 @@ interface SchedulingInviteComposerProps {
   doctorEmail: string;
   doctorStaffId: string;
   sessionId?: string;
+  sessionType?: string;
   onSuccess?: () => void;
 }
 
@@ -48,8 +64,10 @@ export function SchedulingInviteComposer({
   doctorEmail,
   doctorStaffId,
   sessionId,
+  sessionType = 'baseline_review',
   onSuccess,
 }: SchedulingInviteComposerProps) {
+  const templateKey = `scheduling_invite_${sessionType}`;
   const { user } = useAuth();
   const { data: myStaff } = useStaffProfile();
   const [subject, setSubject] = useState('');
@@ -81,15 +99,26 @@ export function SchedulingInviteComposer({
     const { data, error } = await supabase
       .from('reminder_templates')
       .select('subject, body')
-      .eq('key', TEMPLATE_KEY)
+      .eq('key', templateKey)
       .maybeSingle();
 
     if (!error && data) {
       setSubject(data.subject);
       setBody(data.body);
     } else {
-      setSubject(DEFAULT_SUBJECT);
-      setBody(DEFAULT_BODY);
+      // Fallback: try legacy key, then defaults
+      const { data: legacy } = await supabase
+        .from('reminder_templates')
+        .select('subject, body')
+        .eq('key', 'scheduling_invite')
+        .maybeSingle();
+      if (legacy) {
+        setSubject(legacy.subject);
+        setBody(legacy.body);
+      } else {
+        setSubject(DEFAULT_SUBJECTS[sessionType] || DEFAULT_SUBJECTS.baseline_review);
+        setBody(DEFAULT_BODIES[sessionType] || DEFAULT_BODIES.baseline_review);
+      }
     }
   }
 
@@ -100,12 +129,13 @@ export function SchedulingInviteComposer({
     }
     const { error } = await supabase
       .from('reminder_templates')
-      .upsert({ key: TEMPLATE_KEY, subject, body });
+      .upsert({ key: templateKey, subject, body });
 
     if (error) {
       toast({ title: 'Error', description: 'Failed to save template', variant: 'destructive' });
     } else {
-      toast({ title: 'Saved', description: 'Scheduling invite template updated' });
+      const label = sessionType === 'baseline_review' ? 'Baseline Review' : 'Check-in';
+      toast({ title: 'Saved', description: `${label} invite template updated` });
     }
   }
 

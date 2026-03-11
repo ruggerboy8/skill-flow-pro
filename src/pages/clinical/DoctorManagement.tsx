@@ -221,7 +221,7 @@ export default function DoctorManagement() {
                   <TableHead>Stage</TableHead>
                   <TableHead>Next Step</TableHead>
                   <TableHead>Action</TableHead>
-                  <TableHead>Next Meeting</TableHead>
+                  
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>

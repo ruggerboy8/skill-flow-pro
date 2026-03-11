@@ -4,11 +4,12 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Building2, BookOpen, UserCog, Users } from 'lucide-react';
+import { Building2, BookOpen, UserCog, Users, Blocks } from 'lucide-react';
 import { PlatformOrgsTab } from '@/components/platform/PlatformOrgsTab';
 import { PlatformUsersTab } from '@/components/platform/PlatformUsersTab';
 import { ImpersonationTab } from '@/components/platform/ImpersonationTab';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
+import { PlatformRolesTab } from '@/components/platform/PlatformRolesTab';
 
 export default function PlatformPage() {
   const navigate = useNavigate();
@@ -72,7 +73,7 @@ export default function PlatformPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[640px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
           <TabsTrigger value="organizations" className="flex items-center space-x-2">
             <Building2 className="h-4 w-4" />
             <span>Organizations</span>
@@ -80,6 +81,10 @@ export default function PlatformPage() {
           <TabsTrigger value="users" className="flex items-center space-x-2">
             <Users className="h-4 w-4" />
             <span>Users</span>
+          </TabsTrigger>
+          <TabsTrigger value="roles" className="flex items-center space-x-2">
+            <Blocks className="h-4 w-4" />
+            <span>Roles</span>
           </TabsTrigger>
           <TabsTrigger value="pro-moves" className="flex items-center space-x-2">
             <BookOpen className="h-4 w-4" />
@@ -97,6 +102,10 @@ export default function PlatformPage() {
 
         <TabsContent value="users">
           <PlatformUsersTab />
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <PlatformRolesTab />
         </TabsContent>
 
         <TabsContent value="pro-moves">

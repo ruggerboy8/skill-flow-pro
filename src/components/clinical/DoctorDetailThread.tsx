@@ -70,11 +70,12 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
   const addCheckinMutation = useMutation({
     mutationFn: async () => {
       if (!myStaff?.id) throw new Error('Not authenticated');
+      const isFirst = sessions.length === 0;
       const maxSeq = sessions.reduce((max, s) => Math.max(max, s.sequence_number), 0);
       const { error } = await supabase.from('coaching_sessions').insert({
         doctor_staff_id: doctorStaffId,
         coach_staff_id: myStaff.id,
-        session_type: 'follow_up',
+        session_type: isFirst ? 'baseline_review' : 'follow_up',
         sequence_number: maxSeq + 1,
         status: 'scheduled',
       });

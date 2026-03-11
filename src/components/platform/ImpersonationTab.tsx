@@ -125,6 +125,7 @@ export function ImpersonationTab() {
 
   const handleMasquerade = (admin: AdminStaff) => {
     updateOverrides({ enabled: true, masqueradeStaffId: admin.id });
+    setActiveMasqueradeName(admin.name ?? admin.id);
     toast({
       title: 'Simulation active',
       description: `Viewing as ${admin.name ?? admin.id}`,

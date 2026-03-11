@@ -259,7 +259,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     }
   };
 
-  const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') && scopeIds.length === 0);
+  const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager' || selectedAction === 'clinical_director') && scopeIds.length === 0);
 
   return (
     <Sheet open={open} onOpenChange={(nextOpen) => {

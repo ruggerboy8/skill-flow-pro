@@ -15,15 +15,7 @@ const ACTION_STATUS_ICONS: Record<string, { icon: typeof CheckCircle2; color: st
   dropped: { icon: XCircle, color: 'text-muted-foreground', label: 'Dropped' },
 };
 
-const SESSION_STATUS_CONFIG: Record<string, { className: string; label: string }> = {
-  doctor_confirmed: { className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400', label: 'Confirmed' },
-  meeting_pending: { className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', label: 'Awaiting Confirmation' },
-  doctor_revision_requested: { className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', label: 'Revision Requested' },
-  doctor_prep_submitted: { className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', label: 'Ready for Meeting' },
-  scheduling_invite_sent: { className: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400', label: 'Invite Sent' },
-  director_prep_ready: { className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', label: 'Send Invite' },
-  scheduled: { className: 'bg-muted text-muted-foreground', label: 'Draft' },
-};
+import { SESSION_STATUS_CONFIG, DEFAULT_STATUS } from '@/lib/coachingSessionStatus';
 
 export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
   const { data: timeline, isLoading } = useQuery({

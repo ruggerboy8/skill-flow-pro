@@ -95,9 +95,9 @@ export function getDoctorJourneyStatus(
       case 'director_prep_ready':
         return {
           stage: 'prep_complete',
-          label: 'Prep Complete — Ready to Invite',
+          label: 'Agenda Ready',
           variant: 'default',
-          colorClass: 'bg-emerald-100 text-emerald-800',
+          colorClass: 'bg-amber-100 text-amber-800',
           nextAction: 'Send scheduling invite to doctor',
         };
       case 'meeting_pending':

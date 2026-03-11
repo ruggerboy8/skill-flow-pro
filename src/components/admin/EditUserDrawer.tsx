@@ -58,7 +58,7 @@ interface EditUserDrawerProps {
 export function EditUserDrawer({ open, onClose, onSuccess, user, roles, locations, organizations }: EditUserDrawerProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<'participant' | 'lead' | 'coach' | 'coach_participant' | 'regional_manager' | 'super_admin'>('participant');
+  const [selectedAction, setSelectedAction] = useState<'participant' | 'lead' | 'coach' | 'coach_participant' | 'regional_manager' | 'clinical_director' | 'super_admin'>('participant');
   const [scopeType, setScopeType] = useState<'org' | 'location'>('org');
   const [scopeIds, setScopeIds] = useState<string[]>([]);
   const [hireDate, setHireDate] = useState<string>('');
@@ -85,6 +85,8 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
       // Determine current action from flags
       if (user.is_super_admin) {
         setSelectedAction('super_admin');
+      } else if ((user as any).is_clinical_director) {
+        setSelectedAction('clinical_director');
       } else if ((user as any).is_org_admin) {
         setSelectedAction('regional_manager');
       } else if (user.is_coach && user.is_participant) {
@@ -117,7 +119,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     if (!user?.user_id) return;
     
     // Validate scope for Lead/Coach/Coach+Participant/Regional Manager
-    if ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') && scopeIds.length === 0) {
+    if ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager' || selectedAction === 'clinical_director') && scopeIds.length === 0) {
       toast({
         title: "Scope required",
         description: "Please select at least one scope.",
@@ -157,7 +159,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         location_id: selectedLocationId || null,
       };
       
-      if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') {
+      if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager' || selectedAction === 'clinical_director') {
         payload.coach_scope_type = scopeType;
         payload.coach_scope_ids = scopeIds;
       }
@@ -199,6 +201,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   // Determine current status badge
   const getCurrentStatusBadge = () => {
     if (user.is_super_admin) return <Badge variant="destructive">Super Admin</Badge>;
+    if ((user as any).is_clinical_director) return <Badge className="bg-teal-600 hover:bg-teal-700 text-white">Clinical Director</Badge>;
     if ((user as any).is_org_admin) return <Badge className="bg-amber-500 hover:bg-amber-600">Regional Manager</Badge>;
     if (user.is_coach && user.is_participant) return <Badge variant="secondary">Coach + Participant</Badge>;
     if (user.is_coach && !user.is_participant) return <Badge variant="secondary">Coach</Badge>;
@@ -247,12 +250,16 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         return scopeCount > 0
           ? `This will promote ${user.name} to Regional Manager with admin powers for ${scopeCount} ${scopeLabel}: ${scopeText}. They will NOT do weekly ProMoves.`
           : `This will promote ${user.name} to Regional Manager (requires scope selection).`;
+      case 'clinical_director':
+        return scopeCount > 0
+          ? `This will promote ${user.name} to Clinical Director with coach + admin powers for ${scopeCount} ${scopeLabel}: ${scopeText}, plus access to the Clinical tab.`
+          : `This will promote ${user.name} to Clinical Director (requires scope selection).`;
       case 'super_admin':
         return `This will promote ${user.name} to Super Admin and remove participant tasks.`;
     }
   };
 
-  const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') && scopeIds.length === 0);
+  const isSaveDisabled = loading || ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager' || selectedAction === 'clinical_director') && scopeIds.length === 0);
 
   return (
     <Sheet open={open} onOpenChange={(nextOpen) => {
@@ -428,6 +435,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 <Label htmlFor="action-regional-manager" className="font-normal cursor-pointer">Promote to Regional Manager (Admin powers)</Label>
               </div>
               <div className="flex items-center space-x-2">
+                <RadioGroupItem value="clinical_director" id="action-clinical-director" />
+                <Label htmlFor="action-clinical-director" className="font-normal cursor-pointer">Promote to Clinical Director (Admin + Clinical tab)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
                 <RadioGroupItem value="super_admin" id="action-super-admin" />
                 <Label htmlFor="action-super-admin" className="font-normal cursor-pointer">Promote to Super Admin</Label>
               </div>
@@ -435,7 +446,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
           </div>
 
           {/* Scope (Conditional) */}
-          {(selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') && (
+          {(selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager' || selectedAction === 'clinical_director') && (
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               <div className="space-y-2">
                 <Label htmlFor="scope-type" className="text-sm font-semibold">Scope Type</Label>

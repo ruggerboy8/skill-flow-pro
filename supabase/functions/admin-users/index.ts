@@ -386,7 +386,7 @@ serve(async (req: Request) => {
         if (!currentStaff) return json({ error: "Staff not found" }, 404);
         
         // Validate scope requirements for lead, coach, coach_participant, and regional_manager
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") && (!coach_scope_type || !coach_scope_ids || !Array.isArray(coach_scope_ids) || coach_scope_ids.length === 0)) {
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") && (!coach_scope_type || !coach_scope_ids || !Array.isArray(coach_scope_ids) || coach_scope_ids.length === 0)) {
           return json({ error: "Scope type and at least one scope ID are required for this action." }, 422);
         }
         
@@ -479,10 +479,11 @@ serve(async (req: Request) => {
           clinical_director: {
             is_participant: false,
             is_lead: false,
-            is_coach: false,
-            is_org_admin: false,
+            is_coach: true,
+            is_org_admin: true,
             is_super_admin: false,
             is_clinical_director: true,
+            is_doctor: false,
             coach_scope_type: null,
             coach_scope_id: null,
             home_route: '/clinical',
@@ -550,7 +551,7 @@ serve(async (req: Request) => {
         }
         
         // Sync scope to staff table for RPC compatibility (get_coach_roster_summary uses staff.coach_scope_*)
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") && 
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") && 
             coach_scope_type && coach_scope_ids && coach_scope_ids.length > 0) {
           // Keep scope_type as 'org' or 'location' - must match staff_coach_scope_type_check constraint
           updates.coach_scope_type = coach_scope_type;
@@ -579,7 +580,7 @@ serve(async (req: Request) => {
         }
         
         // Handle coach_scopes junction table
-        if (preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") {
+        if (preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") {
           // Delete existing scopes
           const { error: deleteErr } = await admin
             .from("coach_scopes")

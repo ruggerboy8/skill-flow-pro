@@ -1210,6 +1210,51 @@ export type Database = {
           },
         ]
       }
+      organization_pro_move_overrides: {
+        Row: {
+          created_at: string
+          hidden_at: string | null
+          id: string
+          is_hidden: boolean
+          org_id: string
+          pro_move_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          is_hidden?: boolean
+          org_id: string
+          pro_move_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          is_hidden?: boolean
+          org_id?: string
+          pro_move_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_pro_move_overrides_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_pro_move_overrides_pro_move_id_fkey"
+            columns: ["pro_move_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+        ]
+      }
       organization_role_names: {
         Row: {
           display_name: string

@@ -386,7 +386,7 @@ serve(async (req: Request) => {
         if (!currentStaff) return json({ error: "Staff not found" }, 404);
         
         // Validate scope requirements for lead, coach, coach_participant, and regional_manager
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") && (!coach_scope_type || !coach_scope_ids || !Array.isArray(coach_scope_ids) || coach_scope_ids.length === 0)) {
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") && (!coach_scope_type || !coach_scope_ids || !Array.isArray(coach_scope_ids) || coach_scope_ids.length === 0)) {
           return json({ error: "Scope type and at least one scope ID are required for this action." }, 422);
         }
         

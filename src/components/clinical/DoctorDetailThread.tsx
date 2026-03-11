@@ -22,6 +22,8 @@ interface Session {
   status: string;
   scheduled_at: string | null;
   meeting_link?: string | null;
+  coach_staff_id: string;
+  coach_name?: string;
 }
 
 import { SESSION_STATUS_CONFIG, DEFAULT_STATUS } from '@/lib/coachingSessionStatus';

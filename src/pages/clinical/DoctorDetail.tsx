@@ -74,11 +74,14 @@ export default function DoctorDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('coaching_sessions')
-        .select('id, session_type, sequence_number, status, scheduled_at, meeting_link')
+        .select('id, session_type, sequence_number, status, scheduled_at, meeting_link, coach_staff_id, coach:staff!coaching_sessions_coach_staff_id_fkey(name)')
         .eq('doctor_staff_id', staffId)
         .order('sequence_number', { ascending: false });
       if (error) throw error;
-      return data;
+      return (data || []).map((s: any) => ({
+        ...s,
+        coach_name: s.coach?.name || 'Unknown Coach',
+      }));
     },
     enabled: !!staffId,
   });

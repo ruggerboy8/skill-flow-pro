@@ -133,6 +133,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
             can_manage_library,
             can_manage_locations,
             can_manage_users,
+            can_manage_assignments,
             is_org_admin,
             is_platform_admin
           )

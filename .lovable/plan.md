@@ -1,43 +1,55 @@
 
 
-## Comprehensive FK Join Hint Audit
+# Add Clinical Director as a Formal Admin Role Preset
 
-### Problem Found
+## Summary
 
-The database has **two** FK constraints from `locations` to `practice_groups`:
-1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
-2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
+Add "Clinical Director" as a selectable role in the Edit User drawer. A Clinical Director will behave like a Regional Manager (non-participant, coach powers, scoped to org/locations) but additionally gets `is_clinical_director = true`, granting access to the Clinical tab.
 
-Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
+## Changes
 
-### Issues to Fix
+### 1. Edge Function: `admin-users/index.ts`
 
-**1. Wrong FK hint name (will fail at runtime)**
-These files reference `locations_group_id_fkey` which does not exist as a constraint:
+Update the `clinical_director` preset (already exists at line 479) to mirror `regional_manager` behavior:
 
-| File | Line |
-|------|------|
-| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
-| `src/pages/coach/RemindersTab.tsx` | 148 |
-
-Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
-
-**2. Corrupted select syntax (double alias, double parentheses)**
-`src/components/admin/AdminLocationsTab.tsx` line 50 has:
-```
-practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
-```
-This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
-```
-practice_group:practice_groups!locations_org_fkey(name)
+```typescript
+clinical_director: {
+  is_participant: false,
+  is_lead: false,
+  is_coach: true,           // was false — needs coach powers like regional
+  is_org_admin: true,        // was false — needs admin powers like regional
+  is_super_admin: false,
+  is_clinical_director: true,
+  is_doctor: false,
+  coach_scope_type: null,
+  coach_scope_id: null,
+  home_route: '/clinical',
+},
 ```
 
-**3. No issues (already correct)**
-- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
-- All `scope_organization_id` references — intentional audit table column ✓
-- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
+Also update the scope-sync block (~line 553) to include `clinical_director` alongside `regional_manager` so scopes get written to `coach_scopes` and synced to the staff table.
 
-### Summary
+### 2. Frontend: `EditUserDrawer.tsx`
 
-3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
+- Add `'clinical_director'` to the `selectedAction` type union (line 61)
+- Add a radio option for "Clinical Director" between Regional Manager and Super Admin (around line 429)
+- Include `clinical_director` in all scope-related conditionals (lines 120, 160, 255, 438) so it requires scope selection like regional_manager
+- Update `getCurrentStatusBadge` to show a Clinical Director badge
+- Update `getLiveSummary` with a clinical_director case
+- Update the `useEffect` initialization to detect `is_clinical_director` and set `selectedAction('clinical_director')`
+
+### 3. Frontend: `useUserRole.tsx`
+
+Clinical directors with `is_coach` and `is_org_admin` will now naturally derive `isRegional`, `isCoach`, `showRegionalDashboard`, and `canAccessAdmin` from existing logic. The `canAccessClinical` check already works via `isClinicalDirector || is_super_admin`. No changes needed here.
+
+### 4. Frontend: `Layout.tsx`
+
+No changes needed. Navigation already shows the Clinical tab when `isClinicalDirector || isSuperAdmin`, and coach/admin tabs when `isCoach`/`canAccessAdmin`. The new flags on the clinical director preset will naturally surface these nav items.
+
+## What This Achieves
+
+- Admins can promote any user to "Clinical Director" from the Edit User drawer
+- Clinical Directors get: coach dashboard, admin/builder access, command center, **and** the Clinical tab
+- Scoped to specific orgs/locations like a regional manager
+- No hardcoded user checks needed
 

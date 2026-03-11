@@ -48,6 +48,7 @@ interface CoachAssessmentInfo {
   status: string | null;
   updated_at: string | null;
   completed_at: string | null;
+  coach_staff_id?: string;
 }
 
 interface Props {

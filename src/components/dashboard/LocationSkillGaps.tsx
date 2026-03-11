@@ -59,11 +59,16 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
     }
   }, [locationId, lookback]);
 
-  const dfiGaps = gaps.filter(g => g.role_name === 'DFI');
-  const rdaGaps = gaps.filter(g => g.role_name === 'RDA');
-  const omGaps = gaps.filter(g => g.role_name === 'Office Manager');
-  
-  const hasOmGaps = omGaps.length > 0;
+  // Group gaps by role_id for dynamic tabs
+  const roleGroups = gaps.reduce<Map<number, { name: string; gaps: SkillGap[] }>>((acc, g) => {
+    if (!acc.has(g.role_id)) {
+      acc.set(g.role_id, { name: resolveRole(g.role_id, g.role_name), gaps: [] });
+    }
+    acc.get(g.role_id)!.gaps.push(g);
+    return acc;
+  }, new Map());
+
+  const roleEntries = Array.from(roleGroups.entries()).sort((a, b) => a[0] - b[0]);
   const lookbackLabel = lookback === 'all' ? 'all time' : `${lookback} weeks`;
 
   function getConfidenceColor(avg: number): string {

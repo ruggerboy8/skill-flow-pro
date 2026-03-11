@@ -201,6 +201,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   // Determine current status badge
   const getCurrentStatusBadge = () => {
     if (user.is_super_admin) return <Badge variant="destructive">Super Admin</Badge>;
+    if ((user as any).is_clinical_director) return <Badge className="bg-teal-600 hover:bg-teal-700 text-white">Clinical Director</Badge>;
     if ((user as any).is_org_admin) return <Badge className="bg-amber-500 hover:bg-amber-600">Regional Manager</Badge>;
     if (user.is_coach && user.is_participant) return <Badge variant="secondary">Coach + Participant</Badge>;
     if (user.is_coach && !user.is_participant) return <Badge variant="secondary">Coach</Badge>;

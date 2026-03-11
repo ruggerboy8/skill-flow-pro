@@ -531,7 +531,7 @@ export type Database = {
         }
         Insert: {
           code?: string | null
-          competency_id: number
+          competency_id?: number
           description?: string | null
           domain_id?: number | null
           friendly_description?: string | null
@@ -1703,16 +1703,19 @@ export type Database = {
       }
       roles: {
         Row: {
+          active: boolean
           role_code: string | null
           role_id: number
           role_name: string | null
         }
         Insert: {
+          active?: boolean
           role_code?: string | null
-          role_id: number
+          role_id?: number
           role_name?: string | null
         }
         Update: {
+          active?: boolean
           role_code?: string | null
           role_id?: number
           role_name?: string | null

@@ -176,7 +176,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   });
 
   // Fetch coach baseline items for coach scores
-  const isBaselineReview = sessionType === 'baseline_review';
+  const isBaselineReview = (session?.session_type || 'baseline_review') === 'baseline_review';
   const { data: coachItems } = useQuery({
     queryKey: ['coach-baseline-items-for-prep', doctorStaffId, myStaff?.id],
     queryFn: async () => {

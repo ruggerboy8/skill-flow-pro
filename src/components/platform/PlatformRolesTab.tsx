@@ -28,6 +28,7 @@ interface Role {
   role_name: string;
   role_code: string;
   active: boolean;
+  practice_type: string;
 }
 
 interface Competency {
@@ -64,7 +65,7 @@ export function PlatformRolesTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('roles')
-        .select('role_id, role_name, role_code, active')
+        .select('role_id, role_name, role_code, active, practice_type')
         .order('role_id');
       if (error) throw error;
       return data as Role[];
@@ -177,7 +178,7 @@ export function PlatformRolesTab() {
               <CardContent className="p-3 flex items-center justify-between">
                 <div>
                   <p className="font-medium text-sm">{role.role_name}</p>
-                  <p className="text-xs text-muted-foreground">{role.role_code}</p>
+                  <p className="text-xs text-muted-foreground">{role.role_code} · {role.practice_type === 'pediatric_us' ? 'Pedi US' : role.practice_type === 'general_us' ? 'Gen US' : 'Gen UK'}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {!role.active && (

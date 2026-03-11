@@ -223,7 +223,7 @@ export function PlatformOrgsTab() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {org.practice_type === 'pediatric' ? 'Pediatric' : 'General'}
+                          {org.practice_type === 'pediatric_us' ? 'Pediatric – US' : org.practice_type === 'general_us' ? 'General – US' : org.practice_type === 'general_uk' ? 'General – UK' : org.practice_type}
                         </Badge>
                       </TableCell>
                       <TableCell>{org.group_count}</TableCell>

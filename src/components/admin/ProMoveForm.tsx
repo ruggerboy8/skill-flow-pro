@@ -35,7 +35,7 @@ interface ProMove {
   competency_id?: number;
   role_name?: string;
   competency_name?: string;
-  practice_type?: string;
+  practice_types?: string[];
 }
 
 interface ProMoveFormProps {
@@ -56,7 +56,7 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
     description: '',
     resources_url: '',
     intervention_text: '',
-    practice_type: 'pediatric'
+    practice_types: ['pediatric_us'] as string[]
   });
   const [filteredCompetencies, setFilteredCompetencies] = useState<Competency[]>(competencies);
 
@@ -69,10 +69,9 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
         description: proMove.description || '',
         resources_url: proMove.resources_url || '',
         intervention_text: proMove.intervention_text || '',
-        practice_type: proMove.practice_type || 'pediatric'
+        practice_types: proMove.practice_types ?? ['pediatric_us']
       });
     } else if (selectedRole && selectedRole !== 'all') {
-      // Pre-select role when adding new pro-move with role filter
       setFormData(prev => ({ ...prev, role_id: selectedRole }));
     }
   }, [proMove, selectedRole]);
@@ -173,7 +172,7 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
         description: formData.description.trim() || null,
         resources_url: formData.resources_url.trim() || null,
         intervention_text: formData.intervention_text.trim() || null,
-        practice_type: formData.practice_type,
+        practice_types: formData.practice_types,
         active: true
       };
 
@@ -276,20 +275,29 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="practice_type">Practice Type *</Label>
-            <Select
-              value={formData.practice_type}
-              onValueChange={(value) => setFormData({ ...formData, practice_type: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select practice type" />
-              </SelectTrigger>
-              <SelectContent className="bg-background z-50">
-                <SelectItem value="pediatric">Pediatric</SelectItem>
-                <SelectItem value="general">General</SelectItem>
-                <SelectItem value="all">All (applies to every practice type)</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Practice Types *</Label>
+            <div className="flex flex-col gap-2">
+              {([
+                { value: 'pediatric_us', label: 'Pediatric – US' },
+                { value: 'general_us', label: 'General – US' },
+                { value: 'general_uk', label: 'General – UK' },
+              ] as const).map(({ value, label }) => (
+                <label key={value} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.practice_types.includes(value)}
+                    onChange={(e) => {
+                      const next = e.target.checked
+                        ? [...formData.practice_types, value]
+                        : formData.practice_types.filter(t => t !== value);
+                      setFormData({ ...formData, practice_types: next });
+                    }}
+                    className="rounded border-border"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
             <p className="text-xs text-muted-foreground">Controls which org types see this pro move</p>
           </div>
 

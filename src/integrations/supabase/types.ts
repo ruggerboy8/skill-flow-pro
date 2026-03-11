@@ -1511,7 +1511,7 @@ export type Database = {
           date_added: string | null
           description: string | null
           intervention_text: string | null
-          practice_type: string
+          practice_types: string[]
           resources_url: string | null
           retired_at: string | null
           retired_by: string | null
@@ -1530,7 +1530,7 @@ export type Database = {
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
-          practice_type?: string
+          practice_types?: string[]
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null
@@ -1549,7 +1549,7 @@ export type Database = {
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
-          practice_type?: string
+          practice_types?: string[]
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null
@@ -1704,18 +1704,21 @@ export type Database = {
       roles: {
         Row: {
           active: boolean
+          practice_type: string
           role_code: string | null
           role_id: number
           role_name: string | null
         }
         Insert: {
           active?: boolean
+          practice_type?: string
           role_code?: string | null
           role_id?: number
           role_name?: string | null
         }
         Update: {
           active?: boolean
+          practice_type?: string
           role_code?: string | null
           role_id?: number
           role_name?: string | null

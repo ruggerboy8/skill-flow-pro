@@ -34,7 +34,7 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
   const [orgName, setOrgName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
-  const [practiceType, setPracticeType] = useState<'pediatric' | 'general'>('general');
+  const [practiceType, setPracticeType] = useState<'pediatric_us' | 'general_us' | 'general_uk'>('general_us');
 
   // First admin fields
   const [adminName, setAdminName] = useState('');
@@ -49,7 +49,7 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
     setOrgName('');
     setSlug('');
     setSlugEdited(false);
-    setPracticeType('general');
+    setPracticeType('general_us');
     setAdminName('');
     setAdminEmail('');
     setShowAdminSection(false);
@@ -208,19 +208,25 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
               <Label>Practice type *</Label>
               <RadioGroup
                 value={practiceType}
-                onValueChange={(v) => setPracticeType(v as 'pediatric' | 'general')}
-                className="flex gap-6"
+                onValueChange={(v) => setPracticeType(v as 'pediatric_us' | 'general_us' | 'general_uk')}
+                className="flex flex-col gap-3"
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="pediatric" id="type-pediatric" />
-                  <Label htmlFor="type-pediatric" className="font-normal cursor-pointer">
-                    Pediatric
+                  <RadioGroupItem value="pediatric_us" id="type-pediatric-us" />
+                  <Label htmlFor="type-pediatric-us" className="font-normal cursor-pointer">
+                    Pediatric – US
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="general" id="type-general" />
-                  <Label htmlFor="type-general" className="font-normal cursor-pointer">
-                    General
+                  <RadioGroupItem value="general_us" id="type-general-us" />
+                  <Label htmlFor="type-general-us" className="font-normal cursor-pointer">
+                    General – US
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="general_uk" id="type-general-uk" />
+                  <Label htmlFor="type-general-uk" className="font-normal cursor-pointer">
+                    General – UK
                   </Label>
                 </div>
               </RadioGroup>

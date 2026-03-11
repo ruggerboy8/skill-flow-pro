@@ -36,7 +36,7 @@ export function ProMoveLibrary() {
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
-  const [practiceTypeFilter, setPracticeTypeFilter] = useState<'all' | 'pediatric' | 'general'>('all');
+  const [practiceTypeFilter, setPracticeTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'domain' | 'competency' | 'updated'>('updated');
   const [resourceFilters, setResourceFilters] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -263,15 +263,19 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
       {/* Practice type filter chips */}
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground font-medium">Practice type:</span>
-        {(['all', 'pediatric', 'general'] as const).map((type) => (
+        {([
+          { value: 'all', label: 'All' },
+          { value: 'pediatric_us', label: 'Pediatric – US' },
+          { value: 'general_us', label: 'General – US' },
+          { value: 'general_uk', label: 'General – UK' },
+        ]).map(({ value, label }) => (
           <Button
-            key={type}
-            variant={practiceTypeFilter === type ? 'default' : 'outline'}
+            key={value}
+            variant={practiceTypeFilter === value ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setPracticeTypeFilter(type)}
-            className="capitalize"
+            onClick={() => setPracticeTypeFilter(value)}
           >
-            {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
+            {label}
           </Button>
         ))}
       </div>

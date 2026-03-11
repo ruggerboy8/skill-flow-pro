@@ -26,7 +26,7 @@ import { Eye, EyeOff, Search } from 'lucide-react';
 interface ProMoveRow {
   action_id: number;
   action_statement: string;
-  practice_type: string;
+  practice_types: string[];
   role_name: string;
   domain_name: string;
   competency_name: string;
@@ -55,15 +55,15 @@ export function OrgProMoveLibraryTab() {
 
       if (orgErr) throw orgErr;
 
-      const orgPracticeType = orgData?.practice_type ?? 'pediatric';
+      const orgPracticeType = orgData?.practice_type ?? 'pediatric_us';
 
-      // 2. Fetch active pro moves for this practice_type (or 'all')
+      // 2. Fetch active pro moves whose practice_types array overlaps the org's type
       const { data: proMoves, error: pmErr } = await supabase
         .from('pro_moves')
         .select(`
           action_id,
           action_statement,
-          practice_type,
+          practice_types,
           roles!fk_pro_moves_role_id(role_name),
           competencies!fk_pro_moves_competency_id(
             name,
@@ -71,7 +71,7 @@ export function OrgProMoveLibraryTab() {
           )
         `)
         .eq('active', true)
-        .in('practice_type', [orgPracticeType, 'all'])
+        .overlaps('practice_types', [orgPracticeType])
         .order('action_id');
 
       if (pmErr) throw pmErr;
@@ -91,7 +91,7 @@ export function OrgProMoveLibraryTab() {
       const merged: ProMoveRow[] = (proMoves ?? []).map((pm: any) => ({
         action_id: pm.action_id,
         action_statement: pm.action_statement,
-        practice_type: pm.practice_type,
+        practice_types: pm.practice_types ?? [],
         role_name: pm.roles?.role_name ?? '—',
         domain_name: pm.competencies?.domains?.domain_name ?? '—',
         competency_name: pm.competencies?.name ?? '—',
@@ -240,7 +240,7 @@ export function OrgProMoveLibraryTab() {
                           variant="outline"
                           className="text-xs capitalize"
                         >
-                          {row.practice_type}
+                          {row.practice_types.join(', ')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

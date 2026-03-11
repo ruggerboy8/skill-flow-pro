@@ -70,7 +70,7 @@ interface ProMoveListProps {
   activeOnly: boolean;
   resourceFilters?: string[];
   sortBy: 'domain' | 'competency' | 'updated';
-  practiceTypeFilter?: 'all' | 'pediatric' | 'general';
+  practiceTypeFilter?: string;
   onEdit: (proMove: ProMove) => void;
 }
 
@@ -133,7 +133,7 @@ export function ProMoveList({
 
       // Filter by practice type (platform admin tool shows all by default)
       if (practiceTypeFilter && practiceTypeFilter !== 'all') {
-        query = query.eq('practice_type', practiceTypeFilter);
+        query = query.overlaps('practice_types', [practiceTypeFilter]);
       }
 
       const { data, error } = await query;

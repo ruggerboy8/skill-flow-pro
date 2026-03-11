@@ -54,7 +54,7 @@ export default function DoctorCoachingHistory() {
   );
 }
 
-function CompletedSessionCard({ session }: { session: { id: string; session_type: string; sequence_number: number; scheduled_at: string } }) {
+function CompletedSessionCard({ session }: { session: { id: string; session_type: string; sequence_number: number; scheduled_at: string | null } }) {
   const [open, setOpen] = useState(false);
 
   const { data: meetingRecord } = useQuery({

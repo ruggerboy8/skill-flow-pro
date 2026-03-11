@@ -36,7 +36,7 @@ export function ProMoveLibrary() {
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
-  const [practiceTypeFilter, setPracticeTypeFilter] = useState<'all' | 'pediatric' | 'general'>('all');
+  const [practiceTypeFilter, setPracticeTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'domain' | 'competency' | 'updated'>('updated');
   const [resourceFilters, setResourceFilters] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);

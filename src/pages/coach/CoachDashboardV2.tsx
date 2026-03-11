@@ -175,9 +175,13 @@ export default function CoachDashboardV2({
   }, [summaries, selectedOrganizations]);
 
   const roleOptions = useMemo(() => {
-    const roles = Array.from(new Set(summaries.map(s => s.role_name))).sort();
-    return roles.map(role => ({ value: role, label: role }));
-  }, [summaries]);
+    const rolesSet = new Map<string, string>();
+    summaries.forEach(s => {
+      const display = resolveRole(s.role_id, s.role_name);
+      rolesSet.set(display, display);
+    });
+    return Array.from(rolesSet.keys()).sort().map(role => ({ value: role, label: role }));
+  }, [summaries, resolveRole]);
 
   // Apply filters
   const filteredSummaries = useMemo(() => {

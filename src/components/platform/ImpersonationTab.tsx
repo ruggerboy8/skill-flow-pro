@@ -96,8 +96,7 @@ export function ImpersonationTab() {
           .from('staff')
           .select('id, name, is_org_admin, user_capabilities(is_org_admin)');
         const { data: staffData, error } = await (staffQuery as any)
-          .in('primary_location_id', locationIds)
-          .eq('active', true);
+          .in('primary_location_id', locationIds);
 
         if (error) throw error;
 

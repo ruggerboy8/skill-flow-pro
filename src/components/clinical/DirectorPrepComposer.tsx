@@ -728,7 +728,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                     <DomainBadge domain={domainName} />
                     <span className="text-sm font-medium flex-1">{pm?.action_statement}</span>
                     <ScoreCircle score={item.self_score} label="Self" />
-                    <ScoreCircle score={coachScore} label="You" />
+                    {isBaselineReview && <ScoreCircle score={coachScore} label="You" />}
                     <Button
                       variant="ghost"
                       size="icon"

@@ -585,7 +585,6 @@ export default function DoctorReviewPrep() {
                     <DomainBadge domain={domainName} />
                     <span className="text-sm font-medium flex-1">{pm?.action_statement}</span>
                     <ScoreCircle score={item.self_score} label="Self" />
-                    <ScoreCircle score={coachRatingMap[item.action_id] ?? null} label="Coach" />
                     <Button
                       variant="ghost"
                       size="icon"

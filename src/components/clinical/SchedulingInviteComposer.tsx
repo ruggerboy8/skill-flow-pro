@@ -129,12 +129,13 @@ export function SchedulingInviteComposer({
     }
     const { error } = await supabase
       .from('reminder_templates')
-      .upsert({ key: TEMPLATE_KEY, subject, body });
+      .upsert({ key: templateKey, subject, body });
 
     if (error) {
       toast({ title: 'Error', description: 'Failed to save template', variant: 'destructive' });
     } else {
-      toast({ title: 'Saved', description: 'Scheduling invite template updated' });
+      const label = sessionType === 'baseline_review' ? 'Baseline Review' : 'Check-in';
+      toast({ title: 'Saved', description: `${label} invite template updated` });
     }
   }
 

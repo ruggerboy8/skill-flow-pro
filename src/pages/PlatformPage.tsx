@@ -4,11 +4,12 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Building2, BookOpen, UserCog, Users } from 'lucide-react';
+import { Building2, BookOpen, UserCog, Users, Blocks } from 'lucide-react';
 import { PlatformOrgsTab } from '@/components/platform/PlatformOrgsTab';
 import { PlatformUsersTab } from '@/components/platform/PlatformUsersTab';
 import { ImpersonationTab } from '@/components/platform/ImpersonationTab';
 import { ProMoveLibrary } from '@/components/admin/ProMoveLibrary';
+import { PlatformRolesTab } from '@/components/platform/PlatformRolesTab';
 
 export default function PlatformPage() {
   const navigate = useNavigate();

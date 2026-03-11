@@ -135,7 +135,7 @@ export default function DoctorDetail() {
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{doctor.name}</h1>
+            <h1 className="text-2xl font-bold">{drName(doctor.name)}</h1>
             <DoctorJourneyStatusPill status={journeyStatus} />
           </div>
           <p className="text-sm text-muted-foreground flex items-center gap-1">

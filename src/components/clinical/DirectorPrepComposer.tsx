@@ -55,7 +55,9 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [realSessionId, setRealSessionId] = useState<string | null>(initialSessionId === 'new' ? null : initialSessionId);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [priorActionStatuses, setPriorActionStatuses] = useState<Record<number, 'addressed' | 'continuing' | 'dropped'>>({});
-
+  const [filterLowSelf, setFilterLowSelf] = useState(false);
+  const [filterLowCoach, setFilterLowCoach] = useState(false);
+  const [filterGap, setFilterGap] = useState<'none' | 'gap1' | 'gap2'>('none');
   const sessionId = realSessionId ?? '';
 
   // Auto-create session when sessionId is 'new'

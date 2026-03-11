@@ -56,7 +56,6 @@ export function ImpersonationTab() {
   }, []);
 
   // Load org admins when selected org changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!selectedOrgId) {
       setAdmins([]);
@@ -102,14 +101,14 @@ export function ImpersonationTab() {
         if (error) throw error;
 
         // Filter for org admins (new caps row OR legacy flag)
-        const orgAdmins = (staffData ?? []).filter((s) => {
+        const orgAdmins = (staffData ?? []).filter((s: any) => {
           const caps = Array.isArray(s.user_capabilities)
             ? s.user_capabilities[0]
             : (s.user_capabilities as { is_org_admin: boolean } | null);
           return s.is_org_admin || caps?.is_org_admin;
         });
 
-        setAdmins(orgAdmins.map((s) => ({ id: s.id, name: s.name })));
+        setAdmins(orgAdmins.map((s: any) => ({ id: s.id, name: s.name })));
       } catch (err: any) {
         toast({
           title: 'Error',
@@ -122,7 +121,7 @@ export function ImpersonationTab() {
     };
 
     loadAdmins();
-  }, [selectedOrgId]);
+  }, [selectedOrgId, toast]);
 
   const handleMasquerade = (admin: AdminStaff) => {
     updateOverrides({ enabled: true, masqueradeStaffId: admin.id });

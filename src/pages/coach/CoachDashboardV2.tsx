@@ -572,7 +572,7 @@ export default function CoachDashboardV2({
                             </CollapsibleTrigger>
                           </TableCell>
                           <TableCell className="font-medium">{row.staff_name}</TableCell>
-                          <TableCell>{row.role_name}</TableCell>
+                          <TableCell>{resolveRole(row.role_id, row.role_name)}</TableCell>
                           <TableCell>{row.location_name}</TableCell>
                           <TableCell className={`text-center font-medium ${getRateColor(sixWeekRate)}`}>
                             {ratesLoading ? (

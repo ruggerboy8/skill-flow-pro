@@ -330,7 +330,7 @@ export default function StaffDetailV2() {
           </div>
           <h1 className="text-3xl font-bold">{staffInfo.name}</h1>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>{staffInfo.role_name}</span>
+            <span>{resolveRole(staffInfo.role_id, staffInfo.role_name)}</span>
             <span>•</span>
             <span>{staffInfo.location_name}</span>
             <span>•</span>

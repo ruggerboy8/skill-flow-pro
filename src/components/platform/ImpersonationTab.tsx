@@ -157,8 +157,8 @@ export function ImpersonationTab() {
             <AlertTitle>Simulation active</AlertTitle>
             <AlertDescription className="flex items-center justify-between gap-4">
               <span>
-                Masquerading as staff{' '}
-                <code className="font-mono text-xs">{overrides.masqueradeStaffId}</code>
+                Masquerading as{' '}
+                <strong>{activeMasqueradeName || overrides.masqueradeStaffId}</strong>
               </span>
               <Button
                 size="sm"

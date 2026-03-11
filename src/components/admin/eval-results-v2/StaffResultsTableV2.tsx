@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import {
   Table,
   TableBody,
@@ -36,6 +37,7 @@ interface StaffResultsTableV2Props {
 export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsTableV2Props) {
   const [showDraftsOnly, setShowDraftsOnly] = useState(false);
   const queryClient = useQueryClient();
+  const { resolve: resolveRole } = useRoleDisplayNames();
 
   // Aggregate by staff
   const staffRows = aggregateByStaff(data);
@@ -132,7 +134,7 @@ export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsT
               >
                 <TableCell className="font-medium">{staff.staffName}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {staff.roleName}
+                  {resolveRole(staff.roleId, staff.roleName)}
                 </TableCell>
                 <TableCell className="text-center">
                   {getStatusBadge(staff, (e) => {

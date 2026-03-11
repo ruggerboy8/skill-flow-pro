@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useRoleDisplayNames } from "@/hooks/useRoleDisplayNames";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CheckCircle, Mail, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -111,6 +112,7 @@ export function InviteUserDialog({
   organizations,
 }: InviteUserDialogProps) {
   const { toast } = useToast();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const [loading, setLoading] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
   const [invitedName, setInvitedName] = useState("");
@@ -382,7 +384,7 @@ export function InviteUserDialog({
               <SelectContent>
                 {roles.map((role) => (
                   <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                    {role.role_name}
+                    {resolveRole(role.role_id, role.role_name)}
                   </SelectItem>
                 ))}
               </SelectContent>

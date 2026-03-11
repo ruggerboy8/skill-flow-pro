@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useRoleDisplayNames } from "@/hooks/useRoleDisplayNames";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -58,6 +59,7 @@ interface Location {
 export function AdminUsersTab() {
   const { toast } = useToast();
   const { isSuperAdmin, organizationId } = useUserRole();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -406,10 +408,10 @@ const handleResendInvite = async (user: User) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All roles</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                    {role.role_name}
-                  </SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role.role_id} value={role.role_id.toString()}>
+                      {resolveRole(role.role_id, role.role_name)}
+                    </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -479,7 +481,7 @@ const handleResendInvite = async (user: User) => {
                           </div>
                         </TableCell>
                         <TableCell className="truncate">{user.email || "—"}</TableCell>
-                        <TableCell className="truncate">{user.role_name || "—"}</TableCell>
+                        <TableCell className="truncate">{user.role_id ? resolveRole(user.role_id, user.role_name || '—') : '—'}</TableCell>
                         <TableCell className="truncate">{user.location_name || "—"}</TableCell>
                         <TableCell>{getStatusBadge(user)}</TableCell>
                         <TableCell className="text-right">

@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { useLocationExcuses } from '@/hooks/useLocationExcuses';
 import { StaffWeekSummary } from '@/types/coachV2';
@@ -36,6 +37,7 @@ export default function CoachDashboardV2({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { resolve: resolveRole } = useRoleDisplayNames();
 
   // Week selection - always normalize to Monday
   const [selectedWeek, setSelectedWeek] = useState<Date>(() => {
@@ -173,9 +175,13 @@ export default function CoachDashboardV2({
   }, [summaries, selectedOrganizations]);
 
   const roleOptions = useMemo(() => {
-    const roles = Array.from(new Set(summaries.map(s => s.role_name))).sort();
-    return roles.map(role => ({ value: role, label: role }));
-  }, [summaries]);
+    const rolesSet = new Map<string, string>();
+    summaries.forEach(s => {
+      const display = resolveRole(s.role_id, s.role_name);
+      rolesSet.set(display, display);
+    });
+    return Array.from(rolesSet.keys()).sort().map(role => ({ value: role, label: role }));
+  }, [summaries, resolveRole]);
 
   // Apply filters
   const filteredSummaries = useMemo(() => {
@@ -195,7 +201,7 @@ export default function CoachDashboardV2({
     }
 
     if (selectedRoles.length > 0) {
-      filtered = filtered.filter(s => selectedRoles.includes(s.role_name));
+      filtered = filtered.filter(s => selectedRoles.includes(resolveRole(s.role_id, s.role_name)));
     }
 
     if (search.trim()) {
@@ -566,7 +572,7 @@ export default function CoachDashboardV2({
                             </CollapsibleTrigger>
                           </TableCell>
                           <TableCell className="font-medium">{row.staff_name}</TableCell>
-                          <TableCell>{row.role_name}</TableCell>
+                          <TableCell>{resolveRole(row.role_id, row.role_name)}</TableCell>
                           <TableCell>{row.location_name}</TableCell>
                           <TableCell className={`text-center font-medium ${getRateColor(sixWeekRate)}`}>
                             {ratesLoading ? (

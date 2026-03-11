@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -42,6 +43,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   const [roles, setRoles] = useState<Role[]>([]);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
+  const { resolve: resolveRole } = useRoleDisplayNames();
 
   // Fetch available periods for the selected organization
   // Include both submitted AND draft evaluations for period detection
@@ -233,7 +235,10 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   
   if (filters.roleIds.length > 0) {
     const roleNames = filters.roleIds
-      .map(id => roles.find(r => r.role_id === id)?.role_name)
+      .map(id => {
+        const r = roles.find(r => r.role_id === id);
+        return r ? resolveRole(r.role_id, r.role_name) : undefined;
+      })
       .filter(Boolean)
       .join(', ');
     activeFilters.push({
@@ -243,7 +248,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   }
 
   const locationOptions = locations.map(l => ({ value: l.id, label: l.name }));
-  const roleOptions = roles.map(r => ({ value: r.role_id.toString(), label: r.role_name }));
+  const roleOptions = roles.map(r => ({ value: r.role_id.toString(), label: resolveRole(r.role_id, r.role_name) }));
 
   const hasSecondaryFilters = filters.locationIds.length > 0 || filters.roleIds.length > 0;
 

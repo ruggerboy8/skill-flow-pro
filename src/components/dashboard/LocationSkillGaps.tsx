@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 
 interface SkillGap {
   action_id: number;
@@ -28,6 +29,7 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lookback, setLookback] = useState<LookbackOption>('6');
+  const { resolve: resolveRole } = useRoleDisplayNames();
 
   useEffect(() => {
     async function fetchGaps() {
@@ -57,11 +59,16 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
     }
   }, [locationId, lookback]);
 
-  const dfiGaps = gaps.filter(g => g.role_name === 'DFI');
-  const rdaGaps = gaps.filter(g => g.role_name === 'RDA');
-  const omGaps = gaps.filter(g => g.role_name === 'Office Manager');
-  
-  const hasOmGaps = omGaps.length > 0;
+  // Group gaps by role_id for dynamic tabs
+  const roleGroups = gaps.reduce<Map<number, { name: string; gaps: SkillGap[] }>>((acc, g) => {
+    if (!acc.has(g.role_id)) {
+      acc.set(g.role_id, { name: resolveRole(g.role_id, g.role_name), gaps: [] });
+    }
+    acc.get(g.role_id)!.gaps.push(g);
+    return acc;
+  }, new Map());
+
+  const roleEntries = Array.from(roleGroups.entries()).sort((a, b) => a[0] - b[0]);
   const lookbackLabel = lookback === 'all' ? 'all time' : `${lookback} weeks`;
 
   function getConfidenceColor(avg: number): string {
@@ -187,25 +194,19 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="dfi">
+        <Tabs defaultValue={roleEntries[0]?.[0]?.toString() || '0'}>
           <TabsList className="w-full">
-            <TabsTrigger value="dfi" className="flex-1">DFI</TabsTrigger>
-            <TabsTrigger value="rda" className="flex-1">RDA</TabsTrigger>
-            {hasOmGaps && (
-              <TabsTrigger value="om" className="flex-1">OM</TabsTrigger>
-            )}
+            {roleEntries.map(([roleId, { name }]) => (
+              <TabsTrigger key={roleId} value={roleId.toString()} className="flex-1">
+                {name}
+              </TabsTrigger>
+            ))}
           </TabsList>
-          <TabsContent value="dfi" className="mt-3">
-            <GapList items={dfiGaps} roleName="DFI" />
-          </TabsContent>
-          <TabsContent value="rda" className="mt-3">
-            <GapList items={rdaGaps} roleName="RDA" />
-          </TabsContent>
-          {hasOmGaps && (
-            <TabsContent value="om" className="mt-3">
-              <GapList items={omGaps} roleName="Office Manager" />
+          {roleEntries.map(([roleId, { name, gaps: roleGaps }]) => (
+            <TabsContent key={roleId} value={roleId.toString()} className="mt-3">
+              <GapList items={roleGaps} roleName={name} />
             </TabsContent>
-          )}
+          ))}
         </Tabs>
       </CardContent>
     </Card>

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { SlotCanvas } from './SlotCanvas';
 
 interface Role {
@@ -28,6 +29,7 @@ interface GlobalAssignmentBuilderProps {
  */
 export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderProps) {
   const { toast } = useToast();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<number | null>(roleFilter || null);
@@ -265,7 +267,7 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
                 >
                   <option value="">Select role...</option>
                   {roles.map(r => (
-                    <option key={r.role_id} value={r.role_id}>{r.role_name}</option>
+                    <option key={r.role_id} value={r.role_id}>{resolveRole(r.role_id, r.role_name)}</option>
                   ))}
                 </select>
               </div>

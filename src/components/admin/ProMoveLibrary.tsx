@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ interface Competency {
 
 export function ProMoveLibrary() {
   const { toast } = useToast();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   
   // State management
   const [roles, setRoles] = useState<Role[]>([]);
@@ -291,8 +293,8 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
             <SelectContent className="bg-background z-50">
               <SelectItem value="all">All roles</SelectItem>
               {roles.map(role => (
-                <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                  {role.role_name}
+              <SelectItem key={role.role_id} value={role.role_id.toString()}>
+                  {resolveRole(role.role_id, role.role_name)}
                 </SelectItem>
               ))}
             </SelectContent>

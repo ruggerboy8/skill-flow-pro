@@ -152,6 +152,32 @@ export default function DoctorReviewPrep() {
     enabled: !!session?.doctor_staff_id,
   });
 
+  // Fetch coach baseline ratings for this doctor
+  const { data: coachBaselineItems } = useQuery({
+    queryKey: ['coach-baseline-items-for-doctor-prep', session?.doctor_staff_id],
+    queryFn: async () => {
+      if (!session?.doctor_staff_id) return [];
+      const { data: assessment } = await supabase
+        .from('coach_baseline_assessments')
+        .select('id')
+        .eq('doctor_staff_id', session.doctor_staff_id)
+        .maybeSingle();
+      if (!assessment?.id) return [];
+      const { data, error } = await supabase
+        .from('coach_baseline_items')
+        .select('action_id, rating')
+        .eq('assessment_id', assessment.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!session?.doctor_staff_id,
+  });
+
+  const coachRatingMap: Record<number, number> = {};
+  (coachBaselineItems || []).forEach((item: any) => {
+    if (item.rating != null) coachRatingMap[item.action_id] = item.rating;
+  });
+
   // Fetch prior session experiments for progress notes (follow-ups only)
   const { data: priorExperiments } = useQuery({
     queryKey: ['prior-experiments-doctor', sessionId, session?.doctor_staff_id],

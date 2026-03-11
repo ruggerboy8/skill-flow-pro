@@ -248,7 +248,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   }
 
   const locationOptions = locations.map(l => ({ value: l.id, label: l.name }));
-  const roleOptions = roles.map(r => ({ value: r.role_id.toString(), label: r.role_name }));
+  const roleOptions = roles.map(r => ({ value: r.role_id.toString(), label: resolveRole(r.role_id, r.role_name) }));
 
   const hasSecondaryFilters = filters.locationIds.length > 0 || filters.roleIds.length > 0;
 

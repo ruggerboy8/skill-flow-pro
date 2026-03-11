@@ -119,7 +119,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     if (!user?.user_id) return;
     
     // Validate scope for Lead/Coach/Coach+Participant/Regional Manager
-    if ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') && scopeIds.length === 0) {
+    if ((selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager' || selectedAction === 'clinical_director') && scopeIds.length === 0) {
       toast({
         title: "Scope required",
         description: "Please select at least one scope.",

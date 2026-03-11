@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, CheckCircle2, Clock, CircleDashed } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, CheckCircle2, Clock, CircleDashed, ShieldAlert } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import DOMPurify from 'dompurify';
@@ -26,6 +26,13 @@ interface Props {
 
 export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const queryClient = useQueryClient();
+  const { data: myStaff } = useQuery({
+    queryKey: ['staff-profile-for-ownership'],
+    queryFn: async () => {
+      const { data } = await supabase.from('staff').select('id').eq('user_id', (await supabase.auth.getUser()).data.user?.id!).single();
+      return data;
+    },
+  });
   const [summary, setSummary] = useState('');
   const [experiments, setExperiments] = useState<Experiment[]>([{ title: '', description: '' }]);
   const [transcriptMode, setTranscriptMode] = useState(false);
@@ -185,6 +192,8 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
   if (!session) return null;
 
+  const isReadOnly = myStaff?.id ? session.coach_staff_id !== myStaff.id : false;
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       {/* Header */}
@@ -193,13 +202,19 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-xl font-bold">Capture Meeting Outcome</h2>
+          <h2 className="text-xl font-bold">{isReadOnly ? 'Meeting Outcome (Read Only)' : 'Capture Meeting Outcome'}</h2>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
             <Calendar className="h-3.5 w-3.5" />
-            {format(new Date(session.scheduled_at), 'MMMM d, yyyy')}
+            {session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}
             <span>·</span>
             <span>{doctorName}</span>
           </div>
+          {isReadOnly && (
+            <Badge variant="secondary" className="text-xs mt-1 gap-1">
+              <ShieldAlert className="h-3 w-3" />
+              Managed by another coach
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -403,22 +418,27 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
             placeholder="Write a warm note to the doctor summarizing what you discussed, what you agreed on, and what they'll focus on next. Use 'you' language (e.g., 'You mentioned that…', 'We agreed you'd try…')."
             rows={5}
             className="resize-y"
+            disabled={isReadOnly}
           />
         </CardContent>
       </Card>
 
       {/* Submit */}
-      <Button
-        className="w-full gap-2"
-        onClick={() => submitMutation.mutate()}
-        disabled={!summary.trim() || submitMutation.isPending}
-      >
-        <Send className="h-4 w-4" />
-        {submitMutation.isPending ? 'Submitting...' : 'Submit & Share with Doctor'}
-      </Button>
-      <p className="text-xs text-muted-foreground text-center pb-4">
-        The doctor will be able to review and acknowledge this summary.
-      </p>
+      {!isReadOnly && (
+        <>
+          <Button
+            className="w-full gap-2"
+            onClick={() => submitMutation.mutate()}
+            disabled={!summary.trim() || submitMutation.isPending}
+          >
+            <Send className="h-4 w-4" />
+            {submitMutation.isPending ? 'Submitting...' : 'Submit & Share with Doctor'}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center pb-4">
+            The doctor will be able to review and acknowledge this summary.
+          </p>
+        </>
+      )}
     </div>
   );
 }

@@ -5,14 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock, FileText, Mail, Plus, Trash2 } from 'lucide-react';
+import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock, FileText, Mail, Plus, Trash2, ShieldAlert, UserCog } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { MeetingOutcomeCapture } from '@/components/clinical/MeetingOutcomeCapture';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
 import { DirectorPrepComposer } from '@/components/clinical/DirectorPrepComposer';
 import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
 
 interface Session {
@@ -22,6 +24,8 @@ interface Session {
   status: string;
   scheduled_at: string | null;
   meeting_link?: string | null;
+  coach_staff_id: string;
+  coach_name?: string;
 }
 
 import { SESSION_STATUS_CONFIG, DEFAULT_STATUS } from '@/lib/coachingSessionStatus';
@@ -59,12 +63,28 @@ interface Props {
 
 export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail, doctorBaselineComplete, coachAssessment, onStartCoachWizard }: Props) {
   const { data: myStaff } = useStaffProfile();
+  const { isSuperAdmin } = useUserRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [captureSessionId, setCaptureSessionId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [prepSessionId, setPrepSessionId] = useState<string | null>(null);
   const [inviteSessionId, setInviteSessionId] = useState<string | null>(null);
+
+  // Fetch clinical directors for reassign dropdown (super admin only)
+  const { data: clinicalDirectors } = useQuery({
+    queryKey: ['clinical-directors-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('id, name')
+        .or('is_clinical_director.eq.true,is_super_admin.eq.true')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: isSuperAdmin,
+  });
 
   // Add Check-in mutation
   const addCheckinMutation = useMutation({
@@ -85,7 +105,12 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
       toast({ title: 'Check-in added', description: 'New follow-up session created. Build your agenda to get started.' });
     },
-    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: (e: Error) => {
+      const msg = (e as any)?.code === '23505'
+        ? 'A session with this sequence already exists for this doctor.'
+        : e.message;
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+    },
   });
 
   const handleInviteSuccess = () => {
@@ -171,31 +196,37 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
         </Card>
       )}
 
-      {sorted.map((session) => (
-        <SessionCard
-          key={session.id}
-          session={session}
-          expanded={expandedId === session.id}
-          onToggle={() => setExpandedId(expandedId === session.id ? null : session.id)}
-          onCapture={() => setCaptureSessionId(session.id)}
-          onBuildAgenda={() => setPrepSessionId(session.id)}
-          onEditAgenda={() => setPrepSessionId(session.id)}
-          onInvite={() => setInviteSessionId(session.id)}
-          coachName={coachName}
-          doctorName={doctorName}
-          onDelete={async () => {
-            await supabase.from('coaching_session_selections').delete().eq('session_id', session.id);
-            await supabase.from('coaching_meeting_records').delete().eq('session_id', session.id);
-            const { error } = await supabase.from('coaching_sessions').delete().eq('id', session.id);
-            if (error) {
-              toast({ title: 'Error', description: error.message, variant: 'destructive' });
-            } else {
-              queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
-              toast({ title: 'Session deleted' });
-            }
-          }}
-        />
-      ))}
+      {sorted.map((session) => {
+        const isOwner = session.coach_staff_id === myStaff?.id;
+        return (
+          <SessionCard
+            key={session.id}
+            session={session}
+            isOwner={isOwner}
+            isSuperAdmin={isSuperAdmin}
+            clinicalDirectors={clinicalDirectors}
+            expanded={expandedId === session.id}
+            onToggle={() => setExpandedId(expandedId === session.id ? null : session.id)}
+            onCapture={() => setCaptureSessionId(session.id)}
+            onBuildAgenda={() => setPrepSessionId(session.id)}
+            onEditAgenda={() => setPrepSessionId(session.id)}
+            onInvite={() => setInviteSessionId(session.id)}
+            coachName={coachName}
+            doctorName={doctorName}
+            onDelete={async () => {
+              await supabase.from('coaching_session_selections').delete().eq('session_id', session.id);
+              await supabase.from('coaching_meeting_records').delete().eq('session_id', session.id);
+              const { error } = await supabase.from('coaching_sessions').delete().eq('id', session.id);
+              if (error) {
+                toast({ title: 'Error', description: error.message, variant: 'destructive' });
+              } else {
+                queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+                toast({ title: 'Session deleted' });
+              }
+            }}
+          />
+        );
+      })}
 
       {/* Scheduling Invite Composer */}
       <SchedulingInviteComposer
@@ -214,6 +245,9 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
 
 function SessionCard({
   session,
+  isOwner,
+  isSuperAdmin,
+  clinicalDirectors,
   expanded,
   onToggle,
   onCapture,
@@ -225,6 +259,9 @@ function SessionCard({
   doctorName,
 }: {
   session: Session;
+  isOwner: boolean;
+  isSuperAdmin: boolean;
+  clinicalDirectors?: { id: string; name: string }[];
   expanded: boolean;
   onToggle: () => void;
   onCapture: () => void;
@@ -235,15 +272,31 @@ function SessionCard({
   coachName: string;
   doctorName: string;
 }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const statusInfo = statusLabels[session.status] || { label: session.status, className: 'bg-muted text-muted-foreground' };
   const typeLabel = session.session_type === 'baseline_review'
     ? 'Baseline Review'
     : `Check-in ${session.sequence_number - 1}`;
 
   const expandableStatus = isExpandable(session.status);
-  const showCapture = canCaptureStatus(session.status);
-  const showBuildAgenda = canBuildAgenda(session.status);
-  const showInvite = canInvite(session.status);
+  const showCapture = isOwner && canCaptureStatus(session.status);
+  const showBuildAgenda = isOwner && canBuildAgenda(session.status);
+  const showInvite = isOwner && canInvite(session.status);
+  const showDelete = isOwner;
+
+  const handleReassign = async (newCoachId: string) => {
+    const { error } = await supabase
+      .from('coaching_sessions')
+      .update({ coach_staff_id: newCoachId })
+      .eq('id', session.id);
+    if (error) {
+      toast({ title: 'Reassign failed', description: error.message, variant: 'destructive' });
+    } else {
+      queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+      toast({ title: 'Session reassigned' });
+    }
+  };
 
   const { data: meetingSummary } = useQuery({
     queryKey: ['meeting-summary', session.id],
@@ -356,6 +409,12 @@ function SessionCard({
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {!isOwner && (
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <ShieldAlert className="h-3 w-3" />
+                  {session.coach_name || 'Another coach'}
+                </Badge>
+              )}
               <Badge className={`${statusInfo.className} hover:${statusInfo.className}`}>
                 {statusInfo.label}
               </Badge>
@@ -401,32 +460,48 @@ function SessionCard({
                   Start Meeting
                 </Button>
               )}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete {typeLabel}?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently remove this session and all its prep data, selections, and meeting records.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              {showDelete && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {typeLabel}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently remove this session and all its prep data, selections, and meeting records.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              {isSuperAdmin && !isOwner && clinicalDirectors && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Select onValueChange={handleReassign} value={session.coach_staff_id}>
+                    <SelectTrigger className="h-8 w-8 p-0 border-none [&>svg]:hidden">
+                      <UserCog className="h-3.5 w-3.5 text-muted-foreground" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clinicalDirectors.map(cd => (
+                        <SelectItem key={cd.id} value={cd.id}>{cd.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </CardHeader>
         </CollapsibleTrigger>

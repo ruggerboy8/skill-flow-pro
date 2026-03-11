@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter, ShieldAlert } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
@@ -15,6 +15,7 @@ import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
 import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import DOMPurify from 'dompurify';
 
 interface Props {
   sessionId: string;
@@ -67,6 +68,10 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [filterLowCoach, setFilterLowCoach] = useState(false);
   const [filterGap, setFilterGap] = useState<'none' | 'gap1' | 'gap2'>('none');
   const sessionId = realSessionId ?? '';
+
+  // Check ownership
+  const { data: myStaffForOwnership } = useStaffProfile();
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   // Auto-create session when sessionId is 'new'
   const { data: myStaff } = useStaffProfile();
@@ -135,6 +140,13 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     },
     enabled: !!sessionId,
   });
+
+  // Set read-only if session belongs to another coach
+  useEffect(() => {
+    if (session && myStaffForOwnership?.id && session.coach_staff_id !== myStaffForOwnership.id) {
+      setIsReadOnly(true);
+    }
+  }, [session, myStaffForOwnership?.id]);
 
   // Fetch doctor's baseline items as the ProMove pool
   const { data: baselineItems } = useQuery({
@@ -446,9 +458,40 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   }
 
   // Guard: if doctor has already submitted, don't allow editing — redirect back
-  if (session && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
+  if (session && !isReadOnly && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
     onBack();
     return null;
+  }
+
+  // Read-only view for sessions owned by another coach
+  if (isReadOnly && session) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h2 className="text-xl font-bold">Prep for {doctorName}</h2>
+            <Badge variant="secondary" className="text-xs mt-1 gap-1">
+              <ShieldAlert className="h-3 w-3" />
+              Managed by another coach — read only
+            </Badge>
+          </div>
+        </div>
+        {session.coach_note && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Coach Agenda</CardTitle></CardHeader>
+            <CardContent>
+              <div
+                className="prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(session.coach_note) }}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
   }
 
   if (published) {

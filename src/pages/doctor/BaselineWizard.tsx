@@ -148,7 +148,8 @@ export default function BaselineWizard() {
   // Show tutorial when entering assessment for the first time
   useEffect(() => {
     if (currentStep === 'assessment' && domains?.length) {
-      const seen = localStorage.getItem('baseline-tutorial-seen');
+      const tutorialKey = `baseline-tutorial-seen-${staff?.id || 'unknown'}`;
+      const seen = localStorage.getItem(tutorialKey);
       if (!seen) {
         // Small delay to let DOM render
         const timer = setTimeout(() => setShowTutorial(true), 500);

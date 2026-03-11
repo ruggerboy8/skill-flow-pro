@@ -601,7 +601,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                     {allRoles.map(role => (
                       <div key={role.role_id} className="flex items-center space-x-2">
                         <Checkbox id={`role-${role.role_id}`} checked={selectedRoleIds.includes(role.role_id)} onCheckedChange={() => toggleRole(role.role_id)} />
-                        <Label htmlFor={`role-${role.role_id}`} className="cursor-pointer text-sm leading-tight">{role.role_name}</Label>
+                        <Label htmlFor={`role-${role.role_id}`} className="cursor-pointer text-sm leading-tight">{resolveRole(role.role_id, role.role_name)}</Label>
                       </div>
                     ))}
                   </div>

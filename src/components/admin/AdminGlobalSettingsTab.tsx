@@ -270,6 +270,72 @@ export function AdminGlobalSettingsTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Role Display Names */}
+      {organizationId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5" />
+              Role Display Names
+            </CardTitle>
+            <CardDescription>
+              Customize how role titles appear to your team
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {rolesLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : roles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No roles found for your organization's practice type.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Platform Role</TableHead>
+                      <TableHead>Your Display Name</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {roles.map((role) => (
+                      <TableRow key={role.role_id}>
+                        <TableCell className="font-medium">
+                          {role.role_name}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={role.display_name}
+                            onChange={(e) =>
+                              handleAliasChange(role.role_id, e.target.value)
+                            }
+                            placeholder={role.role_name}
+                            className="max-w-xs"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSaveAliases}
+                    disabled={rolesSaving}
+                  >
+                    {rolesSaving ? "Saving…" : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

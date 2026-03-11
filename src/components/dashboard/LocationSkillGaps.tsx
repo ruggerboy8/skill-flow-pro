@@ -194,25 +194,19 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="dfi">
+        <Tabs defaultValue={roleEntries[0]?.[0]?.toString() || '0'}>
           <TabsList className="w-full">
-            <TabsTrigger value="dfi" className="flex-1">DFI</TabsTrigger>
-            <TabsTrigger value="rda" className="flex-1">RDA</TabsTrigger>
-            {hasOmGaps && (
-              <TabsTrigger value="om" className="flex-1">OM</TabsTrigger>
-            )}
+            {roleEntries.map(([roleId, { name }]) => (
+              <TabsTrigger key={roleId} value={roleId.toString()} className="flex-1">
+                {name}
+              </TabsTrigger>
+            ))}
           </TabsList>
-          <TabsContent value="dfi" className="mt-3">
-            <GapList items={dfiGaps} roleName="DFI" />
-          </TabsContent>
-          <TabsContent value="rda" className="mt-3">
-            <GapList items={rdaGaps} roleName="RDA" />
-          </TabsContent>
-          {hasOmGaps && (
-            <TabsContent value="om" className="mt-3">
-              <GapList items={omGaps} roleName="Office Manager" />
+          {roleEntries.map(([roleId, { name, gaps: roleGaps }]) => (
+            <TabsContent key={roleId} value={roleId.toString()} className="mt-3">
+              <GapList items={roleGaps} roleName={name} />
             </TabsContent>
-          )}
+          ))}
         </Tabs>
       </CardContent>
     </Card>

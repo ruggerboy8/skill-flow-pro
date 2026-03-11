@@ -26,7 +26,7 @@ import { Eye, EyeOff, Search } from 'lucide-react';
 interface ProMoveRow {
   action_id: number;
   action_statement: string;
-  practice_type: string;
+  practice_types: string[];
   role_name: string;
   domain_name: string;
   competency_name: string;

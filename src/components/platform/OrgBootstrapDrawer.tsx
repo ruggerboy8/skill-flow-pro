@@ -114,8 +114,10 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
       if (locErr) throw locErr;
 
       // 4. Optionally invite the first org admin
-      if (showAdminSection && adminEmail.trim() && adminName.trim()) {
-        const { error: invErr } = await supabase.functions.invoke('admin-users', {
+      let inviteSent = false;
+      const wantsInvite = showAdminSection && adminEmail.trim() && adminName.trim();
+      if (wantsInvite) {
+        const { data: invData, error: invErr } = await supabase.functions.invoke('admin-users', {
           body: {
             action: 'invite_user',
             email: adminEmail.trim(),
@@ -130,15 +132,23 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
             },
           },
         });
-        if (invErr) throw invErr;
+        if (invErr) {
+          console.error('Invite error (FunctionsError):', invErr);
+          throw invErr;
+        }
+        // supabase.functions.invoke may return a non-2xx body in `data`
+        if (invData?.error) {
+          console.error('Invite error (response body):', invData.error);
+          throw new Error(invData.error);
+        }
+        inviteSent = true;
       }
 
       toast({
         title: 'Organization created',
-        description:
-          showAdminSection && adminEmail.trim()
-            ? `${orgName.trim()} is ready. Invite sent to ${adminEmail.trim()}.`
-            : `${orgName.trim()} has been bootstrapped. Add staff when ready.`,
+        description: inviteSent
+          ? `${orgName.trim()} is ready. Invite sent to ${adminEmail.trim()}.`
+          : `${orgName.trim()} has been bootstrapped. Add staff when ready.`,
       });
 
       handleReset();

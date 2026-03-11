@@ -408,10 +408,10 @@ const handleResendInvite = async (user: User) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All roles</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                    {role.role_name}
-                  </SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role.role_id} value={role.role_id.toString()}>
+                      {resolveRole(role.role_id, role.role_name)}
+                    </SelectItem>
                 ))}
               </SelectContent>
             </Select>

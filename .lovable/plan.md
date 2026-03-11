@@ -1,43 +1,65 @@
 
 
-## Comprehensive FK Join Hint Audit
+# Fix Clinical Director Portal: 6 Issues
 
-### Problem Found
+## Issue 1: Auto-create Baseline Review session on release
 
-The database has **two** FK constraints from `locations` to `practice_groups`:
-1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
-2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
+Currently, the coaching thread shows "No coaching sessions yet" until the director manually creates one. The "Notify Doctor" card in `DoctorDetailOverview` is a separate action outside the thread.
 
-Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
+**Changes:**
+- **`DoctorDetailOverview.tsx`**: In the `releaseMutation.onSuccess`, after releasing the baseline, also auto-insert a `coaching_sessions` row with `session_type: 'baseline_review'`, `sequence_number: 1`, `status: 'scheduled'`. Remove the "Notify Doctor" card entirely — that action will move into the thread.
+- **`DoctorDetailThread.tsx`**: When a baseline_review session exists at status `scheduled`, the existing "Build Agenda" button already appears. The "Add Coaching Session" button should appear above it (it already does when `sessions.length > 0`). This means the thread becomes the single hub immediately after release.
+- Remove the `showNotify` logic and `NotifyDoctorDialog` import from `DoctorDetailOverview` (the prep note can be sent from the scheduling invite flow instead).
 
-### Issues to Fix
+## Issue 2: Coach baseline wizard accessible from thread
 
-**1. Wrong FK hint name (will fail at runtime)**
-These files reference `locations_group_id_fkey` which does not exist as a constraint:
+Currently the private coach baseline wizard is buried under the collapsible "Baseline Assessment" section at the bottom.
 
-| File | Line |
-|------|------|
-| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
-| `src/pages/coach/RemindersTab.tsx` | 148 |
+**Changes:**
+- **`DoctorDetail.tsx`**: Pass `coachAssessment` and `onStartCoachWizard` to `DoctorDetailThread` as new props.
+- **`DoctorDetailThread.tsx`**: Add a compact card above the session list (or below the "Add Session" button) showing the coach's private baseline status with a button to open the wizard. Only show when the doctor's baseline is complete and there are sessions. Something like: "Your Private Assessment: [Not Started / In Progress / Complete] → [Start / Continue / View]".
 
-Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
+## Issue 3: Coach baseline wizard renders in half-screen Sheet
 
-**2. Corrupted select syntax (double alias, double parentheses)**
-`src/components/admin/AdminLocationsTab.tsx` line 50 has:
-```
-practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
-```
-This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
-```
-practice_group:practice_groups!locations_org_fkey(name)
-```
+The wizard is opened via a `Sheet` with `side="right"` and `sm:max-w-2xl` — this makes it a narrow side panel, which is cramped for a full assessment wizard.
 
-**3. No issues (already correct)**
-- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
-- All `scope_organization_id` references — intentional audit table column ✓
-- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
+**Changes:**
+- **`DoctorDetail.tsx`**: Replace the `Sheet/SheetContent` wrapper with a conditional render. When `showCoachWizard` is true, render `CoachBaselineWizard` as a full-page overlay (similar to how `DirectorPrepComposer` replaces the thread view). This gives the wizard the full viewport.
 
-### Summary
+## Issue 4: "Stop & Transcribe" button unclickable
 
-3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
+The button is at line 648 of `CoachBaselineWizard.tsx`, inside a `div` at the very bottom of the scrollable content. In the Sheet (half-screen), it's likely clipped or below the fold. Since Issue 3 converts to full-page, this should be resolved. However, there's also a structural fix needed:
+
+**Changes:**
+- **`CoachBaselineWizard.tsx`**: Move the "Stop & Transcribe" and processing controls into a **sticky footer** (`sticky bottom-0`) so they're always visible when recording, regardless of scroll position. This is critical because the user scrolls through domains while recording.
+
+## Issue 5: Next action text mismatch in portal
+
+Looking at `doctorStatus.ts`, the `nextAction` strings are coach-oriented but some are wrong for the current stage context:
+
+- `doctor_confirmed` → nextAction says "Schedule a follow-up to check on progress" — this is correct for the portal
+- `ready_for_prep` → says "Build your meeting agenda before inviting to schedule" — correct
+- `scheduling_invite_sent` → says "Waiting for doctor to schedule via the link you sent" — correct
+- `baseline_submitted` → says "Review baseline results" — should say "Complete your private assessment and build meeting agenda"
+- `invited` → says "Release the baseline when ready for the doctor to begin" — correct
+
+**Changes:**
+- **`doctorStatus.ts`**: Update `nextAction` for `baseline_submitted` to "Complete your private assessment, then build the meeting agenda" and for `ready_for_prep` (with nudge) to "Open the coaching thread to build your meeting agenda".
+- **`DoctorManagement.tsx` `InlineAction`**: Add cases for `scheduling_invite_sent` ("View Details") and `meeting_ready` ("Start Meeting") stages.
+
+## Issue 6: Doctor baseline tutorial didn't auto-play
+
+The tutorial triggers when `currentStep === 'assessment'` and `localStorage.getItem('baseline-tutorial-seen')` is falsy. If the user has previously visited (even on a different account), the localStorage flag persists.
+
+**Changes:**
+- **`BaselineWizard.tsx`**: Make the localStorage key account-specific: `baseline-tutorial-seen-${staff?.id}` instead of the generic `baseline-tutorial-seen`. This ensures each doctor sees the tutorial on their first visit. Also update `handleTutorialComplete` to use the same key.
+
+## Files to modify:
+1. `src/components/clinical/DoctorDetailOverview.tsx` — auto-create session on release, remove notify card
+2. `src/components/clinical/DoctorDetailThread.tsx` — add coach baseline status card
+3. `src/pages/clinical/DoctorDetail.tsx` — replace Sheet with full-page render for wizard
+4. `src/components/clinical/CoachBaselineWizard.tsx` — sticky footer for recording controls
+5. `src/lib/doctorStatus.ts` — fix nextAction text
+6. `src/pages/clinical/DoctorManagement.tsx` — add missing InlineAction cases
+7. `src/pages/doctor/BaselineWizard.tsx` — account-specific tutorial localStorage key
 

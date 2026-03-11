@@ -58,7 +58,7 @@ interface EditUserDrawerProps {
 export function EditUserDrawer({ open, onClose, onSuccess, user, roles, locations, organizations }: EditUserDrawerProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<'participant' | 'lead' | 'coach' | 'coach_participant' | 'regional_manager' | 'super_admin'>('participant');
+  const [selectedAction, setSelectedAction] = useState<'participant' | 'lead' | 'coach' | 'coach_participant' | 'regional_manager' | 'clinical_director' | 'super_admin'>('participant');
   const [scopeType, setScopeType] = useState<'org' | 'location'>('org');
   const [scopeIds, setScopeIds] = useState<string[]>([]);
   const [hireDate, setHireDate] = useState<string>('');

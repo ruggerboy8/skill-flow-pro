@@ -27,7 +27,7 @@ export default function DoctorCoachingHistory() {
     enabled: !!staff?.id,
   });
 
-  const completedSessions = sessions?.filter(s => s.status === 'doctor_confirmed')
+  const completedSessions = sessions?.filter(s => s.status === 'doctor_confirmed' || s.status === 'meeting_pending')
     .sort((a, b) => b.sequence_number - a.sequence_number) || [];
 
   return (

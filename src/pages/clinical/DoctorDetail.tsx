@@ -13,7 +13,6 @@ import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
 import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
 import { DoctorGrowthTimeline } from '@/components/clinical/DoctorGrowthTimeline';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -112,6 +111,17 @@ export default function DoctorDetail() {
     (doctor as any)?.baseline_released_at,
   );
 
+  // Full-page coach baseline wizard (replaces detail view)
+  if (showCoachWizard && staffId && doctor) {
+    return (
+      <CoachBaselineWizard
+        doctorStaffId={staffId}
+        doctorName={doctor.name}
+        onBack={() => setShowCoachWizard(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -130,7 +140,7 @@ export default function DoctorDetail() {
           </p>
         </div>
       </div>
-      {/* Pre-session actions (release baseline, notify doctor) */}
+      {/* Pre-session actions (release baseline) */}
       <DoctorDetailOverview
         doctor={doctor}
         baseline={baseline}
@@ -147,6 +157,9 @@ export default function DoctorDetail() {
           doctorName={doctor.name}
           doctorStaffId={staffId!}
           doctorEmail={doctor.email}
+          doctorBaselineComplete={baseline?.status === 'completed'}
+          coachAssessment={coachAssessment}
+          onStartCoachWizard={() => setShowCoachWizard(true)}
         />
       </div>
 
@@ -184,21 +197,6 @@ export default function DoctorDetail() {
           />
         </CollapsibleContent>
       </Collapsible>
-
-      {/* Coach Baseline Wizard */}
-      <Sheet open={showCoachWizard} onOpenChange={setShowCoachWizard}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-0">
-          <div className="p-6">
-            {staffId && doctor && (
-              <CoachBaselineWizard
-                doctorStaffId={staffId}
-                doctorName={doctor.name}
-                onBack={() => setShowCoachWizard(false)}
-              />
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

@@ -39,15 +39,25 @@ const isExpandable = (status: string) =>
   ['director_prep_ready', 'scheduling_invite_sent', 'doctor_prep_submitted', 'meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(status);
 
 
+interface CoachAssessmentInfo {
+  id: string;
+  status: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+}
+
 interface Props {
   sessions: Session[];
   coachName?: string;
   doctorName?: string;
   doctorStaffId: string;
   doctorEmail: string;
+  doctorBaselineComplete?: boolean;
+  coachAssessment?: CoachAssessmentInfo | null;
+  onStartCoachWizard?: () => void;
 }
 
-export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail }: Props) {
+export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail, doctorBaselineComplete, coachAssessment, onStartCoachWizard }: Props) {
   const { data: myStaff } = useStaffProfile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -110,6 +120,33 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
 
   return (
     <div className="space-y-3">
+      {/* Coach Private Assessment card — shown when doctor baseline is complete */}
+      {doctorBaselineComplete && sessions.length > 0 && onStartCoachWizard && (
+        <Card className="border-dashed border-accent/50">
+          <CardContent className="flex items-center justify-between py-3">
+            <div>
+              <p className="text-sm font-medium">Your Private Assessment</p>
+              <p className="text-xs text-muted-foreground">
+                {coachAssessment?.status === 'completed'
+                  ? 'Complete — view comparison on the baseline tab'
+                  : coachAssessment?.status === 'in_progress'
+                  ? 'In progress — continue where you left off'
+                  : 'Not started — record your own ratings before the meeting'}
+              </p>
+            </div>
+            <Button
+              variant={coachAssessment?.status === 'completed' ? 'outline' : 'default'}
+              size="sm"
+              onClick={onStartCoachWizard}
+              className="gap-1.5"
+            >
+              <ClipboardEdit className="h-3.5 w-3.5" />
+              {coachAssessment?.status === 'completed' ? 'View' : coachAssessment?.status === 'in_progress' ? 'Continue' : 'Start'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Always-visible Add Coaching Session button above the thread */}
       {sessions.length > 0 && (
         <Button

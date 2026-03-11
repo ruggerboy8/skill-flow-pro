@@ -140,7 +140,7 @@ export function getDoctorJourneyStatus(
       label: 'Ready for Prep',
       variant: 'outline',
       colorClass: 'bg-blue-100 text-blue-800',
-      nextAction: 'Build your meeting agenda before inviting to schedule',
+      nextAction: 'Open the coaching thread to build your meeting agenda',
       nudge: 'Tip: Complete your private baseline assessment before the meeting for better prep.',
     };
   }
@@ -163,7 +163,7 @@ export function getDoctorJourneyStatus(
       label: 'Baseline Submitted',
       variant: 'default',
       colorClass: 'bg-green-100 text-green-800',
-      nextAction: 'Review baseline results',
+      nextAction: 'Complete your private assessment, then build the meeting agenda',
     };
   }
 

@@ -631,133 +631,133 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         );
       })}
 
-      {/* ── Bottom section: processing, transcript, and actions ── */}
-      <div className="space-y-4 pt-4 border-t">
-        {/* Stop & Transcribe button (while recording) */}
-        {recState.isRecording && (
-          <Card>
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-                  </span>
-                  <span className="text-sm font-medium">Recording in progress</span>
+      {/* ── Non-recording bottom section: transcript and complete ── */}
+      {!recState.isRecording && (
+        <div className="space-y-4 pt-4 border-t">
+          {/* Processing indicator */}
+          {isProcessing && (
+            <Card>
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3 justify-center py-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">{processingStep}</span>
                 </div>
-                <Button
-                  variant="destructive"
-                  onClick={handleStopAndTranscribe}
-                  className="gap-2"
-                >
-                  <MicOff className="h-4 w-4" />
-                  Stop & Transcribe
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Processing indicator */}
-        {isProcessing && (
-          <Card>
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3 justify-center py-2">
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground">{processingStep}</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Transcript display + Map to Notes */}
-        {transcript && !isProcessing && (
-          <Card>
-            <CardContent className="py-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Transcript</span>
+          {/* Transcript display + Map to Notes */}
+          {transcript && !isProcessing && (
+            <Card>
+              <CardContent className="py-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Transcript</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
+                    >
+                      {isTranscriptExpanded ? 'Collapse' : 'Expand'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setTranscript(null); setMappingJustCompleted(false); }}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                      New Recording
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
+
+                {isTranscriptExpanded && (
+                  <Textarea
+                    value={transcript}
+                    onChange={(e) => setTranscript(e.target.value)}
+                    onBlur={async () => {
+                      if (assessmentId && transcript) {
+                        await supabase
+                          .from('coach_baseline_assessments')
+                          .update({ recording_transcript: transcript, updated_at: new Date().toISOString() })
+                          .eq('id', assessmentId);
+                      }
+                    }}
+                    className="bg-muted/30 border rounded-md p-3 text-sm max-h-[300px] min-h-[100px] overflow-y-auto resize-y"
+                    placeholder="Edit transcript..."
+                  />
+                )}
+
+                {!mappingJustCompleted && (
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
+                    onClick={handleMapToNotes}
+                    disabled={isMappingNotes}
+                    className="w-full gap-2"
                   >
-                    {isTranscriptExpanded ? 'Collapse' : 'Expand'}
+                    <Sparkles className="h-4 w-4" />
+                    Map to Pro Move Notes
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setTranscript(null); setMappingJustCompleted(false); }}
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                    New Recording
-                  </Button>
-                </div>
-              </div>
+                )}
 
-              {isTranscriptExpanded && (
-                <Textarea
-                  value={transcript}
-                  onChange={(e) => setTranscript(e.target.value)}
-                  onBlur={async () => {
-                    if (assessmentId && transcript) {
-                      await supabase
-                        .from('coach_baseline_assessments')
-                        .update({ recording_transcript: transcript, updated_at: new Date().toISOString() })
-                        .eq('id', assessmentId);
-                    }
-                  }}
-                  className="bg-muted/30 border rounded-md p-3 text-sm max-h-[300px] min-h-[100px] overflow-y-auto resize-y"
-                  placeholder="Edit transcript..."
-                />
-              )}
+                {mappingJustCompleted && (
+                  <div className="flex items-center gap-2 text-sm text-emerald-600 justify-center py-1">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Notes mapped successfully
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setMappingJustCompleted(false); }}
+                      className="ml-2 text-xs"
+                    >
+                      Re-map
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-              {!mappingJustCompleted && (
-                <Button
-                  onClick={handleMapToNotes}
-                  disabled={isMappingNotes}
-                  className="w-full gap-2"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Map to Pro Move Notes
-                </Button>
-              )}
+          {/* Complete Assessment */}
+          {!isProcessing && (
+            <div className="flex justify-end">
+              <Button
+                onClick={() => completeMutation.mutate()}
+                disabled={!allRated || completeMutation.isPending}
+                size="lg"
+                className="shadow-lg"
+              >
+                {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
-              {mappingJustCompleted && (
-                <div className="flex items-center gap-2 text-sm text-emerald-600 justify-center py-1">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Notes mapped successfully
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setMappingJustCompleted(false); }}
-                    className="ml-2 text-xs"
-                  >
-                    Re-map
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Complete Assessment */}
-        {!recState.isRecording && !isProcessing && (
-          <div className="flex justify-end">
+      {/* ── Sticky footer: Stop & Transcribe (visible while recording) ── */}
+      {recState.isRecording && (
+        <div className="sticky bottom-0 z-30 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-t shadow-lg">
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+              </span>
+              <span className="text-sm font-medium">Recording in progress</span>
+            </div>
             <Button
-              onClick={() => completeMutation.mutate()}
-              disabled={!allRated || completeMutation.isPending}
-              size="lg"
-              className="shadow-lg"
+              variant="destructive"
+              onClick={handleStopAndTranscribe}
+              className="gap-2"
             >
-              {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
+              <MicOff className="h-4 w-4" />
+              Stop & Transcribe
             </Button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

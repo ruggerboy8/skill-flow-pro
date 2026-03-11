@@ -309,6 +309,20 @@ function InlineAction({ stage, doctorId, navigate }: { stage: string; doctorId: 
       </Button>
     );
   }
+  if (stage === 'scheduling_invite_sent') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        View Details <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'meeting_ready') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Start Meeting <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
   if (stage === 'meeting_pending') {
     return (
       <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>

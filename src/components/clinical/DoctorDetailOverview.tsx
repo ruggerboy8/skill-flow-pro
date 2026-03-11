@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Send, MessageSquare } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { type DoctorJourneyStatus } from '@/lib/doctorStatus';
-import { NotifyDoctorDialog } from '@/components/clinical/NotifyDoctorDialog';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 
 interface Session {
   id: string;
@@ -27,7 +27,7 @@ interface Props {
 export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [showNotifyDialog, setShowNotifyDialog] = useState(false);
+  const { data: myStaff } = useStaffProfile();
 
   const isNotReleased = journeyStatus.stage === 'invited';
 
@@ -35,12 +35,28 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      if (!myStaff?.id) throw new Error('Staff profile not loaded');
+
+      // Release baseline
       const { error } = await supabase
         .from('staff')
         .update({ baseline_released_at: new Date().toISOString(), baseline_released_by: user.id } as any)
         .eq('id', doctor.id);
       if (error) throw error;
 
+      // Auto-create baseline_review session in the coaching thread
+      const { error: sessionErr } = await supabase
+        .from('coaching_sessions')
+        .insert({
+          doctor_staff_id: doctor.id,
+          coach_staff_id: myStaff.id,
+          session_type: 'baseline_review',
+          sequence_number: 1,
+          status: 'scheduled',
+        });
+      if (sessionErr) console.error('Failed to auto-create baseline review session:', sessionErr);
+
+      // Send release email
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
@@ -63,66 +79,35 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
-      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment. A notification email has been sent.` });
+      queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment. A baseline review session has been added to the coaching thread.` });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
-  // Only show pre-session cards; all session-specific actions are in the thread now
-  const showNotify = baseline?.status === 'completed' && sessions.length === 0;
-  const hasAnything = isNotReleased || showNotify;
-
-  if (!hasAnything) return null;
+  if (!isNotReleased) return null;
 
   return (
     <div className="space-y-4">
       {/* Release Baseline Button */}
-      {isNotReleased && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="flex items-center justify-between py-4">
-            <div>
-              <p className="text-sm font-medium">Ready to release baseline?</p>
-              <p className="text-xs text-muted-foreground">
-                This will allow {doctor.name} to begin their self-assessment.
-              </p>
-            </div>
-            <Button
-              onClick={() => releaseMutation.mutate()}
-              disabled={releaseMutation.isPending}
-              className="gap-2"
-            >
-              <Send className="h-4 w-4" />
-              {releaseMutation.isPending ? 'Releasing…' : 'Release Baseline'}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Notify Doctor — baseline complete, no sessions yet */}
-      {showNotify && (
-        <Card className="border-dashed border-accent">
-          <CardContent className="flex items-center justify-between py-4">
-            <div>
-              <p className="text-sm font-medium">Send a prep note to {doctor.name}</p>
-              <p className="text-xs text-muted-foreground">
-                Share a personal note and optional scheduling link before building your agenda.
-              </p>
-            </div>
-            <Button variant="outline" onClick={() => setShowNotifyDialog(true)} className="gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Notify Doctor
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      <NotifyDoctorDialog
-        open={showNotifyDialog}
-        onOpenChange={setShowNotifyDialog}
-        doctorName={doctor.name}
-        doctorEmail={doctor.email}
-        doctorStaffId={doctor.id}
-      />
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="flex items-center justify-between py-4">
+          <div>
+            <p className="text-sm font-medium">Ready to release baseline?</p>
+            <p className="text-xs text-muted-foreground">
+              This will allow {doctor.name} to begin their self-assessment.
+            </p>
+          </div>
+          <Button
+            onClick={() => releaseMutation.mutate()}
+            disabled={releaseMutation.isPending}
+            className="gap-2"
+          >
+            <Send className="h-4 w-4" />
+            {releaseMutation.isPending ? 'Releasing…' : 'Release Baseline'}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

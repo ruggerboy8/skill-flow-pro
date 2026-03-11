@@ -315,7 +315,7 @@ export default function BaselineWizard() {
 
   const handleTutorialComplete = () => {
     setShowTutorial(false);
-    localStorage.setItem('baseline-tutorial-seen', 'true');
+    localStorage.setItem(`baseline-tutorial-seen-${staff?.id || 'unknown'}`, 'true');
   };
 
   if (domainsLoading) {

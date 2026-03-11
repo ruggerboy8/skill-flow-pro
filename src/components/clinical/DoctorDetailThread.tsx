@@ -120,6 +120,33 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
 
   return (
     <div className="space-y-3">
+      {/* Coach Private Assessment card — shown when doctor baseline is complete */}
+      {doctorBaselineComplete && sessions.length > 0 && onStartCoachWizard && (
+        <Card className="border-dashed border-accent/50">
+          <CardContent className="flex items-center justify-between py-3">
+            <div>
+              <p className="text-sm font-medium">Your Private Assessment</p>
+              <p className="text-xs text-muted-foreground">
+                {coachAssessment?.status === 'completed'
+                  ? 'Complete — view comparison on the baseline tab'
+                  : coachAssessment?.status === 'in_progress'
+                  ? 'In progress — continue where you left off'
+                  : 'Not started — record your own ratings before the meeting'}
+              </p>
+            </div>
+            <Button
+              variant={coachAssessment?.status === 'completed' ? 'outline' : 'default'}
+              size="sm"
+              onClick={onStartCoachWizard}
+              className="gap-1.5"
+            >
+              <ClipboardEdit className="h-3.5 w-3.5" />
+              {coachAssessment?.status === 'completed' ? 'View' : coachAssessment?.status === 'in_progress' ? 'Continue' : 'Start'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Always-visible Add Coaching Session button above the thread */}
       {sessions.length > 0 && (
         <Button

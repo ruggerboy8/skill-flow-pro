@@ -28,6 +28,7 @@ interface Role {
   role_name: string;
   role_code: string;
   active: boolean;
+  practice_type: string;
 }
 
 interface Competency {

@@ -99,15 +99,26 @@ export function SchedulingInviteComposer({
     const { data, error } = await supabase
       .from('reminder_templates')
       .select('subject, body')
-      .eq('key', TEMPLATE_KEY)
+      .eq('key', templateKey)
       .maybeSingle();
 
     if (!error && data) {
       setSubject(data.subject);
       setBody(data.body);
     } else {
-      setSubject(DEFAULT_SUBJECT);
-      setBody(DEFAULT_BODY);
+      // Fallback: try legacy key, then defaults
+      const { data: legacy } = await supabase
+        .from('reminder_templates')
+        .select('subject, body')
+        .eq('key', 'scheduling_invite')
+        .maybeSingle();
+      if (legacy) {
+        setSubject(legacy.subject);
+        setBody(legacy.body);
+      } else {
+        setSubject(DEFAULT_SUBJECTS[sessionType] || DEFAULT_SUBJECTS.baseline_review);
+        setBody(DEFAULT_BODIES[sessionType] || DEFAULT_BODIES.baseline_review);
+      }
     }
   }
 

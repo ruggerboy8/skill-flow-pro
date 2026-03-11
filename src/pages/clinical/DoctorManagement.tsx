@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight } from 'lucide-react';
+import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';

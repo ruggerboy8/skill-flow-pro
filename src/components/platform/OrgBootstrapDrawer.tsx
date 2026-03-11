@@ -34,7 +34,7 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
   const [orgName, setOrgName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
-  const [practiceType, setPracticeType] = useState<'pediatric' | 'general'>('general');
+  const [practiceType, setPracticeType] = useState<'pediatric_us' | 'general_us' | 'general_uk'>('general_us');
 
   // First admin fields
   const [adminName, setAdminName] = useState('');

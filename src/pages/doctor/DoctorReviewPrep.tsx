@@ -544,7 +544,10 @@ export default function DoctorReviewPrep() {
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pro Move</p>
                       </div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Self Score</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap w-5 text-center">Self</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap w-5 text-center">Coach</p>
+                      </div>
                     </div>
                     {(groupedItems[domain] || []).map(item => {
                       const pm = item.pro_moves as any;

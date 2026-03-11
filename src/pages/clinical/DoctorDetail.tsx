@@ -120,7 +120,7 @@ export default function DoctorDetail() {
     return (
       <CoachBaselineWizard
         doctorStaffId={staffId}
-        doctorName={doctor.name}
+        doctorName={drName(doctor.name)}
         onBack={() => setShowCoachWizard(false)}
       />
     );

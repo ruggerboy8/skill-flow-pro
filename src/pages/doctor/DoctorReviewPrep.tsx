@@ -344,7 +344,7 @@ export default function DoctorReviewPrep() {
           session={session}
           selections={(allSelections || []) as any}
           coachName={coachName || 'Your Coach'}
-          doctorName={staff?.name || 'Doctor'}
+          doctorName={drName(staff?.name)}
         />
       </div>
     );

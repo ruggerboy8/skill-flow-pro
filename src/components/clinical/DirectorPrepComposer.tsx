@@ -176,26 +176,44 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   });
 
   // Fetch coach baseline items for coach scores
+  const isBaselineReview = sessionType === 'baseline_review';
   const { data: coachItems } = useQuery({
-    queryKey: ['coach-baseline-items-for-prep', doctorStaffId],
+    queryKey: ['coach-baseline-items-for-prep', doctorStaffId, myStaff?.id],
     queryFn: async () => {
-      const { data: assessment } = await supabase
-        .from('coach_baseline_assessments')
-        .select('id')
-        .eq('doctor_staff_id', doctorStaffId)
-        .maybeSingle();
-
-      if (!assessment?.id) return [];
+      // Try current coach's assessment first
+      let assessmentId: string | null = null;
+      if (myStaff?.id) {
+        const { data: myAssessment } = await supabase
+          .from('coach_baseline_assessments')
+          .select('id')
+          .eq('doctor_staff_id', doctorStaffId)
+          .eq('coach_staff_id', myStaff.id)
+          .maybeSingle();
+        assessmentId = myAssessment?.id ?? null;
+      }
+      // Fallback to latest completed assessment
+      if (!assessmentId) {
+        const { data: latest } = await supabase
+          .from('coach_baseline_assessments')
+          .select('id')
+          .eq('doctor_staff_id', doctorStaffId)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        assessmentId = latest?.id ?? null;
+      }
+      if (!assessmentId) return [];
 
       const { data, error } = await supabase
         .from('coach_baseline_items')
         .select('action_id, rating')
-        .eq('assessment_id', assessment.id);
+        .eq('assessment_id', assessmentId);
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!doctorStaffId,
+    enabled: !!doctorStaffId && isBaselineReview,
   });
 
   // Build a map of action_id -> coach rating

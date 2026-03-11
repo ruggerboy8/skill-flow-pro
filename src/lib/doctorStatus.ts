@@ -95,9 +95,9 @@ export function getDoctorJourneyStatus(
       case 'director_prep_ready':
         return {
           stage: 'prep_complete',
-          label: 'Prep Complete — Ready to Invite',
+          label: 'Agenda Ready',
           variant: 'default',
-          colorClass: 'bg-emerald-100 text-emerald-800',
+          colorClass: 'bg-amber-100 text-amber-800',
           nextAction: 'Send scheduling invite to doctor',
         };
       case 'meeting_pending':
@@ -110,21 +110,14 @@ export function getDoctorJourneyStatus(
           nextAction: 'Doctor can review the summary. You can schedule the next session.',
         };
       case 'doctor_confirmed':
-        if (isFollowup) {
-          return {
-            stage: 'followup_completed',
-            label: `Follow-up ${latest.sequence_number - 1} Complete`,
-            variant: 'default',
-            colorClass: 'bg-green-100 text-green-800',
-            nextAction: 'Schedule next follow-up when ready',
-          };
-        }
         return {
-          stage: 'doctor_confirmed',
-          label: 'Baseline Review Complete',
+          stage: isFollowup ? 'followup_completed' : 'doctor_confirmed',
+          label: 'Completed',
           variant: 'default',
           colorClass: 'bg-green-100 text-green-800',
-          nextAction: 'Schedule a follow-up to check on progress',
+          nextAction: isFollowup
+            ? 'Schedule next follow-up when ready'
+            : 'Schedule a follow-up to check on progress',
         };
       case 'doctor_revision_requested':
         // R1.5: Softened — treat same as meeting_pending with a note

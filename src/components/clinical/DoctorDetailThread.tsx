@@ -191,31 +191,37 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
         </Card>
       )}
 
-      {sorted.map((session) => (
-        <SessionCard
-          key={session.id}
-          session={session}
-          expanded={expandedId === session.id}
-          onToggle={() => setExpandedId(expandedId === session.id ? null : session.id)}
-          onCapture={() => setCaptureSessionId(session.id)}
-          onBuildAgenda={() => setPrepSessionId(session.id)}
-          onEditAgenda={() => setPrepSessionId(session.id)}
-          onInvite={() => setInviteSessionId(session.id)}
-          coachName={coachName}
-          doctorName={doctorName}
-          onDelete={async () => {
-            await supabase.from('coaching_session_selections').delete().eq('session_id', session.id);
-            await supabase.from('coaching_meeting_records').delete().eq('session_id', session.id);
-            const { error } = await supabase.from('coaching_sessions').delete().eq('id', session.id);
-            if (error) {
-              toast({ title: 'Error', description: error.message, variant: 'destructive' });
-            } else {
-              queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
-              toast({ title: 'Session deleted' });
-            }
-          }}
-        />
-      ))}
+      {sorted.map((session) => {
+        const isOwner = session.coach_staff_id === myStaff?.id;
+        return (
+          <SessionCard
+            key={session.id}
+            session={session}
+            isOwner={isOwner}
+            isSuperAdmin={isSuperAdmin}
+            clinicalDirectors={clinicalDirectors}
+            expanded={expandedId === session.id}
+            onToggle={() => setExpandedId(expandedId === session.id ? null : session.id)}
+            onCapture={() => setCaptureSessionId(session.id)}
+            onBuildAgenda={() => setPrepSessionId(session.id)}
+            onEditAgenda={() => setPrepSessionId(session.id)}
+            onInvite={() => setInviteSessionId(session.id)}
+            coachName={coachName}
+            doctorName={doctorName}
+            onDelete={async () => {
+              await supabase.from('coaching_session_selections').delete().eq('session_id', session.id);
+              await supabase.from('coaching_meeting_records').delete().eq('session_id', session.id);
+              const { error } = await supabase.from('coaching_sessions').delete().eq('id', session.id);
+              if (error) {
+                toast({ title: 'Error', description: error.message, variant: 'destructive' });
+              } else {
+                queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+                toast({ title: 'Session deleted' });
+              }
+            }}
+          />
+        );
+      })}
 
       {/* Scheduling Invite Composer */}
       <SchedulingInviteComposer

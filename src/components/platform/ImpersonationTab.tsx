@@ -94,7 +94,7 @@ export function ImpersonationTab() {
         // Step 3: active staff in those locations, with capabilities
         const { data: staffData, error } = await supabase
           .from('staff')
-          .select('id, display_name, is_org_admin, user_capabilities(is_org_admin)')
+          .select('id, name, is_org_admin, user_capabilities(is_org_admin)')
           .in('primary_location_id', locationIds)
           .eq('active', true);
 

@@ -172,7 +172,7 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
         description: formData.description.trim() || null,
         resources_url: formData.resources_url.trim() || null,
         intervention_text: formData.intervention_text.trim() || null,
-        practice_type: formData.practice_type,
+        practice_types: formData.practice_types,
         active: true
       };
 

@@ -69,10 +69,9 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
         description: proMove.description || '',
         resources_url: proMove.resources_url || '',
         intervention_text: proMove.intervention_text || '',
-        practice_type: proMove.practice_type || 'pediatric'
+        practice_types: proMove.practice_types ?? ['pediatric_us']
       });
     } else if (selectedRole && selectedRole !== 'all') {
-      // Pre-select role when adding new pro-move with role filter
       setFormData(prev => ({ ...prev, role_id: selectedRole }));
     }
   }, [proMove, selectedRole]);

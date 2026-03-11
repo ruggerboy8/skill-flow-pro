@@ -16,6 +16,7 @@ export interface UserCapabilities {
   can_manage_library: boolean;
   can_manage_locations: boolean;
   can_manage_users: boolean;
+  can_manage_assignments: boolean;
   is_org_admin: boolean;
   is_platform_admin: boolean;
 }
@@ -132,6 +133,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
             can_manage_library,
             can_manage_locations,
             can_manage_users,
+            can_manage_assignments,
             is_org_admin,
             is_platform_admin
           )

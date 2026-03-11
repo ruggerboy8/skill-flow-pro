@@ -2153,6 +2153,7 @@ export type Database = {
       user_capabilities: {
         Row: {
           can_invite_users: boolean
+          can_manage_assignments: boolean
           can_manage_library: boolean
           can_manage_locations: boolean
           can_manage_users: boolean
@@ -2169,6 +2170,7 @@ export type Database = {
         }
         Insert: {
           can_invite_users?: boolean
+          can_manage_assignments?: boolean
           can_manage_library?: boolean
           can_manage_locations?: boolean
           can_manage_users?: boolean
@@ -2185,6 +2187,7 @@ export type Database = {
         }
         Update: {
           can_invite_users?: boolean
+          can_manage_assignments?: boolean
           can_manage_library?: boolean
           can_manage_locations?: boolean
           can_manage_users?: boolean

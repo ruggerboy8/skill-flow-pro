@@ -89,15 +89,24 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
       if (groupErr) throw groupErr;
 
       // 3. Create a placeholder location under that group
-      const today = new Date().toISOString().split('T')[0];
+      // Snap program_start_date to next Monday (or today if already Monday)
+      const now = new Date();
+      const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
+      const daysUntilMonday = dayOfWeek === 1 ? 0 : ((8 - dayOfWeek) % 7) || 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() + daysUntilMonday);
+      const startDate = monday.toISOString().split('T')[0];
+
+      const locationSlug = toSlug(orgName.trim());
       const { data: location, error: locErr } = await supabase
         .from('locations')
         .insert({
           name: orgName.trim(),
+          slug: locationSlug,
           group_id: group.id,
           active: true,
           timezone: 'America/Chicago',
-          program_start_date: today,
+          program_start_date: startDate,
           cycle_length_weeks: 13,
         })
         .select('id')

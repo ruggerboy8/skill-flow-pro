@@ -219,7 +219,7 @@ export function ImpersonationTab() {
                       <div className="flex items-center gap-2">
                         <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
                         <span className="text-sm font-medium">
-                          {admin.display_name ?? 'Unnamed'}
+                          {admin.name ?? 'Unnamed'}
                         </span>
                         {isActive && (
                           <Badge variant="secondary" className="text-xs">

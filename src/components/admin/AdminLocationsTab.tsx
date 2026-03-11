@@ -8,7 +8,8 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, MoreHorizontal, Edit, Archive } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Archive, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LocationFormDrawer } from "./LocationFormDrawer";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +43,7 @@ export function AdminLocationsTab() {
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Location | null>(null);
 
   const loadLocations = async () => {
     try {
@@ -125,7 +127,6 @@ export function AdminLocationsTab() {
   const toggleLocationActive = async (location: Location) => {
     try {
       if (location.active) {
-        // about to archive; block if staff still assigned
         const { count, error: cntErr } = await supabase
           .from("staff")
           .select("*", { count: "exact", head: true })
@@ -163,6 +164,42 @@ export function AdminLocationsTab() {
         description: "Failed to update location",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeleteLocation = async (location: Location) => {
+    try {
+      const { count, error: cntErr } = await supabase
+        .from("staff")
+        .select("*", { count: "exact", head: true })
+        .eq("primary_location_id", location.id);
+
+      if (cntErr) throw cntErr;
+
+      if ((count ?? 0) > 0) {
+        toast({
+          title: "Cannot delete",
+          description: "This location still has staff assigned. Remove or reassign all staff first.",
+          variant: "destructive",
+        });
+        setDeleteTarget(null);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("locations")
+        .delete()
+        .eq("id", location.id);
+
+      if (error) throw error;
+
+      toast({ title: "Deleted", description: `Location "${location.name}" has been permanently deleted.` });
+      setDeleteTarget(null);
+      loadLocations();
+    } catch (error) {
+      console.error("Error deleting location:", error);
+      toast({ title: "Error", description: "Failed to delete location. It may have related data.", variant: "destructive" });
+      setDeleteTarget(null);
     }
   };
 
@@ -299,6 +336,13 @@ export function AdminLocationsTab() {
                               <Archive className="h-4 w-4 mr-2" />
                               {location.active ? "Archive" : "Unarchive"}
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setDeleteTarget(location)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -321,6 +365,26 @@ export function AdminLocationsTab() {
         location={selectedLocation}
         organizations={organizations}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Location</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && handleDeleteLocation(deleteTarget)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

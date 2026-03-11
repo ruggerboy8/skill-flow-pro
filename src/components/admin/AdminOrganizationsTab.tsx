@@ -7,7 +7,8 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, MoreHorizontal, Edit, Archive } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Archive, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { OrganizationFormDrawer } from "./OrganizationFormDrawer";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +27,7 @@ export function AdminOrganizationsTab() {
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Organization | null>(null);
 
   const loadOrganizations = async () => {
     try {
@@ -112,6 +114,42 @@ export function AdminOrganizationsTab() {
         description: "Failed to update group",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeleteOrganization = async (organization: Organization) => {
+    try {
+      const { count, error: cntErr } = await supabase
+        .from("locations")
+        .select("*", { count: "exact", head: true })
+        .eq("group_id", organization.id);
+
+      if (cntErr) throw cntErr;
+
+      if ((count ?? 0) > 0) {
+        toast({
+          title: "Cannot delete",
+          description: "This group still has locations. Remove or reassign all locations first.",
+          variant: "destructive",
+        });
+        setDeleteTarget(null);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("practice_groups")
+        .delete()
+        .eq("id", organization.id);
+
+      if (error) throw error;
+
+      toast({ title: "Deleted", description: `Group "${organization.name}" has been permanently deleted.` });
+      setDeleteTarget(null);
+      loadOrganizations();
+    } catch (error) {
+      console.error("Error deleting group:", error);
+      toast({ title: "Error", description: "Failed to delete group. It may have related data.", variant: "destructive" });
+      setDeleteTarget(null);
     }
   };
 
@@ -215,6 +253,13 @@ export function AdminOrganizationsTab() {
                               <Archive className="h-4 w-4 mr-2" />
                               {organization.active ? "Archive" : "Unarchive"}
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setDeleteTarget(organization)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -236,6 +281,26 @@ export function AdminOrganizationsTab() {
         onSuccess={handleFormSuccess}
         organization={selectedOrganization}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && handleDeleteOrganization(deleteTarget)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

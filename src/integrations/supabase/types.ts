@@ -175,7 +175,9 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           doctor_staff_id: string
+          domain_notes: Json | null
           id: string
+          recording_transcript: string | null
           started_at: string | null
           status: string | null
           updated_at: string | null
@@ -185,7 +187,9 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           doctor_staff_id: string
+          domain_notes?: Json | null
           id?: string
+          recording_transcript?: string | null
           started_at?: string | null
           status?: string | null
           updated_at?: string | null
@@ -195,7 +199,9 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           doctor_staff_id?: string
+          domain_notes?: Json | null
           id?: string
+          recording_transcript?: string | null
           started_at?: string | null
           status?: string | null
           updated_at?: string | null
@@ -312,6 +318,48 @@ export type Database = {
           },
         ]
       }
+      coaching_agenda_templates: {
+        Row: {
+          created_at: string
+          id: string
+          session_type: string
+          staff_id: string
+          template_html: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          session_type: string
+          staff_id: string
+          template_html?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          session_type?: string
+          staff_id?: string
+          template_html?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_agenda_templates_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_agenda_templates_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       coaching_meeting_records: {
         Row: {
           calibration_confirmed: boolean
@@ -320,6 +368,7 @@ export type Database = {
           doctor_revision_note: string | null
           experiments: Json | null
           id: string
+          prior_action_status: Json | null
           session_id: string
           submitted_at: string | null
           summary: string
@@ -331,6 +380,7 @@ export type Database = {
           doctor_revision_note?: string | null
           experiments?: Json | null
           id?: string
+          prior_action_status?: Json | null
           session_id: string
           submitted_at?: string | null
           summary?: string
@@ -342,6 +392,7 @@ export type Database = {
           doctor_revision_note?: string | null
           experiments?: Json | null
           id?: string
+          prior_action_status?: Json | null
           session_id?: string
           submitted_at?: string | null
           summary?: string
@@ -400,7 +451,7 @@ export type Database = {
           doctor_staff_id: string
           id: string
           meeting_link: string | null
-          scheduled_at: string
+          scheduled_at: string | null
           sequence_number: number
           session_type: string
           status: string
@@ -414,7 +465,7 @@ export type Database = {
           doctor_staff_id: string
           id?: string
           meeting_link?: string | null
-          scheduled_at: string
+          scheduled_at?: string | null
           sequence_number?: number
           session_type?: string
           status?: string
@@ -428,7 +479,7 @@ export type Database = {
           doctor_staff_id?: string
           id?: string
           meeting_link?: string | null
-          scheduled_at?: string
+          scheduled_at?: string | null
           sequence_number?: number
           session_type?: string
           status?: string
@@ -1748,6 +1799,7 @@ export type Database = {
           primary_location_id: string | null
           role_id: number | null
           roles_updated_at: string | null
+          scheduling_link: string | null
           updated_at: string | null
           user_id: string
         }
@@ -1780,6 +1832,7 @@ export type Database = {
           primary_location_id?: string | null
           role_id?: number | null
           roles_updated_at?: string | null
+          scheduling_link?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -1812,6 +1865,7 @@ export type Database = {
           primary_location_id?: string | null
           role_id?: number | null
           roles_updated_at?: string | null
+          scheduling_link?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -2046,6 +2100,72 @@ export type Database = {
             foreignKeyName: "user_backlog_v2_staff_id_fkey"
             columns: ["staff_id"]
             isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
+      user_capabilities: {
+        Row: {
+          can_invite_users: boolean
+          can_manage_library: boolean
+          can_manage_locations: boolean
+          can_manage_users: boolean
+          can_review_evals: boolean
+          can_submit_evals: boolean
+          can_view_submissions: boolean
+          created_at: string
+          is_org_admin: boolean
+          is_participant: boolean
+          is_platform_admin: boolean
+          participation_start_at: string | null
+          staff_id: string
+          updated_at: string
+        }
+        Insert: {
+          can_invite_users?: boolean
+          can_manage_library?: boolean
+          can_manage_locations?: boolean
+          can_manage_users?: boolean
+          can_review_evals?: boolean
+          can_submit_evals?: boolean
+          can_view_submissions?: boolean
+          created_at?: string
+          is_org_admin?: boolean
+          is_participant?: boolean
+          is_platform_admin?: boolean
+          participation_start_at?: string | null
+          staff_id: string
+          updated_at?: string
+        }
+        Update: {
+          can_invite_users?: boolean
+          can_manage_library?: boolean
+          can_manage_locations?: boolean
+          can_manage_users?: boolean
+          can_review_evals?: boolean
+          can_submit_evals?: boolean
+          can_view_submissions?: boolean
+          created_at?: string
+          is_org_admin?: boolean
+          is_participant?: boolean
+          is_platform_admin?: boolean
+          participation_start_at?: string | null
+          staff_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_capabilities_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: true
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_capabilities_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: true
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
           },
@@ -3105,6 +3225,7 @@ export type Database = {
           material_count: number
         }[]
       }
+      get_my_coach_staff_ids: { Args: { _user_id: string }; Returns: string[] }
       get_my_weekly_scores: {
         Args: { p_week_of?: string }
         Returns: {

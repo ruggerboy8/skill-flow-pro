@@ -55,19 +55,21 @@ export default function DoctorDetail() {
   });
 
   const { data: coachAssessment } = useQuery({
-    queryKey: ['coach-baseline-assessment', staffId, myStaff?.id],
+    queryKey: ['coach-baseline-assessment', staffId],
     queryFn: async () => {
-      if (!myStaff?.id || !staffId) return null;
+      if (!staffId) return null;
+      // Fetch ANY coach assessment for this doctor (first-to-start owns it)
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
-        .select('id, status, updated_at, completed_at')
+        .select('id, status, updated_at, completed_at, coach_staff_id')
         .eq('doctor_staff_id', staffId)
-        .eq('coach_staff_id', myStaff.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
       if (error) throw error;
       return data;
     },
-    enabled: !!staffId && !!myStaff?.id,
+    enabled: !!staffId,
   });
 
   const { data: sessions } = useQuery({

@@ -56,7 +56,7 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
     description: '',
     resources_url: '',
     intervention_text: '',
-    practice_type: 'pediatric'
+    practice_types: ['pediatric_us'] as string[]
   });
   const [filteredCompetencies, setFilteredCompetencies] = useState<Competency[]>(competencies);
 

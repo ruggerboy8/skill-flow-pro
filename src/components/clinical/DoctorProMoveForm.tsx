@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 
 const DOCTOR_ROLE_ID = 4;
+const DEFAULT_PRACTICE_TYPES = ['pediatric_us'];
 
 interface Competency {
   competency_id: number;

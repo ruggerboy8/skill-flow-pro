@@ -1030,6 +1030,25 @@ serve(async (req: Request) => {
           if (delStaffErr) throw new Error(`Failed to delete staff: ${delStaffErr.message}`);
         }
 
+        // Clean up tables with direct FK to auth.users (not staff.id)
+        // These must be nullified/deleted BEFORE deleting the auth user
+        const nullifyOps = [
+          admin.from("reminder_log").delete().eq("sender_user_id", user_id),
+          admin.from("reminder_log").delete().eq("target_user_id", user_id),
+          admin.from("reminder_templates").update({ updated_by: null }).eq("updated_by", user_id),
+          admin.from("excused_locations").update({ created_by: null }).eq("created_by", user_id),
+          admin.from("excused_submissions").update({ created_by: null }).eq("created_by", user_id),
+          admin.from("excused_weeks").update({ created_by: null }).eq("created_by", user_id),
+          admin.from("organizations").update({ created_by: null }).eq("created_by", user_id),
+          admin.from("alcan_weekly_plan").update({ computed_by: null }).eq("computed_by", user_id),
+          admin.from("alcan_weekly_plan").update({ published_by: null }).eq("published_by", user_id),
+          admin.from("staff").update({ baseline_released_by: null }).eq("baseline_released_by", user_id),
+        ];
+        const nullResults = await Promise.all(nullifyOps);
+        for (const r of nullResults) {
+          if (r.error) console.warn("Nullify warning:", r.error.message);
+        }
+
         // Delete the auth user
         const { error: delAuthErr } = await admin.auth.admin.deleteUser(user_id);
         if (delAuthErr) throw delAuthErr;

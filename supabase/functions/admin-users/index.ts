@@ -551,7 +551,7 @@ serve(async (req: Request) => {
         }
         
         // Sync scope to staff table for RPC compatibility (get_coach_roster_summary uses staff.coach_scope_*)
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") && 
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") && 
             coach_scope_type && coach_scope_ids && coach_scope_ids.length > 0) {
           // Keep scope_type as 'org' or 'location' - must match staff_coach_scope_type_check constraint
           updates.coach_scope_type = coach_scope_type;

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

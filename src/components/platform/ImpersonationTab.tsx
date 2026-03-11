@@ -29,7 +29,7 @@ interface OrgOption {
 
 interface AdminStaff {
   id: string;
-  display_name: string | null;
+  name: string | null;
 }
 
 export function ImpersonationTab() {

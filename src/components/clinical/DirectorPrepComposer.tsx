@@ -15,6 +15,7 @@ import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
 import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import DOMPurify from 'dompurify';
 
 interface Props {
   sessionId: string;

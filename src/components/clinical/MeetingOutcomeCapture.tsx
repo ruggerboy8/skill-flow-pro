@@ -178,6 +178,15 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
         .update({ status: 'meeting_pending', scheduled_at: new Date().toISOString() })
         .eq('id', sessionId);
       if (statusErr) throw statusErr;
+
+      // Send email notification to doctor (fire-and-forget)
+      try {
+        await supabase.functions.invoke('notify-meeting-summary', {
+          body: { session_id: sessionId },
+        });
+      } catch (emailErr) {
+        console.warn('Meeting summary email notification failed:', emailErr);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });

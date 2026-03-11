@@ -521,7 +521,6 @@ export default function DoctorReviewPrep() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap w-5 text-center">Self</p>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap w-5 text-center">Coach</p>
                       </div>
                     </div>
                     {(groupedItems[domain] || []).map(item => {

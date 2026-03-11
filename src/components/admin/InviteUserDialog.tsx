@@ -384,7 +384,7 @@ export function InviteUserDialog({
               <SelectContent>
                 {roles.map((role) => (
                   <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                    {role.role_name}
+                    {resolveRole(role.role_id, role.role_name)}
                   </SelectItem>
                 ))}
               </SelectContent>

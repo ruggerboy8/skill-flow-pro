@@ -267,7 +267,7 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
                 >
                   <option value="">Select role...</option>
                   {roles.map(r => (
-                    <option key={r.role_id} value={r.role_id}>{r.role_name}</option>
+                    <option key={r.role_id} value={r.role_id}>{resolveRole(r.role_id, r.role_name)}</option>
                   ))}
                 </select>
               </div>

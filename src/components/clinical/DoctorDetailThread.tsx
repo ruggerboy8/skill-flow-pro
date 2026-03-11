@@ -205,6 +205,7 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
         doctorEmail={doctorEmail}
         doctorStaffId={doctorStaffId}
         sessionId={inviteSessionId ?? undefined}
+        sessionType={sessions.find(s => s.id === inviteSessionId)?.session_type}
         onSuccess={handleInviteSuccess}
       />
     </div>

@@ -95,11 +95,15 @@ serve(async (req) => {
     const reviewLink = `https://alcanskills.lovable.app/doctor/review-prep/${session_id}`;
 
     const subject = `Your coaching meeting summary is ready for review`;
-    const body = `Hi Dr. ${firstName},
+    const html = `<p>Hi Dr. ${firstName},</p>
+<p>${coachName} has shared the summary from your recent coaching session. Please take a moment to <a href="${reviewLink}">review the key takeaways and action steps</a>.</p>
+<p>If everything looks good, confirm it so your action steps are locked in. If something needs adjusting, you can request a revision.</p>
+<p>— The ALCAN Team</p>`;
 
-${coachName} has shared the summary from your recent coaching session. Please take a moment to review the key takeaways and action steps.
+    const text = `Hi Dr. ${firstName},
 
-Review your summary here:
+${coachName} has shared the summary from your recent coaching session. Please take a moment to review the key takeaways and action steps:
+
 ${reviewLink}
 
 If everything looks good, confirm it so your action steps are locked in. If something needs adjusting, you can request a revision.
@@ -117,7 +121,8 @@ If everything looks good, confirm it so your action steps are locked in. If some
         to: [doctor.email],
         reply_to: replyTo,
         subject,
-        text: body,
+        html,
+        text,
       }),
     });
 

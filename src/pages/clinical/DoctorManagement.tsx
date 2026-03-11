@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight } from 'lucide-react';
+import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';
@@ -127,10 +127,16 @@ export default function DoctorManagement() {
           <h1 className="text-2xl font-bold">Clinical Director Portal</h1>
           <p className="text-muted-foreground">Manage doctor onboarding and development</p>
         </div>
-        <Button onClick={() => setInviteOpen(true)}>
-          <UserPlus className="w-4 h-4 mr-2" />
-          Invite Doctor
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate('/clinical/pro-moves')}>
+            <BookOpen className="w-4 h-4 mr-2" />
+            Pro Moves Library
+          </Button>
+          <Button onClick={() => setInviteOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invite Doctor
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

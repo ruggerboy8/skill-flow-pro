@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format } from 'date-fns';
+
 import { getDoctorJourneyStatus, type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
 
@@ -20,7 +20,7 @@ interface DoctorRow {
   location_name: string | null;
   created_at: string;
   journeyStatus: DoctorJourneyStatus;
-  nextMeeting: string | null;
+  
 }
 
 type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
@@ -95,7 +95,7 @@ export default function DoctorManagement() {
           location_name: (s.locations as any)?.name || null,
           created_at: s.created_at || '',
           journeyStatus,
-          nextMeeting: upcomingSessions[0]?.scheduled_at || null,
+          
         };
       });
     },
@@ -221,7 +221,7 @@ export default function DoctorManagement() {
                   <TableHead>Stage</TableHead>
                   <TableHead>Next Step</TableHead>
                   <TableHead>Action</TableHead>
-                  <TableHead>Next Meeting</TableHead>
+                  
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -251,12 +251,6 @@ export default function DoctorManagement() {
                     </TableCell>
                     <TableCell>
                       <InlineAction stage={doctor.journeyStatus.stage} doctorId={doctor.id} navigate={navigate} />
-                    </TableCell>
-                    <TableCell>
-                      {doctor.nextMeeting
-                        ? format(new Date(doctor.nextMeeting), 'MMM d, yyyy')
-                        : <span className="text-muted-foreground">—</span>
-                      }
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>

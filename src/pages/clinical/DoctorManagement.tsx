@@ -253,12 +253,6 @@ export default function DoctorManagement() {
                       <InlineAction stage={doctor.journeyStatus.stage} doctorId={doctor.id} navigate={navigate} />
                     </TableCell>
                     <TableCell>
-                      {doctor.nextMeeting
-                        ? format(new Date(doctor.nextMeeting), 'MMM d, yyyy')
-                        : <span className="text-muted-foreground">—</span>
-                      }
-                    </TableCell>
-                    <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="icon">

@@ -35,7 +35,7 @@ interface ProMove {
   competency_id?: number;
   role_name?: string;
   competency_name?: string;
-  practice_type?: string;
+  practice_types?: string[];
 }
 
 interface ProMoveFormProps {

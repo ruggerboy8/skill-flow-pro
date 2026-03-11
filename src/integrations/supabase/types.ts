@@ -318,6 +318,48 @@ export type Database = {
           },
         ]
       }
+      coaching_agenda_templates: {
+        Row: {
+          created_at: string
+          id: string
+          session_type: string
+          staff_id: string
+          template_html: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          session_type: string
+          staff_id: string
+          template_html?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          session_type?: string
+          staff_id?: string
+          template_html?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_agenda_templates_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_agenda_templates_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       coaching_meeting_records: {
         Row: {
           calibration_confirmed: boolean

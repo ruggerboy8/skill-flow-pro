@@ -166,9 +166,10 @@ Instructions:
 2. Write each note in a warm, conversational coaching tone (second person)
 3. Fix grammar, remove filler words, 1-3 sentences, max 500 characters
 4. Preserve specific observations — do NOT fabricate
-5. Each Pro Move appears at most once
-6. Return at least one note if the transcript contains substantive feedback
-7. Only use action IDs listed above`;
+5. CRITICAL: If you cannot confidently match a section or determine specific observations, include the verbatim transcript text rather than paraphrasing or restating the Pro Move statement. Never restate the Pro Move's action statement as a note.
+6. Each Pro Move appears at most once
+7. Return at least one note if the transcript contains substantive feedback
+8. Only use action IDs listed above`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

@@ -35,6 +35,7 @@ interface User {
   is_coach: boolean;
   is_lead: boolean;
   is_participant: boolean;
+  is_clinical_director?: boolean;
   is_paused: boolean;
   paused_at?: string | null;
   pause_reason?: string | null;

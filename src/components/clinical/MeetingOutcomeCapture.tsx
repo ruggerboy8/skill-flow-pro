@@ -192,6 +192,8 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
   if (!session) return null;
 
+  const isReadOnly = myStaff?.id ? session.coach_staff_id !== myStaff.id : false;
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       {/* Header */}

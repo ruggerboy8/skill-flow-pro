@@ -59,8 +59,8 @@ export function AdminLocationsTab() {
       if (error) throw error;
 
       const allLocations = (data || []) as unknown as Location[];
-      // Scope to the admin's org when they're not a platform admin
-      const filtered = !isSuperAdmin && organizationId
+      // Scope to the admin's org (platform admins use /platform for cross-org work)
+      const filtered = organizationId
         ? allLocations.filter(l => l.practice_group?.organization_id === organizationId)
         : allLocations;
 
@@ -87,8 +87,8 @@ export function AdminLocationsTab() {
         .eq("active", true)
         .order("name");
 
-      // Scope to the admin's org when they're not a platform admin
-      if (!isSuperAdmin && organizationId) {
+      // Scope to the admin's org (platform admins use /platform for cross-org work)
+      if (organizationId) {
         query = query.eq("organization_id", organizationId);
       }
 

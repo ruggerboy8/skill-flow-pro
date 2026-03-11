@@ -91,8 +91,8 @@ export function AdminUsersTab() {
           role_id: roleFilter === "all" ? undefined : parseInt(roleFilter),
           location_id: locationFilter === "all" ? undefined : locationFilter,
           super_admin: superAdminFilter === "all" ? undefined : superAdminFilter === "true",
-          // Scope to the admin's org when they're not a platform admin
-          organization_id: !isSuperAdmin && organizationId ? organizationId : undefined,
+          // Scope to the admin's org (applies to all roles — platform admins use /platform for cross-org work)
+          organization_id: organizationId ?? undefined,
         }
       });
 
@@ -129,7 +129,7 @@ export function AdminUsersTab() {
         .eq("active", true)
         .order("name");
 
-      if (!isSuperAdmin && organizationId) {
+      if (organizationId) {
         orgsQuery = orgsQuery.eq("organization_id", organizationId);
       }
 
@@ -147,7 +147,7 @@ export function AdminUsersTab() {
 
       // Filter locations to the admin's org client-side (join already has organization_id)
       const allLocs = (locationsResult.data || []) as unknown as Array<Location & { practice_group?: { organization_id?: string | null } }>;
-      const scopedLocs = !isSuperAdmin && organizationId
+      const scopedLocs = organizationId
         ? allLocs.filter(l => (l.practice_group as any)?.organization_id === organizationId)
         : allLocs;
       setLocations(scopedLocs as unknown as Location[]);

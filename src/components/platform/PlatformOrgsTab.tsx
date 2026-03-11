@@ -18,7 +18,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Trash2 } from 'lucide-react';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +48,9 @@ export function PlatformOrgsTab() {
   const [orgs, setOrgs] = useState<OrgRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [orgToDelete, setOrgToDelete] = useState<OrgRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadOrgs = async () => {
     setLoading(true);
@@ -77,6 +90,57 @@ export function PlatformOrgsTab() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteClick = async (org: OrgRow) => {
+    // Pre-flight: check for existing groups (includes inactive)
+    const { count, error } = await supabase
+      .from('practice_groups')
+      .select('*', { count: 'exact', head: true })
+      .eq('organization_id', org.id);
+
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to check org dependencies', variant: 'destructive' });
+      return;
+    }
+
+    if ((count ?? 0) > 0) {
+      toast({
+        title: 'Cannot delete',
+        description: `"${org.name}" has ${count} group(s). Remove all groups, locations, and users first.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setOrgToDelete(org);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!orgToDelete) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .delete()
+        .eq('id', orgToDelete.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Deleted', description: `"${orgToDelete.name}" has been removed.` });
+      setDeleteDialogOpen(false);
+      setOrgToDelete(null);
+      loadOrgs();
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to delete organization',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -140,12 +204,13 @@ export function PlatformOrgsTab() {
                   >
                     Created
                   </SortableTableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No organizations yet
                     </TableCell>
                   </TableRow>
@@ -165,6 +230,17 @@ export function PlatformOrgsTab() {
                       <TableCell>
                         {new Date(org.created_at).toLocaleDateString()}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDeleteClick(org)}
+                          title="Delete organization"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -182,6 +258,29 @@ export function PlatformOrgsTab() {
           loadOrgs();
         }}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{orgToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the organization record. This action cannot be undone.
+              <br /><br />
+              Any cascading data (role names, weekly plans) will also be removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -70,17 +70,19 @@ interface ProMoveListProps {
   activeOnly: boolean;
   resourceFilters?: string[];
   sortBy: 'domain' | 'competency' | 'updated';
+  practiceTypeFilter?: 'all' | 'pediatric' | 'general';
   onEdit: (proMove: ProMove) => void;
 }
 
-export function ProMoveList({ 
-  roleFilter, 
-  competencyFilter, 
-  searchTerm, 
+export function ProMoveList({
+  roleFilter,
+  competencyFilter,
+  searchTerm,
   activeOnly,
   resourceFilters = [],
-  sortBy, 
-  onEdit 
+  sortBy,
+  practiceTypeFilter = 'all',
+  onEdit
 }: ProMoveListProps) {
   const { toast } = useToast();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
@@ -93,7 +95,7 @@ export function ProMoveList({
 
   useEffect(() => {
     loadProMoves();
-  }, [roleFilter, competencyFilter, searchTerm, activeOnly, sortBy]);
+  }, [roleFilter, competencyFilter, searchTerm, activeOnly, sortBy, practiceTypeFilter]);
 
   const loadProMoves = async () => {
     setLoading(true);
@@ -127,6 +129,11 @@ export function ProMoveList({
       
       if (searchTerm) {
         query = query.ilike('action_statement', `%${searchTerm}%`);
+      }
+
+      // Filter by practice type (platform admin tool shows all by default)
+      if (practiceTypeFilter && practiceTypeFilter !== 'all') {
+        query = query.eq('practice_type', practiceTypeFilter);
       }
 
       const { data, error } = await query;

@@ -3,11 +3,12 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, MapPin, Building, Settings, Building2 } from "lucide-react";
+import { Shield, Users, MapPin, Building, Settings, Building2, BookOpen } from "lucide-react";
 import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
 import { AdminLocationsTab } from "@/components/admin/AdminLocationsTab";
 import { AdminOrganizationsTab } from "@/components/admin/AdminOrganizationsTab";
 import { AdminGlobalSettingsTab } from "@/components/admin/AdminGlobalSettingsTab";
+import { OrgProMoveLibraryTab } from "@/components/admin/OrgProMoveLibraryTab";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -85,7 +86,7 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[640px]">
           <TabsTrigger value="users" className="flex items-center space-x-2">
             <Users className="h-4 w-4" />
             <span>Users</span>
@@ -97,6 +98,10 @@ export default function AdminPage() {
           <TabsTrigger value="organizations" className="flex items-center space-x-2">
             <Building className="h-4 w-4" />
             <span>Groups</span>
+          </TabsTrigger>
+          <TabsTrigger value="pro-moves" className="flex items-center space-x-2">
+            <BookOpen className="h-4 w-4" />
+            <span>Pro Moves</span>
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center space-x-2">
             <Settings className="h-4 w-4" />
@@ -114,6 +119,10 @@ export default function AdminPage() {
 
         <TabsContent value="organizations">
           <AdminOrganizationsTab />
+        </TabsContent>
+
+        <TabsContent value="pro-moves">
+          <OrgProMoveLibraryTab />
         </TabsContent>
 
         <TabsContent value="settings">

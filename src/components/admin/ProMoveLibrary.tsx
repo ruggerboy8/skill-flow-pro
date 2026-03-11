@@ -36,6 +36,7 @@ export function ProMoveLibrary() {
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
+  const [practiceTypeFilter, setPracticeTypeFilter] = useState<'all' | 'pediatric' | 'general'>('all');
   const [sortBy, setSortBy] = useState<'domain' | 'competency' | 'updated'>('updated');
   const [resourceFilters, setResourceFilters] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -259,6 +260,22 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
         </div>
       </div>
 
+      {/* Practice type filter chips */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground font-medium">Practice type:</span>
+        {(['all', 'pediatric', 'general'] as const).map((type) => (
+          <Button
+            key={type}
+            variant={practiceTypeFilter === type ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPracticeTypeFilter(type)}
+            className="capitalize"
+          >
+            {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
+          </Button>
+        ))}
+      </div>
+
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 bg-muted/50 rounded-lg">
         <div className="space-y-2">
@@ -420,6 +437,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
           activeOnly={showActiveOnly}
           resourceFilters={resourceFilters}
           sortBy={sortBy}
+          practiceTypeFilter={practiceTypeFilter}
           onEdit={handleEditProMove}
         />
       </div>

@@ -476,6 +476,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
           doctorEmail={doctorEmail}
           doctorStaffId={doctorStaffId}
           sessionId={sessionId}
+          sessionType={sessionType}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
             queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });

@@ -70,11 +70,12 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
   const addCheckinMutation = useMutation({
     mutationFn: async () => {
       if (!myStaff?.id) throw new Error('Not authenticated');
+      const isFirst = sessions.length === 0;
       const maxSeq = sessions.reduce((max, s) => Math.max(max, s.sequence_number), 0);
       const { error } = await supabase.from('coaching_sessions').insert({
         doctor_staff_id: doctorStaffId,
         coach_staff_id: myStaff.id,
-        session_type: 'follow_up',
+        session_type: isFirst ? 'baseline_review' : 'follow_up',
         sequence_number: maxSeq + 1,
         status: 'scheduled',
       });
@@ -147,18 +148,16 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
         </Card>
       )}
 
-      {/* Always-visible Add Coaching Session button above the thread */}
-      {sessions.length > 0 && (
-        <Button
-          variant="outline"
-          className="w-full h-12 gap-2 border-dashed text-base font-medium"
-          onClick={() => addCheckinMutation.mutate()}
-          disabled={addCheckinMutation.isPending}
-        >
-          <Plus className="h-5 w-5" />
-          {addCheckinMutation.isPending ? 'Creating…' : 'Add Coaching Session'}
-        </Button>
-      )}
+      {/* Always-visible Add Coaching Session button */}
+      <Button
+        variant="outline"
+        className="w-full h-12 gap-2 border-dashed text-base font-medium"
+        onClick={() => addCheckinMutation.mutate()}
+        disabled={addCheckinMutation.isPending}
+      >
+        <Plus className="h-5 w-5" />
+        {addCheckinMutation.isPending ? 'Creating…' : sessions.length === 0 ? 'Add Baseline Review' : 'Add Coaching Session'}
+      </Button>
 
       {sessions.length === 0 && (
         <Card className="border-dashed">
@@ -166,7 +165,7 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
             <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
             <p className="text-muted-foreground">No coaching sessions yet.</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Complete your prep above to begin the coaching thread.
+              Add a baseline review session above to get started.
             </p>
           </CardContent>
         </Card>

@@ -123,28 +123,30 @@ export default function DoctorHome() {
       );
     }
 
-    // Meeting scheduled but director hasn't prepped yet — show informational card
-    const scheduledSession = sessions?.find(s => s.status === 'scheduled');
-    if (scheduledSession) {
+    // Session exists but invite not sent yet — do not show as scheduled to doctor
+    const preInviteSession = sessions?.find(s => s.status === 'scheduled' || s.status === 'director_prep_ready');
+    if (preInviteSession) {
       return (
         <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30">
           <CardHeader>
             <div className="flex items-center gap-3">
               <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               <div>
-                <CardTitle>Meeting Scheduled</CardTitle>
+                <CardTitle>Meeting Prep In Progress</CardTitle>
                 <CardDescription>
-                  {formatInTimeZone(new Date(scheduledSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}
+                  Your clinical director is finishing your agenda. You'll be invited to schedule next.
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Your meeting is coming up. You'll get a notification when the agenda is ready for your review.
+              Once your invite is sent, you'll be able to complete prep and confirm scheduling.
             </p>
           </CardContent>
         </Card>
+      );
+    }
       );
     }
 

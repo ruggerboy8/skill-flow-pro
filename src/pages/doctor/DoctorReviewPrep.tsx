@@ -279,6 +279,25 @@ export default function DoctorReviewPrep() {
     );
   }
 
+  const doctorPrepAccessibleStatuses = ['scheduling_invite_sent', 'doctor_prep_submitted', 'meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'];
+  if (!doctorPrepAccessibleStatuses.includes(session.status)) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <div className="flex items-center gap-3">
+          <Link to="/doctor">
+            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+          </Link>
+          <div>
+            <h2 className="text-xl font-bold">Meeting Prep Not Available Yet</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Your clinical director is still preparing your meeting. You'll get access after your scheduling invite is sent.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Meeting pending — show confirmation card
   if (isMeetingPending) {
     return (

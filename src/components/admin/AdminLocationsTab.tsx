@@ -43,6 +43,7 @@ export function AdminLocationsTab() {
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Location | null>(null);
 
   const loadLocations = async () => {
     try {

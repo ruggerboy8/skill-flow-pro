@@ -20,7 +20,7 @@ interface DoctorRow {
   location_name: string | null;
   created_at: string;
   journeyStatus: DoctorJourneyStatus;
-  nextMeeting: string | null;
+  
 }
 
 type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';

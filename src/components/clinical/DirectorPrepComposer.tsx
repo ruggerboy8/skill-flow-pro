@@ -237,6 +237,23 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!session?.doctor_staff_id && (session?.sequence_number ?? 0) > 1,
   });
 
+  // Fetch saved agenda template for this session type
+  const sessionType = session?.session_type || 'baseline_review';
+  const { data: savedTemplate } = useQuery({
+    queryKey: ['agenda-template', myStaff?.id, sessionType],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('coaching_agenda_templates')
+        .select('template_html')
+        .eq('staff_id', myStaff!.id)
+        .eq('session_type', sessionType)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.template_html || null;
+    },
+    enabled: !!myStaff?.id && !!sessionType,
+  });
+
   // Initialize from existing data
   useState(() => {
     if (existingSelections?.length) {

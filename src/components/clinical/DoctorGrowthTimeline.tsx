@@ -111,7 +111,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
           const experiments = (entry.record?.experiments as any[]) || [];
           const priorStatuses = (entry.record?.prior_action_status as any[]) || [];
           const typeLabel = entry.session_type === 'baseline_review' ? 'Baseline Review' : `Check-in ${entry.sequence_number - 1}`;
-          const statusConfig = SESSION_STATUS_CONFIG[entry.status] || SESSION_STATUS_CONFIG.scheduled;
+          const statusConfig = SESSION_STATUS_CONFIG[entry.status] || DEFAULT_STATUS;
 
           return (
             <div key={entry.id} className="relative pb-6 last:pb-0">

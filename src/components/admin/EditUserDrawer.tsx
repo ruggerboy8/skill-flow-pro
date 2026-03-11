@@ -250,6 +250,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         return scopeCount > 0
           ? `This will promote ${user.name} to Regional Manager with admin powers for ${scopeCount} ${scopeLabel}: ${scopeText}. They will NOT do weekly ProMoves.`
           : `This will promote ${user.name} to Regional Manager (requires scope selection).`;
+      case 'clinical_director':
+        return scopeCount > 0
+          ? `This will promote ${user.name} to Clinical Director with coach + admin powers for ${scopeCount} ${scopeLabel}: ${scopeText}, plus access to the Clinical tab.`
+          : `This will promote ${user.name} to Clinical Director (requires scope selection).`;
       case 'super_admin':
         return `This will promote ${user.name} to Super Admin and remove participant tasks.`;
     }

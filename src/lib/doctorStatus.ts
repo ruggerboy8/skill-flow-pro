@@ -57,7 +57,12 @@ export function getDoctorJourneyStatus(
     const isFollowup = latest.session_type === 'followup';
     const prefix = isFollowup ? 'Follow-up' : 'Baseline review';
 
-    switch (latest.status) {
+    // For doctor perspective, sessions that haven't reached the invite stage
+    // shouldn't override baseline status — the doctor hasn't been engaged yet
+    const preInviteStatuses = ['scheduled', 'director_prep_ready'];
+    if (perspective === 'doctor' && preInviteStatuses.includes(latest.status)) {
+      // Fall through to baseline checks below
+    } else switch (latest.status) {
       case 'scheduling_invite_sent':
         if (perspective === 'doctor') {
           return {

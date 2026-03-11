@@ -1,0 +1,2 @@
+ALTER TABLE public.coach_baseline_items DROP CONSTRAINT coach_baseline_items_rating_check;
+ALTER TABLE public.coach_baseline_items ADD CONSTRAINT coach_baseline_items_rating_check CHECK (rating >= 0 AND rating <= 4);

@@ -104,6 +104,10 @@ export default function PlatformPage() {
           <PlatformUsersTab />
         </TabsContent>
 
+        <TabsContent value="roles">
+          <PlatformRolesTab />
+        </TabsContent>
+
         <TabsContent value="pro-moves">
           <ProMoveLibrary />
         </TabsContent>

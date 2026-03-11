@@ -435,6 +435,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 <Label htmlFor="action-regional-manager" className="font-normal cursor-pointer">Promote to Regional Manager (Admin powers)</Label>
               </div>
               <div className="flex items-center space-x-2">
+                <RadioGroupItem value="clinical_director" id="action-clinical-director" />
+                <Label htmlFor="action-clinical-director" className="font-normal cursor-pointer">Promote to Clinical Director (Admin + Clinical tab)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
                 <RadioGroupItem value="super_admin" id="action-super-admin" />
                 <Label htmlFor="action-super-admin" className="font-normal cursor-pointer">Promote to Super Admin</Label>
               </div>

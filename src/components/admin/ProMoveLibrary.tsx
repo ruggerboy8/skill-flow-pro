@@ -29,6 +29,7 @@ interface Competency {
 
 export function ProMoveLibrary() {
   const { toast } = useToast();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   
   // State management
   const [roles, setRoles] = useState<Role[]>([]);

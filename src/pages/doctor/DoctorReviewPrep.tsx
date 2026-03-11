@@ -577,7 +577,10 @@ export default function DoctorReviewPrep() {
                               <p className="text-xs text-muted-foreground italic mt-0.5">{pm.competencies.name}</p>
                             )}
                           </div>
-                          <ScoreCircle score={item.self_score} />
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <ScoreCircle score={item.self_score} />
+                            <ScoreCircle score={coachRatingMap[item.action_id] ?? null} />
+                          </div>
                         </label>
                       );
                     })}

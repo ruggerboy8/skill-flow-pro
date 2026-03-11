@@ -481,7 +481,7 @@ const handleResendInvite = async (user: User) => {
                           </div>
                         </TableCell>
                         <TableCell className="truncate">{user.email || "—"}</TableCell>
-                        <TableCell className="truncate">{user.role_name || "—"}</TableCell>
+                        <TableCell className="truncate">{user.role_id ? resolveRole(user.role_id, user.role_name || '—') : '—'}</TableCell>
                         <TableCell className="truncate">{user.location_name || "—"}</TableCell>
                         <TableCell>{getStatusBadge(user)}</TableCell>
                         <TableCell className="text-right">

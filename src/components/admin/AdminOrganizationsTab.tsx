@@ -253,6 +253,13 @@ export function AdminOrganizationsTab() {
                               <Archive className="h-4 w-4 mr-2" />
                               {organization.active ? "Archive" : "Unarchive"}
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setDeleteTarget(organization)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

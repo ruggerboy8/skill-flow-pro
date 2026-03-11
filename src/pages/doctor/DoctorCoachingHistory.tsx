@@ -84,7 +84,7 @@ function CompletedSessionCard({ session }: { session: { id: string; session_type
               <div>
                 <p className="text-sm font-medium">{typeLabel}</p>
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(session.scheduled_at), 'MMMM d, yyyy')}
+                  {session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}
                 </p>
               </div>
             </div>

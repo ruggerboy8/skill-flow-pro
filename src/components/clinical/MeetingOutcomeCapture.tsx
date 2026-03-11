@@ -400,7 +400,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           <Textarea
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            placeholder="Summarize the key discussion points, agreements, and next steps..."
+            placeholder="Write a warm note to the doctor summarizing what you discussed, what you agreed on, and what they'll focus on next. Use 'you' language (e.g., 'You mentioned that…', 'We agreed you'd try…')."
             rows={5}
             className="resize-y"
           />

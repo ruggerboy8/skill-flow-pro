@@ -32,6 +32,7 @@ export function useUserRole() {
       canManageLibrary: false,
       canManageLocations: false,
       canManageUsers: false,
+      canManageAssignments: false,
       hasCapabilitiesRow: false,
     };
   }
@@ -110,6 +111,10 @@ export function useUserRole() {
     ? (caps.can_manage_users ?? false)
     : (staff.is_org_admin || staff.is_super_admin || false);
 
+  const canManageAssignments = caps
+    ? (caps.can_manage_assignments ?? false)
+    : (staff.is_org_admin || staff.is_super_admin || false);
+
   // ─── Managed scope lists ──────────────────────────────────────────────────
   const managedLocationIds = locationScopes.map(s => s.scope_id);
   const managedOrgIds = orgScopes.map(s => s.scope_id);
@@ -161,6 +166,7 @@ export function useUserRole() {
     canManageLibrary,
     canManageLocations,
     canManageUsers,
+    canManageAssignments,
     hasCapabilitiesRow,
   };
 }

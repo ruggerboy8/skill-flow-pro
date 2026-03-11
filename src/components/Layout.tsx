@@ -50,6 +50,11 @@ export default function Layout() {
 
   // Can access admin = super admin OR org admin
   const canAccessAdmin = isSuperAdmin || isOrgAdmin;
+
+  // Can access builder = admins, OR staff with explicit can_manage_assignments capability
+  const canManageAssignments =
+    canAccessAdmin ||
+    ((staffProfile?.user_capabilities as any)?.can_manage_assignments ?? false);
   
   // Office managers who are NOT coaches should see "My Location" link
   const showLocationDashboard = isOfficeManager && !isCoach && !isOrgAdmin;
@@ -89,8 +94,10 @@ export default function Layout() {
     ...(isCoach || isOrgAdmin || isLead ? [
       { name: 'Coach', href: '/coach', icon: Users },
     ] : []),
-    ...(canAccessAdmin ? [
+    ...(canManageAssignments ? [
       { name: 'Builder', href: '/builder', icon: SettingsIcon },
+    ] : []),
+    ...(canAccessAdmin ? [
       { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Evaluations', href: '/admin/evaluations', icon: TrendingUp }
     ] : []),

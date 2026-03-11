@@ -1,43 +1,41 @@
 
 
-## Comprehensive FK Join Hint Audit
+## Build Error Fixes
 
-### Problem Found
+There are 7 build errors across 4 files. All are straightforward type-safety issues.
 
-The database has **two** FK constraints from `locations` to `practice_groups`:
-1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
-2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
+### 1. `coach-remind/index.ts` — `locations` is an array, not an object (lines 145-146)
 
-Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
+The `.select('primary_location_id, locations(timezone)')` join returns `locations` as `{ timezone: string }[]` (array) since the relationship isn't declared as `.single()`. The code accesses `.locations?.timezone` as if it's a single object.
 
-### Issues to Fix
+**Fix**: Access `staffData?.locations?.[0]?.timezone` instead of `staffData?.locations?.timezone`.
 
-**1. Wrong FK hint name (will fail at runtime)**
-These files reference `locations_group_id_fkey` which does not exist as a constraint:
+### 2. `planner-upsert/index.ts` — `error` is `unknown` (line 234)
 
-| File | Line |
-|------|------|
-| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
-| `src/pages/coach/RemindersTab.tsx` | 148 |
+**Fix**: Change `error.message` to `(error as Error).message`.
 
-Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
+### 3. `sequencer-rank/index.ts` — Three errors
 
-**2. Corrupted select syntax (double alias, double parentheses)**
-`src/components/admin/AdminLocationsTab.tsx` line 50 has:
-```
-practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
-```
-This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
-```
-practice_group:practice_groups!locations_org_fkey(name)
-```
+- **Line 477**: Parameter `e` implicitly has `any` type. **Fix**: Type the callback `(e: { competencyId: number; score?: number }) =>`.
+- **Line 550**: `nextPicks` implicitly `any[]`. **Fix**: Add explicit type `const nextPicks: typeof scored = [];`.
+- **Line 742**: `error` is `unknown`. **Fix**: `(error as Error).message`.
 
-**3. No issues (already correct)**
-- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
-- All `scope_organization_id` references — intentional audit table column ✓
-- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
+### 4. `OrgProMoveLibraryTab.tsx` — `organization_pro_move_overrides` not in generated types (lines 80-82, 131-140)
+
+The table `organization_pro_move_overrides` doesn't exist in the auto-generated Supabase types. The typed client rejects it, causing TS2589/TS2769 cascades.
+
+**Fix**: Use `(supabase as any).from('organization_pro_move_overrides')` for both the select query (line 80) and the upsert (line 131), then type-cast the results. This matches the pattern used in `ImpersonationTab.tsx`.
 
 ### Summary
 
-3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
+| File | Error | Fix |
+|------|-------|-----|
+| `coach-remind/index.ts` | `.locations.timezone` on array | `locations?.[0]?.timezone` |
+| `planner-upsert/index.ts` | `error` is `unknown` | `(error as Error).message` |
+| `sequencer-rank/index.ts` | implicit `any` on `e` | Add type annotation |
+| `sequencer-rank/index.ts` | `nextPicks` implicit `any[]` | `const nextPicks: typeof scored = []` |
+| `sequencer-rank/index.ts` | `error` is `unknown` | `(error as Error).message` |
+| `OrgProMoveLibraryTab.tsx` | table not in types | Cast to `any` for both queries |
+
+All six fixes are single-line or minimal changes. No logic or behavior changes.
 

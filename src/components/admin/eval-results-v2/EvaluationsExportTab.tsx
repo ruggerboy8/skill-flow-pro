@@ -52,6 +52,7 @@ interface RoleOption { role_id: number; role_name: string; }
 // ── Component ──────────────────────────────────────────────────
 export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsExportTabProps) {
   const { user } = useAuth();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const [currentStep, setCurrentStep] = useState(0);
   const [config, setConfig] = useState<ExportConfig>(DEFAULT_EXPORT_CONFIG);
   const [isExporting, setIsExporting] = useState(false);

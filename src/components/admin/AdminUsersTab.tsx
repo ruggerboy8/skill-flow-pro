@@ -59,6 +59,7 @@ interface Location {
 export function AdminUsersTab() {
   const { toast } = useToast();
   const { isSuperAdmin, organizationId } = useUserRole();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);

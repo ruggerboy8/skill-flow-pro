@@ -336,6 +336,13 @@ export function AdminLocationsTab() {
                               <Archive className="h-4 w-4 mr-2" />
                               {location.active ? "Archive" : "Unarchive"}
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setDeleteTarget(location)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

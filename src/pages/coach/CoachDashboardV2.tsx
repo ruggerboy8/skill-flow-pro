@@ -201,7 +201,7 @@ export default function CoachDashboardV2({
     }
 
     if (selectedRoles.length > 0) {
-      filtered = filtered.filter(s => selectedRoles.includes(s.role_name));
+      filtered = filtered.filter(s => selectedRoles.includes(resolveRole(s.role_id, s.role_name)));
     }
 
     if (search.trim()) {

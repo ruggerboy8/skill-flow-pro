@@ -446,7 +446,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
           </div>
 
           {/* Scope (Conditional) */}
-          {(selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') && (
+          {(selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager' || selectedAction === 'clinical_director') && (
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
               <div className="space-y-2">
                 <Label htmlFor="scope-type" className="text-sm font-semibold">Scope Type</Label>

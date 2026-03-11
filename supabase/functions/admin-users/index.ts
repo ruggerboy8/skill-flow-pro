@@ -580,7 +580,7 @@ serve(async (req: Request) => {
         }
         
         // Handle coach_scopes junction table
-        if (preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") {
+        if (preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") {
           // Delete existing scopes
           const { error: deleteErr } = await admin
             .from("coach_scopes")

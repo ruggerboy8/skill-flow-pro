@@ -29,7 +29,7 @@ interface OrgOption {
 
 interface AdminStaff {
   id: string;
-  display_name: string | null;
+  name: string | null;
 }
 
 export function ImpersonationTab() {
@@ -92,9 +92,10 @@ export function ImpersonationTab() {
         }
 
         // Step 3: active staff in those locations, with capabilities
-        const { data: staffData, error } = await supabase
+        const staffQuery = supabase
           .from('staff')
-          .select('id, display_name, is_org_admin, user_capabilities(is_org_admin)')
+          .select('id, name, is_org_admin, user_capabilities(is_org_admin)');
+        const { data: staffData, error } = await (staffQuery as any)
           .in('primary_location_id', locationIds)
           .eq('active', true);
 
@@ -108,7 +109,7 @@ export function ImpersonationTab() {
           return s.is_org_admin || caps?.is_org_admin;
         });
 
-        setAdmins(orgAdmins.map((s) => ({ id: s.id, display_name: s.display_name })));
+        setAdmins(orgAdmins.map((s) => ({ id: s.id, name: s.name })));
       } catch (err: any) {
         toast({
           title: 'Error',
@@ -127,7 +128,7 @@ export function ImpersonationTab() {
     updateOverrides({ enabled: true, masqueradeStaffId: admin.id });
     toast({
       title: 'Simulation active',
-      description: `Viewing as ${admin.display_name ?? admin.id}`,
+      description: `Viewing as ${admin.name ?? admin.id}`,
     });
   };
 
@@ -219,7 +220,7 @@ export function ImpersonationTab() {
                       <div className="flex items-center gap-2">
                         <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
                         <span className="text-sm font-medium">
-                          {admin.display_name ?? 'Unnamed'}
+                          {admin.name ?? 'Unnamed'}
                         </span>
                         {isActive && (
                           <Badge variant="secondary" className="text-xs">

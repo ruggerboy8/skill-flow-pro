@@ -1,29 +1,43 @@
 
 
-## Platform Console Audit
+## Comprehensive FK Join Hint Audit
 
-### Bug 1: `ImpersonationTab.tsx` — `display_name` column doesn't exist on `staff` (BUILD ERROR)
-**Line 97**: The query selects `display_name` from `staff`, but the column is actually `name`.
-- This causes the TS2589/TS2339 cascade of type errors.
-- **Fix**: Change `select('id, display_name, is_org_admin, user_capabilities(is_org_admin)')` to `select('id, name, is_org_admin, user_capabilities(is_org_admin)')`.
-- Update the `AdminStaff` interface to use `name` instead of `display_name`.
-- Update all references: line 111 (`s.display_name` → `s.name`), line 130 (`admin.display_name` → `admin.name`), line 222 (`admin.display_name` → `admin.name`).
+### Problem Found
 
-### Bug 2: `OrgBootstrapDrawer.tsx` — Missing `slug` on location insert (BUILD ERROR)
-**Line 93-104**: The `locations` insert is missing the required `slug` field. The `locations` table schema requires `slug: string` (non-nullable, no default).
-- **Fix**: Generate a slug from the org name (e.g., `toSlug(orgName)`) and include it in the insert payload.
+The database has **two** FK constraints from `locations` to `practice_groups`:
+1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
+2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
 
-### Bug 3: `PlatformOrgsTab.tsx` — No edit/detail action on org rows
-The organizations table is read-only display. There's no way to click into an org to manage its groups, locations, or settings. This is a functionality gap but not a crash — noting for awareness.
+Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
 
-### Bug 4: `OrgBootstrapDrawer.tsx` — `program_start_date` uses today's date without Monday validation
-**Line 92**: Sets `program_start_date` to today. The `LocationDialog` component validates that start dates must be Mondays, but the bootstrap drawer skips this. Could create downstream issues with cycle calculations.
-- **Fix**: Snap the date to the next Monday if today isn't a Monday.
+### Issues to Fix
 
-### Implementation Plan
+**1. Wrong FK hint name (will fail at runtime)**
+These files reference `locations_group_id_fkey` which does not exist as a constraint:
 
-1. **Fix ImpersonationTab** — Replace `display_name` with `name` in the query, interface, and all UI references.
-2. **Fix OrgBootstrapDrawer** — Add `slug: toSlug(orgName)` to the location insert. Snap `program_start_date` to the nearest Monday.
+| File | Line |
+|------|------|
+| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
+| `src/pages/coach/RemindersTab.tsx` | 148 |
 
-Both fixes are straightforward single-file edits that resolve the build errors.
+Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
+
+**2. Corrupted select syntax (double alias, double parentheses)**
+`src/components/admin/AdminLocationsTab.tsx` line 50 has:
+```
+practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
+```
+This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
+```
+practice_group:practice_groups!locations_org_fkey(name)
+```
+
+**3. No issues (already correct)**
+- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
+- All `scope_organization_id` references — intentional audit table column ✓
+- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
+
+### Summary
+
+3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
 

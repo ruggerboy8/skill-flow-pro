@@ -95,8 +95,8 @@ export function ImpersonationTab() {
         const { data: staffData, error } = await supabase
           .from('staff')
           .select('id, name, is_org_admin, user_capabilities(is_org_admin)')
-          .in('primary_location_id', locationIds)
-          .eq('active', true);
+          .in('primary_location_id', locationIds as string[])
+          .eq('active', true) as { data: Array<{ id: string; name: string | null; is_org_admin: boolean | null; user_capabilities: { is_org_admin: boolean } | { is_org_admin: boolean }[] | null }> | null; error: any };
 
         if (error) throw error;
 

@@ -137,6 +137,7 @@ export function ImpersonationTab() {
     toast({ title: 'Simulation cleared', description: 'Returned to your own platform admin view' });
   };
 
+  const [activeMasqueradeName, setActiveMasqueradeName] = useState<string>('');
   const activeMasquerade = overrides.enabled && overrides.masqueradeStaffId;
 
   return (

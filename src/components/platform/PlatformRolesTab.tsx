@@ -65,7 +65,7 @@ export function PlatformRolesTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('roles')
-        .select('role_id, role_name, role_code, active')
+        .select('role_id, role_name, role_code, active, practice_type')
         .order('role_id');
       if (error) throw error;
       return data as Role[];

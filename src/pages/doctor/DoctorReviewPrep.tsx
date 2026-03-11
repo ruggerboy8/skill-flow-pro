@@ -41,12 +41,21 @@ const SCORE_COLORS: Record<number, string> = {
   1: 'bg-orange-500',
 };
 
-function ScoreCircle({ score }: { score: number | null | undefined }) {
+function ScoreCircle({ score, label }: { score: number | null | undefined; label?: string }) {
   if (score == null) return null;
+  if (score === 0) return (
+    <div className="flex flex-col items-center gap-0.5">
+      {label && <span className="text-[9px] text-muted-foreground">{label}</span>}
+      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[9px] font-bold bg-muted text-muted-foreground">N/A</span>
+    </div>
+  );
   return (
-    <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
-      {score}
-    </span>
+    <div className="flex flex-col items-center gap-0.5">
+      {label && <span className="text-[9px] text-muted-foreground">{label}</span>}
+      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
+        {score}
+      </span>
+    </div>
   );
 }
 
@@ -141,6 +150,32 @@ export default function DoctorReviewPrep() {
       return data || [];
     },
     enabled: !!session?.doctor_staff_id,
+  });
+
+  // Fetch coach baseline ratings for this doctor
+  const { data: coachBaselineItems } = useQuery({
+    queryKey: ['coach-baseline-items-for-doctor-prep', session?.doctor_staff_id],
+    queryFn: async () => {
+      if (!session?.doctor_staff_id) return [];
+      const { data: assessment } = await supabase
+        .from('coach_baseline_assessments')
+        .select('id')
+        .eq('doctor_staff_id', session.doctor_staff_id)
+        .maybeSingle();
+      if (!assessment?.id) return [];
+      const { data, error } = await supabase
+        .from('coach_baseline_items')
+        .select('action_id, rating')
+        .eq('assessment_id', assessment.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!session?.doctor_staff_id,
+  });
+
+  const coachRatingMap: Record<number, number> = {};
+  (coachBaselineItems || []).forEach((item: any) => {
+    if (item.rating != null) coachRatingMap[item.action_id] = item.rating;
   });
 
   // Fetch prior session experiments for progress notes (follow-ups only)
@@ -509,7 +544,10 @@ export default function DoctorReviewPrep() {
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pro Move</p>
                       </div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Self Score</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap w-5 text-center">Self</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap w-5 text-center">Coach</p>
+                      </div>
                     </div>
                     {(groupedItems[domain] || []).map(item => {
                       const pm = item.pro_moves as any;
@@ -539,7 +577,10 @@ export default function DoctorReviewPrep() {
                               <p className="text-xs text-muted-foreground italic mt-0.5">{pm.competencies.name}</p>
                             )}
                           </div>
-                          <ScoreCircle score={item.self_score} />
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <ScoreCircle score={item.self_score} />
+                            <ScoreCircle score={coachRatingMap[item.action_id] ?? null} />
+                          </div>
                         </label>
                       );
                     })}
@@ -570,7 +611,8 @@ export default function DoctorReviewPrep() {
                   <div key={item.action_id} className="flex items-center gap-2 p-2.5 rounded-md bg-background border">
                     <DomainBadge domain={domainName} />
                     <span className="text-sm font-medium flex-1">{pm?.action_statement}</span>
-                    <ScoreCircle score={item.self_score} />
+                    <ScoreCircle score={item.self_score} label="Self" />
+                    <ScoreCircle score={coachRatingMap[item.action_id] ?? null} label="Coach" />
                     <Button
                       variant="ghost"
                       size="icon"

@@ -37,6 +37,7 @@ interface StaffResultsTableV2Props {
 export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsTableV2Props) {
   const [showDraftsOnly, setShowDraftsOnly] = useState(false);
   const queryClient = useQueryClient();
+  const { resolve: resolveRole } = useRoleDisplayNames();
 
   // Aggregate by staff
   const staffRows = aggregateByStaff(data);

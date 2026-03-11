@@ -117,6 +117,41 @@ export function AdminOrganizationsTab() {
     }
   };
 
+  const handleDeleteOrganization = async (organization: Organization) => {
+    try {
+      const { count, error: cntErr } = await supabase
+        .from("locations")
+        .select("*", { count: "exact", head: true })
+        .eq("group_id", organization.id);
+
+      if (cntErr) throw cntErr;
+
+      if ((count ?? 0) > 0) {
+        toast({
+          title: "Cannot delete",
+          description: "This group still has locations. Remove or reassign all locations first.",
+          variant: "destructive",
+        });
+        setDeleteTarget(null);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("practice_groups")
+        .delete()
+        .eq("id", organization.id);
+
+      if (error) throw error;
+
+      toast({ title: "Deleted", description: `Group "${organization.name}" has been permanently deleted.` });
+      setDeleteTarget(null);
+      loadOrganizations();
+    } catch (error) {
+      console.error("Error deleting group:", error);
+      toast({ title: "Error", description: "Failed to delete group. It may have related data.", variant: "destructive" });
+      setDeleteTarget(null);
+    }
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";
     const d = new Date(dateString);

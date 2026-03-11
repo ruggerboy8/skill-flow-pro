@@ -553,7 +553,6 @@ export default function DoctorReviewPrep() {
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <ScoreCircle score={item.self_score} />
-                            <ScoreCircle score={coachRatingMap[item.action_id] ?? null} />
                           </div>
                         </label>
                       );

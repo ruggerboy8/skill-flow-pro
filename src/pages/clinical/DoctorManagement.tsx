@@ -234,7 +234,7 @@ export default function DoctorManagement() {
                   >
                     <TableCell>
                       <div>
-                        <span className="font-medium">{doctor.name}</span>
+                        <span className="font-medium">Dr. {doctor.name}</span>
                         <p className="text-xs text-muted-foreground">{doctor.email}</p>
                       </div>
                     </TableCell>

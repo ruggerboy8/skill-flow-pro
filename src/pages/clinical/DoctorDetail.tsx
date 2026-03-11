@@ -158,7 +158,7 @@ export default function DoctorDetail() {
         <DoctorDetailThread
           sessions={sessions || []}
           coachName={myStaff?.name}
-          doctorName={doctor.name}
+          doctorName={drName(doctor.name)}
           doctorStaffId={staffId!}
           doctorEmail={doctor.email}
           doctorBaselineComplete={baseline?.status === 'completed'}

@@ -56,7 +56,7 @@ export default function DoctorHome() {
     'doctor',
   );
 
-  const displayName = staff?.name || 'Doctor';
+  const displayName = drName(staff?.name);
 
   // Determine primary CTA
   const renderPrimaryCTA = () => {

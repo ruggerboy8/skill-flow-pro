@@ -134,7 +134,7 @@ export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsT
               >
                 <TableCell className="font-medium">{staff.staffName}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {staff.roleName}
+                  {resolveRole(staff.roleId, staff.roleName)}
                 </TableCell>
                 <TableCell className="text-center">
                   {getStatusBadge(staff, (e) => {

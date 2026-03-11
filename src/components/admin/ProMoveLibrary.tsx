@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

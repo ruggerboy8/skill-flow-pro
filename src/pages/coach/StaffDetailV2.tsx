@@ -42,6 +42,7 @@ export default function StaffDetailV2() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const { isSuperAdmin, isOrgAdmin } = useUserRole();
   const queryClient = useQueryClient();
   const selectedWeek = searchParams.get('week');

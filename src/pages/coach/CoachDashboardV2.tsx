@@ -37,6 +37,7 @@ export default function CoachDashboardV2({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { resolve: resolveRole } = useRoleDisplayNames();
 
   // Week selection - always normalize to Monday
   const [selectedWeek, setSelectedWeek] = useState<Date>(() => {

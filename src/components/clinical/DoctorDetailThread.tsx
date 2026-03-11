@@ -63,12 +63,28 @@ interface Props {
 
 export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail, doctorBaselineComplete, coachAssessment, onStartCoachWizard }: Props) {
   const { data: myStaff } = useStaffProfile();
+  const { isSuperAdmin } = useUserRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [captureSessionId, setCaptureSessionId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [prepSessionId, setPrepSessionId] = useState<string | null>(null);
   const [inviteSessionId, setInviteSessionId] = useState<string | null>(null);
+
+  // Fetch clinical directors for reassign dropdown (super admin only)
+  const { data: clinicalDirectors } = useQuery({
+    queryKey: ['clinical-directors-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('id, name')
+        .or('is_clinical_director.eq.true,is_super_admin.eq.true')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: isSuperAdmin,
+  });
 
   // Add Check-in mutation
   const addCheckinMutation = useMutation({

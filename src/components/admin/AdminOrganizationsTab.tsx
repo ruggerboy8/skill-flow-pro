@@ -151,6 +151,7 @@ export function AdminOrganizationsTab() {
       toast({ title: "Error", description: "Failed to delete group. It may have related data.", variant: "destructive" });
       setDeleteTarget(null);
     }
+  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";

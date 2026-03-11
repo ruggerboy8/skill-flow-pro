@@ -64,8 +64,10 @@ export function SchedulingInviteComposer({
   doctorEmail,
   doctorStaffId,
   sessionId,
+  sessionType = 'baseline_review',
   onSuccess,
 }: SchedulingInviteComposerProps) {
+  const templateKey = `scheduling_invite_${sessionType}`;
   const { user } = useAuth();
   const { data: myStaff } = useStaffProfile();
   const [subject, setSubject] = useState('');

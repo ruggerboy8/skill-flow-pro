@@ -91,7 +91,7 @@ export function OrgProMoveLibraryTab() {
       const merged: ProMoveRow[] = (proMoves ?? []).map((pm: any) => ({
         action_id: pm.action_id,
         action_statement: pm.action_statement,
-        practice_type: pm.practice_type,
+        practice_types: pm.practice_types ?? [],
         role_name: pm.roles?.role_name ?? '—',
         domain_name: pm.competencies?.domains?.domain_name ?? '—',
         competency_name: pm.competencies?.name ?? '—',

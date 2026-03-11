@@ -95,7 +95,7 @@ export default function DoctorManagement() {
           location_name: (s.locations as any)?.name || null,
           created_at: s.created_at || '',
           journeyStatus,
-          nextMeeting: upcomingSessions[0]?.scheduled_at || null,
+          
         };
       });
     },

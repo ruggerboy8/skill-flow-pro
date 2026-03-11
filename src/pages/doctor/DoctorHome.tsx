@@ -148,30 +148,7 @@ export default function DoctorHome() {
       );
     }
 
-    // Session exists but invite not sent yet — do not show as scheduled to doctor
-    const preInviteSession = sessions?.find(s => s.status === 'scheduled' || s.status === 'director_prep_ready');
-    if (preInviteSession) {
-      return (
-        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-              <div>
-                <CardTitle>Meeting Prep In Progress</CardTitle>
-                <CardDescription>
-                  Your clinical director is finishing your agenda. You'll be invited to schedule next.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Once your invite is sent, you'll be able to complete prep and confirm scheduling.
-            </p>
-          </CardContent>
-        </Card>
-      );
-    }
+    // Skip pre-invite sessions entirely — don't alert doctors about in-progress prep
 
     // Post-confirmation: show friendly "on track" message if coaching has started
     const hasConfirmedSession = sessions?.some(s => s.status === 'doctor_confirmed');

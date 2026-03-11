@@ -70,7 +70,7 @@ interface ProMoveListProps {
   activeOnly: boolean;
   resourceFilters?: string[];
   sortBy: 'domain' | 'competency' | 'updated';
-  practiceTypeFilter?: 'all' | 'pediatric' | 'general';
+  practiceTypeFilter?: string;
   onEdit: (proMove: ProMove) => void;
 }
 

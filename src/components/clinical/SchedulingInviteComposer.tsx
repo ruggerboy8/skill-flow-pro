@@ -10,10 +10,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { toast } from '@/hooks/use-toast';
 
-const TEMPLATE_KEY = 'scheduling_invite';
+const DEFAULT_SUBJECTS: Record<string, string> = {
+  baseline_review: '{{coach_name}} would like to schedule your coaching session',
+  check_in: '{{coach_name}} would like to schedule a follow-up',
+};
 
-const DEFAULT_SUBJECT = '{{coach_name}} would like to schedule your coaching session';
-const DEFAULT_BODY = `Hi {{first_name}},
+const DEFAULT_BODIES: Record<string, string> = {
+  baseline_review: `Hi {{first_name}},
 
 {{coach_name}} has completed their review and is ready to meet with you to discuss your baseline assessment.
 
@@ -29,7 +32,19 @@ In your prep, you'll:
   • Add any questions or topics you want to discuss
 
 Looking forward to connecting!
-— {{coach_name}}`;
+— {{coach_name}}`,
+  check_in: `Hi {{first_name}},
+
+{{coach_name}} is ready for your next check-in.
+
+Please schedule a time:
+{{scheduling_link}}
+
+Before the meeting, complete your prep here:
+{{prep_link}}
+
+— {{coach_name}}`,
+};
 
 interface SchedulingInviteComposerProps {
   open: boolean;

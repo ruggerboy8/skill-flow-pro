@@ -693,7 +693,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <ScoreCircle score={item.self_score} label="Self" />
-                              <ScoreCircle score={coachScore} label="You" />
+                              {isBaselineReview && <ScoreCircle score={coachScore} label="You" />}
                             </div>
                           </label>
                         );

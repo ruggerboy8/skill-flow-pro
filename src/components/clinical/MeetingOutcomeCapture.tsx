@@ -26,6 +26,13 @@ interface Props {
 
 export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const queryClient = useQueryClient();
+  const { data: myStaff } = useQuery({
+    queryKey: ['staff-profile-for-ownership'],
+    queryFn: async () => {
+      const { data } = await supabase.from('staff').select('id').eq('user_id', (await supabase.auth.getUser()).data.user?.id!).single();
+      return data;
+    },
+  });
   const [summary, setSummary] = useState('');
   const [experiments, setExperiments] = useState<Experiment[]>([{ title: '', description: '' }]);
   const [transcriptMode, setTranscriptMode] = useState(false);

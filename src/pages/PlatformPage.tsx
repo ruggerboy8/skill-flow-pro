@@ -73,7 +73,7 @@ export default function PlatformPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[640px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[800px]">
           <TabsTrigger value="organizations" className="flex items-center space-x-2">
             <Building2 className="h-4 w-4" />
             <span>Organizations</span>
@@ -81,6 +81,10 @@ export default function PlatformPage() {
           <TabsTrigger value="users" className="flex items-center space-x-2">
             <Users className="h-4 w-4" />
             <span>Users</span>
+          </TabsTrigger>
+          <TabsTrigger value="roles" className="flex items-center space-x-2">
+            <Blocks className="h-4 w-4" />
+            <span>Roles</span>
           </TabsTrigger>
           <TabsTrigger value="pro-moves" className="flex items-center space-x-2">
             <BookOpen className="h-4 w-4" />

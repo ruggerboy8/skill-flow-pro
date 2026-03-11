@@ -35,6 +35,14 @@ const SCORE_COLORS: Record<number, string> = {
 
 function ScoreCircle({ score, label }: { score: number | null | undefined; label: string }) {
   if (score == null) return null;
+  if (score === 0) return (
+    <div className="flex items-center gap-1">
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[9px] font-bold bg-muted text-muted-foreground">
+        N/A
+      </span>
+    </div>
+  );
   return (
     <div className="flex items-center gap-1">
       <span className="text-[10px] text-muted-foreground">{label}</span>
@@ -616,52 +624,59 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                     className="rounded-lg border p-3 space-y-1"
                     style={{ backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.06)` }}
                   >
-                    {(groupedItems[domain] || []).filter(item => {
-                      const selfScore = item.self_score;
-                      const coachScore = coachRatingMap[item.action_id];
-                      // Low self: score 1 or 2 (exclude 0 = N/A)
-                      if (filterLowSelf && (selfScore == null || selfScore === 0 || selfScore > 2)) return false;
-                      // Low coach: score 1 or 2 (exclude 0 = N/A, null)
-                      if (filterLowCoach && (coachScore == null || coachScore === 0 || coachScore > 2)) return false;
-                      // Gap filters: both must be non-null and > 0
-                      if (filterGap !== 'none') {
-                        if (selfScore == null || selfScore === 0 || coachScore == null || coachScore === 0) return false;
-                        const gap = Math.abs(selfScore - coachScore);
-                        if (filterGap === 'gap1' && gap < 1) return false;
-                        if (filterGap === 'gap2' && gap < 2) return false;
+                    {(() => {
+                      const filtered = (groupedItems[domain] || []).filter(item => {
+                        const selfScore = item.self_score;
+                        const coachScore = coachRatingMap[item.action_id];
+                        if (filterLowSelf && (selfScore == null || selfScore === 0 || selfScore > 2)) return false;
+                        if (filterLowCoach && (coachScore == null || coachScore === 0 || coachScore > 2)) return false;
+                        if (filterGap !== 'none') {
+                          if (selfScore == null || selfScore === 0 || coachScore == null || coachScore === 0) return false;
+                          const gap = Math.abs(selfScore - coachScore);
+                          if (filterGap === 'gap1' && gap < 1) return false;
+                          if (filterGap === 'gap2' && gap < 2) return false;
+                        }
+                        return true;
+                      });
+                      if (filtered.length === 0) {
+                        return (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No items match the current filters.
+                          </p>
+                        );
                       }
-                      return true;
-                    }).map(item => {
-                      const pm = item.pro_moves as any;
-                      const competency = pm?.competencies;
-                      const isSelected = selectedActions.includes(item.action_id);
-                      const coachScore = coachRatingMap[item.action_id];
-                      return (
-                        <label
-                          key={item.action_id}
-                          className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-primary/10 ring-1 ring-primary/30'
-                              : 'hover:bg-background/60'
-                          }`}
-                        >
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleAction(item.action_id)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
-                            {competency?.name && (
-                              <p className="text-xs text-muted-foreground italic mt-0.5">{competency.name}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <ScoreCircle score={item.self_score} label="Self" />
-                            <ScoreCircle score={coachScore} label="You" />
-                          </div>
-                        </label>
-                      );
-                    })}
+                      return filtered.map(item => {
+                        const pm = item.pro_moves as any;
+                        const competency = pm?.competencies;
+                        const isSelected = selectedActions.includes(item.action_id);
+                        const coachScore = coachRatingMap[item.action_id];
+                        return (
+                          <label
+                            key={item.action_id}
+                            className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-primary/10 ring-1 ring-primary/30'
+                                : 'hover:bg-background/60'
+                            }`}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleAction(item.action_id)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
+                              {competency?.name && (
+                                <p className="text-xs text-muted-foreground italic mt-0.5">{competency.name}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <ScoreCircle score={item.self_score} label="Self" />
+                              <ScoreCircle score={coachScore} label="You" />
+                            </div>
+                          </label>
+                        );
+                      });
+                    })()}
                   </div>
                 </TabsContent>
               ))}

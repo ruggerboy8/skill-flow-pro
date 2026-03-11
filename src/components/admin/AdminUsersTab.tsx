@@ -279,7 +279,9 @@ const handleResendInvite = async (user: User) => {
     if (user.is_super_admin) {
       indicators.push({ abbr: 'SA', label: 'Super Admin', color: 'bg-red-500 text-white' });
     }
-    if (user.is_org_admin) {
+    if (user.is_clinical_director) {
+      indicators.push({ abbr: 'CD', label: 'Clinical Director', color: 'bg-teal-600 text-white' });
+    } else if (user.is_org_admin) {
       indicators.push({ abbr: 'RM', label: 'Regional Manager', color: 'bg-purple-500 text-white' });
     }
     if (user.is_coach && !user.is_org_admin) {

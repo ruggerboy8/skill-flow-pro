@@ -59,8 +59,8 @@ export default function DoctorHome() {
 
   // Determine primary CTA
   const renderPrimaryCTA = () => {
-    // Active prep needed — doctor needs to complete their side
-    const prepSession = sessions?.find(s => s.status === 'director_prep_ready' || s.status === 'scheduling_invite_sent');
+    // Active prep needed — only after invite is sent
+    const prepSession = sessions?.find(s => s.status === 'scheduling_invite_sent');
     if (prepSession) {
       return (
         <Card className="border-primary/30 bg-primary/5">

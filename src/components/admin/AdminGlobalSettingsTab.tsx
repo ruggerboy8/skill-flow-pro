@@ -39,6 +39,114 @@ export function AdminGlobalSettingsTab() {
     loadSettings();
   }, []);
 
+  useEffect(() => {
+    if (organizationId) loadRoleAliases();
+  }, [organizationId]);
+
+  const loadRoleAliases = async () => {
+    if (!organizationId) return;
+    setRolesLoading(true);
+
+    // 1. Get org's practice_type
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("practice_type")
+      .eq("id", organizationId)
+      .single();
+
+    if (!org) {
+      setRolesLoading(false);
+      return;
+    }
+
+    // 2. Fetch roles matching practice_type
+    const { data: platformRoles } = await supabase
+      .from("roles")
+      .select("role_id, role_name, practice_type")
+      .eq("practice_type", org.practice_type)
+      .eq("active", true)
+      .order("role_id");
+
+    // 3. Fetch existing aliases
+    const { data: aliases } = await supabase
+      .from("organization_role_names")
+      .select("role_id, display_name")
+      .eq("org_id", organizationId);
+
+    const aliasMap = new Map(
+      (aliases || []).map((a) => [a.role_id, a.display_name])
+    );
+
+    setRoles(
+      (platformRoles || []).map((r) => ({
+        role_id: r.role_id,
+        role_name: r.role_name || "",
+        display_name: aliasMap.get(r.role_id) || "",
+      }))
+    );
+    setRolesLoading(false);
+  };
+
+  const handleAliasChange = (roleId: number, value: string) => {
+    setRoles((prev) =>
+      prev.map((r) =>
+        r.role_id === roleId ? { ...r, display_name: value } : r
+      )
+    );
+  };
+
+  const handleSaveAliases = async () => {
+    if (!organizationId) return;
+    setRolesSaving(true);
+
+    const rows = roles
+      .filter((r) => r.display_name.trim() !== "")
+      .map((r) => ({
+        org_id: organizationId,
+        role_id: r.role_id,
+        display_name: r.display_name.trim(),
+        updated_at: new Date().toISOString(),
+      }));
+
+    // Delete any rows where the user cleared the display name
+    const clearedRoleIds = roles
+      .filter((r) => r.display_name.trim() === "")
+      .map((r) => r.role_id);
+
+    let error = null;
+
+    if (rows.length > 0) {
+      const { error: upsertError } = await supabase
+        .from("organization_role_names")
+        .upsert(rows, { onConflict: "org_id,role_id" });
+      error = upsertError;
+    }
+
+    if (!error && clearedRoleIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("organization_role_names")
+        .delete()
+        .eq("org_id", organizationId)
+        .in("role_id", clearedRoleIds);
+      error = deleteError;
+    }
+
+    if (error) {
+      console.error("Error saving role aliases:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save role display names.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Saved",
+        description: "Role display names updated successfully.",
+      });
+    }
+    setRolesSaving(false);
+  };
+
   const loadSettings = async () => {
     const { data, error } = await supabase
       .from("app_kv")

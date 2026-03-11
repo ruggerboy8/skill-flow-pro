@@ -479,10 +479,11 @@ serve(async (req: Request) => {
           clinical_director: {
             is_participant: false,
             is_lead: false,
-            is_coach: false,
-            is_org_admin: false,
+            is_coach: true,
+            is_org_admin: true,
             is_super_admin: false,
             is_clinical_director: true,
+            is_doctor: false,
             coach_scope_type: null,
             coach_scope_id: null,
             home_route: '/clinical',

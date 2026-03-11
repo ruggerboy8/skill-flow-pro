@@ -140,9 +140,12 @@ serve(async (req) => {
           .replace(/\{\{scheduling_link\}\}/g, link || "[no link provided]")
           .replace(/\{\{prep_link\}\}/g, resolvedPrepLink);
 
+      let htmlBody: string | undefined;
+
       if (custom_subject && custom_body) {
         subject = interpolate(custom_subject);
         body = interpolate(custom_body);
+        // Custom templates are plain text
       } else {
         subject = `${coachName} would like to schedule your coaching session`;
 
@@ -159,7 +162,7 @@ serve(async (req) => {
         htmlParts.push(`<p>Before the meeting, please <a href="${resolvedPrepLink}">complete your meeting prep</a> on the Pro Moves site. In your prep, you'll:</p>`);
         htmlParts.push(`<ul><li>Review the meeting agenda your coach has prepared</li><li>Select 1–2 Pro Moves you'd like to focus on</li><li>Add any questions or topics you want to discuss</li></ul>`);
         htmlParts.push(`<p>Looking forward to connecting!<br/>— ${coachName}</p>`);
-        const htmlBody = htmlParts.join("\n");
+        htmlBody = htmlParts.join("\n");
 
         // Plain text fallback
         const textParts = [
@@ -187,24 +190,26 @@ serve(async (req) => {
         textParts.push("Looking forward to connecting!");
         textParts.push(`— ${coachName}`);
         body = textParts.join("\n");
+      }
 
-        // Send with both html and text
-        try {
-          const resendRes = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${resendApiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              from: fromEmail,
-              to: [doctor.email],
-              reply_to: replyTo,
-              subject,
-              html: htmlBody,
-              text: body,
-            }),
-          });
+      try {
+        const emailPayload: Record<string, unknown> = {
+          from: fromEmail,
+          to: [doctor.email],
+          reply_to: replyTo,
+          subject,
+          text: body,
+        };
+        if (htmlBody) emailPayload.html = htmlBody;
+
+        const resendRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(emailPayload),
+        });
 
         if (resendRes.ok) {
           emailSent = true;

@@ -471,7 +471,7 @@ export function ClinicalBaselineResults({
                         setCoachScoreFilters(new Set());
                         setShowOnlyNoted(false);
                         setShowCoachRatings(false);
-                        setSortBy('self');
+                        setSortConfig({ column: 'self', direction: 'desc' });
                       }}
                       className="text-xs text-destructive hover:underline whitespace-nowrap"
                     >

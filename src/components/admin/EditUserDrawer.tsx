@@ -159,7 +159,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         location_id: selectedLocationId || null,
       };
       
-      if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager') {
+      if (selectedAction === 'lead' || selectedAction === 'coach' || selectedAction === 'coach_participant' || selectedAction === 'regional_manager' || selectedAction === 'clinical_director') {
         payload.coach_scope_type = scopeType;
         payload.coach_scope_ids = scopeIds;
       }

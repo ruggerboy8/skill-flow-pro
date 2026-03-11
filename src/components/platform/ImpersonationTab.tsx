@@ -41,6 +41,7 @@ export function ImpersonationTab() {
   const [admins, setAdmins] = useState<AdminStaff[]>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(true);
   const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [activeMasqueradeName, setActiveMasqueradeName] = useState<string>('');
 
   // Load org list on mount
   useEffect(() => {
@@ -56,7 +57,6 @@ export function ImpersonationTab() {
   }, []);
 
   // Load org admins when selected org changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!selectedOrgId) {
       setAdmins([]);
@@ -102,14 +102,14 @@ export function ImpersonationTab() {
         if (error) throw error;
 
         // Filter for org admins (new caps row OR legacy flag)
-        const orgAdmins = (staffData ?? []).filter((s) => {
+        const orgAdmins = (staffData ?? []).filter((s: any) => {
           const caps = Array.isArray(s.user_capabilities)
             ? s.user_capabilities[0]
             : (s.user_capabilities as { is_org_admin: boolean } | null);
           return s.is_org_admin || caps?.is_org_admin;
         });
 
-        setAdmins(orgAdmins.map((s) => ({ id: s.id, name: s.name })));
+        setAdmins(orgAdmins.map((s: any) => ({ id: s.id, name: s.name })));
       } catch (err: any) {
         toast({
           title: 'Error',
@@ -122,10 +122,11 @@ export function ImpersonationTab() {
     };
 
     loadAdmins();
-  }, [selectedOrgId]);
+  }, [selectedOrgId, toast]);
 
   const handleMasquerade = (admin: AdminStaff) => {
     updateOverrides({ enabled: true, masqueradeStaffId: admin.id });
+    setActiveMasqueradeName(admin.name ?? admin.id);
     toast({
       title: 'Simulation active',
       description: `Viewing as ${admin.name ?? admin.id}`,
@@ -156,8 +157,8 @@ export function ImpersonationTab() {
             <AlertTitle>Simulation active</AlertTitle>
             <AlertDescription className="flex items-center justify-between gap-4">
               <span>
-                Masquerading as staff{' '}
-                <code className="font-mono text-xs">{overrides.masqueradeStaffId}</code>
+                Masquerading as{' '}
+                <strong>{activeMasqueradeName || overrides.masqueradeStaffId}</strong>
               </span>
               <Button
                 size="sm"

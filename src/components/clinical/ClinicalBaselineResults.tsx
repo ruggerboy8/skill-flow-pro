@@ -520,7 +520,7 @@ export function ClinicalBaselineResults({
                         const isExpanded = expandedNoteId === item.action_id;
 
                         // Row color follows whichever column is sorted
-                        const activeScore = sortBy === 'coach' && showCoachRatings && coachScore && coachScore >= 1 && coachScore <= 4
+                        const activeScore = sortConfig.column === 'coach' && showCoachRatings && coachScore && coachScore >= 1 && coachScore <= 4
                           ? coachScore
                           : item.score;
                         const colors = SCORE_COLORS[activeScore];

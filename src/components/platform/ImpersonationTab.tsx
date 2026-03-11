@@ -127,7 +127,7 @@ export function ImpersonationTab() {
     updateOverrides({ enabled: true, masqueradeStaffId: admin.id });
     toast({
       title: 'Simulation active',
-      description: `Viewing as ${admin.display_name ?? admin.id}`,
+      description: `Viewing as ${admin.name ?? admin.id}`,
     });
   };
 

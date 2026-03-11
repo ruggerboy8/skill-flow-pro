@@ -239,22 +239,32 @@ export function ClinicalBaselineResults({
     if (!showCoachRatings) setShowCoachRatings(true);
   };
 
+  const handleSortClick = (column: 'self' | 'coach') => {
+    setSortConfig(prev => {
+      if (prev.column === column) {
+        return { column, direction: prev.direction === 'desc' ? 'asc' : 'desc' };
+      }
+      return { column, direction: 'desc' };
+    });
+  };
+
   const getSortedDomainItems = (domain: string) => {
     const domainData = groupedByDomain[domain];
     if (!domainData) return [];
+    const dir = sortConfig.direction === 'asc' ? 1 : -1;
     let result = Object.entries(domainData)
       .flatMap(([score, items]) => items.map(item => ({ ...item, score: Number(score) })))
       .sort((a, b) => {
-        if (sortBy === 'coach' && showCoachRatings) {
+        if (sortConfig.column === 'coach' && showCoachRatings) {
           const aCoach = coachRatingsMap.get(a.action_id) ?? 0;
           const bCoach = coachRatingsMap.get(b.action_id) ?? 0;
-          if (bCoach !== aCoach) return bCoach - aCoach;
-          return b.score - a.score;
+          if (bCoach !== aCoach) return (bCoach - aCoach) * dir;
+          return (b.score - a.score) * dir;
         }
-        if (b.score !== a.score) return b.score - a.score;
+        if (b.score !== a.score) return (b.score - a.score) * dir;
         const aCoach = coachRatingsMap.get(a.action_id) ?? 0;
         const bCoach = coachRatingsMap.get(b.action_id) ?? 0;
-        return bCoach - aCoach;
+        return (bCoach - aCoach) * dir;
       });
 
     // Apply self score filters

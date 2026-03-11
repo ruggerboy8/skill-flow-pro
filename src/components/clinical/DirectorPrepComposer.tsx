@@ -140,6 +140,13 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!sessionId,
   });
 
+  // Set read-only if session belongs to another coach
+  useEffect(() => {
+    if (session && myStaffForOwnership?.id && session.coach_staff_id !== myStaffForOwnership.id) {
+      setIsReadOnly(true);
+    }
+  }, [session, myStaffForOwnership?.id]);
+
   // Fetch doctor's baseline items as the ProMove pool
   const { data: baselineItems } = useQuery({
     queryKey: ['doctor-baseline-items-for-prep', doctorStaffId],

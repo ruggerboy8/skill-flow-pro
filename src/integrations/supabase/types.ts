@@ -3307,6 +3307,13 @@ export type Database = {
         }[]
       }
       get_office_manager_location_id: { Args: never; Returns: string }
+      get_own_staff_flags: {
+        Args: never
+        Returns: {
+          is_coach: boolean
+          is_super_admin: boolean
+        }[]
+      }
       get_performance_trend: {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json

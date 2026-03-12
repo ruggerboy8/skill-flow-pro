@@ -341,7 +341,9 @@ export default function DoctorBaselineResults() {
                       </div>
                     )}
                     {sortedItems.map((item) => {
-                      const hasNote = !!item.self_note?.trim();
+                      const hasSelfNote = !!item.self_note?.trim();
+                      const hasCoachNote = !!item.coach_note?.trim();
+                      const hasAnyNote = hasSelfNote || hasCoachNote;
                       const isExpanded = expandedNoteId === item.action_id;
                       const colors = SCORE_COLORS[item.self_score];
 
@@ -349,7 +351,7 @@ export default function DoctorBaselineResults() {
                         <div key={item.action_id}>
                           <button
                             onClick={() => {
-                              if (hasNote) {
+                              if (hasAnyNote) {
                                 setExpandedNoteId(isExpanded ? null : item.action_id);
                               } else {
                                 setSelectedItem(item);
@@ -368,7 +370,7 @@ export default function DoctorBaselineResults() {
                               <p className="text-sm font-medium text-foreground">{item.action_statement}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <p className="text-xs text-muted-foreground">{item.competency_name}</p>
-                                {hasNote && (
+                                {hasAnyNote && (
                                   <span className="flex items-center gap-0.5 text-primary">
                                     <MessageSquare className="h-3 w-3" />
                                     <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
@@ -384,10 +386,20 @@ export default function DoctorBaselineResults() {
                               <GraduationCap className="h-4 w-4" />
                             </button>
                           </button>
-                          {hasNote && isExpanded && (
-                            <div className="bg-muted/30 border-t px-4 py-3">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Your note</p>
-                              <p className="text-sm whitespace-pre-wrap text-foreground">{item.self_note}</p>
+                          {hasAnyNote && isExpanded && (
+                            <div className="bg-muted/30 border-t px-4 py-3 space-y-2">
+                              {hasCoachNote && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Coach note{item.coach_score != null ? ` (rated ${item.coach_score})` : ''}</p>
+                                  <p className="text-sm whitespace-pre-wrap text-foreground">{item.coach_note}</p>
+                                </div>
+                              )}
+                              {hasSelfNote && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Your note</p>
+                                  <p className="text-sm whitespace-pre-wrap text-foreground">{item.self_note}</p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

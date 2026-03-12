@@ -351,8 +351,12 @@ export default function DoctorReviewPrep() {
     );
   }
 
-  // Group baseline items by domain
-  const groupedItems = (baselineItems || []).reduce((acc, item) => {
+  // Group baseline items by domain, applying optional low-self filter
+  const filteredBaselineItems = lowSelfFilter
+    ? (baselineItems || []).filter(item => item.self_score != null && item.self_score > 0 && item.self_score <= 2)
+    : (baselineItems || []);
+
+  const groupedItems = filteredBaselineItems.reduce((acc, item) => {
     const pm = item.pro_moves as any;
     const domainName = pm?.competencies?.domains?.domain_name || 'Other';
     if (!acc[domainName]) acc[domainName] = [];

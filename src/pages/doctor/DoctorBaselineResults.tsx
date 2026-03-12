@@ -189,7 +189,7 @@ export default function DoctorBaselineResults() {
     if (selfScoreFilters.size > 0) {
       result = result.filter(item => selfScoreFilters.has(item.self_score));
     }
-    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim());
+    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim() || item.coach_note?.trim());
     return result;
   };
 

@@ -644,9 +644,9 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                       }}
                       className="text-xs rounded-full px-3 py-1.5 border-2 font-semibold transition-all"
                       style={isActive ? {
-                        backgroundColor: `hsl(${raw} / 0.85)`,
-                        borderColor: `hsl(${raw})`,
-                        color: 'white',
+                        backgroundColor: `hsl(${raw} / 0.3)`,
+                        borderColor: `hsl(${raw} / 0.8)`,
+                        color: 'hsl(0 0% 10%)',
                       } : {
                         backgroundColor: `hsl(${raw} / 0.08)`,
                         borderColor: `hsl(${raw} / 0.25)`,

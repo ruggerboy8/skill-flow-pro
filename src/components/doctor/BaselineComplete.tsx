@@ -152,7 +152,7 @@ export function BaselineComplete({ onFinish, assessmentId, releaserName, existin
               <p>
                 Before we wrap up, I'd love to hear what this was like for you. A few sentences is great — just whatever comes to mind.
               </p>
-              <p className="text-right font-medium text-foreground">— Dr. Alex</p>
+              <p className="text-right font-medium text-foreground">— {signOff}</p>
             </div>
 
             {/* Guiding prompts */}

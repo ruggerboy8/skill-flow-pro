@@ -75,15 +75,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         
         // Check if user needs password setup based on metadata flag
-        if (event === 'SIGNED_IN' && session?.user) {
+        if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
           const hasPasswordSet = session.user.user_metadata?.password_set;
           if (!hasPasswordSet) {
             // User needs to set password
             setNeedsPasswordSetup(true);
           } else {
             setNeedsPasswordSetup(false);
-            // Check user roles
-            checkUserStatus(session.user.id);
+            // Check user roles (only fetch if we haven't already or on sign-in)
+            if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+              checkUserStatus(session.user.id);
+            }
           }
         } else if (event === 'SIGNED_OUT') {
           setNeedsPasswordSetup(false);

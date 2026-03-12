@@ -68,7 +68,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
-      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment. A baseline review session has been added to the coaching thread.` });
+      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment.` });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });

@@ -95,16 +95,23 @@ export function BaselineComplete({ onFinish, assessmentId, existingReflection }:
         body: formData,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if the response body has a user-friendly message (e.g. "too short")
+        const msg = data?.message || 'Please try again or type your reflection instead.';
+        throw new Error(msg);
+      }
       const transcript = data?.transcript || data?.text || '';
+      if (!transcript.trim()) {
+        throw new Error('No speech detected. Please try recording again with a clear voice.');
+      }
       setReflectionText(transcript);
       setReflectionMode('voice');
       toast({ title: 'Transcription complete', description: 'Review and edit the transcript below.' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Transcription error:', error);
       toast({
         title: 'Transcription failed',
-        description: 'Please try again or type your reflection instead.',
+        description: error.message || 'Please try again or type your reflection instead.',
         variant: 'destructive',
       });
     } finally {

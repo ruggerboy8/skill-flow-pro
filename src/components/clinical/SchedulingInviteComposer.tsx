@@ -140,7 +140,7 @@ export function SchedulingInviteComposer({
   }
 
   const prepLink = sessionId
-    ? `${window.location.origin}/doctor/review-prep/${sessionId}`
+    ? `https://alcanskills.lovable.app/doctor/review-prep/${sessionId}`
     : '[prep link — generated after session is created]';
 
   function getPreview(template: string) {

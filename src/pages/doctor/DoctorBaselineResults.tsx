@@ -193,7 +193,7 @@ export default function DoctorBaselineResults() {
     return result;
   };
 
-  const hasAnyNotes = items?.some(item => item.self_note?.trim()) ?? false;
+  const hasAnyNotes = items?.some(item => item.self_note?.trim() || item.coach_note?.trim()) ?? false;
   const anyFiltersActive = selfScoreFilters.size > 0;
 
   const isLoading = loadingBaseline || loadingItems;

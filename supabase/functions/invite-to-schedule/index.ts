@@ -123,7 +123,7 @@ serve(async (req) => {
     // Send email via Resend
     let emailSent = false;
     if (resendApiKey && doctor.email) {
-      const firstName = doctor.name.split(" ")[0];
+      const firstName = doctor.name.replace(/^dr\.?\s*/i, '').trim().split(" ")[0] || doctor.name;
       const coachName = callerStaff.name;
       // Resolve prep_link: use provided value, or construct from session
       const resolvedPrepLink = prep_link || `https://alcanskills.lovable.app/doctor/review-prep/${sessionData.id}`;

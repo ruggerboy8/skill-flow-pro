@@ -128,6 +128,20 @@ serve(async (req) => {
       sizeInMB: (fileSize / (1024 * 1024)).toFixed(2),
     });
 
+    // Guard against very short / near-silent recordings that cause Whisper to hallucinate
+    // (e.g. returning "visit www.fema.gov"). 3KB webm ≈ < 1 second of audio.
+    const MIN_FILE_BYTES = 3_000;
+    if (fileSize < MIN_FILE_BYTES) {
+      console.warn('[transcribe-audio] File too small, likely silence/noise:', fileSize);
+      return new Response(
+        JSON.stringify({
+          error: 'Recording too short',
+          message: 'The recording was too short to transcribe. Please record at least a few seconds of audio.',
+        }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     let result: { transcript: string };
     let service: 'whisper' | 'elevenlabs';
 

@@ -1,5 +1,3 @@
-
-
 ## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
 **Status: ✅ Complete**
@@ -25,3 +23,26 @@
 | `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
 | `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
 | `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
+
+## Enterprise Isolation Fix
+
+**Status: ✅ Complete**
+
+### What changed
+
+1. **`get_user_org_id()` SECURITY DEFINER function** — resolves a user's `organization_id` via `staff → locations → practice_groups`, used in all org-scoped RLS policies
+2. **Alcan backfill** — 96 legacy `source='global', org_id=NULL` assignments updated to `source='org', org_id=<alcan_id>`
+3. **`weekly_assignments` RLS** — dropped permissive global-read policy (bleedover source), added org-scoped SELECT and org-admin ALL policies
+4. **`practice_groups` RLS** — added org-admin write policy (INSERT/UPDATE/DELETE within own org)
+5. **`locations` RLS** — added org-admin write policy (within own org's groups)
+6. **CHECK constraints** — `weekly_assignments_source_check` updated to allow `'org'`; combo check updated for `source='org'` requiring `org_id IS NOT NULL`
+7. **`assembleWeek()`** — resolves `organization_id` from location's practice_group, queries by `org_id` with no fallback
+8. **`GlobalAssignmentBuilder`** — saves with `org_id` from `useUserRole()` and `source: 'org'`
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| Migration SQL | `get_user_org_id()`, CHECK constraints, RLS policies, backfill |
+| `src/lib/locationState.ts` | `assembleWeek()` queries by `org_id`, no fallback |
+| `src/components/admin/GlobalAssignmentBuilder.tsx` | Uses `useUserRole().organizationId`, saves with `source: 'org'` |

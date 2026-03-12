@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter, ShieldAlert } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -67,6 +67,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [filterLowSelf, setFilterLowSelf] = useState(false);
   const [filterLowCoach, setFilterLowCoach] = useState(false);
   const [filterGap, setFilterGap] = useState<'none' | 'gap1' | 'gap2'>('none');
+  const [activeDomains, setActiveDomains] = useState<Set<string>>(new Set());
   const sessionId = realSessionId ?? '';
 
   // Check ownership
@@ -621,26 +622,46 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         </CardHeader>
         <CardContent>
           {availableDomains.length > 0 ? (
-            <Tabs defaultValue={availableDomains[0]}>
-              <TabsList className="w-full h-auto flex-wrap gap-1 bg-transparent p-0 mb-3">
-                {availableDomains.map(domain => (
-                  <TabsTrigger
-                    key={domain}
-                    value={domain}
-                    className="text-xs data-[state=active]:shadow-sm rounded-full px-3 py-1.5 border transition-colors"
-                    style={{
-                      backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.15)`,
-                      borderColor: `hsl(${getDomainColorRaw(domain)} / 0.3)`,
-                    }}
-                  >
-                    {domain}
-                    <span className="ml-1 text-muted-foreground">({(groupedItems[domain] || []).length})</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+            <div className="space-y-3">
+              {/* Domain multi-select filter buttons */}
+              <div className="flex flex-wrap gap-2">
+                {availableDomains.map(domain => {
+                  const isActive = activeDomains.size === 0 || activeDomains.has(domain);
+                  const raw = getDomainColorRaw(domain);
+                  return (
+                    <button
+                      key={domain}
+                      onClick={() => {
+                        setActiveDomains(prev => {
+                          const next = new Set(prev);
+                          if (next.has(domain)) {
+                            next.delete(domain);
+                          } else {
+                            next.add(domain);
+                          }
+                          return next;
+                        });
+                      }}
+                      className="text-xs rounded-full px-3 py-1.5 border-2 font-semibold transition-all"
+                      style={isActive ? {
+                        backgroundColor: `hsl(${raw} / 0.85)`,
+                        borderColor: `hsl(${raw})`,
+                        color: 'white',
+                      } : {
+                        backgroundColor: `hsl(${raw} / 0.08)`,
+                        borderColor: `hsl(${raw} / 0.25)`,
+                        color: `hsl(${raw})`,
+                      }}
+                    >
+                      {domain}
+                      <span className="ml-1 opacity-70">({(groupedItems[domain] || []).length})</span>
+                    </button>
+                  );
+                })}
+              </div>
 
               {/* Filter Bar */}
-              <div className="flex flex-wrap items-center gap-1.5 mb-3">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Filter className="h-3.5 w-3.5 text-muted-foreground" />
                 <Badge
                   variant={filterLowSelf ? 'default' : 'outline'}
@@ -684,69 +705,74 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 )}
               </div>
 
-              {availableDomains.map(domain => (
-                <TabsContent key={domain} value={domain} className="mt-0">
-                  <div
-                    className="rounded-lg border p-3 space-y-1"
-                    style={{ backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.06)` }}
-                  >
-                    {(() => {
-                      const filtered = (groupedItems[domain] || []).filter(item => {
-                        const selfScore = item.self_score;
-                        const coachScore = coachRatingMap[item.action_id];
-                        if (filterLowSelf && (selfScore == null || selfScore === 0 || selfScore > 2)) return false;
-                        if (filterLowCoach && (coachScore == null || coachScore === 0 || coachScore > 2)) return false;
-                        if (filterGap !== 'none') {
-                          if (selfScore == null || selfScore === 0 || coachScore == null || coachScore === 0) return false;
-                          const gap = Math.abs(selfScore - coachScore);
-                          if (filterGap === 'gap1' && gap < 1) return false;
-                          if (filterGap === 'gap2' && gap < 2) return false;
-                        }
-                        return true;
-                      });
-                      if (filtered.length === 0) {
-                        return (
-                          <p className="text-sm text-muted-foreground text-center py-4">
-                            No items match the current filters.
-                          </p>
-                        );
-                      }
-                      return filtered.map(item => {
-                        const pm = item.pro_moves as any;
-                        const competency = pm?.competencies;
-                        const isSelected = selectedActions.includes(item.action_id);
-                        const coachScore = coachRatingMap[item.action_id];
-                        return (
-                          <label
-                            key={item.action_id}
-                            className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-primary/10 ring-1 ring-primary/30'
-                                : 'hover:bg-background/60'
-                            }`}
-                          >
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleAction(item.action_id)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
-                              {competency?.name && (
-                                <p className="text-xs text-muted-foreground italic mt-0.5">{competency.name}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <ScoreCircle score={item.self_score} label="Self" />
-                              {isBaselineReview && <ScoreCircle score={coachScore} label="You" />}
-                            </div>
-                          </label>
-                        );
-                      });
-                    })()}
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
+              {/* Domain-grouped items */}
+              {availableDomains
+                .filter(domain => activeDomains.size === 0 || activeDomains.has(domain))
+                .map(domain => {
+                  const filtered = (groupedItems[domain] || []).filter(item => {
+                    const selfScore = item.self_score;
+                    const coachScore = coachRatingMap[item.action_id];
+                    if (filterLowSelf && (selfScore == null || selfScore === 0 || selfScore > 2)) return false;
+                    if (filterLowCoach && (coachScore == null || coachScore === 0 || coachScore > 2)) return false;
+                    if (filterGap !== 'none') {
+                      if (selfScore == null || selfScore === 0 || coachScore == null || coachScore === 0) return false;
+                      const gap = Math.abs(selfScore - coachScore);
+                      if (filterGap === 'gap1' && gap < 1) return false;
+                      if (filterGap === 'gap2' && gap < 2) return false;
+                    }
+                    return true;
+                  });
+                  if (filtered.length === 0) return null;
+                  const raw = getDomainColorRaw(domain);
+                  return (
+                    <div key={domain}>
+                      <div
+                        className="rounded-t-lg px-3 py-1.5 flex items-center gap-2"
+                        style={{ backgroundColor: `hsl(${raw} / 0.12)` }}
+                      >
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `hsl(${raw})` }} />
+                        <span className="text-xs font-semibold" style={{ color: `hsl(${raw})` }}>{domain}</span>
+                      </div>
+                      <div
+                        className="rounded-b-lg border border-t-0 p-3 space-y-1"
+                        style={{ backgroundColor: `hsl(${raw} / 0.04)` }}
+                      >
+                        {filtered.map(item => {
+                          const pm = item.pro_moves as any;
+                          const competency = pm?.competencies;
+                          const isSelected = selectedActions.includes(item.action_id);
+                          const coachScore = coachRatingMap[item.action_id];
+                          return (
+                            <label
+                              key={item.action_id}
+                              className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'bg-primary/10 ring-1 ring-primary/30'
+                                  : 'hover:bg-background/60'
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleAction(item.action_id)}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
+                                {competency?.name && (
+                                  <p className="text-xs text-muted-foreground italic mt-0.5">{competency.name}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <ScoreCircle score={item.self_score} label="Self" />
+                                {isBaselineReview && <ScoreCircle score={coachScore} label="You" />}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">No baseline items found.</p>
           )}

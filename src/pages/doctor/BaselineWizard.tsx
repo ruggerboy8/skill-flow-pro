@@ -374,6 +374,7 @@ export default function BaselineWizard() {
       {currentStep === 'welcome' && (
         <BaselineWelcome 
           staffName={staff?.name || 'Doctor'}
+          releaserName={releaserDisplayName}
           onStart={handleStart}
           isLoading={createAssessmentMutation.isPending}
         />

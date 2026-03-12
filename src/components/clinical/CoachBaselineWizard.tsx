@@ -218,16 +218,24 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!staff?.id) throw new Error('No staff ID');
+      console.log('[CoachBaseline] Creating assessment for doctor:', doctorStaffId, 'coach:', staff.id);
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
         .insert({ doctor_staff_id: doctorStaffId, coach_staff_id: staff.id, status: 'in_progress' })
         .select('id')
         .single();
-      if (error) throw error;
+      if (error) {
+        console.error('[CoachBaseline] Create error:', error);
+        throw error;
+      }
+      console.log('[CoachBaseline] Created assessment:', data.id);
       return data.id;
     },
     onSuccess: (id) => setAssessmentId(id),
-    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: (e: Error) => {
+      console.error('[CoachBaseline] Create mutation failed:', e);
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    },
   });
 
   // Save rating

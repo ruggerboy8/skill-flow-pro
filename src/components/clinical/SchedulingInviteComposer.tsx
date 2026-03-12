@@ -145,7 +145,8 @@ export function SchedulingInviteComposer({
 
   function getPreview(template: string) {
     const coachName = myStaff?.name || 'Coach';
-    const firstName = doctorName.split(' ')[0];
+    const nameParts = doctorName.replace(/^dr\.?\s*/i, '').trim().split(' ');
+    const firstName = nameParts[0] || doctorName;
     return template
       .replace(/\{\{coach_name\}\}/g, coachName)
       .replace(/\{\{first_name\}\}/g, firstName)

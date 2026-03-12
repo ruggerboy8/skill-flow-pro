@@ -208,13 +208,13 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
       const newAssignments = slots.map((slot, index) => ({
         role_id: selectedRole,
         week_start_date: weekStartDate,
-        source: 'global',
+        source: 'org' as const,
         status: 'locked',
         action_id: slot.action_id || null,
         competency_id: slot.competency_id || null,
         self_select: slot.self_select,
         display_order: index + 1,
-        org_id: null,
+        org_id: organizationId,
         location_id: null
       }));
 

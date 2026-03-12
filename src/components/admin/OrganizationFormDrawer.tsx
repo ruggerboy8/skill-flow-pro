@@ -17,9 +17,10 @@ interface OrganizationFormDrawerProps {
   onClose: () => void;
   onSuccess: () => void;
   organization: Organization | null;
+  organizationId?: string;
 }
 
-export function OrganizationFormDrawer({ open, onClose, onSuccess, organization }: OrganizationFormDrawerProps) {
+export function OrganizationFormDrawer({ open, onClose, onSuccess, organization, organizationId }: OrganizationFormDrawerProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -59,12 +60,11 @@ export function OrganizationFormDrawer({ open, onClose, onSuccess, organization 
           .update({ name: formData.name.trim(), slug, active: true })
           .eq("id", organization.id));
       } else {
-        const { data: orgs } = await supabase.from("organizations").select("id").limit(1).single();
-        if (!orgs) throw new Error("No parent organization found");
+        if (!organizationId) throw new Error("No parent organization found");
 
         ({ error } = await supabase
           .from("practice_groups")
-          .insert([{ name: formData.name.trim(), slug, active: true, organization_id: orgs.id }]));
+          .insert([{ name: formData.name.trim(), slug, active: true, organization_id: organizationId }]));
       }
 
       if (error) throw error;

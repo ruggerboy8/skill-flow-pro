@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { OrganizationFormDrawer } from "./OrganizationFormDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface Organization {
   id: string;
@@ -23,6 +24,7 @@ interface Organization {
 
 export function AdminOrganizationsTab() {
   const { toast } = useToast();
+  const { organizationId } = useUserRole();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -30,11 +32,13 @@ export function AdminOrganizationsTab() {
   const [deleteTarget, setDeleteTarget] = useState<Organization | null>(null);
 
   const loadOrganizations = async () => {
+    if (!organizationId) return;
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from("practice_groups")
         .select("*")
+        .eq("organization_id", organizationId)
         .order("name");
 
       if (error) throw error;
@@ -56,7 +60,7 @@ export function AdminOrganizationsTab() {
 
   useEffect(() => {
     loadOrganizations();
-  }, []);
+  }, [organizationId]);
 
   const handleNewOrganization = () => {
     setSelectedOrganization(null);
@@ -280,6 +284,7 @@ export function AdminOrganizationsTab() {
         }}
         onSuccess={handleFormSuccess}
         organization={selectedOrganization}
+        organizationId={organizationId ?? undefined}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

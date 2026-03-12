@@ -11,9 +11,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+
+const TIMEZONE_OPTIONS = [
+  { value: 'America/New_York', label: 'Eastern (ET)' },
+  { value: 'America/Chicago', label: 'Central (CT)' },
+  { value: 'America/Denver', label: 'Mountain (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii (HT)' },
+  { value: 'Europe/London', label: 'London (GMT/BST)' },
+  { value: 'Europe/Paris', label: 'Central Europe (CET)' },
+];
 
 interface OrgBootstrapDrawerProps {
   open: boolean;
@@ -35,6 +47,7 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
   const [practiceType, setPracticeType] = useState<'pediatric_us' | 'general_us' | 'general_uk'>('general_us');
+  const [timezone, setTimezone] = useState('America/Chicago');
 
   // First admin fields
   const [adminName, setAdminName] = useState('');
@@ -50,6 +63,7 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
     setSlug('');
     setSlugEdited(false);
     setPracticeType('general_us');
+    setTimezone('America/Chicago');
     setAdminName('');
     setAdminEmail('');
     setShowAdminSection(false);
@@ -105,7 +119,7 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
           slug: locationSlug,
           group_id: group.id,
           active: true,
-          timezone: 'America/Chicago',
+          timezone,
           program_start_date: startDate,
           cycle_length_weeks: 13,
         })
@@ -113,43 +127,47 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
         .single();
       if (locErr) throw locErr;
 
-      // 4. Optionally invite the first org admin
-      let inviteSent = false;
-      const wantsInvite = showAdminSection && adminEmail.trim() && adminName.trim();
-      if (wantsInvite) {
-        const { data: invData, error: invErr } = await supabase.functions.invoke('admin-users', {
-          body: {
-            action: 'invite_user',
-            email: adminEmail.trim(),
-            name: adminName.trim(),
-            location_id: location.id,
-            is_participant: false,
-            capabilities: {
-              is_org_admin: true,
-              can_manage_users: true,
-              can_manage_locations: true,
-              can_invite_users: true,
-            },
-          },
-        });
-        if (invErr) {
-          console.error('Invite error (FunctionsError):', invErr);
-          throw invErr;
-        }
-        // supabase.functions.invoke may return a non-2xx body in `data`
-        if (invData?.error) {
-          console.error('Invite error (response body):', invData.error);
-          throw new Error(invData.error);
-        }
-        inviteSent = true;
-      }
-
+      // Org, group, and location are all created — show success regardless of invite outcome
       toast({
         title: 'Organization created',
-        description: inviteSent
-          ? `${orgName.trim()} is ready. Invite sent to ${adminEmail.trim()}.`
-          : `${orgName.trim()} has been bootstrapped. Add staff when ready.`,
+        description: `${orgName.trim()} has been bootstrapped with an initial group and location.`,
       });
+
+      // 4. Optionally invite the first org admin (handled separately — org creation already succeeded)
+      const wantsInvite = showAdminSection && adminEmail.trim() && adminName.trim();
+      if (wantsInvite) {
+        try {
+          const { data: invData, error: invErr } = await supabase.functions.invoke('admin-users', {
+            body: {
+              action: 'invite_user',
+              email: adminEmail.trim(),
+              name: adminName.trim(),
+              location_id: location.id,
+              is_participant: false,
+              capabilities: {
+                is_org_admin: true,
+                can_manage_users: true,
+                can_manage_locations: true,
+                can_invite_users: true,
+              },
+            },
+          });
+          if (invErr) throw invErr;
+          if (invData?.error) throw new Error(invData.error);
+
+          toast({
+            title: 'Invite sent',
+            description: `${adminEmail.trim()} will receive a link to set their password.`,
+          });
+        } catch (inviteErr: any) {
+          console.error('Invite error:', inviteErr);
+          toast({
+            title: 'Invite failed',
+            description: `The organization was created, but the invite to ${adminEmail.trim()} failed: ${inviteErr.message || 'Unknown error'}. You can resend it from the Users tab.`,
+            variant: 'destructive',
+          });
+        }
+      }
 
       handleReset();
       onSuccess();
@@ -230,6 +248,25 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
                   </Label>
                 </div>
               </RadioGroup>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="org-timezone">Timezone *</Label>
+              <Select value={timezone} onValueChange={setTimezone}>
+                <SelectTrigger id="org-timezone">
+                  <SelectValue placeholder="Select timezone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <SelectItem key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Used for submission deadlines. Can be adjusted per location later.
+              </p>
             </div>
           </div>
 

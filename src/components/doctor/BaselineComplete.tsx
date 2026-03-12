@@ -29,8 +29,9 @@ const REFLECTION_PROMPTS = [
   "What stood out?",
 ];
 
-export function BaselineComplete({ onFinish, assessmentId, existingReflection }: BaselineCompleteProps) {
+export function BaselineComplete({ onFinish, assessmentId, releaserName, existingReflection }: BaselineCompleteProps) {
   const { toast } = useToast();
+  const signOff = releaserName || 'Your Clinical Director';
   const [phase, setPhase] = useState<'reflection' | 'done'>(
     existingReflection?.submittedAt ? 'done' : 'reflection'
   );

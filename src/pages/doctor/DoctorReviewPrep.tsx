@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { drName } from '@/lib/doctorDisplayName';
@@ -62,6 +62,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
 
 export default function DoctorReviewPrep() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
   const { data: staff } = useStaffProfile();
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
@@ -323,7 +324,7 @@ export default function DoctorReviewPrep() {
             <Badge className="bg-purple-100 text-purple-800 mt-1">Awaiting Your Confirmation</Badge>
           </div>
         </div>
-        <MeetingConfirmationCard sessionId={sessionId!} />
+        <MeetingConfirmationCard sessionId={sessionId!} onConfirmed={() => navigate('/doctor')} />
       </div>
     );
   }

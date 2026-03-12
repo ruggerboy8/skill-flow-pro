@@ -3045,6 +3045,10 @@ export type Database = {
         Args: { p_org_id: string; p_role_id?: number }
         Returns: Json
       }
+      coach_baseline_exists_for_doctor: {
+        Args: { _doctor_staff_id: string }
+        Returns: boolean
+      }
       compare_conf_perf_to_eval: {
         Args: {
           p_end?: string

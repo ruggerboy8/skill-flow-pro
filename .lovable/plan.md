@@ -1,84 +1,43 @@
 
 
-## Audit: Coach/Doctor Data Flow — Findings and Fix Plan
+## Comprehensive FK Join Hint Audit
 
-### Critical Issue: Infinite Recursion on `coach_baseline_assessments` INSERT
+### Problem Found
 
-**Root Cause:** The RLS INSERT policy "Coach can insert first assessment" contains a self-referencing subquery:
+The database has **two** FK constraints from `locations` to `practice_groups`:
+1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
+2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
 
-```sql
-WITH CHECK (
-  is_clinical_or_admin(auth.uid()) 
-  AND NOT EXISTS (
-    SELECT 1 FROM coach_baseline_assessments existing   -- ← self-reference
-    WHERE existing.doctor_staff_id = coach_baseline_assessments.doctor_staff_id
-  )
-)
+Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
+
+### Issues to Fix
+
+**1. Wrong FK hint name (will fail at runtime)**
+These files reference `locations_group_id_fkey` which does not exist as a constraint:
+
+| File | Line |
+|------|------|
+| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
+| `src/pages/coach/RemindersTab.tsx` | 148 |
+
+Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
+
+**2. Corrupted select syntax (double alias, double parentheses)**
+`src/components/admin/AdminLocationsTab.tsx` line 50 has:
+```
+practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
+```
+This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
+```
+practice_group:practice_groups!locations_org_fkey(name)
 ```
 
-Postgres evaluates SELECT policies on `coach_baseline_assessments` to execute the `EXISTS` subquery, which themselves trigger further policy evaluations — causing infinite recursion.
-
-**Fix:** Create a `SECURITY DEFINER` function that bypasses RLS to check for an existing assessment, then replace the INSERT policy to use it:
-
-```sql
-CREATE OR REPLACE FUNCTION public.coach_baseline_exists_for_doctor(_doctor_staff_id uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM coach_baseline_assessments
-    WHERE doctor_staff_id = _doctor_staff_id
-  );
-$$;
-```
-
-Then replace the INSERT policy:
-
-```sql
-DROP POLICY "Coach can insert first assessment" ON coach_baseline_assessments;
-CREATE POLICY "Coach can insert first assessment" ON coach_baseline_assessments
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    is_clinical_or_admin(auth.uid())
-    AND NOT coach_baseline_exists_for_doctor(doctor_staff_id)
-  );
-```
-
-### Full Audit of All Write Operations in the Coach/Doctor Flow
-
-I reviewed every table involved in the coaching lifecycle. Here are the results:
-
-| Table | Operation | Policy Pattern | Status |
-|-------|-----------|---------------|--------|
-| `coach_baseline_assessments` | INSERT | Self-referencing subquery | **BROKEN — fix above** |
-| `coach_baseline_assessments` | UPDATE | Joins to `staff` via `coach_staff_id` | OK |
-| `coach_baseline_items` | INSERT/UPDATE | Joins `coach_baseline_assessments → staff` | OK (cross-table, no loop) |
-| `coaching_sessions` | INSERT (ALL) | Joins to `staff` via `coach_staff_id` | OK |
-| `coaching_sessions` | UPDATE (doctor) | Joins to `staff` via `doctor_staff_id` | OK |
-| `coaching_session_selections` | INSERT (coach) | Via `coaching_sessions → staff` | OK |
-| `coaching_session_selections` | INSERT (doctor) | Via `coaching_sessions → staff` | OK |
-| `coaching_meeting_records` | ALL (coach) | Via `coaching_sessions → staff` | OK |
-| `coaching_meeting_records` | UPDATE (doctor) | Via `coaching_sessions → staff` | OK |
-| `doctor_baseline_assessments` | INSERT | Via `staff` (doctor) | OK |
-| `doctor_baseline_assessments` | UPDATE | Via `staff` (doctor) | OK |
-| `doctor_baseline_items` | INSERT/UPDATE | Via `doctor_baseline_assessments → staff` | OK (cross-table) |
-
-### Edge Cases Reviewed
-
-1. **Duplicate coach assessments:** The UNIQUE constraint on `(doctor_staff_id, coach_staff_id)` prevents duplicates at the DB level. The `CoachBaselineWizard` also fetches existing before creating. Both safe.
-
-2. **Duplicate coaching sessions:** The UNIQUE constraint `(doctor_staff_id, sequence_number)` prevents duplicates. The `addCheckinMutation` catches `23505` errors. The `DirectorPrepComposer` checks for existing `scheduled` sessions before creating. Both safe.
-
-3. **Race condition on auto-create in `CoachBaselineWizard`:** The `useEffect` at line 407 that auto-creates the assessment when `existingAssessment === null` could fire before the query finishes (since `null` is the initial state). However, the query uses `maybeSingle()` which returns `null` for no rows, and `useQuery` returns `undefined` before loading. The `enabled: !!staff?.id` guard and the fact that `existingAssessment` starts as `undefined` (not `null`) prevents premature creation. Safe.
-
-4. **Duplicate `coach_baseline_items`:** Uses `onConflict: 'assessment_id,action_id'` for upserts. There are actually two identical UNIQUE constraints (`coach_baseline_items_assessment_action_unique` and `coach_baseline_items_assessment_id_action_id_key`) — redundant but harmless.
-
-5. **`doctor_baseline_items` score range:** CHECK constraint `self_score >= 1 AND self_score <= 4` conflicts with the N/A option if it sends `null` or `0`. The code sends `null` for N/A, which is allowed since `self_score` is nullable. Safe.
-
-6. **`coach_baseline_items` rating range:** CHECK constraint `rating >= 0 AND rating <= 4` — allows 0 which could be used for N/A. Code sends `null` for unrated, which bypasses the check. Safe.
+**3. No issues (already correct)**
+- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
+- All `scope_organization_id` references — intentional audit table column ✓
+- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
 
 ### Summary
 
-Only one fix is needed: replace the self-referencing INSERT policy on `coach_baseline_assessments` with a `SECURITY DEFINER` function. All other write paths are correctly structured.
+3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
 

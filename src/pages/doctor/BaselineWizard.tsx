@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { drName } from '@/lib/doctorDisplayName';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { BaselineWelcome } from '@/components/doctor/BaselineWelcome';
@@ -35,6 +36,23 @@ export default function BaselineWizard() {
   const [ratings, setRatings] = useState<Record<number, { score: number | null; note: string }>>({});
   const [showTutorial, setShowTutorial] = useState(false);
   const [forceOpenProMoveId, setForceOpenProMoveId] = useState<number | null>(null);
+
+  // Fetch name of the person who released this baseline
+  const { data: releaserName } = useQuery({
+    queryKey: ['baseline-releaser', staff?.id],
+    queryFn: async () => {
+      if (!staff?.baseline_released_by) return null;
+      const { data } = await supabase
+        .from('staff')
+        .select('name')
+        .eq('id', staff.baseline_released_by)
+        .maybeSingle();
+      return data?.name || null;
+    },
+    enabled: !!staff?.baseline_released_by,
+  });
+
+  const releaserDisplayName = releaserName ? drName(releaserName) : 'Your Clinical Director';
 
   // Fetch existing assessment
   const { data: existingAssessment } = useQuery({
@@ -356,6 +374,7 @@ export default function BaselineWizard() {
       {currentStep === 'welcome' && (
         <BaselineWelcome 
           staffName={staff?.name || 'Doctor'}
+          releaserName={releaserDisplayName}
           onStart={handleStart}
           isLoading={createAssessmentMutation.isPending}
         />
@@ -396,7 +415,7 @@ export default function BaselineWizard() {
       )}
 
       {currentStep === 'complete' && (
-        <BaselineComplete onFinish={handleFinish} assessmentId={assessmentId} />
+        <BaselineComplete onFinish={handleFinish} assessmentId={assessmentId} releaserName={releaserDisplayName} />
       )}
 
       {/* Tutorial overlay */}

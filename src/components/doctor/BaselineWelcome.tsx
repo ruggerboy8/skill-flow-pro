@@ -4,11 +4,14 @@ import { Loader2 } from 'lucide-react';
 
 interface BaselineWelcomeProps {
   staffName: string;
+  releaserName?: string;
   onStart: () => void;
   isLoading?: boolean;
 }
 
-export function BaselineWelcome({ staffName, onStart, isLoading }: BaselineWelcomeProps) {
+export function BaselineWelcome({ staffName, releaserName, onStart, isLoading }: BaselineWelcomeProps) {
+  const signOff = releaserName || 'Your Clinical Director';
+
   return (
     <Card className="max-w-2xl mx-auto">
       <CardHeader className="text-center">
@@ -24,7 +27,7 @@ export function BaselineWelcome({ staffName, onStart, isLoading }: BaselineWelco
           <p>
             Be honest about where you are today. That's what makes this useful.
           </p>
-          <p className="text-right font-medium text-foreground">— Dr. Alex</p>
+          <p className="text-right font-medium text-foreground">— {signOff}</p>
         </div>
 
         <Button 

@@ -439,26 +439,26 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     );
   }
 
-  if (isComplete) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Button variant="ghost" onClick={onBack} className="gap-2">
-          <ArrowLeft className="h-4 w-4" /> Back to Doctor Detail
-        </Button>
-        <Card>
-          <CardContent className="pt-6 text-center space-y-4">
-            <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
-            <h2 className="text-xl font-semibold">Assessment Complete</h2>
-            <p className="text-muted-foreground">
-              Your private baseline assessment for {doctorName} has been saved.
-              You can view the comparison on the doctor's detail page.
-            </p>
-            <Button onClick={onBack}>Return to Doctor Detail</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Dirty detection: compare current ratings to initial snapshot
+  const isDirty = isComplete && initialSnapshot !== null && JSON.stringify(ratings) !== initialSnapshot;
+
+  // Re-save handler for completed assessments with changes
+  const handleResave = useCallback(() => {
+    // Update the assessment's updated_at
+    if (assessmentId) {
+      supabase
+        .from('coach_baseline_assessments')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', assessmentId)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment'] });
+          queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
+          setInitialSnapshot(JSON.stringify(ratings));
+          toast({ title: 'Changes saved', description: 'Your updated assessment has been saved.' });
+        });
+    }
+    setShowSaveConfirm(false);
+  }, [assessmentId, ratings, queryClient, toast]);
 
   const totalProMoves = domains.reduce((sum, d) => sum + d.proMoves.length, 0);
   const ratedCount = Object.values(ratings).filter(r => r.score !== null).length;

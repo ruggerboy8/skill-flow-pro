@@ -1,0 +1,3 @@
+ALTER TABLE coaching_session_selections
+ADD CONSTRAINT coaching_session_selections_action_id_fkey
+FOREIGN KEY (action_id) REFERENCES pro_moves(action_id);

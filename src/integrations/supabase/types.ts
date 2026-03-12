@@ -434,6 +434,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "coaching_session_selections_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
             foreignKeyName: "coaching_session_selections_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false

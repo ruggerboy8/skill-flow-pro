@@ -730,17 +730,31 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
             </Card>
           )}
 
-          {/* Complete Assessment */}
+          {/* Complete / Save Changes */}
           {!isProcessing && (
-            <div className="flex justify-end">
-              <Button
-                onClick={() => completeMutation.mutate()}
-                disabled={!allRated || completeMutation.isPending}
-                size="lg"
-                className="shadow-lg"
-              >
-                {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
-              </Button>
+            <div className="flex items-center justify-end gap-3">
+              {isComplete && isDirty && (
+                <p className="text-sm text-muted-foreground">You have unsaved changes</p>
+              )}
+              {isComplete ? (
+                <Button
+                  onClick={() => isDirty ? setShowSaveConfirm(true) : onBack()}
+                  size="lg"
+                  variant={isDirty ? 'default' : 'outline'}
+                  className="shadow-lg"
+                >
+                  {isDirty ? 'Save Changes' : 'Back to Detail'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => completeMutation.mutate()}
+                  disabled={!allRated || completeMutation.isPending}
+                  size="lg"
+                  className="shadow-lg"
+                >
+                  {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
+                </Button>
+              )}
             </div>
           )}
         </div>

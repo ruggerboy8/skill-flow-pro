@@ -579,6 +579,8 @@ export default function DoctorReviewPrep() {
                 </TabsContent>
               ))}
             </Tabs>
+          ) : lowSelfFilter ? (
+            <p className="text-sm text-muted-foreground">No Pro Moves with a self score of 1–2. Try removing the filter.</p>
           ) : (
             <p className="text-sm text-muted-foreground">No baseline items found.</p>
           )}

@@ -67,6 +67,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [filterLowSelf, setFilterLowSelf] = useState(false);
   const [filterLowCoach, setFilterLowCoach] = useState(false);
   const [filterGap, setFilterGap] = useState<'none' | 'gap1' | 'gap2'>('none');
+  const [activeDomains, setActiveDomains] = useState<Set<string>>(new Set());
   const sessionId = realSessionId ?? '';
 
   // Check ownership

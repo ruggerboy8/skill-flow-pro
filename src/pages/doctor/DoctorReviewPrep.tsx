@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, Calendar, X, CheckCircle2, Circle, Clock, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Send, Calendar, X, CheckCircle2, Circle, Clock, ExternalLink, Filter } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import DOMPurify from 'dompurify';
 import { format } from 'date-fns';
@@ -68,6 +68,7 @@ export default function DoctorReviewPrep() {
   const [doctorNote, setDoctorNote] = useState('');
   const [progressEntries, setProgressEntries] = useState<ProgressEntry[]>([]);
   const [hasScheduled, setHasScheduled] = useState(false);
+  const [lowSelfFilter, setLowSelfFilter] = useState(false);
 
   // Fetch session
   const { data: session, isLoading: sessionLoading } = useQuery({
@@ -350,8 +351,12 @@ export default function DoctorReviewPrep() {
     );
   }
 
-  // Group baseline items by domain
-  const groupedItems = (baselineItems || []).reduce((acc, item) => {
+  // Group baseline items by domain, applying optional low-self filter
+  const filteredBaselineItems = lowSelfFilter
+    ? (baselineItems || []).filter(item => item.self_score != null && item.self_score > 0 && item.self_score <= 2)
+    : (baselineItems || []);
+
+  const groupedItems = filteredBaselineItems.reduce((acc, item) => {
     const pm = item.pro_moves as any;
     const domainName = pm?.competencies?.domains?.domain_name || 'Other';
     if (!acc[domainName]) acc[domainName] = [];
@@ -490,8 +495,20 @@ export default function DoctorReviewPrep() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex items-center gap-2 mb-3">
+            <Button
+              variant={lowSelfFilter ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setLowSelfFilter(prev => !prev)}
+            >
+              <Filter className="h-3 w-3" />
+              Low Self (1–2)
+            </Button>
+          </div>
           {availableDomains.length > 0 ? (
-            <Tabs defaultValue={availableDomains[0]}>
+            <Tabs defaultValue={availableDomains[0]} key={availableDomains.join(',')}>
+
               <TabsList className="w-full h-auto flex-wrap gap-1 bg-transparent p-0 mb-3">
                 {availableDomains.map(domain => (
                   <TabsTrigger
@@ -562,6 +579,8 @@ export default function DoctorReviewPrep() {
                 </TabsContent>
               ))}
             </Tabs>
+          ) : lowSelfFilter ? (
+            <p className="text-sm text-muted-foreground">No Pro Moves with a self score of 1–2. Try removing the filter.</p>
           ) : (
             <p className="text-sm text-muted-foreground">No baseline items found.</p>
           )}

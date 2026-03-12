@@ -202,6 +202,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       });
       setRatings(loaded);
       setOpenNotes(notesOpen);
+      // Snapshot for dirty detection (only set once)
+      if (initialSnapshot === null) {
+        setInitialSnapshot(JSON.stringify(loaded));
+      }
     }
   }, [existingItems]);
 

@@ -237,6 +237,39 @@ serve(async (req: Request) => {
           return json({ error: "role_id is required for participants" }, 400);
         }
 
+        // Org ownership check: non-super-admin callers can only invite to locations
+        // within their own organization. Super admins can invite to any org.
+        if (!me.is_super_admin) {
+          const { data: callerOrgId } = await caller.rpc('current_user_org_id');
+
+          // Resolve the target location's org via practice_groups
+          const { data: targetLoc } = await admin
+            .from('locations')
+            .select('group_id')
+            .eq('id', location_id)
+            .single();
+
+          let targetOrgId: string | null = null;
+          if (targetLoc?.group_id) {
+            const { data: targetGroup } = await admin
+              .from('practice_groups')
+              .select('organization_id')
+              .eq('id', targetLoc.group_id)
+              .single();
+            targetOrgId = targetGroup?.organization_id ?? null;
+          }
+
+          if (!callerOrgId || !targetOrgId || callerOrgId !== targetOrgId) {
+            console.error(
+              `invite_user: org ownership check failed — caller org=${callerOrgId}, target location org=${targetOrgId}, location_id=${location_id}`,
+            );
+            return json(
+              { error: 'Forbidden: the specified location does not belong to your organization' },
+              403,
+            );
+          }
+        }
+
         // 1) Send invite first to get the user_id (uses the Invite User email template)
         const redirectTo = `${SITE_URL}/auth/callback`;
         const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {

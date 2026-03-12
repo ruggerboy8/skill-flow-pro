@@ -428,7 +428,15 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
 
   // Auto-create assessment if none exists
   useEffect(() => {
+    console.log('[CoachBaseline] Auto-create check:', {
+      staffId: staff?.id,
+      existingAssessment,
+      assessmentId,
+      createPending: createMutation.isPending,
+      assessmentError: assessmentError?.message,
+    });
     if (staff?.id && existingAssessment === null && !assessmentId && !createMutation.isPending) {
+      console.log('[CoachBaseline] Auto-creating assessment...');
       createMutation.mutate();
     }
   }, [staff?.id, existingAssessment, assessmentId]);

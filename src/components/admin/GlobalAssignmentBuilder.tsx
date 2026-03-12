@@ -84,10 +84,8 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
         .select('id, action_id, competency_id, self_select, display_order')
         .eq('role_id', selectedRole)
         .eq('week_start_date', weekStartDate)
-        .eq('source', 'global')
         .eq('status', 'locked')
-        .is('org_id', null)
-        .is('location_id', null)
+        .eq('org_id', organizationId)
         .is('superseded_at', null)
         .order('display_order');
 

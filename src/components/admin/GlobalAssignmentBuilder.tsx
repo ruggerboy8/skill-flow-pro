@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
+import { useUserRole } from '@/hooks/useUserRole';
 import { SlotCanvas } from './SlotCanvas';
 
 interface Role {
@@ -30,6 +31,7 @@ interface GlobalAssignmentBuilderProps {
 export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderProps) {
   const { toast } = useToast();
   const { resolve: resolveRole } = useRoleDisplayNames();
+  const { organizationId } = useUserRole();
   
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<number | null>(roleFilter || null);
@@ -82,10 +84,8 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
         .select('id, action_id, competency_id, self_select, display_order')
         .eq('role_id', selectedRole)
         .eq('week_start_date', weekStartDate)
-        .eq('source', 'global')
         .eq('status', 'locked')
-        .is('org_id', null)
-        .is('location_id', null)
+        .eq('org_id', organizationId)
         .is('superseded_at', null)
         .order('display_order');
 
@@ -199,9 +199,7 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
         .update({ superseded_at: new Date().toISOString() })
         .eq('role_id', selectedRole)
         .eq('week_start_date', weekStartDate)
-        .eq('source', 'global')
-        .is('org_id', null)
-        .is('location_id', null)
+        .eq('org_id', organizationId)
         .is('superseded_at', null);
 
       if (supersededError) throw supersededError;
@@ -210,13 +208,13 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
       const newAssignments = slots.map((slot, index) => ({
         role_id: selectedRole,
         week_start_date: weekStartDate,
-        source: 'global',
+        source: 'org' as const,
         status: 'locked',
         action_id: slot.action_id || null,
         competency_id: slot.competency_id || null,
         self_select: slot.self_select,
         display_order: index + 1,
-        org_id: null,
+        org_id: organizationId,
         location_id: null
       }));
 

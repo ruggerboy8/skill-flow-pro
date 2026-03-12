@@ -12,6 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw, FileText, Sparkles } from 'lucide-react';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const SCORE_CONFIG = [
   { value: 1, selected: 'bg-orange-100 border-orange-400 text-orange-800' },

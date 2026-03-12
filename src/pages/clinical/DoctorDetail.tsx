@@ -169,19 +169,7 @@ export default function DoctorDetail() {
         />
       </div>
 
-      {/* Growth Timeline — collapsible */}
-      <Collapsible open={timelineOpen} onOpenChange={setTimelineOpen}>
-        <CollapsibleTrigger asChild>
-          <button className="flex items-center gap-3 w-full py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
-            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", timelineOpen && "rotate-180")} />
-            <TrendingUp className="h-5 w-5 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">Growth Timeline</h2>
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-2">
-          <DoctorGrowthTimeline doctorStaffId={staffId!} />
-        </CollapsibleContent>
-      </Collapsible>
+      {/* Growth Timeline — hidden for now (too similar to coaching thread) */}
 
       {/* Baseline — collapsible section */}
       <Collapsible open={baselineOpen} onOpenChange={setBaselineOpen}>

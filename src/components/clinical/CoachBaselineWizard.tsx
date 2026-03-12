@@ -453,20 +453,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     return 'Tap a Pro Move…';
   };
 
-  if (domainsLoading || !domains) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
-
-  // Dirty detection: compare current ratings to initial snapshot
-  const isDirty = isComplete && initialSnapshot !== null && JSON.stringify(ratings) !== initialSnapshot;
-
-  // Re-save handler for completed assessments with changes
+  // Re-save handler for completed assessments with changes (must be before early return)
   const handleResave = useCallback(() => {
-    // Update the assessment's updated_at
     if (assessmentId) {
       supabase
         .from('coach_baseline_assessments')
@@ -481,6 +469,17 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     }
     setShowSaveConfirm(false);
   }, [assessmentId, ratings, queryClient, toast]);
+
+  if (domainsLoading || !domains) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  // Dirty detection: compare current ratings to initial snapshot
+  const isDirty = isComplete && initialSnapshot !== null && JSON.stringify(ratings) !== initialSnapshot;
 
   const totalProMoves = domains.reduce((sum, d) => sum + d.proMoves.length, 0);
   const ratedCount = Object.values(ratings).filter(r => r.score !== null).length;

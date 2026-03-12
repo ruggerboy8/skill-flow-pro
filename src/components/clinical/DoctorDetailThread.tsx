@@ -439,6 +439,17 @@ function SessionCard({
                   </Button>
                 </>
               )}
+              {showResendInvite && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={(e) => { e.stopPropagation(); onInvite(); }}
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Resend Invite
+                </Button>
+              )}
               {showCapture && (
                 <Button
                   size="sm"

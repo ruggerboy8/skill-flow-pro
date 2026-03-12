@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserRole } from '@/hooks/useUserRole';
 import type { EvaluationPeriod } from '@/lib/evalPeriods';
 
 export type StaffDeliveryStatus = 'no_eval' | 'draft' | 'not_released' | 'released' | 'viewed' | 'reviewed' | 'focus_set';
@@ -51,24 +52,47 @@ function deriveStatus(eval_: {
 export function useEvalDeliveryProgress(
   period: EvaluationPeriod | null
 ): UseEvalDeliveryProgressResult {
+  const { isSuperAdmin, organizationId: callerOrgId, isLoading: roleLoading } = useUserRole();
+
   const query = useQuery({
-    queryKey: ['eval-delivery-progress', period?.type, period?.quarter, period?.year],
+    queryKey: ['eval-delivery-progress', period?.type, period?.quarter, period?.year, isSuperAdmin, callerOrgId],
     queryFn: async (): Promise<LocationProgress[]> => {
       if (!period) return [];
 
-      // 1. Get all active locations with org info
-      const { data: locations, error: locError } = await supabase
+      // 1. Scope to the caller's org groups (super admins see all)
+      let allowedGroupIds: string[] | null = null;
+      if (!isSuperAdmin && callerOrgId) {
+        const { data: groups, error: groupsError } = await supabase
+          .from('practice_groups')
+          .select('id')
+          .eq('organization_id', callerOrgId)
+          .eq('active', true);
+
+        if (groupsError) throw groupsError;
+        allowedGroupIds = (groups || []).map(g => g.id);
+
+        // Org has no active groups yet — return empty rather than all locations
+        if (allowedGroupIds.length === 0) return [];
+      }
+
+      // 2. Get active locations, optionally filtered by allowed groups
+      let locQuery = supabase
         .from('locations')
         .select('id, name, group_id, practice_group:practice_groups!locations_org_fkey(name)')
         .eq('active', true)
         .order('name');
 
+      if (allowedGroupIds !== null) {
+        locQuery = locQuery.in('group_id', allowedGroupIds);
+      }
+
+      const { data: locations, error: locError } = await locQuery;
       if (locError) throw locError;
       if (!locations || locations.length === 0) return [];
 
       const locationIds = locations.map(l => l.id);
 
-      // 2. Get all active participants with their names
+      // 3. Get all active participants with their names
       const { data: staffRows, error: staffError } = await supabase
         .from('staff')
         .select('id, name, primary_location_id, role_id, roles!staff_role_id_fkey(role_name)')
@@ -90,7 +114,7 @@ export function useEvalDeliveryProgress(
         }
       }
 
-      // 3. Query evaluations for this period
+      // 4. Query evaluations for this period
       let evalQuery = supabase
         .from('evaluations')
         .select('id, location_id, staff_id, status, is_visible_to_staff, viewed_at, acknowledged_at, focus_selected_at')
@@ -109,11 +133,10 @@ export function useEvalDeliveryProgress(
       // Index evals by staff_id within location
       const evalByStaff = new Map<string, typeof evaluations extends (infer T)[] | null ? T : never>();
       for (const e of evaluations || []) {
-        // Key by staff_id (one eval per staff per period)
         evalByStaff.set(e.staff_id, e);
       }
 
-      // 4. Build result
+      // 5. Build result
       const result: LocationProgress[] = locations.map(loc => {
         const staff = staffByLocation.get(loc.id) || [];
         const totalStaff = staff.length;
@@ -168,12 +191,14 @@ export function useEvalDeliveryProgress(
 
       return result;
     },
-    enabled: !!period
+    // Wait for role to resolve before querying — avoids a brief flash where org
+    // admins momentarily see all locations before isSuperAdmin settles to false.
+    enabled: !!period && !roleLoading,
   });
 
   return {
     locations: query.data || [],
     isLoading: query.isLoading,
-    refetch: query.refetch
+    refetch: query.refetch,
   };
 }

@@ -9,7 +9,8 @@ const corsHeaders = {
 /**
  * Sends email notifications to staff when their evaluation is released.
  * Expects: { eval_ids: string[] }
- * Looks up each eval's staff member email/name and sends a notification.
+ * Resolves the org name dynamically from each eval's location chain so that
+ * staff at different organizations receive correctly branded emails.
  */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -60,10 +61,18 @@ serve(async (req) => {
       });
     }
 
-    // Fetch evals with staff info
+    // Fetch evals with staff info AND org name resolved via location → practice_group → organization chain
     const { data: evals, error: evalErr } = await supabase
       .from('evaluations')
-      .select('id, quarter, program_year, type, staff_id, staff!evaluations_staff_id_fkey(name, email)')
+      .select(`
+        id, quarter, program_year, type,
+        staff!evaluations_staff_id_fkey(name, email),
+        locations!evaluations_location_id_fkey(
+          practice_groups!locations_org_fkey(
+            organizations!practice_groups_organization_id_fkey(name)
+          )
+        )
+      `)
       .in('id', eval_ids)
       .eq('is_visible_to_staff', true);
 
@@ -75,8 +84,16 @@ serve(async (req) => {
     }
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    const fromEmail = Deno.env.get('RESEND_FROM') || 'Pro-Moves <pro-moves@alcandentalcooperative.com>';
-    const replyTo = Deno.env.get('RESEND_REPLY_TO') || 'johno@alcandentalcooperative.com';
+
+    // From / reply-to come from env vars — set these to a platform-neutral address
+    // (e.g. "Skill Flow Pro <no-reply@skillflowpro.com>") in Supabase secrets.
+    // The org name in the email body is resolved dynamically, so the from address
+    // can safely remain platform-level while still feeling personalised.
+    const fromEmail = Deno.env.get('RESEND_FROM') || 'Skill Flow Pro <no-reply@skillflowpro.com>';
+    const replyTo = Deno.env.get('RESEND_REPLY_TO') || undefined;
+
+    // App URL — override in Supabase secrets once the platform has a permanent domain.
+    const appUrl = Deno.env.get('APP_URL') || 'https://skillflowpro.com';
 
     if (!resendApiKey) {
       console.error('RESEND_API_KEY not configured');
@@ -90,28 +107,42 @@ serve(async (req) => {
       const staff = ev.staff as any;
       if (!staff?.email) continue;
 
+      // Resolve org name: evaluations → locations → practice_groups → organizations
+      const orgName: string =
+        (ev as any).locations?.practice_groups?.organizations?.name || 'Your Practice';
+
       const firstName = (staff.name || '').split(' ')[0] || 'Team Member';
       const periodLabel = ev.type === 'Baseline'
         ? 'Baseline'
         : `${ev.quarter || ''} ${ev.program_year}`.trim();
 
       const subject = `Your ${periodLabel} evaluation is ready for review`;
-      const body = `Hi ${firstName},\n\nYour ${periodLabel} evaluation is ready! Log in to review your scores, highlights, and set your focus for the quarter ahead.\n\nhttps://alcanskills.lovable.app\n\n— The ALCAN Team`;
+      const body = [
+        `Hi ${firstName},`,
+        '',
+        `Your ${periodLabel} evaluation is ready! Log in to review your scores, highlights, and set your focus for the quarter ahead.`,
+        '',
+        appUrl,
+        '',
+        `— The ${orgName} Team`,
+      ].join('\n');
 
       try {
+        const emailPayload: Record<string, unknown> = {
+          from: fromEmail,
+          to: [staff.email],
+          subject,
+          text: body,
+        };
+        if (replyTo) emailPayload.reply_to = replyTo;
+
         const resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${resendApiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            from: fromEmail,
-            to: [staff.email],
-            reply_to: replyTo,
-            subject,
-            text: body,
-          }),
+          body: JSON.stringify(emailPayload),
         });
 
         if (!resendRes.ok) {
@@ -119,7 +150,7 @@ serve(async (req) => {
           console.error(`Failed to email ${staff.email}:`, err);
         } else {
           sent++;
-          console.log(`✓ Notified ${staff.email} for eval ${ev.id}`);
+          console.log(`✓ Notified ${staff.email} for eval ${ev.id} (org: ${orgName})`);
         }
       } catch (emailErr) {
         console.error(`Email error for ${staff.email}:`, emailErr);

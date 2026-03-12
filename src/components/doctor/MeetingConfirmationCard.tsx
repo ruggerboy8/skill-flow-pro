@@ -79,7 +79,7 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
       queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['meeting-record', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['my-coaching-sessions'] });
-      toast({ title: 'All set!', description: 'You've confirmed receipt of your meeting summary.' });
+      toast({ title: 'All set!', description: 'You have confirmed receipt of your meeting summary.' });
       onConfirmed?.();
     },
     onError: (err: any) => {

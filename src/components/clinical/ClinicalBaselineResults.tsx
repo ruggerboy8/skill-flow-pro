@@ -278,7 +278,7 @@ export function ClinicalBaselineResults({
         return cs !== undefined && coachScoreFilters.has(cs);
       });
     }
-    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim());
+    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim() || coachNotesMap.has(item.action_id));
     return result;
   };
 

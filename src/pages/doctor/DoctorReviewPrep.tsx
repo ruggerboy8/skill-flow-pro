@@ -62,6 +62,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
 
 export default function DoctorReviewPrep() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
   const { data: staff } = useStaffProfile();
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);

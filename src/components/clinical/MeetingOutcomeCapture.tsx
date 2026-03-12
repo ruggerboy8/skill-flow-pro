@@ -302,8 +302,8 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                   <div key={i} className="flex items-start gap-2.5 p-2 rounded-md bg-muted/30 border">
                     {statusIcon(p.status)}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{p.title}</p>
+                      <div className="flex items-start gap-2 flex-wrap">
+                        <p className="text-sm font-medium break-words">{p.title}</p>
                         <Badge variant="secondary" className="text-[10px]">{p.status}</Badge>
                       </div>
                       {p.note && <p className="text-xs text-muted-foreground mt-0.5">{p.note}</p>}

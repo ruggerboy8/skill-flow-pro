@@ -282,7 +282,7 @@ export function ClinicalBaselineResults({
     return result;
   };
 
-  const hasAnyNotes = items?.some(item => item.self_note?.trim()) ?? false;
+  const hasAnyNotes = (items?.some(item => item.self_note?.trim()) ?? false) || coachNotesMap.size > 0;
   const hasCoachData = coachRatingsMap.size > 0;
 
   // Not started state

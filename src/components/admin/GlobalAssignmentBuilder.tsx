@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
+import { useUserRole } from '@/hooks/useUserRole';
 import { SlotCanvas } from './SlotCanvas';
 
 interface Role {

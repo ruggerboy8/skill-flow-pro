@@ -18,6 +18,8 @@ interface BaselineItem {
   action_id: number;
   self_score: number;
   self_note: string | null;
+  coach_note: string | null;
+  coach_score: number | null;
   action_statement: string;
   competency_name: string;
   domain_name: string;

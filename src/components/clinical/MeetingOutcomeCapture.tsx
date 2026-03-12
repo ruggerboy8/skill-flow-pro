@@ -240,7 +240,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
             return (
               <div
                 key={`${sel.action_id}-${sel.selected_by}`}
-                className={`flex items-center gap-2 p-2 rounded-md ${isOverlap ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}
+                className={`flex items-start gap-2 p-2 rounded-md ${isOverlap ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}
               >
                 <DomainBadge domain={pm?.competencies?.domains?.domain_name} />
                 <span className="text-sm flex-1">{pm?.action_statement || `Action #${sel.action_id}`}</span>

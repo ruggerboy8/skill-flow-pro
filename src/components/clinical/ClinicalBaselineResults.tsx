@@ -278,11 +278,11 @@ export function ClinicalBaselineResults({
         return cs !== undefined && coachScoreFilters.has(cs);
       });
     }
-    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim());
+    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim() || coachNotesMap.has(item.action_id));
     return result;
   };
 
-  const hasAnyNotes = items?.some(item => item.self_note?.trim()) ?? false;
+  const hasAnyNotes = (items?.some(item => item.self_note?.trim()) ?? false) || coachNotesMap.size > 0;
   const hasCoachData = coachRatingsMap.size > 0;
 
   // Not started state

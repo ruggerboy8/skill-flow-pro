@@ -46,6 +46,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const [ratings, setRatings] = useState<Record<number, { score: number | null; note: string }>>({});
   const [isComplete, setIsComplete] = useState(false);
   const [activeActionId, setActiveActionId] = useState<number | null>(null);
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   // Track which pro-move note textareas are open
   const [openNotes, setOpenNotes] = useState<Set<number>>(new Set());

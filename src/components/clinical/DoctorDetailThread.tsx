@@ -148,6 +148,18 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
   return (
     <div className="space-y-3">
 
+      {/* Coach Baseline Assessment CTA — show when doctor baseline is done but coach hasn't completed theirs */}
+      {doctorBaselineComplete && coachAssessment?.status !== 'completed' && (
+        <Button
+          variant="outline"
+          className="w-full h-12 gap-2 border-dashed text-base font-medium"
+          onClick={onStartCoachWizard}
+        >
+          <ShieldCheck className="h-5 w-5" />
+          {!coachAssessment ? 'Start Coach Baseline Assessment' : 'Continue Coach Baseline Assessment'}
+        </Button>
+      )}
+
       {/* Always-visible Add Coaching Session button */}
       <Button
         variant="outline"

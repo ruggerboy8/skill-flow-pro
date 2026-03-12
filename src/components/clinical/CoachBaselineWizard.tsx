@@ -38,6 +38,7 @@ interface CoachBaselineWizardProps {
 }
 
 export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: CoachBaselineWizardProps) {
+  console.log('[CoachBaseline] Mount/render — doctorStaffId:', doctorStaffId, 'doctorName:', doctorName);
   const { data: staff } = useStaffProfile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -90,9 +91,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   }, [recState.isRecording, recState.recordingTime, activeActionId]);
 
   // Fetch or create assessment
-  const { data: existingAssessment } = useQuery({
+  const { data: existingAssessment, error: assessmentError } = useQuery({
     queryKey: ['coach-baseline-assessment', doctorStaffId, staff?.id],
     queryFn: async () => {
+      console.log('[CoachBaseline] Fetching assessment for doctor:', doctorStaffId, 'coach:', staff?.id);
       if (!staff?.id) return null;
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
@@ -100,7 +102,11 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         .eq('doctor_staff_id', doctorStaffId)
         .eq('coach_staff_id', staff.id)
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        console.error('[CoachBaseline] Assessment fetch error:', error);
+        throw error;
+      }
+      console.log('[CoachBaseline] Assessment result:', data?.id, data?.status);
       return data;
     },
     enabled: !!staff?.id,
@@ -213,16 +219,24 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!staff?.id) throw new Error('No staff ID');
+      console.log('[CoachBaseline] Creating assessment for doctor:', doctorStaffId, 'coach:', staff.id);
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
         .insert({ doctor_staff_id: doctorStaffId, coach_staff_id: staff.id, status: 'in_progress' })
         .select('id')
         .single();
-      if (error) throw error;
+      if (error) {
+        console.error('[CoachBaseline] Create error:', error);
+        throw error;
+      }
+      console.log('[CoachBaseline] Created assessment:', data.id);
       return data.id;
     },
     onSuccess: (id) => setAssessmentId(id),
-    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: (e: Error) => {
+      console.error('[CoachBaseline] Create mutation failed:', e);
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    },
   });
 
   // Save rating
@@ -415,7 +429,15 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
 
   // Auto-create assessment if none exists
   useEffect(() => {
+    console.log('[CoachBaseline] Auto-create check:', {
+      staffId: staff?.id,
+      existingAssessment,
+      assessmentId,
+      createPending: createMutation.isPending,
+      assessmentError: assessmentError?.message,
+    });
     if (staff?.id && existingAssessment === null && !assessmentId && !createMutation.isPending) {
+      console.log('[CoachBaseline] Auto-creating assessment...');
       createMutation.mutate();
     }
   }, [staff?.id, existingAssessment, assessmentId]);

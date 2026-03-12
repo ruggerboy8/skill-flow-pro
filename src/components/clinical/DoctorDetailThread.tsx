@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock, FileText, Mail, Plus, Trash2, ShieldAlert, UserCog } from 'lucide-react';
+import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock, FileText, Mail, Plus, Trash2, ShieldAlert, UserCog, ShieldCheck } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { MeetingOutcomeCapture } from '@/components/clinical/MeetingOutcomeCapture';
 import { CombinedPrepView } from '@/components/clinical/CombinedPrepView';
@@ -147,6 +147,18 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
 
   return (
     <div className="space-y-3">
+
+      {/* Coach Baseline Assessment CTA — show when doctor baseline is done but coach hasn't completed theirs */}
+      {doctorBaselineComplete && coachAssessment?.status !== 'completed' && (
+        <Button
+          variant="outline"
+          className="w-full h-12 gap-2 border-dashed text-base font-medium"
+          onClick={onStartCoachWizard}
+        >
+          <ShieldCheck className="h-5 w-5" />
+          {!coachAssessment ? 'Start Coach Baseline Assessment' : 'Continue Coach Baseline Assessment'}
+        </Button>
+      )}
 
       {/* Always-visible Add Coaching Session button */}
       <Button

@@ -88,6 +88,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           home_route,
            allow_backfill_until,
            baseline_released_at,
+           baseline_released_by,
            scheduling_link,
           locations (
             group_id,

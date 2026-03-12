@@ -12,6 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw, FileText, Sparkles } from 'lucide-react';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const SCORE_CONFIG = [
   { value: 1, selected: 'bg-orange-100 border-orange-400 text-orange-800' },
@@ -42,6 +46,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const [ratings, setRatings] = useState<Record<number, { score: number | null; note: string }>>({});
   const [isComplete, setIsComplete] = useState(false);
   const [activeActionId, setActiveActionId] = useState<number | null>(null);
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   // Track which pro-move note textareas are open
   const [openNotes, setOpenNotes] = useState<Set<number>>(new Set());
@@ -196,6 +202,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       });
       setRatings(loaded);
       setOpenNotes(notesOpen);
+      // Snapshot for dirty detection (only set once)
+      if (initialSnapshot === null) {
+        setInitialSnapshot(JSON.stringify(loaded));
+      }
     }
   }, [existingItems]);
 
@@ -429,26 +439,26 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     );
   }
 
-  if (isComplete) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Button variant="ghost" onClick={onBack} className="gap-2">
-          <ArrowLeft className="h-4 w-4" /> Back to Doctor Detail
-        </Button>
-        <Card>
-          <CardContent className="pt-6 text-center space-y-4">
-            <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
-            <h2 className="text-xl font-semibold">Assessment Complete</h2>
-            <p className="text-muted-foreground">
-              Your private baseline assessment for {doctorName} has been saved.
-              You can view the comparison on the doctor's detail page.
-            </p>
-            <Button onClick={onBack}>Return to Doctor Detail</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Dirty detection: compare current ratings to initial snapshot
+  const isDirty = isComplete && initialSnapshot !== null && JSON.stringify(ratings) !== initialSnapshot;
+
+  // Re-save handler for completed assessments with changes
+  const handleResave = useCallback(() => {
+    // Update the assessment's updated_at
+    if (assessmentId) {
+      supabase
+        .from('coach_baseline_assessments')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', assessmentId)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment'] });
+          queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
+          setInitialSnapshot(JSON.stringify(ratings));
+          toast({ title: 'Changes saved', description: 'Your updated assessment has been saved.' });
+        });
+    }
+    setShowSaveConfirm(false);
+  }, [assessmentId, ratings, queryClient, toast]);
 
   const totalProMoves = domains.reduce((sum, d) => sum + d.proMoves.length, 0);
   const ratedCount = Object.values(ratings).filter(r => r.score !== null).length;
@@ -464,9 +474,20 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       </Button>
 
       <div>
-        <h1 className="text-xl font-semibold">Private Assessment: {doctorName}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold">
+            {isComplete ? 'Review Assessment' : 'Private Assessment'}: {doctorName}
+          </h1>
+          {isComplete && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+              <CheckCircle2 className="h-3 w-3" /> Complete
+            </span>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground mt-1">
-          Rate each Pro Move and optionally record verbal feedback. This is visible only to clinical directors.
+          {isComplete
+            ? 'You can review and update ratings or notes. Changes will require confirmation before saving.'
+            : 'Rate each Pro Move and optionally record verbal feedback. This is visible only to clinical directors.'}
         </p>
       </div>
 
@@ -720,17 +741,31 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
             </Card>
           )}
 
-          {/* Complete Assessment */}
+          {/* Complete / Save Changes */}
           {!isProcessing && (
-            <div className="flex justify-end">
-              <Button
-                onClick={() => completeMutation.mutate()}
-                disabled={!allRated || completeMutation.isPending}
-                size="lg"
-                className="shadow-lg"
-              >
-                {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
-              </Button>
+            <div className="flex items-center justify-end gap-3">
+              {isComplete && isDirty && (
+                <p className="text-sm text-muted-foreground">You have unsaved changes</p>
+              )}
+              {isComplete ? (
+                <Button
+                  onClick={() => isDirty ? setShowSaveConfirm(true) : onBack()}
+                  size="lg"
+                  variant={isDirty ? 'default' : 'outline'}
+                  className="shadow-lg"
+                >
+                  {isDirty ? 'Save Changes' : 'Back to Detail'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => completeMutation.mutate()}
+                  disabled={!allRated || completeMutation.isPending}
+                  size="lg"
+                  className="shadow-lg"
+                >
+                  {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -758,6 +793,22 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           </div>
         </div>
       )}
+
+      {/* Confirmation dialog for saving changes to completed assessment */}
+      <AlertDialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It looks like you've updated some ratings or notes. Are you sure you want to save these changes?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResave}>Save Changes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

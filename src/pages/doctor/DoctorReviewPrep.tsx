@@ -495,8 +495,20 @@ export default function DoctorReviewPrep() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex items-center gap-2 mb-3">
+            <Button
+              variant={lowSelfFilter ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setLowSelfFilter(prev => !prev)}
+            >
+              <Filter className="h-3 w-3" />
+              Low Self (1–2)
+            </Button>
+          </div>
           {availableDomains.length > 0 ? (
-            <Tabs defaultValue={availableDomains[0]}>
+            <Tabs defaultValue={availableDomains[0]} key={availableDomains.join(',')}>
+
               <TabsList className="w-full h-auto flex-wrap gap-1 bg-transparent p-0 mb-3">
                 {availableDomains.map(domain => (
                   <TabsTrigger

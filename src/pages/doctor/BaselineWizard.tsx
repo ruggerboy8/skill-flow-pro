@@ -37,6 +37,23 @@ export default function BaselineWizard() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [forceOpenProMoveId, setForceOpenProMoveId] = useState<number | null>(null);
 
+  // Fetch name of the person who released this baseline
+  const { data: releaserName } = useQuery({
+    queryKey: ['baseline-releaser', staff?.id],
+    queryFn: async () => {
+      if (!staff?.baseline_released_by) return null;
+      const { data } = await supabase
+        .from('staff')
+        .select('name')
+        .eq('id', staff.baseline_released_by)
+        .maybeSingle();
+      return data?.name || null;
+    },
+    enabled: !!staff?.baseline_released_by,
+  });
+
+  const releaserDisplayName = releaserName ? drName(releaserName) : 'Your Clinical Director';
+
   // Fetch existing assessment
   const { data: existingAssessment } = useQuery({
     queryKey: ['my-baseline-assessment', staff?.id],

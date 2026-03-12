@@ -474,9 +474,20 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       </Button>
 
       <div>
-        <h1 className="text-xl font-semibold">Private Assessment: {doctorName}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold">
+            {isComplete ? 'Review Assessment' : 'Private Assessment'}: {doctorName}
+          </h1>
+          {isComplete && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+              <CheckCircle2 className="h-3 w-3" /> Complete
+            </span>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground mt-1">
-          Rate each Pro Move and optionally record verbal feedback. This is visible only to clinical directors.
+          {isComplete
+            ? 'You can review and update ratings or notes. Changes will require confirmation before saving.'
+            : 'Rate each Pro Move and optionally record verbal feedback. This is visible only to clinical directors.'}
         </p>
       </div>
 

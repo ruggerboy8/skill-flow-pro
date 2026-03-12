@@ -31,6 +31,7 @@ interface GlobalAssignmentBuilderProps {
 export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderProps) {
   const { toast } = useToast();
   const { resolve: resolveRole } = useRoleDisplayNames();
+  const { organizationId } = useUserRole();
   
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<number | null>(roleFilter || null);

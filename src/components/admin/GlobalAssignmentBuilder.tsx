@@ -199,9 +199,7 @@ export function GlobalAssignmentBuilder({ roleFilter }: GlobalAssignmentBuilderP
         .update({ superseded_at: new Date().toISOString() })
         .eq('role_id', selectedRole)
         .eq('week_start_date', weekStartDate)
-        .eq('source', 'global')
-        .is('org_id', null)
-        .is('location_id', null)
+        .eq('org_id', organizationId)
         .is('superseded_at', null);
 
       if (supersededError) throw supersededError;

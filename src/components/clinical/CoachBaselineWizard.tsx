@@ -90,9 +90,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   }, [recState.isRecording, recState.recordingTime, activeActionId]);
 
   // Fetch or create assessment
-  const { data: existingAssessment } = useQuery({
+  const { data: existingAssessment, error: assessmentError } = useQuery({
     queryKey: ['coach-baseline-assessment', doctorStaffId, staff?.id],
     queryFn: async () => {
+      console.log('[CoachBaseline] Fetching assessment for doctor:', doctorStaffId, 'coach:', staff?.id);
       if (!staff?.id) return null;
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
@@ -100,7 +101,11 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         .eq('doctor_staff_id', doctorStaffId)
         .eq('coach_staff_id', staff.id)
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        console.error('[CoachBaseline] Assessment fetch error:', error);
+        throw error;
+      }
+      console.log('[CoachBaseline] Assessment result:', data?.id, data?.status);
       return data;
     },
     enabled: !!staff?.id,

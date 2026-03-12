@@ -272,6 +272,7 @@ function SessionCard({
   const showCapture = isOwner && canCaptureStatus(session.status);
   const showBuildAgenda = isOwner && canBuildAgenda(session.status);
   const showInvite = isOwner && canInvite(session.status);
+  const showResendInvite = isOwner && session.status === 'scheduling_invite_sent';
   const showDelete = isOwner;
 
   const handleReassign = async (newCoachId: string) => {

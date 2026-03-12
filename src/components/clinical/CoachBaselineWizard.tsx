@@ -38,6 +38,7 @@ interface CoachBaselineWizardProps {
 }
 
 export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: CoachBaselineWizardProps) {
+  console.log('[CoachBaseline] Mount/render — doctorStaffId:', doctorStaffId, 'doctorName:', doctorName);
   const { data: staff } = useStaffProfile();
   const { toast } = useToast();
   const queryClient = useQueryClient();

@@ -793,6 +793,22 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           </div>
         </div>
       )}
+
+      {/* Confirmation dialog for saving changes to completed assessment */}
+      <AlertDialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It looks like you've updated some ratings or notes. Are you sure you want to save these changes?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResave}>Save Changes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

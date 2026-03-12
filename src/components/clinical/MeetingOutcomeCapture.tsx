@@ -240,10 +240,10 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
             return (
               <div
                 key={`${sel.action_id}-${sel.selected_by}`}
-                className={`flex items-center gap-2 p-2 rounded-md ${isOverlap ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}
+                className={`flex items-start gap-2 p-2 rounded-md ${isOverlap ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'}`}
               >
                 <DomainBadge domain={pm?.competencies?.domains?.domain_name} />
-                <span className="text-sm flex-1">{pm?.action_statement || `Action #${sel.action_id}`}</span>
+                <span className="text-sm flex-1 min-w-0 break-words">{pm?.action_statement || `Action #${sel.action_id}`}</span>
                 {isOverlap && <Badge className="bg-primary/20 text-primary text-xs">Both</Badge>}
                 {!isOverlap && (
                   <Badge variant="secondary" className="text-xs">
@@ -302,8 +302,8 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                   <div key={i} className="flex items-start gap-2.5 p-2 rounded-md bg-muted/30 border">
                     {statusIcon(p.status)}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{p.title}</p>
+                      <div className="flex items-start gap-2 flex-wrap">
+                        <p className="text-sm font-medium break-words">{p.title}</p>
                         <Badge variant="secondary" className="text-[10px]">{p.status}</Badge>
                       </div>
                       {p.note && <p className="text-xs text-muted-foreground mt-0.5">{p.note}</p>}

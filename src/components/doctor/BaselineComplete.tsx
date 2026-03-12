@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 interface BaselineCompleteProps {
   onFinish: () => void;
   assessmentId: string | null;
+  releaserName?: string;
   existingReflection?: {
     original: string | null;
     formatted: string | null;

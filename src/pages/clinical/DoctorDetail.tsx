@@ -22,7 +22,7 @@ export default function DoctorDetail() {
   const { staffId } = useParams<{ staffId: string }>();
   const { data: myStaff } = useStaffProfile();
   const [showCoachWizard, setShowCoachWizard] = useState(false);
-  const [baselineOpen, setBaselineOpen] = useState(false);
+  const [baselineOpen, setBaselineOpen] = useState(true);
   const [timelineOpen, setTimelineOpen] = useState(false);
 
   const { data: doctor, isLoading: doctorLoading } = useQuery({

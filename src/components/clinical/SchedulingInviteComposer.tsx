@@ -16,7 +16,7 @@ const DEFAULT_SUBJECTS: Record<string, string> = {
 };
 
 const DEFAULT_BODIES: Record<string, string> = {
-  baseline_review: `Hi {{first_name}},
+  baseline_review: `Hi Dr. {{first_name}},
 
 {{coach_name}} has completed their review and is ready to meet with you to discuss your baseline assessment.
 
@@ -33,7 +33,7 @@ In your prep, you'll:
 
 Looking forward to connecting!
 — {{coach_name}}`,
-  check_in: `Hi {{first_name}},
+  check_in: `Hi Dr. {{first_name}},
 
 {{coach_name}} is ready for your next check-in.
 

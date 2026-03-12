@@ -415,7 +415,7 @@ export default function BaselineWizard() {
       )}
 
       {currentStep === 'complete' && (
-        <BaselineComplete onFinish={handleFinish} assessmentId={assessmentId} />
+        <BaselineComplete onFinish={handleFinish} assessmentId={assessmentId} releaserName={releaserDisplayName} />
       )}
 
       {/* Tutorial overlay */}

@@ -263,7 +263,7 @@ export function BaselineComplete({ onFinish, assessmentId, releaserName, existin
             <p>
               This is a collaborative discussion to align on your development priorities and create a plan for your professional growth.
             </p>
-            <p className="text-right font-medium text-foreground">— Dr. Alex</p>
+            <p className="text-right font-medium text-foreground">— {signOff}</p>
           </div>
 
           <Button onClick={onFinish} className="w-full" size="lg">

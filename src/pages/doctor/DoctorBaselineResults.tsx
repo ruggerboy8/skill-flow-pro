@@ -69,9 +69,41 @@ export default function DoctorBaselineResults() {
     enabled: !!staff?.id,
   });
 
+  // Fetch coach baseline assessment for this doctor
+  const { data: coachBaseline } = useQuery({
+    queryKey: ['coach-baseline-for-doctor', staff?.id],
+    queryFn: async () => {
+      if (!staff?.id) return null;
+      const { data, error } = await supabase
+        .from('coach_baseline_assessments')
+        .select('id')
+        .eq('doctor_staff_id', staff.id)
+        .eq('status', 'completed')
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!staff?.id,
+  });
+
+  // Fetch coach baseline items
+  const { data: coachItems } = useQuery({
+    queryKey: ['coach-baseline-items-for-doctor', coachBaseline?.id],
+    queryFn: async () => {
+      if (!coachBaseline?.id) return [];
+      const { data, error } = await supabase
+        .from('coach_baseline_items')
+        .select('action_id, rating, note_text')
+        .eq('assessment_id', coachBaseline.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!coachBaseline?.id,
+  });
+
   // Fetch baseline items with pro moves and domain info
   const { data: items, isLoading: loadingItems } = useQuery({
-    queryKey: ['baseline-items', baseline?.id],
+    queryKey: ['baseline-items', baseline?.id, coachItems],
     queryFn: async () => {
       if (!baseline?.id) return [];
       const { data, error } = await supabase
@@ -94,15 +126,27 @@ export default function DoctorBaselineResults() {
         .eq('assessment_id', baseline.id)
         .not('self_score', 'is', null);
       if (error) throw error;
-      return (data || []).map((item: any) => ({
-        action_id: item.action_id,
-        self_score: item.self_score,
-        self_note: item.self_note || null,
-        action_statement: item.pro_moves.action_statement,
-        competency_name: item.pro_moves.competencies.name,
-        domain_name: item.pro_moves.competencies.domains.domain_name,
-        domain_id: item.pro_moves.competencies.domains.domain_id,
-      })) as BaselineItem[];
+
+      // Build coach note/score lookup
+      const coachMap = new Map<number, { note: string | null; score: number | null }>();
+      coachItems?.forEach(ci => {
+        coachMap.set(ci.action_id, { note: ci.note_text || null, score: ci.rating ?? null });
+      });
+
+      return (data || []).map((item: any) => {
+        const coach = coachMap.get(item.action_id);
+        return {
+          action_id: item.action_id,
+          self_score: item.self_score,
+          self_note: item.self_note || null,
+          coach_note: coach?.note || null,
+          coach_score: coach?.score ?? null,
+          action_statement: item.pro_moves.action_statement,
+          competency_name: item.pro_moves.competencies.name,
+          domain_name: item.pro_moves.competencies.domains.domain_name,
+          domain_id: item.pro_moves.competencies.domains.domain_id,
+        };
+      }) as BaselineItem[];
     },
     enabled: !!baseline?.id,
   });

@@ -44,18 +44,6 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
         .eq('id', doctor.id);
       if (error) throw error;
 
-      // Auto-create baseline_review session in the coaching thread
-      const { error: sessionErr } = await supabase
-        .from('coaching_sessions')
-        .insert({
-          doctor_staff_id: doctor.id,
-          coach_staff_id: myStaff.id,
-          session_type: 'baseline_review',
-          sequence_number: 1,
-          status: 'scheduled',
-        });
-      if (sessionErr) console.error('Failed to auto-create baseline review session:', sessionErr);
-
       // Send release email
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -80,7 +68,7 @@ export function DoctorDetailOverview({ doctor, baseline, sessions, journeyStatus
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
-      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment. A baseline review session has been added to the coaching thread.` });
+      toast({ title: 'Baseline released', description: `${doctor.name} can now start their self-assessment.` });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });

@@ -434,6 +434,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "coaching_session_selections_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
             foreignKeyName: "coaching_session_selections_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
@@ -3045,6 +3052,10 @@ export type Database = {
         Args: { p_org_id: string; p_role_id?: number }
         Returns: Json
       }
+      coach_baseline_exists_for_doctor: {
+        Args: { _doctor_staff_id: string }
+        Returns: boolean
+      }
       compare_conf_perf_to_eval: {
         Args: {
           p_end?: string
@@ -3307,6 +3318,13 @@ export type Database = {
         }[]
       }
       get_office_manager_location_id: { Args: never; Returns: string }
+      get_own_staff_flags: {
+        Args: never
+        Returns: {
+          is_coach: boolean
+          is_super_admin: boolean
+        }[]
+      }
       get_performance_trend: {
         Args: { p_role_id: number; p_staff_id: string; p_window?: number }
         Returns: Json

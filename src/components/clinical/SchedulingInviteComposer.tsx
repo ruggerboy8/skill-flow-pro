@@ -33,7 +33,7 @@ In your prep, you'll:
 
 Looking forward to connecting!
 — {{coach_name}}`,
-  check_in: `Hi {{first_name}},
+  check_in: `Hi Dr. {{first_name}},
 
 {{coach_name}} is ready for your next check-in.
 

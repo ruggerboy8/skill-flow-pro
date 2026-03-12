@@ -240,7 +240,8 @@ serve(async (req: Request) => {
         // Org ownership check: non-super-admin callers can only invite to locations
         // within their own organization. Super admins can invite to any org.
         if (!me.is_super_admin) {
-          const { data: callerOrgId } = await caller.rpc('current_user_org_id');
+          const { data: callerOrgId, error: orgRpcErr } = await caller.rpc('current_user_org_id');
+          if (orgRpcErr) console.error('current_user_org_id RPC failed:', orgRpcErr.message);
 
           // Resolve the target location's org via practice_groups
           const { data: targetLoc } = await admin

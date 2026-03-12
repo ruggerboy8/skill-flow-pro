@@ -226,7 +226,7 @@ export default function DoctorReviewPrep() {
             <Badge className="bg-purple-100 text-purple-800 mt-1">Awaiting Your Confirmation</Badge>
           </div>
         </div>
-        <MeetingConfirmationCard sessionId={sessionId!} />
+        <MeetingConfirmationCard sessionId={sessionId!} onConfirmed={() => navigate('/doctor')} />
       </div>
     );
   }

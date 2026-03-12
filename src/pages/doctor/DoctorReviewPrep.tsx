@@ -68,6 +68,7 @@ export default function DoctorReviewPrep() {
   const [doctorNote, setDoctorNote] = useState('');
   const [progressEntries, setProgressEntries] = useState<ProgressEntry[]>([]);
   const [hasScheduled, setHasScheduled] = useState(false);
+  const [lowSelfFilter, setLowSelfFilter] = useState(false);
 
   // Fetch session
   const { data: session, isLoading: sessionLoading } = useQuery({

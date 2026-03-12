@@ -531,7 +531,7 @@ export type Database = {
         }
         Insert: {
           code?: string | null
-          competency_id: number
+          competency_id?: number
           description?: string | null
           domain_id?: number | null
           friendly_description?: string | null
@@ -1210,6 +1210,51 @@ export type Database = {
           },
         ]
       }
+      organization_pro_move_overrides: {
+        Row: {
+          created_at: string
+          hidden_at: string | null
+          id: string
+          is_hidden: boolean
+          org_id: string
+          pro_move_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          is_hidden?: boolean
+          org_id: string
+          pro_move_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          is_hidden?: boolean
+          org_id?: string
+          pro_move_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_pro_move_overrides_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_pro_move_overrides_pro_move_id_fkey"
+            columns: ["pro_move_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+        ]
+      }
       organization_role_names: {
         Row: {
           display_name: string
@@ -1466,7 +1511,7 @@ export type Database = {
           date_added: string | null
           description: string | null
           intervention_text: string | null
-          practice_type: string
+          practice_types: string[]
           resources_url: string | null
           retired_at: string | null
           retired_by: string | null
@@ -1485,7 +1530,7 @@ export type Database = {
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
-          practice_type?: string
+          practice_types?: string[]
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null
@@ -1504,7 +1549,7 @@ export type Database = {
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
-          practice_type?: string
+          practice_types?: string[]
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null
@@ -1658,16 +1703,22 @@ export type Database = {
       }
       roles: {
         Row: {
+          active: boolean
+          practice_type: string
           role_code: string | null
           role_id: number
           role_name: string | null
         }
         Insert: {
+          active?: boolean
+          practice_type?: string
           role_code?: string | null
-          role_id: number
+          role_id?: number
           role_name?: string | null
         }
         Update: {
+          active?: boolean
+          practice_type?: string
           role_code?: string | null
           role_id?: number
           role_name?: string | null
@@ -2108,6 +2159,7 @@ export type Database = {
       user_capabilities: {
         Row: {
           can_invite_users: boolean
+          can_manage_assignments: boolean
           can_manage_library: boolean
           can_manage_locations: boolean
           can_manage_users: boolean
@@ -2124,6 +2176,7 @@ export type Database = {
         }
         Insert: {
           can_invite_users?: boolean
+          can_manage_assignments?: boolean
           can_manage_library?: boolean
           can_manage_locations?: boolean
           can_manage_users?: boolean
@@ -2140,6 +2193,7 @@ export type Database = {
         }
         Update: {
           can_invite_users?: boolean
+          can_manage_assignments?: boolean
           can_manage_library?: boolean
           can_manage_locations?: boolean
           can_manage_users?: boolean

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // kept for potential future use
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter, ShieldAlert } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';

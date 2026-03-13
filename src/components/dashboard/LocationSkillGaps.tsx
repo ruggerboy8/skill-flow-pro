@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor, getDomainColorRich } from '@/lib/domainColors';
+import { getDomainOrderIndex } from '@/lib/domainUtils';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { cn } from '@/lib/utils';
 
@@ -74,7 +75,7 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
     });
     return Array.from(byDomain.entries())
       .map(([domain, { sum, count }]) => ({ domain, avg: sum / count }))
-      .sort((a, b) => a.avg - b.avg);
+      .sort((a, b) => getDomainOrderIndex(a.domain) - getDomainOrderIndex(b.domain));
   }, [gaps]);
 
   // Group gaps by role_id for dynamic tabs

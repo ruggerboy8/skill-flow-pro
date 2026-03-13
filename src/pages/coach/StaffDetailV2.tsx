@@ -22,8 +22,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CalendarOff, MoreVertical, Check, X, ClipboardCheck } from 'lucide-react';
-import { format, parseISO, subWeeks, differenceInDays } from 'date-fns';
+import { CalendarOff, MoreVertical, Check, X } from 'lucide-react';
+import { getDomainOrderIndex } from '@/lib/domainUtils';
+import { format, parseISO, subWeeks } from 'date-fns';
 import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -134,15 +135,6 @@ export default function StaffDetailV2() {
   const isExcused = (weekOf: string, metric: 'confidence' | 'performance') =>
     excusedSubmissions.some(e => e.week_of === weekOf && e.metric === metric);
 
-  // Eval proximity: returns closest eval within ±14 days of a given week_of
-  const getEvalForWeek = (weekOf: string) => {
-    const weekDate = parseISO(weekOf);
-    return staffEvals.find(ev => {
-      if (!ev.observed_at) return false;
-      const diff = Math.abs(differenceInDays(parseISO(ev.observed_at), weekDate));
-      return diff <= 14;
-    }) ?? null;
-  };
 
   // Domain confidence strip (last 6 weeks)
   const domainConfidenceStrip = useMemo(() => {
@@ -159,7 +151,7 @@ export default function StaffDetailV2() {
     return Array.from(byDomain.entries()).map(([domain, { sum, count }]) => ({
       domain,
       avg: sum / count,
-    })).sort((a, b) => a.domain.localeCompare(b.domain));
+    })).sort((a, b) => getDomainOrderIndex(a.domain) - getDomainOrderIndex(b.domain));
   }, [rawData]);
 
   // Get staff info from first available summary
@@ -450,7 +442,6 @@ export default function StaffDetailV2() {
                       const perfExcused = isExcused(weekOf, 'performance');
                       const hasAllConf = summary.conf_count === summary.assignment_count;
                       const hasAllPerf = summary.perf_count === summary.assignment_count;
-                      const nearbyEval = getEvalForWeek(weekOf);
 
                       return (
                         <AccordionItem key={weekOf} value={weekOf}>
@@ -464,12 +455,6 @@ export default function StaffDetailV2() {
                                   <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
                                     <CalendarOff className="h-3 w-3 mr-1" />
                                     Exempt
-                                  </Badge>
-                                )}
-                                {nearbyEval && (
-                                  <Badge variant="outline" className="border-primary/40 text-primary bg-primary/5 gap-1">
-                                    <ClipboardCheck className="h-3 w-3" />
-                                    Eval
                                   </Badge>
                                 )}
                               </div>

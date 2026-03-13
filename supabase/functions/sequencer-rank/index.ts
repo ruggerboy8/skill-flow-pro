@@ -419,8 +419,8 @@ serve(async (req) => {
     logs.push(`Domain coverage: ${domainCoverage.length} domains tracked (${domainCoverageAssign?.length || 0} records from weekly_assignments)`);
 
     // Add sample move logging
-    if (eligible.length > 0) {
-      logs.push(`Sample move for introspection: ${eligible[0].name} (id=${eligible[0].id})`);
+    if (eligibleFinal.length > 0) {
+      logs.push(`Sample move for introspection: ${eligibleFinal[0].name} (id=${eligibleFinal[0].id})`);
     }
 
     // Import and run engine (inline for now since we can't import from src/)

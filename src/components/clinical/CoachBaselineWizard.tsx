@@ -472,8 +472,10 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
 
   if (domainsLoading || !domains) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="max-w-2xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+        <Skeleton className="h-12 w-full rounded-lg" />
       </div>
     );
   }

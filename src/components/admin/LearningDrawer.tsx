@@ -763,8 +763,11 @@ export function LearningDrawer({
         </SheetHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="space-y-4 py-6">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-20 w-full rounded-lg" />
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-20 w-full rounded-lg" />
           </div>
         ) : (
           <div className="space-y-6 py-6">

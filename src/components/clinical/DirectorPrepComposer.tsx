@@ -452,8 +452,10 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   // Show loading while creating session
   if (!sessionId || isCreatingSession) {
     return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-32 w-full rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
       </div>
     );
   }

@@ -26,7 +26,7 @@ export function ProMoveRow({ move }: ProMoveRowProps) {
             {move.name}
           </p>
           <span 
-            className="px-1.5 py-0.5 text-[10px] rounded text-foreground ring-1 ring-border/50 shrink-0"
+            className="px-1.5 py-0.5 text-2xs rounded text-foreground ring-1 ring-border/50 shrink-0"
             style={{ backgroundColor: `hsl(${move.domainColorHsl})` }}
           >
             {move.domainName}

@@ -55,6 +55,9 @@ export interface StaffProfile {
     perf_due_time?: string;
     practice_groups?: {
       organization_id: string | null;
+      organizations?: {
+        practice_type: string | null;
+      } | null;
     } | null;
   } | null;
   coach_scopes: {

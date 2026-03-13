@@ -16,6 +16,7 @@ interface RecommenderPanelProps {
   roleId: number;
   roleName: string;
   practiceType?: string;
+  orgId?: string;
 }
 
 

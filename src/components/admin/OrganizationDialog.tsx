@@ -74,6 +74,7 @@ export function OrganizationDialog({ open, onClose, organization }: Organization
           description: 'Group updated successfully'
         });
       } else {
+        // Fetch parent organization_id
         const { data: orgs } = await supabase.from('organizations').select('id').limit(1).single();
         if (!orgs) throw new Error('No parent organization found');
 

@@ -48,6 +48,7 @@ const SCORE_COLORS: Record<number, { bg: string; border: string; text: string; a
   3: { bg: 'hsl(210 80% 95%)', border: 'hsl(210 60% 80%)', text: 'hsl(210 80% 30%)', activeBorder: 'hsl(210 70% 45%)' },
   2: { bg: 'hsl(38 90% 95%)', border: 'hsl(38 70% 75%)', text: 'hsl(38 80% 30%)', activeBorder: 'hsl(38 80% 45%)' },
   1: { bg: 'hsl(0 70% 95%)', border: 'hsl(0 60% 80%)', text: 'hsl(0 70% 35%)', activeBorder: 'hsl(0 65% 45%)' },
+  0: { bg: 'hsl(0 0% 95%)', border: 'hsl(0 0% 80%)', text: 'hsl(0 0% 40%)', activeBorder: 'hsl(0 0% 50%)' },
 };
 
 const SCORE_LABELS: Record<number, string> = {
@@ -55,9 +56,10 @@ const SCORE_LABELS: Record<number, string> = {
   3: 'Consistent',
   2: 'Developing',
   1: 'Rarely',
+  0: 'N/A',
 };
 
-type SortBy = 'self' | 'coach';
+type SortConfig = { column: 'self' | 'coach'; direction: 'asc' | 'desc' };
 
 export function ClinicalBaselineResults({ 
   staffId, 
@@ -72,7 +74,7 @@ export function ClinicalBaselineResults({
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
   const [selfScoreFilters, setSelfScoreFilters] = useState<Set<number>>(new Set());
   const [coachScoreFilters, setCoachScoreFilters] = useState<Set<number>>(new Set());
-  const [sortBy, setSortBy] = useState<SortBy>('self');
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ column: 'self', direction: 'desc' });
 
   // Fetch baseline assessment with flagged domains
   const { data: baseline } = useQuery({
@@ -186,9 +188,9 @@ export function ClinicalBaselineResults({
     const grouped: GroupedData = {};
     items.forEach((item) => {
       const domain = item.domain_name;
-      if (!grouped[domain]) grouped[domain] = { 4: [], 3: [], 2: [], 1: [] };
+      if (!grouped[domain]) grouped[domain] = { 4: [], 3: [], 2: [], 1: [], 0: [] };
       const score = item.self_score;
-      if (score >= 1 && score <= 4) grouped[domain][score].push(item);
+      if (score >= 0 && score <= 4) grouped[domain][score].push(item);
     });
     return grouped;
   }, [items]);
@@ -237,22 +239,32 @@ export function ClinicalBaselineResults({
     if (!showCoachRatings) setShowCoachRatings(true);
   };
 
+  const handleSortClick = (column: 'self' | 'coach') => {
+    setSortConfig(prev => {
+      if (prev.column === column) {
+        return { column, direction: prev.direction === 'desc' ? 'asc' : 'desc' };
+      }
+      return { column, direction: 'desc' };
+    });
+  };
+
   const getSortedDomainItems = (domain: string) => {
     const domainData = groupedByDomain[domain];
     if (!domainData) return [];
+    const dir = sortConfig.direction === 'asc' ? 1 : -1;
     let result = Object.entries(domainData)
       .flatMap(([score, items]) => items.map(item => ({ ...item, score: Number(score) })))
       .sort((a, b) => {
-        if (sortBy === 'coach' && showCoachRatings) {
+        if (sortConfig.column === 'coach' && showCoachRatings) {
           const aCoach = coachRatingsMap.get(a.action_id) ?? 0;
           const bCoach = coachRatingsMap.get(b.action_id) ?? 0;
-          if (bCoach !== aCoach) return bCoach - aCoach;
-          return b.score - a.score;
+          if (bCoach !== aCoach) return (bCoach - aCoach) * dir;
+          return (b.score - a.score) * dir;
         }
-        if (b.score !== a.score) return b.score - a.score;
+        if (b.score !== a.score) return (b.score - a.score) * dir;
         const aCoach = coachRatingsMap.get(a.action_id) ?? 0;
         const bCoach = coachRatingsMap.get(b.action_id) ?? 0;
-        return bCoach - aCoach;
+        return (bCoach - aCoach) * dir;
       });
 
     // Apply self score filters
@@ -266,11 +278,11 @@ export function ClinicalBaselineResults({
         return cs !== undefined && coachScoreFilters.has(cs);
       });
     }
-    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim());
+    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim() || coachNotesMap.has(item.action_id));
     return result;
   };
 
-  const hasAnyNotes = items?.some(item => item.self_note?.trim()) ?? false;
+  const hasAnyNotes = (items?.some(item => item.self_note?.trim()) ?? false) || coachNotesMap.size > 0;
   const hasCoachData = coachRatingsMap.size > 0;
 
   // Not started state
@@ -459,7 +471,7 @@ export function ClinicalBaselineResults({
                         setCoachScoreFilters(new Set());
                         setShowOnlyNoted(false);
                         setShowCoachRatings(false);
-                        setSortBy('self');
+                        setSortConfig({ column: 'self', direction: 'desc' });
                       }}
                       className="text-xs text-destructive hover:underline whitespace-nowrap"
                     >
@@ -475,20 +487,20 @@ export function ClinicalBaselineResults({
                   <TabsContent key={domain} value={domain} className="mt-0 p-0">
                     {/* Column headers with sortable Self/Coach */}
                     <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/10 text-xs text-muted-foreground">
-                      <button
-                        onClick={() => setSortBy('self')}
-                        className={`px-2 py-0.5 rounded text-center font-semibold flex items-center justify-center gap-0.5 cursor-pointer transition-all ${sortBy === 'self' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted'}`}
+                     <button
+                        onClick={() => handleSortClick('self')}
+                        className={`px-2 py-0.5 rounded text-center font-semibold flex items-center justify-center gap-0.5 cursor-pointer transition-all ${sortConfig.column === 'self' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted'}`}
                       >
                         Self
-                        {sortBy === 'self' && <ArrowDown className="h-3 w-3" />}
+                        {sortConfig.column === 'self' && (sortConfig.direction === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
                       </button>
                       {showCoachRatings && (
                         <button
-                          onClick={() => setSortBy('coach')}
-                          className={`px-2 py-0.5 rounded text-center font-semibold flex items-center justify-center gap-0.5 cursor-pointer transition-all ${sortBy === 'coach' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted'}`}
+                          onClick={() => handleSortClick('coach')}
+                          className={`px-2 py-0.5 rounded text-center font-semibold flex items-center justify-center gap-0.5 cursor-pointer transition-all ${sortConfig.column === 'coach' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted'}`}
                         >
                           Coach
-                          {sortBy === 'coach' && <ArrowDown className="h-3 w-3" />}
+                          {sortConfig.column === 'coach' && (sortConfig.direction === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
                         </button>
                       )}
                     </div>
@@ -508,7 +520,7 @@ export function ClinicalBaselineResults({
                         const isExpanded = expandedNoteId === item.action_id;
 
                         // Row color follows whichever column is sorted
-                        const activeScore = sortBy === 'coach' && showCoachRatings && coachScore && coachScore >= 1 && coachScore <= 4
+                        const activeScore = sortConfig.column === 'coach' && showCoachRatings && coachScore && coachScore >= 1 && coachScore <= 4
                           ? coachScore
                           : item.score;
                         const colors = SCORE_COLORS[activeScore];
@@ -532,10 +544,10 @@ export function ClinicalBaselineResults({
                                 return (
                                   <>
                                     <div
-                                      className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border"
+                                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold border ${item.score === 0 ? 'text-[10px]' : 'text-sm'}`}
                                       style={{ backgroundColor: selfColors.bg, borderColor: selfColors.border, color: selfColors.text }}
                                     >
-                                      {item.score}
+                                      {item.score === 0 ? 'N/A' : item.score}
                                     </div>
                                     {showCoachRatings && (
                                       <div

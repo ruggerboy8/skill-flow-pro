@@ -219,7 +219,16 @@ export function InviteUserDialog({
       const { data, error } = await supabase.functions.invoke("admin-users", { body });
 
       if (error) {
-        const errorMessage = data?.error || error.message || "Failed to invite user";
+        // supabase.functions.invoke may not parse the body on error, so check data first
+        let errorMessage = "Failed to invite user";
+        if (data?.error) {
+          errorMessage = data.error;
+        } else if (error.message?.includes("non-2xx")) {
+          // Generic message — the edge function likely returned a descriptive error we couldn't read
+          errorMessage = "The invitation failed. The email may already be registered. Please check and try again.";
+        } else {
+          errorMessage = error.message;
+        }
         throw new Error(errorMessage);
       }
       if (data?.error) {

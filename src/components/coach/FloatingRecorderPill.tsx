@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ChevronRight, RotateCcw } from 'lucide-react';
 
 interface FloatingRecorderPillProps {
   recordingTime: number;
@@ -9,7 +10,13 @@ interface FloatingRecorderPillProps {
   isPaused: boolean;
   onPauseToggle: () => void;
   onDoneClick?: () => void;
+  onStartOver?: () => void;
   activeCompetencyLabel?: string;
+  showArrow?: boolean;
+  /** Always show Start Over, not just when paused */
+  alwaysShowStartOver?: boolean;
+  /** When provided, pill tracks this vertical position (px from viewport top) instead of centering */
+  anchorTop?: number | null;
 }
 
 export function FloatingRecorderPill({
@@ -18,7 +25,11 @@ export function FloatingRecorderPill({
   isPaused,
   onPauseToggle,
   onDoneClick,
+  onStartOver,
   activeCompetencyLabel,
+  showArrow,
+  alwaysShowStartOver,
+  anchorTop,
 }: FloatingRecorderPillProps) {
   const isMobile = useIsMobile();
 
@@ -30,18 +41,29 @@ export function FloatingRecorderPill({
 
   if (!isRecording) return null;
 
+  // Determine if we should use dynamic anchor positioning (desktop only)
+  const useDynamicPosition = !isMobile && anchorTop != null;
+
   return (
     <div
       className={cn(
-        "fixed z-50 flex flex-col items-center gap-1",
+        "fixed z-50 flex items-center gap-1 pointer-events-none",
         isMobile 
-          ? "bottom-20 left-1/2 -translate-x-1/2" 
-          : "left-4 top-1/2 -translate-y-1/2"
+          ? "bottom-20 left-1/2 -translate-x-1/2 flex-col" 
+          : "left-4 flex-row"
       )}
+      style={useDynamicPosition ? {
+        top: `${anchorTop}px`,
+        transform: 'translateY(-50%)',
+        transition: 'top 0.4s ease-out',
+      } : (!isMobile ? {
+        top: '50%',
+        transform: 'translateY(-50%)',
+      } : undefined)}
     >
       <div
         className={cn(
-          "flex flex-col items-center gap-2 p-3 rounded-2xl",
+          "flex flex-col items-center gap-2 p-3 rounded-2xl pointer-events-auto",
           "bg-background/95 backdrop-blur-sm border shadow-lg",
           isPaused 
             ? "ring-2 ring-amber-500/50" 
@@ -78,8 +100,21 @@ export function FloatingRecorderPill({
           )}
         </button>
 
-        {/* Done? pill - only when paused */}
-        {isPaused && (
+        {/* Start Over button */}
+        {(isPaused || alwaysShowStartOver) && onStartOver && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs px-3 text-muted-foreground"
+            onClick={onStartOver}
+          >
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Start Over
+          </Button>
+        )}
+
+        {/* Done? pill - only when paused and no alwaysShowStartOver (bottom bar handles it) */}
+        {isPaused && !alwaysShowStartOver && (
           <Button
             variant="destructive"
             size="sm"
@@ -90,6 +125,16 @@ export function FloatingRecorderPill({
           </Button>
         )}
       </div>
+
+      {/* Right-facing arrow indicator */}
+      {showArrow && !isMobile && (
+        <div className="flex items-center text-primary/60">
+          <ChevronRight className={cn(
+            "h-5 w-5 transition-opacity",
+            isPaused ? "opacity-30" : "opacity-100 animate-pulse"
+          )} />
+        </div>
+      )}
     </div>
   );
 }

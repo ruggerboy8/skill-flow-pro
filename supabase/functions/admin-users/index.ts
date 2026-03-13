@@ -491,7 +491,7 @@ serve(async (req: Request) => {
         if (!currentStaff) return json({ error: "Staff not found" }, 404);
         
         // Validate scope requirements for lead, coach, coach_participant, and regional_manager
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") && (!coach_scope_type || !coach_scope_ids || !Array.isArray(coach_scope_ids) || coach_scope_ids.length === 0)) {
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") && (!coach_scope_type || !coach_scope_ids || !Array.isArray(coach_scope_ids) || coach_scope_ids.length === 0)) {
           return json({ error: "Scope type and at least one scope ID are required for this action." }, 422);
         }
         
@@ -584,10 +584,11 @@ serve(async (req: Request) => {
           clinical_director: {
             is_participant: false,
             is_lead: false,
-            is_coach: false,
-            is_org_admin: false,
+            is_coach: true,
+            is_org_admin: true,
             is_super_admin: false,
             is_clinical_director: true,
+            is_doctor: false,
             coach_scope_type: null,
             coach_scope_id: null,
             home_route: '/clinical',
@@ -655,7 +656,7 @@ serve(async (req: Request) => {
         }
         
         // Sync scope to staff table for RPC compatibility (get_coach_roster_summary uses staff.coach_scope_*)
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") && 
+        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") && 
             coach_scope_type && coach_scope_ids && coach_scope_ids.length > 0) {
           // Keep scope_type as 'org' or 'location' - must match staff_coach_scope_type_check constraint
           updates.coach_scope_type = coach_scope_type;
@@ -684,7 +685,7 @@ serve(async (req: Request) => {
         }
         
         // Handle coach_scopes junction table
-        if (preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager") {
+        if (preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") {
           // Delete existing scopes
           const { error: deleteErr } = await admin
             .from("coach_scopes")
@@ -959,71 +960,6 @@ serve(async (req: Request) => {
         return json({ ok: true, message: `User ${currentStaff.name} has been unpaused` });
       }
 
-      case "delete_user": {
-        const { user_id } = payload ?? {};
-        if (!user_id) return json({ error: "user_id required" }, 400);
-
-        // First, get the staff record to find the staff_id
-        const { data: staffRecord, error: staffLookupErr } = await admin
-          .from("staff")
-          .select("id")
-          .eq("user_id", user_id)
-          .maybeSingle();
-
-        if (staffLookupErr) {
-          console.error("Error looking up staff:", staffLookupErr);
-          throw new Error(`Failed to lookup staff: ${staffLookupErr.message}`);
-        }
-
-        if (staffRecord) {
-          const staffId = staffRecord.id;
-          console.log(`Deleting user ${user_id} with staff_id ${staffId}`);
-
-          // Delete all dependent records before deleting staff
-          // Order matters due to FK constraints
-          // NOTE: reminder_log FK references auth.users.id (user_id), not staff.id
-          const deletions = [
-            admin.from("weekly_scores").delete().eq("staff_id", staffId),
-            admin.from("weekly_self_select").delete().eq("user_id", staffId),
-            admin.from("user_backlog").delete().eq("user_id", staffId),
-            admin.from("user_backlog_v2").delete().eq("staff_id", staffId),
-            admin.from("coach_scopes").delete().eq("staff_id", staffId),
-            admin.from("manager_priorities").delete().eq("coach_staff_id", staffId),
-            admin.from("resource_events").delete().eq("staff_id", staffId),
-            admin.from("reminder_log").delete().eq("target_user_id", user_id),  // FK to auth.users
-            admin.from("reminder_log").delete().eq("sender_user_id", user_id),  // FK to auth.users
-            // evaluation_items cascade from evaluations
-            admin.from("evaluations").delete().eq("staff_id", staffId),
-            admin.from("evaluations").delete().eq("evaluator_id", staffId),
-            // admin_audit - set changed_by to null or skip (keeping audit trail)
-          ];
-
-          const results = await Promise.allSettled(deletions);
-          results.forEach((r, i) => {
-            if (r.status === "rejected") {
-              console.warn(`Deletion ${i} failed:`, r.reason);
-            }
-          });
-
-          // Now delete staff record
-          const { error: staffDelErr } = await admin.from("staff").delete().eq("id", staffId);
-          if (staffDelErr) {
-            console.error("Error deleting staff:", staffDelErr);
-            throw new Error(`Failed to delete staff: ${staffDelErr.message}`);
-          }
-        } else {
-          console.log(`No staff record found for user_id ${user_id}, proceeding to delete auth user`);
-        }
-
-        // Finally delete auth user
-        const { error: delErr } = await admin.auth.admin.deleteUser(user_id);
-        if (delErr) {
-          console.error("Error deleting auth user:", delErr);
-          throw delErr;
-        }
-
-        return json({ ok: true });
-      }
 
       case "invite_doctor": {
         // Only clinical directors or super admins can invite doctors
@@ -1031,7 +967,7 @@ serve(async (req: Request) => {
           return json({ error: "Only Clinical Directors can invite doctors" }, 403);
         }
         
-        const { email, name, location_id, group_id, organization_id } = payload ?? {};
+        const { email, name, location_id, group_id, organization_id, release_baseline } = payload ?? {};
         const resolvedGroupId = group_id || organization_id;
         if (!email || !name || !resolvedGroupId) {
           return json({ error: "Missing required fields: email, name, and group_id are required" }, 400);
@@ -1056,19 +992,26 @@ serve(async (req: Request) => {
         }
 
         // 2) Create staff row with is_doctor = true
-        // location_id is optional for roaming doctors
+        // If release_baseline is truthy, set baseline_released_at now
+        const staffInsert: Record<string, any> = { 
+          name, 
+          email, 
+          role_id: 4,  // Doctor role
+          primary_location_id: location_id || null,  // null = roaming
+          is_participant: false,
+          is_doctor: true,
+          user_id: invite.user.id,
+          home_route: '/doctor',
+        };
+
+        if (release_baseline) {
+          staffInsert.baseline_released_at = new Date().toISOString();
+          staffInsert.baseline_released_by = authUser.user.id;
+        }
+
         const { data: staff, error: staffErr } = await admin
           .from("staff")
-          .insert({ 
-            name, 
-            email, 
-            role_id: 4,  // Doctor role
-            primary_location_id: location_id || null,  // null = roaming
-            is_participant: false,
-            is_doctor: true,
-            user_id: invite.user.id,
-            home_route: '/doctor',
-          })
+          .insert(staffInsert)
           .select("id")
           .single();
         
@@ -1106,8 +1049,178 @@ serve(async (req: Request) => {
           user_metadata: { staff_id: staff.id, user_type: 'doctor' }
         });
 
-        console.log(`✅ Invited doctor ${name} (${email}) - staff_id: ${staff.id}`);
-        return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true });
+        console.log(`✅ Invited doctor ${name} (${email}) - staff_id: ${staff.id}, baseline_released: ${!!release_baseline}`);
+        return json({ ok: true, staff_id: staff.id, user_id: invite.user.id, email_sent: true, baseline_released: !!release_baseline });
+      }
+
+      case "delete_user": {
+        const { user_id } = payload ?? {};
+        if (!user_id) return json({ error: "user_id required" }, 400);
+
+        // Only super admins can delete users
+        if (!me.is_super_admin) {
+          return json({ error: "Only super admins can delete users" }, 403);
+        }
+
+        // Get staff record
+        const { data: staffToDelete, error: fetchErr } = await admin
+          .from("staff")
+          .select("id")
+          .eq("user_id", user_id)
+          .maybeSingle();
+
+        if (fetchErr) throw fetchErr;
+
+        if (staffToDelete) {
+          const sid = staffToDelete.id;
+
+          const requireDelete = async (label: string, op: Promise<{ error: { message: string } | null }>) => {
+            const { error } = await op;
+            if (error) throw new Error(`Failed to delete ${label}: ${error.message}`);
+          };
+
+          const { data: sessions, error: sessionsErr } = await admin
+            .from("coaching_sessions")
+            .select("id")
+            .or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+          if (sessionsErr) throw new Error(`Failed to load coaching sessions: ${sessionsErr.message}`);
+          const sessionIds = (sessions ?? []).map((s: any) => s.id);
+
+          if (sessionIds.length > 0) {
+            await requireDelete(
+              "coaching meeting records",
+              admin.from("coaching_meeting_records").delete().in("session_id", sessionIds),
+            );
+            await requireDelete(
+              "coaching session selections",
+              admin.from("coaching_session_selections").delete().in("session_id", sessionIds),
+            );
+          }
+
+          await requireDelete(
+            "coaching sessions (doctor)",
+            admin.from("coaching_sessions").delete().eq("doctor_staff_id", sid),
+          );
+          await requireDelete(
+            "coaching sessions (coach)",
+            admin.from("coaching_sessions").delete().eq("coach_staff_id", sid),
+          );
+
+          const { data: coachBaselines, error: coachBaselinesErr } = await admin
+            .from("coach_baseline_assessments")
+            .select("id")
+            .or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+          if (coachBaselinesErr) throw new Error(`Failed to load coach baseline assessments: ${coachBaselinesErr.message}`);
+          const cbIds = (coachBaselines ?? []).map((b: any) => b.id);
+
+          if (cbIds.length > 0) {
+            await requireDelete(
+              "coach baseline items",
+              admin.from("coach_baseline_items").delete().in("assessment_id", cbIds),
+            );
+          }
+
+          await requireDelete(
+            "coach baseline assessments (doctor)",
+            admin.from("coach_baseline_assessments").delete().eq("doctor_staff_id", sid),
+          );
+          await requireDelete(
+            "coach baseline assessments (coach)",
+            admin.from("coach_baseline_assessments").delete().eq("coach_staff_id", sid),
+          );
+
+          const { data: doctorBaselines, error: doctorBaselinesErr } = await admin
+            .from("doctor_baseline_assessments")
+            .select("id")
+            .eq("doctor_staff_id", sid);
+          if (doctorBaselinesErr) throw new Error(`Failed to load doctor baseline assessments: ${doctorBaselinesErr.message}`);
+          const dbIds = (doctorBaselines ?? []).map((b: any) => b.id);
+
+          if (dbIds.length > 0) {
+            await requireDelete(
+              "doctor baseline items",
+              admin.from("doctor_baseline_items").delete().in("assessment_id", dbIds),
+            );
+          }
+
+          await requireDelete(
+            "doctor baseline assessments",
+            admin.from("doctor_baseline_assessments").delete().eq("doctor_staff_id", sid),
+          );
+
+          const { data: evals, error: evalsErr } = await admin
+            .from("evaluations")
+            .select("id")
+            .or(`staff_id.eq.${sid},evaluator_id.eq.${sid},released_by.eq.${sid}`);
+          if (evalsErr) throw new Error(`Failed to load evaluations: ${evalsErr.message}`);
+          const evalIds = (evals ?? []).map((e: any) => e.id);
+
+          if (evalIds.length > 0) {
+            await requireDelete(
+              "evaluation items",
+              admin.from("evaluation_items").delete().in("evaluation_id", evalIds),
+            );
+          }
+
+          await requireDelete(
+            "evaluations (staff)",
+            admin.from("evaluations").delete().eq("staff_id", sid),
+          );
+          await requireDelete(
+            "evaluations (evaluator)",
+            admin.from("evaluations").delete().eq("evaluator_id", sid),
+          );
+          await requireDelete(
+            "evaluations (released_by)",
+            admin.from("evaluations").delete().eq("released_by", sid),
+          );
+
+          await requireDelete("coach scopes", admin.from("coach_scopes").delete().eq("staff_id", sid));
+          await requireDelete("manager priorities", admin.from("manager_priorities").delete().eq("coach_staff_id", sid));
+          await requireDelete("excused submissions", admin.from("excused_submissions").delete().eq("staff_id", sid));
+          await requireDelete("admin audit (staff)", admin.from("admin_audit").delete().eq("staff_id", sid));
+          await requireDelete("admin audit (changed_by)", admin.from("admin_audit").delete().eq("changed_by", sid));
+          await requireDelete("resource events", admin.from("resource_events").delete().eq("staff_id", sid));
+          await requireDelete("organization role names", admin.from("organization_role_names").delete().eq("updated_by", sid));
+          await requireDelete("pro moves", admin.from("pro_moves").delete().eq("retired_by", sid));
+          await requireDelete("staff audit", admin.from("staff_audit").delete().eq("staff_id", sid));
+          await requireDelete("staff quarter focus", admin.from("staff_quarter_focus").delete().eq("staff_id", sid));
+          await requireDelete("user backlog", admin.from("user_backlog_v2").delete().eq("staff_id", sid));
+          await requireDelete("user capabilities", admin.from("user_capabilities").delete().eq("staff_id", sid));
+          await requireDelete("weekly scores", admin.from("weekly_scores").delete().eq("staff_id", sid));
+
+          const { error: delStaffErr } = await admin
+            .from("staff")
+            .delete()
+            .eq("id", sid);
+          if (delStaffErr) throw new Error(`Failed to delete staff: ${delStaffErr.message}`);
+        }
+
+        // Clean up tables with direct FK to auth.users (not staff.id)
+        // These must be nullified/deleted BEFORE deleting the auth user
+        const nullifyOps = [
+          admin.from("reminder_log").delete().eq("sender_user_id", user_id),
+          admin.from("reminder_log").delete().eq("target_user_id", user_id),
+          admin.from("reminder_templates").update({ updated_by: null }).eq("updated_by", user_id),
+          admin.from("excused_locations").update({ created_by: null }).eq("created_by", user_id),
+          admin.from("excused_submissions").update({ created_by: null }).eq("created_by", user_id),
+          admin.from("excused_weeks").update({ created_by: null }).eq("created_by", user_id),
+          admin.from("organizations").update({ created_by: null }).eq("created_by", user_id),
+          admin.from("alcan_weekly_plan").update({ computed_by: null }).eq("computed_by", user_id),
+          admin.from("alcan_weekly_plan").update({ published_by: null }).eq("published_by", user_id),
+          admin.from("staff").update({ baseline_released_by: null }).eq("baseline_released_by", user_id),
+        ];
+        const nullResults = await Promise.all(nullifyOps);
+        for (const r of nullResults) {
+          if (r.error) console.warn("Nullify warning:", r.error.message);
+        }
+
+        // Delete the auth user
+        const { error: delAuthErr } = await admin.auth.admin.deleteUser(user_id);
+        if (delAuthErr) throw delAuthErr;
+
+        console.log(`✅ Deleted user ${user_id}`);
+        return json({ ok: true });
       }
 
       default:

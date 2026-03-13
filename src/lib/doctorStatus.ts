@@ -5,10 +5,10 @@ export type DoctorJourneyStage =
   | 'baseline_released'
   | 'baseline_in_progress'
   | 'baseline_submitted'
-  | 'director_baseline_pending'
-  | 'baseline_review_scheduled'
-  | 'waiting_for_doctor_prep'
+  | 'ready_for_prep'
   | 'prep_complete'
+  | 'scheduling_invite_sent'
+  | 'meeting_ready'
   | 'meeting_pending'
   | 'doctor_confirmed'
   | 'followup_scheduled'
@@ -21,6 +21,8 @@ export interface DoctorJourneyStatus {
   colorClass: string;
   nextAction: string;
   nextActionUrl?: string;
+  /** Non-blocking nudge shown as info banner, not a gate */
+  nudge?: string;
 }
 
 interface BaselineInfo {
@@ -37,7 +39,7 @@ interface SessionInfo {
   session_type: string;
   sequence_number: number;
   status: string;
-  scheduled_at: string;
+  scheduled_at: string | null;
 }
 
 export function getDoctorJourneyStatus(
@@ -45,109 +47,128 @@ export function getDoctorJourneyStatus(
   coachBaseline: CoachBaselineInfo | null | undefined,
   sessions: SessionInfo[] | null | undefined,
   baselineReleasedAt?: string | null,
+  perspective: 'coach' | 'doctor' = 'coach',
 ): DoctorJourneyStatus {
   // Check sessions first (highest priority — active coaching cycle)
   if (sessions && sessions.length > 0) {
-    // Sort by sequence_number desc to get latest session
     const sorted = [...sessions].sort((a, b) => b.sequence_number - a.sequence_number);
     const latest = sorted[0];
 
     const isFollowup = latest.session_type === 'followup';
     const prefix = isFollowup ? 'Follow-up' : 'Baseline review';
 
-    switch (latest.status) {
-      case 'scheduled':
-        return {
-          stage: isFollowup ? 'followup_scheduled' : 'baseline_review_scheduled',
-          label: `${prefix} Scheduled`,
-          variant: 'outline',
-          colorClass: 'bg-blue-100 text-blue-800',
-          nextAction: 'Complete prep for meeting',
-          nextActionUrl: undefined,
-        };
-      case 'director_prep_ready':
-        return {
-          stage: 'waiting_for_doctor_prep',
-          label: 'Prep Ready — Waiting on Doctor',
-          variant: 'secondary',
-          colorClass: 'bg-amber-100 text-amber-800',
-          nextAction: 'Doctor needs to complete their prep',
-        };
-      case 'doctor_prep_submitted':
-        return {
-          stage: 'prep_complete',
-          label: 'Ready for Meeting',
-          variant: 'default',
-          colorClass: 'bg-emerald-100 text-emerald-800',
-          nextAction: 'Both sides are prepped — time to meet!',
-        };
-      case 'meeting_pending':
-        return {
-          stage: 'meeting_pending',
-          label: 'Awaiting Doctor Sign-off',
-          variant: 'secondary',
-          colorClass: 'bg-purple-100 text-purple-800',
-          nextAction: 'Doctor needs to review and confirm the meeting summary',
-        };
-      case 'doctor_confirmed':
-        // Check if all sessions are confirmed — if latest is confirmed, check if it's a follow-up
-        if (isFollowup) {
+    // For doctor perspective, sessions that haven't reached the invite stage
+    // shouldn't override baseline status — the doctor hasn't been engaged yet
+    const preInviteStatuses = ['scheduled', 'director_prep_ready'];
+    if (perspective === 'doctor' && preInviteStatuses.includes(latest.status)) {
+      // Fall through to baseline checks below
+    } else switch (latest.status) {
+      case 'scheduling_invite_sent':
+        if (perspective === 'doctor') {
           return {
-            stage: 'followup_completed',
-            label: `Follow-up ${latest.sequence_number - 1} Complete`,
+            stage: 'scheduling_invite_sent',
+            label: 'Prep Available',
             variant: 'default',
-            colorClass: 'bg-green-100 text-green-800',
-            nextAction: 'Schedule next follow-up when ready',
+            colorClass: 'bg-primary/10 text-primary',
+            nextAction: 'Complete your meeting prep and schedule your session',
+            nextActionUrl: `/doctor/review-prep/${latest.id}`,
           };
         }
         return {
-          stage: 'doctor_confirmed',
-          label: 'Baseline Review Complete',
-          variant: 'default',
-          colorClass: 'bg-green-100 text-green-800',
-          nextAction: 'Schedule a follow-up to check on progress',
+          stage: 'scheduling_invite_sent',
+          label: 'Pending Scheduling',
+          variant: 'outline',
+          colorClass: 'bg-blue-100 text-blue-800',
+          nextAction: 'Waiting for doctor to schedule via the link you sent',
         };
-      case 'doctor_revision_requested':
+      case 'scheduled':
+        return {
+          stage: 'ready_for_prep',
+          label: 'Session Draft',
+          variant: 'secondary',
+          colorClass: 'bg-muted text-muted-foreground',
+          nextAction: 'Build your meeting agenda before inviting to schedule',
+        };
+      case 'doctor_prep_submitted':
+        return {
+          stage: 'meeting_ready',
+          label: 'Doctor Prep Submitted',
+          variant: 'default',
+          colorClass: 'bg-emerald-100 text-emerald-800',
+          nextAction: 'Doctor completed their prep — ready to start meeting',
+        };
+      case 'director_prep_ready':
+        return {
+          stage: 'prep_complete',
+          label: 'Agenda Ready',
+          variant: 'default',
+          colorClass: 'bg-amber-100 text-amber-800',
+          nextAction: 'Send scheduling invite to doctor',
+        };
+      case 'meeting_pending':
+        // R1.5: Softened — no longer a blocking gate
         return {
           stage: 'meeting_pending',
-          label: 'Edit Requested by Doctor',
-          variant: 'destructive',
-          colorClass: 'bg-red-100 text-red-800',
-          nextAction: 'Review the doctor\'s feedback and update the summary',
+          label: 'Summary Shared',
+          variant: 'secondary',
+          colorClass: 'bg-purple-100 text-purple-800',
+          nextAction: 'Doctor can review the summary. You can schedule the next session.',
+        };
+      case 'doctor_confirmed':
+        return {
+          stage: isFollowup ? 'followup_completed' : 'doctor_confirmed',
+          label: 'Completed',
+          variant: 'default',
+          colorClass: 'bg-green-100 text-green-800',
+          nextAction: isFollowup
+            ? 'Schedule next follow-up when ready'
+            : 'Schedule a follow-up to check on progress',
+        };
+      case 'doctor_revision_requested':
+        // R1.5: Softened — treat same as meeting_pending with a note
+        return {
+          stage: 'meeting_pending',
+          label: 'Summary Shared — Doctor Left a Note',
+          variant: 'secondary',
+          colorClass: 'bg-amber-100 text-amber-800',
+          nextAction: 'Review the doctor\'s note. You can still schedule the next session.',
         };
     }
   }
 
-  // Check coach baseline status (only when coachBaseline info is actually provided)
+  // R1.3: Removed the coach baseline scheduling gate
+  // When doctor baseline is complete but coach baseline isn't,
+  // show ready_for_prep with a soft nudge instead of blocking
   if (baseline?.status === 'completed' && coachBaseline !== null && coachBaseline !== undefined && coachBaseline?.status !== 'completed') {
     return {
-      stage: 'director_baseline_pending',
-      label: 'Your Review Needed',
-      variant: 'secondary',
-      colorClass: 'bg-amber-100 text-amber-800',
-      nextAction: 'Complete your private baseline assessment before scheduling',
-    };
-  }
-
-  // Check if both baselines done but no session yet
-  if (baseline?.status === 'completed' && coachBaseline?.status === 'completed') {
-    return {
-      stage: 'baseline_submitted',
-      label: 'Ready to Schedule',
+      stage: 'ready_for_prep',
+      label: 'Ready for Prep',
       variant: 'outline',
       colorClass: 'bg-blue-100 text-blue-800',
-      nextAction: 'Schedule the baseline review meeting',
+      nextAction: 'Open the coaching thread to build your meeting agenda',
+      nudge: 'Tip: Complete your private baseline assessment before the meeting for better prep.',
     };
   }
 
-  // Check doctor baseline
+  // Both baselines done but no session yet → ready for prep
+  if (baseline?.status === 'completed' && coachBaseline?.status === 'completed') {
+    return {
+      stage: 'ready_for_prep',
+      label: 'Ready for Prep',
+      variant: 'outline',
+      colorClass: 'bg-blue-100 text-blue-800',
+      nextAction: 'Build your meeting agenda before inviting to schedule',
+    };
+  }
+
+  // Doctor baseline submitted (no coach baseline info provided)
   if (baseline?.status === 'completed') {
     return {
       stage: 'baseline_submitted',
       label: 'Baseline Submitted',
       variant: 'default',
       colorClass: 'bg-green-100 text-green-800',
-      nextAction: 'Review baseline results',
+      nextAction: 'Complete your private assessment, then build the meeting agenda',
     };
   }
 

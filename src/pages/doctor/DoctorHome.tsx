@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, CheckCircle2, Eye, Calendar, FileText, Sparkles, Target } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, Eye, FileText, Sparkles, Target } from 'lucide-react';
 import { format } from 'date-fns';
+import { drName } from '@/lib/doctorDisplayName';
 import { formatInTimeZone } from 'date-fns-tz';
 
 const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -52,142 +53,25 @@ export default function DoctorHome() {
     null, // doctor doesn't see coach baseline
     sessions || [],
     staff?.baseline_released_at,
+    'doctor',
   );
 
-  const displayName = staff?.name || 'Doctor';
+  const displayName = drName(staff?.name);
 
-  // Determine primary CTA
-  const renderPrimaryCTA = () => {
-    // Active prep needed — doctor needs to complete their side
-    const prepSession = sessions?.find(s => s.status === 'director_prep_ready');
-    if (prepSession) {
-      return (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-primary" />
-              <div>
-                <CardTitle>Complete Your Meeting Prep</CardTitle>
-                <CardDescription>
-                  Meeting on {formatInTimeZone(new Date(prepSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              Your agenda and discussion topics are ready for review. Add your own input before the meeting.
-            </p>
-            <Link to={`/doctor/review-prep/${prepSession.id}`}>
-              <Button className="w-full">Start Prep</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      );
-    }
+  // Collect ALL outstanding action items instead of showing only the first match
+  const pendingMeetings = sessions?.filter(s => s.status === 'meeting_pending') || [];
+  const prepSessions = sessions?.filter(s => s.status === 'scheduling_invite_sent') || [];
+  const submittedPrepSessions = sessions?.filter(s => s.status === 'doctor_prep_submitted') || [];
 
-    // Doctor already submitted prep — let them review it
-    const submittedPrepSession = sessions?.find(s => s.status === 'doctor_prep_submitted');
-    if (submittedPrepSession) {
-      return (
-        <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
-              <div>
-                <CardTitle>Prep Submitted</CardTitle>
-                <CardDescription>
-                  Meeting on {formatInTimeZone(new Date(submittedPrepSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              Your prep is submitted. You can review it anytime before the meeting.
-            </p>
-            <Link to={`/doctor/review-prep/${submittedPrepSession.id}`}>
-              <Button variant="outline" className="w-full gap-2">
-                <Eye className="h-4 w-4" />
-                View My Prep
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      );
-    }
+  const hasActionableItems = pendingMeetings.length > 0 || prepSessions.length > 0 || submittedPrepSessions.length > 0;
+  const hasCoachingStarted = sessions?.some(s => 
+    ['doctor_confirmed', 'meeting_pending', 'scheduling_invite_sent', 'doctor_prep_submitted'].includes(s.status)
+  );
 
-    // Meeting scheduled but director hasn't prepped yet — show informational card
-    const scheduledSession = sessions?.find(s => s.status === 'scheduled');
-    if (scheduledSession) {
-      return (
-        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-              <div>
-                <CardTitle>Meeting Scheduled</CardTitle>
-                <CardDescription>
-                  {formatInTimeZone(new Date(scheduledSession.scheduled_at), LOCAL_TZ, MEETING_FMT)}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Your meeting is coming up. You'll get a notification when the agenda is ready for your review.
-            </p>
-          </CardContent>
-        </Card>
-      );
-    }
+  // Render baseline CTA only when no coaching has started
+  const renderBaselineCTA = () => {
+    if (hasCoachingStarted) return null;
 
-    // Meeting confirmation needed
-    const pendingMeeting = sessions?.find(s => s.status === 'meeting_pending');
-    if (pendingMeeting) {
-      return (
-        <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/30">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-8 w-8 text-purple-600" />
-              <div>
-                <CardTitle>Review Meeting Summary</CardTitle>
-                <CardDescription>
-                  Your meeting summary is ready for review and confirmation.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Link to={`/doctor/review-prep/${pendingMeeting.id}`}>
-              <Button className="w-full" variant="outline">Review & Confirm</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // Post-confirmation: show friendly "on track" message if coaching has started
-    const hasConfirmedSession = sessions?.some(s => s.status === 'doctor_confirmed');
-    if (hasConfirmedSession && baseline?.status === 'completed') {
-      return (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Sparkles className="h-8 w-8 text-primary" />
-              <div>
-                <CardTitle>You're on Track</CardTitle>
-                <CardDescription>
-                  Your coaching journey is underway. Keep practicing your action steps and check back for your next session.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-      );
-    }
-
-    // Baseline states — only show if no coaching sessions exist
     if (baseline?.status === 'completed') {
       return (
         <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
@@ -220,7 +104,6 @@ export default function DoctorHome() {
       );
     }
 
-    // Baseline released but not started — show CTA to begin
     if (staff?.baseline_released_at && !baseline) {
       return (
         <Card className="border-primary/30 bg-primary/5">
@@ -247,7 +130,6 @@ export default function DoctorHome() {
       );
     }
 
-    // Default: friendly welcome — baseline will be initiated by clinical director
     return (
       <Card className="border-primary/20 bg-primary/5">
         <CardHeader>
@@ -284,13 +166,13 @@ export default function DoctorHome() {
     );
   };
 
-  // Upcoming meetings
-  const upcomingSessions = sessions?.filter(s => 
-    ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(s.status)
-  ).sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()) || [];
+  // All sessions with active action steps (confirmed or meeting_pending)
+  const activeSessionIds = sessions?.filter(s => 
+    ['doctor_confirmed', 'meeting_pending'].includes(s.status)
+  ).map(s => s.id) || [];
 
-  // Most recent confirmed session for "Current Focus"
-  const latestConfirmed = sessions?.find(s => s.status === 'doctor_confirmed');
+  // "On track" message only when there are no outstanding items
+  const showOnTrack = !hasActionableItems && sessions?.some(s => s.status === 'doctor_confirmed') && baseline?.status === 'completed';
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -302,53 +184,130 @@ export default function DoctorHome() {
         </div>
       </div>
 
-      {/* Primary CTA */}
-      {renderPrimaryCTA()}
+      {/* All pending meeting summaries needing confirmation */}
+      {pendingMeetings.map(s => (
+        <Card key={s.id} className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/30">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-8 w-8 text-purple-600" />
+              <div>
+                <CardTitle>Review Meeting Summary</CardTitle>
+                <CardDescription>
+                  Session {s.sequence_number} summary is ready for your review and confirmation.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Link to={`/doctor/review-prep/${s.id}`}>
+              <Button className="w-full" variant="outline">Review & Confirm</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ))}
 
-      {/* Current Focus — action steps from latest confirmed session */}
-      {latestConfirmed && <CurrentFocusCard sessionId={latestConfirmed.id} />}
+      {/* All sessions needing prep */}
+      {prepSessions.map(s => (
+        <Card key={s.id} className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <FileText className="h-8 w-8 text-primary" />
+              <div>
+                <CardTitle>Complete Your Meeting Prep</CardTitle>
+                <CardDescription>
+                  {s.scheduled_at
+                    ? `Meeting on ${formatInTimeZone(new Date(s.scheduled_at), LOCAL_TZ, MEETING_FMT)}`
+                    : 'Your coach is ready to meet — prep before scheduling.'
+                  }
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Your agenda and discussion topics are ready for review. Add your own input before the meeting.
+            </p>
+            <Link to={`/doctor/review-prep/${s.id}`}>
+              <Button className="w-full">Start Prep</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ))}
 
-      {/* Upcoming Meetings */}
-      {upcomingSessions.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Upcoming Meetings</h2>
-          {upcomingSessions.map(session => (
-            <Card key={session.id}>
-              <CardContent className="flex items-center gap-3 py-4">
-                <Calendar className="h-5 w-5 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">
-                    {session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${session.sequence_number - 1}`}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatInTimeZone(new Date(session.scheduled_at), LOCAL_TZ, MEETING_FMT)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {/* Submitted preps — informational */}
+      {submittedPrepSessions.map(s => (
+        <Card key={s.id} className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <div>
+                <CardTitle>Prep Submitted</CardTitle>
+                <CardDescription>
+                  {s.scheduled_at
+                    ? `Meeting on ${formatInTimeZone(new Date(s.scheduled_at), LOCAL_TZ, MEETING_FMT)}`
+                    : 'Your prep is submitted and shared with your coach.'}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Link to={`/doctor/review-prep/${s.id}`}>
+              <Button variant="outline" className="w-full gap-2">
+                <Eye className="h-4 w-4" />
+                View My Prep
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ))}
+
+      {/* On track — only when nothing is outstanding */}
+      {showOnTrack && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-8 w-8 text-primary" />
+              <div>
+                <CardTitle>You're on Track</CardTitle>
+                <CardDescription>
+                  Your coaching journey is underway. Keep practicing your action steps and check back for your next session.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
       )}
+
+      {/* Baseline CTA — only shown when no coaching sessions are active */}
+      {!hasActionableItems && !showOnTrack && renderBaselineCTA()}
+
+      {/* Current Focus — action steps from all active sessions */}
+      {activeSessionIds.length > 0 && <CurrentFocusCard sessionIds={activeSessionIds} />}
+
     </div>
   );
 }
 
-function CurrentFocusCard({ sessionId }: { sessionId: string }) {
-  const { data: meetingRecord } = useQuery({
-    queryKey: ['meeting-record', sessionId],
+function CurrentFocusCard({ sessionIds }: { sessionIds: string[] }) {
+  const { data: meetingRecords } = useQuery({
+    queryKey: ['meeting-records-focus', sessionIds],
     queryFn: async () => {
+      if (!sessionIds.length) return [];
       const { data, error } = await supabase
         .from('coaching_meeting_records')
-        .select('experiments')
-        .eq('session_id', sessionId)
-        .maybeSingle();
+        .select('session_id, experiments')
+        .in('session_id', sessionIds);
       if (error) throw error;
-      return data;
+      return data || [];
     },
+    enabled: sessionIds.length > 0,
   });
 
-  const actionSteps = (meetingRecord?.experiments as any[] | null) || [];
-  if (actionSteps.length === 0) return null;
+  const allSteps = (meetingRecords || []).flatMap(
+    r => ((r.experiments as any[] | null) || []).map((step: any) => ({ ...step, sessionId: r.session_id }))
+  );
+
+  if (allSteps.length === 0) return null;
 
   return (
     <Card className="border-primary/20">
@@ -359,7 +318,7 @@ function CurrentFocusCard({ sessionId }: { sessionId: string }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {actionSteps.map((step: any, i: number) => (
+        {allSteps.map((step: any, i: number) => (
           <div key={i} className="p-3 rounded-lg bg-primary/5 border border-primary/10">
             <p className="text-sm font-medium">{step.title}</p>
             {step.description && (

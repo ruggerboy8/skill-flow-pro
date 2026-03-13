@@ -34,6 +34,8 @@ async function transcribeWithWhisper(
   whisperFormData.append('file', audioFile, fileName);
   whisperFormData.append('model', 'whisper-1');
   whisperFormData.append('language', 'en');
+  // Prompt hint improves accuracy for domain-specific vocabulary and prevents hallucination on short clips
+  whisperFormData.append('prompt', 'This is a clinical director providing a baseline assessment of a pediatric dentist. They are commenting on specific Pro Moves related to clinical skills, case acceptance, cultural behavior, and clerical tasks. Terms include: sealants, SDF, Curodont, bitewings, PA, pano, RDA, odontogram, caries risk, sedation, nitrous, pulp therapy, DEJ, anticipatory guidance, morning huddle, space maintainer.');
 
   console.log('[transcribe-audio] Calling OpenAI Whisper API...');
 
@@ -125,6 +127,20 @@ serve(async (req) => {
       size: fileSize,
       sizeInMB: (fileSize / (1024 * 1024)).toFixed(2),
     });
+
+    // Guard against very short / near-silent recordings that cause Whisper to hallucinate
+    // (e.g. returning "visit www.fema.gov"). 3KB webm ≈ < 1 second of audio.
+    const MIN_FILE_BYTES = 3_000;
+    if (fileSize < MIN_FILE_BYTES) {
+      console.warn('[transcribe-audio] File too small, likely silence/noise:', fileSize);
+      return new Response(
+        JSON.stringify({
+          error: 'Recording too short',
+          message: 'The recording was too short to transcribe. Please record at least a few seconds of audio.',
+        }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     let result: { transcript: string };
     let service: 'whisper' | 'elevenlabs';

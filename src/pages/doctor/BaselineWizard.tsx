@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { drName } from '@/lib/doctorDisplayName';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { BaselineWelcome } from '@/components/doctor/BaselineWelcome';
@@ -35,6 +36,23 @@ export default function BaselineWizard() {
   const [ratings, setRatings] = useState<Record<number, { score: number | null; note: string }>>({});
   const [showTutorial, setShowTutorial] = useState(false);
   const [forceOpenProMoveId, setForceOpenProMoveId] = useState<number | null>(null);
+
+  // Fetch name of the person who released this baseline
+  const { data: releaserName } = useQuery({
+    queryKey: ['baseline-releaser', staff?.id],
+    queryFn: async () => {
+      if (!staff?.baseline_released_by) return null;
+      const { data } = await supabase
+        .from('staff')
+        .select('name')
+        .eq('id', staff.baseline_released_by)
+        .maybeSingle();
+      return data?.name || null;
+    },
+    enabled: !!staff?.baseline_released_by,
+  });
+
+  const releaserDisplayName = releaserName ? drName(releaserName) : 'Your Clinical Director';
 
   // Fetch existing assessment
   const { data: existingAssessment } = useQuery({
@@ -117,7 +135,13 @@ export default function BaselineWizard() {
         });
       });
       
-      return Array.from(domainMap.values());
+      const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+      const allDomains = Array.from(domainMap.values());
+      return allDomains.sort((a, b) => {
+        const ai = DOMAIN_ORDER.indexOf(a.domain_name);
+        const bi = DOMAIN_ORDER.indexOf(b.domain_name);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      });
     },
   });
 
@@ -148,7 +172,8 @@ export default function BaselineWizard() {
   // Show tutorial when entering assessment for the first time
   useEffect(() => {
     if (currentStep === 'assessment' && domains?.length) {
-      const seen = localStorage.getItem('baseline-tutorial-seen');
+      const tutorialKey = `baseline-tutorial-seen-${staff?.id || 'unknown'}`;
+      const seen = localStorage.getItem(tutorialKey);
       if (!seen) {
         // Small delay to let DOM render
         const timer = setTimeout(() => setShowTutorial(true), 500);
@@ -314,7 +339,7 @@ export default function BaselineWizard() {
 
   const handleTutorialComplete = () => {
     setShowTutorial(false);
-    localStorage.setItem('baseline-tutorial-seen', 'true');
+    localStorage.setItem(`baseline-tutorial-seen-${staff?.id || 'unknown'}`, 'true');
   };
 
   if (domainsLoading) {
@@ -348,7 +373,8 @@ export default function BaselineWizard() {
     <div className="max-w-4xl mx-auto">
       {currentStep === 'welcome' && (
         <BaselineWelcome 
-          staffName={staff?.name || 'Doctor'}
+          staffName={drName(staff?.name)}
+          releaserName={releaserDisplayName}
           onStart={handleStart}
           isLoading={createAssessmentMutation.isPending}
         />
@@ -389,7 +415,7 @@ export default function BaselineWizard() {
       )}
 
       {currentStep === 'complete' && (
-        <BaselineComplete onFinish={handleFinish} assessmentId={assessmentId} />
+        <BaselineComplete onFinish={handleFinish} assessmentId={assessmentId} releaserName={releaserDisplayName} />
       )}
 
       {/* Tutorial overlay */}

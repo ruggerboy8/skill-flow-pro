@@ -3,13 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { UserPlus, ArrowLeft, Mail, MoreHorizontal } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight, BookOpen } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format } from 'date-fns';
+
 import { getDoctorJourneyStatus, type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
 
@@ -20,7 +20,7 @@ interface DoctorRow {
   location_name: string | null;
   created_at: string;
   journeyStatus: DoctorJourneyStatus;
-  nextMeeting: string | null;
+  
 }
 
 type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
@@ -44,7 +44,6 @@ export default function DoctorManagement() {
       const doctorIds = staffData?.map(d => d.id) || [];
       if (doctorIds.length === 0) return [];
       
-      // Fetch baselines, coach baselines, and sessions in parallel
       const [baselinesRes, coachBaselinesRes, sessionsRes] = await Promise.all([
         supabase
           .from('doctor_baseline_assessments')
@@ -68,7 +67,6 @@ export default function DoctorManagement() {
       const baselineMap = new Map(baselinesRes.data?.map(b => [b.doctor_staff_id, b]) || []);
       const coachBaselineMap = new Map(coachBaselinesRes.data?.map(b => [b.doctor_staff_id, b]) || []);
       
-      // Group sessions by doctor
       const sessionsMap = new Map<string, typeof sessionsRes.data>();
       for (const s of sessionsRes.data || []) {
         if (!sessionsMap.has(s.doctor_staff_id)) sessionsMap.set(s.doctor_staff_id, []);
@@ -86,7 +84,6 @@ export default function DoctorManagement() {
           (s as any).baseline_released_at,
         );
 
-        // Find next upcoming meeting
         const upcomingSessions = sessions
           .filter(sess => ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(sess.status))
           .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
@@ -98,41 +95,94 @@ export default function DoctorManagement() {
           location_name: (s.locations as any)?.name || null,
           created_at: s.created_at || '',
           journeyStatus,
-          nextMeeting: upcomingSessions[0]?.scheduled_at || null,
+          
         };
       });
     },
   });
 
+  // Compute stats from doctors data
+  const stats = doctors ? {
+    total: doctors.length,
+    completed: doctors.filter(d => ['baseline_submitted', 'ready_for_prep', 'prep_complete', 'scheduling_invite_sent', 'meeting_ready', 'meeting_pending', 'doctor_confirmed', 'followup_scheduled', 'followup_completed'].includes(d.journeyStatus.stage)).length,
+    inProgress: doctors.filter(d => d.journeyStatus.stage === 'baseline_in_progress').length,
+    invited: doctors.filter(d => ['invited', 'baseline_released'].includes(d.journeyStatus.stage)).length,
+  } : null;
+
   const filteredDoctors = doctors?.filter(d => {
     if (filter === 'all') return true;
     if (filter === 'needs_my_action') {
-      return ['director_baseline_pending', 'baseline_submitted', 'baseline_review_scheduled', 'prep_complete', 'doctor_confirmed', 'followup_completed'].includes(d.journeyStatus.stage);
+      return ['baseline_submitted', 'ready_for_prep', 'prep_complete', 'doctor_confirmed', 'followup_completed'].includes(d.journeyStatus.stage);
     }
     if (filter === 'waiting_on_doctor') {
-      return ['invited', 'baseline_in_progress', 'waiting_for_doctor_prep', 'meeting_pending'].includes(d.journeyStatus.stage);
+      return ['invited', 'baseline_in_progress', 'baseline_released', 'meeting_pending', 'scheduling_invite_sent'].includes(d.journeyStatus.stage);
     }
     return true;
   });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link to="/clinical">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">Doctor Management</h1>
-          <p className="text-muted-foreground">Invite and manage doctors in the program</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Clinical Director Portal</h1>
+          <p className="text-muted-foreground">Manage doctor onboarding and development</p>
         </div>
-        <Button onClick={() => setInviteOpen(true)}>
-          <UserPlus className="w-4 h-4 mr-2" />
-          Invite Doctor
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate('/clinical/pro-moves')}>
+            <BookOpen className="w-4 h-4 mr-2" />
+            Pro Moves Library
+          </Button>
+          <Button onClick={() => setInviteOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invite Doctor
+          </Button>
+        </div>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Doctors</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{isLoading ? '—' : stats?.total ?? 0}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Baseline Complete</CardTitle>
+            <ClipboardCheck className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600">{isLoading ? '—' : stats?.completed ?? 0}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+            <Clock className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">{isLoading ? '—' : stats?.inProgress ?? 0}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Invited</CardTitle>
+            <UserPlus className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{isLoading ? '—' : stats?.invited ?? 0}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Doctor List */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>All Doctors</CardTitle>
@@ -170,7 +220,8 @@ export default function DoctorManagement() {
                   <TableHead>Location</TableHead>
                   <TableHead>Stage</TableHead>
                   <TableHead>Next Step</TableHead>
-                  <TableHead>Next Meeting</TableHead>
+                  <TableHead>Action</TableHead>
+                  
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -183,7 +234,7 @@ export default function DoctorManagement() {
                   >
                     <TableCell>
                       <div>
-                        <span className="font-medium">{doctor.name}</span>
+                        <span className="font-medium">Dr. {doctor.name}</span>
                         <p className="text-xs text-muted-foreground">{doctor.email}</p>
                       </div>
                     </TableCell>
@@ -199,10 +250,7 @@ export default function DoctorManagement() {
                       <span className="text-sm text-muted-foreground">{doctor.journeyStatus.nextAction}</span>
                     </TableCell>
                     <TableCell>
-                      {doctor.nextMeeting
-                        ? format(new Date(doctor.nextMeeting), 'MMM d, yyyy')
-                        : <span className="text-muted-foreground">—</span>
-                      }
+                      <InlineAction stage={doctor.journeyStatus.stage} doctorId={doctor.id} navigate={navigate} />
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -240,4 +288,48 @@ export default function DoctorManagement() {
       />
     </div>
   );
+}
+
+function InlineAction({ stage, doctorId, navigate }: { stage: string; doctorId: string; navigate: (path: string) => void }) {
+  const goToDetail = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/clinical/doctors/${doctorId}`);
+  };
+
+  if (['baseline_submitted', 'ready_for_prep', 'prep_complete'].includes(stage)) {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Build Prep <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'scheduling_invite_sent') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        View Details <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'meeting_ready') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Start Meeting <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'meeting_pending') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Schedule Next <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'doctor_confirmed' || stage === 'followup_completed') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Start Follow-up <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  return <span className="text-xs text-muted-foreground">—</span>;
 }

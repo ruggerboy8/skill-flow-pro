@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
@@ -30,6 +31,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
   const [name, setName] = useState('');
   const [groupId, setGroupId] = useState('');
   const [locationId, setLocationId] = useState('__roaming__');
+  const [releaseBaseline, setReleaseBaseline] = useState(true);
 
   // Fetch practice groups
   const { data: practiceGroups } = useQuery({
@@ -81,6 +83,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
             name: name.trim(),
             group_id: groupId,
             location_id: locationId === '__roaming__' ? null : locationId,
+            release_baseline: releaseBaseline,
           }),
         }
       );
@@ -116,6 +119,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
     setName('');
     setGroupId('');
     setLocationId('__roaming__');
+    setReleaseBaseline(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -148,7 +152,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Dr. Jane Smith"
+              placeholder="Jane Smith"
               required
             />
           </div>
@@ -204,6 +208,20 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
             <p className="text-xs text-muted-foreground">
               Leave as "Roaming" for doctors who work at multiple locations
             </p>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="release-baseline" className="text-sm font-medium">Release baseline immediately</Label>
+              <p className="text-xs text-muted-foreground">
+                Allow the doctor to start their self-assessment as soon as they accept the invite
+              </p>
+            </div>
+            <Switch
+              id="release-baseline"
+              checked={releaseBaseline}
+              onCheckedChange={setReleaseBaseline}
+            />
           </div>
 
           <DialogFooter>

@@ -1,6 +1,7 @@
 import { Separator } from '@/components/ui/separator';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { Link as LinkIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Link as LinkIcon, CheckCircle2, Clock, Circle } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 interface Selection {
@@ -13,6 +14,17 @@ interface Selection {
       domains?: { domain_name?: string };
     };
   };
+}
+
+interface ProgressEntry {
+  title: string;
+  status: 'going_well' | 'working_on_it' | 'not_started';
+  note: string;
+}
+
+interface ParsedDoctorNote {
+  progress: ProgressEntry[];
+  freeNote: string;
 }
 
 interface Props {
@@ -28,24 +40,32 @@ interface Props {
   doctorName?: string;
 }
 
-export function CombinedPrepView({ session, selections, coachName = 'Alex', doctorName = 'Doctor' }: Props) {
+const STATUS_CONFIG: Record<string, { label: string; icon: typeof CheckCircle2; colorClass: string }> = {
+  going_well: { label: 'Going well', icon: CheckCircle2, colorClass: 'text-emerald-600' },
+  working_on_it: { label: 'Working on it', icon: Clock, colorClass: 'text-amber-600' },
+  not_started: { label: "Haven't started", icon: Circle, colorClass: 'text-muted-foreground' },
+};
+
+function parseDoctorNote(raw: string | null | undefined): ParsedDoctorNote | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.progress && Array.isArray(parsed.progress)) return parsed as ParsedDoctorNote;
+  } catch {
+    // Not JSON — plain text
+  }
+  return null;
+}
+
+export function CombinedPrepView({ session, selections, coachName = 'Your Coach', doctorName = 'Doctor' }: Props) {
   const coachSelections = selections.filter(s => s.selected_by === 'coach');
   const doctorSelections = selections.filter(s => s.selected_by === 'doctor');
+  const parsedNote = parseDoctorNote(session.doctor_note);
 
   return (
     <div className="space-y-6 pt-4">
-      {/* Meeting Link */}
-      {session.meeting_link && (
-        <a
-          href={session.meeting_link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-sm text-primary underline"
-        >
-          <LinkIcon className="h-4 w-4" />
-          Join Meeting
-        </a>
-      )}
+
+
 
       {/* Your Agenda */}
       {session.coach_note && (
@@ -92,10 +112,46 @@ export function CombinedPrepView({ session, selections, coachName = 'Alex', doct
 
       <Separator />
 
+      {/* Prior Action Steps Progress (if present) */}
+      {parsedNote && parsedNote.progress.length > 0 && (
+        <>
+          <section>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{doctorName}'s Action Step Updates</h4>
+            <div className="space-y-2">
+              {parsedNote.progress.map((entry, i) => {
+                const config = STATUS_CONFIG[entry.status] || STATUS_CONFIG.not_started;
+                const Icon = config.icon;
+                return (
+                  <div key={i} className="p-3 rounded-md bg-muted/40 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-4 w-4 ${config.colorClass}`} />
+                      <span className="text-sm font-medium">{entry.title}</span>
+                      <Badge variant="secondary" className="text-xs ml-auto">{config.label}</Badge>
+                    </div>
+                    {entry.note && (
+                      <p className="text-xs text-muted-foreground pl-6">{entry.note}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+          <Separator />
+        </>
+      )}
+
       {/* Doctor's Notes */}
       <section>
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{doctorName}'s Notes & Questions</h4>
-        {session.doctor_note ? (
+        {parsedNote ? (
+          parsedNote.freeNote ? (
+            <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-lg p-4">
+              {parsedNote.freeNote}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">No additional notes.</p>
+          )
+        ) : session.doctor_note ? (
           <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-lg p-4">
             {session.doctor_note}
           </div>

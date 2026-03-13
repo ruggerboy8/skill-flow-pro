@@ -18,6 +18,8 @@ interface BaselineItem {
   action_id: number;
   self_score: number;
   self_note: string | null;
+  coach_note: string | null;
+  coach_score: number | null;
   action_statement: string;
   competency_name: string;
   domain_name: string;
@@ -67,9 +69,41 @@ export default function DoctorBaselineResults() {
     enabled: !!staff?.id,
   });
 
+  // Fetch coach baseline assessment for this doctor
+  const { data: coachBaseline } = useQuery({
+    queryKey: ['coach-baseline-for-doctor', staff?.id],
+    queryFn: async () => {
+      if (!staff?.id) return null;
+      const { data, error } = await supabase
+        .from('coach_baseline_assessments')
+        .select('id')
+        .eq('doctor_staff_id', staff.id)
+        .eq('status', 'completed')
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!staff?.id,
+  });
+
+  // Fetch coach baseline items
+  const { data: coachItems } = useQuery({
+    queryKey: ['coach-baseline-items-for-doctor', coachBaseline?.id],
+    queryFn: async () => {
+      if (!coachBaseline?.id) return [];
+      const { data, error } = await supabase
+        .from('coach_baseline_items')
+        .select('action_id, rating, note_text')
+        .eq('assessment_id', coachBaseline.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!coachBaseline?.id,
+  });
+
   // Fetch baseline items with pro moves and domain info
   const { data: items, isLoading: loadingItems } = useQuery({
-    queryKey: ['baseline-items', baseline?.id],
+    queryKey: ['baseline-items', baseline?.id, coachItems],
     queryFn: async () => {
       if (!baseline?.id) return [];
       const { data, error } = await supabase
@@ -92,15 +126,27 @@ export default function DoctorBaselineResults() {
         .eq('assessment_id', baseline.id)
         .not('self_score', 'is', null);
       if (error) throw error;
-      return (data || []).map((item: any) => ({
-        action_id: item.action_id,
-        self_score: item.self_score,
-        self_note: item.self_note || null,
-        action_statement: item.pro_moves.action_statement,
-        competency_name: item.pro_moves.competencies.name,
-        domain_name: item.pro_moves.competencies.domains.domain_name,
-        domain_id: item.pro_moves.competencies.domains.domain_id,
-      })) as BaselineItem[];
+
+      // Build coach note/score lookup
+      const coachMap = new Map<number, { note: string | null; score: number | null }>();
+      coachItems?.forEach(ci => {
+        coachMap.set(ci.action_id, { note: ci.note_text || null, score: ci.rating ?? null });
+      });
+
+      return (data || []).map((item: any) => {
+        const coach = coachMap.get(item.action_id);
+        return {
+          action_id: item.action_id,
+          self_score: item.self_score,
+          self_note: item.self_note || null,
+          coach_note: coach?.note || null,
+          coach_score: coach?.score ?? null,
+          action_statement: item.pro_moves.action_statement,
+          competency_name: item.pro_moves.competencies.name,
+          domain_name: item.pro_moves.competencies.domains.domain_name,
+          domain_id: item.pro_moves.competencies.domains.domain_id,
+        };
+      }) as BaselineItem[];
     },
     enabled: !!baseline?.id,
   });
@@ -143,11 +189,11 @@ export default function DoctorBaselineResults() {
     if (selfScoreFilters.size > 0) {
       result = result.filter(item => selfScoreFilters.has(item.self_score));
     }
-    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim());
+    if (showOnlyNoted) result = result.filter(item => item.self_note?.trim() || item.coach_note?.trim());
     return result;
   };
 
-  const hasAnyNotes = items?.some(item => item.self_note?.trim()) ?? false;
+  const hasAnyNotes = items?.some(item => item.self_note?.trim() || item.coach_note?.trim()) ?? false;
   const anyFiltersActive = selfScoreFilters.size > 0;
 
   const isLoading = loadingBaseline || loadingItems;
@@ -295,7 +341,9 @@ export default function DoctorBaselineResults() {
                       </div>
                     )}
                     {sortedItems.map((item) => {
-                      const hasNote = !!item.self_note?.trim();
+                      const hasSelfNote = !!item.self_note?.trim();
+                      const hasCoachNote = !!item.coach_note?.trim();
+                      const hasAnyNote = hasSelfNote || hasCoachNote;
                       const isExpanded = expandedNoteId === item.action_id;
                       const colors = SCORE_COLORS[item.self_score];
 
@@ -303,7 +351,7 @@ export default function DoctorBaselineResults() {
                         <div key={item.action_id}>
                           <button
                             onClick={() => {
-                              if (hasNote) {
+                              if (hasAnyNote) {
                                 setExpandedNoteId(isExpanded ? null : item.action_id);
                               } else {
                                 setSelectedItem(item);
@@ -322,7 +370,7 @@ export default function DoctorBaselineResults() {
                               <p className="text-sm font-medium text-foreground">{item.action_statement}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <p className="text-xs text-muted-foreground">{item.competency_name}</p>
-                                {hasNote && (
+                                {hasAnyNote && (
                                   <span className="flex items-center gap-0.5 text-primary">
                                     <MessageSquare className="h-3 w-3" />
                                     <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
@@ -338,10 +386,20 @@ export default function DoctorBaselineResults() {
                               <GraduationCap className="h-4 w-4" />
                             </button>
                           </button>
-                          {hasNote && isExpanded && (
-                            <div className="bg-muted/30 border-t px-4 py-3">
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Your note</p>
-                              <p className="text-sm whitespace-pre-wrap text-foreground">{item.self_note}</p>
+                          {hasAnyNote && isExpanded && (
+                            <div className="bg-muted/30 border-t px-4 py-3 space-y-2">
+                              {hasCoachNote && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Coach note{item.coach_score != null ? ` (rated ${item.coach_score})` : ''}</p>
+                                  <p className="text-sm whitespace-pre-wrap text-foreground">{item.coach_note}</p>
+                                </div>
+                              )}
+                              {hasSelfNote && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Your note</p>
+                                  <p className="text-sm whitespace-pre-wrap text-foreground">{item.self_note}</p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

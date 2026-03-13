@@ -3,21 +3,27 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MapPin } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronDown, TrendingUp } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
-import { DoctorNextActionPanel } from '@/components/clinical/DoctorNextActionPanel';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { drName } from '@/lib/doctorDisplayName';
+
 import { DoctorDetailOverview } from '@/components/clinical/DoctorDetailOverview';
 import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
 import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
+import { DoctorGrowthTimeline } from '@/components/clinical/DoctorGrowthTimeline';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 export default function DoctorDetail() {
   const { staffId } = useParams<{ staffId: string }>();
   const { data: myStaff } = useStaffProfile();
   const [showCoachWizard, setShowCoachWizard] = useState(false);
+  const [baselineOpen, setBaselineOpen] = useState(true);
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   const { data: doctor, isLoading: doctorLoading } = useQuery({
     queryKey: ['doctor-detail', staffId],
@@ -49,19 +55,21 @@ export default function DoctorDetail() {
   });
 
   const { data: coachAssessment } = useQuery({
-    queryKey: ['coach-baseline-assessment', staffId, myStaff?.id],
+    queryKey: ['coach-baseline-assessment', staffId],
     queryFn: async () => {
-      if (!myStaff?.id || !staffId) return null;
+      if (!staffId) return null;
+      // Fetch ANY coach assessment for this doctor (first-to-start owns it)
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
-        .select('id, status, updated_at, completed_at')
+        .select('id, status, updated_at, completed_at, coach_staff_id')
         .eq('doctor_staff_id', staffId)
-        .eq('coach_staff_id', myStaff.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
       if (error) throw error;
       return data;
     },
-    enabled: !!staffId && !!myStaff?.id,
+    enabled: !!staffId,
   });
 
   const { data: sessions } = useQuery({
@@ -69,26 +77,19 @@ export default function DoctorDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('coaching_sessions')
-        .select('id, session_type, sequence_number, status, scheduled_at, meeting_link')
+        .select('id, session_type, sequence_number, status, scheduled_at, meeting_link, coach_staff_id, coach:staff!coaching_sessions_coach_staff_id_fkey(name)')
         .eq('doctor_staff_id', staffId)
         .order('sequence_number', { ascending: false });
       if (error) throw error;
-      return data;
+      return (data || []).map((s: any) => ({
+        ...s,
+        coach_name: s.coach?.name || 'Unknown Coach',
+      }));
     },
     enabled: !!staffId,
   });
 
   const isLoading = doctorLoading || baselineLoading;
-
-  if (showCoachWizard && staffId && doctor) {
-    return (
-      <CoachBaselineWizard
-        doctorStaffId={staffId}
-        doctorName={doctor.name}
-        onBack={() => setShowCoachWizard(false)}
-      />
-    );
-  }
 
   if (isLoading) {
     return (
@@ -102,7 +103,7 @@ export default function DoctorDetail() {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Doctor not found</p>
-        <Link to="/clinical/doctors">
+        <Link to="/clinical">
           <Button variant="link">Back to Doctor Management</Button>
         </Link>
       </div>
@@ -116,16 +117,27 @@ export default function DoctorDetail() {
     (doctor as any)?.baseline_released_at,
   );
 
+  // Full-page coach baseline wizard (replaces detail view)
+  if (showCoachWizard && staffId && doctor) {
+    return (
+      <CoachBaselineWizard
+        doctorStaffId={staffId}
+        doctorName={drName(doctor.name)}
+        onBack={() => setShowCoachWizard(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link to="/clinical/doctors">
+        <Link to="/clinical">
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{doctor.name}</h1>
+            <h1 className="text-2xl font-bold">{drName(doctor.name)}</h1>
             <DoctorJourneyStatusPill status={journeyStatus} />
           </div>
           <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -134,39 +146,51 @@ export default function DoctorDetail() {
           </p>
         </div>
       </div>
+      {/* Pre-session actions (release baseline) */}
+      <DoctorDetailOverview
+        doctor={doctor}
+        baseline={baseline}
+        sessions={sessions || []}
+        journeyStatus={journeyStatus}
+      />
 
-      {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Up Next</TabsTrigger>
-          <TabsTrigger value="thread">Coaching</TabsTrigger>
-          <TabsTrigger value="baseline">Baseline</TabsTrigger>
-        </TabsList>
+      {/* Coaching Thread — the single hub for all session actions */}
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">Coaching Thread</h2>
+        <DoctorDetailThread
+          sessions={sessions || []}
+          coachName={myStaff?.name}
+          doctorName={drName(doctor.name)}
+          doctorStaffId={staffId!}
+          doctorEmail={doctor.email}
+          doctorBaselineComplete={baseline?.status === 'completed'}
+          coachAssessment={coachAssessment}
+          onStartCoachWizard={() => setShowCoachWizard(true)}
+        />
+      </div>
 
-        <DoctorNextActionPanel status={journeyStatus} />
+      {/* Growth Timeline — hidden for now (too similar to coaching thread) */}
 
-        <TabsContent value="overview">
-          <DoctorDetailOverview
-            doctor={doctor}
-            baseline={baseline}
-            sessions={sessions || []}
-            journeyStatus={journeyStatus}
-          />
-        </TabsContent>
-
-        <TabsContent value="thread">
-          <DoctorDetailThread sessions={sessions || []} coachName={myStaff?.name} doctorName={doctor.name} />
-        </TabsContent>
-
-        <TabsContent value="baseline">
+      {/* Baseline — collapsible section */}
+      <Collapsible open={baselineOpen} onOpenChange={setBaselineOpen}>
+        <CollapsibleTrigger asChild>
+          <button className="flex items-center gap-3 w-full py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", baselineOpen && "rotate-180")} />
+            <h2 className="text-lg font-semibold">Baseline Assessment</h2>
+            {baseline?.status === 'completed' && (
+              <Badge variant="secondary" className="ml-auto text-xs">Complete</Badge>
+            )}
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-2">
           <DoctorDetailBaseline
             staffId={staffId!}
             baseline={baseline}
             coachAssessment={coachAssessment}
             onStartCoachWizard={() => setShowCoachWizard(true)}
           />
-        </TabsContent>
-      </Tabs>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

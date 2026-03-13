@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 interface BaselineCompleteProps {
   onFinish: () => void;
   assessmentId: string | null;
+  releaserName?: string;
   existingReflection?: {
     original: string | null;
     formatted: string | null;
@@ -28,8 +29,9 @@ const REFLECTION_PROMPTS = [
   "What stood out?",
 ];
 
-export function BaselineComplete({ onFinish, assessmentId, existingReflection }: BaselineCompleteProps) {
+export function BaselineComplete({ onFinish, assessmentId, releaserName, existingReflection }: BaselineCompleteProps) {
   const { toast } = useToast();
+  const signOff = releaserName || 'Your Clinical Director';
   const [phase, setPhase] = useState<'reflection' | 'done'>(
     existingReflection?.submittedAt ? 'done' : 'reflection'
   );
@@ -95,16 +97,23 @@ export function BaselineComplete({ onFinish, assessmentId, existingReflection }:
         body: formData,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if the response body has a user-friendly message (e.g. "too short")
+        const msg = data?.message || 'Please try again or type your reflection instead.';
+        throw new Error(msg);
+      }
       const transcript = data?.transcript || data?.text || '';
+      if (!transcript.trim()) {
+        throw new Error('No speech detected. Please try recording again with a clear voice.');
+      }
       setReflectionText(transcript);
       setReflectionMode('voice');
       toast({ title: 'Transcription complete', description: 'Review and edit the transcript below.' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Transcription error:', error);
       toast({
         title: 'Transcription failed',
-        description: 'Please try again or type your reflection instead.',
+        description: error.message || 'Please try again or type your reflection instead.',
         variant: 'destructive',
       });
     } finally {
@@ -143,7 +152,7 @@ export function BaselineComplete({ onFinish, assessmentId, existingReflection }:
               <p>
                 Before we wrap up, I'd love to hear what this was like for you. A few sentences is great — just whatever comes to mind.
               </p>
-              <p className="text-right font-medium text-foreground">— Dr. Alex</p>
+              <p className="text-right font-medium text-foreground">— {signOff}</p>
             </div>
 
             {/* Guiding prompts */}
@@ -254,7 +263,7 @@ export function BaselineComplete({ onFinish, assessmentId, existingReflection }:
             <p>
               This is a collaborative discussion to align on your development priorities and create a plan for your professional growth.
             </p>
-            <p className="text-right font-medium text-foreground">— Dr. Alex</p>
+            <p className="text-right font-medium text-foreground">— {signOff}</p>
           </div>
 
           <Button onClick={onFinish} className="w-full" size="lg">

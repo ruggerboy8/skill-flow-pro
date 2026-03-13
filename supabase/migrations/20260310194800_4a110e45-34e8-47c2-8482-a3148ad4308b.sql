@@ -1,0 +1,1 @@
+ALTER TABLE public.coaching_meeting_records ADD COLUMN IF NOT EXISTS prior_action_status JSONB DEFAULT '[]'::jsonb;

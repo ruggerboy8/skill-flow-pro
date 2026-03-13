@@ -1,22 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter, ShieldAlert } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
 import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
+import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import DOMPurify from 'dompurify';
 
 interface Props {
   sessionId: string;
   doctorStaffId: string;
+  doctorName: string;
+  doctorEmail: string;
   onBack: () => void;
 }
 
@@ -31,6 +36,14 @@ const SCORE_COLORS: Record<number, string> = {
 
 function ScoreCircle({ score, label }: { score: number | null | undefined; label: string }) {
   if (score == null) return null;
+  if (score === 0) return (
+    <div className="flex items-center gap-1">
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[9px] font-bold bg-muted text-muted-foreground">
+        N/A
+      </span>
+    </div>
+  );
   return (
     <div className="flex items-center gap-1">
       <span className="text-[10px] text-muted-foreground">{label}</span>
@@ -41,12 +54,78 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   );
 }
 
-export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props) {
+export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffId, doctorName, doctorEmail, onBack }: Props) {
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [coachNote, setCoachNote] = useState('');
   const [published, setPublished] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
+  const [realSessionId, setRealSessionId] = useState<string | null>(initialSessionId === 'new' ? null : initialSessionId);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [priorActionStatuses, setPriorActionStatuses] = useState<Record<number, 'addressed' | 'continuing' | 'dropped'>>({});
+  const [filterLowSelf, setFilterLowSelf] = useState(false);
+  const [filterLowCoach, setFilterLowCoach] = useState(false);
+  const [filterGap, setFilterGap] = useState<'none' | 'gap1' | 'gap2'>('none');
+  const [activeDomains, setActiveDomains] = useState<Set<string>>(new Set());
+  const sessionId = realSessionId ?? '';
+
+  // Check ownership
+  const { data: myStaffForOwnership } = useStaffProfile();
+  const [isReadOnly, setIsReadOnly] = useState(false);
+
+  // Auto-create session when sessionId is 'new'
+  const { data: myStaff } = useStaffProfile();
+  useEffect(() => {
+    if (initialSessionId !== 'new' || realSessionId || isCreatingSession || !myStaff?.id) return;
+    setIsCreatingSession(true);
+    (async () => {
+      try {
+        // Check for existing incomplete sessions first
+        const { data: existing } = await supabase
+          .from('coaching_sessions')
+          .select('id')
+          .eq('doctor_staff_id', doctorStaffId)
+          .eq('coach_staff_id', myStaff.id)
+          .eq('status', 'scheduled')
+          .maybeSingle();
+
+        if (existing?.id) {
+          setRealSessionId(existing.id);
+          return;
+        }
+
+        // Get next sequence number
+        const { data: sessions } = await supabase
+          .from('coaching_sessions')
+          .select('sequence_number')
+          .eq('doctor_staff_id', doctorStaffId)
+          .order('sequence_number', { ascending: false })
+          .limit(1);
+
+        const nextSeq = (sessions?.[0]?.sequence_number ?? 0) + 1;
+        const sessionType = nextSeq === 1 ? 'baseline_review' : 'follow_up';
+
+        const { data: created, error } = await supabase
+          .from('coaching_sessions')
+          .insert({
+            doctor_staff_id: doctorStaffId,
+            coach_staff_id: myStaff.id,
+            session_type: sessionType,
+            sequence_number: nextSeq,
+            status: 'scheduled',
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        setRealSessionId(created.id);
+      } catch (err: any) {
+        toast({ title: 'Error creating session', description: err.message, variant: 'destructive' });
+      } finally {
+        setIsCreatingSession(false);
+      }
+    })();
+  }, [initialSessionId, realSessionId, isCreatingSession, myStaff?.id, doctorStaffId]);
 
   // Fetch session details
   const { data: session } = useQuery({
@@ -60,7 +139,15 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
       if (error) throw error;
       return data;
     },
+    enabled: !!sessionId,
   });
+
+  // Set read-only if session belongs to another coach
+  useEffect(() => {
+    if (session && myStaffForOwnership?.id && session.coach_staff_id !== myStaffForOwnership.id) {
+      setIsReadOnly(true);
+    }
+  }, [session, myStaffForOwnership?.id]);
 
   // Fetch doctor's baseline items as the ProMove pool
   const { data: baselineItems } = useQuery({
@@ -102,26 +189,44 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
   });
 
   // Fetch coach baseline items for coach scores
+  const isBaselineReview = (session?.session_type || 'baseline_review') === 'baseline_review';
   const { data: coachItems } = useQuery({
-    queryKey: ['coach-baseline-items-for-prep', doctorStaffId],
+    queryKey: ['coach-baseline-items-for-prep', doctorStaffId, myStaff?.id],
     queryFn: async () => {
-      const { data: assessment } = await supabase
-        .from('coach_baseline_assessments')
-        .select('id')
-        .eq('doctor_staff_id', doctorStaffId)
-        .maybeSingle();
-
-      if (!assessment?.id) return [];
+      // Try current coach's assessment first
+      let assessmentId: string | null = null;
+      if (myStaff?.id) {
+        const { data: myAssessment } = await supabase
+          .from('coach_baseline_assessments')
+          .select('id')
+          .eq('doctor_staff_id', doctorStaffId)
+          .eq('coach_staff_id', myStaff.id)
+          .maybeSingle();
+        assessmentId = myAssessment?.id ?? null;
+      }
+      // Fallback to latest completed assessment
+      if (!assessmentId) {
+        const { data: latest } = await supabase
+          .from('coach_baseline_assessments')
+          .select('id')
+          .eq('doctor_staff_id', doctorStaffId)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        assessmentId = latest?.id ?? null;
+      }
+      if (!assessmentId) return [];
 
       const { data, error } = await supabase
         .from('coach_baseline_items')
         .select('action_id, rating')
-        .eq('assessment_id', assessment.id);
+        .eq('assessment_id', assessmentId);
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!doctorStaffId,
+    enabled: !!doctorStaffId && isBaselineReview,
   });
 
   // Build a map of action_id -> coach rating
@@ -171,6 +276,23 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     enabled: !!session?.doctor_staff_id && (session?.sequence_number ?? 0) > 1,
   });
 
+  // Fetch saved agenda template for this session type
+  const sessionType = session?.session_type || 'baseline_review';
+  const { data: savedTemplate } = useQuery({
+    queryKey: ['agenda-template', myStaff?.id, sessionType],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('coaching_agenda_templates')
+        .select('template_html')
+        .eq('staff_id', myStaff!.id)
+        .eq('session_type', sessionType)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.template_html || null;
+    },
+    enabled: !!myStaff?.id && !!sessionType,
+  });
+
   // Initialize from existing data
   useState(() => {
     if (existingSelections?.length) {
@@ -190,6 +312,37 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
       }
       return [...prev, actionId];
     });
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!myStaff?.id || !coachNote.trim() || coachNote === '<p><br></p>') {
+      toast({ title: 'Nothing to save', description: 'Write your agenda first.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('coaching_agenda_templates')
+        .upsert({
+          staff_id: myStaff.id,
+          session_type: sessionType,
+          template_html: coachNote,
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: 'staff_id,session_type' });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['agenda-template'] });
+      toast({ title: 'Template saved ✓' });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleLoadTemplate = () => {
+    if (!savedTemplate) {
+      toast({ title: 'No saved template', description: `No template found for ${sessionType === 'baseline_review' ? 'Baseline Review' : 'Check-in'}.`, variant: 'destructive' });
+      return;
+    }
+    setCoachNote(savedTemplate);
+    toast({ title: 'Template loaded' });
   };
 
   const handleMagicFormat = async () => {
@@ -241,11 +394,27 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
         .update({ coach_note: coachNote, status: 'director_prep_ready' })
         .eq('id', sessionId);
       if (sessErr) throw sessErr;
+
+      // Save prior action statuses if any exist
+      if (priorExperiments && priorExperiments.length > 0 && Object.keys(priorActionStatuses).length > 0) {
+        const statusArray = priorExperiments.map((exp: any, i: number) => ({
+          index: i,
+          title: exp.title,
+          status: priorActionStatuses[i] || null,
+        }));
+        // Upsert into the meeting record for this session
+        await supabase
+          .from('coaching_meeting_records')
+          .upsert({
+            session_id: sessionId,
+            prior_action_status: statusArray,
+          } as any, { onConflict: 'session_id' });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
       setPublished(true);
-      toast({ title: 'Prep published', description: 'The doctor can now see and complete their part.' });
+      setShowInviteDialog(true);
     },
     onError: (err: any) => {
       toast({ title: 'Error publishing prep', description: err.message, variant: 'destructive' });
@@ -280,10 +449,50 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
     },
   });
 
+  // Show loading while creating session
+  if (!sessionId || isCreatingSession) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   // Guard: if doctor has already submitted, don't allow editing — redirect back
-  if (session && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
+  if (session && !isReadOnly && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
     onBack();
     return null;
+  }
+
+  // Read-only view for sessions owned by another coach
+  if (isReadOnly && session) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h2 className="text-xl font-bold">Prep for {doctorName}</h2>
+            <Badge variant="secondary" className="text-xs mt-1 gap-1">
+              <ShieldAlert className="h-3 w-3" />
+              Managed by another coach — read only
+            </Badge>
+          </div>
+        </div>
+        {session.coach_note && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Coach Agenda</CardTitle></CardHeader>
+            <CardContent>
+              <div
+                className="prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(session.coach_note) }}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
   }
 
   if (published) {
@@ -292,15 +501,31 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
         <Card className="border-green-200 bg-green-50/50">
           <CardContent className="flex flex-col items-center py-8 text-center">
             <CheckCircle2 className="h-12 w-12 text-green-600 mb-4" />
-            <h2 className="text-xl font-bold">Prep Published</h2>
+            <h2 className="text-xl font-bold">Prep Published & Invite Sent</h2>
             <p className="text-muted-foreground mt-2">
-              The doctor can now see your agenda and complete their prep before the meeting.
+              The doctor can now see your agenda. A scheduling invite has been sent.
             </p>
             <Button variant="outline" className="mt-6" onClick={onBack}>
               Back to Doctor Detail
             </Button>
           </CardContent>
         </Card>
+
+        <SchedulingInviteComposer
+          open={showInviteDialog}
+          onOpenChange={(open) => {
+            setShowInviteDialog(open);
+          }}
+          doctorName={doctorName}
+          doctorEmail={doctorEmail}
+          doctorStaffId={doctorStaffId}
+          sessionId={sessionId}
+          sessionType={sessionType}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+            queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
+          }}
+        />
       </div>
     );
   }
@@ -336,7 +561,7 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
         </Button>
         <div>
           <h2 className="text-xl font-bold">Build Meeting Agenda</h2>
-          {session && (
+          {session?.scheduled_at && (
             <p className="text-sm text-muted-foreground">
               Meeting: {format(new Date(session.scheduled_at), 'EEEE, MMMM d \'at\' h:mm a')}
             </p>
@@ -350,17 +575,39 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
           <CardHeader>
             <div className="flex items-center gap-2">
               <FlaskConical className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Prior Experiments</CardTitle>
+              <CardTitle className="text-base">Prior Action Steps</CardTitle>
             </div>
-            <CardDescription>From the previous session — discuss progress on these.</CardDescription>
+            <CardDescription>From the previous session — tag each item's status.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {priorExperiments.map((exp: any, i: number) => (
-              <div key={i} className="p-2 rounded-md bg-muted/30 border">
-                <p className="text-sm font-medium">{exp.title}</p>
-                {exp.description && <p className="text-xs text-muted-foreground mt-0.5">{exp.description}</p>}
-              </div>
-            ))}
+          <CardContent className="space-y-3">
+            {priorExperiments.map((exp: any, i: number) => {
+              const status = priorActionStatuses[i];
+              return (
+                <div key={i} className="p-3 rounded-md bg-muted/30 border space-y-2">
+                  <p className="text-sm font-medium">{exp.title}</p>
+                  {exp.description && <p className="text-xs text-muted-foreground">{exp.description}</p>}
+                  <div className="flex gap-1.5">
+                    {([
+                      { key: 'addressed' as const, label: '✓ Addressed', variant: 'default' },
+                      { key: 'continuing' as const, label: '→ Continuing', variant: 'secondary' },
+                      { key: 'dropped' as const, label: '✗ Dropped', variant: 'outline' },
+                    ] as const).map(opt => (
+                      <Badge
+                        key={opt.key}
+                        variant={status === opt.key ? 'default' : 'outline'}
+                        className={`cursor-pointer text-xs ${status === opt.key ? '' : 'opacity-60 hover:opacity-100'}`}
+                        onClick={() => setPriorActionStatuses(prev => ({
+                          ...prev,
+                          [i]: prev[i] === opt.key ? undefined! : opt.key,
+                        }))}
+                      >
+                        {opt.label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}
@@ -375,65 +622,157 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
         </CardHeader>
         <CardContent>
           {availableDomains.length > 0 ? (
-            <Tabs defaultValue={availableDomains[0]}>
-              <TabsList className="w-full h-auto flex-wrap gap-1 bg-transparent p-0 mb-3">
-                {availableDomains.map(domain => (
-                  <TabsTrigger
-                    key={domain}
-                    value={domain}
-                    className="text-xs data-[state=active]:shadow-sm rounded-full px-3 py-1.5 border transition-colors"
-                    style={{
-                      backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.15)`,
-                      borderColor: `hsl(${getDomainColorRaw(domain)} / 0.3)`,
-                    }}
-                  >
-                    {domain}
-                    <span className="ml-1 text-muted-foreground">({(groupedItems[domain] || []).length})</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+            <div className="space-y-3">
+              {/* Domain multi-select filter buttons */}
+              <div className="flex flex-wrap gap-2">
+                {availableDomains.map(domain => {
+                  const isActive = activeDomains.size === 0 || activeDomains.has(domain);
+                  const raw = getDomainColorRaw(domain);
+                  return (
+                    <button
+                      key={domain}
+                      onClick={() => {
+                        setActiveDomains(prev => {
+                          const next = new Set(prev);
+                          if (next.has(domain)) {
+                            next.delete(domain);
+                          } else {
+                            next.add(domain);
+                          }
+                          return next;
+                        });
+                      }}
+                      className="text-xs rounded-full px-3 py-1.5 border-2 font-semibold transition-all"
+                      style={isActive ? {
+                        backgroundColor: `hsl(${raw} / 0.3)`,
+                        borderColor: `hsl(${raw} / 0.8)`,
+                        color: 'hsl(0 0% 10%)',
+                      } : {
+                        backgroundColor: `hsl(${raw} / 0.08)`,
+                        borderColor: `hsl(${raw} / 0.25)`,
+                        color: `hsl(${raw})`,
+                      }}
+                    >
+                      {domain}
+                      <span className="ml-1 opacity-70">({(groupedItems[domain] || []).length})</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-              {availableDomains.map(domain => (
-                <TabsContent key={domain} value={domain} className="mt-0">
-                  <div
-                    className="rounded-lg border p-3 space-y-1"
-                    style={{ backgroundColor: `hsl(${getDomainColorRaw(domain)} / 0.06)` }}
+              {/* Filter Bar */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                <Badge
+                  variant={filterLowSelf ? 'default' : 'outline'}
+                  className="cursor-pointer text-xs"
+                  onClick={() => setFilterLowSelf(v => !v)}
+                >
+                  Low Self (1–2)
+                </Badge>
+                {isBaselineReview && (
+                  <>
+                    <Badge
+                      variant={filterLowCoach ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => setFilterLowCoach(v => !v)}
+                    >
+                      Low Coach (1–2)
+                    </Badge>
+                    <Badge
+                      variant={filterGap === 'gap1' ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => setFilterGap(v => v === 'gap1' ? 'none' : 'gap1')}
+                    >
+                      Gap ≥1
+                    </Badge>
+                    <Badge
+                      variant={filterGap === 'gap2' ? 'default' : 'outline'}
+                      className="cursor-pointer text-xs"
+                      onClick={() => setFilterGap(v => v === 'gap2' ? 'none' : 'gap2')}
+                    >
+                      Gap ≥2
+                    </Badge>
+                  </>
+                )}
+                {(filterLowSelf || filterLowCoach || filterGap !== 'none') && (
+                  <button
+                    onClick={() => { setFilterLowSelf(false); setFilterLowCoach(false); setFilterGap('none'); }}
+                    className="text-xs text-primary hover:underline ml-1"
                   >
-                    {(groupedItems[domain] || []).map(item => {
-                      const pm = item.pro_moves as any;
-                      const competency = pm?.competencies;
-                      const isSelected = selectedActions.includes(item.action_id);
-                      const coachScore = coachRatingMap[item.action_id];
-                      return (
-                        <label
-                          key={item.action_id}
-                          className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-primary/10 ring-1 ring-primary/30'
-                              : 'hover:bg-background/60'
-                          }`}
-                        >
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleAction(item.action_id)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
-                            {competency?.name && (
-                              <p className="text-xs text-muted-foreground italic mt-0.5">{competency.name}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <ScoreCircle score={item.self_score} label="Self" />
-                            <ScoreCircle score={coachScore} label="You" />
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Domain-grouped items */}
+              {availableDomains
+                .filter(domain => activeDomains.size === 0 || activeDomains.has(domain))
+                .map(domain => {
+                  const filtered = (groupedItems[domain] || []).filter(item => {
+                    const selfScore = item.self_score;
+                    const coachScore = coachRatingMap[item.action_id];
+                    if (filterLowSelf && (selfScore == null || selfScore === 0 || selfScore > 2)) return false;
+                    if (filterLowCoach && (coachScore == null || coachScore === 0 || coachScore > 2)) return false;
+                    if (filterGap !== 'none') {
+                      if (selfScore == null || selfScore === 0 || coachScore == null || coachScore === 0) return false;
+                      const gap = Math.abs(selfScore - coachScore);
+                      if (filterGap === 'gap1' && gap < 1) return false;
+                      if (filterGap === 'gap2' && gap < 2) return false;
+                    }
+                    return true;
+                  });
+                  if (filtered.length === 0) return null;
+                  const raw = getDomainColorRaw(domain);
+                  return (
+                    <div key={domain}>
+                      <div
+                        className="rounded-t-lg px-3 py-1.5 flex items-center gap-2"
+                        style={{ backgroundColor: `hsl(${raw} / 0.12)` }}
+                      >
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `hsl(${raw})` }} />
+                        <span className="text-xs font-semibold" style={{ color: `hsl(${raw})` }}>{domain}</span>
+                      </div>
+                      <div
+                        className="rounded-b-lg border border-t-0 p-3 space-y-1"
+                        style={{ backgroundColor: `hsl(${raw} / 0.04)` }}
+                      >
+                        {filtered.map(item => {
+                          const pm = item.pro_moves as any;
+                          const competency = pm?.competencies;
+                          const isSelected = selectedActions.includes(item.action_id);
+                          const coachScore = coachRatingMap[item.action_id];
+                          return (
+                            <label
+                              key={item.action_id}
+                              className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'bg-primary/10 ring-1 ring-primary/30'
+                                  : 'hover:bg-background/60'
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleAction(item.action_id)}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
+                                {competency?.name && (
+                                  <p className="text-xs text-muted-foreground italic mt-0.5">{competency.name}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <ScoreCircle score={item.self_score} label="Self" />
+                                {isBaselineReview && <ScoreCircle score={coachScore} label="You" />}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">No baseline items found.</p>
           )}
@@ -459,7 +798,7 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
                     <DomainBadge domain={domainName} />
                     <span className="text-sm font-medium flex-1">{pm?.action_statement}</span>
                     <ScoreCircle score={item.self_score} label="Self" />
-                    <ScoreCircle score={coachScore} label="You" />
+                    {isBaselineReview && <ScoreCircle score={coachScore} label="You" />}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -479,23 +818,44 @@ export function DirectorPrepComposer({ sessionId, doctorStaffId, onBack }: Props
       {/* Meeting Agenda (Quill) */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-base">Meeting Agenda</CardTitle>
               <CardDescription>
                 Build your agenda for the meeting. Use the magic button to auto-format.
               </CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={handleMagicFormat}
-              disabled={isFormatting}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              {isFormatting ? 'Formatting...' : 'Magic Format'}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs"
+                onClick={handleLoadTemplate}
+                title={savedTemplate ? 'Load your saved template' : 'No saved template'}
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                Load
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs"
+                onClick={handleSaveTemplate}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Save
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleMagicFormat}
+                disabled={isFormatting}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {isFormatting ? 'Formatting...' : 'Magic Format'}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

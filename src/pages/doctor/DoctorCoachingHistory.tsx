@@ -27,7 +27,7 @@ export default function DoctorCoachingHistory() {
     enabled: !!staff?.id,
   });
 
-  const completedSessions = sessions?.filter(s => s.status === 'doctor_confirmed')
+  const completedSessions = sessions?.filter(s => s.status === 'doctor_confirmed' || s.status === 'meeting_pending')
     .sort((a, b) => b.sequence_number - a.sequence_number) || [];
 
   return (
@@ -54,7 +54,7 @@ export default function DoctorCoachingHistory() {
   );
 }
 
-function CompletedSessionCard({ session }: { session: { id: string; session_type: string; sequence_number: number; scheduled_at: string } }) {
+function CompletedSessionCard({ session }: { session: { id: string; session_type: string; sequence_number: number; scheduled_at: string | null } }) {
   const [open, setOpen] = useState(false);
 
   const { data: meetingRecord } = useQuery({
@@ -84,7 +84,7 @@ function CompletedSessionCard({ session }: { session: { id: string; session_type
               <div>
                 <p className="text-sm font-medium">{typeLabel}</p>
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(session.scheduled_at), 'MMMM d, yyyy')}
+                  {session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}
                 </p>
               </div>
             </div>

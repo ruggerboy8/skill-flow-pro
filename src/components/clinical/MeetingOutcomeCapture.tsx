@@ -7,9 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Plus, Trash2, Send, Calendar } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, CheckCircle2, Clock, CircleDashed, ShieldAlert } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import DOMPurify from 'dompurify';
 
 interface Experiment {
   title: string;
@@ -23,8 +26,18 @@ interface Props {
 
 export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const queryClient = useQueryClient();
+  const { data: myStaff } = useQuery({
+    queryKey: ['staff-profile-for-ownership'],
+    queryFn: async () => {
+      const { data } = await supabase.from('staff').select('id').eq('user_id', (await supabase.auth.getUser()).data.user?.id!).single();
+      return data;
+    },
+  });
   const [summary, setSummary] = useState('');
   const [experiments, setExperiments] = useState<Experiment[]>([{ title: '', description: '' }]);
+  const [transcriptMode, setTranscriptMode] = useState(false);
+  const [rawTranscript, setRawTranscript] = useState('');
+  const [aiProcessing, setAiProcessing] = useState(false);
 
   const { data: session } = useQuery({
     queryKey: ['coaching-session', sessionId],
@@ -75,7 +88,6 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const coachSelections = selections?.filter(s => s.selected_by === 'coach') || [];
   const doctorSelections = selections?.filter(s => s.selected_by === 'doctor') || [];
 
-  // Find overlapping action_ids
   const coachIds = new Set(coachSelections.map(s => s.action_id));
   const doctorIds = new Set(doctorSelections.map(s => s.action_id));
   const overlapIds = new Set([...coachIds].filter(id => doctorIds.has(id)));
@@ -98,6 +110,53 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
     setExperiments(prev => prev.map((e, i) => i === index ? { ...e, [field]: value } : e));
   };
 
+  const generateFromTranscript = async () => {
+    if (!rawTranscript.trim()) {
+      toast({ title: 'Paste a transcript first', variant: 'destructive' });
+      return;
+    }
+    setAiProcessing(true);
+    try {
+      // Step 1: Format transcript
+      const { data: fmtData, error: fmtErr } = await supabase.functions.invoke('format-transcript', {
+        body: { transcript: rawTranscript, source: 'coaching' },
+      });
+      if (fmtErr) throw fmtErr;
+      const formatted = fmtData?.formatted || rawTranscript;
+
+      // Step 2: Extract insights (coaching mode for action steps)
+      const { data: insData, error: insErr } = await supabase.functions.invoke('extract-insights', {
+        body: { transcript: formatted, source: 'coaching' },
+      });
+      if (insErr) throw insErr;
+
+      // Unwrap nested insights key if present
+      const insights = insData?.insights || insData;
+
+      // Pre-fill summary
+      if (insights?.summary_html) {
+        const plainText = insights.summary_html.replace(/<[^>]*>/g, '').trim();
+        if (plainText) setSummary(plainText);
+      }
+
+      // Pre-fill action steps from AI-extracted commitments
+      const actionSteps = insights?.action_steps as { title: string }[] | undefined;
+      if (actionSteps?.length) {
+        const newExperiments: Experiment[] = actionSteps.slice(0, 3).map(step => ({
+          title: step.title,
+          description: '',
+        }));
+        if (newExperiments.length > 0) setExperiments(newExperiments);
+      }
+
+      toast({ title: 'AI summary generated', description: 'Review and edit the pre-filled fields below.' });
+    } catch (err: any) {
+      toast({ title: 'AI processing failed', description: err.message || 'Try again or enter manually.', variant: 'destructive' });
+    } finally {
+      setAiProcessing(false);
+    }
+  };
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       const validExperiments = experiments.filter(e => e.title.trim());
@@ -116,9 +175,18 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
       const { error: statusErr } = await supabase
         .from('coaching_sessions')
-        .update({ status: 'meeting_pending' })
+        .update({ status: 'meeting_pending', scheduled_at: new Date().toISOString() })
         .eq('id', sessionId);
       if (statusErr) throw statusErr;
+
+      // Send email notification to doctor (fire-and-forget)
+      try {
+        await supabase.functions.invoke('notify-meeting-summary', {
+          body: { session_id: sessionId },
+        });
+      } catch (emailErr) {
+        console.warn('Meeting summary email notification failed:', emailErr);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
@@ -133,6 +201,8 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
   if (!session) return null;
 
+  const isReadOnly = myStaff?.id ? session.coach_staff_id !== myStaff.id : false;
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       {/* Header */}
@@ -141,13 +211,19 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-xl font-bold">Capture Meeting Outcome</h2>
+          <h2 className="text-xl font-bold">{isReadOnly ? 'Meeting Outcome (Read Only)' : 'Capture Meeting Outcome'}</h2>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
             <Calendar className="h-3.5 w-3.5" />
-            {format(new Date(session.scheduled_at), 'MMMM d, yyyy')}
+            {session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}
             <span>·</span>
             <span>{doctorName}</span>
           </div>
+          {isReadOnly && (
+            <Badge variant="secondary" className="text-xs mt-1 gap-1">
+              <ShieldAlert className="h-3 w-3" />
+              Managed by another coach
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -181,6 +257,119 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
             <p className="text-sm text-muted-foreground">No discussion topics selected.</p>
           )}
         </CardContent>
+      </Card>
+
+      {/* Coach Agenda */}
+      {session.coach_note && session.coach_note.trim() && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              Coach Agenda
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="prose prose-sm max-w-none text-sm [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(session.coach_note) }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Doctor's Prep Notes */}
+      {session.doctor_note && (() => {
+        try {
+          const parsed = JSON.parse(session.doctor_note);
+          const progress = (parsed.progress as { title: string; status: string; note?: string }[]) || [];
+          const freeNote = parsed.freeNote as string | undefined;
+          if (progress.length === 0 && !freeNote?.trim()) return null;
+
+          const statusIcon = (s: string) => {
+            if (s === 'Going well') return <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />;
+            if (s === 'Working on it') return <Clock className="h-4 w-4 text-amber-500 shrink-0" />;
+            return <CircleDashed className="h-4 w-4 text-muted-foreground shrink-0" />;
+          };
+
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{doctorName}'s Prep Notes</CardTitle>
+                <CardDescription>Progress on prior action steps and additional notes from the doctor.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {progress.map((p, i) => (
+                  <div key={i} className="flex items-start gap-2.5 p-2 rounded-md bg-muted/30 border">
+                    {statusIcon(p.status)}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2 flex-wrap">
+                        <p className="text-sm font-medium break-words">{p.title}</p>
+                        <Badge variant="secondary" className="text-[10px]">{p.status}</Badge>
+                      </div>
+                      {p.note && <p className="text-xs text-muted-foreground mt-0.5">{p.note}</p>}
+                    </div>
+                  </div>
+                ))}
+                {freeNote?.trim() && (
+                  <div className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3 border">
+                    {freeNote}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        } catch {
+          // doctor_note is plain text, not JSON
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{doctorName}'s Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md p-3">{session.doctor_note}</p>
+              </CardContent>
+            </Card>
+          );
+        }
+      })()}
+
+      {/* AI Transcript Assist */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                AI Transcript Assist
+              </CardTitle>
+              <CardDescription>Paste a meeting transcript to auto-generate summary and action steps.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="transcript-mode" className="text-xs text-muted-foreground">Use Transcript</Label>
+              <Switch id="transcript-mode" checked={transcriptMode} onCheckedChange={setTranscriptMode} />
+            </div>
+          </div>
+        </CardHeader>
+        {transcriptMode && (
+          <CardContent className="space-y-3">
+            <Textarea
+              value={rawTranscript}
+              onChange={(e) => setRawTranscript(e.target.value)}
+              placeholder="Paste your meeting transcript here..."
+              rows={6}
+              className="resize-y text-sm"
+            />
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={generateFromTranscript}
+              disabled={aiProcessing || !rawTranscript.trim()}
+            >
+              {aiProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {aiProcessing ? 'Processing...' : 'Generate Summary'}
+            </Button>
+          </CardContent>
+        )}
       </Card>
 
       {/* Experiments */}
@@ -235,25 +424,30 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           <Textarea
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            placeholder="Summarize the key discussion points, agreements, and next steps..."
+            placeholder="Write a warm note to the doctor summarizing what you discussed, what you agreed on, and what they'll focus on next. Use 'you' language (e.g., 'You mentioned that…', 'We agreed you'd try…')."
             rows={5}
             className="resize-y"
+            disabled={isReadOnly}
           />
         </CardContent>
       </Card>
 
       {/* Submit */}
-      <Button
-        className="w-full gap-2"
-        onClick={() => submitMutation.mutate()}
-        disabled={!summary.trim() || submitMutation.isPending}
-      >
-        <Send className="h-4 w-4" />
-        {submitMutation.isPending ? 'Submitting...' : 'Submit for Doctor Review'}
-      </Button>
-      <p className="text-xs text-muted-foreground text-center pb-4">
-        The doctor will be able to review and confirm this summary.
-      </p>
+      {!isReadOnly && (
+        <>
+          <Button
+            className="w-full gap-2"
+            onClick={() => submitMutation.mutate()}
+            disabled={!summary.trim() || submitMutation.isPending}
+          >
+            <Send className="h-4 w-4" />
+            {submitMutation.isPending ? 'Submitting...' : 'Submit & Share with Doctor'}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center pb-4">
+            The doctor will be able to review and acknowledge this summary.
+          </p>
+        </>
+      )}
     </div>
   );
 }

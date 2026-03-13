@@ -46,3 +46,25 @@
 ### 1D — text-2xs Utility
 - Added `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `tailwind.config.ts`
 - Replaced all 340 occurrences of `text-[10px]` → `text-2xs` across 42 files
+
+## Micro-Celebrations + Mobile Slide Transitions
+
+**Status: ✅ Complete**
+
+### 3A — Confetti on Celebration Moments
+- Added `canvas-confetti` dependency
+- Created `src/lib/confetti.ts` helper with `fireCelebration()` function
+- PerformanceWizard: confetti fires on victory modal open + on successful non-repair submit
+- ConfidenceWizard: confetti fires on successful non-repair submit
+
+### 3B — Submit Button Checkmark Animation
+- Added `submitPhase` state (`idle` | `saving` | `done`) to both wizards
+- Submit button transitions: text → spinner → green ✓ checkmark with scale-in animation
+- 1.8s celebration delay before navigating (0.8s for repair mode)
+
+### 4A — Mobile Slide Transitions
+- Added `framer-motion` dependency
+- Wrapped wizard step content in `<AnimatePresence mode="wait">` with directional slide variants
+- Forward (Next): slides in from right, exits left
+- Backward (Back): slides in from left, exits right
+- 200ms ease-out transitions; progress dots and sticky footer stay static

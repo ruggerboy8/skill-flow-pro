@@ -10,7 +10,7 @@ import { WeekBuilderPanel } from "@/components/planner/WeekBuilderPanel";
 
 export default function AdminBuilder() {
   const navigate = useNavigate();
-  const { canManageAssignments, organizationId, isLoading } = useUserRole();
+  const { canManageAssignments, organizationId, practiceType, isLoading } = useUserRole();
 
   if (isLoading) {
     return (

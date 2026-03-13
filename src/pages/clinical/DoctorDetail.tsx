@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, MapPin, ChevronDown, TrendingUp } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';

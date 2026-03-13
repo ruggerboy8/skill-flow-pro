@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter, ShieldAlert } from 'lucide-react';

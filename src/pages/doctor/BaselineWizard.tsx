@@ -8,6 +8,7 @@ import { BaselineWelcome } from '@/components/doctor/BaselineWelcome';
 import { DomainAssessmentStep } from '@/components/doctor/DomainAssessmentStep';
 import { BaselineComplete } from '@/components/doctor/BaselineComplete';
 import { BaselineTutorial } from '@/components/doctor/BaselineTutorial';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 

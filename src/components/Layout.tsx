@@ -12,6 +12,7 @@ import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
 import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 // Server-side backfill detection via RPC
 
 export default function Layout() {

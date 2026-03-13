@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { drName } from '@/lib/doctorDisplayName';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';

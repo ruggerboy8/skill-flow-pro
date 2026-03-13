@@ -900,6 +900,7 @@ export function WeekBuilderPanel({
           roleId={roleId}
           onSelect={handleSelectProMove}
           orgId={orgId}
+          practiceType={practiceType}
         />
       )}
 

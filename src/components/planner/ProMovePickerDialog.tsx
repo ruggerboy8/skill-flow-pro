@@ -57,11 +57,17 @@ export function ProMovePickerDialog({
     setHiddenCount(0);
 
     // 1) moves
-    const { data: movesData } = await supabase
+    let movesQuery = supabase
       .from('pro_moves')
       .select('action_id, action_statement, competency_id')
       .eq('role_id', roleId)
       .eq('active', true);
+
+    if (practiceType) {
+      movesQuery = movesQuery.contains('practice_types', [practiceType]);
+    }
+
+    const { data: movesData } = await movesQuery;
 
     // 2) org visibility overrides — exclude moves the org has hidden
     let hiddenIds = new Set<number>();

@@ -81,7 +81,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
             <Minus className="w-5 h-5 text-muted-foreground" />
           </div>
           <div>
-            <p className="text-xs text-muted-foreground font-medium">Completion Rate</p>
+            <p className="text-xs text-muted-foreground font-medium">Meeting Participation Rate</p>
             <p className="text-sm text-muted-foreground">No submission data yet</p>
           </div>
         </div>
@@ -125,7 +125,7 @@ export default function OnTimeRateWidget({ staffId }: OnTimeRateWidgetProps) {
           <TrendingUp className={cn("w-5 h-5", getHealthColor(rate))} />
         </div>
         <div>
-          <p className="text-xs text-muted-foreground font-medium">Completion Rate</p>
+          <p className="text-xs text-muted-foreground font-medium">Meeting Participation Rate</p>
           <div className="flex items-baseline gap-2">
             <span className={cn("text-2xl font-bold", getHealthColor(rate))}>
               {stats.completionRate.toFixed(0)}%

@@ -22,8 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CalendarOff, MoreVertical, Check, X } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { CalendarOff, MoreVertical, Check, X, ClipboardCheck } from 'lucide-react';
+import { format, parseISO, subWeeks, differenceInDays } from 'date-fns';
 import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -31,9 +31,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import OnTimeRateWidget from '@/components/coach/OnTimeRateWidget';
 import { QuarterlyEvalsTab } from '@/components/coach/QuarterlyEvalsTab';
-import { StaffPriorityFocusTab } from '@/components/coach/StaffPriorityFocusTab';
+import { StaffOverviewTab } from '@/components/coach/StaffOverviewTab';
 import { RawScoreRow } from '@/types/coachV2';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainColor, getDomainColorRich } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { toast } from 'sonner';
 
@@ -113,9 +113,54 @@ export default function StaffDetailV2() {
     },
   });
 
+  // Fetch evaluations for this staff member (for eval proximity badge + count)
+  const { data: staffEvals = [] } = useQuery({
+    queryKey: ['staff-evals-dates', staffId],
+    queryFn: async () => {
+      if (!staffId) return [];
+      const { data, error } = await supabase
+        .from('evaluations')
+        .select('id, observed_at, status')
+        .eq('staff_id', staffId)
+        .eq('status', 'submitted');
+      if (error) throw error;
+      return (data || []) as { id: string; observed_at: string | null; status: string }[];
+    },
+    enabled: !!staffId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Helper to check if a metric is excused
   const isExcused = (weekOf: string, metric: 'confidence' | 'performance') =>
     excusedSubmissions.some(e => e.week_of === weekOf && e.metric === metric);
+
+  // Eval proximity: returns closest eval within ±14 days of a given week_of
+  const getEvalForWeek = (weekOf: string) => {
+    const weekDate = parseISO(weekOf);
+    return staffEvals.find(ev => {
+      if (!ev.observed_at) return false;
+      const diff = Math.abs(differenceInDays(parseISO(ev.observed_at), weekDate));
+      return diff <= 14;
+    }) ?? null;
+  };
+
+  // Domain confidence strip (last 6 weeks)
+  const domainConfidenceStrip = useMemo(() => {
+    const sixWeeksAgo = subWeeks(new Date(), 6);
+    const byDomain = new Map<string, { sum: number; count: number }>();
+    rawData.forEach(row => {
+      if (row.confidence_score === null || !row.domain_name || !row.week_of) return;
+      if (new Date(row.week_of) < sixWeeksAgo) return;
+      const existing = byDomain.get(row.domain_name) ?? { sum: 0, count: 0 };
+      existing.sum += (row as any).confidence_score;
+      existing.count += 1;
+      byDomain.set(row.domain_name, existing);
+    });
+    return Array.from(byDomain.entries()).map(([domain, { sum, count }]) => ({
+      domain,
+      avg: sum / count,
+    })).sort((a, b) => a.domain.localeCompare(b.domain));
+  }, [rawData]);
 
   // Get staff info from first available summary
   const staffInfo = useMemo(() => {
@@ -338,14 +383,42 @@ export default function StaffDetailV2() {
         </div>
       </div>
 
-      {/* On-time widget */}
-      <OnTimeRateWidget staffId={staffId!} />
+      {/* Domain Confidence Strip */}
+      {domainConfidenceStrip.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">
+            Self-reported avg confidence · last 6 weeks
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {domainConfidenceStrip.map(({ domain, avg }) => {
+              const richColor = getDomainColorRich(domain);
+              const bgColor = avg >= 3.0 ? 'bg-emerald-50 dark:bg-emerald-950/20' : avg >= 2.5 ? 'bg-amber-50 dark:bg-amber-950/20' : 'bg-rose-50 dark:bg-rose-950/20';
+              const textColor = avg >= 3.0 ? 'text-emerald-700 dark:text-emerald-400' : avg >= 2.5 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400';
+              return (
+                <div key={domain} className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${bgColor}`}>
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: richColor }} />
+                  <span className="text-xs font-medium text-muted-foreground">{domain}</span>
+                  <span className={`text-sm font-bold ${textColor}`}>{avg.toFixed(1)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Meeting Participation Widget */}
+      <div>
+        <OnTimeRateWidget staffId={staffId!} />
+        <p className="text-xs text-muted-foreground mt-2">
+          Based on weekly pro move submissions, which reflect participation in check-in/check-out meetings.
+        </p>
+      </div>
 
       {/* Tabs */}
       <Tabs defaultValue="history" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="history">Performance History</TabsTrigger>
-          <TabsTrigger value="focus">Priority Focus</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="evaluations">Quarterly Evaluations</TabsTrigger>
         </TabsList>
 
@@ -357,20 +430,28 @@ export default function StaffDetailV2() {
               </CardContent>
             </Card>
           ) : (
-            groupedWeeks.map(({ key, label, weeks }) => (
+            groupedWeeks.map(({ key, label, weeks }, groupIdx) => {
+              // Default open: most recent week overall = first week of first group
+              const defaultOpen = selectedWeek
+                ? [selectedWeek]
+                : groupIdx === 0 && weeks[0]
+                  ? [weeks[0][0]]
+                  : [];
+              return (
               <Card key={key}>
                 <CardHeader>
                   <CardTitle className="text-lg">{label}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Accordion type="multiple" defaultValue={selectedWeek ? [selectedWeek] : []}>
+                  <Accordion type="multiple" defaultValue={defaultOpen}>
                     {weeks.map(([weekOf, summary]) => {
                       const isWeekExempt = summary.scores.length > 0 && (summary.scores[0] as RawScoreRow & { is_week_exempt?: boolean }).is_week_exempt;
                       const confExcused = isExcused(weekOf, 'confidence');
                       const perfExcused = isExcused(weekOf, 'performance');
                       const hasAllConf = summary.conf_count === summary.assignment_count;
                       const hasAllPerf = summary.perf_count === summary.assignment_count;
-                      
+                      const nearbyEval = getEvalForWeek(weekOf);
+
                       return (
                         <AccordionItem key={weekOf} value={weekOf}>
                           <AccordionTrigger className="hover:no-underline">
@@ -383,6 +464,12 @@ export default function StaffDetailV2() {
                                   <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
                                     <CalendarOff className="h-3 w-3 mr-1" />
                                     Exempt
+                                  </Badge>
+                                )}
+                                {nearbyEval && (
+                                  <Badge variant="outline" className="border-primary/40 text-primary bg-primary/5 gap-1">
+                                    <ClipboardCheck className="h-3 w-3" />
+                                    Eval
                                   </Badge>
                                 )}
                               </div>
@@ -459,12 +546,13 @@ export default function StaffDetailV2() {
                   </Accordion>
                 </CardContent>
               </Card>
-            ))
+              );
+            })
           )}
         </TabsContent>
 
-        <TabsContent value="focus">
-          <StaffPriorityFocusTab rawData={rawData} />
+        <TabsContent value="overview">
+          <StaffOverviewTab rawData={rawData as any} evalCount={staffEvals.length} />
         </TabsContent>
 
         <TabsContent value="evaluations">

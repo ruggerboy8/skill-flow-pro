@@ -4,6 +4,8 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useLocationExcuses } from '@/hooks/useLocationExcuses';
 import { LocationHealthCard, LocationStats } from '@/components/dashboard/LocationHealthCard';
 import { ExcuseSubmissionsDialog } from '@/components/dashboard/ExcuseSubmissionsDialog';
+import { SignalsBanner, Signal } from '@/components/dashboard/SignalsBanner';
+import { DomainConfidenceHeatmap } from '@/components/dashboard/DomainConfidenceHeatmap';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -128,6 +130,30 @@ export default function RegionalDashboard() {
     };
   }, [summaries, managedLocationIds, managedOrgIds, isSuperAdmin, now, anchors]);
 
+  // Compute signals based on location stats
+  const signals = useMemo((): Signal[] => {
+    const result: Signal[] = [];
+    locationStats.forEach(loc => {
+      if (loc.submissionRate < 70 && loc.staffCount > 0) {
+        result.push({
+          type: 'participation_drop',
+          message: `${loc.name}: participation rate is ${Math.round(loc.submissionRate)}% this week — below 70%.`,
+          locationName: loc.name,
+        });
+      }
+    });
+    return result;
+  }, [locationStats]);
+
+  // Build location names map for heatmap
+  const locationNamesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    locationStats.forEach(loc => { map[loc.id] = loc.name; });
+    return map;
+  }, [locationStats]);
+
+  const locationIdList = useMemo(() => locationStats.map(l => l.id), [locationStats]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background p-4">
@@ -191,6 +217,9 @@ export default function RegionalDashboard() {
           </div>
         </div>
 
+        {/* Signals Banner */}
+        <SignalsBanner signals={signals} />
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
@@ -252,6 +281,14 @@ export default function RegionalDashboard() {
           </Card>
         </div>
 
+        {/* Domain Confidence Heatmap */}
+        {locationIdList.length > 0 && (
+          <DomainConfidenceHeatmap
+            locationIds={locationIdList}
+            locationNames={locationNamesMap}
+          />
+        )}
+
         {/* Location Grid */}
         {locationStats.length === 0 ? (
           <Card>
@@ -262,9 +299,9 @@ export default function RegionalDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {locationStats.map(stats => (
-              <LocationHealthCard 
-                key={stats.id} 
-                stats={stats} 
+              <LocationHealthCard
+                key={stats.id}
+                stats={stats}
                 excuseStatus={getExcuseStatus(stats.id)}
                 submissionGates={submissionGates}
               />

@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { getDomainColor } from '@/lib/domainColors';
+import { getDomainColor, getDomainColorRich } from '@/lib/domainColors';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
+import { cn } from '@/lib/utils';
 
 interface SkillGap {
   action_id: number;
@@ -58,6 +61,21 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
       fetchGaps();
     }
   }, [locationId, lookback]);
+
+  // Domain-level averages for the primary view
+  const domainAvgs = useMemo(() => {
+    const byDomain = new Map<string, { sum: number; count: number }>();
+    gaps.forEach(g => {
+      if (!g.domain_name) return;
+      const existing = byDomain.get(g.domain_name) ?? { sum: 0, count: 0 };
+      existing.sum += g.avg_confidence;
+      existing.count += 1;
+      byDomain.set(g.domain_name, existing);
+    });
+    return Array.from(byDomain.entries())
+      .map(([domain, { sum, count }]) => ({ domain, avg: sum / count }))
+      .sort((a, b) => a.avg - b.avg);
+  }, [gaps]);
 
   // Group gaps by role_id for dynamic tabs
   const roleGroups = gaps.reduce<Map<number, { name: string; gaps: SkillGap[] }>>((acc, g) => {
@@ -193,21 +211,51 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
           </ToggleGroup>
         </div>
       </CardHeader>
-      <CardContent>
-        <Tabs defaultValue={roleEntries[0]?.[0]?.toString() || '0'}>
-          <TabsList className="w-full">
-            {roleEntries.map(([roleId, { name }]) => (
-              <TabsTrigger key={roleId} value={roleId.toString()} className="flex-1">
-                {name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {roleEntries.map(([roleId, { name, gaps: roleGaps }]) => (
-            <TabsContent key={roleId} value={roleId.toString()} className="mt-3">
-              <GapList items={roleGaps} roleName={name} />
-            </TabsContent>
-          ))}
-        </Tabs>
+      <CardContent className="space-y-4">
+        {/* Domain-level summary — primary view */}
+        {domainAvgs.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Team Self-Reported Confidence by Domain</p>
+            <div className="flex flex-wrap gap-2">
+              {domainAvgs.map(({ domain, avg }) => {
+                const richColor = getDomainColorRich(domain);
+                const bgCls = avg >= 3.0 ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/50' : avg >= 2.5 ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200/50' : 'bg-rose-50 dark:bg-rose-950/20 border-rose-200/50';
+                const textCls = avg >= 3.0 ? 'text-emerald-700 dark:text-emerald-400' : avg >= 2.5 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400';
+                return (
+                  <div key={domain} className={cn('flex items-center gap-2 rounded-lg border px-3 py-2', bgCls)}>
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: richColor }} />
+                    <span className="text-xs font-medium text-muted-foreground">{domain}</span>
+                    <span className={cn('text-sm font-bold', textCls)}>{avg.toFixed(1)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Pro move detail — collapsible secondary */}
+        <Collapsible>
+          <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <ChevronDown className="h-3 w-3" />
+            Show individual pro moves
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3">
+            <Tabs defaultValue={roleEntries[0]?.[0]?.toString() || '0'}>
+              <TabsList className="w-full">
+                {roleEntries.map(([roleId, { name }]) => (
+                  <TabsTrigger key={roleId} value={roleId.toString()} className="flex-1">
+                    {name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {roleEntries.map(([roleId, { name, gaps: roleGaps }]) => (
+                <TabsContent key={roleId} value={roleId.toString()} className="mt-3">
+                  <GapList items={roleGaps} roleName={name} />
+                </TabsContent>
+              ))}
+            </Tabs>
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
     </Card>
   );

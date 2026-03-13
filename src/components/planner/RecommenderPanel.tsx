@@ -15,6 +15,7 @@ import { adaptSequencerRow, type RankedMove } from '@/lib/sequencerAdapter';
 interface RecommenderPanelProps {
   roleId: number;
   roleName: string;
+  practiceType?: string;
 }
 
 

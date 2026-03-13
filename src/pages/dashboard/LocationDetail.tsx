@@ -170,8 +170,6 @@ export default function LocationDetail({
           </div>
         </div>
 
-        {/* Evaluation Cadence */}
-        {locationId && <EvalCadenceWidget locationId={locationId} />}
 
         {/* Skill Gaps Panel */}
         <div>

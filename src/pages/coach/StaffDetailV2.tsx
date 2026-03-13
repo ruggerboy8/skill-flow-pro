@@ -442,7 +442,6 @@ export default function StaffDetailV2() {
                       const perfExcused = isExcused(weekOf, 'performance');
                       const hasAllConf = summary.conf_count === summary.assignment_count;
                       const hasAllPerf = summary.perf_count === summary.assignment_count;
-                      const nearbyEval = getEvalForWeek(weekOf);
 
                       return (
                         <AccordionItem key={weekOf} value={weekOf}>
@@ -456,12 +455,6 @@ export default function StaffDetailV2() {
                                   <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
                                     <CalendarOff className="h-3 w-3 mr-1" />
                                     Exempt
-                                  </Badge>
-                                )}
-                                {nearbyEval && (
-                                  <Badge variant="outline" className="border-primary/40 text-primary bg-primary/5 gap-1">
-                                    <ClipboardCheck className="h-3 w-3" />
-                                    Eval
                                   </Badge>
                                 )}
                               </div>

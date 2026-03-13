@@ -1515,14 +1515,17 @@ export type Database = {
           action_statement: string | null
           active: boolean | null
           competency_id: number | null
+          copied_from_action_id: number | null
           date_added: string | null
           description: string | null
           intervention_text: string | null
+          owner_org_id: string | null
           practice_types: string[]
           resources_url: string | null
           retired_at: string | null
           retired_by: string | null
           role_id: number | null
+          source: string
           status: string | null
           steps: string | null
           updated_at: string | null
@@ -1534,14 +1537,17 @@ export type Database = {
           action_statement?: string | null
           active?: boolean | null
           competency_id?: number | null
+          copied_from_action_id?: number | null
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
+          owner_org_id?: string | null
           practice_types?: string[]
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null
           role_id?: number | null
+          source?: string
           status?: string | null
           steps?: string | null
           updated_at?: string | null
@@ -1553,14 +1559,17 @@ export type Database = {
           action_statement?: string | null
           active?: boolean | null
           competency_id?: number | null
+          copied_from_action_id?: number | null
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
+          owner_org_id?: string | null
           practice_types?: string[]
           resources_url?: string | null
           retired_at?: string | null
           retired_by?: string | null
           role_id?: number | null
+          source?: string
           status?: string | null
           steps?: string | null
           updated_at?: string | null
@@ -1588,6 +1597,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_onboarding_progress"
             referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "pro_moves_copied_from_action_id_fkey"
+            columns: ["copied_from_action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "pro_moves_owner_org_id_fkey"
+            columns: ["owner_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pro_moves_retired_by_fkey"
@@ -3620,6 +3643,18 @@ export type Database = {
       needs_backfill: {
         Args: { p_role_id: number; p_staff_id: string }
         Returns: Json
+      }
+      org_visible_pro_moves: {
+        Args: { p_org_id: string; p_role_id?: number }
+        Returns: {
+          action_id: number
+          action_statement: string
+          competency_id: number
+          owner_org_id: string
+          practice_types: string[]
+          role_id: number
+          source: string
+        }[]
       }
       recover_orphaned_scores: { Args: never; Returns: Json }
       release_single_evaluation: {

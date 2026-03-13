@@ -1,5 +1,3 @@
-
-
 ## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
 **Status: ✅ Complete**
@@ -25,3 +23,26 @@
 | `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
 | `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
 | `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
+
+## Tier 1 — Design System Token Unification
+
+**Status: ✅ Complete**
+
+### 1A — Consolidate Domain Colors (3→1)
+- Replaced unused `--domain-planning/environment/interactions/learning-experiences` CSS vars with `--domain-clinical/clerical/cultural/case-acceptance` (rich + pastel)
+- Updated `tailwind.config.ts` domain keys to match
+- `domainColors.ts` exports CSS var names; API unchanged
+- `DOMAIN_META` in `constants/domains.ts` now uses `chipStyle()` with token-derived colors
+
+### 1B — StatusBadge Component + Tokens
+- Added `--status-complete/missing/late/excused/pending` CSS tokens to `index.css`
+- Created `src/components/ui/StatusBadge.tsx` with token-driven colors
+- Replaced inline `StatusPill` in `CoachDashboardV2`, `StaffDetailV2`, `ScoreHistoryV2`, `StatsScores`
+
+### 1C — Score Color Tokens (1–4)
+- Added `--score-1` through `--score-4` (+ `-bg` pastel variants) to `index.css`
+- Updated `NumberScale.tsx` to use inline styles with CSS vars instead of hardcoded Tailwind
+
+### 1D — text-2xs Utility
+- Added `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `tailwind.config.ts`
+- Replaced all 340 occurrences of `text-[10px]` → `text-2xs` across 42 files

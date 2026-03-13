@@ -34,7 +34,7 @@ export function RecommenderPanel({ roleId, roleName, practiceType, orgId }: Reco
 
   useEffect(() => {
     loadRecommendations();
-  }, [roleId, preset, practiceType]);
+  }, [roleId, preset, practiceType, orgId]);
 
   const loadRecommendations = async () => {
     setLoading(true);

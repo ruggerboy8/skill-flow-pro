@@ -108,6 +108,10 @@ export function WeeklyProMovesPanel() {
     return DOMAIN_META[domainId]?.chipClass || 'bg-muted';
   };
 
+  const getDomainChipStyle = (domainId: number): React.CSSProperties => {
+    return DOMAIN_META[domainId]?.chipStyle() || {};
+  };
+
   const getDriverLabel = (driver: string) => {
     return DRIVER_LABELS[driver]?.label || driver;
   };

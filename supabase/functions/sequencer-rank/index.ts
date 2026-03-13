@@ -426,7 +426,7 @@ serve(async (req) => {
     // Import and run engine (inline for now since we can't import from src/)
     // We'll compute directly here
     const inputs = {
-      eligibleMoves: eligible,
+      eligibleMoves: eligibleFinal,
       confidenceHistory,
       evals,
       lastSelected,

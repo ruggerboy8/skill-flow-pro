@@ -195,7 +195,7 @@ export function AdminUsersTab() {
   useEffect(() => {
     loadUsers(1, debouncedSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFilter, locationFilter, superAdminFilter, debouncedSearch]);
+  }, [roleFilter, locationFilter, flagFilter, debouncedSearch]);
 
   const handleInviteSuccess = () => {
     setInviteDialogOpen(false);

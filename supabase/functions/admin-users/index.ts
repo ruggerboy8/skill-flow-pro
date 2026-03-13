@@ -7,7 +7,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 const APP_URL = Deno.env.get("APP_URL") || "http://localhost:3000";
-const SITE_URL = Deno.env.get("SITE_URL") || "https://alcanskills.lovable.app";
+const SITE_URL = Deno.env.get("SITE_URL") || Deno.env.get("APP_URL") || "https://alcanskills.lovable.app";
 
 // Fail fast if environment isn't wired
 if (!SUPABASE_URL || !SERVICE_ROLE || !SUPABASE_ANON_KEY) {

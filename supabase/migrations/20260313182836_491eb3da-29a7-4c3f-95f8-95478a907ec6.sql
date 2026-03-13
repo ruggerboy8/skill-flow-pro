@@ -1,0 +1,1 @@
+DELETE FROM weekly_scores WHERE staff_id = 'a30d8b1c-84d2-4f90-b48a-99bd60d33d5f' AND week_of = '2026-03-09' AND id IN ('5922e2a6-ac82-45a5-8b0b-57c10fe23efe', '29f67eb1-bb1e-433d-835a-c25ea614ad92', '9c10efe0-f8de-47eb-b583-18f8fb0ed59b');

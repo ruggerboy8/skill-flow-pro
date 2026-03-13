@@ -35,6 +35,7 @@ export function ProMovePickerDialog({
   roleId,
   onSelect,
   orgId,
+  practiceType,
 }: ProMovePickerDialogProps) {
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
   const [filteredMoves, setFilteredMoves] = useState<ProMove[]>([]);

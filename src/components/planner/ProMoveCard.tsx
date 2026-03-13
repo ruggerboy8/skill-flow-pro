@@ -28,7 +28,7 @@ export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
           <h4 className="font-semibold text-sm leading-tight mb-1">{move.name}</h4>
           <div className="flex items-center gap-2 flex-wrap">
             <span 
-              className="px-1.5 py-0.5 text-[10px] rounded text-foreground ring-1 ring-border/50"
+              className="px-1.5 py-0.5 text-2xs rounded text-foreground ring-1 ring-border/50"
               style={{ backgroundColor: domainHsl }}
             >
               {move.domainName}
@@ -37,7 +37,7 @@ export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="px-1.5 py-0.5 text-[10px] rounded bg-primary/10 text-primary ring-1 ring-primary/30">
+                    <span className="px-1.5 py-0.5 text-2xs rounded bg-primary/10 text-primary ring-1 ring-primary/30">
                       High priority
                     </span>
                   </TooltipTrigger>

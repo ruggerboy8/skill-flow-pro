@@ -110,7 +110,15 @@ serve(async (req: Request) => {
             const locationScopes = callerScopes.filter((s: any) => s.scope_type === 'location').map((s: any) => s.scope_id);
             
             if (orgScopes.length > 0) {
-              q = q.in('locations.group_id', orgScopes);
+              // Resolve location IDs from practice group scopes to filter staff directly
+              const { data: scopeLocs } = await admin
+                .from("locations").select("id").in("group_id", orgScopes);
+              const scopeLocIds = (scopeLocs ?? []).map((l: any) => l.id);
+              if (scopeLocIds.length > 0) {
+                q = q.in("primary_location_id", scopeLocIds);
+              } else {
+                q = q.eq("id", "00000000-0000-0000-0000-000000000000");
+              }
             } else if (locationScopes.length > 0) {
               q = q.in('primary_location_id', locationScopes);
             }

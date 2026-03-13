@@ -563,7 +563,7 @@ export function WeeklyProMovesPanel() {
                   <div key={pick.proMoveId} className="border rounded-lg p-3">
                     <div className="font-medium text-sm">#{i + 1}: {pick.name}</div>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      <Badge className={getDomainChipClass(pick.domainId)}>
+                      <Badge className={getDomainChipClass(pick.domainId)} style={getDomainChipStyle(pick.domainId)}>
                         {pick.domainName}
                       </Badge>
                       {getStatusBadge(pick.status, pick.severity)}

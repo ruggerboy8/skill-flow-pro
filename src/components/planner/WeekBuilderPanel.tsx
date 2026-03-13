@@ -41,13 +41,15 @@ interface WeekAssignment {
 interface WeekBuilderPanelProps {
   roleId: number;
   roleName: string;
-  orgId?: string; // When present, pro move picker will filter out org-hidden moves
+  orgId?: string;
+  practiceType?: string;
 }
 
 export function WeekBuilderPanel({
   roleId,
   roleName,
   orgId,
+  practiceType,
 }: WeekBuilderPanelProps) {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
@@ -898,6 +900,7 @@ export function WeekBuilderPanel({
           roleId={roleId}
           onSelect={handleSelectProMove}
           orgId={orgId}
+          practiceType={practiceType}
         />
       )}
 

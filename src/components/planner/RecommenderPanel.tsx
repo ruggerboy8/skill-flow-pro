@@ -15,12 +15,13 @@ import { adaptSequencerRow, type RankedMove } from '@/lib/sequencerAdapter';
 interface RecommenderPanelProps {
   roleId: number;
   roleName: string;
+  practiceType?: string;
 }
 
 
 const PAGE_SIZE = 12;
 
-export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
+export function RecommenderPanel({ roleId, roleName, practiceType }: RecommenderPanelProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rankedAll, setRankedAll] = useState<RankedMove[]>([]);
@@ -32,7 +33,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
 
   useEffect(() => {
     loadRecommendations();
-  }, [roleId, preset]);
+  }, [roleId, preset, practiceType]);
 
   const loadRecommendations = async () => {
     setLoading(true);
@@ -43,6 +44,7 @@ export function RecommenderPanel({ roleId, roleName }: RecommenderPanelProps) {
           roleId,
           lookbackWeeks: 9,
           preset,
+          practiceType,
           constraints: {
             minDistinctDomains: 2,
             cooldownWeeks: 4,

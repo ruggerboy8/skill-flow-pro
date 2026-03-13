@@ -10,7 +10,7 @@ import { WeekBuilderPanel } from "@/components/planner/WeekBuilderPanel";
 
 export default function AdminBuilder() {
   const navigate = useNavigate();
-  const { canManageAssignments, organizationId, isLoading } = useUserRole();
+  const { canManageAssignments, organizationId, practiceType, isLoading } = useUserRole();
 
   if (isLoading) {
     return (
@@ -45,15 +45,15 @@ export default function AdminBuilder() {
         </TabsList>
 
         <TabsContent value="dfi-planner" className="space-y-6">
-          <PlannerTabContent roleId={1} roleName="DFI" orgId={organizationId} />
+          <PlannerTabContent roleId={1} roleName="DFI" orgId={organizationId} practiceType={practiceType} />
         </TabsContent>
 
         <TabsContent value="rda-planner" className="space-y-6">
-          <PlannerTabContent roleId={2} roleName="RDA" orgId={organizationId} />
+          <PlannerTabContent roleId={2} roleName="RDA" orgId={organizationId} practiceType={practiceType} />
         </TabsContent>
 
         <TabsContent value="om-planner" className="space-y-6">
-          <PlannerTabContent roleId={3} roleName="Office Manager" orgId={organizationId} />
+          <PlannerTabContent roleId={3} roleName="Office Manager" orgId={organizationId} practiceType={practiceType} />
         </TabsContent>
 
         <TabsContent value="library" className="space-y-6">
@@ -69,23 +69,25 @@ function PlannerTabContent({
   roleId,
   roleName,
   orgId,
+  practiceType,
 }: {
   roleId: number;
   roleName: string;
   orgId?: string;
+  practiceType?: string;
 }) {
   return (
     <div className="flex gap-4">
       {/* Left: Recommender */}
       <div className="w-1/2 shrink-0">
         <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
-          <RecommenderPanel roleId={roleId} roleName={roleName} />
+          <RecommenderPanel roleId={roleId} roleName={roleName} practiceType={practiceType} />
         </div>
       </div>
 
       {/* Right: Week Builder with integrated controls */}
       <div className="flex-1 min-w-0">
-        <WeekBuilderPanel roleId={roleId} roleName={roleName} orgId={orgId} />
+        <WeekBuilderPanel roleId={roleId} roleName={roleName} orgId={orgId} practiceType={practiceType} />
       </div>
     </div>
   );

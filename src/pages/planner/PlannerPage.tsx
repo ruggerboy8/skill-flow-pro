@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { RecommenderPanel } from '@/components/planner/RecommenderPanel';
 import { WeekBuilderPanel } from '@/components/planner/WeekBuilderPanel';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface PlannerPageProps {
   roleId: number;
@@ -12,6 +13,7 @@ interface PlannerPageProps {
 
 export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
   const navigate = useNavigate();
+  const { practiceType } = useUserRole();
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -35,6 +37,7 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
             <RecommenderPanel
               roleId={roleId}
               roleName={roleName}
+              practiceType={practiceType}
             />
           </div>
         </ResizablePanel>
@@ -46,6 +49,7 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
             <WeekBuilderPanel 
               roleId={roleId} 
               roleName={roleName}
+              practiceType={practiceType}
             />
           </div>
         </ResizablePanel>

@@ -25,7 +25,8 @@ interface ProMovePickerDialogProps {
   onClose: () => void;
   roleId: number;
   onSelect: (actionId: number) => void;
-  orgId?: string; // When provided, hides moves the org has marked not-visible
+  orgId?: string;
+  practiceType?: string;
 }
 
 export function ProMovePickerDialog({

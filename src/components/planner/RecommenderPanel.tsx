@@ -33,7 +33,7 @@ export function RecommenderPanel({ roleId, roleName, practiceType }: Recommender
 
   useEffect(() => {
     loadRecommendations();
-  }, [roleId, preset]);
+  }, [roleId, preset, practiceType]);
 
   const loadRecommendations = async () => {
     setLoading(true);

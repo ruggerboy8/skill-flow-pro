@@ -8,13 +8,21 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, CalendarOff, MoreVertical, Check, X } from 'lucide-react';
+import { CalendarOff, MoreVertical, Check, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
 import { useAuth } from '@/hooks/useAuth';
@@ -251,10 +259,19 @@ export default function StaffDetailV2() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate('/coach')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/coach" className="cursor-pointer" onClick={(e) => { e.preventDefault(); navigate('/coach'); }}>
+                Coach Dashboard
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Loading…</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <div className="animate-pulse space-y-4">
           <div className="h-32 bg-muted rounded" />
           <div className="h-64 bg-muted rounded" />
@@ -266,10 +283,19 @@ export default function StaffDetailV2() {
   if (error || !staffInfo) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate('/coach')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/coach" className="cursor-pointer" onClick={(e) => { e.preventDefault(); navigate('/coach'); }}>
+                Coach Dashboard
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Error</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <Card>
           <CardContent className="pt-6">
             <p className="text-destructive">
@@ -283,15 +309,24 @@ export default function StaffDetailV2() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/coach" className="cursor-pointer" onClick={(e) => { e.preventDefault(); navigate('/coach'); }}>
+              Coach Dashboard
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{staffInfo.name}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/coach')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </div>
           <h1 className="text-3xl font-bold">{staffInfo.name}</h1>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span>{resolveRole(staffInfo.role_id, staffInfo.role_name)}</span>

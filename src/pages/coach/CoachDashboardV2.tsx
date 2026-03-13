@@ -408,58 +408,74 @@ export default function CoachDashboardV2({
         </Button>
       </div>
 
-      {/* Filter controls */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {!hideOrgLocationFilters && (
-          <>
-            <MultiSelect
-              options={organizationOptions}
-              selected={selectedOrganizations}
-              onChange={setSelectedOrganizations}
-              placeholder="All Groups"
-              searchPlaceholder="Search orgs..."
-              className="min-w-[200px]"
-            />
+      {/* Filter controls — collapsible */}
+      <Collapsible defaultOpen={hasActiveFilters}>
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />
+              Filters
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-2xs">
+                  {[selectedOrganizations.length, selectedLocations.length, selectedRoles.length, search.trim() ? 1 : 0].reduce((a, b) => a + b, 0)}
+                </Badge>
+              )}
+            </Button>
+          </CollapsibleTrigger>
+          {hasActiveFilters && !forcedLocationId && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={clearFilters}
+              className="text-muted-foreground hover:text-foreground text-xs"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
+        <CollapsibleContent className="pt-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {!hideOrgLocationFilters && (
+              <>
+                <MultiSelect
+                  options={organizationOptions}
+                  selected={selectedOrganizations}
+                  onChange={setSelectedOrganizations}
+                  placeholder="All Groups"
+                  searchPlaceholder="Search orgs..."
+                  className="min-w-[200px]"
+                />
+
+                <MultiSelect
+                  options={locationOptions}
+                  selected={selectedLocations}
+                  onChange={setSelectedLocations}
+                  placeholder="All Locations"
+                  searchPlaceholder="Search locations..."
+                  className="min-w-[200px]"
+                />
+              </>
+            )}
 
             <MultiSelect
-              options={locationOptions}
-              selected={selectedLocations}
-              onChange={setSelectedLocations}
-              placeholder="All Locations"
-              searchPlaceholder="Search locations..."
-              className="min-w-[200px]"
+              options={roleOptions}
+              selected={selectedRoles}
+              onChange={setSelectedRoles}
+              placeholder="All Roles"
+              searchPlaceholder="Search roles..."
+              className="min-w-[160px]"
             />
-          </>
-        )}
 
-        <MultiSelect
-          options={roleOptions}
-          selected={selectedRoles}
-          onChange={setSelectedRoles}
-          placeholder="All Roles"
-          searchPlaceholder="Search roles..."
-          className="min-w-[160px]"
-        />
-
-        <Input
-          placeholder="Search by name or email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-[240px]"
-        />
-
-        {hasActiveFilters && !forcedLocationId && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={clearFilters}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4 mr-1" />
-            Clear Filters
-          </Button>
-        )}
-      </div>
+            <Input
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-[240px]"
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Staff Coverage Table */}
       <Card>

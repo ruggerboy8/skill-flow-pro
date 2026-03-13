@@ -160,7 +160,7 @@ export default function StaffDetailV2() {
     return Array.from(byDomain.entries()).map(([domain, { sum, count }]) => ({
       domain,
       avg: sum / count,
-    })).sort((a, b) => a.domain.localeCompare(b.domain));
+    })).sort((a, b) => getDomainOrderIndex(a.domain) - getDomainOrderIndex(b.domain));
   }, [rawData]);
 
   // Get staff info from first available summary

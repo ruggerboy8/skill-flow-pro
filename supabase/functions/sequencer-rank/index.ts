@@ -382,7 +382,7 @@ serve(async (req) => {
     logs.push(`Last selected records: ${lastSelectedAssign?.length || 0} from weekly_assignments, ${lastSelected.length} unique moves`);
     
     // Log never-seen moves
-    const neverSeen = eligible.filter(m => !lastSelected.some(ls => ls.proMoveId === m.id));
+    const neverSeen = eligibleFinal.filter(m => !lastSelected.some(ls => ls.proMoveId === m.id));
     logs.push(`Never assigned moves: ${neverSeen.length} (e.g., ${neverSeen.slice(0, 3).map(m => m.name).join(', ')})`);
     
     // Log sample confidence data

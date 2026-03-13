@@ -8,6 +8,7 @@ export function useUserRole() {
       isLoading: true,
       staffId: undefined,
       organizationId: undefined as string | undefined,
+      practiceType: undefined as string | undefined,
       isSuperAdmin: false,
       isOrgAdmin: false,
       isRegional: false,

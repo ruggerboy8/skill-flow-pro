@@ -153,28 +153,25 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
           </p>
         </div>
       </CardHeader>
-      <CardContent className="relative overflow-x-auto px-0">
-        <table className="w-full text-sm border-separate border-spacing-0">
+      <CardContent className="overflow-x-auto">
+        <table className="w-full text-sm">
           <thead>
-            <tr>
-              <th className="text-left py-2 pr-4 font-medium text-muted-foreground w-32 sticky left-0 z-10 bg-card after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border">Domain</th>
+            <tr className="border-b border-border">
+              <th className="text-left py-2 pr-4 font-medium text-muted-foreground w-32">Domain</th>
               {locationData.map(loc => (
-                <th key={loc.locationId} className="text-center py-2 px-2 font-medium text-muted-foreground min-w-[80px] border-b border-border">
+                <th key={loc.locationId} className="text-center py-2 px-2 font-medium text-muted-foreground min-w-[80px]">
                   <span className="text-xs">{loc.locationName}</span>
                 </th>
               ))}
-              <th className="text-center py-2 px-2 font-semibold text-foreground min-w-[80px] border-b border-border">
+              <th className="text-center py-2 px-2 font-semibold text-foreground min-w-[80px]">
                 <span className="text-xs">Group Avg</span>
               </th>
             </tr>
           </thead>
           <tbody>
             {DOMAINS.map((domain, i) => (
-              <tr key={domain}>
-                <td className={cn(
-                  'py-2 pr-4 sticky left-0 z-10 bg-card after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border',
-                  i < DOMAINS.length - 1 && 'border-b border-border'
-                )}>
+              <tr key={domain} className={cn(i < DOMAINS.length - 1 && 'border-b border-border')}>
+                <td className="py-2 pr-4">
                   <div className="flex items-center gap-2">
                     <div
                       className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -186,7 +183,7 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
                 {locationData.map(loc => {
                   const avg = loc.domainAvgs[domain];
                   return (
-                    <td key={loc.locationId} className={cn('text-center py-2 px-2', scoreBg(avg), i < DOMAINS.length - 1 && 'border-b border-border')}>
+                    <td key={loc.locationId} className={cn('text-center py-2 px-2', scoreBg(avg))}>
                       {avg !== undefined ? (
                         <span className={cn('font-semibold text-sm', scoreColor(avg))}>
                           {avg.toFixed(1)}
@@ -197,7 +194,7 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
                     </td>
                   );
                 })}
-                <td className={cn('text-center py-2 px-2 font-bold', scoreBg(groupAvgs[domain]), i < DOMAINS.length - 1 && 'border-b border-border')}>
+                <td className={cn('text-center py-2 px-2 font-bold', scoreBg(groupAvgs[domain]))}>
                   {groupAvgs[domain] !== undefined ? (
                     <span className={cn('text-sm font-bold', scoreColor(groupAvgs[domain]))}>
                       {groupAvgs[domain]!.toFixed(1)}

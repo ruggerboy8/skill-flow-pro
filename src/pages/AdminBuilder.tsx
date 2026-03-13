@@ -53,7 +53,7 @@ export default function AdminBuilder() {
         </TabsContent>
 
         <TabsContent value="om-planner" className="space-y-6">
-          <PlannerTabContent roleId={3} roleName="Office Manager" orgId={organizationId} />
+          <PlannerTabContent roleId={3} roleName="Office Manager" orgId={organizationId} practiceType={practiceType} />
         </TabsContent>
 
         <TabsContent value="library" className="space-y-6">

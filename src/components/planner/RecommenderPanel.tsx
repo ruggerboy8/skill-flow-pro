@@ -22,7 +22,7 @@ interface RecommenderPanelProps {
 
 const PAGE_SIZE = 12;
 
-export function RecommenderPanel({ roleId, roleName, practiceType }: RecommenderPanelProps) {
+export function RecommenderPanel({ roleId, roleName, practiceType, orgId }: RecommenderPanelProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rankedAll, setRankedAll] = useState<RankedMove[]>([]);

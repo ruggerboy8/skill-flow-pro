@@ -117,14 +117,14 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
             <div key={entry.id} className="relative pb-6 last:pb-0">
               {/* Node dot */}
               <div className="absolute -left-6 top-1 w-[22px] h-[22px] rounded-full border-2 border-background bg-primary flex items-center justify-center">
-                <span className="text-[10px] font-bold text-primary-foreground">{entry.sequence_number}</span>
+                <span className="text-2xs font-bold text-primary-foreground">{entry.sequence_number}</span>
               </div>
 
               <div className="space-y-2">
                 {/* Header row */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{typeLabel}</span>
-                  <Badge className={`text-[10px] ${statusConfig.className}`}>
+                  <Badge className={`text-2xs ${statusConfig.className}`}>
                     {statusConfig.label}
                   </Badge>
                   {entry.scheduled_at && (

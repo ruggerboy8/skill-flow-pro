@@ -262,14 +262,34 @@ export function LocationEvalDetail({ filters, locationId, locationName, onBack }
   const getStatusBadge = (staffId: string) => {
     const evalStatus = evalStatuses?.get(staffId);
     if (!evalStatus) {
-      return <Badge variant="secondary" className="text-xs">No eval</Badge>;
+      return <Badge variant="outline" className="text-xs" style={{ color: 'hsl(var(--eval-no-eval))' }}>No eval</Badge>;
     }
     if (evalStatus.status === 'submitted') {
-      return <Badge variant="default" className="text-xs bg-green-600">Submitted</Badge>;
+      return (
+        <Badge
+          variant="secondary"
+          className="text-xs"
+          style={{
+            backgroundColor: 'hsl(var(--eval-submitted-bg))',
+            color: 'hsl(var(--eval-submitted))',
+          }}
+        >
+          Submitted
+        </Badge>
+      );
     }
     return (
       <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">Draft</Badge>
+        <Badge
+          variant="outline"
+          className="text-xs"
+          style={{
+            borderColor: 'hsl(var(--eval-draft-border))',
+            color: 'hsl(var(--eval-draft))',
+          }}
+        >
+          Draft
+        </Badge>
         <Button
           size="sm"
           variant="ghost"

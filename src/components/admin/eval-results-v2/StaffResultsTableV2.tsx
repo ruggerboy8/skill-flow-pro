@@ -169,17 +169,35 @@ export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsT
 
 function getStatusBadge(staff: StaffRowV2, onSubmit: (e: React.MouseEvent) => void, isPending: boolean) {
   if (!staff.evaluationId) {
-    return <Badge variant="outline" className="text-muted-foreground">No eval</Badge>;
+    return <Badge variant="outline" style={{ color: 'hsl(var(--eval-no-eval))' }}>No eval</Badge>;
   }
   
   if (staff.evaluationStatus === 'submitted') {
-    return <Badge variant="secondary">Submitted</Badge>;
+    return (
+      <Badge
+        variant="secondary"
+        style={{
+          backgroundColor: 'hsl(var(--eval-submitted-bg))',
+          color: 'hsl(var(--eval-submitted))',
+        }}
+      >
+        Submitted
+      </Badge>
+    );
   }
   
   if (staff.evaluationStatus === 'draft') {
     return (
       <div className="flex items-center gap-2 justify-center">
-        <Badge variant="outline" className="border-amber-300 text-amber-600">Draft</Badge>
+        <Badge
+          variant="outline"
+          style={{
+            borderColor: 'hsl(var(--eval-draft-border))',
+            color: 'hsl(var(--eval-draft))',
+          }}
+        >
+          Draft
+        </Badge>
         <Button 
           size="sm" 
           variant="ghost" 

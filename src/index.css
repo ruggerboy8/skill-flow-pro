@@ -89,6 +89,14 @@ All colors MUST be HSL.
     --win-perfect: 217 91% 60%;
     --win-perfect-bg: 214 95% 96%;
     --win-perfect-border: 213 93% 85%;
+
+    /* Eval status colors */
+    --eval-submitted: 142 71% 45%;
+    --eval-submitted-bg: 142 76% 92%;
+    --eval-draft: 45 93% 47%;
+    --eval-draft-bg: 48 96% 89%;
+    --eval-draft-border: 43 96% 72%;
+    --eval-no-eval: var(--muted-foreground);
     
     /* Domain colors (rich/saturated) */
     --domain-clinical: 211 85% 55%;

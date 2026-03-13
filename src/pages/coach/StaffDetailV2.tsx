@@ -283,10 +283,19 @@ export default function StaffDetailV2() {
   if (error || !staffInfo) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate('/coach')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/coach" className="cursor-pointer" onClick={(e) => { e.preventDefault(); navigate('/coach'); }}>
+                Coach Dashboard
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Error</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <Card>
           <CardContent className="pt-6">
             <p className="text-destructive">

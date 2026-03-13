@@ -71,7 +71,7 @@ export function AdminUsersTab() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
-  const [superAdminFilter, setSuperAdminFilter] = useState<string>("all");
+  const [flagFilter, setFlagFilter] = useState<string>("all");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);

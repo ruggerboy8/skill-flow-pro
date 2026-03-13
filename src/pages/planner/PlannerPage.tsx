@@ -48,6 +48,7 @@ export default function PlannerPage({ roleId, roleName, practiceType }: PlannerP
             <WeekBuilderPanel 
               roleId={roleId} 
               roleName={roleName}
+              practiceType={practiceType}
             />
           </div>
         </ResizablePanel>

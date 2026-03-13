@@ -171,13 +171,13 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
           <tbody>
             {DOMAINS.map(domain => (
               <tr key={domain} className="border-b last:border-0">
-                <td className="py-2 pr-4">
+                <td className="py-2 pr-4 sticky left-0 bg-card z-10">
                   <div className="flex items-center gap-2">
                     <div
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: getDomainColor(domain) }}
                     />
-                    <span className="font-medium text-xs">{domain}</span>
+                    <span className="font-medium text-xs whitespace-nowrap">{domain}</span>
                   </div>
                 </td>
                 {locationData.map(loc => {

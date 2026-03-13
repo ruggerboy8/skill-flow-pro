@@ -153,7 +153,7 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
           </p>
         </div>
       </CardHeader>
-      <CardContent className="relative overflow-x-auto">
+      <CardContent className="relative overflow-x-auto px-0">
         <table className="w-full text-sm border-separate border-spacing-0">
           <thead>
             <tr>

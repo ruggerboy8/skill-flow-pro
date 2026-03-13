@@ -71,7 +71,7 @@ export function AdminUsersTab() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
-  const [superAdminFilter, setSuperAdminFilter] = useState<string>("all");
+  const [flagFilter, setFlagFilter] = useState<string>("all");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -93,7 +93,7 @@ export function AdminUsersTab() {
           limit: usersPerPage,
           role_id: roleFilter === "all" ? undefined : parseInt(roleFilter),
           location_id: locationFilter === "all" ? undefined : locationFilter,
-          super_admin: superAdminFilter === "all" ? undefined : superAdminFilter === "true",
+          flag: flagFilter === "all" ? undefined : flagFilter,
           // Scope to the admin's org (applies to all roles — platform admins use /platform for cross-org work)
           organization_id: organizationId ?? undefined,
         }
@@ -195,7 +195,7 @@ export function AdminUsersTab() {
   useEffect(() => {
     loadUsers(1, debouncedSearch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFilter, locationFilter, superAdminFilter, debouncedSearch]);
+  }, [roleFilter, locationFilter, flagFilter, debouncedSearch]);
 
   const handleInviteSuccess = () => {
     setInviteDialogOpen(false);
@@ -301,11 +301,21 @@ const handleResendInvite = async (user: User) => {
   const filteredUsers = users.filter(user => {
     const matchesRole = roleFilter === "all" || !roleFilter || user.role_id?.toString() === roleFilter;
     const matchesLocation = locationFilter === "all" || !locationFilter || user.location_id === locationFilter;
-    const matchesSuperAdmin = superAdminFilter === "all" || !superAdminFilter || 
-      (superAdminFilter === "true" && user.is_super_admin) ||
-      (superAdminFilter === "false" && !user.is_super_admin);
     
-    return matchesRole && matchesLocation && matchesSuperAdmin;
+    let matchesFlag = true;
+    if (flagFilter && flagFilter !== "all") {
+      switch (flagFilter) {
+        case "super_admin": matchesFlag = !!user.is_super_admin; break;
+        case "org_admin": matchesFlag = !!user.is_org_admin; break;
+        case "coach": matchesFlag = !!user.is_coach; break;
+        case "lead": matchesFlag = !!user.is_lead; break;
+        case "participant": matchesFlag = !!user.is_participant; break;
+        case "clinical_director": matchesFlag = !!user.is_clinical_director; break;
+        case "paused": matchesFlag = !!user.is_paused; break;
+      }
+    }
+    
+    return matchesRole && matchesLocation && matchesFlag;
   });
 
   const { sortedData, sortConfig, handleSort } = useTableSort(filteredUsers);
@@ -446,14 +456,19 @@ const handleResendInvite = async (user: User) => {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={superAdminFilter} onValueChange={setSuperAdminFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Filter admin" />
+            <Select value={flagFilter} onValueChange={setFlagFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Filter by flag" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All users</SelectItem>
-                <SelectItem value="true">Super admins</SelectItem>
-                <SelectItem value="false">Regular users</SelectItem>
+                <SelectItem value="all">All flags</SelectItem>
+                <SelectItem value="super_admin">Super Admin</SelectItem>
+                <SelectItem value="org_admin">Org Admin</SelectItem>
+                <SelectItem value="clinical_director">Clinical Director</SelectItem>
+                <SelectItem value="coach">Coach</SelectItem>
+                <SelectItem value="lead">Lead</SelectItem>
+                <SelectItem value="participant">Participant</SelectItem>
+                <SelectItem value="paused">Paused</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -44,6 +44,7 @@ export function RecommenderPanel({ roleId, roleName, practiceType }: Recommender
           roleId,
           lookbackWeeks: 9,
           preset,
+          practiceType,
           constraints: {
             minDistinctDomains: 2,
             cooldownWeeks: 4,

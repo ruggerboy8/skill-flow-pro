@@ -49,6 +49,7 @@ export function WeekBuilderPanel({
   roleId,
   roleName,
   orgId,
+  practiceType,
 }: WeekBuilderPanelProps) {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');

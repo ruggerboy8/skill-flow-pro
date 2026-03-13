@@ -69,10 +69,12 @@ function PlannerTabContent({
   roleId,
   roleName,
   orgId,
+  practiceType,
 }: {
   roleId: number;
   roleName: string;
   orgId?: string;
+  practiceType?: string;
 }) {
   return (
     <div className="flex gap-4">

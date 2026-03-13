@@ -323,7 +323,7 @@ setSubmitting(true);
                       {focus.action_statement || 'Self-Select'}
                       {focus.domain_name && (
                         <span
-                          className="inline-flex items-center rounded px-2 py-0.5 text-[10px]"
+                          className="inline-flex items-center rounded px-2 py-0.5 text-2xs"
                           style={{ backgroundColor: getDomainColor(focus.domain_name) }}
                         >
                           {focus.domain_name}

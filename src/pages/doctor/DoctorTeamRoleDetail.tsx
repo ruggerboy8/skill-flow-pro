@@ -61,7 +61,7 @@ export default function DoctorTeamRoleDetail() {
               {/* Spine */}
               <div className="w-8 shrink-0 flex flex-col items-center justify-center" style={{ backgroundColor: domainColor }}>
                 <span
-                  className="text-[10px] font-bold tracking-widest uppercase"
+                  className="text-2xs font-bold tracking-widest uppercase"
                   style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}
                 >
                   {domain}

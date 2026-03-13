@@ -563,7 +563,7 @@ export default function DoctorReviewPrep() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-medium leading-snug">{pm?.action_statement || `Action #${item.action_id}`}</p>
                               {isSuggested && (
-                                <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0">{coachName}'s pick</Badge>
+                                <Badge className="bg-amber-100 text-amber-800 text-2xs px-1.5 py-0">{coachName}'s pick</Badge>
                               )}
                             </div>
                             {pm?.competencies?.name && (

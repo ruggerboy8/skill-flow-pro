@@ -125,7 +125,7 @@ export function StaffDomainDrawer({
                         {competency.competency_name}
                       </span>
                       {competency.framework && (
-                        <Badge variant="outline" className="text-[10px] leading-4">
+                        <Badge variant="outline" className="text-2xs leading-4">
                           {competency.framework.toUpperCase()}
                         </Badge>
                       )}

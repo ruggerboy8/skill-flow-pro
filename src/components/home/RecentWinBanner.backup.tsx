@@ -136,11 +136,11 @@ export function RecentWinBanner() {
                 <h3 className={`text-sm font-bold ${theme.textTitle} tracking-tight`}>
                   {narrative.headline}
                 </h3>
-                <Badge variant="secondary" className={`text-[10px] px-1.5 h-5 font-bold ${theme.badge}`}>
+                <Badge variant="secondary" className={`text-2xs px-1.5 h-5 font-bold ${theme.badge}`}>
                   {narrative.badge}
                 </Badge>
               </div>
-              <p className="text-[10px] text-muted-foreground font-medium">
+              <p className="text-2xs text-muted-foreground font-medium">
                 {narrative.timeLabel} • {format(parseISO(win.out_week_of), "MMM d")}
               </p>
             </div>

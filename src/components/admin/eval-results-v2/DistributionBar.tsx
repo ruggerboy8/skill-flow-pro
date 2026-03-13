@@ -58,7 +58,7 @@ export function DistributionBar({ distribution, showLabels = true, className }: 
       </div>
       
       {showLabels && (
-        <div className="flex justify-between text-[10px] text-muted-foreground">
+        <div className="flex justify-between text-2xs text-muted-foreground">
           <span>1: {p1}%</span>
           <span>2: {p2}%</span>
           <span>3: {p3}%</span>

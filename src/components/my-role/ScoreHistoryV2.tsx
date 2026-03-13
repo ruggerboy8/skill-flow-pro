@@ -45,9 +45,9 @@ interface YearGroup {
 
 function StatusPill({ hasAll, hasAnyLate, isExempt }: { hasAll: boolean; hasAnyLate: boolean; isExempt?: boolean }) {
   if (isExempt) return <span className="text-muted-foreground text-xs">—</span>;
-  if (!hasAll) return <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Missing</Badge>;
-  if (hasAnyLate) return <Badge className="h-5 px-1.5 text-[10px] bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Late</Badge>;
-  return <Badge className="h-5 px-1.5 text-[10px] bg-green-100 text-green-800 hover:bg-green-100">Done</Badge>;
+  if (!hasAll) return <Badge variant="destructive" className="h-5 px-1.5 text-2xs">Missing</Badge>;
+  if (hasAnyLate) return <Badge className="h-5 px-1.5 text-2xs bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Late</Badge>;
+  return <Badge className="h-5 px-1.5 text-2xs bg-green-100 text-green-800 hover:bg-green-100">Done</Badge>;
 }
 
 export default function ScoreHistoryV2() {

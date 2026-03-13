@@ -36,6 +36,7 @@ export default function PlannerPage({ roleId, roleName, practiceType }: PlannerP
             <RecommenderPanel
               roleId={roleId}
               roleName={roleName}
+              practiceType={practiceType}
             />
           </div>
         </ResizablePanel>

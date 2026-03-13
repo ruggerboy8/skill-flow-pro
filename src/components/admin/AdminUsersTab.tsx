@@ -301,11 +301,21 @@ const handleResendInvite = async (user: User) => {
   const filteredUsers = users.filter(user => {
     const matchesRole = roleFilter === "all" || !roleFilter || user.role_id?.toString() === roleFilter;
     const matchesLocation = locationFilter === "all" || !locationFilter || user.location_id === locationFilter;
-    const matchesSuperAdmin = superAdminFilter === "all" || !superAdminFilter || 
-      (superAdminFilter === "true" && user.is_super_admin) ||
-      (superAdminFilter === "false" && !user.is_super_admin);
     
-    return matchesRole && matchesLocation && matchesSuperAdmin;
+    let matchesFlag = true;
+    if (flagFilter && flagFilter !== "all") {
+      switch (flagFilter) {
+        case "super_admin": matchesFlag = !!user.is_super_admin; break;
+        case "org_admin": matchesFlag = !!user.is_org_admin; break;
+        case "coach": matchesFlag = !!user.is_coach; break;
+        case "lead": matchesFlag = !!user.is_lead; break;
+        case "participant": matchesFlag = !!user.is_participant; break;
+        case "clinical_director": matchesFlag = !!user.is_clinical_director; break;
+        case "paused": matchesFlag = !!user.is_paused; break;
+      }
+    }
+    
+    return matchesRole && matchesLocation && matchesFlag;
   });
 
   const { sortedData, sortConfig, handleSort } = useTableSort(filteredUsers);

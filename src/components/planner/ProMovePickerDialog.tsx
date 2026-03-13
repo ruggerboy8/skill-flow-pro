@@ -56,32 +56,34 @@ export function ProMovePickerDialog({
     setLoading(true);
     setHiddenCount(0);
 
-    // 1) moves
-    let movesQuery = supabase
-      .from('pro_moves')
-      .select('action_id, action_statement, competency_id')
-      .eq('role_id', roleId)
-      .eq('active', true);
+    let visibleMoves: { action_id: number; action_statement: string; competency_id: number }[] = [];
 
-    if (practiceType) {
-      movesQuery = movesQuery.contains('practice_types', [practiceType]);
+    if (orgId) {
+      // Server-resolved: uses org practice_type + hidden overrides + org-custom moves
+      const { data: orgMoves, error } = await supabase
+        .rpc('org_visible_pro_moves', { p_org_id: orgId, p_role_id: roleId });
+      if (!error && orgMoves) {
+        visibleMoves = orgMoves.map((m: any) => ({
+          action_id: m.action_id,
+          action_statement: m.action_statement,
+          competency_id: m.competency_id,
+        }));
+      }
+    } else {
+      // Legacy fallback: client-side filtering
+      let movesQuery = supabase
+        .from('pro_moves')
+        .select('action_id, action_statement, competency_id')
+        .eq('role_id', roleId)
+        .eq('active', true);
+
+      if (practiceType) {
+        movesQuery = movesQuery.contains('practice_types', [practiceType]);
+      }
+
+      const { data: movesData } = await movesQuery;
+      visibleMoves = movesData ?? [];
     }
-
-    const { data: movesData } = await movesQuery;
-
-    // 2) org visibility overrides — exclude moves the org has hidden
-    let hiddenIds = new Set<number>();
-    if (orgId && movesData && movesData.length > 0) {
-      const { data: overrides } = await supabase
-        .from('organization_pro_move_overrides')
-        .select('pro_move_id')
-        .eq('org_id', orgId)
-        .eq('is_hidden', true);
-      hiddenIds = new Set((overrides ?? []).map(o => o.pro_move_id));
-    }
-
-    const visibleMoves = (movesData ?? []).filter(m => !hiddenIds.has(m.action_id));
-    setHiddenCount((movesData ?? []).length - visibleMoves.length);
 
     // 3) competencies + domains for visible moves only
     const competencyIds = [...new Set(visibleMoves.map(m => m.competency_id))];

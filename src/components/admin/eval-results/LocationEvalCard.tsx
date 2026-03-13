@@ -111,18 +111,18 @@ export function LocationEvalCard({ stats, onClick }: LocationEvalCardProps) {
             {allComplete ? (
               <Badge 
                 variant="secondary" 
-                className="text-[10px] bg-primary/10 text-primary"
+                className="text-2xs bg-primary/10 text-primary"
               >
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 {submitted}/{totalStaff}
               </Badge>
             ) : (
               <>
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-2xs">
                   {submitted} submitted
                 </Badge>
                 {drafts > 0 && (
-                  <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-300">
+                  <Badge variant="outline" className="text-2xs text-amber-600 dark:text-amber-400 border-amber-300">
                     <FileEdit className="h-3 w-3 mr-1" />
                     {drafts} drafts
                   </Badge>

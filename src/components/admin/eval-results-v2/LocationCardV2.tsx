@@ -22,7 +22,7 @@ export function LocationCardV2({ data, onClick }: LocationCardV2Props) {
   return (
     <Card 
       className={cn(
-        "cursor-pointer hover:shadow-md transition-shadow",
+        "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all",
         getTopBoxBg(data.topBoxRate)
       )}
       onClick={onClick}

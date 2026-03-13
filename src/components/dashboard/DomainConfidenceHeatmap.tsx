@@ -186,7 +186,7 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
                 {locationData.map(loc => {
                   const avg = loc.domainAvgs[domain];
                   return (
-                    <td key={loc.locationId} className={cn('text-center py-2 px-2 rounded', scoreBg(avg))}>
+                    <td key={loc.locationId} className={cn('text-center py-2 px-2', scoreBg(avg), i < DOMAINS.length - 1 && 'border-b border-border')}>
                       {avg !== undefined ? (
                         <span className={cn('font-semibold text-sm', scoreColor(avg))}>
                           {avg.toFixed(1)}

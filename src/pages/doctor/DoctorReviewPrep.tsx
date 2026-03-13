@@ -536,10 +536,10 @@ export default function DoctorReviewPrep() {
                     <div className="flex items-center gap-3 px-2.5 pb-1 mb-1 border-b border-border/50">
                       <div className="w-4" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pro Move</p>
+                        <p className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Pro Move</p>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap w-5 text-center">Self</p>
+                        <p className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap w-5 text-center">Self</p>
                       </div>
                     </div>
                     {(groupedItems[domain] || []).map(item => {

@@ -316,10 +316,10 @@ export default function ScoreHistoryV2() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="font-bold text-sm">Week of {weekLabel}</span>
                                       {isCurrentWeek && (
-                                        <Badge variant="default" className="text-[10px] h-5 px-1.5">Current</Badge>
+                                        <Badge variant="default" className="text-2xs h-5 px-1.5">Current</Badge>
                                       )}
                                       {isExempt && (
-                                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-[10px] h-5 px-1.5">Exempt</Badge>
+                                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-2xs h-5 px-1.5">Exempt</Badge>
                                       )}
                                     </div>
                                     {isSuperAdmin && scores.length > 0 && (

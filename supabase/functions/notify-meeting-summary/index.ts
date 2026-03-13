@@ -92,7 +92,8 @@ serve(async (req) => {
 
     const firstName = (doctor.name || '').split(' ')[0] || 'Doctor';
     const coachName = caller.name || 'your clinical director';
-    const reviewLink = `https://alcanskills.lovable.app/doctor/review-prep/${session_id}`;
+    const appUrl = Deno.env.get('APP_URL') || 'https://alcanskills.lovable.app';
+    const reviewLink = `${appUrl}/doctor/review-prep/${session_id}`;
 
     const subject = `Your coaching meeting summary is ready for review`;
     const html = `<p>Hi Dr. ${firstName},</p>

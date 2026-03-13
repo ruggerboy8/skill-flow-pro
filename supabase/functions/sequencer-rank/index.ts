@@ -121,11 +121,21 @@ serve(async (req) => {
     cutoff8w.setDate(cutoff8w.getDate() - 8 * 7);
 
     // 1. Fetch eligible moves with competencies
-    const { data: eligibleMoves, error: movesError } = await supabase
+    // Accept practiceType from caller to filter pro moves by practice type
+    const practiceType = (body as any).practiceType as string | undefined;
+
+    let movesQuery = supabase
       .from('pro_moves')
       .select('action_id, action_statement, competency_id')
       .eq('active', true)
       .eq('role_id', body.roleId);
+
+    if (practiceType) {
+      movesQuery = movesQuery.contains('practice_types', [practiceType]);
+      logs.push(`Filtering pro moves by practice_type: ${practiceType}`);
+    }
+
+    const { data: eligibleMoves, error: movesError } = await movesQuery;
 
     if (movesError) throw movesError;
 

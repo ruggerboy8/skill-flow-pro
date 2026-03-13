@@ -126,7 +126,8 @@ serve(async (req) => {
       const firstName = doctor.name.replace(/^dr\.?\s*/i, '').trim().split(" ")[0] || doctor.name;
       const coachName = callerStaff.name;
       // Resolve prep_link: use provided value, or construct from session
-      const resolvedPrepLink = prep_link || `https://alcanskills.lovable.app/doctor/review-prep/${sessionData.id}`;
+      const appUrl = Deno.env.get('APP_URL') || 'https://alcanskills.lovable.app';
+      const resolvedPrepLink = prep_link || `${appUrl}/doctor/review-prep/${sessionData.id}`;
 
       // Use custom template if provided, otherwise build default
       let subject: string;

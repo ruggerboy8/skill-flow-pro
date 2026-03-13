@@ -133,7 +133,15 @@ serve(async (req: Request) => {
             .eq("organization_id", organization_id);
           const orgGroupIds = (orgGroups ?? []).map((g: any) => g.id);
           if (orgGroupIds.length > 0) {
-            q = q.in("locations.group_id", orgGroupIds);
+            // Resolve location IDs from group IDs to filter staff directly
+            const { data: orgLocs } = await admin
+              .from("locations").select("id").in("group_id", orgGroupIds);
+            const orgLocIds = (orgLocs ?? []).map((l: any) => l.id);
+            if (orgLocIds.length > 0) {
+              q = q.in("primary_location_id", orgLocIds);
+            } else {
+              q = q.eq("id", "00000000-0000-0000-0000-000000000000");
+            }
           } else {
             // Org has no groups — return empty result set
             q = q.eq("id", "00000000-0000-0000-0000-000000000000");

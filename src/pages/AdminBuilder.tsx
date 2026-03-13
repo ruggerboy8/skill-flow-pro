@@ -59,7 +59,7 @@ export default function AdminBuilder() {
 
         <TabsContent value="library" className="space-y-6">
           <h2 className="text-xl font-semibold">Pro-Move Library</h2>
-          <ProMoveLibrary />
+          {isSuperAdmin ? <ProMoveLibrary /> : <OrgProMoveLibraryTab />}
         </TabsContent>
       </Tabs>
     </div>

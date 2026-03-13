@@ -9,7 +9,7 @@ import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { useLocationExcuses } from '@/hooks/useLocationExcuses';
 import { LocationHealthCard, LocationStats } from '@/components/dashboard/LocationHealthCard';
 import { LocationSkillGaps } from '@/components/dashboard/LocationSkillGaps';
-import { EvalCadenceWidget } from '@/components/dashboard/EvalCadenceWidget';
+
 import LocationSubmissionWidget from '@/components/dashboard/LocationSubmissionWidget';
 import CoachDashboardV2 from '@/pages/coach/CoachDashboardV2';
 import { getWeekAnchors, nowUtc } from '@/lib/centralTime';

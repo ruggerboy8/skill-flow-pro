@@ -79,7 +79,7 @@ function PlannerTabContent({
       {/* Left: Recommender */}
       <div className="w-1/2 shrink-0">
         <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
-          <RecommenderPanel roleId={roleId} roleName={roleName} />
+          <RecommenderPanel roleId={roleId} roleName={roleName} practiceType={practiceType} />
         </div>
       </div>
 

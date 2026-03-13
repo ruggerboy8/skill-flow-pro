@@ -157,7 +157,7 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b">
-              <th className="text-left py-2 pr-4 font-medium text-muted-foreground w-32">Domain</th>
+              <th className="text-left py-2 pr-4 font-medium text-muted-foreground w-32 sticky left-0 bg-card z-10">Domain</th>
               {locationData.map(loc => (
                 <th key={loc.locationId} className="text-center py-2 px-2 font-medium text-muted-foreground min-w-[80px]">
                   <span className="text-xs">{loc.locationName}</span>
@@ -171,13 +171,13 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
           <tbody>
             {DOMAINS.map(domain => (
               <tr key={domain} className="border-b last:border-0">
-                <td className="py-2 pr-4">
+                <td className="py-2 pr-4 sticky left-0 bg-card z-10">
                   <div className="flex items-center gap-2">
                     <div
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: getDomainColor(domain) }}
                     />
-                    <span className="font-medium text-xs">{domain}</span>
+                    <span className="font-medium text-xs whitespace-nowrap">{domain}</span>
                   </div>
                 </td>
                 {locationData.map(loc => {

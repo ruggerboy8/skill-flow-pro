@@ -216,30 +216,9 @@ export default function StatsScores() {
     setDeleteDialogOpen(true);
   };
 
-  // Status pill component
   function StatusPill({ hasAll, hasAnyLate, isExempt }: { hasAll: boolean; hasAnyLate: boolean; isExempt?: boolean }) {
-    if (isExempt) {
-      return <span className="text-muted-foreground">—</span>;
-    }
-    if (!hasAll) {
-      return (
-        <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
-          Missing
-        </Badge>
-      );
-    }
-    if (hasAnyLate) {
-      return (
-        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-          Late
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-        Complete
-      </Badge>
-    );
+    const status = isExempt ? 'exempt' as const : !hasAll ? 'missing' as const : hasAnyLate ? 'late' as const : 'complete' as const;
+    return <StatusBadge status={status} />;
   }
 
   if (loading) {

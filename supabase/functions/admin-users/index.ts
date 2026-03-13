@@ -152,6 +152,18 @@ serve(async (req: Request) => {
         if (location_id) q = q.eq("primary_location_id", location_id);
         if (role_id) q = q.eq("role_id", role_id);
         if (super_admin !== undefined) q = q.eq("is_super_admin", super_admin);
+        // Flag-based filtering
+        if (flag) {
+          switch (flag) {
+            case "super_admin": q = q.eq("is_super_admin", true); break;
+            case "org_admin": q = q.eq("is_org_admin", true); break;
+            case "coach": q = q.eq("is_coach", true); break;
+            case "lead": q = q.eq("is_lead", true); break;
+            case "participant": q = q.eq("is_participant", true); break;
+            case "clinical_director": q = q.eq("is_clinical_director", true); break;
+            case "paused": q = q.eq("is_paused", true); break;
+          }
+        }
 
         const { data, count, error } = await q.range(from, to);
         if (error) throw error;

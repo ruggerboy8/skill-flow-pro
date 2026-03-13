@@ -49,7 +49,7 @@ export default function AdminBuilder() {
         </TabsContent>
 
         <TabsContent value="rda-planner" className="space-y-6">
-          <PlannerTabContent roleId={2} roleName="RDA" orgId={organizationId} />
+          <PlannerTabContent roleId={2} roleName="RDA" orgId={organizationId} practiceType={practiceType} />
         </TabsContent>
 
         <TabsContent value="om-planner" className="space-y-6">

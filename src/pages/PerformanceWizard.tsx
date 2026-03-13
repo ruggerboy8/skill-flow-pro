@@ -1,5 +1,5 @@
 // Updated Performance Wizard to use progress-based approach instead of ISO week
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,8 @@ import { assembleCurrentWeek } from '@/lib/weekAssembly';
 import { useReliableSubmission } from '@/hooks/useReliableSubmission';
 import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+import { fireCelebration } from '@/lib/confetti';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,9 +81,12 @@ export default function PerformanceWizard() {
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submitPhase, setSubmitPhase] = useState<'idle' | 'saving' | 'done'>('idle');
   const [isCarryoverWeek, setIsCarryoverWeek] = useState(false);
   const [isConfidenceExcused, setIsConfidenceExcused] = useState(false);
   const [showVictory, setShowVictory] = useState(false);
+  const [direction, setDirection] = useState(1);
+  const prevIndexRef = useRef(0);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -152,6 +157,23 @@ export default function PerformanceWizard() {
   const { thuStartZ, mondayZ } = getAnchors(effectiveNow, tz);
 
   const currentIndex = Math.max(0, (Number(n) || 1) - 1);
+
+  // Track direction based on index changes
+  useEffect(() => {
+    if (currentIndex > prevIndexRef.current) {
+      setDirection(1);
+    } else if (currentIndex < prevIndexRef.current) {
+      setDirection(-1);
+    }
+    prevIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  // Fire confetti when victory modal opens
+  useEffect(() => {
+    if (showVictory) {
+      fireCelebration();
+    }
+  }, [showVictory]);
 
   useEffect(() => {
     if (user) {
@@ -639,6 +661,7 @@ export default function PerformanceWizard() {
 
   const proceed = () => {
     if (currentIndex < weeklyFocus.length - 1) {
+      setDirection(1);
       navigate(preserveSearchParams(`/performance/current/step/${currentIndex + 2}`));
     } else {
       handleSubmit();
@@ -649,6 +672,7 @@ export default function PerformanceWizard() {
 
   const handleBack = () => {
     if (currentIndex > 0) {
+      setDirection(-1);
       navigate(preserveSearchParams(`/performance/current/step/${currentIndex}`));
     }
   };
@@ -721,6 +745,7 @@ export default function PerformanceWizard() {
     }
 
     setSubmitting(true);
+    setSubmitPhase('saving');
 
     // Get location timezone for proper deadline calculation
     let timezone = 'America/Chicago'; // default fallback
@@ -814,28 +839,47 @@ export default function PerformanceWizard() {
     const success = await submitWithRetry('performance', submissionData);
     
     if (success) {
-      toast({
-        title: isRepair ? "Performance backfilled" : "Great week!",
-        description: isRepair ? "Scores updated for past week." : "Enjoy your weekend!"
-      });
-    }
-    
-    // Clear sessionStorage on successful submission
-    if (scoresStorageKey) {
-      sessionStorage.removeItem(scoresStorageKey);
-    }
-    
-    // Navigate based on mode
-    if (isRepair) {
-      // Backfill mode: return to practice log or specified returnTo
-      const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
+      // Show checkmark phase
+      setSubmitPhase('done');
+      
+      // Clear sessionStorage on successful submission
+      if (scoresStorageKey) {
+        sessionStorage.removeItem(scoresStorageKey);
+      }
+
+      // Fire confetti for non-repair submissions
+      if (!isRepair) {
+        setTimeout(() => fireCelebration(), 300);
+      }
+
+      // Navigate after celebration delay
       setTimeout(() => {
-        navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
-      }, 150);
+        if (isRepair) {
+          const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
+          navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
+        } else {
+          navigate('/');
+        }
+      }, isRepair ? 800 : 1800);
     } else {
-      navigate('/');
+      // Clear sessionStorage on successful submission
+      if (scoresStorageKey) {
+        sessionStorage.removeItem(scoresStorageKey);
+      }
+      
+      setSubmitPhase('idle');
+      setSubmitting(false);
+      
+      // Navigate based on mode
+      if (isRepair) {
+        const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
+        setTimeout(() => {
+          navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
+        }, 150);
+      } else {
+        navigate('/');
+      }
     }
-    setSubmitting(false);
   };
 
   const handleScoreChange = (score: number) => {
@@ -878,6 +922,12 @@ export default function PerformanceWizard() {
   const hasScore = performanceScores[currentFocus.id] !== undefined;
   const isLastItem = currentIndex === weeklyFocus.length - 1;
 
+  const slideVariants = {
+    enter: (dir: number) => ({ x: dir * 30, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (dir: number) => ({ x: dir * -30, opacity: 0 }),
+  };
+
   return (
     <div className="min-h-[100dvh] pb-24 bg-background">
       {/* Environmental Gradient */}
@@ -905,66 +955,77 @@ export default function PerformanceWizard() {
         ))}
       </div>
 
-      {/* Main Content Area */}
-      <div className="px-2 sm:px-4 max-w-md mx-auto">
-        {/* Submitting Indicator */}
-        {pendingCount > 0 && (
-          <div className="flex justify-center mb-4">
-            <Badge variant="secondary" className="bg-white/90 text-foreground flex items-center gap-1">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Saving...
-            </Badge>
-          </div>
-        )}
-
-        {/* Spine Card */}
-        <div className="flex rounded-2xl overflow-hidden shadow-2xl border border-white/20">
-          {/* THE SPINE */}
-          <div 
-            className="w-8 shrink-0 flex items-center justify-center"
-            style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}
-          >
-            <span 
-              className="text-2xs font-bold tracking-wider uppercase text-white drop-shadow-sm whitespace-nowrap"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-            >
-              {currentFocus.domain_name}
-            </span>
-          </div>
-
-          {/* Content Area */}
-          <div className="flex-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm p-4 sm:p-6 space-y-4">
-            {/* Confidence Context Badge */}
-            {isConfidenceExcused ? (
-              <Badge variant="secondary" className="text-xs bg-muted/50">
-                Confidence: Excused
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="text-xs bg-muted/50">
-                Your confidence: {getConfidenceScore(currentFocus.id)}
-              </Badge>
+      {/* Animated Main Content Area */}
+      <AnimatePresence mode="wait" custom={direction}>
+        <motion.div
+          key={currentIndex}
+          custom={direction}
+          variants={slideVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          <div className="px-2 sm:px-4 max-w-md mx-auto">
+            {/* Submitting Indicator */}
+            {pendingCount > 0 && (
+              <div className="flex justify-center mb-4">
+                <Badge variant="secondary" className="bg-white/90 text-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Saving...
+                </Badge>
+              </div>
             )}
 
-            {/* Pro Move Hero Text */}
-            <p className="text-xl md:text-2xl font-semibold leading-relaxed text-foreground tracking-tight">
-              {currentFocus.action_statement}
-            </p>
+            {/* Spine Card */}
+            <div className="flex rounded-2xl overflow-hidden shadow-2xl border border-white/20">
+              {/* THE SPINE */}
+              <div 
+                className="w-8 shrink-0 flex items-center justify-center"
+                style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}
+              >
+                <span 
+                  className="text-2xs font-bold tracking-wider uppercase text-white drop-shadow-sm whitespace-nowrap"
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                >
+                  {currentFocus.domain_name}
+                </span>
+              </div>
+
+              {/* Content Area */}
+              <div className="flex-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm p-4 sm:p-6 space-y-4">
+                {/* Confidence Context Badge */}
+                {isConfidenceExcused ? (
+                  <Badge variant="secondary" className="text-xs bg-muted/50">
+                    Confidence: Excused
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-xs bg-muted/50">
+                    Your confidence: {getConfidenceScore(currentFocus.id)}
+                  </Badge>
+                )}
+
+                {/* Pro Move Hero Text */}
+                <p className="text-xl md:text-2xl font-semibold leading-relaxed text-foreground tracking-tight">
+                  {currentFocus.action_statement}
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
 
-      </div>
-
-      {/* Question & Scale */}
-      <div className="px-4 max-w-md mx-auto mt-8 space-y-6">
-        <div className="text-center">
-          <p className="text-base font-medium text-foreground mb-1">How did you do?</p>
-          <p className="text-sm text-muted-foreground">How often did you actually do this action this week?</p>
-        </div>
-        <NumberScale
-          value={performanceScores[currentFocus.id] || null}
-          onChange={handleScoreChange}
-        />
-      </div>
+          {/* Question & Scale */}
+          <div className="px-4 max-w-md mx-auto mt-8 space-y-6">
+            <div className="text-center">
+              <p className="text-base font-medium text-foreground mb-1">How did you do?</p>
+              <p className="text-sm text-muted-foreground">How often did you actually do this action this week?</p>
+            </div>
+            <NumberScale
+              value={performanceScores[currentFocus.id] || null}
+              onChange={handleScoreChange}
+            />
+          </div>
+        </motion.div>
+      </AnimatePresence>
 
       {/* Sticky Footer */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-white/40 dark:border-slate-700/40 z-50">
@@ -980,9 +1041,14 @@ export default function PerformanceWizard() {
           <Button 
             onClick={handleNext}
             disabled={!hasScore || submitting}
-            className="flex-[2] rounded-full"
+            className={cn(
+              "flex-[2] rounded-full transition-all duration-300",
+              submitPhase === 'done' && "bg-emerald-500 hover:bg-emerald-500"
+            )}
           >
-            {submitting ? (
+            {submitPhase === 'done' ? (
+              <Check className="h-5 w-5 animate-scale-in" />
+            ) : submitPhase === 'saving' ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Saving...

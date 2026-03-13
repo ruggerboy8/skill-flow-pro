@@ -22,7 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CalendarOff, MoreVertical, Check, X, ClipboardCheck } from 'lucide-react';
+import { CalendarOff, MoreVertical, Check, X } from 'lucide-react';
+import { getDomainOrderIndex } from '@/lib/domainUtils';
 import { format, parseISO, subWeeks, differenceInDays } from 'date-fns';
 import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
 import { useAuth } from '@/hooks/useAuth';

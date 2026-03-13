@@ -152,47 +152,10 @@ export default function StaffDetailV2() {
     }));
   }, [weekSummaries]);
 
-  // Status pill component
-  function StatusPill({ 
-    hasAll, 
-    hasAnyLate, 
-    isExempt,
-    isExcused 
-  }: { 
-    hasAll: boolean; 
-    hasAnyLate: boolean; 
-    isExempt?: boolean;
-    isExcused?: boolean;
-  }) {
-    if (isExempt) {
-      return <span className="text-muted-foreground">—</span>;
-    }
-    if (isExcused) {
-      return (
-        <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-slate-200">
-          Excused
-        </Badge>
-      );
-    }
-    if (!hasAll) {
-      return (
-        <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
-          Missing
-        </Badge>
-      );
-    }
-    if (hasAnyLate) {
-      return (
-        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-          Late
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-        Complete
-      </Badge>
-    );
+  // Status pill - delegates to shared StatusBadge
+  function StatusPill({ hasAll, hasAnyLate, isExempt, isExcused }: { hasAll: boolean; hasAnyLate: boolean; isExempt?: boolean; isExcused?: boolean }) {
+    const status = isExempt ? 'exempt' : isExcused ? 'excused' : !hasAll ? 'missing' : hasAnyLate ? 'late' : 'complete';
+    return <StatusBadge status={status} />;
   }
 
   // Excuse dropdown component for super admins

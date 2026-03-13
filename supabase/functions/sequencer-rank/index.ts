@@ -120,24 +120,48 @@ serve(async (req) => {
     const cutoff8w = new Date(effectiveDateObj);
     cutoff8w.setDate(cutoff8w.getDate() - 8 * 7);
 
-    // 1. Fetch eligible moves with competencies
-    // Accept practiceType from caller to filter pro moves by practice type
+    // 1. Fetch eligible moves — prefer org_visible_pro_moves RPC when orgId provided
     const practiceType = (body as any).practiceType as string | undefined;
+    const orgId = (body as any).orgId as string | undefined;
 
-    let movesQuery = supabase
-      .from('pro_moves')
-      .select('action_id, action_statement, competency_id')
-      .eq('active', true)
-      .eq('role_id', body.roleId);
+    let eligible: any[] = [];
 
-    if (practiceType) {
-      movesQuery = movesQuery.contains('practice_types', [practiceType]);
-      logs.push(`Filtering pro moves by practice_type: ${practiceType}`);
+    if (orgId) {
+      // Server-resolved: uses org practice_type + hidden overrides + org-custom moves
+      const { data: orgMoves, error: orgErr } = await supabase
+        .rpc('org_visible_pro_moves', { p_org_id: orgId, p_role_id: body.roleId });
+      if (orgErr) throw orgErr;
+      eligible = (orgMoves || []).map((m: any) => ({
+        actionId: m.action_id,
+        statement: m.action_statement,
+        competencyId: m.competency_id,
+      }));
+      logs.push(`Using org_visible_pro_moves RPC for org ${orgId}: ${eligible.length} moves`);
+    } else {
+      // Legacy path: client-provided practiceType filter
+      let movesQuery = supabase
+        .from('pro_moves')
+        .select('action_id, action_statement, competency_id')
+        .eq('active', true)
+        .eq('role_id', body.roleId);
+
+      if (practiceType) {
+        movesQuery = movesQuery.contains('practice_types', [practiceType]);
+        logs.push(`Filtering pro moves by practice_type: ${practiceType}`);
+      }
+
+      const { data: eligibleMoves, error: movesError } = await movesQuery;
+      if (movesError) throw movesError;
+
+      eligible = (eligibleMoves || []).map((m: any) => ({
+        actionId: m.action_id,
+        statement: m.action_statement,
+        competencyId: m.competency_id,
+      }));
     }
 
-    const { data: eligibleMoves, error: movesError } = await movesQuery;
-
-    if (movesError) throw movesError;
+    // 1b. Fetch competencies with domains separately
+    const competencyIds = eligible.map((m: any) => m.competencyId) || [];
 
     // 1b. Fetch competencies with domains separately
     const competencyIds = eligibleMoves?.map((m: any) => m.competency_id) || [];

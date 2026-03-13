@@ -1,5 +1,5 @@
 // Updated Confidence Wizard to use progress-based approach instead of ISO week
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,8 @@ import { assembleCurrentWeek } from '@/lib/weekAssembly';
 import { useReliableSubmission } from '@/hooks/useReliableSubmission';
 import { AlertCircle, Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+import { fireCelebration } from '@/lib/confetti';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,8 +66,11 @@ export default function ConfidenceWizard() {
   const [optionsByCompetency, setOptionsByCompetency] = useState<{ [key: number]: { action_id: string; action_statement: string }[] }>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submitPhase, setSubmitPhase] = useState<'idle' | 'saving' | 'done'>('idle');
   const [hasConfidence, setHasConfidence] = useState(false);
   const [showIntervention, setShowIntervention] = useState(false);
+  const [direction, setDirection] = useState(1);
+  const prevIndexRef = useRef(0);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -153,6 +158,16 @@ export default function ConfidenceWizard() {
   const afterTueNoon = effectiveNow >= tueDueZ;
 
   const currentIndex = Math.max(0, (Number(n) || 1) - 1);
+
+  // Track direction based on index changes
+  useEffect(() => {
+    if (currentIndex > prevIndexRef.current) {
+      setDirection(1);
+    } else if (currentIndex < prevIndexRef.current) {
+      setDirection(-1);
+    }
+    prevIndexRef.current = currentIndex;
+  }, [currentIndex]);
 
   useEffect(() => {
     if (user) {
@@ -719,6 +734,7 @@ export default function ConfidenceWizard() {
 
   const proceed = () => {
     if (currentIndex < weeklyFocus.length - 1) {
+      setDirection(1);
       navigate(preserveSearchParams(`/confidence/current/step/${currentIndex + 2}`));
     } else {
       handleSubmit();
@@ -729,6 +745,7 @@ export default function ConfidenceWizard() {
 
   const handleBack = () => {
     if (currentIndex > 0) {
+      setDirection(-1);
       navigate(preserveSearchParams(`/confidence/current/step/${currentIndex}`));
     }
   };
@@ -785,6 +802,7 @@ export default function ConfidenceWizard() {
     }
 
     setSubmitting(true);
+    setSubmitPhase('saving');
 
     // Debug logging to track self-select state
     console.log('Submit debug - selectedActions:', selectedActions);
@@ -927,42 +945,63 @@ export default function ConfidenceWizard() {
     console.log('Navigation params:', { isRepair, returnTo });
     
     if (success) {
-      toast({
-        title: isRepair ? "Confidence backfilled" : "Confidence saved",
-        description: isRepair ? "Scores updated for past week." : "Great! Come back later to rate your performance."
-      });
+      // Show checkmark phase
+      setSubmitPhase('done');
+      
+      // Clear sessionStorage on successful submission
+      if (scoresStorageKey) {
+        sessionStorage.removeItem(scoresStorageKey);
+      }
+      if (selectionsStorageKey) {
+        sessionStorage.removeItem(selectionsStorageKey);
+      }
+
+      // Fire confetti for non-repair submissions
+      if (!isRepair) {
+        setTimeout(() => fireCelebration(), 300);
+      }
+
+      // Navigate after celebration delay
+      setTimeout(() => {
+        if (isRepair) {
+          const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
+          navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
+        } else if (returnTo) {
+          const dest = decodeURIComponent(returnTo);
+          navigate(dest, { replace: true });
+        } else {
+          navigate('/');
+        }
+      }, isRepair ? 800 : 1800);
     } else {
       // Don't show error toast - useReliableSubmission handles retries in background
-      // and already shows "Saving..." toast. Data will eventually be saved.
       console.log('Immediate submission failed, retries queued in background');
-    }
-    
-    // Clear sessionStorage on successful submission
-    if (scoresStorageKey) {
-      sessionStorage.removeItem(scoresStorageKey);
-    }
-    if (selectionsStorageKey) {
-      sessionStorage.removeItem(selectionsStorageKey);
-    }
-    
-    setSubmitting(false);
-    
-    // Always navigate - data will be saved via background retries if immediate attempt failed
-    if (isRepair) {
-      // Backfill mode: return to practice log or specified returnTo
-      const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
-      console.log('Navigating back to:', dest);
-      setTimeout(() => {
-        navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
-      }, 150);
-    } else if (returnTo) {
-      const dest = decodeURIComponent(returnTo);
-      console.log('Returning to performance wizard:', dest);
-      setTimeout(() => {
-        navigate(dest, { replace: true });
-      }, 150);
-    } else {
-      navigate('/');
+      
+      // Clear sessionStorage
+      if (scoresStorageKey) {
+        sessionStorage.removeItem(scoresStorageKey);
+      }
+      if (selectionsStorageKey) {
+        sessionStorage.removeItem(selectionsStorageKey);
+      }
+      
+      setSubmitPhase('idle');
+      setSubmitting(false);
+      
+      // Always navigate - data will be saved via background retries
+      if (isRepair) {
+        const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
+        setTimeout(() => {
+          navigate(dest, { replace: true, state: { repairJustSubmitted: true } });
+        }, 150);
+      } else if (returnTo) {
+        const dest = decodeURIComponent(returnTo);
+        setTimeout(() => {
+          navigate(dest, { replace: true });
+        }, 150);
+      } else {
+        navigate('/');
+      }
     }
   };
 
@@ -1015,6 +1054,12 @@ export default function ConfidenceWizard() {
   const canProceed = hasScore && hasRequiredSelection;
   const isLastItem = currentIndex === weeklyFocus.length - 1;
 
+  const slideVariants = {
+    enter: (dir: number) => ({ x: dir * 30, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (dir: number) => ({ x: dir * -30, opacity: 0 }),
+  };
+
   return (
     <div className="min-h-[100dvh] pb-24 bg-background">
       {/* Environmental Gradient */}
@@ -1042,89 +1087,100 @@ export default function ConfidenceWizard() {
         ))}
       </div>
 
-      {/* Main Content Area */}
-      <div className="px-2 sm:px-4 max-w-md mx-auto">
-        {/* Submitting Indicator */}
-        {submitting && (
-          <div className="flex justify-center mb-4">
-            <Badge variant="secondary" className="bg-white/90 text-foreground flex items-center gap-1">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Saving...
-            </Badge>
-          </div>
-        )}
-
-        {/* Spine Card */}
-        <div className="flex rounded-2xl overflow-hidden shadow-2xl border border-white/20">
-          {/* THE SPINE */}
-          <div 
-            className="w-8 shrink-0 flex items-center justify-center"
-            style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}
-          >
-            <span 
-              className="text-2xs font-bold tracking-wider uppercase text-white drop-shadow-sm whitespace-nowrap"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-            >
-              {currentFocus.domain_name}
-            </span>
-          </div>
-
-          {/* Content Area */}
-          <div className="flex-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm p-4 sm:p-6 space-y-4">
-            {/* Competency Pill (if self-select) */}
-            {selfSelectById[currentFocus.id] && competencyNameById[currentFocus.id] && (
-              <Badge variant="outline" className="text-xs font-semibold bg-muted/50">
-                {competencyNameById[currentFocus.id]}
-              </Badge>
+      {/* Animated Main Content Area */}
+      <AnimatePresence mode="wait" custom={direction}>
+        <motion.div
+          key={currentIndex}
+          custom={direction}
+          variants={slideVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          <div className="px-2 sm:px-4 max-w-md mx-auto">
+            {/* Submitting Indicator */}
+            {submitting && (
+              <div className="flex justify-center mb-4">
+                <Badge variant="secondary" className="bg-white/90 text-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Saving...
+                </Badge>
+              </div>
             )}
 
-            {/* Self-Select Dropdown OR Hero Text */}
-            {selfSelectById[currentFocus.id] ? (
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-foreground">
-                  Select your Pro Move:
-                </Label>
-                <Select
-                  value={selectedActions[currentFocus.id] || ""}
-                  onValueChange={(value) => handleSelectionChange(currentFocus.id, value)}
+            {/* Spine Card */}
+            <div className="flex rounded-2xl overflow-hidden shadow-2xl border border-white/20">
+              {/* THE SPINE */}
+              <div 
+                className="w-8 shrink-0 flex items-center justify-center"
+                style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}
+              >
+                <span 
+                  className="text-2xs font-bold tracking-wider uppercase text-white drop-shadow-sm whitespace-nowrap"
+                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
                 >
-                  <SelectTrigger className="w-full bg-white dark:bg-slate-700">
-                    <SelectValue placeholder="Choose a Pro Move..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-slate-800 border shadow-lg z-50">
-                    {competencyById[currentFocus.id] && 
-                     optionsByCompetency[competencyById[currentFocus.id]]?.map((option) => (
-                      <SelectItem key={option.action_id} value={option.action_id}>
-                        {option.action_statement}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!hasRequiredSelection && (
-                  <p className="text-sm text-destructive">Please select a Pro Move to continue.</p>
+                  {currentFocus.domain_name}
+                </span>
+              </div>
+
+              {/* Content Area */}
+              <div className="flex-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm p-4 sm:p-6 space-y-4">
+                {/* Competency Pill (if self-select) */}
+                {selfSelectById[currentFocus.id] && competencyNameById[currentFocus.id] && (
+                  <Badge variant="outline" className="text-xs font-semibold bg-muted/50">
+                    {competencyNameById[currentFocus.id]}
+                  </Badge>
+                )}
+
+                {/* Self-Select Dropdown OR Hero Text */}
+                {selfSelectById[currentFocus.id] ? (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-foreground">
+                      Select your Pro Move:
+                    </Label>
+                    <Select
+                      value={selectedActions[currentFocus.id] || ""}
+                      onValueChange={(value) => handleSelectionChange(currentFocus.id, value)}
+                    >
+                      <SelectTrigger className="w-full bg-white dark:bg-slate-700">
+                        <SelectValue placeholder="Choose a Pro Move..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white dark:bg-slate-800 border shadow-lg z-50">
+                        {competencyById[currentFocus.id] && 
+                         optionsByCompetency[competencyById[currentFocus.id]]?.map((option) => (
+                          <SelectItem key={option.action_id} value={option.action_id}>
+                            {option.action_statement}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!hasRequiredSelection && (
+                      <p className="text-sm text-destructive">Please select a Pro Move to continue.</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xl md:text-2xl font-semibold leading-relaxed text-foreground tracking-tight">
+                    {currentFocus.action_statement}
+                  </p>
                 )}
               </div>
-            ) : (
-              <p className="text-xl md:text-2xl font-semibold leading-relaxed text-foreground tracking-tight">
-                {currentFocus.action_statement}
-              </p>
-            )}
+            </div>
           </div>
-        </div>
 
-      </div>
-
-      {/* Question & Scale */}
-      <div className="px-4 max-w-md mx-auto mt-8 space-y-6">
-        <div className="text-center">
-          <p className="text-base font-medium text-foreground mb-1">How confident are you?</p>
-          <p className="text-sm text-muted-foreground">That you're already doing this 100% of the time</p>
-        </div>
-        <NumberScale
-          value={scores[currentFocus.id] || null}
-          onChange={handleScoreChange}
-        />
-      </div>
+          {/* Question & Scale */}
+          <div className="px-4 max-w-md mx-auto mt-8 space-y-6">
+            <div className="text-center">
+              <p className="text-base font-medium text-foreground mb-1">How confident are you?</p>
+              <p className="text-sm text-muted-foreground">That you're already doing this 100% of the time</p>
+            </div>
+            <NumberScale
+              value={scores[currentFocus.id] || null}
+              onChange={handleScoreChange}
+            />
+          </div>
+        </motion.div>
+      </AnimatePresence>
 
       {/* Sticky Footer */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-white/40 dark:border-slate-700/40 z-50">
@@ -1140,9 +1196,14 @@ export default function ConfidenceWizard() {
           <Button 
             onClick={handleNext}
             disabled={!canProceed || submitting}
-            className="flex-[2] rounded-full"
+            className={cn(
+              "flex-[2] rounded-full transition-all duration-300",
+              submitPhase === 'done' && "bg-emerald-500 hover:bg-emerald-500"
+            )}
           >
-            {submitting ? (
+            {submitPhase === 'done' ? (
+              <Check className="h-5 w-5 animate-scale-in" />
+            ) : submitPhase === 'saving' ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Saving...

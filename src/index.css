@@ -69,6 +69,18 @@ All colors MUST be HSL.
     --positive: 160 84% 39%;
     --warning: 45 93% 47%;
     --warning-foreground: 0 0% 9%;
+
+    /* Status colors */
+    --status-complete: 142 71% 45%;
+    --status-complete-bg: 142 76% 92%;
+    --status-missing: 0 84% 60%;
+    --status-missing-bg: 0 93% 94%;
+    --status-late: 45 93% 47%;
+    --status-late-bg: 48 96% 89%;
+    --status-excused: 215 14% 55%;
+    --status-excused-bg: 210 40% 96%;
+    --status-pending: 215 14% 55%;
+    --status-pending-bg: 210 40% 96%;
     
     /* Domain colors (rich/saturated) */
     --domain-clinical: 211 85% 55%;

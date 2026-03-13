@@ -42,6 +42,7 @@ interface SaveWeekRequest {
     }
   }>
   updaterUserId: string
+  orgId?: string | null  // When present, scopes assignment to this org; otherwise global
 }
 
 type RequestBody = RecommendRequest | SaveWeekRequest
@@ -92,24 +93,28 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === 'saveWeek') {
-      const { roleId, weekStartDate, picks, updaterUserId } = body
+      const { roleId, weekStartDate, picks, updaterUserId, orgId } = body
       const upserted: Array<{ id: string, displayOrder: number, actionId: number | null }> = []
       const skippedLocked: Array<{ id: string, displayOrder: number, actionId: number | null }> = []
       const deleted: Array<{ id: string, displayOrder: number }> = []
 
       // Process each slot
       for (const pick of picks) {
-        // Check if row exists in weekly_assignments (V2)
-        const { data: existing } = await supabase
+        // Check if row exists in weekly_assignments (V2), scoped to org or global
+        let existingQuery = supabase
           .from('weekly_assignments')
           .select('id, action_id')
-          .is('org_id', null)
           .is('location_id', null)
           .eq('role_id', roleId)
           .eq('week_start_date', weekStartDate)
           .eq('display_order', pick.displayOrder)
           .is('superseded_at', null)
-          .maybeSingle()
+
+        existingQuery = orgId
+          ? existingQuery.eq('org_id', orgId)
+          : existingQuery.is('org_id', null)
+
+        const { data: existing } = await existingQuery.maybeSingle()
 
         if (existing) {
           // Check if locked (has scores)
@@ -177,14 +182,14 @@ Deno.serve(async (req) => {
           const { data: inserted, error: insertError } = await supabase
             .from('weekly_assignments')
             .insert({
-              org_id: null,
+              org_id: orgId ?? null,
               location_id: null,
               role_id: roleId,
               week_start_date: weekStartDate,
               display_order: pick.displayOrder,
               action_id: pick.actionId,
               competency_id: competencyId,
-              source: 'global',
+              source: orgId ? 'org' : 'global',
               status: 'locked',
               self_select: false,
             })

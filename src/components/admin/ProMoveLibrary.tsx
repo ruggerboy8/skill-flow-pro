@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ interface Competency {
 
 export function ProMoveLibrary() {
   const { toast } = useToast();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   
   // State management
   const [roles, setRoles] = useState<Role[]>([]);
@@ -36,6 +38,7 @@ export function ProMoveLibrary() {
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
+  const [practiceTypeFilter, setPracticeTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'domain' | 'competency' | 'updated'>('updated');
   const [resourceFilters, setResourceFilters] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -259,6 +262,26 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
         </div>
       </div>
 
+      {/* Practice type filter chips */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground font-medium">Practice type:</span>
+        {([
+          { value: 'all', label: 'All' },
+          { value: 'pediatric_us', label: 'Pediatric – US' },
+          { value: 'general_us', label: 'General – US' },
+          { value: 'general_uk', label: 'General – UK' },
+        ]).map(({ value, label }) => (
+          <Button
+            key={value}
+            variant={practiceTypeFilter === value ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setPracticeTypeFilter(value)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 bg-muted/50 rounded-lg">
         <div className="space-y-2">
@@ -270,8 +293,8 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
             <SelectContent className="bg-background z-50">
               <SelectItem value="all">All roles</SelectItem>
               {roles.map(role => (
-                <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                  {role.role_name}
+              <SelectItem key={role.role_id} value={role.role_id.toString()}>
+                  {resolveRole(role.role_id, role.role_name)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -420,6 +443,7 @@ RDA,"Example Competency","Example pro-move text","Optional description","Optiona
           activeOnly={showActiveOnly}
           resourceFilters={resourceFilters}
           sortBy={sortBy}
+          practiceTypeFilter={practiceTypeFilter}
           onEdit={handleEditProMove}
         />
       </div>

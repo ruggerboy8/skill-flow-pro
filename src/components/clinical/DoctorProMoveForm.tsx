@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 
 const DOCTOR_ROLE_ID = 4;
+const DEFAULT_PRACTICE_TYPES = ['pediatric_us'];
 
 interface Competency {
   competency_id: number;
@@ -72,6 +73,7 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
         competency_id: parseInt(formData.competency_id),
         action_statement: formData.action_statement.trim(),
         description: formData.description.trim() || null,
+        practice_types: DEFAULT_PRACTICE_TYPES,
         active: true
       };
 

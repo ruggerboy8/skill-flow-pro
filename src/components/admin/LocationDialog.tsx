@@ -38,7 +38,8 @@ const TIMEZONE_OPTIONS = [
   { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
   { value: 'America/Phoenix', label: 'Arizona Time (MST)' },
   { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
-  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HST)' }
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HST)' },
+  { value: 'Europe/London', label: 'London (GMT/BST)' },
 ];
 
 export function LocationDialog({ open, onClose, location }: LocationDialogProps) {

@@ -6,6 +6,21 @@ import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useSim } from '@/devtools/SimProvider';
 
+export interface UserCapabilities {
+  is_participant: boolean;
+  participation_start_at: string | null;
+  can_view_submissions: boolean;
+  can_submit_evals: boolean;
+  can_review_evals: boolean;
+  can_invite_users: boolean;
+  can_manage_library: boolean;
+  can_manage_locations: boolean;
+  can_manage_users: boolean;
+  can_manage_assignments: boolean;
+  is_org_admin: boolean;
+  is_platform_admin: boolean;
+}
+
 export interface StaffProfile {
   id: string;
   name?: string;
@@ -38,11 +53,16 @@ export interface StaffProfile {
     conf_due_time?: string;
     perf_due_day?: number;
     perf_due_time?: string;
+    practice_groups?: {
+      organization_id: string | null;
+    } | null;
   } | null;
   coach_scopes: {
     scope_type: 'org' | 'location';
     scope_id: string;
   }[];
+  // New: granular capability toggles. null = no user_capabilities row yet (fall back to staff flags).
+  user_capabilities: UserCapabilities | null;
 }
 
 interface UseStaffProfileOptions {
@@ -98,11 +118,28 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
             conf_due_day,
             conf_due_time,
             perf_due_day,
-            perf_due_time
+            perf_due_time,
+            practice_groups!locations_org_fkey (
+              organization_id
+            )
           ),
           coach_scopes (
             scope_type,
             scope_id
+          ),
+          user_capabilities (
+            is_participant,
+            participation_start_at,
+            can_view_submissions,
+            can_submit_evals,
+            can_review_evals,
+            can_invite_users,
+            can_manage_library,
+            can_manage_locations,
+            can_manage_users,
+            can_manage_assignments,
+            is_org_admin,
+            is_platform_admin
           )
         `);
 
@@ -123,7 +160,13 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
         throw new Error('No staff profile found');
       }
 
-      return data as StaffProfile;
+      // Supabase returns the one-to-one join as an array; unwrap to object or null
+      const raw = data as any;
+      const caps = Array.isArray(raw.user_capabilities)
+        ? (raw.user_capabilities[0] ?? null)
+        : (raw.user_capabilities ?? null);
+
+      return { ...raw, user_capabilities: caps } as StaffProfile;
     },
     enabled: !!user || !!masqueradeStaffId,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
@@ -134,7 +177,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
   useEffect(() => {
     if (query.error) {
       console.error('Staff profile error:', query.error);
-      
+
       const error = query.error as any;
       // Don't redirect when masquerading
       if (!masqueradeStaffId && redirectToSetup && (error.code === 'PGRST116' || error.message === 'No staff profile found')) {

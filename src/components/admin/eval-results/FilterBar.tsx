@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -42,6 +44,10 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   const [roles, setRoles] = useState<Role[]>([]);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
+  const { resolve: resolveRole } = useRoleDisplayNames();
+
+  // Resolve caller role so we can scope the group dropdown to the caller's org
+  const { isSuperAdmin, organizationId: callerOrgId, isLoading: roleLoading } = useUserRole();
 
   // Fetch available periods for the selected organization
   // Include both submitted AND draft evaluations for period detection
@@ -121,11 +127,27 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
     }
   }, [availablePeriods, filters.organizationId]);
 
-  // Load organizations on mount
+  // Reload group list once role info is resolved so we can apply org scope correctly.
+  // Separating this from loadRoles prevents a double-fetch on mount.
   useEffect(() => {
-    loadOrganizations();
+    if (!roleLoading) {
+      loadOrganizations();
+    }
+  }, [roleLoading, isSuperAdmin, callerOrgId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Roles don't require org scoping — load once on mount
+  useEffect(() => {
     loadRoles();
   }, []);
+
+  // Auto-select the single group when there is only one option (typical for org admins
+  // with a single practice group). Only fires when organizations changes and no group
+  // is already selected.
+  useEffect(() => {
+    if (organizations.length === 1 && !filters.organizationId) {
+      onFiltersChange({ ...filters, organizationId: organizations[0].id });
+    }
+  }, [organizations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load locations when organization changes
   useEffect(() => {
@@ -138,12 +160,18 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
 
   async function loadOrganizations() {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('practice_groups')
         .select('id, name')
         .eq('active', true)
         .order('name');
 
+      // Non-super-admins only see groups within their own organization
+      if (!isSuperAdmin && callerOrgId) {
+        query = query.eq('organization_id', callerOrgId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setOrganizations(data || []);
     } catch (error) {
@@ -233,7 +261,10 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   
   if (filters.roleIds.length > 0) {
     const roleNames = filters.roleIds
-      .map(id => roles.find(r => r.role_id === id)?.role_name)
+      .map(id => {
+        const r = roles.find(r => r.role_id === id);
+        return r ? resolveRole(r.role_id, r.role_name) : undefined;
+      })
       .filter(Boolean)
       .join(', ');
     activeFilters.push({
@@ -243,7 +274,7 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
   }
 
   const locationOptions = locations.map(l => ({ value: l.id, label: l.name }));
-  const roleOptions = roles.map(r => ({ value: r.role_id.toString(), label: r.role_name }));
+  const roleOptions = roles.map(r => ({ value: r.role_id.toString(), label: resolveRole(r.role_id, r.role_name) }));
 
   const hasSecondaryFilters = filters.locationIds.length > 0 || filters.roleIds.length > 0;
 

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { BatchProcessorProvider } from "@/contexts/BatchProcessorContext";
+import { SimProvider } from "@/devtools/SimProvider";
 
 // Pages (same imports you already have)
 import Login from "@/pages/Login";
@@ -29,6 +30,7 @@ import CoachDashboardV2 from "@/pages/coach/CoachDashboardV2";
 import StaffDetailV2 from "@/pages/coach/StaffDetailV2";
 import { EvaluationHub } from "@/pages/coach/EvaluationHub";
 import AdminPage from "@/pages/AdminPage";
+import PlatformPage from "@/pages/PlatformPage";
 import EvalResultsV2 from "@/pages/admin/EvalResultsV2";
 import EvaluationViewer from "@/pages/EvaluationViewer";
 import EvaluationReview from "@/pages/EvaluationReview";
@@ -154,6 +156,7 @@ function AppRoutes() {
         </Route>
 
         <Route path="admin" element={<AdminPage />} />
+        <Route path="platform" element={<PlatformPage />} />
         <Route path="admin/evaluations" element={<EvalResultsV2 />} />
         {/* Legacy redirects for old eval results paths */}
         <Route path="admin/eval-results" element={<Navigate to="/admin/evaluations" replace />} />
@@ -196,14 +199,16 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BatchProcessorProvider>
-          <BrowserRouter>
-            <RouteErrorBoundary>
-              <AppRoutes />
-            </RouteErrorBoundary>
-            <Toaster />
-          </BrowserRouter>
-        </BatchProcessorProvider>
+        <SimProvider>
+          <BatchProcessorProvider>
+            <BrowserRouter>
+              <RouteErrorBoundary>
+                <AppRoutes />
+              </RouteErrorBoundary>
+              <Toaster />
+            </BrowserRouter>
+          </BatchProcessorProvider>
+        </SimProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

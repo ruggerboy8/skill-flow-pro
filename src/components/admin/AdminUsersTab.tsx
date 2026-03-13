@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useRoleDisplayNames } from "@/hooks/useRoleDisplayNames";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -57,10 +59,12 @@ interface Location {
 
 export function AdminUsersTab() {
   const { toast } = useToast();
+  const { isSuperAdmin, organizationId } = useUserRole();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [organizations, setOrganizations] = useState<Array<{ id: string; name: string }>>([]);
+  const [groups, setGroups] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -82,14 +86,16 @@ export function AdminUsersTab() {
       if (isInitialLoad) setLoading(true);
       
       const { data, error } = await supabase.functions.invoke('admin-users', {
-        body: { 
+        body: {
           action: 'list_users',
           search,
           page,
           limit: usersPerPage,
           role_id: roleFilter === "all" ? undefined : parseInt(roleFilter),
           location_id: locationFilter === "all" ? undefined : locationFilter,
-          super_admin: superAdminFilter === "all" ? undefined : superAdminFilter === "true"
+          super_admin: superAdminFilter === "all" ? undefined : superAdminFilter === "true",
+          // Scope to the admin's org (applies to all roles — platform admins use /platform for cross-org work)
+          organization_id: organizationId ?? undefined,
         }
       });
 
@@ -113,10 +119,27 @@ export function AdminUsersTab() {
 
   const loadRolesAndLocations = async () => {
     try {
+      // Build scoped queries when the caller is an org admin (not platform admin)
+      let locQuery = supabase
+        .from("locations")
+        .select("id, name, group_id, practice_group:practice_groups!locations_org_fkey(name, organization_id)")
+        .eq("active", true)
+        .order("name");
+
+      let orgsQuery = supabase
+        .from("practice_groups")
+        .select("id, name")
+        .eq("active", true)
+        .order("name");
+
+      if (organizationId) {
+        orgsQuery = orgsQuery.eq("organization_id", organizationId);
+      }
+
       const [rolesResult, locationsResult, orgsResult] = await Promise.all([
         supabase.from("roles").select("role_id, role_name").order("role_name"),
-        supabase.from("locations").select("id, name, group_id, practice_group:practice_groups!locations_org_fkey(name)").eq("active", true).order("name"),
-        supabase.from("practice_groups").select("id, name").eq("active", true).order("name"),
+        locQuery,
+        orgsQuery,
       ]);
 
       if (rolesResult.error) throw rolesResult.error;
@@ -124,17 +147,26 @@ export function AdminUsersTab() {
       if (orgsResult.error) throw orgsResult.error;
 
       setRoles(rolesResult.data || []);
-      setLocations((locationsResult.data || []) as unknown as Location[]);
-      setOrganizations((orgsResult.data || []) as unknown as Array<{ id: string; name: string }>);
+
+      // Filter locations to the admin's org client-side (join already has organization_id)
+      const allLocs = (locationsResult.data || []) as unknown as Array<Location & { practice_group?: { organization_id?: string | null } }>;
+      const scopedLocs = organizationId
+        ? allLocs.filter(l => (l.practice_group as any)?.organization_id === organizationId)
+        : allLocs;
+      setLocations(scopedLocs as unknown as Location[]);
+
+      setGroups((orgsResult.data || []) as unknown as Array<{ id: string; name: string }>);
     } catch (error) {
       console.error("Error loading roles/locations/orgs:", error);
     }
   };
 
+  // Re-run when role info loads (isSuperAdmin/organizationId start as defaults until profile resolves)
   useEffect(() => {
     loadUsers();
     loadRolesAndLocations();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin, organizationId]);
 
   // Debounce search term for smooth typing
   useEffect(() => {
@@ -379,10 +411,10 @@ const handleResendInvite = async (user: User) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All roles</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                    {role.role_name}
-                  </SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role.role_id} value={role.role_id.toString()}>
+                      {resolveRole(role.role_id, role.role_name)}
+                    </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -452,7 +484,7 @@ const handleResendInvite = async (user: User) => {
                           </div>
                         </TableCell>
                         <TableCell className="truncate">{user.email || "—"}</TableCell>
-                        <TableCell className="truncate">{user.role_name || "—"}</TableCell>
+                        <TableCell className="truncate">{user.role_id ? resolveRole(user.role_id, user.role_name || '—') : '—'}</TableCell>
                         <TableCell className="truncate">{user.location_name || "—"}</TableCell>
                         <TableCell>{getStatusBadge(user)}</TableCell>
                         <TableCell className="text-right">
@@ -533,7 +565,7 @@ const handleResendInvite = async (user: User) => {
         onSuccess={handleInviteSuccess}
         roles={roles}
         locations={locations}
-        organizations={organizations}
+        organizations={groups}
       />
 
       <EditUserDrawer
@@ -543,7 +575,7 @@ const handleResendInvite = async (user: User) => {
         user={selectedUser}
         roles={roles}
         locations={locations}
-        organizations={organizations}
+        organizations={groups}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

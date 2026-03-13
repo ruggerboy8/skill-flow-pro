@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTableSort } from "@/hooks/useTableSort";
@@ -7,7 +8,8 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, MoreHorizontal, Edit, Archive } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Archive, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LocationFormDrawer } from "./LocationFormDrawer";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +26,7 @@ interface Location {
   active: boolean;
   practice_group?: {
     name: string;
+    organization_id?: string | null;
   };
 }
 
@@ -34,11 +37,13 @@ interface Organization {
 
 export function AdminLocationsTab() {
   const { toast } = useToast();
+  const { isSuperAdmin, organizationId } = useUserRole();
   const [locations, setLocations] = useState<Location[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Location | null>(null);
 
   const loadLocations = async () => {
     try {
@@ -47,13 +52,19 @@ export function AdminLocationsTab() {
         .from("locations")
         .select(`
           id, name, group_id, timezone, program_start_date, cycle_length_weeks, active,
-          practice_group:practice_groups!locations_org_fkey(name)
+          practice_group:practice_groups!locations_org_fkey(name, organization_id)
         `)
         .order("name");
 
       if (error) throw error;
 
-      setLocations((data || []) as unknown as Location[]);
+      const allLocations = (data || []) as unknown as Location[];
+      // Scope to the admin's org (platform admins use /platform for cross-org work)
+      const filtered = organizationId
+        ? allLocations.filter(l => l.practice_group?.organization_id === organizationId)
+        : allLocations;
+
+      setLocations(filtered);
     } catch (error) {
       console.error("Error loading locations:", error);
       toast({
@@ -70,12 +81,18 @@ export function AdminLocationsTab() {
 
   const loadOrganizations = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("practice_groups")
         .select("id, name")
         .eq("active", true)
         .order("name");
 
+      // Scope to the admin's org (platform admins use /platform for cross-org work)
+      if (organizationId) {
+        query = query.eq("organization_id", organizationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
 
       setOrganizations(data || []);
@@ -84,10 +101,12 @@ export function AdminLocationsTab() {
     }
   };
 
+  // Re-run when role info loads (isSuperAdmin/organizationId start as defaults until profile resolves)
   useEffect(() => {
     loadLocations();
     loadOrganizations();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin, organizationId]);
 
   const handleNewLocation = () => {
     setSelectedLocation(null);
@@ -108,7 +127,6 @@ export function AdminLocationsTab() {
   const toggleLocationActive = async (location: Location) => {
     try {
       if (location.active) {
-        // about to archive; block if staff still assigned
         const { count, error: cntErr } = await supabase
           .from("staff")
           .select("*", { count: "exact", head: true })
@@ -149,6 +167,42 @@ export function AdminLocationsTab() {
     }
   };
 
+  const handleDeleteLocation = async (location: Location) => {
+    try {
+      const { count, error: cntErr } = await supabase
+        .from("staff")
+        .select("*", { count: "exact", head: true })
+        .eq("primary_location_id", location.id);
+
+      if (cntErr) throw cntErr;
+
+      if ((count ?? 0) > 0) {
+        toast({
+          title: "Cannot delete",
+          description: "This location still has staff assigned. Remove or reassign all staff first.",
+          variant: "destructive",
+        });
+        setDeleteTarget(null);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("locations")
+        .delete()
+        .eq("id", location.id);
+
+      if (error) throw error;
+
+      toast({ title: "Deleted", description: `Location "${location.name}" has been permanently deleted.` });
+      setDeleteTarget(null);
+      loadLocations();
+    } catch (error) {
+      console.error("Error deleting location:", error);
+      toast({ title: "Error", description: "Failed to delete location. It may have related data.", variant: "destructive" });
+      setDeleteTarget(null);
+    }
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "—";
     try {
@@ -172,6 +226,7 @@ export function AdminLocationsTab() {
       'America/Toronto': 'Eastern',
       'America/Edmonton': 'Mountain',
       'America/Vancouver': 'Pacific',
+      'Europe/London': 'London (GMT/BST)',
     };
     
     return timezoneMap[timezone] || timezone;
@@ -281,6 +336,13 @@ export function AdminLocationsTab() {
                               <Archive className="h-4 w-4 mr-2" />
                               {location.active ? "Archive" : "Unarchive"}
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setDeleteTarget(location)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -303,6 +365,26 @@ export function AdminLocationsTab() {
         location={selectedLocation}
         organizations={organizations}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Location</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && handleDeleteLocation(deleteTarget)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ export default function StaffDetailV2() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const { isSuperAdmin, isOrgAdmin } = useUserRole();
   const queryClient = useQueryClient();
   const selectedWeek = searchParams.get('week');
@@ -117,7 +119,7 @@ export default function StaffDetailV2() {
       role_name: firstSummary.role_name,
       location_id: firstSummary.location_id,
       location_name: firstSummary.location_name,
-      organization_name: firstSummary.group_name,
+      group_name: firstSummary.group_name,
     };
   }, [weekSummaries]);
 
@@ -328,11 +330,11 @@ export default function StaffDetailV2() {
           </div>
           <h1 className="text-3xl font-bold">{staffInfo.name}</h1>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>{staffInfo.role_name}</span>
+            <span>{resolveRole(staffInfo.role_id, staffInfo.role_name)}</span>
             <span>•</span>
             <span>{staffInfo.location_name}</span>
             <span>•</span>
-            <span>{staffInfo.organization_name}</span>
+            <span>{staffInfo.group_name}</span>
           </div>
         </div>
       </div>

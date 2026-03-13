@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useEvalCoverage } from '@/hooks/useEvalCoverage';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +22,7 @@ import type { EvaluationPeriod } from '@/lib/evalPeriods';
 
 export default function EvalResultsV2() {
   const { user, isSuperAdmin: authIsSuperAdmin, isOrgAdmin } = useAuth();
+  const { canReviewEvals } = useUserRole();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -83,13 +85,14 @@ export default function EvalResultsV2() {
     }
 
     // Use auth roles directly - no need for extra RPC call
-    if (authIsSuperAdmin || isOrgAdmin) {
+    // canReviewEvals grants access to the Delivery tab (releasing evals to staff)
+    if (authIsSuperAdmin || isOrgAdmin || canReviewEvals) {
       setHasAccess(true);
     } else {
       setHasAccess(false);
       navigate('/');
     }
-  }, [user, authIsSuperAdmin, isOrgAdmin, navigate]);
+  }, [user, authIsSuperAdmin, isOrgAdmin, canReviewEvals, navigate]);
 
   // Reset view when org changes
   useEffect(() => {

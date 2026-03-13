@@ -11,7 +11,7 @@ import { useRoutePersistence } from '@/hooks/useRoutePersistence';
 import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
-import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Stethoscope, ClipboardList } from 'lucide-react';
+import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList } from 'lucide-react';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -50,6 +50,11 @@ export default function Layout() {
 
   // Can access admin = super admin OR org admin
   const canAccessAdmin = isSuperAdmin || isOrgAdmin;
+
+  // Can access builder = admins, OR staff with explicit can_manage_assignments capability
+  const canManageAssignments =
+    canAccessAdmin ||
+    ((staffProfile?.user_capabilities as any)?.can_manage_assignments ?? false);
   
   // Office managers who are NOT coaches should see "My Location" link
   const showLocationDashboard = isOfficeManager && !isCoach && !isOrgAdmin;
@@ -61,6 +66,15 @@ export default function Layout() {
     { name: 'My Role', href: '/doctor/my-role', icon: BookOpen },
     { name: 'My Team', href: '/doctor/my-team', icon: Users },
     { name: 'Coaching History', href: '/doctor/coaching-history', icon: ClipboardList },
+  ] : isSuperAdmin ? [
+    // Super admin navigation — Command Center first, no Home/My Role
+    { name: 'Command Center', href: '/dashboard', icon: Building2 },
+    { name: 'Coach', href: '/coach', icon: Users },
+    { name: 'Clinical', href: '/clinical', icon: Stethoscope },
+    { name: 'Builder', href: '/builder', icon: SettingsIcon },
+    { name: 'Evaluations', href: '/admin/evaluations', icon: TrendingUp },
+    { name: 'Admin', href: '/admin', icon: Shield },
+    { name: 'Platform', href: '/platform', icon: Globe },
   ] : [
     // Standard navigation
     { name: 'Home', href: '/', icon: Home },
@@ -73,21 +87,20 @@ export default function Layout() {
       { name: 'My Location', href: '/my-location', icon: Building2 },
     ] : []),
     // Clinical Director portal
-    ...(isClinicalDirector || isSuperAdmin ? [
+    ...(isClinicalDirector ? [
       { name: 'Clinical', href: '/clinical', icon: Stethoscope },
     ] : []),
     // Backfill nav removed - keeping function for individual score backfill only
-    ...(isCoach || isSuperAdmin || isOrgAdmin || isLead ? [
+    ...(isCoach || isOrgAdmin || isLead ? [
       { name: 'Coach', href: '/coach', icon: Users },
     ] : []),
-    ...(canAccessAdmin ? [
+    ...(canManageAssignments ? [
       { name: 'Builder', href: '/builder', icon: SettingsIcon },
+    ] : []),
+    ...(canAccessAdmin ? [
       { name: 'Admin', href: '/admin', icon: Shield },
       { name: 'Evaluations', href: '/admin/evaluations', icon: TrendingUp }
     ] : []),
-    ...(isSuperAdmin ? [
-      { name: 'Command Center', href: '/dashboard', icon: Building2 }
-    ] : [])
   ];
 
   const isActive = (href: string) => {

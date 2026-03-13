@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +52,7 @@ interface RoleOption { role_id: number; role_name: string; }
 // ── Component ──────────────────────────────────────────────────
 export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsExportTabProps) {
   const { user } = useAuth();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const [currentStep, setCurrentStep] = useState(0);
   const [config, setConfig] = useState<ExportConfig>(DEFAULT_EXPORT_CONFIG);
   const [isExporting, setIsExporting] = useState(false);
@@ -420,7 +422,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
             action: 'evaluations_export_downloaded',
             changed_by: myStaff.id,
             staff_id: myStaff.id,
-            scope_organization_id: selectedOrgIds.length === 1 ? selectedOrgIds[0] : null,
+            scope_group_id: selectedOrgIds.length === 1 ? selectedOrgIds[0] : null,
             new_values: {
               exportVersion: EXPORT_FORMAT.version,
               grain: config.grain,
@@ -599,7 +601,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                     {allRoles.map(role => (
                       <div key={role.role_id} className="flex items-center space-x-2">
                         <Checkbox id={`role-${role.role_id}`} checked={selectedRoleIds.includes(role.role_id)} onCheckedChange={() => toggleRole(role.role_id)} />
-                        <Label htmlFor={`role-${role.role_id}`} className="cursor-pointer text-sm leading-tight">{role.role_name}</Label>
+                        <Label htmlFor={`role-${role.role_id}`} className="cursor-pointer text-sm leading-tight">{resolveRole(role.role_id, role.role_name)}</Label>
                       </div>
                     ))}
                   </div>

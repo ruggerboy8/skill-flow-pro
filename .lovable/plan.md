@@ -1,43 +1,27 @@
 
 
-## Comprehensive FK Join Hint Audit
+## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
-### Problem Found
+**Status: ✅ Complete**
 
-The database has **two** FK constraints from `locations` to `practice_groups`:
-1. **`locations_org_fkey`** — the original constraint (renamed column `organization_id` → `group_id`)
-2. **`locations_organization_id_fkey`** — appears to be a second/duplicate constraint
+### What changed
 
-Because there are multiple FKs pointing to the same table, PostgREST **requires** an explicit hint (`!constraint_name`) to disambiguate. Some files use the correct `!locations_org_fkey`, others use a non-existent `!locations_group_id_fkey`, and one file has corrupted select syntax.
+1. **Practice types expanded** to three region-specific values: `pediatric_us`, `general_us`, `general_uk`
+2. **`roles.practice_type`** column added — each role belongs to one practice type
+3. **`pro_moves.practice_type`** converted to **`pro_moves.practice_types TEXT[]`** — array-based multi-select
+4. All existing data backfilled (`pediatric` → `pediatric_us`, `general` → `general_us`, `all` → all three)
 
-### Issues to Fix
+### Files changed
 
-**1. Wrong FK hint name (will fail at runtime)**
-These files reference `locations_group_id_fkey` which does not exist as a constraint:
-
-| File | Line |
-|------|------|
-| `src/hooks/useEvalDeliveryProgress.tsx` | 62 |
-| `src/pages/coach/RemindersTab.tsx` | 148 |
-
-Fix: Change `!locations_group_id_fkey` → `!locations_org_fkey`
-
-**2. Corrupted select syntax (double alias, double parentheses)**
-`src/components/admin/AdminLocationsTab.tsx` line 50 has:
-```
-practice_group:practice_group:practice_groups!locations_org_fkey ( name ) ( name )
-```
-This has a double alias (`practice_group:practice_group:`) and double column list (`( name ) ( name )`). Should be:
-```
-practice_group:practice_groups!locations_org_fkey(name)
-```
-
-**3. No issues (already correct)**
-- `src/components/admin/AdminUsersTab.tsx` — uses `!locations_org_fkey` ✓
-- All `scope_organization_id` references — intentional audit table column ✓
-- `supabase/functions/admin-users/index.ts` `organization_id` — backward compat ✓
-
-### Summary
-
-3 files need fixing, all with the same root cause: incorrect or malformed FK join hints for the `locations` → `practice_groups` relationship. The correct constraint name is `locations_org_fkey`.
-
+| File | Change |
+|------|--------|
+| Migration SQL | Schema: expanded CHECK on orgs, added practice_types array on pro_moves, added practice_type on roles |
+| `RoleFormDrawer.tsx` | Added practice type Select (3 options) |
+| `PlatformRolesTab.tsx` | Shows practice type badge on role cards, fetches practice_type |
+| `ProMoveForm.tsx` | Replaced single Select with multi-checkbox for practice_types |
+| `DoctorProMoveForm.tsx` | Defaults practice_types to `['pediatric_us']` |
+| `OrgBootstrapDrawer.tsx` | 3 radio options with new labels |
+| `PlatformOrgsTab.tsx` | Badge display for all 3 practice types |
+| `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
+| `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
+| `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |

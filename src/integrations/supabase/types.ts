@@ -3554,6 +3554,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_user_org_id: { Args: { p_user_id: string }; Returns: string }
       get_week_detail_by_week: {
         Args: {
           p_role_id: number

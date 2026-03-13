@@ -76,7 +76,7 @@ serve(async (req: Request) => {
   try {
     switch (action) {
       case "list_users": {
-        const { page = 1, limit = 20, search = "", location_id, role_id, super_admin } = payload ?? {};
+        const { page = 1, limit = 20, search = "", location_id, role_id, super_admin, organization_id } = payload ?? {};
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
@@ -114,6 +114,21 @@ serve(async (req: Request) => {
             } else if (locationScopes.length > 0) {
               q = q.in('primary_location_id', locationScopes);
             }
+          }
+        }
+
+        // Org-level scoping: resolve group IDs for the given organization and filter
+        if (organization_id) {
+          const { data: orgGroups } = await admin
+            .from("practice_groups")
+            .select("id")
+            .eq("organization_id", organization_id);
+          const orgGroupIds = (orgGroups ?? []).map((g: any) => g.id);
+          if (orgGroupIds.length > 0) {
+            q = q.in("locations.group_id", orgGroupIds);
+          } else {
+            // Org has no groups — return empty result set
+            q = q.eq("id", "00000000-0000-0000-0000-000000000000");
           }
         }
 
@@ -209,9 +224,51 @@ serve(async (req: Request) => {
       }
 
       case "invite_user": {
-        const { email, name, role_id, location_id, participation_start_at } = payload ?? {};
-        if (!email || !name || !role_id || !location_id) {
-          return json({ error: "Missing required fields: email, name, role_id, and location_id are all required" }, 400);
+        const { email, name, role_id, location_id, participation_start_at, is_participant, capabilities } = payload ?? {};
+
+        // Determine participant status — default true for backward compatibility
+        const isParticipantUser: boolean = is_participant !== undefined ? Boolean(is_participant) : true;
+
+        if (!email || !name || !location_id) {
+          return json({ error: "Missing required fields: email, name, and location_id are all required" }, 400);
+        }
+        // role_id is required for participants but optional for team members
+        if (isParticipantUser && !role_id) {
+          return json({ error: "role_id is required for participants" }, 400);
+        }
+
+        // Org ownership check: non-super-admin callers can only invite to locations
+        // within their own organization. Super admins can invite to any org.
+        if (!me.is_super_admin) {
+          const { data: callerOrgId, error: orgRpcErr } = await caller.rpc('current_user_org_id');
+          if (orgRpcErr) console.error('current_user_org_id RPC failed:', orgRpcErr.message);
+
+          // Resolve the target location's org via practice_groups
+          const { data: targetLoc } = await admin
+            .from('locations')
+            .select('group_id')
+            .eq('id', location_id)
+            .single();
+
+          let targetOrgId: string | null = null;
+          if (targetLoc?.group_id) {
+            const { data: targetGroup } = await admin
+              .from('practice_groups')
+              .select('organization_id')
+              .eq('id', targetLoc.group_id)
+              .single();
+            targetOrgId = targetGroup?.organization_id ?? null;
+          }
+
+          if (!callerOrgId || !targetOrgId || callerOrgId !== targetOrgId) {
+            console.error(
+              `invite_user: org ownership check failed — caller org=${callerOrgId}, target location org=${targetOrgId}, location_id=${location_id}`,
+            );
+            return json(
+              { error: 'Forbidden: the specified location does not belong to your organization' },
+              403,
+            );
+          }
         }
 
         // 1) Send invite first to get the user_id (uses the Invite User email template)
@@ -228,27 +285,33 @@ serve(async (req: Request) => {
         // 2) Create staff row with the user_id from the invite
         // Office Manager (role_id = 3) gets special flags
         const isOfficeManager = role_id === 3;
-        
+
+        const staffInsert: Record<string, any> = {
+          name,
+          email,
+          primary_location_id: location_id,
+          is_participant: isParticipantUser,
+          user_id: invite.user.id,
+        };
+        if (role_id) {
+          staffInsert.role_id = role_id;
+          staffInsert.is_office_manager = isOfficeManager;
+        }
+        if (participation_start_at) {
+          staffInsert.participation_start_at = participation_start_at;
+        }
+
         const { data: staff, error: staffErr } = await admin
           .from("staff")
-          .insert({ 
-            name, 
-            email, 
-            role_id, 
-            primary_location_id: location_id, 
-            is_participant: true,
-            is_office_manager: isOfficeManager,
-            user_id: invite.user.id,
-            participation_start_at: participation_start_at || null
-          })
+          .insert(staffInsert)
           .select("id")
           .single();
-        
+
         if (staffErr) {
           // If staff creation fails, we should clean up the auth user
           console.error("Staff creation failed, cleaning up auth user:", staffErr);
           await admin.auth.admin.deleteUser(invite.user.id);
-          
+
           // Return user-friendly error for duplicate email
           if (staffErr.code === "23505" && staffErr.message?.includes("email")) {
             return json({ error: "A user with this email address already exists." }, 409);
@@ -256,7 +319,49 @@ serve(async (req: Request) => {
           throw staffErr;
         }
 
-        // 3) For Office Managers, create a coach_scope entry for their location
+        // 3) Insert user_capabilities row
+        const capsInsert: Record<string, any> = {
+          staff_id: staff.id,
+          is_participant: isParticipantUser,
+          participation_start_at: participation_start_at || null,
+          is_platform_admin: false,
+        };
+
+        if (capabilities) {
+          // Apply explicit capability flags from the invite dialog.
+          // Participants can also hold additional permissions (e.g. Lead RDA who reviews evals).
+          capsInsert.can_view_submissions = capabilities.can_view_submissions ?? false;
+          capsInsert.can_submit_evals = capabilities.can_submit_evals ?? false;
+          capsInsert.can_review_evals = capabilities.can_review_evals ?? false;
+          capsInsert.can_invite_users = capabilities.can_invite_users ?? false;
+          capsInsert.can_manage_library = capabilities.can_manage_library ?? false;
+          capsInsert.can_manage_locations = capabilities.can_manage_locations ?? false;
+          capsInsert.can_manage_users = capabilities.can_manage_users ?? false;
+          capsInsert.is_org_admin = capabilities.is_org_admin ?? false;
+
+          // Sync is_org_admin to staff table for backward compatibility
+          if (capabilities.is_org_admin) {
+            await admin.from("staff").update({ is_org_admin: true }).eq("id", staff.id);
+          }
+        } else {
+          // No capabilities sent (legacy call) — default all to false
+          capsInsert.can_view_submissions = false;
+          capsInsert.can_submit_evals = false;
+          capsInsert.can_review_evals = false;
+          capsInsert.can_invite_users = false;
+          capsInsert.can_manage_library = false;
+          capsInsert.can_manage_locations = false;
+          capsInsert.can_manage_users = false;
+          capsInsert.is_org_admin = false;
+        }
+
+        const { error: capsErr } = await admin.from("user_capabilities").insert(capsInsert);
+        if (capsErr) {
+          // Non-fatal: staff record exists, capabilities can be configured later
+          console.warn("Failed to insert user_capabilities row:", capsErr);
+        }
+
+        // 4) For Office Managers, create a coach_scope entry for their location
         if (isOfficeManager && staff?.id) {
           const { error: scopeErr } = await admin
             .from("coach_scopes")
@@ -265,13 +370,13 @@ serve(async (req: Request) => {
               scope_type: 'location',
               scope_id: location_id
             });
-          
+
           if (scopeErr) {
             console.warn("Failed to create coach_scope for Office Manager:", scopeErr);
           }
         }
 
-        // 4) Update user metadata with staff_id
+        // 5) Update user metadata with staff_id
         await admin.auth.admin.updateUserById(invite.user.id, {
           user_metadata: { staff_id: staff.id }
         });
@@ -615,7 +720,50 @@ serve(async (req: Request) => {
             .delete()
             .eq("staff_id", currentStaff.id);
         }
-        
+
+        // Upsert user_capabilities — base on preset defaults, then apply any overrides
+        // sent by the client (e.g. fine-tuned capability toggles from EditUserDrawer).
+        const CAPABILITY_PRESETS: Record<string, Record<string, boolean>> = {
+          participant:       { is_participant: true,  can_view_submissions: false, can_submit_evals: false, can_review_evals: false, can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
+          lead:              { is_participant: true,  can_view_submissions: true,  can_submit_evals: false, can_review_evals: false, can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
+          coach:             { is_participant: false, can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
+          coach_participant: { is_participant: true,  can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
+          regional_manager:  { is_participant: false, can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: true,  can_manage_users: true,  can_manage_locations: true,  can_manage_library: false, is_org_admin: true,  is_platform_admin: false },
+          super_admin:       { is_participant: false, can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: true,  can_manage_users: true,  can_manage_locations: true,  can_manage_library: true,  is_org_admin: true,  is_platform_admin: true  },
+        };
+
+        const capsPreset = CAPABILITY_PRESETS[preset];
+        if (capsPreset && updatedStaff?.id) {
+          // Client may send fine-tuned overrides; merge on top of the preset
+          const capsOverride: Record<string, boolean> = {};
+          const clientCaps = payload?.capabilities ?? {};
+          const overrideKeys = [
+            'can_view_submissions', 'can_submit_evals', 'can_review_evals',
+            'can_invite_users', 'can_manage_users', 'can_manage_locations',
+            'can_manage_library', 'is_org_admin',
+          ];
+          for (const k of overrideKeys) {
+            if (typeof clientCaps[k] === 'boolean') capsOverride[k] = clientCaps[k];
+          }
+
+          const finalCaps = { ...capsPreset, ...capsOverride };
+
+          const { error: capsErr } = await admin
+            .from('user_capabilities')
+            .upsert({
+              staff_id: updatedStaff.id,
+              ...finalCaps,
+              participation_start_at: payload?.participation_start_at ?? null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'staff_id' });
+
+          if (capsErr) {
+            console.warn('user_capabilities upsert failed (non-fatal):', capsErr);
+          } else {
+            console.log(`✅ user_capabilities upserted for staff ${updatedStaff.id} (preset: ${preset})`);
+          }
+        }
+
         // Enhanced audit log
         try {
           const { data: changerStaff } = await admin
@@ -878,7 +1026,25 @@ serve(async (req: Request) => {
           throw staffErr;
         }
 
-        // 3) Update user metadata with staff_id
+        // 3) Insert user_capabilities row for doctor (non-participant, clinical role)
+        const { error: docCapsErr } = await admin.from("user_capabilities").insert({
+          staff_id: staff.id,
+          is_participant: false,
+          can_view_submissions: false,
+          can_submit_evals: false,
+          can_review_evals: false,
+          can_invite_users: false,
+          can_manage_library: false,
+          can_manage_locations: false,
+          can_manage_users: false,
+          is_org_admin: false,
+          is_platform_admin: false,
+        });
+        if (docCapsErr) {
+          console.warn("Failed to insert user_capabilities row for doctor:", docCapsErr);
+        }
+
+        // 4) Update user metadata with staff_id
         await admin.auth.admin.updateUserById(invite.user.id, {
           user_metadata: { staff_id: staff.id, user_type: 'doctor' }
         });

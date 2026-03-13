@@ -129,17 +129,30 @@ export async function assembleWeek(params: {
   const anchors = getWeekAnchors(now, locationData.timezone, offsets2);
   const mondayStr = formatInTimeZone(anchors.mondayZ, locationData.timezone, 'yyyy-MM-dd');
 
-  console.info(`[assembleWeek] Using weekly_assignments for role=${roleId} week=${mondayStr}`);
+  // Resolve the location's organization_id
+  const { data: pgData } = await supabase
+    .from('practice_groups')
+    .select('organization_id')
+    .eq('id', locationData.group_id)
+    .maybeSingle();
+
+  const orgId = pgData?.organization_id;
+
+  console.info(`[assembleWeek] Using weekly_assignments for role=${roleId} week=${mondayStr} org=${orgId}`);
   
-  // Query weekly_assignments (global only: org_id null)
+  if (!orgId) {
+    console.warn('[assembleWeek] ❌ No organization_id found for location=%s', locationId);
+    return [];
+  }
+
+  // Query weekly_assignments scoped to the organization (no fallback)
   const { data: assignData, error: assignErr } = await supabase
     .from('weekly_assignments')
     .select('id, display_order, action_id, self_select')
-    .eq('source', 'global')
     .eq('role_id', roleId)
     .eq('week_start_date', mondayStr)
     .eq('status', 'locked')
-    .is('org_id', null)
+    .eq('org_id', orgId)
     .order('display_order');
 
   if (!assignErr && assignData && assignData.length > 0) {
@@ -164,11 +177,10 @@ export async function assembleWeek(params: {
           )
         )
       `)
-      .eq('source', 'global')
       .eq('role_id', roleId)
       .eq('week_start_date', mondayStr)
       .eq('status', 'locked')
-      .is('org_id', null)
+      .eq('org_id', orgId)
       .order('display_order');
 
     if (enrichErr || !enrichedAssign) {

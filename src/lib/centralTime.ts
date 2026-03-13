@@ -36,15 +36,18 @@ export function getWeekAnchors(now: Date = nowUtc(), tz: string = CT_TZ, offsets
 }
 
 /**
- * Legacy anchors — delegates to getWeekAnchors with CT timezone.
+ * Legacy anchors — delegates to getWeekAnchors.
+ * Accepts an optional timezone string; defaults to CT_TZ for backward compat.
+ * Prefer passing the user's location timezone via useLocationTimezone().
  */
-export function getAnchors(now: Date = nowUtc()) {
-  return getWeekAnchors(now, CT_TZ);
+export function getAnchors(now: Date = nowUtc(), tz: string = CT_TZ) {
+  return getWeekAnchors(now, tz);
 }
 
 // For friendly dates like "Mon, Aug 25"
-export function nextMondayStr(now: Date = nowUtc()) {
-  const { monCheckInZ } = getAnchors(now);
+// Pass the user's location timezone via useLocationTimezone() to get correct results.
+export function nextMondayStr(now: Date = nowUtc(), tz: string = CT_TZ) {
+  const { monCheckInZ } = getAnchors(now, tz);
   const nextMon = addDays(monCheckInZ, 7);
-  return formatInTimeZone(nextMon, CT_TZ, 'EEE, MMM d');
+  return formatInTimeZone(nextMon, tz, 'EEE, MMM d');
 }

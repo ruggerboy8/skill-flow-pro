@@ -25,6 +25,7 @@ interface ProMovePickerDialogProps {
   onClose: () => void;
   roleId: number;
   onSelect: (actionId: number) => void;
+  orgId?: string; // When provided, hides moves the org has marked not-visible
 }
 
 export function ProMovePickerDialog({
@@ -32,16 +33,18 @@ export function ProMovePickerDialog({
   onClose,
   roleId,
   onSelect,
+  orgId,
 }: ProMovePickerDialogProps) {
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
   const [filteredMoves, setFilteredMoves] = useState<ProMove[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hiddenCount, setHiddenCount] = useState(0);
 
   useEffect(() => {
     if (open) loadProMoves();
-  }, [open, roleId]);
+  }, [open, roleId, orgId]);
 
   useEffect(() => {
     filterMoves();
@@ -49,6 +52,7 @@ export function ProMovePickerDialog({
 
   const loadProMoves = async () => {
     setLoading(true);
+    setHiddenCount(0);
 
     // 1) moves
     const { data: movesData } = await supabase
@@ -57,8 +61,22 @@ export function ProMovePickerDialog({
       .eq('role_id', roleId)
       .eq('active', true);
 
-    // 2) competencies + domains
-    const competencyIds = [...new Set(movesData?.map(m => m.competency_id) || [])];
+    // 2) org visibility overrides — exclude moves the org has hidden
+    let hiddenIds = new Set<number>();
+    if (orgId && movesData && movesData.length > 0) {
+      const { data: overrides } = await supabase
+        .from('organization_pro_move_overrides')
+        .select('pro_move_id')
+        .eq('org_id', orgId)
+        .eq('is_hidden', true);
+      hiddenIds = new Set((overrides ?? []).map(o => o.pro_move_id));
+    }
+
+    const visibleMoves = (movesData ?? []).filter(m => !hiddenIds.has(m.action_id));
+    setHiddenCount((movesData ?? []).length - visibleMoves.length);
+
+    // 3) competencies + domains for visible moves only
+    const competencyIds = [...new Set(visibleMoves.map(m => m.competency_id))];
     const { data: competenciesData } = await supabase
       .from('competencies')
       .select(
@@ -77,7 +95,7 @@ export function ProMovePickerDialog({
       ])
     );
 
-    const enriched = (movesData || []).map(m => ({
+    const enriched = visibleMoves.map(m => ({
       action_id: m.action_id,
       action_statement: m.action_statement,
       competency_id: m.competency_id,
@@ -171,6 +189,15 @@ export function ProMovePickerDialog({
               </div>
             </div>
           </div>
+
+          {/* Hidden count note */}
+          {hiddenCount > 0 && (
+            <div className="px-5 py-2 border-b bg-amber-50 dark:bg-amber-950/20">
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                {hiddenCount} move{hiddenCount > 1 ? 's' : ''} hidden by your organization's library settings
+              </p>
+            </div>
+          )}
 
           {/* Results (scrolling) */}
           <ScrollArea className="flex-1">

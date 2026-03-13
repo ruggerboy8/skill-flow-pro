@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useSim } from './SimProvider';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { addDays } from 'date-fns';
-import { CT_TZ, getWeekAnchors } from '@/lib/centralTime';
+import { getWeekAnchors } from '@/lib/centralTime';
+import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { X, Settings, User } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +28,7 @@ interface SimConsoleProps {
 
 export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
   const { overrides, updateOverrides, resetSimulation } = useSim();
+  const displayTz = useLocationTimezone();
   const [customDateTime, setCustomDateTime] = useState('');
   const [staffSearch, setStaffSearch] = useState('');
 
@@ -72,32 +74,32 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
     return staffList.find(s => s.id === overrides.masqueradeStaffId);
   }, [overrides.masqueradeStaffId, staffList]);
 
-  // Generate presets for the current week in Central Time
+  // Generate presets for the current week in the user's location timezone
   const presets = useMemo(() => {
-    const { mondayZ } = getWeekAnchors(new Date(), CT_TZ);
+    const { mondayZ } = getWeekAnchors(new Date(), displayTz);
     return [
-      { 
-        label: 'Mon 9am', 
-        datetime: ctUtcForTz(mondayZ, '09:00:00', CT_TZ).toISOString() 
+      {
+        label: 'Mon 9am',
+        datetime: ctUtcForTz(mondayZ, '09:00:00', displayTz).toISOString()
       },
-      { 
-        label: 'Tue 2pm', 
-        datetime: ctUtcForTz(addDays(mondayZ, 1), '14:00:00', CT_TZ).toISOString() 
+      {
+        label: 'Tue 2pm',
+        datetime: ctUtcForTz(addDays(mondayZ, 1), '14:00:00', displayTz).toISOString()
       },
-      { 
-        label: 'Thu 9am', 
-        datetime: ctUtcForTz(addDays(mondayZ, 3), '09:00:00', CT_TZ).toISOString() 
+      {
+        label: 'Thu 9am',
+        datetime: ctUtcForTz(addDays(mondayZ, 3), '09:00:00', displayTz).toISOString()
       },
-      { 
-        label: 'Sun 9pm', 
-        datetime: ctUtcForTz(addDays(mondayZ, 6), '21:00:00', CT_TZ).toISOString() 
+      {
+        label: 'Sun 9pm',
+        datetime: ctUtcForTz(addDays(mondayZ, 6), '21:00:00', displayTz).toISOString()
       },
     ];
-  }, []);
+  }, [displayTz]);
 
   // Current time display
-  const currentTime = overrides.nowISO 
-    ? formatInTimeZone(new Date(overrides.nowISO), CT_TZ, 'EEE MMM d, h:mm a zzz')
+  const currentTime = overrides.nowISO
+    ? formatInTimeZone(new Date(overrides.nowISO), displayTz, 'EEE MMM d, h:mm a zzz')
     : 'Real time';
 
   // Early return AFTER all hooks are called
@@ -246,11 +248,12 @@ export function SimConsole({ isOpen, onClose }: SimConsoleProps) {
 
 export function SimBanner() {
   const { overrides } = useSim();
+  const displayTz = useLocationTimezone();
 
   if (!overrides.enabled) return null;
 
-  const currentTime = overrides.nowISO 
-    ? formatInTimeZone(new Date(overrides.nowISO), CT_TZ, 'EEE MMM d, h:mm a zzz')
+  const currentTime = overrides.nowISO
+    ? formatInTimeZone(new Date(overrides.nowISO), displayTz, 'EEE MMM d, h:mm a zzz')
     : 'Real time';
 
   return (

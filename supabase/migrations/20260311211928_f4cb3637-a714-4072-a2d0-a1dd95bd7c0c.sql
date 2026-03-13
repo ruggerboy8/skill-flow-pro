@@ -1,0 +1,1 @@
+ALTER TABLE public.user_capabilities ADD COLUMN can_manage_assignments boolean NOT NULL DEFAULT false;

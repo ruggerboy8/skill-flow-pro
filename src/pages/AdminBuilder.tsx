@@ -1,63 +1,30 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { Navigate, useNavigate } from "react-router-dom";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { ProMoveLibrary } from "@/components/admin/ProMoveLibrary";
 import { RecommenderPanel } from "@/components/planner/RecommenderPanel";
 import { WeekBuilderPanel } from "@/components/planner/WeekBuilderPanel";
 
 export default function AdminBuilder() {
-  console.log("=== NEW ADMINBUILDER LOADING ===");
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { canManageAssignments, organizationId, isLoading } = useUserRole();
 
-  useEffect(() => {
-    checkAdminStatus();
-  }, [user]);
-
-  const checkAdminStatus = async () => {
-    console.log("=== CHECKING ADMIN STATUS ===", user?.email);
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { data: staffData } = await supabase
-        .from("staff")
-        .select("is_super_admin, is_org_admin, primary_location_id")
-        .eq("user_id", user.id)
-        .single();
-
-      setIsAdmin(staffData?.is_super_admin || staffData?.is_org_admin || false);
-      console.log("=== ADMIN STATUS RESULT ===", staffData?.is_super_admin, staffData?.is_org_admin);
-    } catch (error) {
-      setIsAdmin(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    console.log("=== ADMINBUILDER LOADING ===");
+  if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Loading...</div>
+      <div className="container mx-auto p-6 space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-96 w-full" />
       </div>
     );
   }
 
-  if (!user || !isAdmin) {
-    console.log("=== ACCESS DENIED ===", { user: !!user, isAdmin });
+  if (!canManageAssignments) {
     return <Navigate to="/" replace />;
   }
-
-  console.log("=== RENDERING NEW TABBED INTERFACE ===");
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -78,15 +45,15 @@ export default function AdminBuilder() {
         </TabsList>
 
         <TabsContent value="dfi-planner" className="space-y-6">
-          <PlannerTabContent roleId={1} roleName="DFI" />
+          <PlannerTabContent roleId={1} roleName="DFI" orgId={organizationId} />
         </TabsContent>
 
         <TabsContent value="rda-planner" className="space-y-6">
-          <PlannerTabContent roleId={2} roleName="RDA" />
+          <PlannerTabContent roleId={2} roleName="RDA" orgId={organizationId} />
         </TabsContent>
 
         <TabsContent value="om-planner" className="space-y-6">
-          <PlannerTabContent roleId={3} roleName="Office Manager" />
+          <PlannerTabContent roleId={3} roleName="Office Manager" orgId={organizationId} />
         </TabsContent>
 
         <TabsContent value="library" className="space-y-6">
@@ -98,7 +65,15 @@ export default function AdminBuilder() {
   );
 }
 
-function PlannerTabContent({ roleId, roleName }: { roleId: number; roleName: string }) {
+function PlannerTabContent({
+  roleId,
+  roleName,
+  orgId,
+}: {
+  roleId: number;
+  roleName: string;
+  orgId?: string;
+}) {
   return (
     <div className="flex gap-4">
       {/* Left: Recommender */}
@@ -110,7 +85,7 @@ function PlannerTabContent({ roleId, roleName }: { roleId: number; roleName: str
 
       {/* Right: Week Builder with integrated controls */}
       <div className="flex-1 min-w-0">
-        <WeekBuilderPanel roleId={roleId} roleName={roleName} />
+        <WeekBuilderPanel roleId={roleId} roleName={roleName} orgId={orgId} />
       </div>
     </div>
   );

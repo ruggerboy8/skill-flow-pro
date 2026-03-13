@@ -41,11 +41,13 @@ interface WeekAssignment {
 interface WeekBuilderPanelProps {
   roleId: number;
   roleName: string;
+  orgId?: string; // When present, pro move picker will filter out org-hidden moves
 }
 
-export function WeekBuilderPanel({ 
-  roleId, 
-  roleName
+export function WeekBuilderPanel({
+  roleId,
+  roleName,
+  orgId,
 }: WeekBuilderPanelProps) {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
@@ -101,15 +103,20 @@ export function WeekBuilderPanel({
       mondays,
     });
 
-    // Use weekly_assignments table
-    const { data: assignmentRows, error: assignmentError } = await supabase
+    // Use weekly_assignments table — scope to this org if orgId is present, else global
+    let weekQuery = supabase
       .from('weekly_assignments')
       .select('id, display_order, action_id, status, week_start_date')
-      .is('org_id', null)
       .is('location_id', null)
       .eq('role_id', roleId)
       .in('week_start_date', mondays)
-      .is('superseded_at', null)
+      .is('superseded_at', null);
+
+    weekQuery = orgId
+      ? weekQuery.eq('org_id', orgId)
+      : weekQuery.is('org_id', null);
+
+    const { data: assignmentRows, error: assignmentError } = await weekQuery
       .order('week_start_date')
       .order('display_order');
 
@@ -398,6 +405,7 @@ export function WeekBuilderPanel({
             weekStartDate: week.weekStart,
             picks,
             updaterUserId: user.id,
+            orgId: orgId ?? null,
           }
         });
 
@@ -463,15 +471,20 @@ export function WeekBuilderPanel({
         return;
       }
 
-      // Delete from weekly_assignments
-      const { data: existingRows, error: checkError } = await supabase
+      // Delete from weekly_assignments — scoped to org or global
+      let deleteCheckQuery = supabase
         .from('weekly_assignments')
         .select('id, action_id, display_order, status')
         .eq('role_id', roleId)
-        .is('org_id', null)
         .is('location_id', null)
         .eq('week_start_date', weekStart)
         .is('superseded_at', null);
+
+      deleteCheckQuery = orgId
+        ? deleteCheckQuery.eq('org_id', orgId)
+        : deleteCheckQuery.is('org_id', null);
+
+      const { data: existingRows, error: checkError } = await deleteCheckQuery;
 
       if (checkError) {
         console.error('[WeekBuilderPanel] Error checking existing rows:', checkError);
@@ -884,6 +897,7 @@ export function WeekBuilderPanel({
           onClose={() => setPickerOpen(false)}
           roleId={roleId}
           onSelect={handleSelectProMove}
+          orgId={orgId}
         />
       )}
 

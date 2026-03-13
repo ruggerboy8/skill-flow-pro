@@ -6,11 +6,21 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, Clock, Tag } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useUserRole } from "@/hooks/useUserRole";
 import type { Json } from "@/integrations/supabase/types";
 
 interface SettingValue {
   enabled: boolean;
+}
+
+interface RoleAlias {
+  role_id: number;
+  role_name: string;
+  display_name: string;
 }
 
 export function AdminGlobalSettingsTab() {
@@ -18,10 +28,124 @@ export function AdminGlobalSettingsTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const { organizationId } = useUserRole();
+
+  // Role aliases state
+  const [roles, setRoles] = useState<RoleAlias[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesSaving, setRolesSaving] = useState(false);
 
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    if (organizationId) loadRoleAliases();
+  }, [organizationId]);
+
+  const loadRoleAliases = async () => {
+    if (!organizationId) return;
+    setRolesLoading(true);
+
+    // 1. Get org's practice_type
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("practice_type")
+      .eq("id", organizationId)
+      .single();
+
+    if (!org) {
+      setRolesLoading(false);
+      return;
+    }
+
+    // 2. Fetch roles matching practice_type
+    const { data: platformRoles } = await supabase
+      .from("roles")
+      .select("role_id, role_name, practice_type")
+      .eq("practice_type", org.practice_type)
+      .eq("active", true)
+      .order("role_id");
+
+    // 3. Fetch existing aliases
+    const { data: aliases } = await supabase
+      .from("organization_role_names")
+      .select("role_id, display_name")
+      .eq("org_id", organizationId);
+
+    const aliasMap = new Map(
+      (aliases || []).map((a) => [a.role_id, a.display_name])
+    );
+
+    setRoles(
+      (platformRoles || []).map((r) => ({
+        role_id: r.role_id,
+        role_name: r.role_name || "",
+        display_name: aliasMap.get(r.role_id) || "",
+      }))
+    );
+    setRolesLoading(false);
+  };
+
+  const handleAliasChange = (roleId: number, value: string) => {
+    setRoles((prev) =>
+      prev.map((r) =>
+        r.role_id === roleId ? { ...r, display_name: value } : r
+      )
+    );
+  };
+
+  const handleSaveAliases = async () => {
+    if (!organizationId) return;
+    setRolesSaving(true);
+
+    const rows = roles
+      .filter((r) => r.display_name.trim() !== "")
+      .map((r) => ({
+        org_id: organizationId,
+        role_id: r.role_id,
+        display_name: r.display_name.trim(),
+        updated_at: new Date().toISOString(),
+      }));
+
+    // Delete any rows where the user cleared the display name
+    const clearedRoleIds = roles
+      .filter((r) => r.display_name.trim() === "")
+      .map((r) => r.role_id);
+
+    let error = null;
+
+    if (rows.length > 0) {
+      const { error: upsertError } = await supabase
+        .from("organization_role_names")
+        .upsert(rows, { onConflict: "org_id,role_id" });
+      error = upsertError;
+    }
+
+    if (!error && clearedRoleIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("organization_role_names")
+        .delete()
+        .eq("org_id", organizationId)
+        .in("role_id", clearedRoleIds);
+      error = deleteError;
+    }
+
+    if (error) {
+      console.error("Error saving role aliases:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save role display names.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Saved",
+        description: "Role display names updated successfully.",
+      });
+    }
+    setRolesSaving(false);
+  };
 
   const loadSettings = async () => {
     const { data, error } = await supabase
@@ -146,6 +270,72 @@ export function AdminGlobalSettingsTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Role Display Names */}
+      {organizationId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5" />
+              Role Display Names
+            </CardTitle>
+            <CardDescription>
+              Customize how role titles appear to your team
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {rolesLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : roles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No roles found for your organization's practice type.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Platform Role</TableHead>
+                      <TableHead>Your Display Name</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {roles.map((role) => (
+                      <TableRow key={role.role_id}>
+                        <TableCell className="font-medium">
+                          {role.role_name}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={role.display_name}
+                            onChange={(e) =>
+                              handleAliasChange(role.role_id, e.target.value)
+                            }
+                            placeholder={role.role_name}
+                            className="max-w-xs"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSaveAliases}
+                    disabled={rolesSaving}
+                  >
+                    {rolesSaving ? "Saving…" : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

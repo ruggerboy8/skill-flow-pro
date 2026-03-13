@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
 import { getDomainColor } from '@/lib/domainColors';
 import { getAnchors } from '@/lib/centralTime';
+import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { getWeekAnchors } from '@/v2/time';
@@ -88,6 +89,7 @@ export default function PerformanceWizard() {
   const now = useNow();
   const { overrides } = useSim();
   const { submitWithRetry, pendingCount } = useReliableSubmission();
+  const tz = useLocationTimezone();
 
   // Parse repair mode parameters
   const qs = new URLSearchParams(location.search);
@@ -147,7 +149,7 @@ export default function PerformanceWizard() {
 
   // Use simulated time if available for time gating
   const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
-  const { thuStartZ, mondayZ } = getAnchors(effectiveNow);
+  const { thuStartZ, mondayZ } = getAnchors(effectiveNow, tz);
 
   const currentIndex = Math.max(0, (Number(n) || 1) - 1);
 

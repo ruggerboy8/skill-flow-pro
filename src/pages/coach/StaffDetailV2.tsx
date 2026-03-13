@@ -135,15 +135,6 @@ export default function StaffDetailV2() {
   const isExcused = (weekOf: string, metric: 'confidence' | 'performance') =>
     excusedSubmissions.some(e => e.week_of === weekOf && e.metric === metric);
 
-  // Eval proximity: returns closest eval within ±14 days of a given week_of
-  const getEvalForWeek = (weekOf: string) => {
-    const weekDate = parseISO(weekOf);
-    return staffEvals.find(ev => {
-      if (!ev.observed_at) return false;
-      const diff = Math.abs(differenceInDays(parseISO(ev.observed_at), weekDate));
-      return diff <= 14;
-    }) ?? null;
-  };
 
   // Domain confidence strip (last 6 weeks)
   const domainConfidenceStrip = useMemo(() => {

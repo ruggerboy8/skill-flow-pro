@@ -1074,7 +1074,7 @@ serve(async (req: Request) => {
         if (staffToDelete) {
           const sid = staffToDelete.id;
 
-          const requireDelete = async (label: string, op: Promise<{ error: { message: string } | null }>) => {
+          const requireDelete = async (label: string, op: PromiseLike<{ error: { message: string } | null }>) => {
             const { error } = await op;
             if (error) throw new Error(`Failed to delete ${label}: ${error.message}`);
           };

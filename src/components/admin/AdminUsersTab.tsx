@@ -93,7 +93,7 @@ export function AdminUsersTab() {
           limit: usersPerPage,
           role_id: roleFilter === "all" ? undefined : parseInt(roleFilter),
           location_id: locationFilter === "all" ? undefined : locationFilter,
-          super_admin: superAdminFilter === "all" ? undefined : superAdminFilter === "true",
+          flag: flagFilter === "all" ? undefined : flagFilter,
           // Scope to the admin's org (applies to all roles — platform admins use /platform for cross-org work)
           organization_id: organizationId ?? undefined,
         }

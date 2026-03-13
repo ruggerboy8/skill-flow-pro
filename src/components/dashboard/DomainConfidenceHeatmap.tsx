@@ -197,7 +197,7 @@ export function DomainConfidenceHeatmap({ locationIds, locationNames, lookbackWe
                     </td>
                   );
                 })}
-                <td className={cn('text-center py-2 px-2 rounded font-bold', scoreBg(groupAvgs[domain]))}>
+                <td className={cn('text-center py-2 px-2 font-bold', scoreBg(groupAvgs[domain]), i < DOMAINS.length - 1 && 'border-b border-border')}>
                   {groupAvgs[domain] !== undefined ? (
                     <span className={cn('text-sm font-bold', scoreColor(groupAvgs[domain]))}>
                       {groupAvgs[domain]!.toFixed(1)}

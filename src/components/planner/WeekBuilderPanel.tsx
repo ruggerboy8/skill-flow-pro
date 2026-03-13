@@ -41,7 +41,8 @@ interface WeekAssignment {
 interface WeekBuilderPanelProps {
   roleId: number;
   roleName: string;
-  orgId?: string; // When present, pro move picker will filter out org-hidden moves
+  orgId?: string;
+  practiceType?: string;
 }
 
 export function WeekBuilderPanel({

@@ -85,7 +85,7 @@ function PlannerTabContent({
 
       {/* Right: Week Builder with integrated controls */}
       <div className="flex-1 min-w-0">
-        <WeekBuilderPanel roleId={roleId} roleName={roleName} orgId={orgId} />
+        <WeekBuilderPanel roleId={roleId} roleName={roleName} orgId={orgId} practiceType={practiceType} />
       </div>
     </div>
   );

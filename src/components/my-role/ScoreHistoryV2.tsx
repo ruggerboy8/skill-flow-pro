@@ -343,7 +343,7 @@ export default function ScoreHistoryV2() {
                                           <Button
                                             variant="outline"
                                             size="sm"
-                                            className="h-5 px-2 text-[10px] border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900"
+                                            className="h-5 px-2 text-2xs border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               navigate(`/confidence/current/step/1?mode=repair&weekOf=${weekOf}`);

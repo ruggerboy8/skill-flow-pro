@@ -73,10 +73,10 @@ export default {
 				},
 				// Domain colors mapped for utilities (bg-domain-planning, etc.)
 				domain: {
-					planning: 'hsl(var(--domain-planning))',
-					environment: 'hsl(var(--domain-environment))',
-					interactions: 'hsl(var(--domain-interactions))',
-					'learning-experiences': 'hsl(var(--domain-learning-experiences))'
+					clinical: 'hsl(var(--domain-clinical))',
+					clerical: 'hsl(var(--domain-clerical))',
+					cultural: 'hsl(var(--domain-cultural))',
+					'case-acceptance': 'hsl(var(--domain-case-acceptance))'
 				}
 			},
 			// Glassmorphism utilities

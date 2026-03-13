@@ -87,6 +87,7 @@ function AppRoutes() {
     );
   }
 
+  if (!user && pathname === '/') return <LandingPage />;
   if (!user) return <Login />;
   if (needsPasswordSetup) return <SetupPassword />;
 

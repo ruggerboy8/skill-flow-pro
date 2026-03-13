@@ -104,7 +104,7 @@ export function LocationHealthCard({
   return (
     <Card 
       className={cn(
-        "cursor-pointer hover:shadow-md transition-all border-2 relative",
+        "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all border-2 relative",
         getStatusClasses(stats.submissionRate)
       )}
       onClick={() => navigate(`/dashboard/location/${stats.id}`)}

@@ -89,7 +89,7 @@ export function CompetencyPicker({
               competencies.map((competency) => (
                 <div
                   key={competency.competency_id}
-                  className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                  className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                   onClick={() => onSelect(competency)}
                 >
                   <div className="flex items-center justify-between">

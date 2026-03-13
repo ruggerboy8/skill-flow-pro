@@ -193,5 +193,26 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    line-height: 1.625;
+  }
+
+  /* 1A — Smooth transitions on interactive elements */
+  button,
+  [role="button"],
+  a,
+  [data-state] {
+    transition: all 150ms ease-out;
+  }
+
+  /* 1B — Typography refinement: tighter heading tracking */
+  h1, h2, h3 {
+    letter-spacing: -0.025em;
+  }
+
+  /* 1C — Consistent focus ring system (fallback for non-shadcn elements) */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius);
   }
 }

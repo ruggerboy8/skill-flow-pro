@@ -12,6 +12,7 @@ import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
 import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -117,8 +118,22 @@ export default function Layout() {
   // Show loading state until roles are loaded
   if (roleLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex min-h-screen">
+        <div className="w-64 border-r p-4 space-y-4 hidden md:block">
+          <Skeleton className="h-8 w-32" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
+        <div className="flex-1 p-6 space-y-6">
+          <Skeleton className="h-10 w-48" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full rounded-xl" />
+            ))}
+          </div>
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
       </div>
     );
   }

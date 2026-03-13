@@ -136,8 +136,23 @@ export function AdminUsersTab() {
         orgsQuery = orgsQuery.eq("organization_id", organizationId);
       }
 
+      // Scope roles to the org's practice_type when not a platform admin
+      let rolesQuery = supabase.from("roles").select("role_id, role_name, practice_type").eq("active", true).order("role_name");
+
+      if (organizationId) {
+        const { data: orgData } = await supabase
+          .from("organizations")
+          .select("practice_type")
+          .eq("id", organizationId)
+          .maybeSingle();
+
+        if (orgData?.practice_type) {
+          rolesQuery = rolesQuery.eq("practice_type", orgData.practice_type);
+        }
+      }
+
       const [rolesResult, locationsResult, orgsResult] = await Promise.all([
-        supabase.from("roles").select("role_id, role_name").order("role_name"),
+        rolesQuery,
         locQuery,
         orgsQuery,
       ]);

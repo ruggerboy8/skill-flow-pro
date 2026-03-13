@@ -11,7 +11,7 @@ interface PlannerPageProps {
   practiceType?: string;
 }
 
-export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
+export default function PlannerPage({ roleId, roleName, practiceType }: PlannerPageProps) {
   const navigate = useNavigate();
 
   return (

@@ -8,6 +8,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 interface PlannerPageProps {
   roleId: number;
   roleName: string;
+  practiceType?: string;
 }
 
 export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {

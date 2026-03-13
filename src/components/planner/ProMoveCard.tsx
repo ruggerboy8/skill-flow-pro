@@ -77,7 +77,7 @@ export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
             {badges.map((b, i) => (
               <Tooltip key={i}>
                 <TooltipTrigger asChild>
-                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-foreground cursor-help">
+                  <span className="px-1.5 py-0.5 text-2xs rounded bg-muted text-foreground cursor-help">
                     {b.label}
                   </span>
                 </TooltipTrigger>

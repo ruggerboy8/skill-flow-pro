@@ -80,7 +80,7 @@ function orderDomains(data: TrajectoryData) {
 // Simple sparkline component
 function Sparkline({ points }: { points: TrendPoint[] }) {
   if (!points || points.length < 2) {
-    return <div className="w-24 h-8 bg-gray-100 rounded flex items-center justify-center text-[10px] text-muted-foreground">n/a</div>;
+    return <div className="w-24 h-8 bg-gray-100 rounded flex items-center justify-center text-2xs text-muted-foreground">n/a</div>;
   }
 
   const values = points.map(p => p.value);

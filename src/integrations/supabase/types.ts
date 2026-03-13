@@ -3610,6 +3610,10 @@ export type Database = {
         Args: { p_org_id: string }
         Returns: boolean
       }
+      is_same_org_eval: {
+        Args: { p_eval_location_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_superadmin: { Args: never; Returns: boolean }
       mark_eval_viewed: { Args: { p_eval_id: string }; Returns: undefined }

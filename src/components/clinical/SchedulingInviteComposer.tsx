@@ -139,8 +139,9 @@ export function SchedulingInviteComposer({
     }
   }
 
+  const appBaseUrl = 'https://alcanskills.lovable.app';
   const prepLink = sessionId
-    ? `https://alcanskills.lovable.app/doctor/review-prep/${sessionId}`
+    ? `${appBaseUrl}/doctor/review-prep/${sessionId}`
     : '[prep link — generated after session is created]';
 
   function getPreview(template: string) {
@@ -173,7 +174,7 @@ export function SchedulingInviteComposer({
           session_id: sessionId || null,
           custom_subject: subject,
           custom_body: body,
-          prep_link: sessionId ? `https://alcanskills.lovable.app/doctor/review-prep/${sessionId}` : undefined,
+          prep_link: sessionId ? `${appBaseUrl}/doctor/review-prep/${sessionId}` : undefined,
         },
       });
       if (error) throw error;

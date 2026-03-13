@@ -7,7 +7,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 const APP_URL = Deno.env.get("APP_URL") || "http://localhost:3000";
-const SITE_URL = Deno.env.get("SITE_URL") || "https://alcanskills.lovable.app";
+const SITE_URL = Deno.env.get("SITE_URL") || Deno.env.get("APP_URL") || "https://alcanskills.lovable.app";
 
 // Fail fast if environment isn't wired
 if (!SUPABASE_URL || !SERVICE_ROLE || !SUPABASE_ANON_KEY) {
@@ -110,7 +110,15 @@ serve(async (req: Request) => {
             const locationScopes = callerScopes.filter((s: any) => s.scope_type === 'location').map((s: any) => s.scope_id);
             
             if (orgScopes.length > 0) {
-              q = q.in('locations.group_id', orgScopes);
+              // Resolve location IDs from practice group scopes to filter staff directly
+              const { data: scopeLocs } = await admin
+                .from("locations").select("id").in("group_id", orgScopes);
+              const scopeLocIds = (scopeLocs ?? []).map((l: any) => l.id);
+              if (scopeLocIds.length > 0) {
+                q = q.in("primary_location_id", scopeLocIds);
+              } else {
+                q = q.eq("id", "00000000-0000-0000-0000-000000000000");
+              }
             } else if (locationScopes.length > 0) {
               q = q.in('primary_location_id', locationScopes);
             }
@@ -125,7 +133,15 @@ serve(async (req: Request) => {
             .eq("organization_id", organization_id);
           const orgGroupIds = (orgGroups ?? []).map((g: any) => g.id);
           if (orgGroupIds.length > 0) {
-            q = q.in("locations.group_id", orgGroupIds);
+            // Resolve location IDs from group IDs to filter staff directly
+            const { data: orgLocs } = await admin
+              .from("locations").select("id").in("group_id", orgGroupIds);
+            const orgLocIds = (orgLocs ?? []).map((l: any) => l.id);
+            if (orgLocIds.length > 0) {
+              q = q.in("primary_location_id", orgLocIds);
+            } else {
+              q = q.eq("id", "00000000-0000-0000-0000-000000000000");
+            }
           } else {
             // Org has no groups — return empty result set
             q = q.eq("id", "00000000-0000-0000-0000-000000000000");

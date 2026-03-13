@@ -120,27 +120,48 @@ serve(async (req) => {
     const cutoff8w = new Date(effectiveDateObj);
     cutoff8w.setDate(cutoff8w.getDate() - 8 * 7);
 
-    // 1. Fetch eligible moves with competencies
-    // Accept practiceType from caller to filter pro moves by practice type
+    // 1. Fetch eligible moves — prefer org_visible_pro_moves RPC when orgId provided
     const practiceType = (body as any).practiceType as string | undefined;
+    const orgId = (body as any).orgId as string | undefined;
 
-    let movesQuery = supabase
-      .from('pro_moves')
-      .select('action_id, action_statement, competency_id')
-      .eq('active', true)
-      .eq('role_id', body.roleId);
+    let eligible: any[] = [];
 
-    if (practiceType) {
-      movesQuery = movesQuery.contains('practice_types', [practiceType]);
-      logs.push(`Filtering pro moves by practice_type: ${practiceType}`);
+    if (orgId) {
+      // Server-resolved: uses org practice_type + hidden overrides + org-custom moves
+      const { data: orgMoves, error: orgErr } = await supabase
+        .rpc('org_visible_pro_moves', { p_org_id: orgId, p_role_id: body.roleId });
+      if (orgErr) throw orgErr;
+      eligible = (orgMoves || []).map((m: any) => ({
+        actionId: m.action_id,
+        statement: m.action_statement,
+        competencyId: m.competency_id,
+      }));
+      logs.push(`Using org_visible_pro_moves RPC for org ${orgId}: ${eligible.length} moves`);
+    } else {
+      // Legacy path: client-provided practiceType filter
+      let movesQuery = supabase
+        .from('pro_moves')
+        .select('action_id, action_statement, competency_id')
+        .eq('active', true)
+        .eq('role_id', body.roleId);
+
+      if (practiceType) {
+        movesQuery = movesQuery.contains('practice_types', [practiceType]);
+        logs.push(`Filtering pro moves by practice_type: ${practiceType}`);
+      }
+
+      const { data: eligibleMoves, error: movesError } = await movesQuery;
+      if (movesError) throw movesError;
+
+      eligible = (eligibleMoves || []).map((m: any) => ({
+        actionId: m.action_id,
+        statement: m.action_statement,
+        competencyId: m.competency_id,
+      }));
     }
 
-    const { data: eligibleMoves, error: movesError } = await movesQuery;
-
-    if (movesError) throw movesError;
-
     // 1b. Fetch competencies with domains separately
-    const competencyIds = eligibleMoves?.map((m: any) => m.competency_id) || [];
+    const competencyIds = [...new Set(eligible.map((m: any) => m.competencyId))];
     const { data: competencies, error: compError } = await supabase
       .from('competencies')
       .select('competency_id, domain_id, domains!competencies_domain_id_fkey(domain_name)')
@@ -156,24 +177,24 @@ serve(async (req) => {
       ]) || []
     );
 
-    let eligible = eligibleMoves?.map((m: any) => {
-      const comp = competencyMap.get(m.competency_id);
+    let eligibleFinal = eligible.map((m: any) => {
+      const comp = competencyMap.get(m.competencyId);
       return {
-        id: m.action_id,
-        name: m.action_statement,
-        competencyId: m.competency_id,
+        id: m.actionId,
+        name: m.statement,
+        competencyId: m.competencyId,
         domainId: comp?.domainId || 0,
         domainName: comp?.domainName || 'Unknown',
       };
-    }) || [];
+    });
 
     // Apply exclusions
     if (config.excludeMoveIds.length > 0) {
-      eligible = eligible.filter(m => !config.excludeMoveIds.includes(m.id));
-      logs.push(`Excluded ${config.excludeMoveIds.length} moves, ${eligible.length} remaining`);
+      eligibleFinal = eligibleFinal.filter(m => !config.excludeMoveIds.includes(m.id));
+      logs.push(`Excluded ${config.excludeMoveIds.length} moves, ${eligibleFinal.length} remaining`);
     }
 
-    logs.push(`Found ${eligible.length} eligible moves`);
+    logs.push(`Found ${eligibleFinal.length} eligible moves`);
 
     // Helper: classify confidence status
     const classifyConfidence = (
@@ -361,13 +382,13 @@ serve(async (req) => {
     logs.push(`Last selected records: ${lastSelectedAssign?.length || 0} from weekly_assignments, ${lastSelected.length} unique moves`);
     
     // Log never-seen moves
-    const neverSeen = eligible.filter(m => !lastSelected.some(ls => ls.proMoveId === m.id));
+    const neverSeen = eligibleFinal.filter(m => !lastSelected.some(ls => ls.proMoveId === m.id));
     logs.push(`Never assigned moves: ${neverSeen.length} (e.g., ${neverSeen.slice(0, 3).map(m => m.name).join(', ')})`);
     
     // Log sample confidence data
     logs.push(`Total confidence records: ${confidenceHistory.length}`);
     const movesWithConf = new Set(confidenceHistory.map(c => c.proMoveId));
-    logs.push(`Moves with confidence data: ${movesWithConf.size}/${eligible.length}`);
+    logs.push(`Moves with confidence data: ${movesWithConf.size}/${eligibleFinal.length}`);
 
     // 5. Fetch domain coverage (last 8 weeks) - UNIFIED: only query weekly_assignments
     const { data: domainCoverageAssign, error: dcAssignError } = await supabase
@@ -382,7 +403,7 @@ serve(async (req) => {
 
     const domainCoverageMap = new Map<number, Set<string>>();
     domainCoverageAssign?.forEach((row: any) => {
-      const move = eligible.find(m => m.id === row.action_id);
+      const move = eligibleFinal.find(m => m.id === row.action_id);
       if (move) {
         const weeks = domainCoverageMap.get(move.domainId) || new Set();
         weeks.add(row.week_start_date);
@@ -398,14 +419,14 @@ serve(async (req) => {
     logs.push(`Domain coverage: ${domainCoverage.length} domains tracked (${domainCoverageAssign?.length || 0} records from weekly_assignments)`);
 
     // Add sample move logging
-    if (eligible.length > 0) {
-      logs.push(`Sample move for introspection: ${eligible[0].name} (id=${eligible[0].id})`);
+    if (eligibleFinal.length > 0) {
+      logs.push(`Sample move for introspection: ${eligibleFinal[0].name} (id=${eligibleFinal[0].id})`);
     }
 
     // Import and run engine (inline for now since we can't import from src/)
     // We'll compute directly here
     const inputs = {
-      eligibleMoves: eligible,
+      eligibleMoves: eligibleFinal,
       confidenceHistory,
       evals,
       lastSelected,
@@ -532,7 +553,7 @@ serve(async (req) => {
     };
 
     // Compute Next
-    const scored = eligible.map(move => ({ ...move, ...scoreCandidate(move, effectiveDate) }));
+    const scored = eligibleFinal.map(move => ({ ...move, ...scoreCandidate(move, effectiveDate) }));
     
     // Enhanced deterministic tie-breaks: finalScore → lowConfShare → lastPracticedWeeks desc → actionId asc
     scored.sort((a, b) => {
@@ -625,7 +646,7 @@ serve(async (req) => {
       return { ...base, R, final, weeksSince };
     };
 
-    const previewScored = eligible.map(move => ({ ...move, ...scoreWithAdvanced(move) }));
+    const previewScored = eligibleFinal.map(move => ({ ...move, ...scoreWithAdvanced(move) }));
     previewScored.sort((a, b) => {
       if (Math.abs(b.final - a.final) >= 0.0001) return b.final - a.final;
       if ((b.lowConfShare || 0) !== (a.lowConfShare || 0)) return (b.lowConfShare || 0) - (a.lowConfShare || 0);

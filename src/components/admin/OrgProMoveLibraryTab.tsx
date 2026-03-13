@@ -55,7 +55,17 @@ export function OrgProMoveLibraryTab() {
 
       if (orgErr) throw orgErr;
 
-      const orgPracticeType = orgData?.practice_type ?? 'pediatric_us';
+      const orgPracticeType = orgData?.practice_type;
+      if (!orgPracticeType) {
+        toast({
+          title: 'Configuration error',
+          description: 'Organization practice type is not set. Please contact support.',
+          variant: 'destructive',
+        });
+        setRows([]);
+        setLoading(false);
+        return;
+      }
 
       // 2. Fetch active pro moves whose practice_types array overlaps the org's type
       const { data: proMoves, error: pmErr } = await supabase

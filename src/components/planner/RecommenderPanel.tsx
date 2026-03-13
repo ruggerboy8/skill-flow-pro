@@ -16,12 +16,13 @@ interface RecommenderPanelProps {
   roleId: number;
   roleName: string;
   practiceType?: string;
+  orgId?: string;
 }
 
 
 const PAGE_SIZE = 12;
 
-export function RecommenderPanel({ roleId, roleName, practiceType }: RecommenderPanelProps) {
+export function RecommenderPanel({ roleId, roleName, practiceType, orgId }: RecommenderPanelProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rankedAll, setRankedAll] = useState<RankedMove[]>([]);
@@ -33,7 +34,7 @@ export function RecommenderPanel({ roleId, roleName, practiceType }: Recommender
 
   useEffect(() => {
     loadRecommendations();
-  }, [roleId, preset, practiceType]);
+  }, [roleId, preset, practiceType, orgId]);
 
   const loadRecommendations = async () => {
     setLoading(true);
@@ -45,6 +46,7 @@ export function RecommenderPanel({ roleId, roleName, practiceType }: Recommender
           lookbackWeeks: 9,
           preset,
           practiceType,
+          orgId,
           constraints: {
             minDistinctDomains: 2,
             cooldownWeeks: 4,

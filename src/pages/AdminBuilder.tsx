@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { ProMoveLibrary } from "@/components/admin/ProMoveLibrary";
+import { OrgProMoveLibraryTab } from "@/components/admin/OrgProMoveLibraryTab";
 import { RecommenderPanel } from "@/components/planner/RecommenderPanel";
 import { WeekBuilderPanel } from "@/components/planner/WeekBuilderPanel";
 
 export default function AdminBuilder() {
   const navigate = useNavigate();
-  const { canManageAssignments, organizationId, practiceType, isLoading } = useUserRole();
+  const { canManageAssignments, organizationId, practiceType, isSuperAdmin, isLoading } = useUserRole();
 
   if (isLoading) {
     return (
@@ -58,7 +59,7 @@ export default function AdminBuilder() {
 
         <TabsContent value="library" className="space-y-6">
           <h2 className="text-xl font-semibold">Pro-Move Library</h2>
-          <ProMoveLibrary />
+          {isSuperAdmin ? <ProMoveLibrary /> : <OrgProMoveLibraryTab />}
         </TabsContent>
       </Tabs>
     </div>
@@ -81,7 +82,7 @@ function PlannerTabContent({
       {/* Left: Recommender */}
       <div className="w-1/2 shrink-0">
         <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
-          <RecommenderPanel roleId={roleId} roleName={roleName} practiceType={practiceType} />
+          <RecommenderPanel roleId={roleId} roleName={roleName} practiceType={practiceType} orgId={orgId} />
         </div>
       </div>
 

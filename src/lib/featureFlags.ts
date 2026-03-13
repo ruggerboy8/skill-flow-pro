@@ -4,3 +4,8 @@ export const isV2 =
 // If/when you want to flip it via env:
 // VITE_V2=true  -> V2 on
 // VITE_V2=false -> V2 off
+
+// Org-level pro move authoring (create/edit custom moves per org)
+// Gated OFF until UI and policies are ready
+export const orgLibraryAuthoringEnabled =
+  import.meta.env.VITE_ORG_LIBRARY_AUTHORING?.toLowerCase?.() === 'true' || false;

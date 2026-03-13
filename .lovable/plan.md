@@ -1,48 +1,104 @@
-## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
-**Status: ✅ Complete**
 
-### What changed
+## Micro-Celebrations + Mobile Slide Transitions
 
-1. **Practice types expanded** to three region-specific values: `pediatric_us`, `general_us`, `general_uk`
-2. **`roles.practice_type`** column added — each role belongs to one practice type
-3. **`pro_moves.practice_type`** converted to **`pro_moves.practice_types TEXT[]`** — array-based multi-select
-4. All existing data backfilled (`pediatric` → `pediatric_us`, `general` → `general_us`, `all` → all three)
+### Current State
 
-### Files changed
+- **PerformanceWizard** has a `showVictory` modal (low-confidence → high-performance detection) but no confetti or enhanced celebration. After final submit, it shows a toast and immediately navigates away.
+- **ConfidenceWizard** has an intervention modal but no victory moment at all. After final submit, same pattern — toast + navigate.
+- Both wizards use URL-based step navigation (`/confidence/current/step/N`, `/performance/current/step/N`) with `navigate()` calls. Step changes are instant — no slide animation.
+- Neither `canvas-confetti` nor `framer-motion` are in the project today.
 
-| File | Change |
-|------|--------|
-| Migration SQL | Schema: expanded CHECK on orgs, added practice_types array on pro_moves, added practice_type on roles |
-| `RoleFormDrawer.tsx` | Added practice type Select (3 options) |
-| `PlatformRolesTab.tsx` | Shows practice type badge on role cards, fetches practice_type |
-| `ProMoveForm.tsx` | Replaced single Select with multi-checkbox for practice_types |
-| `DoctorProMoveForm.tsx` | Defaults practice_types to `['pediatric_us']` |
-| `OrgBootstrapDrawer.tsx` | 3 radio options with new labels |
-| `PlatformOrgsTab.tsx` | Badge display for all 3 practice types |
-| `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
-| `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
-| `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
+---
 
-## Tier 1 — Design System Token Unification
+### 3A — Confetti on Celebration Moments
 
-**Status: ✅ Complete**
+**New dependency:** `canvas-confetti` (~3KB, zero deps)
 
-### 1A — Consolidate Domain Colors (3→1)
-- Replaced unused `--domain-planning/environment/interactions/learning-experiences` CSS vars with `--domain-clinical/clerical/cultural/case-acceptance` (rich + pastel)
-- Updated `tailwind.config.ts` domain keys to match
-- `domainColors.ts` exports CSS var names; API unchanged
-- `DOMAIN_META` in `constants/domains.ts` now uses `chipStyle()` with token-derived colors
+**Where to fire:**
+1. **PerformanceWizard victory modal** — fire confetti burst on `showVictory` becoming `true` (the "That's a Pro Move!" modal). Add a `useEffect` watching `showVictory`.
+2. **PerformanceWizard final submit** — after successful submit (non-repair mode), instead of immediately navigating, show a brief completion state with confetti, then navigate after ~2s.
+3. **ConfidenceWizard final submit** — same pattern: brief completion celebration before navigating to performance wizard or home.
 
-### 1B — StatusBadge Component + Tokens
-- Added `--status-complete/missing/late/excused/pending` CSS tokens to `index.css`
-- Created `src/components/ui/StatusBadge.tsx` with token-driven colors
-- Replaced inline `StatusPill` in `CoachDashboardV2`, `StaffDetailV2`, `ScoreHistoryV2`, `StatsScores`
+**Implementation:** Create a small `src/lib/confetti.ts` helper that wraps `canvas-confetti` with a standard burst config (origin center-top, particle count ~80, spread 60, gravity 1.2). Call it from the wizards.
 
-### 1C — Score Color Tokens (1–4)
-- Added `--score-1` through `--score-4` (+ `-bg` pastel variants) to `index.css`
-- Updated `NumberScale.tsx` to use inline styles with CSS vars instead of hardcoded Tailwind
+**Files:** `src/lib/confetti.ts` (new), `src/pages/PerformanceWizard.tsx`, `src/pages/ConfidenceWizard.tsx`
 
-### 1D — text-2xs Utility
-- Added `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `tailwind.config.ts`
-- Replaced all 340 occurrences of `text-[10px]` → `text-2xs` across 42 files
+---
+
+### 3B — Submit Button Checkmark Animation
+
+**What:** When the user taps "Submit" on the last step, the button text transitions: `Submit` → spinner → `✓` (green check, scale-in animation) → then navigate.
+
+**Implementation:** Add a `submitPhase` state (`idle` | `saving` | `done`) to both wizards. On submit success, set `done` which renders a `<Check>` icon with `animate-scale-in` class. After 1.5s delay, fire confetti and navigate.
+
+**Files:** `src/pages/PerformanceWizard.tsx`, `src/pages/ConfidenceWizard.tsx`
+
+---
+
+### 4A — Mobile Slide Transitions
+
+**New dependency:** `framer-motion` (~50KB gzipped, industry standard)
+
+**How it works with URL-based steps:** Both wizards already derive `currentIndex` from the URL param. The challenge is that step changes happen via `navigate()` which triggers a full re-render, not a local state change.
+
+**Approach:** Wrap the main content area (spine card + question/scale section) in `<AnimatePresence mode="wait">` keyed by `currentIndex`. Track direction via a `useRef` that compares previous vs current index:
+- Forward (Next): enter from right (`x: 30 → 0`), exit left (`x: 0 → -30`)
+- Backward (Back): enter from left (`x: -30 → 0`), exit right (`x: 0 → 30`)
+- Duration: 200ms ease-out
+
+**Scope:** Both `ConfidenceWizard.tsx` and `PerformanceWizard.tsx` render sections. The sticky footer and progress dots stay static — only the card + scale slide.
+
+**Files:** `src/pages/PerformanceWizard.tsx`, `src/pages/ConfidenceWizard.tsx`
+
+---
+
+### Execution Order
+
+1. Install `canvas-confetti` and `framer-motion`
+2. Create `src/lib/confetti.ts` helper
+3. Add submit phase state + checkmark animation to both wizards
+4. Add confetti to victory modal and completion moments
+5. Add `AnimatePresence` slide transitions to both wizard step areas
+
+---
+
+### Technical Detail
+
+The `framer-motion` `AnimatePresence` needs a `custom` prop for direction. Pattern:
+
+```tsx
+const [direction, setDirection] = useState(1); // 1=forward, -1=back
+const variants = {
+  enter: (dir: number) => ({ x: dir * 30, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir * -30, opacity: 0 }),
+};
+
+// In handleNext: setDirection(1)
+// In handleBack: setDirection(-1)
+
+<AnimatePresence mode="wait" custom={direction}>
+  <motion.div
+    key={currentIndex}
+    custom={direction}
+    variants={variants}
+    initial="enter"
+    animate="center"
+    exit="exit"
+    transition={{ duration: 0.2, ease: "easeOut" }}
+  >
+    {/* spine card + scale */}
+  </motion.div>
+</AnimatePresence>
+```
+
+The confetti helper:
+```ts
+import confetti from 'canvas-confetti';
+export const fireCelebration = () => confetti({
+  particleCount: 80, spread: 60, origin: { y: 0.6 },
+  colors: ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'],
+});
+```
+

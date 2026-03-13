@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { ProMoveLibrary } from "@/components/admin/ProMoveLibrary";
+import { OrgProMoveLibraryTab } from "@/components/admin/OrgProMoveLibraryTab";
 import { RecommenderPanel } from "@/components/planner/RecommenderPanel";
 import { WeekBuilderPanel } from "@/components/planner/WeekBuilderPanel";
 

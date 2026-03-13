@@ -9,6 +9,7 @@ import { SimProvider } from "@/devtools/SimProvider";
 
 // Pages (same imports you already have)
 import Login from "@/pages/Login";
+import LandingPage from "@/pages/LandingPage";
 import AuthCallback from "@/pages/AuthCallback";
 import ResetPassword from "@/pages/ResetPassword";
 import SetupPassword from "@/pages/SetupPassword";
@@ -86,6 +87,7 @@ function AppRoutes() {
     );
   }
 
+  if (!user && pathname === '/') return <LandingPage />;
   if (!user) return <Login />;
   if (needsPasswordSetup) return <SetupPassword />;
 

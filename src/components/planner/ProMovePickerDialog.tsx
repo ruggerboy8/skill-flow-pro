@@ -46,7 +46,7 @@ export function ProMovePickerDialog({
 
   useEffect(() => {
     if (open) loadProMoves();
-  }, [open, roleId, orgId]);
+  }, [open, roleId, orgId, practiceType]);
 
   useEffect(() => {
     filterMoves();

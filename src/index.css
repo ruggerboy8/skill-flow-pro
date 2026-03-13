@@ -70,11 +70,17 @@ All colors MUST be HSL.
     --warning: 45 93% 47%;
     --warning-foreground: 0 0% 9%;
     
-    /* Domain colors */
-    --domain-planning: 217 91% 60%;
-    --domain-environment: 142 71% 45%;
-    --domain-interactions: 24 95% 53%;
-    --domain-learning-experiences: 262 83% 58%;
+    /* Domain colors (rich/saturated) */
+    --domain-clinical: 211 85% 55%;
+    --domain-clerical: 123 60% 45%;
+    --domain-cultural: 330 85% 60%;
+    --domain-case-acceptance: 36 90% 55%;
+
+    /* Domain colors (pastel) */
+    --domain-clinical-pastel: 211 100% 92%;
+    --domain-clerical-pastel: 123 41% 88%;
+    --domain-cultural-pastel: 354 70% 89%;
+    --domain-case-acceptance-pastel: 36 100% 90%;
    }
 
   .dark {

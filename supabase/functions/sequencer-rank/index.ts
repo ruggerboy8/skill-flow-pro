@@ -646,7 +646,7 @@ serve(async (req) => {
       return { ...base, R, final, weeksSince };
     };
 
-    const previewScored = eligible.map(move => ({ ...move, ...scoreWithAdvanced(move) }));
+    const previewScored = eligibleFinal.map(move => ({ ...move, ...scoreWithAdvanced(move) }));
     previewScored.sort((a, b) => {
       if (Math.abs(b.final - a.final) >= 0.0001) return b.final - a.final;
       if ((b.lowConfShare || 0) !== (a.lowConfShare || 0)) return (b.lowConfShare || 0) - (a.lowConfShare || 0);

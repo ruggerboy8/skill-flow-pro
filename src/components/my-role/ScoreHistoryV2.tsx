@@ -388,13 +388,13 @@ export default function ScoreHistoryV2() {
                                             <div className="flex items-start justify-between gap-2">
                                               <div className="flex items-center gap-2 flex-wrap">
                                                 <span 
-                                                  className="text-[10px] font-semibold uppercase"
+                                                  className="text-2xs font-semibold uppercase"
                                                   style={{ color: domainColor }}
                                                 >
                                                   {score.domain_name || 'General'}
                                                 </span>
                                                 {score.self_select && (
-                                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                  <div className="flex items-center gap-1 text-2xs text-muted-foreground">
                                                     <Tag className="w-3 h-3" />
                                                     <span>Self-Select</span>
                                                   </div>

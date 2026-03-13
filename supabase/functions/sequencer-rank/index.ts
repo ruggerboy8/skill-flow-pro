@@ -403,7 +403,7 @@ serve(async (req) => {
 
     const domainCoverageMap = new Map<number, Set<string>>();
     domainCoverageAssign?.forEach((row: any) => {
-      const move = eligible.find(m => m.id === row.action_id);
+      const move = eligibleFinal.find(m => m.id === row.action_id);
       if (move) {
         const weeks = domainCoverageMap.get(move.domainId) || new Set();
         weeks.add(row.week_start_date);

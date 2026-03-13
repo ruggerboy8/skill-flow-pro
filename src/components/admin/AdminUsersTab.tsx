@@ -355,7 +355,7 @@ const handleResendInvite = async (user: User) => {
         {indicators.map((ind, i) => (
           <Tooltip key={i}>
             <TooltipTrigger asChild>
-              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold ${ind.color} cursor-default shrink-0`}>
+              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-2xs font-bold ${ind.color} cursor-default shrink-0`}>
                 {ind.abbr}
               </span>
             </TooltipTrigger>

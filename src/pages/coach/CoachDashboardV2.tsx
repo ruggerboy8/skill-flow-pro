@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronLeft, ChevronRight, RotateCw, CalendarOff, X } from 'lucide-react';
@@ -347,34 +348,10 @@ export default function CoachDashboardV2({
     });
   };
 
-  // Status pill component - returns colored badge
+  // Status pill - delegates to shared StatusBadge
   function StatusPill({ hasAll, hasAnyLate, isExcused }: { hasAll: boolean; hasAnyLate: boolean; isExcused?: boolean }) {
-    if (isExcused) {
-      return (
-        <Badge variant="secondary" className="bg-muted text-muted-foreground">
-          Excused
-        </Badge>
-      );
-    }
-    if (!hasAll) {
-      return (
-        <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
-          Missing
-        </Badge>
-      );
-    }
-    if (hasAnyLate) {
-      return (
-        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-          Late
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-        Complete
-      </Badge>
-    );
+    const status = isExcused ? 'excused' : !hasAll ? 'missing' : hasAnyLate ? 'late' : 'complete';
+    return <StatusBadge status={status} />;
   }
 
   if (loading) {

@@ -268,7 +268,7 @@ export default function DoctorBaselineResults() {
                 }}
               >
                 <div className="text-xl font-bold" style={{ color: colors.text }}>{tallyCounts[score as keyof typeof tallyCounts]}</div>
-                <div className="text-[10px] font-medium" style={{ color: colors.text }}>{SCORE_LABELS[score]}</div>
+                <div className="text-2xs font-medium" style={{ color: colors.text }}>{SCORE_LABELS[score]}</div>
               </button>
             );
           })}

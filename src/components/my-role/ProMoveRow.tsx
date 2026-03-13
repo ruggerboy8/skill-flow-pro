@@ -38,7 +38,7 @@ export function ProMoveRow({ move, onClick }: ProMoveRowProps) {
               )}
             </>
           ) : (
-            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal bg-primary/10 text-primary hover:bg-primary/20">
+            <Badge variant="secondary" className="h-5 px-1.5 text-2xs font-normal bg-primary/10 text-primary hover:bg-primary/20">
               Ready to try?
             </Badge>
           )}

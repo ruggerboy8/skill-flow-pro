@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
@@ -44,10 +45,8 @@ interface YearGroup {
 }
 
 function StatusPill({ hasAll, hasAnyLate, isExempt }: { hasAll: boolean; hasAnyLate: boolean; isExempt?: boolean }) {
-  if (isExempt) return <span className="text-muted-foreground text-xs">—</span>;
-  if (!hasAll) return <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Missing</Badge>;
-  if (hasAnyLate) return <Badge className="h-5 px-1.5 text-[10px] bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Late</Badge>;
-  return <Badge className="h-5 px-1.5 text-[10px] bg-green-100 text-green-800 hover:bg-green-100">Done</Badge>;
+  const status = isExempt ? 'exempt' : !hasAll ? 'missing' : hasAnyLate ? 'late' : 'complete';
+  return <StatusBadge status={status} className="h-5 px-1.5 text-2xs" />;
 }
 
 export default function ScoreHistoryV2() {
@@ -316,10 +315,10 @@ export default function ScoreHistoryV2() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="font-bold text-sm">Week of {weekLabel}</span>
                                       {isCurrentWeek && (
-                                        <Badge variant="default" className="text-[10px] h-5 px-1.5">Current</Badge>
+                                        <Badge variant="default" className="text-2xs h-5 px-1.5">Current</Badge>
                                       )}
                                       {isExempt && (
-                                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-[10px] h-5 px-1.5">Exempt</Badge>
+                                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-2xs h-5 px-1.5">Exempt</Badge>
                                       )}
                                     </div>
                                     {isSuperAdmin && scores.length > 0 && (
@@ -343,7 +342,7 @@ export default function ScoreHistoryV2() {
                                           <Button
                                             variant="outline"
                                             size="sm"
-                                            className="h-5 px-2 text-[10px] border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900"
+                                            className="h-5 px-2 text-2xs border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               navigate(`/confidence/current/step/1?mode=repair&weekOf=${weekOf}`);
@@ -388,13 +387,13 @@ export default function ScoreHistoryV2() {
                                             <div className="flex items-start justify-between gap-2">
                                               <div className="flex items-center gap-2 flex-wrap">
                                                 <span 
-                                                  className="text-[10px] font-semibold uppercase"
+                                                  className="text-2xs font-semibold uppercase"
                                                   style={{ color: domainColor }}
                                                 >
                                                   {score.domain_name || 'General'}
                                                 </span>
                                                 {score.self_select && (
-                                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                  <div className="flex items-center gap-1 text-2xs text-muted-foreground">
                                                     <Tag className="w-3 h-3" />
                                                     <span>Self-Select</span>
                                                   </div>

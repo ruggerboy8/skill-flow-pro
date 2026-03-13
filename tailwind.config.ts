@@ -73,10 +73,10 @@ export default {
 				},
 				// Domain colors mapped for utilities (bg-domain-planning, etc.)
 				domain: {
-					planning: 'hsl(var(--domain-planning))',
-					environment: 'hsl(var(--domain-environment))',
-					interactions: 'hsl(var(--domain-interactions))',
-					'learning-experiences': 'hsl(var(--domain-learning-experiences))'
+					clinical: 'hsl(var(--domain-clinical))',
+					clerical: 'hsl(var(--domain-clerical))',
+					cultural: 'hsl(var(--domain-cultural))',
+					'case-acceptance': 'hsl(var(--domain-case-acceptance))'
 				}
 			},
 			// Glassmorphism utilities
@@ -87,9 +87,12 @@ export default {
 			backgroundImage: {
 				'glass-gradient': 'linear-gradient(135deg, rgba(255, 255, 255, 0.80) 0%, rgba(255, 255, 255, 0.40) 100%)'
 			},
-			fontFamily: {
-				sans: ['"Biondi Sans"', 'ui-sans-serif', 'system-ui']
-			},
+		fontSize: {
+			'2xs': ['0.625rem', { lineHeight: '0.875rem' }],
+		},
+		fontFamily: {
+			sans: ['"Biondi Sans"', 'ui-sans-serif', 'system-ui']
+		},
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',

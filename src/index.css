@@ -69,12 +69,42 @@ All colors MUST be HSL.
     --positive: 160 84% 39%;
     --warning: 45 93% 47%;
     --warning-foreground: 0 0% 9%;
+
+    /* Status colors */
+    --status-complete: 142 71% 45%;
+    --status-complete-bg: 142 76% 92%;
+    --status-missing: 0 84% 60%;
+    --status-missing-bg: 0 93% 94%;
+    --status-late: 45 93% 47%;
+    --status-late-bg: 48 96% 89%;
+    --status-excused: 215 14% 55%;
+    --status-excused-bg: 210 40% 96%;
+    --status-pending: 215 14% 55%;
+    --status-pending-bg: 210 40% 96%;
     
-    /* Domain colors */
-    --domain-planning: 217 91% 60%;
-    --domain-environment: 142 71% 45%;
-    --domain-interactions: 24 95% 53%;
-    --domain-learning-experiences: 262 83% 58%;
+    /* Domain colors (rich/saturated) */
+    --domain-clinical: 211 85% 55%;
+    --domain-clerical: 123 60% 45%;
+    --domain-cultural: 330 85% 60%;
+    --domain-case-acceptance: 36 90% 55%;
+
+    /* Domain colors (pastel) */
+    --domain-clinical-pastel: 211 100% 92%;
+    --domain-clerical-pastel: 123 41% 88%;
+    --domain-cultural-pastel: 354 70% 89%;
+    --domain-case-acceptance-pastel: 36 100% 90%;
+
+    /* Score colors (1–4 scale) */
+    --score-1: 24 95% 53%;
+    --score-2: 45 93% 47%;
+    --score-3: 211 85% 55%;
+    --score-4: 160 84% 39%;
+
+    /* Score colors pastel (backgrounds) */
+    --score-1-bg: 24 100% 93%;
+    --score-2-bg: 45 100% 90%;
+    --score-3-bg: 211 100% 92%;
+    --score-4-bg: 160 84% 90%;
    }
 
   .dark {
@@ -114,11 +144,29 @@ All colors MUST be HSL.
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     
-    /* Domain colors */
-    --domain-planning: 217 91% 60%;
-    --domain-environment: 142 71% 45%;
-    --domain-interactions: 24 95% 53%;
-    --domain-learning-experiences: 262 83% 58%;
+    /* Domain colors (rich/saturated) */
+    --domain-clinical: 211 85% 55%;
+    --domain-clerical: 123 60% 45%;
+    --domain-cultural: 330 85% 60%;
+    --domain-case-acceptance: 36 90% 55%;
+
+    /* Domain colors (pastel) */
+    --domain-clinical-pastel: 211 100% 92%;
+    --domain-clerical-pastel: 123 41% 88%;
+    --domain-cultural-pastel: 354 70% 89%;
+    --domain-case-acceptance-pastel: 36 100% 90%;
+
+    /* Score colors (1–4 scale) */
+    --score-1: 24 95% 53%;
+    --score-2: 45 93% 47%;
+    --score-3: 211 85% 55%;
+    --score-4: 160 84% 39%;
+
+    /* Score colors pastel (backgrounds) */
+    --score-1-bg: 24 100% 93%;
+    --score-2-bg: 45 100% 90%;
+    --score-3-bg: 211 100% 92%;
+    --score-4-bg: 160 84% 90%;
   }
 }
 

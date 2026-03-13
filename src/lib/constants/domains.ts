@@ -1,13 +1,32 @@
 // Domain and driver metadata for the sequencer
+import { getDomainColor, getDomainColorRich } from '@/lib/domainColors';
 
 export const DOMAIN_META: Record<number, {
   name: string;
   chipClass: string;
+  /** Inline style for token-driven domain coloring */
+  chipStyle: () => React.CSSProperties;
 }> = {
-  1: { name: 'Clinical', chipClass: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:border-blue-800' },
-  2: { name: 'Clerical', chipClass: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-100 dark:border-green-800' },
-  3: { name: 'Cultural', chipClass: 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900 dark:text-pink-100 dark:border-pink-800' },
-  4: { name: 'Case Acceptance', chipClass: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-100 dark:border-amber-800' },
+  1: { 
+    name: 'Clinical', 
+    chipClass: 'border-transparent text-foreground',
+    chipStyle: () => ({ backgroundColor: getDomainColor('Clinical') }),
+  },
+  2: { 
+    name: 'Clerical', 
+    chipClass: 'border-transparent text-foreground',
+    chipStyle: () => ({ backgroundColor: getDomainColor('Clerical') }),
+  },
+  3: { 
+    name: 'Cultural', 
+    chipClass: 'border-transparent text-foreground',
+    chipStyle: () => ({ backgroundColor: getDomainColor('Cultural') }),
+  },
+  4: { 
+    name: 'Case Acceptance', 
+    chipClass: 'border-transparent text-foreground',
+    chipStyle: () => ({ backgroundColor: getDomainColor('Case Acceptance') }),
+  },
 };
 
 export const DRIVER_LABELS: Record<string, {

@@ -95,7 +95,7 @@ export function StaffPriorityFocusTab({ rawData }: StaffPriorityFocusTabProps) {
                     style={{ backgroundColor: `hsl(${richRaw} / 0.15)` }}
                   >
                     <span 
-                      className="text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
+                      className="text-2xs font-bold uppercase tracking-wider whitespace-nowrap"
                       style={{ 
                         writingMode: 'vertical-rl',
                         transform: 'rotate(180deg)',

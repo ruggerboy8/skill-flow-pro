@@ -422,7 +422,7 @@ export function ProMoveList({
                 <TableCell className="max-w-md align-top">
                   <div className="font-medium">{proMove.action_statement}</div>
                   {!proMove.active && (
-                    <Badge variant="secondary" className="mt-1 text-[10px] h-5">Retired</Badge>
+                    <Badge variant="secondary" className="mt-1 text-2xs h-5">Retired</Badge>
                   )}
                 </TableCell>
                 

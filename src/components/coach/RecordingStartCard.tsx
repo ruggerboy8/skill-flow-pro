@@ -106,7 +106,7 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                     <p className="text-xs text-muted-foreground">
                       {isPaused ? "Paused" : "Recording"}: {formatTime(recordingTime)}
                       {activeCompetencyLabel && !isPaused && (
-                        <span className="block text-[10px] text-primary/70 mt-0.5 truncate max-w-[200px]">
+                        <span className="block text-2xs text-primary/70 mt-0.5 truncate max-w-[200px]">
                           Recording for: {activeCompetencyLabel}
                         </span>
                       )}

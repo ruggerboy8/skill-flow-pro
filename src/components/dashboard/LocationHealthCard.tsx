@@ -122,13 +122,13 @@ export function LocationHealthCard({
             </div>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-[10px] text-primary font-medium mb-0.5 uppercase tracking-wide">
+            <div className="text-2xs text-primary font-medium mb-0.5 uppercase tracking-wide">
               This Week
             </div>
             <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
               {isFullyExcused ? '—' : `${Math.round(stats.submissionRate)}%`}
             </div>
-            <div className="text-[10px] text-muted-foreground leading-tight">
+            <div className="text-2xs text-muted-foreground leading-tight">
               {isFullyExcused ? 'Location Excused' : 'Submitted'}
             </div>
           </div>

@@ -120,7 +120,7 @@ export function StaffResultsTableV2({ data, filters, onRowClick }: StaffResultsT
                   }}
                 >
                   <div>{domain}</div>
-                  <div className="text-[10px] text-muted-foreground font-normal">Obs / Self</div>
+                  <div className="text-2xs text-muted-foreground font-normal">Obs / Self</div>
                 </TableHead>
               ))}
             </TableRow>

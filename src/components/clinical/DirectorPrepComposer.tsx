@@ -38,7 +38,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   if (score == null) return null;
   if (score === 0) return (
     <div className="flex items-center gap-1">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="text-2xs text-muted-foreground">{label}</span>
       <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[9px] font-bold bg-muted text-muted-foreground">
         N/A
       </span>
@@ -46,7 +46,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   );
   return (
     <div className="flex items-center gap-1">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="text-2xs text-muted-foreground">{label}</span>
       <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold text-white ${SCORE_COLORS[score] || 'bg-muted'}`}>
         {score}
       </span>

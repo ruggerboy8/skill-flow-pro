@@ -117,14 +117,14 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
             <div key={entry.id} className="relative pb-6 last:pb-0">
               {/* Node dot */}
               <div className="absolute -left-6 top-1 w-[22px] h-[22px] rounded-full border-2 border-background bg-primary flex items-center justify-center">
-                <span className="text-[10px] font-bold text-primary-foreground">{entry.sequence_number}</span>
+                <span className="text-2xs font-bold text-primary-foreground">{entry.sequence_number}</span>
               </div>
 
               <div className="space-y-2">
                 {/* Header row */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{typeLabel}</span>
-                  <Badge className={`text-[10px] ${statusConfig.className}`}>
+                  <Badge className={`text-2xs ${statusConfig.className}`}>
                     {statusConfig.label}
                   </Badge>
                   {entry.scheduled_at && (
@@ -153,7 +153,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
                 {/* Action Steps */}
                 {experiments.length > 0 && (
                   <div className="pl-2 border-l-2 border-primary/20 space-y-1">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Action Steps</p>
+                    <p className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Action Steps</p>
                     {experiments.map((exp: any, j: number) => (
                       <p key={j} className="text-xs text-foreground">• {exp.title}</p>
                     ))}
@@ -163,7 +163,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
                 {/* Prior Action Statuses */}
                 {priorStatuses.length > 0 && (
                   <div className="pl-2 border-l-2 border-amber-300/40 space-y-1">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Prior Steps Review</p>
+                    <p className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Prior Steps Review</p>
                     {priorStatuses.map((ps: any, j: number) => {
                       const config = ACTION_STATUS_ICONS[ps.status] || ACTION_STATUS_ICONS.continuing;
                       const Icon = config.icon;

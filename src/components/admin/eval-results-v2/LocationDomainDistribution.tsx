@@ -116,8 +116,8 @@ function DomainChart({ domain }: { domain: DomainData }) {
       <div className="flex justify-between mt-1.5 px-0.5">
         {segments.map((seg) => (
           <div key={seg.score} className="text-center w-6">
-            <span className="text-[10px] font-medium text-muted-foreground">{seg.score}</span>
-            <span className="text-[10px] text-muted-foreground block">{seg.percent}%</span>
+            <span className="text-2xs font-medium text-muted-foreground">{seg.score}</span>
+            <span className="text-2xs text-muted-foreground block">{seg.percent}%</span>
           </div>
         ))}
       </div>

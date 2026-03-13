@@ -1,17 +1,35 @@
-// HSL colors for domains matching design system (raw components) - pastel versions
-export const domainColors: Record<string, string> = {
-  Clinical: '211 100% 92%',      // Light blue
-  Clerical: '123 41% 88%',       // Light green
-  Cultural: '354 70% 89%',       // Light pink
-  'Case Acceptance': '36 100% 90%' // Light orange
+// Domain color system — single source of truth
+// CSS custom properties are defined in index.css (--domain-clinical, etc.)
+
+// CSS var names for each domain (rich/saturated versions)
+export const DOMAIN_CSS_VARS: Record<string, string> = {
+  Clinical: '--domain-clinical',
+  Clerical: '--domain-clerical',
+  Cultural: '--domain-cultural',
+  'Case Acceptance': '--domain-case-acceptance',
 };
 
-// Rich/saturated HSL colors for glassmorphism backgrounds
+// CSS var names for pastel versions
+export const DOMAIN_CSS_VARS_PASTEL: Record<string, string> = {
+  Clinical: '--domain-clinical-pastel',
+  Clerical: '--domain-clerical-pastel',
+  Cultural: '--domain-cultural-pastel',
+  'Case Acceptance': '--domain-case-acceptance-pastel',
+};
+
+// Fallback HSL values (used when CSS vars aren't available, e.g. SSR)
+export const domainColors: Record<string, string> = {
+  Clinical: '211 100% 92%',
+  Clerical: '123 41% 88%',
+  Cultural: '354 70% 89%',
+  'Case Acceptance': '36 100% 90%',
+};
+
 export const domainColorsRich: Record<string, string> = {
-  Clinical: '211 85% 55%',       // Stronger Blue
-  Clerical: '123 60% 45%',       // Stronger Green
-  Cultural: '330 85% 60%',       // Stronger Pink/Rose
-  'Case Acceptance': '36 90% 55%' // Stronger Orange
+  Clinical: '211 85% 55%',
+  Clerical: '123 60% 45%',
+  Cultural: '330 85% 60%',
+  'Case Acceptance': '36 90% 55%',
 };
 
 // Returns raw HSL components for alpha blending (pastel)
@@ -23,7 +41,7 @@ export const getDomainColorRaw = (domain: string): string => {
     'cultural': domainColors.Cultural,
     'case acceptance': domainColors['Case Acceptance'],
   };
-  return map[key] || '0 0% 95%'; // fallback to gray
+  return map[key] || '0 0% 95%';
 };
 
 // Returns raw HSL components for rich/saturated colors
@@ -35,7 +53,7 @@ export const getDomainColorRichRaw = (domain: string): string => {
     'cultural': domainColorsRich.Cultural,
     'case acceptance': domainColorsRich['Case Acceptance'],
   };
-  return map[key] || '0 0% 50%'; // fallback to gray
+  return map[key] || '0 0% 50%';
 };
 
 // Returns fully qualified CSS color string (pastel)

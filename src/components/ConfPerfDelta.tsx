@@ -48,12 +48,12 @@ export default function ConfPerfDelta({ confidence, performance }: ConfPerfDelta
   return (
     <div className="flex items-end gap-3 sm:gap-4">
       <div className="flex flex-col items-center leading-none">
-        <span className="uppercase text-[10px] tracking-wide text-muted-foreground">CONF</span>
+        <span className="uppercase text-2xs tracking-wide text-muted-foreground">CONF</span>
         <span className="font-semibold text-sm sm:text-base">{hasConf ? confidence : "—"}</span>
       </div>
       <div className="flex items-center justify-center min-w-[18px] pb-[2px]">{getArrow()}</div>
       <div className="flex flex-col items-center leading-none">
-        <span className="uppercase text-[10px] tracking-wide text-muted-foreground">PERF</span>
+        <span className="uppercase text-2xs tracking-wide text-muted-foreground">PERF</span>
         <span className="font-semibold text-sm sm:text-base">{hasPerf ? performance : "—"}</span>
       </div>
     </div>

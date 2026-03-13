@@ -247,7 +247,7 @@ export function StaffDetailDrawer({
                               <div className="flex items-center gap-2">
                                 <span className="text-sm">{comp.competency_name}</span>
                                 {comp.framework && (
-                                  <Badge variant="outline" className="text-[10px]">
+                                  <Badge variant="outline" className="text-2xs">
                                     {comp.framework.toUpperCase()}
                                   </Badge>
                                 )}

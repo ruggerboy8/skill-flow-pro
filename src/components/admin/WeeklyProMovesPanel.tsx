@@ -108,6 +108,10 @@ export function WeeklyProMovesPanel() {
     return DOMAIN_META[domainId]?.chipClass || 'bg-muted';
   };
 
+  const getDomainChipStyle = (domainId: number): React.CSSProperties => {
+    return DOMAIN_META[domainId]?.chipStyle() || {};
+  };
+
   const getDriverLabel = (driver: string) => {
     return DRIVER_LABELS[driver]?.label || driver;
   };
@@ -530,7 +534,7 @@ export function WeeklyProMovesPanel() {
                   <div key={pick.proMoveId} className="border rounded-lg p-3">
                     <div className="font-medium text-sm">#{i + 1}: {pick.name}</div>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      <Badge className={getDomainChipClass(pick.domainId)}>
+                      <Badge className={getDomainChipClass(pick.domainId)} style={getDomainChipStyle(pick.domainId)}>
                         {pick.domainName}
                       </Badge>
                       {getStatusBadge(pick.status, pick.severity)}
@@ -559,7 +563,7 @@ export function WeeklyProMovesPanel() {
                   <div key={pick.proMoveId} className="border rounded-lg p-3">
                     <div className="font-medium text-sm">#{i + 1}: {pick.name}</div>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      <Badge className={getDomainChipClass(pick.domainId)}>
+                      <Badge className={getDomainChipClass(pick.domainId)} style={getDomainChipStyle(pick.domainId)}>
                         {pick.domainName}
                       </Badge>
                       {getStatusBadge(pick.status, pick.severity)}
@@ -613,7 +617,7 @@ export function WeeklyProMovesPanel() {
                         <TableCell className="font-medium">{row.name}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            <Badge className={getDomainChipClass(row.domainId)}>
+                            <Badge className={getDomainChipClass(row.domainId)} style={getDomainChipStyle(row.domainId)}>
                               {row.domainName}
                             </Badge>
                             {getStatusBadge(row.status, row.severity)}

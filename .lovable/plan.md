@@ -1,56 +1,48 @@
+## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
+**Status: ✅ Complete**
+
+### What changed
+
+1. **Practice types expanded** to three region-specific values: `pediatric_us`, `general_us`, `general_uk`
+2. **`roles.practice_type`** column added — each role belongs to one practice type
+3. **`pro_moves.practice_type`** converted to **`pro_moves.practice_types TEXT[]`** — array-based multi-select
+4. All existing data backfilled (`pediatric` → `pediatric_us`, `general` → `general_us`, `all` → all three)
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| Migration SQL | Schema: expanded CHECK on orgs, added practice_types array on pro_moves, added practice_type on roles |
+| `RoleFormDrawer.tsx` | Added practice type Select (3 options) |
+| `PlatformRolesTab.tsx` | Shows practice type badge on role cards, fetches practice_type |
+| `ProMoveForm.tsx` | Replaced single Select with multi-checkbox for practice_types |
+| `DoctorProMoveForm.tsx` | Defaults practice_types to `['pediatric_us']` |
+| `OrgBootstrapDrawer.tsx` | 3 radio options with new labels |
+| `PlatformOrgsTab.tsx` | Badge display for all 3 practice types |
+| `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
+| `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
+| `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
 
 ## Tier 1 — Design System Token Unification
 
-Four changes, all pure visual refactors with no behavior impact.
+**Status: ✅ Complete**
 
----
-
-### 1A — Consolidate Domain Colors (3 → 1)
-
-**Current state:** CSS vars (`--domain-planning` etc.) defined in `index.css` and `tailwind.config.ts` but **never used** anywhere. All components use `getDomainColor()` / `getDomainColorRich()` from `domainColors.ts` or hardcoded Tailwind classes in `DOMAIN_META` (`constants/domains.ts`).
-
-**Changes:**
-- **`src/index.css`**: Replace `--domain-planning/environment/interactions/learning-experiences` with `--domain-clinical`, `--domain-clerical`, `--domain-cultural`, `--domain-case-acceptance` using the rich HSL values from `domainColorsRich`
-- **`tailwind.config.ts`**: Update `domain` color keys to `clinical`, `clerical`, `cultural`, `case-acceptance` pointing at new CSS vars
-- **`src/lib/domainColors.ts`**: Refactor to read from CSS vars as source of truth, keep `getDomainColor()` / `getDomainColorRich()` API stable
-- **`src/lib/constants/domains.ts`**: Replace hardcoded Tailwind chip classes in `DOMAIN_META` with inline styles using `getDomainColor()` — or better, provide a `chipStyle` object alongside `chipClass` so consumers can use either
-
----
+### 1A — Consolidate Domain Colors (3→1)
+- Replaced unused `--domain-planning/environment/interactions/learning-experiences` CSS vars with `--domain-clinical/clerical/cultural/case-acceptance` (rich + pastel)
+- Updated `tailwind.config.ts` domain keys to match
+- `domainColors.ts` exports CSS var names; API unchanged
+- `DOMAIN_META` in `constants/domains.ts` now uses `chipStyle()` with token-derived colors
 
 ### 1B — StatusBadge Component + Tokens
-
-**Current state:** `StatusPill` is duplicated inline in `CoachDashboardV2.tsx` (lines 351-378) and `StaffDetailV2.tsx` (lines 156-196) with slight drift (Excused uses `bg-muted` vs `bg-slate-100`). Also appears in `ScoreHistoryV2.tsx` and `StatsScores.tsx`.
-
-**Changes:**
-- **`src/index.css`**: Add `--status-complete`, `--status-missing`, `--status-late`, `--status-excused`, `--status-pending` tokens
-- **`src/components/ui/StatusBadge.tsx`** (new): Single component accepting `status: 'complete' | 'missing' | 'late' | 'excused' | 'pending' | 'exempt'`, renders `Badge` with token-derived colors
-- **Replace** inline `StatusPill` in: `CoachDashboardV2.tsx`, `StaffDetailV2.tsx`, `ScoreHistoryV2.tsx`, `StatsScores.tsx`
-
----
+- Added `--status-complete/missing/late/excused/pending` CSS tokens to `index.css`
+- Created `src/components/ui/StatusBadge.tsx` with token-driven colors
+- Replaced inline `StatusPill` in `CoachDashboardV2`, `StaffDetailV2`, `ScoreHistoryV2`, `StatsScores`
 
 ### 1C — Score Color Tokens (1–4)
+- Added `--score-1` through `--score-4` (+ `-bg` pastel variants) to `index.css`
+- Updated `NumberScale.tsx` to use inline styles with CSS vars instead of hardcoded Tailwind
 
-**Current state:** `NumberScale.tsx` hardcodes `bg-orange-100/border-orange-300` for 1, `bg-amber-100` for 2, `bg-blue-100` for 3, `bg-emerald-100` for 4. Same pattern repeated in eval components.
-
-**Changes:**
-- **`src/index.css`**: Add `--score-1` through `--score-4` CSS custom properties
-- **`src/components/NumberScale.tsx`**: Replace `getSemanticColor()` hardcoded Tailwind with inline styles using the tokens
-- Scan and update other score-color consumers (eval results components, baseline results)
-
----
-
-### 1D — Add `text-2xs` Utility
-
-**Current state:** `text-[10px]` appears in **42 files** (~340 matches).
-
-**Changes:**
-- **`tailwind.config.ts`**: Add `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `theme.extend`
-- **All 42 files**: Replace `text-[10px]` → `text-2xs` (mechanical find-and-replace, no logic change)
-
----
-
-### Execution order
-
-1D first (simple grep-replace, highest file count, zero risk), then 1A (domain consolidation), then 1C (score tokens), then 1B (StatusBadge component extraction — touches most logic).
-
+### 1D — text-2xs Utility
+- Added `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `tailwind.config.ts`
+- Replaced all 340 occurrences of `text-[10px]` → `text-2xs` across 42 files

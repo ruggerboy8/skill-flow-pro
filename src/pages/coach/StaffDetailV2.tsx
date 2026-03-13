@@ -291,15 +291,24 @@ export default function StaffDetailV2() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/coach" className="cursor-pointer" onClick={(e) => { e.preventDefault(); navigate('/coach'); }}>
+              Coach Dashboard
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{staffInfo.name}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/coach')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </div>
           <h1 className="text-3xl font-bold">{staffInfo.name}</h1>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span>{resolveRole(staffInfo.role_id, staffInfo.role_name)}</span>

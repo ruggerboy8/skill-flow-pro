@@ -143,6 +143,7 @@ export function useUserRole() {
     isLoading: false,
     staffId: staff.id,
     organizationId: staff.locations?.practice_groups?.organization_id ?? undefined,
+    practiceType: (staff.locations?.practice_groups?.organizations as any)?.practice_type ?? undefined,
     isSuperAdmin,
     isOrgAdmin,
     isRegional,

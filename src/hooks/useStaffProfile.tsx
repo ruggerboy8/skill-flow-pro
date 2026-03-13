@@ -123,7 +123,10 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
             perf_due_day,
             perf_due_time,
             practice_groups!locations_org_fkey (
-              organization_id
+              organization_id,
+              organizations!practice_groups_organization_id_fkey (
+                practice_type
+              )
             )
           ),
           coach_scopes (

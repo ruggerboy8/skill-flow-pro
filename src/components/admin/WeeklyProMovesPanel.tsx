@@ -617,7 +617,7 @@ export function WeeklyProMovesPanel() {
                         <TableCell className="font-medium">{row.name}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            <Badge className={getDomainChipClass(row.domainId)}>
+                            <Badge className={getDomainChipClass(row.domainId)} style={getDomainChipStyle(row.domainId)}>
                               {row.domainName}
                             </Badge>
                             {getStatusBadge(row.status, row.severity)}

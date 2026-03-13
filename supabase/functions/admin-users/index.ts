@@ -76,7 +76,7 @@ serve(async (req: Request) => {
   try {
     switch (action) {
       case "list_users": {
-        const { page = 1, limit = 20, search = "", location_id, role_id, super_admin, organization_id } = payload ?? {};
+        const { page = 1, limit = 20, search = "", location_id, role_id, super_admin, organization_id, flag } = payload ?? {};
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 

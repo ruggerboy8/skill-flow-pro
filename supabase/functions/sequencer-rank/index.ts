@@ -553,7 +553,7 @@ serve(async (req) => {
     };
 
     // Compute Next
-    const scored = eligible.map(move => ({ ...move, ...scoreCandidate(move, effectiveDate) }));
+    const scored = eligibleFinal.map(move => ({ ...move, ...scoreCandidate(move, effectiveDate) }));
     
     // Enhanced deterministic tie-breaks: finalScore → lowConfShare → lastPracticedWeeks desc → actionId asc
     scored.sort((a, b) => {

@@ -456,14 +456,19 @@ const handleResendInvite = async (user: User) => {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={superAdminFilter} onValueChange={setSuperAdminFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Filter admin" />
+            <Select value={flagFilter} onValueChange={setFlagFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Filter by flag" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All users</SelectItem>
-                <SelectItem value="true">Super admins</SelectItem>
-                <SelectItem value="false">Regular users</SelectItem>
+                <SelectItem value="all">All flags</SelectItem>
+                <SelectItem value="super_admin">Super Admin</SelectItem>
+                <SelectItem value="org_admin">Org Admin</SelectItem>
+                <SelectItem value="clinical_director">Clinical Director</SelectItem>
+                <SelectItem value="coach">Coach</SelectItem>
+                <SelectItem value="lead">Lead</SelectItem>
+                <SelectItem value="participant">Participant</SelectItem>
+                <SelectItem value="paused">Paused</SelectItem>
               </SelectContent>
             </Select>
           </div>

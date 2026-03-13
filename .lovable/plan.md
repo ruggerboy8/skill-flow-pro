@@ -1,70 +1,43 @@
-## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
-**Status: ✅ Complete**
 
-### What changed
+## Audit + Adjustments: Staff Detail & Location Detail Pages
 
-1. **Practice types expanded** to three region-specific values: `pediatric_us`, `general_us`, `general_uk`
-2. **`roles.practice_type`** column added — each role belongs to one practice type
-3. **`pro_moves.practice_type`** converted to **`pro_moves.practice_types TEXT[]`** — array-based multi-select
-4. All existing data backfilled (`pediatric` → `pediatric_us`, `general` → `general_us`, `all` → all three)
+### Data Accuracy Audit
 
-### Files changed
+**StaffDetailV2 — domain confidence strip (line 162):** Sorts by `a.domain.localeCompare(b.domain)` — alphabetical, which gives Case Acceptance, Clerical, Clinical, Cultural. Wrong order.
 
-| File | Change |
-|------|--------|
-| Migration SQL | Schema: expanded CHECK on orgs, added practice_types array on pro_moves, added practice_type on roles |
-| `RoleFormDrawer.tsx` | Added practice type Select (3 options) |
-| `PlatformRolesTab.tsx` | Shows practice type badge on role cards, fetches practice_type |
-| `ProMoveForm.tsx` | Replaced single Select with multi-checkbox for practice_types |
-| `DoctorProMoveForm.tsx` | Defaults practice_types to `['pediatric_us']` |
-| `OrgBootstrapDrawer.tsx` | 3 radio options with new labels |
-| `PlatformOrgsTab.tsx` | Badge display for all 3 practice types |
-| `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
-| `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
-| `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
+**StaffDetailV2 — history scores (line 502):** Sorts by `display_order`, which comes from the RPC. This is correct — it reflects the assignment order set by the plan.
 
-## Tier 1 — Design System Token Unification
+**StaffOverviewTab — domainAvgs (line 51):** Sorts by `a.avg - b.avg` (lowest first). This is intentional for "lowest self-reported domains" but the DomainConfidenceTrend chart uses a hardcoded `DOMAINS` array in the correct order — that's fine.
 
-**Status: ✅ Complete**
+**LocationDetail:** Data flows from `useStaffWeeklyScores` through `calculateLocationStats` — this is aggregation logic, not domain-ordered. The `LocationSkillGaps` component groups by role, then domain — need to check if it enforces domain order within each role group.
 
-### 1A — Consolidate Domain Colors (3→1)
-- Replaced unused `--domain-planning/environment/interactions/learning-experiences` CSS vars with `--domain-clinical/clerical/cultural/case-acceptance` (rich + pastel)
-- Updated `tailwind.config.ts` domain keys to match
-- `domainColors.ts` exports CSS var names; API unchanged
-- `DOMAIN_META` in `constants/domains.ts` now uses `chipStyle()` with token-derived colors
+**LocationSubmissionWidget, LocationHealthCard:** These show submission rates, not domain-level data — no domain ordering concern.
 
-### 1B — StatusBadge Component + Tokens
-- Added `--status-complete/missing/late/excused/pending` CSS tokens to `index.css`
-- Created `src/components/ui/StatusBadge.tsx` with token-driven colors
-- Replaced inline `StatusPill` in `CoachDashboardV2`, `StaffDetailV2`, `ScoreHistoryV2`, `StatsScores`
+### Issues Found
 
-### 1C — Score Color Tokens (1–4)
-- Added `--score-1` through `--score-4` (+ `-bg` pastel variants) to `index.css`
-- Updated `NumberScale.tsx` to use inline styles with CSS vars instead of hardcoded Tailwind
+1. **Domain order in StaffDetailV2 confidence strip** — uses `localeCompare` instead of canonical order
+2. **Eval pill in history** — shows an "Eval" badge near weeks that have an evaluation within ±14 days. User wants it removed.
+3. **EvalCadenceWidget** — user wants it hidden for now
 
-### 1D — text-2xs Utility
-- Added `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `tailwind.config.ts`
-- Replaced all 340 occurrences of `text-[10px]` → `text-2xs` across 42 files
+### Plan
 
-## Micro-Celebrations + Mobile Slide Transitions
+#### 1. Fix domain ordering in StaffDetailV2 confidence strip
+**File:** `src/pages/coach/StaffDetailV2.tsx` line 162
+- Import `getDomainOrderIndex` from `@/lib/domainUtils`
+- Change `.sort((a, b) => a.domain.localeCompare(b.domain))` to `.sort((a, b) => getDomainOrderIndex(a.domain) - getDomainOrderIndex(b.domain))`
 
-**Status: ✅ Complete**
+#### 2. Remove "Eval" pill from history tab
+**File:** `src/pages/coach/StaffDetailV2.tsx`
+- Remove the `nearbyEval` variable usage (lines 469-474) — the badge rendering
+- Remove the `getEvalForWeek` call at line 453
+- Keep the `staffEvals` query since it's still used for `evalCount` passed to `StaffOverviewTab`
+- Can also remove the `getEvalForWeek` helper function (lines 138-145) and the `ClipboardCheck` icon import
 
-### 3A — Confetti on Celebration Moments
-- Added `canvas-confetti` dependency
-- Created `src/lib/confetti.ts` helper with `fireCelebration()` function
-- PerformanceWizard: confetti fires on victory modal open + on successful non-repair submit
-- ConfidenceWizard: confetti fires on successful non-repair submit
+#### 3. Hide EvalCadenceWidget in LocationDetail
+**File:** `src/pages/dashboard/LocationDetail.tsx`
+- Comment out or remove lines 173-174 (`EvalCadenceWidget` render + import)
 
-### 3B — Submit Button Checkmark Animation
-- Added `submitPhase` state (`idle` | `saving` | `done`) to both wizards
-- Submit button transitions: text → spinner → green ✓ checkmark with scale-in animation
-- 1.8s celebration delay before navigating (0.8s for repair mode)
+#### 4. Verify LocationSkillGaps domain ordering
+The `LocationSkillGaps` component groups gaps by role tab, then renders them. Need to confirm if domain order is enforced within each role's gap list — if not, add sorting there too.
 
-### 4A — Mobile Slide Transitions
-- Added `framer-motion` dependency
-- Wrapped wizard step content in `<AnimatePresence mode="wait">` with directional slide variants
-- Forward (Next): slides in from right, exits left
-- Backward (Back): slides in from left, exits right
-- 200ms ease-out transitions; progress dots and sticky footer stay static

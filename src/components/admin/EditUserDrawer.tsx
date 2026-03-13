@@ -656,7 +656,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                   <span className="text-xs text-muted-foreground">Loading…</span>
                 )}
                 {capsLoaded && hasAnyCapability && (
-                  <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+                  <span className="rounded-full bg-primary px-1.5 py-0.5 text-2xs font-medium text-primary-foreground">
                     {capabilities.is_org_admin
                       ? "Org admin"
                       : `${Object.entries(capabilities).filter(([k, v]) => k !== 'is_org_admin' && v).length} enabled`}

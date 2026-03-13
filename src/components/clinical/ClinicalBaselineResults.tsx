@@ -544,14 +544,14 @@ export function ClinicalBaselineResults({
                                 return (
                                   <>
                                     <div
-                                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold border ${item.score === 0 ? 'text-[10px]' : 'text-sm'}`}
+                                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold border ${item.score === 0 ? 'text-2xs' : 'text-sm'}`}
                                       style={{ backgroundColor: selfColors.bg, borderColor: selfColors.border, color: selfColors.text }}
                                     >
                                       {item.score === 0 ? 'N/A' : item.score}
                                     </div>
                                     {showCoachRatings && (
                                       <div
-                                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border ${isCoachNa ? 'text-[10px]' : ''}`}
+                                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border ${isCoachNa ? 'text-2xs' : ''}`}
                                         style={coachColors ? { backgroundColor: coachColors.bg, borderColor: coachColors.border, color: coachColors.text } : {}}
                                       >
                                         {coachScore !== undefined ? (isCoachNa ? 'N/A' : coachScore) : '–'}

@@ -194,7 +194,7 @@ export function StrengthsTab({ filters }: StrengthsTabProps) {
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium">{competency.name}</span>
                                 {competency.framework && (
-                                  <Badge variant="outline" className="text-[10px] leading-4">
+                                  <Badge variant="outline" className="text-2xs leading-4">
                                     {competency.framework.toUpperCase()}
                                   </Badge>
                                 )}

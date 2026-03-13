@@ -94,7 +94,7 @@ export function FloatingRecorderPill({
             </span>
           )}
           {activeCompetencyLabel && !isPaused && (
-            <span className="text-[10px] text-muted-foreground max-w-[120px] text-center leading-tight truncate">
+            <span className="text-2xs text-muted-foreground max-w-[120px] text-center leading-tight truncate">
               {activeCompetencyLabel}
             </span>
           )}

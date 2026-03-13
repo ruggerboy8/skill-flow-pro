@@ -190,11 +190,11 @@ serve(async (req) => {
 
     // Apply exclusions
     if (config.excludeMoveIds.length > 0) {
-      eligible = eligible.filter(m => !config.excludeMoveIds.includes(m.id));
-      logs.push(`Excluded ${config.excludeMoveIds.length} moves, ${eligible.length} remaining`);
+      eligibleFinal = eligibleFinal.filter(m => !config.excludeMoveIds.includes(m.id));
+      logs.push(`Excluded ${config.excludeMoveIds.length} moves, ${eligibleFinal.length} remaining`);
     }
 
-    logs.push(`Found ${eligible.length} eligible moves`);
+    logs.push(`Found ${eligibleFinal.length} eligible moves`);
 
     // Helper: classify confidence status
     const classifyConfidence = (

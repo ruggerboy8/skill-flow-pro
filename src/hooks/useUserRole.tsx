@@ -112,7 +112,7 @@ export function useUserRole() {
     : (staff.is_org_admin || staff.is_super_admin || false);
 
   const canManageAssignments = caps
-    ? (caps.can_manage_assignments ?? false)
+    ? (caps.can_manage_assignments ?? false) || isOrgAdmin || isSuperAdmin
     : (staff.is_org_admin || staff.is_super_admin || false);
 
   // ─── Managed scope lists ──────────────────────────────────────────────────

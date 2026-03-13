@@ -161,10 +161,7 @@ serve(async (req) => {
     }
 
     // 1b. Fetch competencies with domains separately
-    const competencyIds = eligible.map((m: any) => m.competencyId) || [];
-
-    // 1b. Fetch competencies with domains separately
-    const competencyIds = eligibleMoves?.map((m: any) => m.competency_id) || [];
+    const competencyIds = [...new Set(eligible.map((m: any) => m.competencyId))];
     const { data: competencies, error: compError } = await supabase
       .from('competencies')
       .select('competency_id, domain_id, domains!competencies_domain_id_fkey(domain_name)')
@@ -180,16 +177,16 @@ serve(async (req) => {
       ]) || []
     );
 
-    let eligible = eligibleMoves?.map((m: any) => {
-      const comp = competencyMap.get(m.competency_id);
+    let eligibleFinal = eligible.map((m: any) => {
+      const comp = competencyMap.get(m.competencyId);
       return {
-        id: m.action_id,
-        name: m.action_statement,
-        competencyId: m.competency_id,
+        id: m.actionId,
+        name: m.statement,
+        competencyId: m.competencyId,
         domainId: comp?.domainId || 0,
         domainName: comp?.domainName || 'Unknown',
       };
-    }) || [];
+    });
 
     // Apply exclusions
     if (config.excludeMoveIds.length > 0) {

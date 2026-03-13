@@ -89,3 +89,34 @@ When writing migrations:
    before policies that reference them
 3. Add a sanity-check `DO $$ ... $$` block at the end of backfill migrations
 4. Migrations are numbered manually for ordering; use `YYYYMMDDHHMMSS_description.sql`
+
+## Design system conventions
+
+### Icon sizes
+
+Use consistent icon sizing based on context:
+
+| Context | Size | Tailwind class |
+|---|---|---|
+| Inline with text (labels, badges, list items) | 16px | `h-4 w-4` |
+| Standalone / buttons / interactive | 20px | `h-5 w-5` |
+| Section headers / empty states | 24px | `h-6 w-6` |
+| Page-level headers | 32px | `h-8 w-8` |
+
+### Font sizes
+
+- Use `text-2xs` (0.625rem / 10px) for micro-labels, timestamps, and metadata.
+  Do **not** use `text-[10px]`.
+
+### Colors
+
+- **Domain colors**: Use `getDomainColor()` / `getDomainColorRich()` from
+  `src/lib/domainColors.ts`. CSS vars: `--domain-clinical`, `--domain-clerical`,
+  `--domain-cultural`, `--domain-case-acceptance` (plus `-pastel` variants).
+- **Score colors** (1–4 scale): `--score-1` through `--score-4` (plus `-bg` variants).
+- **Status colors**: `--status-complete`, `--status-missing`, `--status-late`,
+  `--status-excused`, `--status-pending` (plus `-bg` variants).
+  Use `<StatusBadge />` from `src/components/ui/StatusBadge.tsx`.
+- **Win banner**: `--win-growth`, `--win-perfect` (plus `-bg`, `-border` variants).
+- Never hardcode Tailwind color classes (e.g. `bg-emerald-100`) for semantic
+  states — always use CSS custom properties or token helpers.

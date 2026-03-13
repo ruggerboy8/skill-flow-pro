@@ -76,7 +76,7 @@ export function RecentWinBanner() {
         headline: isLastWeek ? "Your Perfect Week" : "Consistency Streak",
         badge: "Solid Gold",
         context: "You maintained our highest standard across the board.",
-        color: "blue",
+        color: "perfect" as const,
         timeLabel
       };
     }
@@ -87,7 +87,7 @@ export function RecentWinBanner() {
         headline: "Breakthrough",
         badge: "Level Up",
         context: "You flagged this as a gap on Monday and closed it by Friday:",
-        color: "emerald",
+        color: "growth" as const,
         timeLabel
       };
     }
@@ -97,46 +97,65 @@ export function RecentWinBanner() {
       headline: "Trending Up",
       badge: "Progress",
       context: "You are building real confidence in this area:",
-      color: "emerald",
+      color: "growth" as const,
       timeLabel
     };
   };
 
-  // Get narrative and theme
+  // Get narrative and theme — all colors driven by CSS tokens
   const narrative = getWinNarrative(win);
-  const isEmerald = narrative.color === 'emerald';
+  const isGrowth = narrative.color === 'growth';
 
-  const theme = isEmerald ? {
-    cardBorder: "border-emerald-200 bg-emerald-50/50",
-    iconBox: "bg-emerald-100 text-emerald-700",
-    textTitle: "text-emerald-800",
-    badge: "bg-emerald-200 text-emerald-800 border-emerald-200",
-    Icon: TrendingUp
-  } : {
-    cardBorder: "border-blue-200 bg-blue-50/50",
-    iconBox: "bg-blue-100 text-blue-700",
-    textTitle: "text-blue-800",
-    badge: "bg-blue-200 text-blue-800 border-blue-200",
-    Icon: Star
+  const tokenPrefix = isGrowth ? '--win-growth' : '--win-perfect';
+  const Icon = isGrowth ? TrendingUp : Star;
+
+  const cardStyle: React.CSSProperties = {
+    borderColor: `hsl(var(${tokenPrefix}-border))`,
+    backgroundColor: `hsl(var(${tokenPrefix}-bg))`,
+  };
+  const iconStyle: React.CSSProperties = {
+    backgroundColor: `hsl(var(${tokenPrefix}-border))`,
+    color: `hsl(var(${tokenPrefix}))`,
+  };
+  const titleStyle: React.CSSProperties = {
+    color: `hsl(var(${tokenPrefix}))`,
+  };
+  const badgeStyle: React.CSSProperties = {
+    backgroundColor: `hsl(var(${tokenPrefix}-border))`,
+    color: `hsl(var(${tokenPrefix}))`,
+    borderColor: `hsl(var(${tokenPrefix}-border))`,
   };
 
   return (
     <div className="mb-4 md:mb-6 animate-in slide-in-from-top-2 duration-500 fade-in">
-      <Card className={`relative shadow-sm overflow-hidden rounded-none border-x-0 md:rounded-xl md:border ${theme.cardBorder}`}>
+      <Card
+        className="relative shadow-sm overflow-hidden rounded-none border-x-0 md:rounded-xl md:border"
+        style={cardStyle}
+      >
         <CardContent className="p-3 md:p-4">
           
           {/* 1. Header Row: Icon | Headline | Badge */}
           <div className="flex items-start gap-3 mb-3">
-            <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${theme.iconBox}`}>
-              <theme.Icon className="h-4 w-4" />
+            <div
+              className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
+              style={iconStyle}
+            >
+              <Icon className="h-4 w-4" />
             </div>
             
             <div className="flex-1 min-w-0 pt-0.5">
               <div className="flex items-center gap-2">
-                <h3 className={`text-sm font-bold ${theme.textTitle} tracking-tight`}>
+                <h3
+                  className="text-sm font-bold tracking-tight"
+                  style={titleStyle}
+                >
                   {narrative.headline}
                 </h3>
-                <Badge variant="secondary" className={`text-2xs px-1.5 h-5 font-bold ${theme.badge}`}>
+                <Badge
+                  variant="secondary"
+                  className="text-2xs px-1.5 h-5 font-bold"
+                  style={badgeStyle}
+                >
                   {narrative.badge}
                 </Badge>
               </div>
@@ -148,13 +167,13 @@ export function RecentWinBanner() {
 
           {/* 2. The "Why" (Context) */}
           <div className="space-y-2">
-            <p className="text-xs text-slate-600 leading-snug">
+            <p className="text-xs text-muted-foreground leading-snug">
               {narrative.context}
             </p>
             
             {/* 3. The "What" (Pro Move Quote) */}
-            <div className="p-3 bg-white/80 rounded-md border border-black/5 shadow-sm">
-              <p className="text-sm font-medium text-slate-800 leading-snug line-clamp-2 italic">
+            <div className="p-3 bg-background/80 rounded-md border border-border/30 shadow-sm">
+              <p className="text-sm font-medium text-foreground leading-snug line-clamp-2 italic">
                 "{win.out_action_statement}"
               </p>
             </div>
@@ -163,7 +182,7 @@ export function RecentWinBanner() {
           {/* Dismiss Button */}
           <button 
             onClick={handleDismiss}
-            className="absolute top-1 right-1 p-2 text-slate-400 hover:text-slate-600"
+            className="absolute top-1 right-1 p-2 text-muted-foreground hover:text-foreground"
             aria-label="Dismiss celebration"
           >
             <X className="h-4 w-4" />

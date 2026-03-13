@@ -81,6 +81,14 @@ All colors MUST be HSL.
     --status-excused-bg: 210 40% 96%;
     --status-pending: 215 14% 55%;
     --status-pending-bg: 210 40% 96%;
+
+    /* Win banner colors */
+    --win-growth: 160 84% 39%;
+    --win-growth-bg: 152 81% 96%;
+    --win-growth-border: 149 80% 85%;
+    --win-perfect: 217 91% 60%;
+    --win-perfect-bg: 214 95% 96%;
+    --win-perfect-border: 213 93% 85%;
     
     /* Domain colors (rich/saturated) */
     --domain-clinical: 211 85% 55%;

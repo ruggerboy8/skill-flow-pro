@@ -388,7 +388,7 @@ serve(async (req) => {
     // Log sample confidence data
     logs.push(`Total confidence records: ${confidenceHistory.length}`);
     const movesWithConf = new Set(confidenceHistory.map(c => c.proMoveId));
-    logs.push(`Moves with confidence data: ${movesWithConf.size}/${eligible.length}`);
+    logs.push(`Moves with confidence data: ${movesWithConf.size}/${eligibleFinal.length}`);
 
     // 5. Fetch domain coverage (last 8 weeks) - UNIFIED: only query weekly_assignments
     const { data: domainCoverageAssign, error: dcAssignError } = await supabase

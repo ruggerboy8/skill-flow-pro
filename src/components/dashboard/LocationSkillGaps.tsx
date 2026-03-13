@@ -75,7 +75,7 @@ export function LocationSkillGaps({ locationId }: LocationSkillGapsProps) {
     });
     return Array.from(byDomain.entries())
       .map(([domain, { sum, count }]) => ({ domain, avg: sum / count }))
-      .sort((a, b) => a.avg - b.avg);
+      .sort((a, b) => getDomainOrderIndex(a.domain) - getDomainOrderIndex(b.domain));
   }, [gaps]);
 
   // Group gaps by role_id for dynamic tabs

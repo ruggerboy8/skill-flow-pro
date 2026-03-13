@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CalendarOff, MoreVertical, Check, X } from 'lucide-react';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
-import { format, parseISO, subWeeks, differenceInDays } from 'date-fns';
+import { format, parseISO, subWeeks } from 'date-fns';
 import { useStaffAllWeeklyScores } from '@/hooks/useStaffAllWeeklyScores';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';

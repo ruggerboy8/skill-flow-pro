@@ -176,20 +176,20 @@ export function LocationEvalCard({ stats, onClick }: LocationEvalCardProps) {
         <div className="flex items-center justify-between gap-2 pt-1">
           {/* Calibration gap */}
           {gapLabel ? (
-            <Badge variant={gapLabel.variant} className="text-[10px]">
+            <Badge variant={gapLabel.variant} className="text-2xs">
               {gapLabel.label}
             </Badge>
           ) : (
-            <span className="text-[10px] text-muted-foreground">No calibration data</span>
+            <span className="text-2xs text-muted-foreground">No calibration data</span>
           )}
           
           {/* Accountability rate placeholder */}
           {stats.accountabilityRate !== null ? (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-2xs">
               {Math.round(stats.accountabilityRate * 100)}% on-time
             </Badge>
           ) : (
-            <span className="text-[10px] text-muted-foreground">—</span>
+            <span className="text-2xs text-muted-foreground">—</span>
           )}
         </div>
       </CardContent>

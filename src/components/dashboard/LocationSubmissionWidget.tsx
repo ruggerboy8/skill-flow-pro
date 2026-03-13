@@ -236,7 +236,7 @@ export default function LocationSubmissionWidget({ locationId }: LocationSubmiss
       </div>
 
       {/* Disclaimer */}
-      <p className="text-[10px] italic text-muted-foreground mt-3">
+      <p className="text-2xs italic text-muted-foreground mt-3">
         *Excludes current week — assignments not yet due.
       </p>
     </div>

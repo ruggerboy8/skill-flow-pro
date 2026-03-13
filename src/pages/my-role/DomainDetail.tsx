@@ -118,7 +118,7 @@ export default function DomainDetail() {
                     </span>
                     <Button 
                       variant="link" 
-                      className="h-auto p-0 text-[10px] text-primary/80"
+                      className="h-auto p-0 text-2xs text-primary/80"
                       onClick={() => navigate('/my-role/evaluations')}
                     >
                       (View Report)

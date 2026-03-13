@@ -153,7 +153,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
                 {/* Action Steps */}
                 {experiments.length > 0 && (
                   <div className="pl-2 border-l-2 border-primary/20 space-y-1">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Action Steps</p>
+                    <p className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Action Steps</p>
                     {experiments.map((exp: any, j: number) => (
                       <p key={j} className="text-xs text-foreground">• {exp.title}</p>
                     ))}
@@ -163,7 +163,7 @@ export function DoctorGrowthTimeline({ doctorStaffId }: Props) {
                 {/* Prior Action Statuses */}
                 {priorStatuses.length > 0 && (
                   <div className="pl-2 border-l-2 border-amber-300/40 space-y-1">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Prior Steps Review</p>
+                    <p className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Prior Steps Review</p>
                     {priorStatuses.map((ps: any, j: number) => {
                       const config = ACTION_STATUS_ICONS[ps.status] || ACTION_STATUS_ICONS.continuing;
                       const Icon = config.icon;

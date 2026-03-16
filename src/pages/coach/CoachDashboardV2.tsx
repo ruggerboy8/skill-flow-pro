@@ -455,9 +455,11 @@ export default function CoachDashboardV2({
     });
   };
 
-  // Status pill - delegates to shared StatusBadge
-  function StatusPill({ hasAll, hasAnyLate, isExcused }: { hasAll: boolean; hasAnyLate: boolean; isExcused?: boolean }) {
-    const status = isExcused ? 'excused' : !hasAll ? 'missing' : hasAnyLate ? 'late' : 'complete';
+  // Deadline-aware status pill
+  function DeadlineStatusPill({ locationId, hasAll, hasAnyLate, isExcused, metric }: { 
+    locationId: string; hasAll: boolean; hasAnyLate: boolean; isExcused?: boolean; metric: 'confidence' | 'performance' 
+  }) {
+    const status = getDeadlineAwareStatus(locationId, hasAll, hasAnyLate, !!isExcused, metric);
     return <StatusBadge status={status} />;
   }
 

@@ -73,7 +73,7 @@ const statusConfig: Record<SubmissionStatus, { label: string; style: React.CSSPr
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const config = statusConfig[status];
 
-  if (status === 'exempt') {
+  if (status === 'exempt' || status === 'not_open') {
     return <span className="text-muted-foreground">—</span>;
   }
 

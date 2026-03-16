@@ -150,15 +150,22 @@ export function LocationHealthCard({
                 </Badge>
               )}
               {(stats.pendingConfCount ?? 0) > 0 && !excuseStatus?.isConfExcused && (
-                <Badge variant="outline" className="border-primary text-primary gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {stats.pendingConfCount} Pending Conf
+                <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground gap-1">
+                  <Clock className="h-3 w-3" />
+                  {stats.pendingConfCount} Awaiting Conf
                 </Badge>
               )}
               {stats.missingPerfCount > 0 && !excuseStatus?.isPerfExcused && (
-                <Badge variant="outline" className="border-warning text-warning gap-1">
+                <Badge variant="destructive" className="gap-1">
                   <AlertCircle className="h-3 w-3" />
-                  {stats.missingPerfCount} Missing Perf
+                  {stats.missingPerfCount} Late Perf
+                </Badge>
+              )}
+              {submissionGates && submissionGates.performanceOpen && !submissionGates.performanceClosed && 
+               stats.missingPerfCount === 0 && !excuseStatus?.isPerfExcused && (
+                <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground gap-1">
+                  <Clock className="h-3 w-3" />
+                  Perf Window Open
                 </Badge>
               )}
               {excuseStatus?.isConfExcused && (

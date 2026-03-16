@@ -306,8 +306,13 @@ export default function RegionalDashboard() {
                     <p className="text-xs text-muted-foreground">Missing Perf</p>
                   </div>
                 )}
-                {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 && (
-                  <div className="text-sm text-muted-foreground">All on track!</div>
+              {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 && (
+                  <div>
+                    <div className="text-sm text-muted-foreground">All on track!</div>
+                    {nextDeadlineLabel && (
+                      <p className="text-xs text-muted-foreground/70 mt-1">Next: {nextDeadlineLabel}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </CardContent>

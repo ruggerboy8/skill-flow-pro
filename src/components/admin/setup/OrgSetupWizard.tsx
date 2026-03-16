@@ -15,6 +15,7 @@ import {
   Users,
   MapPin,
   Clock,
+  Mail,
   Pencil,
   Plus,
   Loader2,

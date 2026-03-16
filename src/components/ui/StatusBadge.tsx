@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-export type SubmissionStatus = 'complete' | 'missing' | 'late' | 'excused' | 'pending' | 'exempt';
+export type SubmissionStatus = 'complete' | 'missing' | 'late' | 'excused' | 'pending' | 'exempt' | 'not_open';
 
 interface StatusBadgeProps {
   status: SubmissionStatus;
@@ -59,6 +59,11 @@ const statusConfig: Record<SubmissionStatus, { label: string; style: React.CSSPr
     variant: 'secondary',
     style: {},
   },
+  not_open: {
+    label: '—',
+    variant: 'secondary',
+    style: {},
+  },
 };
 
 /**
@@ -68,7 +73,7 @@ const statusConfig: Record<SubmissionStatus, { label: string; style: React.CSSPr
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const config = statusConfig[status];
 
-  if (status === 'exempt') {
+  if (status === 'exempt' || status === 'not_open') {
     return <span className="text-muted-foreground">—</span>;
   }
 

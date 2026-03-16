@@ -10,13 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, AlertCircle, TrendingUp, CloudOff } from 'lucide-react';
+import { Users, AlertCircle, TrendingUp, CloudOff, Clock } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
+import { format as formatDate } from 'date-fns';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { getLocationSubmissionGates, calculateLocationStats, type SubmissionGates } from '@/lib/submissionStatus';
-import { getSubmissionPolicy } from '@/lib/submissionPolicy';
+import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LocationConfig {
@@ -190,6 +191,28 @@ export default function RegionalDashboard() {
     return result;
   }, [locationStats, locationGatesMap]);
 
+  // Compute next deadline label for context when all is on track
+  const nextDeadlineLabel = useMemo(() => {
+    let earliest: { label: string; date: Date } | null = null;
+    locationConfigs.forEach((config) => {
+      const offsets = getPolicyOffsetsForLocation(config);
+      const policy = getSubmissionPolicy(now, config.timezone, offsets);
+      
+      if (!policy.isConfidenceLate(now)) {
+        const label = `Conf due ${formatInTimeZone(policy.confidence_due, config.timezone, 'EEE h:mm a')}`;
+        if (!earliest || policy.confidence_due < earliest.date) {
+          earliest = { label, date: policy.confidence_due };
+        }
+      } else if (!policy.isPerformanceLate(now)) {
+        const label = `Perf due ${formatInTimeZone(policy.performance_due, config.timezone, 'EEE h:mm a')}`;
+        if (!earliest || policy.performance_due < earliest.date) {
+          earliest = { label, date: policy.performance_due };
+        }
+      }
+    });
+    return earliest?.label ?? null;
+  }, [now, locationConfigs]);
+
   // Build location names map for heatmap
   const locationNamesMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -306,8 +329,13 @@ export default function RegionalDashboard() {
                     <p className="text-xs text-muted-foreground">Missing Perf</p>
                   </div>
                 )}
-                {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 && (
-                  <div className="text-sm text-muted-foreground">All on track!</div>
+              {totals.totalMissingConf === 0 && totals.totalPendingConf === 0 && totals.totalMissingPerf === 0 && (
+                  <div>
+                    <div className="text-sm text-muted-foreground">All on track!</div>
+                    {nextDeadlineLabel && (
+                      <p className="text-xs text-muted-foreground/70 mt-1">Next: {nextDeadlineLabel}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </CardContent>

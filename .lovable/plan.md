@@ -1,91 +1,70 @@
+## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
+**Status: ✅ Complete**
 
-## Problem
+### What changed
 
-The deadline-aware logic we just added to `RegionalDashboard` only fixed the **rate calculation**. The actual **status badges** and **signals** across the system still misrepresent state at various points during the week. Here's what happens now:
+1. **Practice types expanded** to three region-specific values: `pediatric_us`, `general_us`, `general_uk`
+2. **`roles.practice_type`** column added — each role belongs to one practice type
+3. **`pro_moves.practice_type`** converted to **`pro_moves.practice_types TEXT[]`** — array-based multi-select
+4. All existing data backfilled (`pediatric` → `pediatric_us`, `general` → `general_us`, `all` → all three)
 
-**Regional Command Center:**
-- Cards show "Pending Conf" badges before the confidence deadline (good), but the label/semantics could be clearer — "Pending" implies something is wrong when really it's just "not due yet."
-- After the confidence deadline passes but before performance opens, cards correctly show "Late Conf" for missing staff. But performance shows nothing — which is correct but there's no positive indicator either.
-- The "Avg Completion" summary card shows 100% before any deadline, which is technically correct but could confuse someone who expects it to reflect actual submissions.
+### Files changed
 
-**Coach Dashboard (`CoachDashboardV2`):**
-- **No deadline awareness at all.** On Monday morning, every staff member without submissions shows `StatusPill → "Missing"` for both Confidence and Performance — even though neither deadline has passed.
-- The `missingConfCount` / `missingPerfCount` used for Reminder buttons count all non-submitted staff regardless of deadlines, inflating the numbers.
-- The default sort puts "missing both" at top, which on Monday means everyone.
+| File | Change |
+|------|--------|
+| Migration SQL | Schema: expanded CHECK on orgs, added practice_types array on pro_moves, added practice_type on roles |
+| `RoleFormDrawer.tsx` | Added practice type Select (3 options) |
+| `PlatformRolesTab.tsx` | Shows practice type badge on role cards, fetches practice_type |
+| `ProMoveForm.tsx` | Replaced single Select with multi-checkbox for practice_types |
+| `DoctorProMoveForm.tsx` | Defaults practice_types to `['pediatric_us']` |
+| `OrgBootstrapDrawer.tsx` | 3 radio options with new labels |
+| `PlatformOrgsTab.tsx` | Badge display for all 3 practice types |
+| `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
+| `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
+| `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
 
-**Staff Detail (`StaffDetailV2`):**
-- Same issue: `StatusPill` for the current week shows "Missing" for unsubmitted metrics regardless of whether the deadline has passed.
+## Tier 1 — Design System Token Unification
 
-### Week timeline scenarios (default deadlines):
+**Status: ✅ Complete**
 
-```text
-Mon 00:01  ─ Confidence opens
-Tue 14:00  ─ Confidence due (late threshold)
-Thu 00:01  ─ Performance opens
-Fri 17:00  ─ Performance due (late threshold)
-Sun 23:59  ─ Week closes
-```
+### 1A — Consolidate Domain Colors (3→1)
+- Replaced unused `--domain-planning/environment/interactions/learning-experiences` CSS vars with `--domain-clinical/clerical/cultural/case-acceptance` (rich + pastel)
+- Updated `tailwind.config.ts` domain keys to match
+- `domainColors.ts` exports CSS var names; API unchanged
+- `DOMAIN_META` in `constants/domains.ts` now uses `chipStyle()` with token-derived colors
 
-| Time of week | Correct Conf status (not submitted) | Correct Perf status (not submitted) |
-|---|---|---|
-| Mon morning | **Pending** (window open, not due) | **—** (window not open) |
-| Tue morning | **Pending** | **—** |
-| Tue after 14:00 | **Missing** | **—** |
-| Wed | **Missing** | **—** |
-| Thu | **Missing** | **Pending** |
-| Fri before 17:00 | **Missing** | **Pending** |
-| Fri after 17:00 | **Missing** | **Missing** |
+### 1B — StatusBadge Component + Tokens
+- Added `--status-complete/missing/late/excused/pending` CSS tokens to `index.css`
+- Created `src/components/ui/StatusBadge.tsx` with token-driven colors
+- Replaced inline `StatusPill` in `CoachDashboardV2`, `StaffDetailV2`, `ScoreHistoryV2`, `StatsScores`
 
-Currently the Coach Dashboard shows "Missing" for everything from Monday onward.
+### 1C — Score Color Tokens (1–4)
+- Added `--score-1` through `--score-4` (+ `-bg` pastel variants) to `index.css`
+- Updated `NumberScale.tsx` to use inline styles with CSS vars instead of hardcoded Tailwind
 
-## Plan
+### 1D — text-2xs Utility
+- Added `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `tailwind.config.ts`
+- Replaced all 340 occurrences of `text-[10px]` → `text-2xs` across 42 files
 
-### 1. Add a `not_open` status to StatusBadge
+## Micro-Celebrations + Mobile Slide Transitions
 
-Add a new status value `not_open` that renders as a neutral dash or "—" (similar to `exempt`). This is for Performance before Thursday — the window isn't open, so no badge should alarm anyone.
+**Status: ✅ Complete**
 
-**File:** `src/components/ui/StatusBadge.tsx`
+### 3A — Confetti on Celebration Moments
+- Added `canvas-confetti` dependency
+- Created `src/lib/confetti.ts` helper with `fireCelebration()` function
+- PerformanceWizard: confetti fires on victory modal open + on successful non-repair submit
+- ConfidenceWizard: confetti fires on successful non-repair submit
 
-### 2. Make Coach Dashboard deadline-aware
+### 3B — Submit Button Checkmark Animation
+- Added `submitPhase` state (`idle` | `saving` | `done`) to both wizards
+- Submit button transitions: text → spinner → green ✓ checkmark with scale-in animation
+- 1.8s celebration delay before navigating (0.8s for repair mode)
 
-**File:** `src/pages/coach/CoachDashboardV2.tsx`
-
-- Fetch per-location deadline configs (same pattern as RegionalDashboard).
-- Compute per-location submission gates using `getLocationSubmissionGates()`.
-- Update `StatusPill` logic per staff row:
-  - **Confidence:** If `!isPastConfidenceDeadline` and not submitted → `pending`. If past deadline and not submitted → `missing`.
-  - **Performance:** If `!isPerformanceOpen` → `not_open` (dash). If open but `!isPastPerformanceDeadline` and not submitted → `pending`. If past deadline → `missing`.
-- Update `missingConfCount` / `missingPerfCount` for Reminder buttons to only count staff at locations past the relevant deadline.
-- Update default sort to deprioritize "pending" rows (they're not actionable yet).
-
-### 3. Make Staff Detail deadline-aware
-
-**File:** `src/pages/coach/StaffDetailV2.tsx`
-
-- For the **current week only**, apply the same deadline-aware StatusPill logic. Historical weeks remain as-is (their deadlines have long passed).
-- Fetch the staff's location config and compute gates for the displayed week.
-
-### 4. Refine Regional Dashboard card labels
-
-**File:** `src/components/dashboard/LocationHealthCard.tsx`
-
-- Rename "Pending Conf" badge to "Awaiting Conf" or keep "Pending" but add a subtle clock icon to distinguish from "Missing."
-- When performance window hasn't opened yet, don't show any perf badge at all (current behavior is correct, just confirming).
-- When **no deadlines have passed** for a location, show an "On Track" badge with context like "Conf due Tue 2pm" instead of a bare 100%.
-
-### 5. Refine Regional Dashboard signals + summary
-
-**File:** `src/pages/dashboard/RegionalDashboard.tsx`
-
-- The "Submissions Status" summary card currently shows "All on track!" when no deadlines have passed. Add a contextual subtitle like "Next deadline: Conf due Tue 2pm" so the admin knows why it's calm.
-- Signals are already gated behind `anyDeadlinePassed` (from the last fix) — no change needed there.
-
-### Files Changed
-
-1. `src/components/ui/StatusBadge.tsx` — add `not_open` status
-2. `src/pages/coach/CoachDashboardV2.tsx` — fetch location configs, deadline-aware StatusPill + reminder counts
-3. `src/pages/coach/StaffDetailV2.tsx` — deadline-aware StatusPill for current week
-4. `src/components/dashboard/LocationHealthCard.tsx` — clearer badge labels, contextual info
-5. `src/pages/dashboard/RegionalDashboard.tsx` — next-deadline context in summary card
-
+### 4A — Mobile Slide Transitions
+- Added `framer-motion` dependency
+- Wrapped wizard step content in `<AnimatePresence mode="wait">` with directional slide variants
+- Forward (Next): slides in from right, exits left
+- Backward (Back): slides in from left, exits right
+- 200ms ease-out transitions; progress dots and sticky footer stay static

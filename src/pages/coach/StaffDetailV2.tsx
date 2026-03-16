@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/StatusBadge';
+import { StatusBadge, type SubmissionStatus } from '@/components/ui/StatusBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
@@ -37,6 +37,9 @@ import { RawScoreRow } from '@/types/coachV2';
 import { getDomainColor, getDomainColorRich } from '@/lib/domainColors';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { toast } from 'sonner';
+import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
+import { nowUtc } from '@/lib/centralTime';
+import { getChicagoMonday } from '@/lib/plannerUtils';
 
 type ExcusedSubmission = {
   id: string;
@@ -198,9 +201,53 @@ export default function StaffDetailV2() {
     }));
   }, [weekSummaries]);
 
-  // Status pill - delegates to shared StatusBadge
-  function StatusPill({ hasAll, hasAnyLate, isExempt, isExcused }: { hasAll: boolean; hasAnyLate: boolean; isExempt?: boolean; isExcused?: boolean }) {
-    const status = isExempt ? 'exempt' : isExcused ? 'excused' : !hasAll ? 'missing' : hasAnyLate ? 'late' : 'complete';
+  // Fetch location config for deadline-aware status
+  const [locationGates, setLocationGates] = useState<SubmissionGates | null>(null);
+  const currentMonday = useMemo(() => getChicagoMonday(new Date()), []);
+
+  useEffect(() => {
+    if (!staffInfo?.location_id) return;
+    supabase
+      .from('locations')
+      .select('timezone, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
+      .eq('id', staffInfo.location_id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setLocationGates(getLocationSubmissionGates(nowUtc(), data));
+        }
+      });
+  }, [staffInfo?.location_id]);
+
+  // Deadline-aware status for current week
+  const getDeadlineAwareStatus = useCallback((
+    weekOf: string,
+    hasAll: boolean,
+    hasAnyLate: boolean,
+    isExempt: boolean,
+    isExcusedVal: boolean,
+    metric: 'confidence' | 'performance'
+  ): SubmissionStatus => {
+    if (isExempt) return 'exempt';
+    if (isExcusedVal) return 'excused';
+    if (hasAll) return hasAnyLate ? 'late' : 'complete';
+    
+    // Only apply deadline awareness to current week
+    if (weekOf !== currentMonday || !locationGates) return 'missing';
+    
+    if (metric === 'confidence') {
+      return locationGates.isPastConfidenceDeadline ? 'missing' : 'pending';
+    } else {
+      if (!locationGates.isPerformanceOpen) return 'not_open';
+      return locationGates.isPastPerformanceDeadline ? 'missing' : 'pending';
+    }
+  }, [currentMonday, locationGates]);
+
+  // Status pill - delegates to shared StatusBadge with deadline awareness
+  function StatusPill({ weekOf, hasAll, hasAnyLate, isExempt, isExcused, metric }: { 
+    weekOf: string; hasAll: boolean; hasAnyLate: boolean; isExempt?: boolean; isExcused?: boolean; metric: 'confidence' | 'performance' 
+  }) {
+    const status = getDeadlineAwareStatus(weekOf, hasAll, hasAnyLate, !!isExempt, !!isExcused, metric);
     return <StatusBadge status={status} />;
   }
 
@@ -462,19 +509,23 @@ export default function StaffDetailV2() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-muted-foreground">Confidence:</span>
                                   <StatusPill
+                                    weekOf={weekOf}
                                     hasAll={hasAllConf}
                                     hasAnyLate={summary.scores.some(s => s.confidence_late)}
                                     isExempt={isWeekExempt}
                                     isExcused={confExcused}
+                                    metric="confidence"
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-muted-foreground">Performance:</span>
                                   <StatusPill
+                                    weekOf={weekOf}
                                     hasAll={hasAllPerf}
                                     hasAnyLate={summary.scores.some(s => s.performance_late)}
                                     isExempt={isWeekExempt}
                                     isExcused={perfExcused}
+                                    metric="performance"
                                   />
                                 </div>
                                 {(isSuperAdmin || isOrgAdmin) && <ExcuseDropdown weekOf={weekOf} />}

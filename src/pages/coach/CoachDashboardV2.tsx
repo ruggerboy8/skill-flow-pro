@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/StatusBadge';
+import { StatusBadge, type SubmissionStatus } from '@/components/ui/StatusBadge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronLeft, ChevronRight, RotateCw, CalendarOff, X } from 'lucide-react';
@@ -23,6 +23,8 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { useStaffSubmissionRates } from '@/hooks/useStaffSubmissionRates';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
+import { nowUtc } from '@/lib/centralTime';
 
 interface CoachDashboardProps {
   forcedLocationId?: string;        // Locks to specific location by UUID
@@ -72,6 +74,17 @@ export default function CoachDashboardV2({
   
   // Exempt week check
   const [isWeekExempt, setIsWeekExempt] = useState(false);
+  
+  // Per-location deadline configs
+  interface LocationConfig {
+    timezone: string;
+    conf_due_day: number;
+    conf_due_time: string;
+    perf_due_day: number;
+    perf_due_time: string;
+  }
+  const [locationConfigs, setLocationConfigs] = useState<Map<string, LocationConfig>>(new Map());
+  const [currentNow, setCurrentNow] = useState(nowUtc());
 
   // Format week for RPC
   const weekOfString = format(selectedWeek, 'yyyy-MM-dd');
@@ -80,6 +93,76 @@ export default function CoachDashboardV2({
   const { rawData, summaries, loading, error, reload } = useStaffWeeklyScores({ 
     weekOf: weekOfString 
   });
+  
+  // Fetch per-location deadline configs
+  useEffect(() => {
+    if (summaries.length === 0) return;
+    const locationIds = [...new Set(summaries.map(s => s.location_id))];
+    supabase
+      .from('locations')
+      .select('id, timezone, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
+      .in('id', locationIds)
+      .then(({ data }) => {
+        if (!data) return;
+        const map = new Map<string, LocationConfig>();
+        data.forEach(loc => {
+          map.set(loc.id, {
+            timezone: loc.timezone,
+            conf_due_day: loc.conf_due_day,
+            conf_due_time: loc.conf_due_time,
+            perf_due_day: loc.perf_due_day,
+            perf_due_time: loc.perf_due_time,
+          });
+        });
+        setLocationConfigs(map);
+      });
+  }, [summaries]);
+
+  // Keep currentNow updated
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentNow(nowUtc()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Build per-location submission gates
+  const locationGatesMap = useMemo(() => {
+    const map = new Map<string, SubmissionGates>();
+    locationConfigs.forEach((config, locId) => {
+      map.set(locId, getLocationSubmissionGates(currentNow, config));
+    });
+    return map;
+  }, [currentNow, locationConfigs]);
+
+  // Check if we're viewing the current week (deadline-awareness only applies to current week)
+  const isCurrentWeek = useMemo(() => {
+    const currentMonday = getChicagoMonday(new Date());
+    return weekOfString === currentMonday;
+  }, [weekOfString]);
+
+  // Helper: get deadline-aware status for a metric
+  const getDeadlineAwareStatus = useCallback((
+    locationId: string, 
+    hasAll: boolean, 
+    hasAnyLate: boolean, 
+    isExcused: boolean,
+    metric: 'confidence' | 'performance'
+  ): SubmissionStatus => {
+    if (isExcused) return 'excused';
+    if (hasAll) return hasAnyLate ? 'late' : 'complete';
+    
+    // For historical weeks, always show missing if not complete
+    if (!isCurrentWeek) return 'missing';
+    
+    const gates = locationGatesMap.get(locationId);
+    if (!gates) return 'missing'; // fallback
+    
+    if (metric === 'confidence') {
+      return gates.isPastConfidenceDeadline ? 'missing' : 'pending';
+    } else {
+      if (!gates.isPerformanceOpen) return 'not_open';
+      return gates.isPastPerformanceDeadline ? 'missing' : 'pending';
+    }
+  }, [isCurrentWeek, locationGatesMap]);
   
   // Location excuses for this week
   const { excuses } = useLocationExcuses(weekOfString);
@@ -231,34 +314,38 @@ export default function CoachDashboardV2({
   // Use table sort hook for sortable columns
   const { sortedData, sortConfig, handleSort } = useTableSort(extendedSummaries);
 
-  // Default sort: missing both → missing conf → missing perf → complete, then A-Z
+  // Default sort: missing both → missing conf → missing perf → pending → complete, then A-Z
   // Only apply default sort when no explicit sort is selected
+  // Deadline-aware: "pending" (before deadline) sorts below "missing" (past deadline)
   const sortedRows = useMemo(() => {
     if (sortConfig.key && sortConfig.order !== null) {
       return sortedData;
     }
     
-    // Default priority-based sort
+    // Default priority-based sort — deadline-aware
     return [...extendedSummaries].sort((a, b) => {
-      const aHasConf = a.conf_count === a.assignment_count;
-      const aHasPerf = a.perf_count === a.assignment_count;
-      const bHasConf = b.conf_count === b.assignment_count;
-      const bHasPerf = b.perf_count === b.assignment_count;
+      const aConfStatus = getDeadlineAwareStatus(a.location_id, a.conf_count === a.assignment_count, false, isMetricExcused(a.staff_id, a.location_id, 'confidence'), 'confidence');
+      const aPerfStatus = getDeadlineAwareStatus(a.location_id, a.perf_count === a.assignment_count, false, isMetricExcused(a.staff_id, a.location_id, 'performance'), 'performance');
+      const bConfStatus = getDeadlineAwareStatus(b.location_id, b.conf_count === b.assignment_count, false, isMetricExcused(b.staff_id, b.location_id, 'confidence'), 'confidence');
+      const bPerfStatus = getDeadlineAwareStatus(b.location_id, b.perf_count === b.assignment_count, false, isMetricExcused(b.staff_id, b.location_id, 'performance'), 'performance');
 
-      const aPriority = (!aHasConf && !aHasPerf) ? 0
-        : !aHasConf ? 1
-        : !aHasPerf ? 2
-        : 3;
+      const getPriority = (conf: SubmissionStatus, perf: SubmissionStatus) => {
+        const isMissing = (s: SubmissionStatus) => s === 'missing';
+        const isPending = (s: SubmissionStatus) => s === 'pending';
+        if (isMissing(conf) && isMissing(perf)) return 0;
+        if (isMissing(conf)) return 1;
+        if (isMissing(perf)) return 2;
+        if (isPending(conf) || isPending(perf)) return 3;
+        return 4;
+      };
 
-      const bPriority = (!bHasConf && !bHasPerf) ? 0
-        : !bHasConf ? 1
-        : !bHasPerf ? 2
-        : 3;
+      const aPriority = getPriority(aConfStatus, aPerfStatus);
+      const bPriority = getPriority(bConfStatus, bPerfStatus);
 
       if (aPriority !== bPriority) return aPriority - bPriority;
       return a.staff_name.localeCompare(b.staff_name);
     });
-  }, [extendedSummaries, sortedData, sortConfig]);
+  }, [extendedSummaries, sortedData, sortConfig, getDeadlineAwareStatus, isMetricExcused]);
 
   // Persist filters to URL
   useEffect(() => {
@@ -289,22 +376,37 @@ export default function CoachDashboardV2({
 
   const hasActiveFilters = selectedOrganizations.length > 0 || selectedLocations.length > 0 || selectedRoles.length > 0 || search.trim() !== '';
 
-  // Missing counts for reminder buttons - exclude staff at excused locations
+  // Missing counts for reminder buttons - only count staff past deadline, exclude excused
   const missingConfCount = sortedRows.filter(s => {
     if (isMetricExcused(s.staff_id, s.location_id, 'confidence')) return false;
-    return s.conf_count < s.assignment_count;
+    if (s.conf_count >= s.assignment_count) return false;
+    if (isCurrentWeek) {
+      const gates = locationGatesMap.get(s.location_id);
+      if (gates && !gates.isPastConfidenceDeadline) return false;
+    }
+    return true;
   }).length;
   
   const missingPerfCount = sortedRows.filter(s => {
     if (isMetricExcused(s.staff_id, s.location_id, 'performance')) return false;
-    return s.perf_count < s.assignment_count;
+    if (s.perf_count >= s.assignment_count) return false;
+    if (isCurrentWeek) {
+      const gates = locationGatesMap.get(s.location_id);
+      if (gates && !gates.isPastPerformanceDeadline) return false;
+    }
+    return true;
   }).length;
 
   // Open reminder modals - filter out excused locations
   const openConfidenceReminder = () => {
     const missing = sortedRows.filter(s => {
       if (isMetricExcused(s.staff_id, s.location_id, 'confidence')) return false;
-      return s.conf_count < s.assignment_count;
+      if (s.conf_count >= s.assignment_count) return false;
+      if (isCurrentWeek) {
+        const gates = locationGatesMap.get(s.location_id);
+        if (gates && !gates.isPastConfidenceDeadline) return false;
+      }
+      return true;
     });
     const recipients = missing.map(s => ({
       id: s.staff_id,
@@ -321,7 +423,12 @@ export default function CoachDashboardV2({
   const openPerformanceReminder = () => {
     const missing = sortedRows.filter(s => {
       if (isMetricExcused(s.staff_id, s.location_id, 'performance')) return false;
-      return s.perf_count < s.assignment_count;
+      if (s.perf_count >= s.assignment_count) return false;
+      if (isCurrentWeek) {
+        const gates = locationGatesMap.get(s.location_id);
+        if (gates && !gates.isPastPerformanceDeadline) return false;
+      }
+      return true;
     });
     const recipients = missing.map(s => ({
       id: s.staff_id,
@@ -348,9 +455,11 @@ export default function CoachDashboardV2({
     });
   };
 
-  // Status pill - delegates to shared StatusBadge
-  function StatusPill({ hasAll, hasAnyLate, isExcused }: { hasAll: boolean; hasAnyLate: boolean; isExcused?: boolean }) {
-    const status = isExcused ? 'excused' : !hasAll ? 'missing' : hasAnyLate ? 'late' : 'complete';
+  // Deadline-aware status pill
+  function DeadlineStatusPill({ locationId, hasAll, hasAnyLate, isExcused, metric }: { 
+    locationId: string; hasAll: boolean; hasAnyLate: boolean; isExcused?: boolean; metric: 'confidence' | 'performance' 
+  }) {
+    const status = getDeadlineAwareStatus(locationId, hasAll, hasAnyLate, !!isExcused, metric);
     return <StatusBadge status={status} />;
   }
 
@@ -577,17 +686,21 @@ export default function CoachDashboardV2({
                             )}
                           </TableCell>
                           <TableCell className="text-center">
-                            <StatusPill
+                            <DeadlineStatusPill
+                              locationId={row.location_id}
                               hasAll={hasAllConf}
                               hasAnyLate={row.scores.some(s => s.confidence_late)}
                               isExcused={isMetricExcused(row.staff_id, row.location_id, 'confidence')}
+                              metric="confidence"
                             />
                           </TableCell>
                           <TableCell className="text-center">
-                            <StatusPill
+                            <DeadlineStatusPill
+                              locationId={row.location_id}
                               hasAll={hasAllPerf}
                               hasAnyLate={row.scores.some(s => s.performance_late)}
                               isExcused={isMetricExcused(row.staff_id, row.location_id, 'performance')}
+                              metric="performance"
                             />
                           </TableCell>
                         </TableRow>

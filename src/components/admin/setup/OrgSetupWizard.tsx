@@ -901,7 +901,7 @@ export function OrgSetupWizard({
 
         {/* Navigation footer */}
         <div className="flex justify-between pt-4 border-t mt-4">
-          {step > 1 && step < 4 ? (
+          {step > 1 && step < 5 ? (
             <Button variant="outline" onClick={handleBack} disabled={saving}>
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back
@@ -910,10 +910,10 @@ export function OrgSetupWizard({
             <div />
           )}
 
-          {step < 4 ? (
+          {step < 5 ? (
             <Button onClick={handleNext} disabled={saving || loadingData}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {step === 3 ? (
+              {step === 4 ? (
                 'Finish Setup'
               ) : (
                 <>

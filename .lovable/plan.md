@@ -1,70 +1,71 @@
-## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
-**Status: ✅ Complete**
 
-### What changed
+## Problem
 
-1. **Practice types expanded** to three region-specific values: `pediatric_us`, `general_us`, `general_uk`
-2. **`roles.practice_type`** column added — each role belongs to one practice type
-3. **`pro_moves.practice_type`** converted to **`pro_moves.practice_types TEXT[]`** — array-based multi-select
-4. All existing data backfilled (`pediatric` → `pediatric_us`, `general` → `general_us`, `all` → all three)
+The Regional Command Center calculates submission rates by always including confidence in `totalRequired` — even on Monday morning before anyone's deadline has passed. This means every location shows ~0% and triggers the "<70% participation" signal on day one of the week.
 
-### Files changed
+Additionally, the dashboard computes a **single set of submission gates** using the logged-in user's timezone, but each location has its own timezone and deadline offsets (`conf_due_day`, `conf_due_time`, `perf_due_day`, `perf_due_time` on the `locations` table). A location in `America/New_York` could have a different effective deadline than one in `America/Los_Angeles`.
 
-| File | Change |
-|------|--------|
-| Migration SQL | Schema: expanded CHECK on orgs, added practice_types array on pro_moves, added practice_type on roles |
-| `RoleFormDrawer.tsx` | Added practice type Select (3 options) |
-| `PlatformRolesTab.tsx` | Shows practice type badge on role cards, fetches practice_type |
-| `ProMoveForm.tsx` | Replaced single Select with multi-checkbox for practice_types |
-| `DoctorProMoveForm.tsx` | Defaults practice_types to `['pediatric_us']` |
-| `OrgBootstrapDrawer.tsx` | 3 radio options with new labels |
-| `PlatformOrgsTab.tsx` | Badge display for all 3 practice types |
-| `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
-| `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
-| `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
+## Fix
 
-## Tier 1 — Design System Token Unification
+### 1. Fetch per-location deadline configs
 
-**Status: ✅ Complete**
+**File:** `src/pages/dashboard/RegionalDashboard.tsx`
 
-### 1A — Consolidate Domain Colors (3→1)
-- Replaced unused `--domain-planning/environment/interactions/learning-experiences` CSS vars with `--domain-clinical/clerical/cultural/case-acceptance` (rich + pastel)
-- Updated `tailwind.config.ts` domain keys to match
-- `domainColors.ts` exports CSS var names; API unchanged
-- `DOMAIN_META` in `constants/domains.ts` now uses `chipStyle()` with token-derived colors
+- After fetching `summaries`, query the `locations` table for all relevant location IDs to get `timezone`, `conf_due_day`, `conf_due_time`, `perf_due_day`, `perf_due_time`.
+- Build a `Map<locationId, { tz, offsets }>` lookup.
 
-### 1B — StatusBadge Component + Tokens
-- Added `--status-complete/missing/late/excused/pending` CSS tokens to `index.css`
-- Created `src/components/ui/StatusBadge.tsx` with token-driven colors
-- Replaced inline `StatusPill` in `CoachDashboardV2`, `StaffDetailV2`, `ScoreHistoryV2`, `StatsScores`
+### 2. Compute per-location submission gates
 
-### 1C — Score Color Tokens (1–4)
-- Added `--score-1` through `--score-4` (+ `-bg` pastel variants) to `index.css`
-- Updated `NumberScale.tsx` to use inline styles with CSS vars instead of hardcoded Tailwind
+**File:** `src/lib/submissionStatus.ts`
 
-### 1D — text-2xs Utility
-- Added `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `tailwind.config.ts`
-- Replaced all 340 occurrences of `text-[10px]` → `text-2xs` across 42 files
+- Add a new function `getPerLocationGates(now, locationConfig)` that uses `getSubmissionPolicy(now, loc.tz, loc.offsets)` to derive gates specific to that location's timezone and deadlines.
+- Alternatively, change `calculateLocationStats` to accept per-location gates rather than global ones.
 
-## Micro-Celebrations + Mobile Slide Transitions
+### 3. Change submission rate logic to be deadline-aware
 
-**Status: ✅ Complete**
+**File:** `src/lib/submissionStatus.ts` — `calculateLocationStats`
 
-### 3A — Confetti on Celebration Moments
-- Added `canvas-confetti` dependency
-- Created `src/lib/confetti.ts` helper with `fireCelebration()` function
-- PerformanceWizard: confetti fires on victory modal open + on successful non-repair submit
-- ConfidenceWizard: confetti fires on successful non-repair submit
+Current logic: always counts confidence in `totalRequired`.
 
-### 3B — Submit Button Checkmark Animation
-- Added `submitPhase` state (`idle` | `saving` | `done`) to both wizards
-- Submit button transitions: text → spinner → green ✓ checkmark with scale-in animation
-- 1.8s celebration delay before navigating (0.8s for repair mode)
+New logic:
+- **Before confidence deadline:** `totalRequired = 0`, `totalSubmitted = 0` for confidence → rate defaults to 100% (nothing is due yet). Confidence submissions are tracked as `pendingConfCount` (informational).
+- **After confidence deadline, before performance opens:** only confidence counts toward rate.
+- **After performance deadline:** both confidence and performance count.
 
-### 4A — Mobile Slide Transitions
-- Added `framer-motion` dependency
-- Wrapped wizard step content in `<AnimatePresence mode="wait">` with directional slide variants
-- Forward (Next): slides in from right, exits left
-- Backward (Back): slides in from left, exits right
-- 200ms ease-out transitions; progress dots and sticky footer stay static
+This way, the rate only reflects metrics whose deadlines have actually passed.
+
+### 4. Update signals threshold logic
+
+**File:** `src/pages/dashboard/RegionalDashboard.tsx`
+
+- Pass per-location gates when computing stats.
+- Signals should only fire when a deadline has actually passed and submissions are missing — not when nothing is due yet.
+- When no deadlines have passed for a location, its rate should be 100% (or excluded from signals).
+
+### 5. Update submission gates passed to LocationHealthCard
+
+- Instead of a single global `submissionGates`, pass per-location gates so each card shows contextually correct badges (e.g., "Pending Conf" vs "Late Conf" based on that location's deadline).
+
+### Technical Details
+
+The key data flow change:
+
+```text
+Before:
+  useLocationTimezone() → single tz → single gates → all locations
+
+After:
+  locations table query → per-location { tz, offsets }
+  → per-location gates via getSubmissionPolicy()
+  → per-location rate calculation
+```
+
+The `locations` query is lightweight (one SELECT for all managed locations). The `getPolicyOffsetsForLocation` helper already exists in `submissionPolicy.ts`.
+
+### Files Changed
+
+1. **`src/pages/dashboard/RegionalDashboard.tsx`** — fetch location configs, compute per-location gates, pass to stats calculation
+2. **`src/lib/submissionStatus.ts`** — update `calculateLocationStats` to only count metrics whose deadlines have passed in the rate denominator
+3. **`src/components/dashboard/LocationHealthCard.tsx`** — minor: accept per-location gate data (interface already supports it)
+

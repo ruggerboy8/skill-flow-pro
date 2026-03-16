@@ -364,7 +364,16 @@ export default function RegionalDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{Math.round(totals.avgRate)}%</div>
+              {totals.anyLocationPastDeadline ? (
+                <div className="text-3xl font-bold">{Math.round(totals.avgRate)}%</div>
+              ) : (
+                <div>
+                  <div className="text-2xl font-bold text-foreground">
+                    {totals.totalConfSubmitted}/{totals.totalConfExpected}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Conf submitted</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

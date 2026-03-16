@@ -395,14 +395,29 @@ export default function RegionalDashboard() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {locationStats.map(stats => (
-              <LocationHealthCard
-                key={stats.id}
-                stats={stats}
-                excuseStatus={getExcuseStatus(stats.id)}
-                submissionGates={getCardSubmissionGates(stats.id)}
-              />
-            ))}
+            {locationStats.map(stats => {
+              // Compute per-location next deadline label
+              const locConfig = locationConfigs.get(stats.id);
+              let locDeadlineLabel: string | null = null;
+              if (locConfig) {
+                const offsets = getPolicyOffsetsForLocation(locConfig);
+                const policy = getSubmissionPolicy(now, locConfig.timezone, offsets);
+                if (!policy.isConfidenceLate(now)) {
+                  locDeadlineLabel = `Conf due ${formatInTimeZone(policy.confidence_due, locConfig.timezone, 'EEE h:mm a')}`;
+                } else if (!policy.isPerformanceLate(now)) {
+                  locDeadlineLabel = `Perf due ${formatInTimeZone(policy.performance_due, locConfig.timezone, 'EEE h:mm a')}`;
+                }
+              }
+              return (
+                <LocationHealthCard
+                  key={stats.id}
+                  stats={stats}
+                  excuseStatus={getExcuseStatus(stats.id)}
+                  submissionGates={getCardSubmissionGates(stats.id)}
+                  nextDeadlineLabel={locDeadlineLabel}
+                />
+              );
+            })}
           </div>
         )}
       </div>

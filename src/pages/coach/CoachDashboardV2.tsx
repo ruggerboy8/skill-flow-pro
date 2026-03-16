@@ -376,37 +376,22 @@ export default function CoachDashboardV2({
 
   const hasActiveFilters = selectedOrganizations.length > 0 || selectedLocations.length > 0 || selectedRoles.length > 0 || search.trim() !== '';
 
-  // Missing counts for reminder buttons - only count staff past deadline, exclude excused
+  // Missing counts for reminder buttons — all non-submitted, non-excused staff (deadline-agnostic)
   const missingConfCount = sortedRows.filter(s => {
     if (isMetricExcused(s.staff_id, s.location_id, 'confidence')) return false;
-    if (s.conf_count >= s.assignment_count) return false;
-    if (isCurrentWeek) {
-      const gates = locationGatesMap.get(s.location_id);
-      if (gates && !gates.isPastConfidenceDeadline) return false;
-    }
-    return true;
+    return s.conf_count < s.assignment_count;
   }).length;
   
   const missingPerfCount = sortedRows.filter(s => {
     if (isMetricExcused(s.staff_id, s.location_id, 'performance')) return false;
-    if (s.perf_count >= s.assignment_count) return false;
-    if (isCurrentWeek) {
-      const gates = locationGatesMap.get(s.location_id);
-      if (gates && !gates.isPastPerformanceDeadline) return false;
-    }
-    return true;
+    return s.perf_count < s.assignment_count;
   }).length;
 
-  // Open reminder modals - filter out excused locations
+  // Open reminder modals — all non-submitted, non-excused staff (managers decide timing)
   const openConfidenceReminder = () => {
     const missing = sortedRows.filter(s => {
       if (isMetricExcused(s.staff_id, s.location_id, 'confidence')) return false;
-      if (s.conf_count >= s.assignment_count) return false;
-      if (isCurrentWeek) {
-        const gates = locationGatesMap.get(s.location_id);
-        if (gates && !gates.isPastConfidenceDeadline) return false;
-      }
-      return true;
+      return s.conf_count < s.assignment_count;
     });
     const recipients = missing.map(s => ({
       id: s.staff_id,
@@ -423,12 +408,7 @@ export default function CoachDashboardV2({
   const openPerformanceReminder = () => {
     const missing = sortedRows.filter(s => {
       if (isMetricExcused(s.staff_id, s.location_id, 'performance')) return false;
-      if (s.perf_count >= s.assignment_count) return false;
-      if (isCurrentWeek) {
-        const gates = locationGatesMap.get(s.location_id);
-        if (gates && !gates.isPastPerformanceDeadline) return false;
-      }
-      return true;
+      return s.perf_count < s.assignment_count;
     });
     const recipients = missing.map(s => ({
       id: s.staff_id,

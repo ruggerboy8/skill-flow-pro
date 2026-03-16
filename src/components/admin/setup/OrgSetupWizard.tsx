@@ -342,15 +342,37 @@ export function OrgSetupWizard({
 
   // ── Navigation ───────────────────────────────────────────────────────────────
 
+  const saveBranding = async (): Promise<boolean> => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          app_display_name: appDisplayName.trim() || null,
+          email_sign_off: emailSignOff.trim() || null,
+          reply_to_email: replyToEmail.trim() || null,
+        })
+        .eq('id', organizationId);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      toast({ title: 'Error saving branding', description: err.message, variant: 'destructive' });
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleNext = async () => {
     let ok = true;
     if (step === 1) ok = await savePositions();
     if (step === 2) ok = await saveLocations();
-    if (step === 3) {
-      ok = await saveSchedules();
+    if (step === 3) ok = await saveSchedules();
+    if (step === 4) {
+      ok = await saveBranding();
       if (ok) onComplete();
     }
-    if (ok) setStep((s) => Math.min(s + 1, 4));
+    if (ok) setStep((s) => Math.min(s + 1, 5));
   };
 
   const handleBack = () => setStep((s) => Math.max(s - 1, 1));

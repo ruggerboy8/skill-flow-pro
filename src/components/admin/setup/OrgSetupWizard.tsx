@@ -73,7 +73,8 @@ const STEPS = [
   { id: 1, label: 'Positions' },
   { id: 2, label: 'Locations' },
   { id: 3, label: 'Schedule' },
-  { id: 4, label: 'All Set!' },
+  { id: 4, label: 'Branding' },
+  { id: 5, label: 'All Set!' },
 ];
 
 const DAY_OPTIONS = [

@@ -1,4 +1,5 @@
 import { StaffWeekSummary } from '@/types/coachV2';
+import { getSubmissionPolicy, getPolicyOffsetsForLocation, type PolicyOffsets } from '@/lib/submissionPolicy';
 
 interface WeekAnchors {
   confidence_deadline?: Date;
@@ -8,6 +9,7 @@ interface WeekAnchors {
 
 export interface SubmissionGates {
   isPastConfidenceDeadline: boolean;
+  isPastPerformanceDeadline: boolean;
   isPerformanceOpen: boolean;
 }
 
@@ -15,7 +17,24 @@ export function getSubmissionGates(now: Date, anchors: WeekAnchors): SubmissionG
   const confDeadline = anchors.confidence_deadline ?? anchors.confidence_due;
   return {
     isPastConfidenceDeadline: confDeadline ? now >= confDeadline : false,
+    isPastPerformanceDeadline: false, // legacy callers don't have this — safe default
     isPerformanceOpen: now >= anchors.checkout_open,
+  };
+}
+
+/**
+ * Build deadline-aware submission gates for a specific location.
+ */
+export function getLocationSubmissionGates(
+  now: Date,
+  locationConfig: { timezone: string; conf_due_day: number; conf_due_time: string; perf_due_day: number; perf_due_time: string },
+): SubmissionGates {
+  const offsets = getPolicyOffsetsForLocation(locationConfig);
+  const policy = getSubmissionPolicy(now, locationConfig.timezone, offsets);
+  return {
+    isPastConfidenceDeadline: policy.isConfidenceLate(now),
+    isPastPerformanceDeadline: policy.isPerformanceLate(now),
+    isPerformanceOpen: policy.isPerformanceOpen(now),
   };
 }
 
@@ -23,13 +42,13 @@ export function calculateMissingCounts(
   staff: StaffWeekSummary[], 
   gates: SubmissionGates
 ): { missingConfCount: number; missingPerfCount: number } {
-  // Count STAFF members missing confidence (only after Tue deadline)
+  // Count STAFF members missing confidence (only after deadline)
   const missingConfCount = gates.isPastConfidenceDeadline 
     ? staff.filter(s => s.conf_count < s.assignment_count).length 
     : 0;
   
-  // Count STAFF members missing performance (only after Thu open)
-  const missingPerfCount = gates.isPerformanceOpen 
+  // Count STAFF members missing performance (only after perf deadline)
+  const missingPerfCount = gates.isPastPerformanceDeadline 
     ? staff.filter(s => s.perf_count < s.assignment_count).length 
     : 0;
   
@@ -50,20 +69,22 @@ export function calculateLocationStats(
 } {
   const staffCount = staff.length;
   
-  // Calculate submission rate based on what's currently expected
-  // Before Tuesday deadline: show confidence completion progress (not gated)
-  // After Thursday: include both confidence and performance
+  // Deadline-aware submission rate:
+  // Only count a metric toward totalRequired once its deadline has passed.
+  // Before any deadline → rate is 100% (nothing is due yet).
   let totalRequired = 0;
   let totalSubmitted = 0;
   
-  // Always track confidence progress (this is the current week's main task)
-  staff.forEach(s => {
-    totalRequired += s.assignment_count;
-    totalSubmitted += s.conf_count;
-  });
+  // Confidence counts toward rate only after confidence deadline
+  if (gates.isPastConfidenceDeadline) {
+    staff.forEach(s => {
+      totalRequired += s.assignment_count;
+      totalSubmitted += s.conf_count;
+    });
+  }
   
-  // After Thursday, also track performance
-  if (gates.isPerformanceOpen) {
+  // Performance counts toward rate only after performance deadline
+  if (gates.isPastPerformanceDeadline) {
     staff.forEach(s => {
       totalRequired += s.assignment_count;
       totalSubmitted += s.perf_count;

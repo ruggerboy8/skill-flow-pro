@@ -59,6 +59,11 @@ const statusConfig: Record<SubmissionStatus, { label: string; style: React.CSSPr
     variant: 'secondary',
     style: {},
   },
+  not_open: {
+    label: '—',
+    variant: 'secondary',
+    style: {},
+  },
 };
 
 /**

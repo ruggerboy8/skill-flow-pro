@@ -509,19 +509,23 @@ export default function StaffDetailV2() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-muted-foreground">Confidence:</span>
                                   <StatusPill
+                                    weekOf={weekOf}
                                     hasAll={hasAllConf}
                                     hasAnyLate={summary.scores.some(s => s.confidence_late)}
                                     isExempt={isWeekExempt}
                                     isExcused={confExcused}
+                                    metric="confidence"
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-muted-foreground">Performance:</span>
                                   <StatusPill
+                                    weekOf={weekOf}
                                     hasAll={hasAllPerf}
                                     hasAnyLate={summary.scores.some(s => s.performance_late)}
                                     isExempt={isWeekExempt}
                                     isExcused={perfExcused}
+                                    metric="performance"
                                   />
                                 </div>
                                 {(isSuperAdmin || isOrgAdmin) && <ExcuseDropdown weekOf={weekOf} />}

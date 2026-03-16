@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertCircle, TrendingUp, CloudOff, Clock } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
+import { format as formatDate } from 'date-fns';
 import { StaffWeekSummary } from '@/types/coachV2';
 import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';

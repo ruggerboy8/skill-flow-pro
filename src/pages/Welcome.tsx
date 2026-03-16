@@ -109,7 +109,7 @@ export default function Welcome() {
                   }
                 </p>
                 <p className="text-muted-foreground text-sm">
-                  The Alcan team is here to support your professional growth every step of the way.
+                  Your team is here to support your professional growth every step of the way.
                 </p>
               </>
             )}

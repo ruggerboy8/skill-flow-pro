@@ -107,9 +107,15 @@ serve(async (req) => {
       const staff = ev.staff as any;
       if (!staff?.email) continue;
 
-      // Resolve org name: evaluations → locations → practice_groups → organizations
-      const orgName: string =
-        (ev as any).locations?.practice_groups?.organizations?.name || 'Your Practice';
+      // Resolve org branding
+      const orgData = (ev as any).locations?.practice_groups?.organizations;
+      const orgName: string = orgData?.name || 'Your Practice';
+      const signOff: string = orgData?.email_sign_off || `The ${orgName} Team`;
+      const orgReplyTo: string = orgData?.reply_to_email || defaultReplyTo;
+      const fromDisplayName: string = orgData?.app_display_name || 'Pro-Moves';
+      const fromEmail = defaultFromEmail.includes('<')
+        ? defaultFromEmail.replace(/^[^<]*</, `${fromDisplayName} <`)
+        : `${fromDisplayName} <${defaultFromEmail}>`;
 
       const firstName = (staff.name || '').split(' ')[0] || 'Team Member';
       const periodLabel = ev.type === 'Baseline'
@@ -124,7 +130,7 @@ serve(async (req) => {
         '',
         appUrl,
         '',
-        `— The ${orgName} Team`,
+        `— ${signOff}`,
       ].join('\n');
 
       try {
@@ -134,7 +140,7 @@ serve(async (req) => {
           subject,
           text: body,
         };
-        if (replyTo) emailPayload.reply_to = replyTo;
+        if (orgReplyTo) emailPayload.reply_to = orgReplyTo;
 
         const resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',

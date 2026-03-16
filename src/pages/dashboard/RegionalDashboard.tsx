@@ -13,15 +13,26 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertCircle, TrendingUp, CloudOff } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { StaffWeekSummary } from '@/types/coachV2';
-import { getWeekAnchors, nowUtc } from '@/lib/centralTime';
+import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
-import { getSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
+import { getLocationSubmissionGates, calculateLocationStats, type SubmissionGates } from '@/lib/submissionStatus';
+import { getSubmissionPolicy } from '@/lib/submissionPolicy';
+import { supabase } from '@/integrations/supabase/client';
+
+interface LocationConfig {
+  timezone: string;
+  conf_due_day: number;
+  conf_due_time: string;
+  perf_due_day: number;
+  perf_due_time: string;
+}
 
 export default function RegionalDashboard() {
   const { managedLocationIds, managedOrgIds, isSuperAdmin } = useUserRole();
   const tz = useLocationTimezone();
   const [now, setNow] = useState(nowUtc());
   const [excuseDialogOpen, setExcuseDialogOpen] = useState(false);
+  const [locationConfigs, setLocationConfigs] = useState<Map<string, LocationConfig>>(new Map());
 
   // Keep time updated for live dashboard feel
   useEffect(() => {
@@ -30,22 +41,35 @@ export default function RegionalDashboard() {
   }, []);
   
   // Use the current user's location timezone for the correct "Week Of" date
-  const anchors = useMemo(() => getWeekAnchors(now, tz), [now, tz]);
-  const weekOf = formatInTimeZone(anchors.mondayZ, tz, 'yyyy-MM-dd');
-  
-  // Submission gates for contextual badge display
-  const submissionGates = useMemo(() => {
-    const gates = getSubmissionGates(now, anchors);
-    return {
-      confidenceOpen: true, // Always open during the week
-      confidenceClosed: gates.isPastConfidenceDeadline,
-      performanceOpen: gates.isPerformanceOpen,
-      performanceClosed: false, // Week-end logic not needed here
-    };
-  }, [now, anchors]);
+  const displayPolicy = useMemo(() => getSubmissionPolicy(now, tz), [now, tz]);
+  const weekOf = formatInTimeZone(displayPolicy.mondayZ, tz, 'yyyy-MM-dd');
   
   // Reuse existing hook - no new RPC needed
   const { summaries, loading, error } = useStaffWeeklyScores({ weekOf });
+
+  // Fetch per-location deadline configs once we have summaries
+  useEffect(() => {
+    if (summaries.length === 0) return;
+    const locationIds = [...new Set(summaries.map(s => s.location_id))];
+    supabase
+      .from('locations')
+      .select('id, timezone, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
+      .in('id', locationIds)
+      .then(({ data }) => {
+        if (!data) return;
+        const map = new Map<string, LocationConfig>();
+        data.forEach(loc => {
+          map.set(loc.id, {
+            timezone: loc.timezone,
+            conf_due_day: loc.conf_due_day,
+            conf_due_time: loc.conf_due_time,
+            perf_due_day: loc.perf_due_day,
+            perf_due_time: loc.perf_due_time,
+          });
+        });
+        setLocationConfigs(map);
+      });
+  }, [summaries]);
   
   // Location-level excuses
   const { 
@@ -53,20 +77,38 @@ export default function RegionalDashboard() {
     canManage: canManageExcuses,
   } = useLocationExcuses(weekOf);
 
+  // Build per-location submission gates
+  const locationGatesMap = useMemo(() => {
+    const map = new Map<string, SubmissionGates>();
+    locationConfigs.forEach((config, locId) => {
+      map.set(locId, getLocationSubmissionGates(now, config));
+    });
+    return map;
+  }, [now, locationConfigs]);
+
+  // Build per-location submission gate props for LocationHealthCard
+  const getCardSubmissionGates = (locId: string) => {
+    const gates = locationGatesMap.get(locId);
+    if (!gates) {
+      return { confidenceOpen: true, confidenceClosed: false, performanceOpen: false, performanceClosed: false };
+    }
+    return {
+      confidenceOpen: true,
+      confidenceClosed: gates.isPastConfidenceDeadline,
+      performanceOpen: gates.isPerformanceOpen,
+      performanceClosed: gates.isPastPerformanceDeadline,
+    };
+  };
+
   // Aggregate by location client-side
   const { locationStats, totals } = useMemo(() => {
     const byLocation = new Map<string, StaffWeekSummary[]>();
     
     summaries.forEach(s => {
-      // Only super admins get truly unrestricted access
       if (!isSuperAdmin) {
-        // Check if user has access via org scope OR location scope
         const hasOrgAccess = managedOrgIds.includes(s.group_id);
         const hasLocationAccess = managedLocationIds.includes(s.location_id);
-        
-        if (!hasOrgAccess && !hasLocationAccess) {
-          return; // Filter out
-        }
+        if (!hasOrgAccess && !hasLocationAccess) return;
       }
       
       if (!byLocation.has(s.location_id)) {
@@ -75,14 +117,17 @@ export default function RegionalDashboard() {
       byLocation.get(s.location_id)!.push(s);
     });
 
-    // Calculate stats per location using shared utils
-    const gates = getSubmissionGates(now, anchors);
-    
     const stats: LocationStats[] = Array.from(byLocation.entries()).map(([locId, staff]) => {
+      // Use per-location gates if available, otherwise default to "nothing due yet"
+      const gates = locationGatesMap.get(locId) ?? {
+        isPastConfidenceDeadline: false,
+        isPastPerformanceDeadline: false,
+        isPerformanceOpen: false,
+      };
+      
       const locStats = calculateLocationStats(staff, gates);
       const excuseStatus = getExcuseStatus(locId);
       
-      // Adjust stats based on excuse status
       let adjustedMissingConf = locStats.missingConfCount;
       let adjustedMissingPerf = locStats.missingPerfCount;
       let adjustedPendingConf = locStats.pendingConfCount;
@@ -96,7 +141,6 @@ export default function RegionalDashboard() {
         adjustedMissingPerf = 0;
       }
       
-      // If fully excused, show 100%
       if (excuseStatus.isConfExcused && excuseStatus.isPerfExcused) {
         adjustedSubmissionRate = 100;
       }
@@ -112,10 +156,8 @@ export default function RegionalDashboard() {
       };
     });
 
-    // Sort by submission rate (lowest first - needs attention)
     stats.sort((a, b) => a.submissionRate - b.submissionRate);
 
-    // Calculate totals
     const totalStaff = stats.reduce((sum, s) => sum + s.staffCount, 0);
     const totalMissingConf = stats.reduce((sum, s) => sum + s.missingConfCount, 0);
     const totalMissingPerf = stats.reduce((sum, s) => sum + s.missingPerfCount, 0);
@@ -128,13 +170,16 @@ export default function RegionalDashboard() {
       locationStats: stats, 
       totals: { totalStaff, totalMissingConf, totalMissingPerf, totalPendingConf, avgRate, locationCount: stats.length }
     };
-  }, [summaries, managedLocationIds, managedOrgIds, isSuperAdmin, now, anchors]);
+  }, [summaries, managedLocationIds, managedOrgIds, isSuperAdmin, locationGatesMap]);
 
-  // Compute signals based on location stats
+  // Compute signals — only fire when a deadline has actually passed
   const signals = useMemo((): Signal[] => {
     const result: Signal[] = [];
     locationStats.forEach(loc => {
-      if (loc.submissionRate < 70 && loc.staffCount > 0) {
+      const gates = locationGatesMap.get(loc.id);
+      // Only signal if at least one deadline has passed for this location
+      const anyDeadlinePassed = gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline;
+      if (anyDeadlinePassed && loc.submissionRate < 70 && loc.staffCount > 0) {
         result.push({
           type: 'participation_drop',
           message: `${loc.name}: participation rate is ${Math.round(loc.submissionRate)}% this week — below 70%.`,
@@ -143,7 +188,7 @@ export default function RegionalDashboard() {
       }
     });
     return result;
-  }, [locationStats]);
+  }, [locationStats, locationGatesMap]);
 
   // Build location names map for heatmap
   const locationNamesMap = useMemo(() => {
@@ -196,7 +241,7 @@ export default function RegionalDashboard() {
           <div>
             <h1 className="text-2xl font-bold">Regional Command Center</h1>
             <p className="text-muted-foreground text-sm">
-              Week of {formatInTimeZone(anchors.mondayZ, tz, 'MMM d, yyyy')}
+              Week of {formatInTimeZone(displayPolicy.mondayZ, tz, 'MMM d, yyyy')}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -303,7 +348,7 @@ export default function RegionalDashboard() {
                 key={stats.id}
                 stats={stats}
                 excuseStatus={getExcuseStatus(stats.id)}
-                submissionGates={submissionGates}
+                submissionGates={getCardSubmissionGates(stats.id)}
               />
             ))}
           </div>

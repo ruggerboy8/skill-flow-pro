@@ -12,9 +12,11 @@ import { LocationSkillGaps } from '@/components/dashboard/LocationSkillGaps';
 
 import LocationSubmissionWidget from '@/components/dashboard/LocationSubmissionWidget';
 import CoachDashboardV2 from '@/pages/coach/CoachDashboardV2';
-import { getWeekAnchors, nowUtc } from '@/lib/centralTime';
+import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
-import { getSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
+import { getLocationSubmissionGates, calculateLocationStats } from '@/lib/submissionStatus';
+import { getSubmissionPolicy } from '@/lib/submissionPolicy';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LocationDetailProps {
   overrideLocationId?: string;
@@ -30,6 +32,7 @@ export default function LocationDetail({
   const navigate = useNavigate();
   const tz = useLocationTimezone();
   const [now, setNow] = useState(nowUtc());
+  const [locConfig, setLocConfig] = useState<{ timezone: string; conf_due_day: number; conf_due_time: string; perf_due_day: number; perf_due_time: string } | null>(null);
 
   // Keep time updated
   useEffect(() => {
@@ -37,8 +40,21 @@ export default function LocationDetail({
     return () => clearInterval(interval);
   }, []);
 
-  const anchors = useMemo(() => getWeekAnchors(now, tz), [now, tz]);
-  const weekOf = formatInTimeZone(anchors.mondayZ, tz, 'yyyy-MM-dd');
+  // Fetch this location's deadline config
+  useEffect(() => {
+    if (!locationId) return;
+    supabase
+      .from('locations')
+      .select('timezone, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
+      .eq('id', locationId)
+      .single()
+      .then(({ data }) => {
+        if (data) setLocConfig(data);
+      });
+  }, [locationId]);
+
+  const displayPolicy = useMemo(() => getSubmissionPolicy(now, tz), [now, tz]);
+  const weekOf = formatInTimeZone(displayPolicy.mondayZ, tz, 'yyyy-MM-dd');
   
   const { summaries, loading, error } = useStaffWeeklyScores({ weekOf });
   
@@ -49,16 +65,18 @@ export default function LocationDetail({
     [getExcuseStatus, locationId]
   );
   
-  // Submission gates for contextual display
-  const submissionGates = useMemo(() => {
-    const gates = getSubmissionGates(now, anchors);
-    return {
-      confidenceOpen: true,
-      confidenceClosed: gates.isPastConfidenceDeadline,
-      performanceOpen: gates.isPerformanceOpen,
-      performanceClosed: false,
-    };
-  }, [now, anchors]);
+  // Per-location submission gates
+  const locationGates = useMemo(() => {
+    if (!locConfig) return { isPastConfidenceDeadline: false, isPastPerformanceDeadline: false, isPerformanceOpen: false };
+    return getLocationSubmissionGates(now, locConfig);
+  }, [now, locConfig]);
+
+  const submissionGates = useMemo(() => ({
+    confidenceOpen: true,
+    confidenceClosed: locationGates.isPastConfidenceDeadline,
+    performanceOpen: locationGates.isPerformanceOpen,
+    performanceClosed: locationGates.isPastPerformanceDeadline,
+  }), [locationGates]);
 
   // Filter to just this location and compute stats
   const { locationStaff, locationStats, locationName } = useMemo(() => {
@@ -73,8 +91,7 @@ export default function LocationDetail({
       };
     }
 
-    const gates = getSubmissionGates(now, anchors);
-    const stats = calculateLocationStats(staff, gates);
+    const stats = calculateLocationStats(staff, locationGates);
     
     const locationStats: LocationStats = {
       id: locationId!,
@@ -87,7 +104,7 @@ export default function LocationDetail({
     };
 
     return { locationStaff: staff, locationStats, locationName: name };
-  }, [summaries, locationId, now, anchors]);
+  }, [summaries, locationId, locationGates]);
 
   if (loading) {
     return (
@@ -141,7 +158,7 @@ export default function LocationDetail({
             <p className="text-lg text-muted-foreground">{locationName}</p>
           )}
           <p className="text-muted-foreground text-sm mt-1">
-            Performance Insights • Week of {formatInTimeZone(anchors.mondayZ, tz, 'MMM d, yyyy')}
+            Performance Insights • Week of {formatInTimeZone(displayPolicy.mondayZ, tz, 'MMM d, yyyy')}
           </p>
         </div>
 
@@ -195,4 +212,3 @@ export default function LocationDetail({
     </div>
   );
 }
-

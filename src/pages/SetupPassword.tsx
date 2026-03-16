@@ -141,7 +141,7 @@ export default function SetupPassword() {
           <div className="flex justify-center">
             <img 
               src={alcanLogo} 
-              alt="Alcan Dental Cooperative" 
+              alt="Pro-Moves" 
               className="h-16 w-auto object-contain"
             />
           </div>

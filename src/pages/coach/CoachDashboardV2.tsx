@@ -74,6 +74,17 @@ export default function CoachDashboardV2({
   
   // Exempt week check
   const [isWeekExempt, setIsWeekExempt] = useState(false);
+  
+  // Per-location deadline configs
+  interface LocationConfig {
+    timezone: string;
+    conf_due_day: number;
+    conf_due_time: string;
+    perf_due_day: number;
+    perf_due_time: string;
+  }
+  const [locationConfigs, setLocationConfigs] = useState<Map<string, LocationConfig>>(new Map());
+  const [currentNow, setCurrentNow] = useState(nowUtc());
 
   // Format week for RPC
   const weekOfString = format(selectedWeek, 'yyyy-MM-dd');

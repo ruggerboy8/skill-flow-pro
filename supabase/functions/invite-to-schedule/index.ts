@@ -17,8 +17,8 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    const fromEmail = Deno.env.get("RESEND_FROM") || "Pro-Moves <pro-moves@alcandentalcooperative.com>";
-    const replyTo = Deno.env.get("RESEND_REPLY_TO") || "johno@alcandentalcooperative.com";
+    const defaultFromEmail = Deno.env.get("RESEND_FROM") || "Pro-Moves <no-reply@mypromoves.com>";
+    const defaultReplyTo = Deno.env.get("RESEND_REPLY_TO") || "johno@alcandentalcooperative.com";
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {

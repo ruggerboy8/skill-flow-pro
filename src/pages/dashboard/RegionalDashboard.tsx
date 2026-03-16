@@ -167,13 +167,24 @@ export default function RegionalDashboard() {
     const totalMissingConf = stats.reduce((sum, s) => sum + s.missingConfCount, 0);
     const totalMissingPerf = stats.reduce((sum, s) => sum + s.missingPerfCount, 0);
     const totalPendingConf = stats.reduce((sum, s) => sum + (s.pendingConfCount ?? 0), 0);
+    const totalConfSubmitted = stats.reduce((sum, s) => sum + (s.confSubmitted ?? 0), 0);
+    const totalConfExpected = stats.reduce((sum, s) => sum + (s.confExpected ?? 0), 0);
+    const totalPerfSubmitted = stats.reduce((sum, s) => sum + (s.perfSubmitted ?? 0), 0);
+    const totalPerfExpected = stats.reduce((sum, s) => sum + (s.perfExpected ?? 0), 0);
     const avgRate = stats.length > 0 
       ? stats.reduce((sum, s) => sum + s.submissionRate, 0) / stats.length 
       : 0;
+    
+    // Check if any location has passed a deadline
+    const anyLocationPastDeadline = stats.some(s => {
+      const gates = locationGatesMap.get(s.id);
+      return gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline;
+    });
 
     return { 
       locationStats: stats, 
-      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalPendingConf, avgRate, locationCount: stats.length }
+      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalPendingConf, avgRate, locationCount: stats.length,
+        totalConfSubmitted, totalConfExpected, totalPerfSubmitted, totalPerfExpected, anyLocationPastDeadline }
     };
   }, [summaries, managedLocationIds, managedOrgIds, isSuperAdmin, locationGatesMap]);
 

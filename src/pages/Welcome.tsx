@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { BookOpen, TrendingUp, Trophy } from 'lucide-react';
-import alcanLogo from '@/assets/alcan-logo-full.jpg';
+import alcanLogo from '@/assets/alcan-logo-full.jpg'; // TODO: Replace with org-specific logo once logo upload is implemented
 
 interface StaffInfo {
   name: string;

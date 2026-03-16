@@ -776,9 +776,73 @@ export function OrgSetupWizard({
     </div>
   );
 
-  // ── Step 4: Done ─────────────────────────────────────────────────────────────
+  // ── Step 4: Branding ──────────────────────────────────────────────────────────
 
-  const renderStep4 = () => {
+  const renderStep4 = () => (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-base font-semibold flex items-center gap-2">
+          <Mail className="h-4 w-4 text-primary" />
+          Email branding
+        </h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Customize how your organization appears in emails sent to staff.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Display Name</Label>
+          <Input
+            value={appDisplayName}
+            onChange={(e) => setAppDisplayName(e.target.value)}
+            placeholder={orgName || 'Your Organization'}
+            className="h-9 text-sm"
+          />
+          <p className="text-2xs text-muted-foreground">
+            How should we refer to your organization in emails?
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Email Sign-off</Label>
+          <Input
+            value={emailSignOff}
+            onChange={(e) => setEmailSignOff(e.target.value)}
+            placeholder={`The ${orgName || 'Your'} Team`}
+            className="h-9 text-sm"
+          />
+          <p className="text-2xs text-muted-foreground">
+            Appears at the bottom of emails, e.g. "— The Kids Tooth Team"
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Reply-to Email (optional)</Label>
+          <Input
+            value={replyToEmail}
+            onChange={(e) => setReplyToEmail(e.target.value)}
+            placeholder="e.g. manager@yourpractice.com"
+            type="email"
+            className="h-9 text-sm"
+          />
+          <p className="text-2xs text-muted-foreground">
+            Where should staff replies go? Leave blank to use the platform default.
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-md border border-dashed border-muted-foreground/30 p-3 mt-2">
+        <p className="text-2xs text-muted-foreground text-center">
+          🎨 Logo upload and accent colors coming soon
+        </p>
+      </div>
+    </div>
+  );
+
+  // ── Step 5: Done ─────────────────────────────────────────────────────────────
+
+  const renderStep5 = () => {
     const checkedCount = Object.values(roleSelections).filter((r) => r.checked).length;
     return (
       <div className="text-center space-y-5 py-4">
@@ -798,6 +862,7 @@ export function OrgSetupWizard({
             ✓ <strong>{locations.length}</strong> location{locations.length !== 1 ? 's' : ''} ready
           </p>
           <p>✓ Submission deadlines set</p>
+          <p>✓ Email branding configured</p>
         </div>
       </div>
     );

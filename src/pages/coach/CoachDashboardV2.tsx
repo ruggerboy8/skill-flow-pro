@@ -401,7 +401,12 @@ export default function CoachDashboardV2({
   const openConfidenceReminder = () => {
     const missing = sortedRows.filter(s => {
       if (isMetricExcused(s.staff_id, s.location_id, 'confidence')) return false;
-      return s.conf_count < s.assignment_count;
+      if (s.conf_count >= s.assignment_count) return false;
+      if (isCurrentWeek) {
+        const gates = locationGatesMap.get(s.location_id);
+        if (gates && !gates.isPastConfidenceDeadline) return false;
+      }
+      return true;
     });
     const recipients = missing.map(s => ({
       id: s.staff_id,

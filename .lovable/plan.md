@@ -68,3 +68,22 @@
 - Forward (Next): slides in from right, exits left
 - Backward (Back): slides in from left, exits right
 - 200ms ease-out transitions; progress dots and sticky footer stay static
+
+## Org-Level Email Branding + Domain Migration
+
+**Status: ✅ Complete**
+
+### What changed
+
+1. **Database**: Added `app_display_name`, `email_sign_off`, `reply_to_email` columns to `organizations` table
+2. **OrgSetupWizard**: Added Step 4 "Branding" (shifted "All Set!" to Step 5) collecting display name, email sign-off, and reply-to email
+3. **Edge Functions**: All 5 email-sending functions (`notify-meeting-summary`, `coach-remind`, `invite-to-schedule`, `notify-eval-release`, `admin-users`) now resolve org branding via staff → location → practice_group → organization chain, with fallback to platform defaults
+4. **Domain migration**: Replaced all `alcandentalcooperative.com` and `alcanskills.lovable.app` hardcoded fallbacks with `mypromoves.com`
+5. **Frontend branding**: Replaced "Alcan" copy in SetupPassword, Welcome, and Layout with neutral "Pro-Moves" branding
+6. **SchedulingInviteComposer**: Replaced hardcoded URL with `window.location.origin`
+7. **Secrets**: Added `APP_URL` and `SITE_URL` set to `https://mypromoves.com`, updated `RESEND_FROM` to new domain
+
+### What this does NOT include (future)
+- Logo upload (storage bucket + org column)
+- Accent color theming (CSS custom properties per org)
+- Custom `from` email domains per org (requires per-org Resend verification)

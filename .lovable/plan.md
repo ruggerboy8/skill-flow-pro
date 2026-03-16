@@ -1,70 +1,78 @@
-## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
-**Status: ✅ Complete**
 
-### What changed
+## Problem
 
-1. **Practice types expanded** to three region-specific values: `pediatric_us`, `general_us`, `general_uk`
-2. **`roles.practice_type`** column added — each role belongs to one practice type
-3. **`pro_moves.practice_type`** converted to **`pro_moves.practice_types TEXT[]`** — array-based multi-select
-4. All existing data backfilled (`pediatric` → `pediatric_us`, `general` → `general_us`, `all` → all three)
+On Monday morning (before any deadline), every location card shows **"100% Submitted"** in green — because we made the rate default to 100% when no deadline has passed. While technically correct (nothing is late), it's misleading: a manager sees "100%" and thinks everyone has already submitted, when in reality nobody has.
 
-### Files changed
+The fix we need is to **always show the real submission count as a progress measure**, but only apply **color grading and alert signals after deadlines pass**.
 
-| File | Change |
-|------|--------|
-| Migration SQL | Schema: expanded CHECK on orgs, added practice_types array on pro_moves, added practice_type on roles |
-| `RoleFormDrawer.tsx` | Added practice type Select (3 options) |
-| `PlatformRolesTab.tsx` | Shows practice type badge on role cards, fetches practice_type |
-| `ProMoveForm.tsx` | Replaced single Select with multi-checkbox for practice_types |
-| `DoctorProMoveForm.tsx` | Defaults practice_types to `['pediatric_us']` |
-| `OrgBootstrapDrawer.tsx` | 3 radio options with new labels |
-| `PlatformOrgsTab.tsx` | Badge display for all 3 practice types |
-| `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
-| `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
-| `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
+## What a manager wants to see at each point in the week
 
-## Tier 1 — Design System Token Unification
+| Timeframe | Big number on card | Color/border | Badges |
+|---|---|---|---|
+| **Mon morning** (nothing due) | "3 / 10 conf" (raw count) | Neutral (gray) | "Conf due Tue 2pm" |
+| **Tue morning** (conf not yet due) | "7 / 10 conf" | Neutral | "3 awaiting conf" |
+| **Tue after 2pm** (conf due) | "70% conf" | Green/amber/red based on rate | "3 late conf" |
+| **Thu** (perf opens) | "70% conf · 2 / 10 perf" | Color based on conf rate | "3 late conf · 8 awaiting perf" |
+| **Fri after 5pm** (both due) | "65% submitted" (combined rate) | Color based on combined rate | "3 late conf · 4 late perf" |
 
-**Status: ✅ Complete**
+## Plan
 
-### 1A — Consolidate Domain Colors (3→1)
-- Replaced unused `--domain-planning/environment/interactions/learning-experiences` CSS vars with `--domain-clinical/clerical/cultural/case-acceptance` (rich + pastel)
-- Updated `tailwind.config.ts` domain keys to match
-- `domainColors.ts` exports CSS var names; API unchanged
-- `DOMAIN_META` in `constants/domains.ts` now uses `chipStyle()` with token-derived colors
+### 1. Expand `calculateLocationStats` return type
 
-### 1B — StatusBadge Component + Tokens
-- Added `--status-complete/missing/late/excused/pending` CSS tokens to `index.css`
-- Created `src/components/ui/StatusBadge.tsx` with token-driven colors
-- Replaced inline `StatusPill` in `CoachDashboardV2`, `StaffDetailV2`, `ScoreHistoryV2`, `StatsScores`
+**File:** `src/lib/submissionStatus.ts`
 
-### 1C — Score Color Tokens (1–4)
-- Added `--score-1` through `--score-4` (+ `-bg` pastel variants) to `index.css`
-- Updated `NumberScale.tsx` to use inline styles with CSS vars instead of hardcoded Tailwind
+Add raw counts to the return value so the card can show "X / Y submitted" before deadlines:
+- `confSubmittedCount` — staff who have submitted confidence (regardless of deadline)
+- `confExpectedCount` — total staff expected to submit confidence
+- `perfSubmittedCount` / `perfExpectedCount` — same for performance
 
-### 1D — text-2xs Utility
-- Added `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `tailwind.config.ts`
-- Replaced all 340 occurrences of `text-[10px]` → `text-2xs` across 42 files
+The existing `submissionRate` stays as-is (only counts post-deadline metrics). Add a new `rawSubmissionCount` object with these fields.
 
-## Micro-Celebrations + Mobile Slide Transitions
+### 2. Expand `LocationStats` interface and pass raw counts
 
-**Status: ✅ Complete**
+**File:** `src/components/dashboard/LocationHealthCard.tsx`
 
-### 3A — Confetti on Celebration Moments
-- Added `canvas-confetti` dependency
-- Created `src/lib/confetti.ts` helper with `fireCelebration()` function
-- PerformanceWizard: confetti fires on victory modal open + on successful non-repair submit
-- ConfidenceWizard: confetti fires on successful non-repair submit
+Add to interface:
+- `confSubmitted: number` / `confExpected: number`
+- `perfSubmitted: number` / `perfExpected: number`
 
-### 3B — Submit Button Checkmark Animation
-- Added `submitPhase` state (`idle` | `saving` | `done`) to both wizards
-- Submit button transitions: text → spinner → green ✓ checkmark with scale-in animation
-- 1.8s celebration delay before navigating (0.8s for repair mode)
+### 3. Redesign the card's big number display
 
-### 4A — Mobile Slide Transitions
-- Added `framer-motion` dependency
-- Wrapped wizard step content in `<AnimatePresence mode="wait">` with directional slide variants
-- Forward (Next): slides in from right, exits left
-- Backward (Back): slides in from left, exits right
-- 200ms ease-out transitions; progress dots and sticky footer stay static
+**File:** `src/components/dashboard/LocationHealthCard.tsx`
+
+Logic for the prominent metric:
+- **Before any deadline passed:** Show `"{confSubmitted}/{confExpected} conf"` in **neutral gray** (no color grading). If perf window is open, also show perf count.
+- **After conf deadline but before perf deadline:** Show `"{submissionRate}% conf"` with color grading. If perf window open, show perf raw count below.
+- **After both deadlines:** Show combined `"{submissionRate}%"` with full color grading (current behavior).
+
+Border/background color: only apply the red/amber/green treatment when at least one deadline has passed. Before that, use a neutral border.
+
+### 4. Refine badges on the card
+
+Current badges are mostly correct already. Adjustments:
+- When no deadline has passed, show a contextual "Conf due {day time}" badge instead of "On Track" (the next-deadline info is already computed in RegionalDashboard — pass it down).
+- Keep "Awaiting Conf" / "Late Conf" / "Late Perf" as-is.
+
+### 5. Update RegionalDashboard summary cards + signals
+
+**File:** `src/pages/dashboard/RegionalDashboard.tsx`
+
+- **Avg Completion card:** Before any location's deadline has passed, show raw count instead of "100%" (e.g., "12 / 40 submitted"). After deadlines, show the rate.
+- **Signals:** Already gated behind `anyDeadlinePassed` — no change needed.
+- Pass `nextDeadlineLabel` per-location to cards for the contextual badge.
+
+### 6. Wire up in RegionalDashboard
+
+**File:** `src/pages/dashboard/RegionalDashboard.tsx`
+
+- Pull `confSubmitted/confExpected/perfSubmitted/perfExpected` from the expanded `calculateLocationStats` return.
+- Pass them through to `LocationHealthCard` via the expanded `LocationStats` interface.
+- Compute per-location next deadline label and pass to card.
+
+### Files Changed
+
+1. `src/lib/submissionStatus.ts` — add raw submission counts to return type
+2. `src/components/dashboard/LocationHealthCard.tsx` — redesign big number (progress vs rate), conditional color grading, deadline context badge
+3. `src/pages/dashboard/RegionalDashboard.tsx` — pass raw counts + per-location deadline labels to cards, update summary card
+

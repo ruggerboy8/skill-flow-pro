@@ -128,6 +128,12 @@ export function OrgSetupWizard({
   // Step 3 — Schedule
   const [schedules, setSchedules] = useState<Record<string, ScheduleData>>({});
 
+  // Step 4 — Branding
+  const [appDisplayName, setAppDisplayName] = useState('');
+  const [emailSignOff, setEmailSignOff] = useState('');
+  const [replyToEmail, setReplyToEmail] = useState('');
+  const [orgName, setOrgName] = useState('');
+
   // ── Data loading ─────────────────────────────────────────────────────────────
 
   const loadData = useCallback(async () => {

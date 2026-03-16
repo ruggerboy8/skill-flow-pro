@@ -1,0 +1,1 @@
+UPDATE staff SET is_clinical_director = true WHERE id = '38d4458c-cc01-402a-bf59-d7530f39c0ec';

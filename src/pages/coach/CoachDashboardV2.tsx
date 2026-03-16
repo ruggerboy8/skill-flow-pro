@@ -94,6 +94,76 @@ export default function CoachDashboardV2({
     weekOf: weekOfString 
   });
   
+  // Fetch per-location deadline configs
+  useEffect(() => {
+    if (summaries.length === 0) return;
+    const locationIds = [...new Set(summaries.map(s => s.location_id))];
+    supabase
+      .from('locations')
+      .select('id, timezone, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
+      .in('id', locationIds)
+      .then(({ data }) => {
+        if (!data) return;
+        const map = new Map<string, LocationConfig>();
+        data.forEach(loc => {
+          map.set(loc.id, {
+            timezone: loc.timezone,
+            conf_due_day: loc.conf_due_day,
+            conf_due_time: loc.conf_due_time,
+            perf_due_day: loc.perf_due_day,
+            perf_due_time: loc.perf_due_time,
+          });
+        });
+        setLocationConfigs(map);
+      });
+  }, [summaries]);
+
+  // Keep currentNow updated
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentNow(nowUtc()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Build per-location submission gates
+  const locationGatesMap = useMemo(() => {
+    const map = new Map<string, SubmissionGates>();
+    locationConfigs.forEach((config, locId) => {
+      map.set(locId, getLocationSubmissionGates(currentNow, config));
+    });
+    return map;
+  }, [currentNow, locationConfigs]);
+
+  // Check if we're viewing the current week (deadline-awareness only applies to current week)
+  const isCurrentWeek = useMemo(() => {
+    const currentMonday = getChicagoMonday(new Date());
+    return weekOfString === currentMonday;
+  }, [weekOfString]);
+
+  // Helper: get deadline-aware status for a metric
+  const getDeadlineAwareStatus = useCallback((
+    locationId: string, 
+    hasAll: boolean, 
+    hasAnyLate: boolean, 
+    isExcused: boolean,
+    metric: 'confidence' | 'performance'
+  ): SubmissionStatus => {
+    if (isExcused) return 'excused';
+    if (hasAll) return hasAnyLate ? 'late' : 'complete';
+    
+    // For historical weeks, always show missing if not complete
+    if (!isCurrentWeek) return 'missing';
+    
+    const gates = locationGatesMap.get(locationId);
+    if (!gates) return 'missing'; // fallback
+    
+    if (metric === 'confidence') {
+      return gates.isPastConfidenceDeadline ? 'missing' : 'pending';
+    } else {
+      if (!gates.isPerformanceOpen) return 'not_open';
+      return gates.isPastPerformanceDeadline ? 'missing' : 'pending';
+    }
+  }, [isCurrentWeek, locationGatesMap]);
+  
   // Location excuses for this week
   const { excuses } = useLocationExcuses(weekOfString);
   

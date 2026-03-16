@@ -154,6 +154,10 @@ export default function RegionalDashboard() {
         missingConfCount: adjustedMissingConf,
         missingPerfCount: adjustedMissingPerf,
         pendingConfCount: adjustedPendingConf,
+        confSubmitted: locStats.confSubmittedCount,
+        confExpected: locStats.confExpectedCount,
+        perfSubmitted: locStats.perfSubmittedCount,
+        perfExpected: locStats.perfExpectedCount,
       };
     });
 

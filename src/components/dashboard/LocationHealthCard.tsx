@@ -9,9 +9,13 @@ export interface LocationStats {
   name: string;
   staffCount: number;
   submissionRate: number;      // 0-100 (conf+perf complete %)
-  missingConfCount: number;    // staff missing confidence (after Tue deadline - LATE)
-  missingPerfCount: number;    // staff missing performance (after Thu open - LATE)
+  missingConfCount: number;    // staff missing confidence (after deadline - LATE)
+  missingPerfCount: number;    // staff missing performance (after deadline - LATE)
   pendingConfCount?: number;   // staff not yet submitted but before deadline
+  confSubmitted?: number;      // raw count of conf submissions
+  confExpected?: number;       // raw count of expected conf submissions
+  perfSubmitted?: number;      // raw count of perf submissions
+  perfExpected?: number;       // raw count of expected perf submissions
 }
 
 export interface ExcuseStatus {
@@ -32,21 +36,29 @@ interface LocationHealthCardProps {
   stats: LocationStats;
   excuseStatus?: ExcuseStatus;
   submissionGates?: SubmissionGates;
+  nextDeadlineLabel?: string | null;
 }
 
 export function LocationHealthCard({ 
   stats, 
   excuseStatus,
   submissionGates,
+  nextDeadlineLabel,
 }: LocationHealthCardProps) {
   const navigate = useNavigate();
 
   const isFullyExcused = excuseStatus?.isConfExcused && excuseStatus?.isPerfExcused;
   const isPartiallyExcused = (excuseStatus?.isConfExcused || excuseStatus?.isPerfExcused) && !isFullyExcused;
 
-  // Visual status based on submission rate (or excused status)
+  const confClosed = submissionGates?.confidenceClosed ?? false;
+  const perfClosed = submissionGates?.performanceClosed ?? false;
+  const perfOpen = submissionGates?.performanceOpen ?? false;
+  const anyDeadlinePassed = confClosed || perfClosed;
+
+  // Visual status: only color-grade after a deadline has passed
   const getStatusClasses = (rate: number) => {
     if (isFullyExcused) return "border-muted bg-muted/20";
+    if (!anyDeadlinePassed) return "border-border bg-card";
     if (rate < 50) return "border-destructive/30 bg-destructive/5";
     if (rate < 80) return "border-warning/30 bg-warning/5";
     return "border-primary/30 bg-primary/5";
@@ -54,12 +66,74 @@ export function LocationHealthCard({
 
   const getRateColor = (rate: number) => {
     if (isFullyExcused) return "text-muted-foreground";
+    if (!anyDeadlinePassed) return "text-foreground";
     if (rate < 50) return "text-destructive";
     if (rate < 80) return "text-warning";
     return "text-primary";
   };
 
-  // Determine which excuse badge to show based on submission period
+  // Render the big number based on deadline state
+  const renderBigNumber = () => {
+    if (isFullyExcused) {
+      return (
+        <>
+          <div className="text-2xl font-black text-muted-foreground">—</div>
+          <div className="text-2xs text-muted-foreground leading-tight">Location Excused</div>
+        </>
+      );
+    }
+
+    const confSub = stats.confSubmitted ?? 0;
+    const confExp = stats.confExpected ?? 0;
+    const perfSub = stats.perfSubmitted ?? 0;
+    const perfExp = stats.perfExpected ?? 0;
+
+    // After both deadlines: combined rate
+    if (confClosed && perfClosed) {
+      return (
+        <>
+          <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
+            {Math.round(stats.submissionRate)}%
+          </div>
+          <div className="text-2xs text-muted-foreground leading-tight">Submitted</div>
+        </>
+      );
+    }
+
+    // After conf deadline, perf not yet due
+    if (confClosed && !perfClosed) {
+      return (
+        <>
+          <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
+            {Math.round(stats.submissionRate)}%
+          </div>
+          <div className="text-2xs text-muted-foreground leading-tight">Conf Rate</div>
+          {perfOpen && confExp > 0 && (
+            <div className="text-2xs text-muted-foreground mt-0.5">
+              {perfSub}/{perfExp} perf
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // Before any deadline: show raw progress counts
+    return (
+      <>
+        <div className="text-xl font-black text-foreground">
+          {confSub}/{confExp}
+        </div>
+        <div className="text-2xs text-muted-foreground leading-tight">Conf</div>
+        {perfOpen && confExp > 0 && (
+          <div className="text-2xs text-muted-foreground mt-0.5">
+            {perfSub}/{perfExp} perf
+          </div>
+        )}
+      </>
+    );
+  };
+
+  // Determine which excuse badge to show
   const getContextualExcuseBadge = () => {
     if (isFullyExcused) {
       const reason = excuseStatus?.confReason || excuseStatus?.perfReason;
@@ -72,7 +146,6 @@ export function LocationHealthCard({
     }
     
     if (isPartiallyExcused) {
-      // During confidence period (before deadline), show conf excuse prominently
       if (excuseStatus?.isConfExcused && submissionGates && !submissionGates.confidenceClosed) {
         return (
           <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
@@ -80,8 +153,6 @@ export function LocationHealthCard({
           </Badge>
         );
       }
-      
-      // During performance period, show perf excuse prominently
       if (excuseStatus?.isPerfExcused && submissionGates?.performanceOpen) {
         return (
           <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
@@ -89,8 +160,6 @@ export function LocationHealthCard({
           </Badge>
         );
       }
-      
-      // Fallback: show whichever is excused
       return (
         <Badge variant="outline" className="border-warning text-warning gap-1 shrink-0">
           {excuseStatus?.isConfExcused ? 'Conf' : 'Perf'} Excused
@@ -125,12 +194,7 @@ export function LocationHealthCard({
             <div className="text-2xs text-primary font-medium mb-0.5 uppercase tracking-wide">
               This Week
             </div>
-            <div className={cn("text-2xl font-black", getRateColor(stats.submissionRate))}>
-              {isFullyExcused ? '—' : `${Math.round(stats.submissionRate)}%`}
-            </div>
-            <div className="text-2xs text-muted-foreground leading-tight">
-              {isFullyExcused ? 'Location Excused' : 'Submitted'}
-            </div>
+            {renderBigNumber()}
           </div>
         </div>
       </CardHeader>
@@ -161,8 +225,7 @@ export function LocationHealthCard({
                   {stats.missingPerfCount} Late Perf
                 </Badge>
               )}
-              {submissionGates && submissionGates.performanceOpen && !submissionGates.performanceClosed && 
-               stats.missingPerfCount === 0 && !excuseStatus?.isPerfExcused && (
+              {perfOpen && !perfClosed && stats.missingPerfCount === 0 && !excuseStatus?.isPerfExcused && (
                 <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground gap-1">
                   <Clock className="h-3 w-3" />
                   Perf Window Open
@@ -178,8 +241,17 @@ export function LocationHealthCard({
                   Perf Excused
                 </Badge>
               )}
-              {stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 && stats.missingPerfCount === 0 && 
-               !excuseStatus?.isConfExcused && !excuseStatus?.isPerfExcused && (
+              {/* Before any deadline: show next deadline context */}
+              {!anyDeadlinePassed && stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 && 
+               !excuseStatus?.isConfExcused && !excuseStatus?.isPerfExcused && nextDeadlineLabel && (
+                <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground gap-1">
+                  <Clock className="h-3 w-3" />
+                  {nextDeadlineLabel}
+                </Badge>
+              )}
+              {/* After deadline(s), all good */}
+              {anyDeadlinePassed && stats.missingConfCount === 0 && (stats.pendingConfCount ?? 0) === 0 && 
+               stats.missingPerfCount === 0 && !excuseStatus?.isConfExcused && !excuseStatus?.isPerfExcused && (
                 <Badge variant="secondary" className="bg-primary/10 text-primary gap-1">
                   <CheckCircle2 className="h-3 w-3" />
                   On Track

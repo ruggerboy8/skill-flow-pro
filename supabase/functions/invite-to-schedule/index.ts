@@ -63,10 +63,10 @@ serve(async (req) => {
       });
     }
 
-    // Get doctor info
+    // Get doctor info + org branding
     const { data: doctor } = await admin
       .from("staff")
-      .select("id, name, email, user_id")
+      .select("id, name, email, user_id, primary_location_id")
       .eq("id", doctor_staff_id)
       .single();
 
@@ -76,6 +76,24 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Resolve org branding
+    let orgBranding: { email_sign_off?: string; reply_to_email?: string; app_display_name?: string } = {};
+    if (doctor.primary_location_id) {
+      const { data: loc } = await admin
+        .from('locations')
+        .select('practice_groups!locations_org_fkey(organizations!practice_groups_organization_id_fkey(email_sign_off, reply_to_email, app_display_name))')
+        .eq('id', doctor.primary_location_id)
+        .single();
+      const org = (loc as any)?.practice_groups?.organizations;
+      if (org) orgBranding = org;
+    }
+
+    const fromDisplayName = orgBranding.app_display_name || 'Pro-Moves';
+    const fromEmail = defaultFromEmail.includes('<')
+      ? defaultFromEmail.replace(/^[^<]*</, `${fromDisplayName} <`)
+      : `${fromDisplayName} <${defaultFromEmail}>`;
+    const replyTo = orgBranding.reply_to_email || defaultReplyTo;
 
     // Use provided scheduling_link, or fall back to caller's stored link
     const link = scheduling_link || callerStaff.scheduling_link;

@@ -139,7 +139,7 @@ export function SchedulingInviteComposer({
     }
   }
 
-  const appBaseUrl = 'https://alcanskills.lovable.app';
+  const appBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mypromoves.com';
   const prepLink = sessionId
     ? `${appBaseUrl}/doctor/review-prep/${sessionId}`
     : '[prep link — generated after session is created]';

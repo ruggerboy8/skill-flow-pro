@@ -61,7 +61,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch evals with staff info AND org name resolved via location → practice_group → organization chain
+    // Fetch evals with staff info AND org branding resolved via location → practice_group → organization chain
     const { data: evals, error: evalErr } = await supabase
       .from('evaluations')
       .select(`
@@ -69,7 +69,7 @@ serve(async (req) => {
         staff!evaluations_staff_id_fkey(name, email),
         locations!evaluations_location_id_fkey(
           practice_groups!locations_org_fkey(
-            organizations!practice_groups_organization_id_fkey(name)
+            organizations!practice_groups_organization_id_fkey(name, email_sign_off, reply_to_email, app_display_name)
           )
         )
       `)

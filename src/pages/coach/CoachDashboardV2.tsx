@@ -376,15 +376,25 @@ export default function CoachDashboardV2({
 
   const hasActiveFilters = selectedOrganizations.length > 0 || selectedLocations.length > 0 || selectedRoles.length > 0 || search.trim() !== '';
 
-  // Missing counts for reminder buttons - exclude staff at excused locations
+  // Missing counts for reminder buttons - only count staff past deadline, exclude excused
   const missingConfCount = sortedRows.filter(s => {
     if (isMetricExcused(s.staff_id, s.location_id, 'confidence')) return false;
-    return s.conf_count < s.assignment_count;
+    if (s.conf_count >= s.assignment_count) return false;
+    if (isCurrentWeek) {
+      const gates = locationGatesMap.get(s.location_id);
+      if (gates && !gates.isPastConfidenceDeadline) return false;
+    }
+    return true;
   }).length;
   
   const missingPerfCount = sortedRows.filter(s => {
     if (isMetricExcused(s.staff_id, s.location_id, 'performance')) return false;
-    return s.perf_count < s.assignment_count;
+    if (s.perf_count >= s.assignment_count) return false;
+    if (isCurrentWeek) {
+      const gates = locationGatesMap.get(s.location_id);
+      if (gates && !gates.isPastPerformanceDeadline) return false;
+    }
+    return true;
   }).length;
 
   // Open reminder modals - filter out excused locations

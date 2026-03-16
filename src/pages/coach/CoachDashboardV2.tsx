@@ -686,17 +686,21 @@ export default function CoachDashboardV2({
                             )}
                           </TableCell>
                           <TableCell className="text-center">
-                            <StatusPill
+                            <DeadlineStatusPill
+                              locationId={row.location_id}
                               hasAll={hasAllConf}
                               hasAnyLate={row.scores.some(s => s.confidence_late)}
                               isExcused={isMetricExcused(row.staff_id, row.location_id, 'confidence')}
+                              metric="confidence"
                             />
                           </TableCell>
                           <TableCell className="text-center">
-                            <StatusPill
+                            <DeadlineStatusPill
+                              locationId={row.location_id}
                               hasAll={hasAllPerf}
                               hasAnyLate={row.scores.some(s => s.performance_late)}
                               isExcused={isMetricExcused(row.staff_id, row.location_id, 'performance')}
+                              metric="performance"
                             />
                           </TableCell>
                         </TableRow>

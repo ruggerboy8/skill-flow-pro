@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/StatusBadge';
+import { StatusBadge, type SubmissionStatus } from '@/components/ui/StatusBadge';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronLeft, ChevronRight, RotateCw, CalendarOff, X } from 'lucide-react';
@@ -23,6 +23,8 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { useStaffSubmissionRates } from '@/hooks/useStaffSubmissionRates';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
+import { nowUtc } from '@/lib/centralTime';
 
 interface CoachDashboardProps {
   forcedLocationId?: string;        // Locks to specific location by UUID

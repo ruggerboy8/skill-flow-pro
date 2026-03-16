@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { BookOpen, TrendingUp, Trophy } from 'lucide-react';
-import alcanLogo from '@/assets/alcan-logo-full.jpg';
+import alcanLogo from '@/assets/alcan-logo-full.jpg'; // TODO: Replace with org-specific logo once logo upload is implemented
 
 interface StaffInfo {
   name: string;
@@ -81,7 +81,7 @@ export default function Welcome() {
           <div className="flex justify-center">
             <img 
               src={alcanLogo} 
-              alt="Alcan Dental Cooperative" 
+              alt="Pro-Moves" 
               className="h-14 w-auto object-contain"
             />
           </div>
@@ -109,7 +109,7 @@ export default function Welcome() {
                   }
                 </p>
                 <p className="text-muted-foreground text-sm">
-                  The Alcan team is here to support your professional growth every step of the way.
+                  Your team is here to support your professional growth every step of the way.
                 </p>
               </>
             )}

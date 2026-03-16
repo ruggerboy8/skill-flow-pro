@@ -15,6 +15,7 @@ import {
   Users,
   MapPin,
   Clock,
+  Mail,
   Pencil,
   Plus,
   Loader2,
@@ -73,7 +74,8 @@ const STEPS = [
   { id: 1, label: 'Positions' },
   { id: 2, label: 'Locations' },
   { id: 3, label: 'Schedule' },
-  { id: 4, label: 'All Set!' },
+  { id: 4, label: 'Branding' },
+  { id: 5, label: 'All Set!' },
 ];
 
 const DAY_OPTIONS = [
@@ -127,18 +129,31 @@ export function OrgSetupWizard({
   // Step 3 — Schedule
   const [schedules, setSchedules] = useState<Record<string, ScheduleData>>({});
 
+  // Step 4 — Branding
+  const [appDisplayName, setAppDisplayName] = useState('');
+  const [emailSignOff, setEmailSignOff] = useState('');
+  const [replyToEmail, setReplyToEmail] = useState('');
+  const [orgName, setOrgName] = useState('');
+
   // ── Data loading ─────────────────────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
     if (!organizationId) return;
     setLoadingData(true);
     try {
-      // Org practice_type → determines which roles to show
+      // Org practice_type + branding fields
       const { data: orgData } = await supabase
         .from('organizations')
-        .select('practice_type')
+        .select('practice_type, name, app_display_name, email_sign_off, reply_to_email')
         .eq('id', organizationId)
         .single();
+
+      // Pre-populate branding fields
+      const oName = orgData?.name || '';
+      setOrgName(oName);
+      setAppDisplayName(orgData?.app_display_name || oName);
+      setEmailSignOff(orgData?.email_sign_off || `The ${oName} Team`);
+      setReplyToEmail(orgData?.reply_to_email || '');
 
       // Load roles for this practice type; fall back to all active roles if none match
       const { data: typedRoles } = await supabase
@@ -328,15 +343,37 @@ export function OrgSetupWizard({
 
   // ── Navigation ───────────────────────────────────────────────────────────────
 
+  const saveBranding = async (): Promise<boolean> => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          app_display_name: appDisplayName.trim() || null,
+          email_sign_off: emailSignOff.trim() || null,
+          reply_to_email: replyToEmail.trim() || null,
+        })
+        .eq('id', organizationId);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      toast({ title: 'Error saving branding', description: err.message, variant: 'destructive' });
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleNext = async () => {
     let ok = true;
     if (step === 1) ok = await savePositions();
     if (step === 2) ok = await saveLocations();
-    if (step === 3) {
-      ok = await saveSchedules();
+    if (step === 3) ok = await saveSchedules();
+    if (step === 4) {
+      ok = await saveBranding();
       if (ok) onComplete();
     }
-    if (ok) setStep((s) => Math.min(s + 1, 4));
+    if (ok) setStep((s) => Math.min(s + 1, 5));
   };
 
   const handleBack = () => setStep((s) => Math.max(s - 1, 1));
@@ -740,9 +777,73 @@ export function OrgSetupWizard({
     </div>
   );
 
-  // ── Step 4: Done ─────────────────────────────────────────────────────────────
+  // ── Step 4: Branding ──────────────────────────────────────────────────────────
 
-  const renderStep4 = () => {
+  const renderStep4 = () => (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-base font-semibold flex items-center gap-2">
+          <Mail className="h-4 w-4 text-primary" />
+          Email branding
+        </h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Customize how your organization appears in emails sent to staff.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Display Name</Label>
+          <Input
+            value={appDisplayName}
+            onChange={(e) => setAppDisplayName(e.target.value)}
+            placeholder={orgName || 'Your Organization'}
+            className="h-9 text-sm"
+          />
+          <p className="text-2xs text-muted-foreground">
+            How should we refer to your organization in emails?
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Email Sign-off</Label>
+          <Input
+            value={emailSignOff}
+            onChange={(e) => setEmailSignOff(e.target.value)}
+            placeholder={`The ${orgName || 'Your'} Team`}
+            className="h-9 text-sm"
+          />
+          <p className="text-2xs text-muted-foreground">
+            Appears at the bottom of emails, e.g. "— The Kids Tooth Team"
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Reply-to Email (optional)</Label>
+          <Input
+            value={replyToEmail}
+            onChange={(e) => setReplyToEmail(e.target.value)}
+            placeholder="e.g. manager@yourpractice.com"
+            type="email"
+            className="h-9 text-sm"
+          />
+          <p className="text-2xs text-muted-foreground">
+            Where should staff replies go? Leave blank to use the platform default.
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-md border border-dashed border-muted-foreground/30 p-3 mt-2">
+        <p className="text-2xs text-muted-foreground text-center">
+          🎨 Logo upload and accent colors coming soon
+        </p>
+      </div>
+    </div>
+  );
+
+  // ── Step 5: Done ─────────────────────────────────────────────────────────────
+
+  const renderStep5 = () => {
     const checkedCount = Object.values(roleSelections).filter((r) => r.checked).length;
     return (
       <div className="text-center space-y-5 py-4">
@@ -762,6 +863,7 @@ export function OrgSetupWizard({
             ✓ <strong>{locations.length}</strong> location{locations.length !== 1 ? 's' : ''} ready
           </p>
           <p>✓ Submission deadlines set</p>
+          <p>✓ Email branding configured</p>
         </div>
       </div>
     );
@@ -793,13 +895,14 @@ export function OrgSetupWizard({
               {step === 2 && renderStep2()}
               {step === 3 && renderStep3()}
               {step === 4 && renderStep4()}
+              {step === 5 && renderStep5()}
             </>
           )}
         </div>
 
         {/* Navigation footer */}
         <div className="flex justify-between pt-4 border-t mt-4">
-          {step > 1 && step < 4 ? (
+          {step > 1 && step < 5 ? (
             <Button variant="outline" onClick={handleBack} disabled={saving}>
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back
@@ -808,10 +911,10 @@ export function OrgSetupWizard({
             <div />
           )}
 
-          {step < 4 ? (
+          {step < 5 ? (
             <Button onClick={handleNext} disabled={saving || loadingData}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {step === 3 ? (
+              {step === 4 ? (
                 'Finish Setup'
               ) : (
                 <>

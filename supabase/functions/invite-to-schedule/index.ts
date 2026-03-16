@@ -17,8 +17,8 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    const fromEmail = Deno.env.get("RESEND_FROM") || "Pro-Moves <pro-moves@alcandentalcooperative.com>";
-    const replyTo = Deno.env.get("RESEND_REPLY_TO") || "johno@alcandentalcooperative.com";
+    const defaultFromEmail = Deno.env.get("RESEND_FROM") || "Pro-Moves <no-reply@mypromoves.com>";
+    const defaultReplyTo = Deno.env.get("RESEND_REPLY_TO") || "johno@alcandentalcooperative.com";
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -63,10 +63,10 @@ serve(async (req) => {
       });
     }
 
-    // Get doctor info
+    // Get doctor info + org branding
     const { data: doctor } = await admin
       .from("staff")
-      .select("id, name, email, user_id")
+      .select("id, name, email, user_id, primary_location_id")
       .eq("id", doctor_staff_id)
       .single();
 
@@ -76,6 +76,24 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Resolve org branding
+    let orgBranding: { email_sign_off?: string; reply_to_email?: string; app_display_name?: string } = {};
+    if (doctor.primary_location_id) {
+      const { data: loc } = await admin
+        .from('locations')
+        .select('practice_groups!locations_org_fkey(organizations!practice_groups_organization_id_fkey(email_sign_off, reply_to_email, app_display_name))')
+        .eq('id', doctor.primary_location_id)
+        .single();
+      const org = (loc as any)?.practice_groups?.organizations;
+      if (org) orgBranding = org;
+    }
+
+    const fromDisplayName = orgBranding.app_display_name || 'Pro-Moves';
+    const fromEmail = defaultFromEmail.includes('<')
+      ? defaultFromEmail.replace(/^[^<]*</, `${fromDisplayName} <`)
+      : `${fromDisplayName} <${defaultFromEmail}>`;
+    const replyTo = orgBranding.reply_to_email || defaultReplyTo;
 
     // Use provided scheduling_link, or fall back to caller's stored link
     const link = scheduling_link || callerStaff.scheduling_link;
@@ -126,7 +144,7 @@ serve(async (req) => {
       const firstName = doctor.name.replace(/^dr\.?\s*/i, '').trim().split(" ")[0] || doctor.name;
       const coachName = callerStaff.name;
       // Resolve prep_link: use provided value, or construct from session
-      const appUrl = Deno.env.get('APP_URL') || 'https://alcanskills.lovable.app';
+      const appUrl = Deno.env.get('APP_URL') || 'https://mypromoves.com';
       const resolvedPrepLink = prep_link || `${appUrl}/doctor/review-prep/${sessionData.id}`;
 
       // Use custom template if provided, otherwise build default

@@ -62,7 +62,7 @@ serve(async (req) => {
     // Fetch session + doctor info
     const { data: session, error: sessErr } = await supabase
       .from('coaching_sessions')
-      .select('id, doctor_staff_id, sequence_number, staff:doctor_staff_id(name, email, user_id)')
+      .select('id, doctor_staff_id, sequence_number, staff:doctor_staff_id(name, email, user_id, primary_location_id)')
       .eq('id', session_id)
       .single();
 
@@ -79,9 +79,29 @@ serve(async (req) => {
       });
     }
 
+    // Resolve org branding via doctor's location chain
+    let orgBranding: { email_sign_off?: string; reply_to_email?: string; app_display_name?: string } = {};
+    if (doctor.primary_location_id) {
+      const { data: loc } = await supabase
+        .from('locations')
+        .select('practice_groups!locations_org_fkey(organizations!practice_groups_organization_id_fkey(email_sign_off, reply_to_email, app_display_name))')
+        .eq('id', doctor.primary_location_id)
+        .single();
+      const org = (loc as any)?.practice_groups?.organizations;
+      if (org) orgBranding = org;
+    }
+
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    const fromEmail = Deno.env.get('RESEND_FROM') || 'Pro-Moves <pro-moves@alcandentalcooperative.com>';
-    const replyTo = Deno.env.get('RESEND_REPLY_TO') || 'johno@alcandentalcooperative.com';
+    const defaultFrom = Deno.env.get('RESEND_FROM') || 'Pro-Moves <no-reply@mypromoves.com>';
+    const defaultReplyTo = Deno.env.get('RESEND_REPLY_TO') || 'johno@alcandentalcooperative.com';
+
+    // Use org branding with fallbacks
+    const fromDisplayName = orgBranding.app_display_name || 'Pro-Moves';
+    const fromEmail = defaultFrom.includes('<')
+      ? defaultFrom.replace(/^[^<]*</, `${fromDisplayName} <`)
+      : `${fromDisplayName} <${defaultFrom}>`;
+    const replyTo = orgBranding.reply_to_email || defaultReplyTo;
+    const signOff = orgBranding.email_sign_off || 'The Pro-Moves Team';
 
     if (!resendApiKey) {
       console.error('RESEND_API_KEY not configured');
@@ -92,14 +112,14 @@ serve(async (req) => {
 
     const firstName = (doctor.name || '').split(' ')[0] || 'Doctor';
     const coachName = caller.name || 'your clinical director';
-    const appUrl = Deno.env.get('APP_URL') || 'https://alcanskills.lovable.app';
+    const appUrl = Deno.env.get('APP_URL') || 'https://mypromoves.com';
     const reviewLink = `${appUrl}/doctor/review-prep/${session_id}`;
 
     const subject = `Your coaching meeting summary is ready for review`;
     const html = `<p>Hi Dr. ${firstName},</p>
 <p>${coachName} has shared the summary from your recent coaching session. Please take a moment to <a href="${reviewLink}">review the key takeaways and action steps</a>.</p>
 <p>If everything looks good, confirm it so your action steps are locked in. If something needs adjusting, you can request a revision.</p>
-<p>— The ALCAN Team</p>`;
+<p>— ${signOff}</p>`;
 
     const text = `Hi Dr. ${firstName},
 
@@ -109,7 +129,7 @@ ${reviewLink}
 
 If everything looks good, confirm it so your action steps are locked in. If something needs adjusting, you can request a revision.
 
-— The ALCAN Team`;
+— ${signOff}`;
 
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',

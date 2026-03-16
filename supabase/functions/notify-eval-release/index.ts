@@ -61,7 +61,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch evals with staff info AND org name resolved via location → practice_group → organization chain
+    // Fetch evals with staff info AND org branding resolved via location → practice_group → organization chain
     const { data: evals, error: evalErr } = await supabase
       .from('evaluations')
       .select(`
@@ -69,7 +69,7 @@ serve(async (req) => {
         staff!evaluations_staff_id_fkey(name, email),
         locations!evaluations_location_id_fkey(
           practice_groups!locations_org_fkey(
-            organizations!practice_groups_organization_id_fkey(name)
+            organizations!practice_groups_organization_id_fkey(name, email_sign_off, reply_to_email, app_display_name)
           )
         )
       `)
@@ -89,11 +89,11 @@ serve(async (req) => {
     // (e.g. "Skill Flow Pro <no-reply@skillflowpro.com>") in Supabase secrets.
     // The org name in the email body is resolved dynamically, so the from address
     // can safely remain platform-level while still feeling personalised.
-    const fromEmail = Deno.env.get('RESEND_FROM') || 'Skill Flow Pro <no-reply@skillflowpro.com>';
-    const replyTo = Deno.env.get('RESEND_REPLY_TO') || undefined;
+    const defaultFromEmail = Deno.env.get('RESEND_FROM') || 'Pro-Moves <no-reply@mypromoves.com>';
+    const defaultReplyTo = Deno.env.get('RESEND_REPLY_TO') || undefined;
 
-    // App URL — override in Supabase secrets once the platform has a permanent domain.
-    const appUrl = Deno.env.get('APP_URL') || 'https://skillflowpro.com';
+    // App URL
+    const appUrl = Deno.env.get('APP_URL') || 'https://mypromoves.com';
 
     if (!resendApiKey) {
       console.error('RESEND_API_KEY not configured');
@@ -107,9 +107,15 @@ serve(async (req) => {
       const staff = ev.staff as any;
       if (!staff?.email) continue;
 
-      // Resolve org name: evaluations → locations → practice_groups → organizations
-      const orgName: string =
-        (ev as any).locations?.practice_groups?.organizations?.name || 'Your Practice';
+      // Resolve org branding
+      const orgData = (ev as any).locations?.practice_groups?.organizations;
+      const orgName: string = orgData?.name || 'Your Practice';
+      const signOff: string = orgData?.email_sign_off || `The ${orgName} Team`;
+      const orgReplyTo: string = orgData?.reply_to_email || defaultReplyTo;
+      const fromDisplayName: string = orgData?.app_display_name || 'Pro-Moves';
+      const fromEmail = defaultFromEmail.includes('<')
+        ? defaultFromEmail.replace(/^[^<]*</, `${fromDisplayName} <`)
+        : `${fromDisplayName} <${defaultFromEmail}>`;
 
       const firstName = (staff.name || '').split(' ')[0] || 'Team Member';
       const periodLabel = ev.type === 'Baseline'
@@ -124,7 +130,7 @@ serve(async (req) => {
         '',
         appUrl,
         '',
-        `— The ${orgName} Team`,
+        `— ${signOff}`,
       ].join('\n');
 
       try {
@@ -134,7 +140,7 @@ serve(async (req) => {
           subject,
           text: body,
         };
-        if (replyTo) emailPayload.reply_to = replyTo;
+        if (orgReplyTo) emailPayload.reply_to = orgReplyTo;
 
         const resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',

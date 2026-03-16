@@ -114,8 +114,8 @@ serve(async (req) => {
 
     // Get Resend config
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    const fromEmail = Deno.env.get('RESEND_FROM') || 'Pro-Moves <pro-moves@alcandentalcooperative.com>';
-    const replyTo = Deno.env.get('RESEND_REPLY_TO') || 'johno@alcandentalcooperative.com';
+    const defaultFromEmail = Deno.env.get('RESEND_FROM') || 'Pro-Moves <no-reply@mypromoves.com>';
+    const defaultReplyTo = Deno.env.get('RESEND_REPLY_TO') || 'johno@alcandentalcooperative.com';
 
     if (!resendApiKey) {
       return new Response(
@@ -131,14 +131,15 @@ serve(async (req) => {
 
     for (const recipient of recipients) {
       try {
-        // Get recipient's location timezone (if they're a staff member)
+        // Get recipient's location timezone and org branding
         let recipientTimezone = 'America/Chicago'; // default
         let weekLabelForRecipient = getWeekLabelForTimezone(recipientTimezone);
+        let orgBranding: { email_sign_off?: string; reply_to_email?: string; app_display_name?: string } = {};
         
         if (!recipient.user_id.startsWith('manual-')) {
           const { data: staffData } = await supabase
             .from('staff')
-            .select('primary_location_id, locations(timezone)')
+            .select('primary_location_id, locations(timezone, practice_groups!locations_org_fkey(organizations!practice_groups_organization_id_fkey(email_sign_off, reply_to_email, app_display_name)))')
             .eq('user_id', recipient.user_id)
             .single();
           
@@ -146,7 +147,16 @@ serve(async (req) => {
             recipientTimezone = (staffData.locations as any).timezone;
             weekLabelForRecipient = getWeekLabelForTimezone(recipientTimezone);
           }
+          const org = (staffData?.locations as any)?.practice_groups?.organizations;
+          if (org) orgBranding = org;
         }
+
+        // Resolve branding with fallbacks
+        const fromDisplayName = orgBranding.app_display_name || 'Pro-Moves';
+        const fromEmail = defaultFromEmail.includes('<')
+          ? defaultFromEmail.replace(/^[^<]*</, `${fromDisplayName} <`)
+          : `${fromDisplayName} <${defaultFromEmail}>`;
+        const replyTo = orgBranding.reply_to_email || defaultReplyTo;
         
         // Extract first name
         const firstName = recipient.name.split(' ')[0];

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Check, Loader2 } from 'lucide-react';
-import alcanLogo from '@/assets/alcan-logo-full.jpg';
+import alcanLogo from '@/assets/alcan-logo-full.jpg'; // TODO: Replace with org-specific logo once logo upload is implemented
 
 interface StaffInfo {
   name: string;
@@ -141,7 +141,7 @@ export default function SetupPassword() {
           <div className="flex justify-center">
             <img 
               src={alcanLogo} 
-              alt="Alcan Dental Cooperative" 
+              alt="Pro-Moves" 
               className="h-16 w-auto object-contain"
             />
           </div>
@@ -157,8 +157,8 @@ export default function SetupPassword() {
             )}
             <p className="text-muted-foreground text-sm leading-relaxed">
               {staffInfo?.locationName 
-                ? `We're getting you set up as part of the ${staffInfo.locationName} team! The Alcan team is excited to support your growth. Let's create your password.`
-                : "The Alcan team is excited to support your growth. Let's create your password to get started."
+                ? `We're getting you set up as part of the ${staffInfo.locationName} team! Your team is excited to support your growth. Let's create your password.`
+                : "Your team is excited to support your growth. Let's create your password to get started."
               }
             </p>
           </div>

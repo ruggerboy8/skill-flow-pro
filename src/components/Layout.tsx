@@ -149,9 +149,9 @@ export default function Layout() {
             <header className="h-16 flex items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 sticky top-0 z-10">
               <SidebarTrigger />
               
-              {/* Centered ALCAN logo */}
+              {/* Centered logo */}
               <div className="absolute left-1/2 -translate-x-1/2">
-                <img src={alcanLogo} alt="ALCAN" className="h-6 dark:invert" />
+                <img src={alcanLogo} alt="Pro-Moves" className="h-6 dark:invert" />
               </div>
               
               <div className="flex-1" />

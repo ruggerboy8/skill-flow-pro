@@ -81,7 +81,7 @@ export default function Welcome() {
           <div className="flex justify-center">
             <img 
               src={alcanLogo} 
-              alt="Alcan Dental Cooperative" 
+              alt="Pro-Moves" 
               className="h-14 w-auto object-contain"
             />
           </div>

@@ -66,6 +66,10 @@ export function calculateLocationStats(
   pendingConfCount: number;
   avgConfidence: number;
   avgPerformance: number;
+  confSubmittedCount: number;
+  confExpectedCount: number;
+  perfSubmittedCount: number;
+  perfExpectedCount: number;
 } {
   const staffCount = staff.length;
   
@@ -123,6 +127,18 @@ export function calculateLocationStats(
   const avgConfidence = confCount > 0 ? totalConf / confCount : 0;
   const avgPerformance = perfCount > 0 ? totalPerf / perfCount : 0;
   
+  // Raw submission counts (regardless of deadline state)
+  let confSubmittedCount = 0;
+  let confExpectedCount = 0;
+  let perfSubmittedCount = 0;
+  let perfExpectedCount = 0;
+  staff.forEach(s => {
+    confExpectedCount += s.assignment_count;
+    perfExpectedCount += s.assignment_count;
+    confSubmittedCount += s.conf_count;
+    perfSubmittedCount += s.perf_count;
+  });
+
   return {
     staffCount,
     submissionRate,
@@ -131,5 +147,9 @@ export function calculateLocationStats(
     pendingConfCount,
     avgConfidence,
     avgPerformance,
+    confSubmittedCount,
+    confExpectedCount,
+    perfSubmittedCount,
+    perfExpectedCount,
   };
 }

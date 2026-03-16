@@ -154,6 +154,10 @@ export default function RegionalDashboard() {
         missingConfCount: adjustedMissingConf,
         missingPerfCount: adjustedMissingPerf,
         pendingConfCount: adjustedPendingConf,
+        confSubmitted: locStats.confSubmittedCount,
+        confExpected: locStats.confExpectedCount,
+        perfSubmitted: locStats.perfSubmittedCount,
+        perfExpected: locStats.perfExpectedCount,
       };
     });
 
@@ -163,13 +167,24 @@ export default function RegionalDashboard() {
     const totalMissingConf = stats.reduce((sum, s) => sum + s.missingConfCount, 0);
     const totalMissingPerf = stats.reduce((sum, s) => sum + s.missingPerfCount, 0);
     const totalPendingConf = stats.reduce((sum, s) => sum + (s.pendingConfCount ?? 0), 0);
+    const totalConfSubmitted = stats.reduce((sum, s) => sum + (s.confSubmitted ?? 0), 0);
+    const totalConfExpected = stats.reduce((sum, s) => sum + (s.confExpected ?? 0), 0);
+    const totalPerfSubmitted = stats.reduce((sum, s) => sum + (s.perfSubmitted ?? 0), 0);
+    const totalPerfExpected = stats.reduce((sum, s) => sum + (s.perfExpected ?? 0), 0);
     const avgRate = stats.length > 0 
       ? stats.reduce((sum, s) => sum + s.submissionRate, 0) / stats.length 
       : 0;
+    
+    // Check if any location has passed a deadline
+    const anyLocationPastDeadline = stats.some(s => {
+      const gates = locationGatesMap.get(s.id);
+      return gates?.isPastConfidenceDeadline || gates?.isPastPerformanceDeadline;
+    });
 
     return { 
       locationStats: stats, 
-      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalPendingConf, avgRate, locationCount: stats.length }
+      totals: { totalStaff, totalMissingConf, totalMissingPerf, totalPendingConf, avgRate, locationCount: stats.length,
+        totalConfSubmitted, totalConfExpected, totalPerfSubmitted, totalPerfExpected, anyLocationPastDeadline }
     };
   }, [summaries, managedLocationIds, managedOrgIds, isSuperAdmin, locationGatesMap]);
 
@@ -349,7 +364,16 @@ export default function RegionalDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{Math.round(totals.avgRate)}%</div>
+              {totals.anyLocationPastDeadline ? (
+                <div className="text-3xl font-bold">{Math.round(totals.avgRate)}%</div>
+              ) : (
+                <div>
+                  <div className="text-2xl font-bold text-foreground">
+                    {totals.totalConfSubmitted}/{totals.totalConfExpected}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Conf submitted</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -371,14 +395,29 @@ export default function RegionalDashboard() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {locationStats.map(stats => (
-              <LocationHealthCard
-                key={stats.id}
-                stats={stats}
-                excuseStatus={getExcuseStatus(stats.id)}
-                submissionGates={getCardSubmissionGates(stats.id)}
-              />
-            ))}
+            {locationStats.map(stats => {
+              // Compute per-location next deadline label
+              const locConfig = locationConfigs.get(stats.id);
+              let locDeadlineLabel: string | null = null;
+              if (locConfig) {
+                const offsets = getPolicyOffsetsForLocation(locConfig);
+                const policy = getSubmissionPolicy(now, locConfig.timezone, offsets);
+                if (!policy.isConfidenceLate(now)) {
+                  locDeadlineLabel = `Conf due ${formatInTimeZone(policy.confidence_due, locConfig.timezone, 'EEE h:mm a')}`;
+                } else if (!policy.isPerformanceLate(now)) {
+                  locDeadlineLabel = `Perf due ${formatInTimeZone(policy.performance_due, locConfig.timezone, 'EEE h:mm a')}`;
+                }
+              }
+              return (
+                <LocationHealthCard
+                  key={stats.id}
+                  stats={stats}
+                  excuseStatus={getExcuseStatus(stats.id)}
+                  submissionGates={getCardSubmissionGates(stats.id)}
+                  nextDeadlineLabel={locDeadlineLabel}
+                />
+              );
+            })}
           </div>
         )}
       </div>

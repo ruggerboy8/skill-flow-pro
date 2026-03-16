@@ -1327,27 +1327,36 @@ export type Database = {
       }
       organizations: {
         Row: {
+          app_display_name: string | null
           created_at: string
           created_by: string | null
+          email_sign_off: string | null
           id: string
           name: string
           practice_type: string
+          reply_to_email: string | null
           slug: string
         }
         Insert: {
+          app_display_name?: string | null
           created_at?: string
           created_by?: string | null
+          email_sign_off?: string | null
           id?: string
           name: string
           practice_type?: string
+          reply_to_email?: string | null
           slug: string
         }
         Update: {
+          app_display_name?: string | null
           created_at?: string
           created_by?: string | null
+          email_sign_off?: string | null
           id?: string
           name?: string
           practice_type?: string
+          reply_to_email?: string | null
           slug?: string
         }
         Relationships: []

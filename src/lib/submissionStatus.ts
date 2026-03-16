@@ -66,6 +66,10 @@ export function calculateLocationStats(
   pendingConfCount: number;
   avgConfidence: number;
   avgPerformance: number;
+  confSubmittedCount: number;
+  confExpectedCount: number;
+  perfSubmittedCount: number;
+  perfExpectedCount: number;
 } {
   const staffCount = staff.length;
   

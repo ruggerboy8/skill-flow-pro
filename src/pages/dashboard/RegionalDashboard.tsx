@@ -17,7 +17,7 @@ import { StaffWeekSummary } from '@/types/coachV2';
 import { nowUtc } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { getLocationSubmissionGates, calculateLocationStats, type SubmissionGates } from '@/lib/submissionStatus';
-import { getSubmissionPolicy } from '@/lib/submissionPolicy';
+import { getSubmissionPolicy, getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LocationConfig {

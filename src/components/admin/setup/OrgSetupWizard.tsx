@@ -140,12 +140,19 @@ export function OrgSetupWizard({
     if (!organizationId) return;
     setLoadingData(true);
     try {
-      // Org practice_type → determines which roles to show
+      // Org practice_type + branding fields
       const { data: orgData } = await supabase
         .from('organizations')
-        .select('practice_type')
+        .select('practice_type, name, app_display_name, email_sign_off, reply_to_email')
         .eq('id', organizationId)
         .single();
+
+      // Pre-populate branding fields
+      const oName = orgData?.name || '';
+      setOrgName(oName);
+      setAppDisplayName(orgData?.app_display_name || oName);
+      setEmailSignOff(orgData?.email_sign_off || `The ${oName} Team`);
+      setReplyToEmail(orgData?.reply_to_email || '');
 
       // Load roles for this practice type; fall back to all active roles if none match
       const { data: typedRoles } = await supabase

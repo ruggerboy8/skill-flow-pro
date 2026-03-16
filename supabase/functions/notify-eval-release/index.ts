@@ -89,11 +89,11 @@ serve(async (req) => {
     // (e.g. "Skill Flow Pro <no-reply@skillflowpro.com>") in Supabase secrets.
     // The org name in the email body is resolved dynamically, so the from address
     // can safely remain platform-level while still feeling personalised.
-    const fromEmail = Deno.env.get('RESEND_FROM') || 'Skill Flow Pro <no-reply@skillflowpro.com>';
-    const replyTo = Deno.env.get('RESEND_REPLY_TO') || undefined;
+    const defaultFromEmail = Deno.env.get('RESEND_FROM') || 'Pro-Moves <no-reply@mypromoves.com>';
+    const defaultReplyTo = Deno.env.get('RESEND_REPLY_TO') || undefined;
 
-    // App URL — override in Supabase secrets once the platform has a permanent domain.
-    const appUrl = Deno.env.get('APP_URL') || 'https://skillflowpro.com';
+    // App URL
+    const appUrl = Deno.env.get('APP_URL') || 'https://mypromoves.com';
 
     if (!resendApiKey) {
       console.error('RESEND_API_KEY not configured');

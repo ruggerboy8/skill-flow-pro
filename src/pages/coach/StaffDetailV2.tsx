@@ -40,7 +40,6 @@ import { toast } from 'sonner';
 import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
 import { nowUtc } from '@/lib/centralTime';
 import { getChicagoMonday } from '@/lib/plannerUtils';
-import { toast } from 'sonner';
 
 type ExcusedSubmission = {
   id: string;

@@ -191,6 +191,28 @@ export default function RegionalDashboard() {
     return result;
   }, [locationStats, locationGatesMap]);
 
+  // Compute next deadline label for context when all is on track
+  const nextDeadlineLabel = useMemo(() => {
+    let earliest: { label: string; date: Date } | null = null;
+    locationConfigs.forEach((config) => {
+      const offsets = getPolicyOffsetsForLocation(config);
+      const policy = getSubmissionPolicy(now, config.timezone, offsets);
+      
+      if (!policy.isConfidenceLate(now)) {
+        const label = `Conf due ${formatInTimeZone(policy.confidence_due, config.timezone, 'EEE h:mm a')}`;
+        if (!earliest || policy.confidence_due < earliest.date) {
+          earliest = { label, date: policy.confidence_due };
+        }
+      } else if (!policy.isPerformanceLate(now)) {
+        const label = `Perf due ${formatInTimeZone(policy.performance_due, config.timezone, 'EEE h:mm a')}`;
+        if (!earliest || policy.performance_due < earliest.date) {
+          earliest = { label, date: policy.performance_due };
+        }
+      }
+    });
+    return earliest?.label ?? null;
+  }, [now, locationConfigs]);
+
   // Build location names map for heatmap
   const locationNamesMap = useMemo(() => {
     const map: Record<string, string> = {};

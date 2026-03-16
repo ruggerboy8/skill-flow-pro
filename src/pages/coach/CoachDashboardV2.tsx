@@ -314,34 +314,38 @@ export default function CoachDashboardV2({
   // Use table sort hook for sortable columns
   const { sortedData, sortConfig, handleSort } = useTableSort(extendedSummaries);
 
-  // Default sort: missing both → missing conf → missing perf → complete, then A-Z
+  // Default sort: missing both → missing conf → missing perf → pending → complete, then A-Z
   // Only apply default sort when no explicit sort is selected
+  // Deadline-aware: "pending" (before deadline) sorts below "missing" (past deadline)
   const sortedRows = useMemo(() => {
     if (sortConfig.key && sortConfig.order !== null) {
       return sortedData;
     }
     
-    // Default priority-based sort
+    // Default priority-based sort — deadline-aware
     return [...extendedSummaries].sort((a, b) => {
-      const aHasConf = a.conf_count === a.assignment_count;
-      const aHasPerf = a.perf_count === a.assignment_count;
-      const bHasConf = b.conf_count === b.assignment_count;
-      const bHasPerf = b.perf_count === b.assignment_count;
+      const aConfStatus = getDeadlineAwareStatus(a.location_id, a.conf_count === a.assignment_count, false, isMetricExcused(a.staff_id, a.location_id, 'confidence'), 'confidence');
+      const aPerfStatus = getDeadlineAwareStatus(a.location_id, a.perf_count === a.assignment_count, false, isMetricExcused(a.staff_id, a.location_id, 'performance'), 'performance');
+      const bConfStatus = getDeadlineAwareStatus(b.location_id, b.conf_count === b.assignment_count, false, isMetricExcused(b.staff_id, b.location_id, 'confidence'), 'confidence');
+      const bPerfStatus = getDeadlineAwareStatus(b.location_id, b.perf_count === b.assignment_count, false, isMetricExcused(b.staff_id, b.location_id, 'performance'), 'performance');
 
-      const aPriority = (!aHasConf && !aHasPerf) ? 0
-        : !aHasConf ? 1
-        : !aHasPerf ? 2
-        : 3;
+      const getPriority = (conf: SubmissionStatus, perf: SubmissionStatus) => {
+        const isMissing = (s: SubmissionStatus) => s === 'missing';
+        const isPending = (s: SubmissionStatus) => s === 'pending';
+        if (isMissing(conf) && isMissing(perf)) return 0;
+        if (isMissing(conf)) return 1;
+        if (isMissing(perf)) return 2;
+        if (isPending(conf) || isPending(perf)) return 3;
+        return 4;
+      };
 
-      const bPriority = (!bHasConf && !bHasPerf) ? 0
-        : !bHasConf ? 1
-        : !bHasPerf ? 2
-        : 3;
+      const aPriority = getPriority(aConfStatus, aPerfStatus);
+      const bPriority = getPriority(bConfStatus, bPerfStatus);
 
       if (aPriority !== bPriority) return aPriority - bPriority;
       return a.staff_name.localeCompare(b.staff_name);
     });
-  }, [extendedSummaries, sortedData, sortConfig]);
+  }, [extendedSummaries, sortedData, sortConfig, getDeadlineAwareStatus, isMetricExcused]);
 
   // Persist filters to URL
   useEffect(() => {

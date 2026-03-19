@@ -78,7 +78,12 @@ export default function Layout() {
     { name: 'Platform', href: '/platform', icon: Globe },
   ] : [
     // Standard navigation
-    { name: 'Home', href: '/', icon: Home },
+    // Org admins see Command Center instead of Home
+    ...(isOrgAdmin ? [
+      { name: 'Command Center', href: '/dashboard', icon: Building2 },
+    ] : [
+      { name: 'Home', href: '/', icon: Home },
+    ]),
     // My Role hidden for regional admins (org admins) - they use coach/admin tools
     ...(!isOrgAdmin ? [
       { name: 'My Role', href: '/my-role', icon: BookOpen },

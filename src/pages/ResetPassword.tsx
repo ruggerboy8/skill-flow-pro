@@ -7,14 +7,13 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ResetPassword() {
-  console.log("ResetPassword component rendering");
   const [params] = useSearchParams();
   const { toast } = useToast();
   const nav = useNavigate();
 
   const [email, setEmail] = useState(params.get("email") ?? "");
   const [code, setCode] = useState("");
-  const [stage, setStage] = useState<"enter-code" | "set-password">("enter-code");
+  const [stage, setStage] = useState<"checking" | "enter-code" | "set-password">("checking");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [working, setWorking] = useState(false);
@@ -22,17 +21,29 @@ export default function ResetPassword() {
   const canVerify = useMemo(() => email && code.length >= 6, [email, code]);
   const canSave = useMemo(() => password.length >= 8 && password === confirm, [password, confirm]);
 
+  // On mount, check if we already have a valid session (from AuthCallback recovery flow)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        // User arrived via email link → session already set by AuthCallback
+        setStage("set-password");
+      } else {
+        // No session → user navigated here manually, show OTP form
+        setStage("enter-code");
+      }
+    });
+  }, []);
+
   async function handleVerifyCode() {
     try {
       setWorking(true);
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         type: "recovery",
         email,
         token: code.trim(),
       });
       if (error) throw error;
 
-      // If successful, Supabase sets a session; now move to choose new password.
       setStage("set-password");
       toast({ title: "Code verified", description: "Please choose a new password." });
     } catch (e: any) {
@@ -53,7 +64,7 @@ export default function ResetPassword() {
       if (error) throw error;
 
       toast({ title: "Password updated", description: "You're all set." });
-      nav("/", { replace: true }); // or nav("/login", { replace: true })
+      nav("/", { replace: true });
     } catch (e: any) {
       toast({
         title: "Couldn't update password",
@@ -72,6 +83,10 @@ export default function ResetPassword() {
           <CardTitle>Reset your password</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {stage === "checking" && (
+            <p className="text-sm text-muted-foreground">Checking session…</p>
+          )}
+
           {stage === "enter-code" && (
             <>
               <label className="text-sm">Email</label>

@@ -357,7 +357,9 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                   <li><code>description</code> - Coach notes</li>
                   <li><code>intervention_text</code> - Intervention guidance</li>
                   <li><code>resources_url</code> - Training materials URL</li>
+                  <li><code>script</code> - Audio narration script</li>
                   <li><code>active</code> - true/false (defaults to true)</li>
+                  <li><code>practice_types</code> - Pipe-separated: <code>pediatric_us</code>, <code>general_us</code>, <code>general_uk</code> (defaults to pediatric_us)</li>
                 </ul>
               </div>
             </div>

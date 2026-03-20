@@ -252,17 +252,52 @@ serve(async (req: Request) => {
       }
 
       case "invite_user": {
-        const { email, name, role_id, location_id, participation_start_at, is_participant, capabilities } = payload ?? {};
+        const { email, name, role_id, location_id, organization_id, participation_start_at, is_participant, capabilities } = payload ?? {};
 
         // Determine participant status — default true for backward compatibility
         const isParticipantUser: boolean = is_participant !== undefined ? Boolean(is_participant) : true;
 
-        if (!email || !name || !location_id) {
-          return json({ error: "Missing required fields: email, name, and location_id are all required" }, 400);
+        if (!email || !name) {
+          return json({ error: "Missing required fields: email and name are required" }, 400);
+        }
+        if (!location_id && !organization_id) {
+          return json({ error: "Either location_id or organization_id is required" }, 400);
         }
         // role_id is required for participants but optional for team members
         if (isParticipantUser && !role_id) {
           return json({ error: "role_id is required for participants" }, 400);
+        }
+
+        // Resolve the actual location_id to use for the staff record
+        let resolvedLocationId = location_id;
+
+        if (!location_id && organization_id) {
+          // Central office user: resolve a default location from the organization
+          const { data: orgGroups } = await admin
+            .from('practice_groups')
+            .select('id')
+            .eq('organization_id', organization_id)
+            .eq('active', true)
+            .limit(1);
+
+          if (!orgGroups || orgGroups.length === 0) {
+            return json({ error: 'No active groups found for this organization' }, 400);
+          }
+
+          const { data: orgLocs } = await admin
+            .from('locations')
+            .select('id')
+            .eq('group_id', orgGroups[0].id)
+            .eq('active', true)
+            .order('name')
+            .limit(1);
+
+          if (!orgLocs || orgLocs.length === 0) {
+            return json({ error: 'No active locations found for this organization' }, 400);
+          }
+
+          resolvedLocationId = orgLocs[0].id;
+          console.log(`Central office user: resolved default location ${resolvedLocationId} from org ${organization_id}`);
         }
 
         // Org ownership check: non-super-admin callers can only invite to locations
@@ -271,31 +306,39 @@ serve(async (req: Request) => {
           const { data: callerOrgId, error: orgRpcErr } = await caller.rpc('current_user_org_id');
           if (orgRpcErr) console.error('current_user_org_id RPC failed:', orgRpcErr.message);
 
-          // Resolve the target location's org via practice_groups
-          const { data: targetLoc } = await admin
-            .from('locations')
-            .select('group_id')
-            .eq('id', location_id)
-            .single();
-
-          let targetOrgId: string | null = null;
-          if (targetLoc?.group_id) {
-            const { data: targetGroup } = await admin
-              .from('practice_groups')
-              .select('organization_id')
-              .eq('id', targetLoc.group_id)
+          if (organization_id && !location_id) {
+            // Central office invite: just compare org IDs directly
+            if (!callerOrgId || callerOrgId !== organization_id) {
+              console.error(`invite_user: org ownership check failed — caller org=${callerOrgId}, target org=${organization_id}`);
+              return json({ error: 'Forbidden: you can only invite users to your own organization' }, 403);
+            }
+          } else {
+            // Clinic staff invite: resolve target location's org
+            const { data: targetLoc } = await admin
+              .from('locations')
+              .select('group_id')
+              .eq('id', resolvedLocationId)
               .single();
-            targetOrgId = targetGroup?.organization_id ?? null;
-          }
 
-          if (!callerOrgId || !targetOrgId || callerOrgId !== targetOrgId) {
-            console.error(
-              `invite_user: org ownership check failed — caller org=${callerOrgId}, target location org=${targetOrgId}, location_id=${location_id}`,
-            );
-            return json(
-              { error: 'Forbidden: the specified location does not belong to your organization' },
-              403,
-            );
+            let targetOrgId: string | null = null;
+            if (targetLoc?.group_id) {
+              const { data: targetGroup } = await admin
+                .from('practice_groups')
+                .select('organization_id')
+                .eq('id', targetLoc.group_id)
+                .single();
+              targetOrgId = targetGroup?.organization_id ?? null;
+            }
+
+            if (!callerOrgId || !targetOrgId || callerOrgId !== targetOrgId) {
+              console.error(
+                `invite_user: org ownership check failed — caller org=${callerOrgId}, target location org=${targetOrgId}, location_id=${resolvedLocationId}`,
+              );
+              return json(
+                { error: 'Forbidden: the specified location does not belong to your organization' },
+                403,
+              );
+            }
           }
         }
 
@@ -317,7 +360,7 @@ serve(async (req: Request) => {
         const staffInsert: Record<string, any> = {
           name,
           email,
-          primary_location_id: location_id,
+          primary_location_id: resolvedLocationId,
           is_participant: isParticipantUser,
           user_id: invite.user.id,
         };
@@ -396,7 +439,7 @@ serve(async (req: Request) => {
             .insert({
               staff_id: staff.id,
               scope_type: 'location',
-              scope_id: location_id
+              scope_id: resolvedLocationId
             });
 
           if (scopeErr) {

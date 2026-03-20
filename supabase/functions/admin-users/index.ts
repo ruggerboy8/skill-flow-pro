@@ -360,7 +360,7 @@ serve(async (req: Request) => {
         const staffInsert: Record<string, any> = {
           name,
           email,
-          primary_location_id: location_id,
+          primary_location_id: resolvedLocationId,
           is_participant: isParticipantUser,
           user_id: invite.user.id,
         };

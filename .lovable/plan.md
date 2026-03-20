@@ -1,89 +1,63 @@
-## Practice Type on Roles + Multi-Select Practice Type on Pro Moves
 
-**Status: ✅ Complete**
 
-### What changed
+# Support Location-less Admin Users in the Invite Flow
 
-1. **Practice types expanded** to three region-specific values: `pediatric_us`, `general_us`, `general_uk`
-2. **`roles.practice_type`** column added — each role belongs to one practice type
-3. **`pro_moves.practice_type`** converted to **`pro_moves.practice_types TEXT[]`** — array-based multi-select
-4. All existing data backfilled (`pediatric` → `pediatric_us`, `general` → `general_us`, `all` → all three)
+## Problem
+The current invite dialog requires Group and Location for every user. Central office admins (e.g., regional coordinators, data analysts) don't belong to a specific clinic location and shouldn't need a clinical role. They are also never participants.
 
-### Files changed
+## Solution
+Add an early branching question at the top of the invite form and adjust the backend to accept invites without a `location_id`.
 
-| File | Change |
-|------|--------|
-| Migration SQL | Schema: expanded CHECK on orgs, added practice_types array on pro_moves, added practice_type on roles |
-| `RoleFormDrawer.tsx` | Added practice type Select (3 options) |
-| `PlatformRolesTab.tsx` | Shows practice type badge on role cards, fetches practice_type |
-| `ProMoveForm.tsx` | Replaced single Select with multi-checkbox for practice_types |
-| `DoctorProMoveForm.tsx` | Defaults practice_types to `['pediatric_us']` |
-| `OrgBootstrapDrawer.tsx` | 3 radio options with new labels |
-| `PlatformOrgsTab.tsx` | Badge display for all 3 practice types |
-| `OrgProMoveLibraryTab.tsx` | Uses `.overlaps('practice_types', [orgPracticeType])` |
-| `ProMoveList.tsx` | Uses `.overlaps('practice_types', [filter])` |
-| `ProMoveLibrary.tsx` | Updated filter chips to 4 options (All + 3 types) |
+## Changes
 
-## Tier 1 — Design System Token Unification
+### 1. Frontend: `src/components/admin/InviteUserDialog.tsx`
+- Add a toggle/radio at the top: **"Will this person work at a clinic location?"**
+  - **Yes (default)**: Current flow — Group, Location required; participant enrollment available; role optional.
+  - **No (Central office / Admin)**: Hide Group, Location, Role, and participant enrollment sections. Auto-expand the permissions panel. `is_participant` forced to `false`.
+- Update `isFormValid`: only require `email` + `name` when the user is a central-office admin. At least one capability must be selected (they need some reason to exist in the system).
+- When submitting without a location, do NOT send `location_id`. Instead, send the caller's `organization_id` so the edge function can resolve org membership.
 
-**Status: ✅ Complete**
+### 2. Backend: `supabase/functions/admin-users/index.ts` — `invite_user` action
+- Relax the `location_id` requirement: accept either `location_id` OR `organization_id`.
+- When `location_id` is absent but `organization_id` is provided:
+  - Skip the location-based org ownership check; instead verify the `organization_id` matches the caller's org (unless super admin).
+  - Pick the first active location in that org as a "home" `primary_location_id` for the staff record (the staff table has a NOT NULL constraint on this column). Alternatively, set it to a designated "central" location — but using the first available location is simpler and avoids schema changes.
+- The rest of the flow (auth invite, staff insert, capabilities insert) stays the same.
 
-### 1A — Consolidate Domain Colors (3→1)
-- Replaced unused `--domain-planning/environment/interactions/learning-experiences` CSS vars with `--domain-clinical/clerical/cultural/case-acceptance` (rich + pastel)
-- Updated `tailwind.config.ts` domain keys to match
-- `domainColors.ts` exports CSS var names; API unchanged
-- `DOMAIN_META` in `constants/domains.ts` now uses `chipStyle()` with token-derived colors
+### 3. No database migration needed
+The `staff.primary_location_id` column is NOT NULL, so we still assign one — we just auto-select it from the org rather than requiring the user to choose. No schema changes required.
 
-### 1B — StatusBadge Component + Tokens
-- Added `--status-complete/missing/late/excused/pending` CSS tokens to `index.css`
-- Created `src/components/ui/StatusBadge.tsx` with token-driven colors
-- Replaced inline `StatusPill` in `CoachDashboardV2`, `StaffDetailV2`, `ScoreHistoryV2`, `StatsScores`
+## Technical Details
 
-### 1C — Score Color Tokens (1–4)
-- Added `--score-1` through `--score-4` (+ `-bg` pastel variants) to `index.css`
-- Updated `NumberScale.tsx` to use inline styles with CSS vars instead of hardcoded Tailwind
+**Frontend validation change:**
+```
+// Central office admin: just need email + name + at least one capability
+const isFormValid = isCentralOffice
+  ? !!email && !!name && hasAnyCapability
+  : !!email && !!name && !!location_id && (!isParticipant || !!roleId);
+```
 
-### 1D — text-2xs Utility
-- Added `fontSize: { '2xs': ['0.625rem', { lineHeight: '0.875rem' }] }` to `tailwind.config.ts`
-- Replaced all 340 occurrences of `text-[10px]` → `text-2xs` across 42 files
+**Edge function change (invite_user):**
+- Accept `organization_id` as an alternative to `location_id`
+- When only `organization_id` is provided, resolve a default location: `practice_groups` → `locations` (first active one)
+- Use that resolved location as `primary_location_id`
 
-## Micro-Celebrations + Mobile Slide Transitions
+**UI flow:**
+```text
+┌─────────────────────────────────┐
+│  Email *                        │
+│  Name *                         │
+│                                 │
+│  ○ Clinic staff (default)       │
+│  ○ Central office / Admin       │
+│                                 │
+│  [if clinic: Group, Location,   │
+│   Role, Participant toggle]     │
+│                                 │
+│  [if central: permissions       │
+│   panel auto-expanded]          │
+│                                 │
+│  [Send invite]                  │
+└─────────────────────────────────┘
+```
 
-**Status: ✅ Complete**
-
-### 3A — Confetti on Celebration Moments
-- Added `canvas-confetti` dependency
-- Created `src/lib/confetti.ts` helper with `fireCelebration()` function
-- PerformanceWizard: confetti fires on victory modal open + on successful non-repair submit
-- ConfidenceWizard: confetti fires on successful non-repair submit
-
-### 3B — Submit Button Checkmark Animation
-- Added `submitPhase` state (`idle` | `saving` | `done`) to both wizards
-- Submit button transitions: text → spinner → green ✓ checkmark with scale-in animation
-- 1.8s celebration delay before navigating (0.8s for repair mode)
-
-### 4A — Mobile Slide Transitions
-- Added `framer-motion` dependency
-- Wrapped wizard step content in `<AnimatePresence mode="wait">` with directional slide variants
-- Forward (Next): slides in from right, exits left
-- Backward (Back): slides in from left, exits right
-- 200ms ease-out transitions; progress dots and sticky footer stay static
-
-## Org-Level Email Branding + Domain Migration
-
-**Status: ✅ Complete**
-
-### What changed
-
-1. **Database**: Added `app_display_name`, `email_sign_off`, `reply_to_email` columns to `organizations` table
-2. **OrgSetupWizard**: Added Step 4 "Branding" (shifted "All Set!" to Step 5) collecting display name, email sign-off, and reply-to email
-3. **Edge Functions**: All 5 email-sending functions (`notify-meeting-summary`, `coach-remind`, `invite-to-schedule`, `notify-eval-release`, `admin-users`) now resolve org branding via staff → location → practice_group → organization chain, with fallback to platform defaults
-4. **Domain migration**: Replaced all `alcandentalcooperative.com` and `alcanskills.lovable.app` hardcoded fallbacks with `mypromoves.com`
-5. **Frontend branding**: Replaced "Alcan" copy in SetupPassword, Welcome, and Layout with neutral "Pro-Moves" branding
-6. **SchedulingInviteComposer**: Replaced hardcoded URL with `window.location.origin`
-7. **Secrets**: Added `APP_URL` and `SITE_URL` set to `https://mypromoves.com`, updated `RESEND_FROM` to new domain
-
-### What this does NOT include (future)
-- Logo upload (storage bucket + org column)
-- Accent color theming (CSS custom properties per org)
-- Custom `from` email domains per org (requires per-org Resend verification)

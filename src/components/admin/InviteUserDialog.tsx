@@ -153,6 +153,11 @@ export function InviteUserDialog({
     return locations.filter((loc) => loc.group_id === formData.group_id);
   }, [formData.group_id, locations]);
 
+  // Whether any capability is enabled
+  const hasAnyCapability = Object.entries(capabilities).some(
+    ([key, val]) => key !== "is_org_admin" && val === true
+  ) || capabilities.is_org_admin;
+
   // Send is disabled until basic info + (role if participant)
   const isFormValid = isCentralOffice
     ? !!formData.email && !!formData.name && hasAnyCapability
@@ -160,11 +165,6 @@ export function InviteUserDialog({
       !!formData.name &&
       !!formData.location_id &&
       (!isParticipant || !!roleId);
-
-  // Whether any capability is enabled
-  const hasAnyCapability = Object.entries(capabilities).some(
-    ([key, val]) => key !== "is_org_admin" && val === true
-  ) || capabilities.is_org_admin;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 

@@ -239,7 +239,8 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
         resources_url: row.data.resources_url || null,
         intervention_text: row.data.intervention_text || null,
         script: row.data.script || null,
-        active: row.data.active?.toLowerCase() === 'false' ? false : true
+        active: row.data.active?.toLowerCase() === 'false' ? false : true,
+        practice_types: row.data.practice_types?.trim() || null
       }));
 
       const { data: result, error } = await supabase.rpc('bulk_upsert_pro_moves', {

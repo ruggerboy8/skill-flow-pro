@@ -356,107 +356,144 @@ export function InviteUserDialog({
             />
           </div>
 
+          {/* ── User type branching ── */}
           <div className="space-y-2">
-            <Label>Group *</Label>
-            <Select value={formData.group_id} onValueChange={handleGroupChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select group" />
-              </SelectTrigger>
-              <SelectContent>
-                {organizations.map((org) => (
-                  <SelectItem key={org.id} value={org.id}>
-                    {org.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Location *</Label>
-            <Select
-              value={formData.location_id}
-              onValueChange={(value) => setFormData({ ...formData, location_id: value })}
-              disabled={!formData.group_id}
+            <Label>What type of user is this?</Label>
+            <RadioGroup
+              value={userType}
+              onValueChange={(val: "clinic" | "central") => {
+                setUserType(val);
+                if (val === "central") {
+                  setIsParticipant(false);
+                  setShowPermissions(true);
+                  setFormData({ ...formData, group_id: "", location_id: "" });
+                  setRoleId("");
+                }
+              }}
+              className="flex gap-4"
             >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={formData.group_id ? "Select a location" : "Select group first"}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredLocations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              If they work at multiple locations, choose their primary one.
-            </p>
-          </div>
-
-          {/* ── Role ── */}
-          <div className="space-y-2">
-            <Label>
-              Role{isParticipant ? " *" : " (optional)"}
-            </Label>
-            <Select value={roleId} onValueChange={setRoleId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((role) => (
-                  <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                    {resolveRole(role.role_id, role.role_name)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {isParticipant && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="clinic" />
+                <span className="text-sm">Clinic staff</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="central" />
+                <span className="text-sm">Central office / Admin</span>
+              </label>
+            </RadioGroup>
+            {isCentralOffice && (
               <p className="text-xs text-muted-foreground">
-                Determines which Pro Moves are assigned to them.
+                This person won't be assigned to a specific clinic or receive Pro Moves.
               </p>
             )}
           </div>
 
-          {/* ── Pro Move programme enrollment ── */}
-          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <Checkbox
-                id="is-participant"
-                checked={isParticipant}
-                onCheckedChange={(checked) => setIsParticipant(checked === true)}
-                className="mt-0.5"
-              />
-              <div>
-                <p className="text-sm font-medium leading-none">
-                  Enrolled in the Pro Move programme
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  They'll receive weekly Pro Move assignments and be tracked for completion.
-                </p>
+          {/* ── Clinic-specific fields ── */}
+          {!isCentralOffice && (
+            <>
+              <div className="space-y-2">
+                <Label>Group *</Label>
+                <Select value={formData.group_id} onValueChange={handleGroupChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </label>
 
-            {isParticipant && (
-              <div className="space-y-1 pt-1 pl-7">
-                <Label htmlFor="start-date" className="text-sm">
-                  Start date (optional)
-                </Label>
-                <Input
-                  id="start-date"
-                  type="date"
-                  value={participationStartAt}
-                  onChange={(e) => setParticipationStartAt(e.target.value)}
-                />
+              <div className="space-y-2">
+                <Label>Location *</Label>
+                <Select
+                  value={formData.location_id}
+                  onValueChange={(value) => setFormData({ ...formData, location_id: value })}
+                  disabled={!formData.group_id}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={formData.group_id ? "Select a location" : "Select group first"}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredLocations.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground">
-                  Assignments only accrue from this date onward. Leave blank to start immediately.
+                  If they work at multiple locations, choose their primary one.
                 </p>
               </div>
-            )}
-          </div>
+
+              {/* ── Role ── */}
+              <div className="space-y-2">
+                <Label>
+                  Role{isParticipant ? " *" : " (optional)"}
+                </Label>
+                <Select value={roleId} onValueChange={setRoleId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.role_id} value={role.role_id.toString()}>
+                        {resolveRole(role.role_id, role.role_name)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isParticipant && (
+                  <p className="text-xs text-muted-foreground">
+                    Determines which Pro Moves are assigned to them.
+                  </p>
+                )}
+              </div>
+
+              {/* ── Pro Move programme enrollment ── */}
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <Checkbox
+                    id="is-participant"
+                    checked={isParticipant}
+                    onCheckedChange={(checked) => setIsParticipant(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <p className="text-sm font-medium leading-none">
+                      Enrolled in the Pro Move programme
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      They'll receive weekly Pro Move assignments and be tracked for completion.
+                    </p>
+                  </div>
+                </label>
+
+                {isParticipant && (
+                  <div className="space-y-1 pt-1 pl-7">
+                    <Label htmlFor="start-date" className="text-sm">
+                      Start date (optional)
+                    </Label>
+                    <Input
+                      id="start-date"
+                      type="date"
+                      value={participationStartAt}
+                      onChange={(e) => setParticipationStartAt(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Assignments only accrue from this date onward. Leave blank to start immediately.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* ── Additional permissions (collapsible) ── */}
           <div className="rounded-lg border border-border overflow-hidden">

@@ -209,11 +209,17 @@ export function InviteUserDialog({
         action: "invite_user",
         email: formData.email,
         name: formData.name,
-        location_id: formData.location_id,
-        is_participant: isParticipant,
+        is_participant: isCentralOffice ? false : isParticipant,
         // Always send capabilities — participants can also have additional permissions
         capabilities,
       };
+
+      if (isCentralOffice) {
+        // Central office: send organization_id, backend resolves a default location
+        body.organization_id = organizationId;
+      } else {
+        body.location_id = formData.location_id;
+      }
 
       if (isParticipant && roleId) {
         body.role_id = parseInt(roleId);

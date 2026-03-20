@@ -271,6 +271,7 @@ export function InviteUserDialog({
 
   const handleClose = () => {
     setFormData({ email: "", name: "", group_id: "", location_id: "" });
+    setUserType("clinic");
     setRoleId("");
     setIsParticipant(false);
     setParticipationStartAt("");

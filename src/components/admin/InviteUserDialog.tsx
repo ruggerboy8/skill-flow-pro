@@ -128,6 +128,9 @@ export function InviteUserDialog({
     location_id: "",
   });
 
+  // User type branching
+  const [userType, setUserType] = useState<"clinic" | "central">("clinic");
+
   // Role (optional unless isParticipant)
   const [roleId, setRoleId] = useState("");
 
@@ -140,6 +143,8 @@ export function InviteUserDialog({
 
   // Permissions accordion open state
   const [showPermissions, setShowPermissions] = useState(false);
+
+  const isCentralOffice = userType === "central";
 
   // ── Derived ───────────────────────────────────────────────────────────────
 

@@ -115,6 +115,7 @@ export function InviteUserDialog({
 }: InviteUserDialogProps) {
   const { toast } = useToast();
   const { resolve: resolveRole } = useRoleDisplayNames();
+  const { organizationId } = useUserRole();
   const [loading, setLoading] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
   const [invitedName, setInvitedName] = useState("");

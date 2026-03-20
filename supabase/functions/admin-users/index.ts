@@ -439,7 +439,7 @@ serve(async (req: Request) => {
             .insert({
               staff_id: staff.id,
               scope_type: 'location',
-              scope_id: location_id
+              scope_id: resolvedLocationId
             });
 
           if (scopeErr) {

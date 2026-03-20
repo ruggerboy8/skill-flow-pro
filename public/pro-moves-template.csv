@@ -1,19 +1,28 @@
 # Pro-Moves Bulk Upload Template
 # Required columns: role_name, competency_name, text
-# Optional columns: action_id, description, resources_url, intervention_text, script, active
+# Optional columns: action_id, description, resources_url, intervention_text, script, active, practice_types
 #
 # IMPORTANT: Leave action_id blank for NEW pro-moves. 
 # Fill action_id when UPDATING existing pro-moves (download current library to get IDs).
 # If action_id is provided, it MUST exist in the database or the row will error.
 #
 # Valid role_name values: DFI, RDA, Office Manager
+#
+# practice_types: Use pipe (|) to separate multiple values.
+# Valid values: pediatric_us, general_us, general_uk
+# If left blank, defaults to pediatric_us for new rows; existing rows keep their current value.
+#
+# Examples:
+#   pediatric_us           → US pediatric practices only
+#   general_uk             → UK general practices only
+#   pediatric_us|general_us → Both US practice types
 
-action_id,role_name,competency_name,text,description,resources_url,intervention_text,script,active
-,"DFI","Effective Objection Handling","Handle patient concerns professionally, addressing their specific needs","Coach notes here","https://example.com/training","Example intervention text","Example script for audio narration","true"
-,"DFI","Establishing Credibility","Build trust with patients through professional communication","","","","","true"
-,"RDA","Clear Treatment Communication","Communicate treatment clearly to patients, ensuring understanding","","","","","true"
-,"RDA","Effective Objection Handling","Address patient objections effectively with empathy","","","","","true"
-,"Office Manager","Quality Through Feedback","Actively seek and implement parent feedback to improve systems","","","","","true"
-,"Office Manager","Leading and Coaching","Coach and develop team members through regular feedback sessions","","","","","true"
-,"Office Manager","Operational Efficiency","Optimize office workflows to maximize productivity","","","","","true"
-,"Office Manager","Case Communication","Present treatment plans clearly and address family concerns","","","","","true"
+action_id,role_name,competency_name,text,description,resources_url,intervention_text,script,active,practice_types
+,"DFI","Effective Objection Handling","Handle patient concerns professionally, addressing their specific needs","Coach notes here","https://example.com/training","Example intervention text","Example script for audio narration","true","pediatric_us"
+,"DFI","Establishing Credibility","Build trust with patients through professional communication","","","","","true","pediatric_us|general_us"
+,"RDA","Clear Treatment Communication","Communicate treatment clearly to patients, ensuring understanding","","","","","true","pediatric_us"
+,"RDA","Effective Objection Handling","Address patient objections effectively with empathy","","","","","true","general_uk"
+,"Office Manager","Quality Through Feedback","Actively seek and implement parent feedback to improve systems","","","","","true","pediatric_us"
+,"Office Manager","Leading and Coaching","Coach and develop team members through regular feedback sessions","","","","","true","pediatric_us|general_uk"
+,"Office Manager","Operational Efficiency","Optimize office workflows to maximize productivity","","","","","true","general_us"
+,"Office Manager","Case Communication","Present treatment plans clearly and address family concerns","","","","","true","pediatric_us"

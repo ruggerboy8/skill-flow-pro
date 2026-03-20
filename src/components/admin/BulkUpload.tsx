@@ -239,7 +239,8 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
         resources_url: row.data.resources_url || null,
         intervention_text: row.data.intervention_text || null,
         script: row.data.script || null,
-        active: row.data.active?.toLowerCase() === 'false' ? false : true
+        active: row.data.active?.toLowerCase() === 'false' ? false : true,
+        practice_types: row.data.practice_types?.trim() || null
       }));
 
       const { data: result, error } = await supabase.rpc('bulk_upsert_pro_moves', {
@@ -356,7 +357,9 @@ export function BulkUpload({ onClose, roles, competencies }: BulkUploadProps) {
                   <li><code>description</code> - Coach notes</li>
                   <li><code>intervention_text</code> - Intervention guidance</li>
                   <li><code>resources_url</code> - Training materials URL</li>
+                  <li><code>script</code> - Audio narration script</li>
                   <li><code>active</code> - true/false (defaults to true)</li>
+                  <li><code>practice_types</code> - Pipe-separated: <code>pediatric_us</code>, <code>general_us</code>, <code>general_uk</code> (defaults to pediatric_us)</li>
                 </ul>
               </div>
             </div>

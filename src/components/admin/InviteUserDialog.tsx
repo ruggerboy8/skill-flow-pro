@@ -154,11 +154,12 @@ export function InviteUserDialog({
   }, [formData.group_id, locations]);
 
   // Send is disabled until basic info + (role if participant)
-  const isFormValid =
-    !!formData.email &&
-    !!formData.name &&
-    !!formData.location_id &&
-    (!isParticipant || !!roleId);
+  const isFormValid = isCentralOffice
+    ? !!formData.email && !!formData.name && hasAnyCapability
+    : !!formData.email &&
+      !!formData.name &&
+      !!formData.location_id &&
+      (!isParticipant || !!roleId);
 
   // Whether any capability is enabled
   const hasAnyCapability = Object.entries(capabilities).some(

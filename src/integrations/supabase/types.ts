@@ -1883,6 +1883,7 @@ export type Database = {
           location: string | null
           name: string
           organization: string | null
+          organization_id: string | null
           participation_start_at: string | null
           pause_reason: string | null
           paused_at: string | null
@@ -1916,6 +1917,7 @@ export type Database = {
           location?: string | null
           name: string
           organization?: string | null
+          organization_id?: string | null
           participation_start_at?: string | null
           pause_reason?: string | null
           paused_at?: string | null
@@ -1949,6 +1951,7 @@ export type Database = {
           location?: string | null
           name?: string
           organization?: string | null
+          organization_id?: string | null
           participation_start_at?: string | null
           pause_reason?: string | null
           paused_at?: string | null
@@ -1960,6 +1963,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "staff_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "staff_primary_location_id_fkey"
             columns: ["primary_location_id"]

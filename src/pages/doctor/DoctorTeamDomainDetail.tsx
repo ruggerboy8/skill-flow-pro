@@ -69,7 +69,6 @@ export default function DoctorTeamDomainDetail() {
         competencies: (competencies || []).map(c => ({
           competency_id: c.competency_id,
           title: c.name || '',
-          title: c.name || '',
           subtitle: c.tagline,
           description: (c as any).friendly_description || null,
           observerScore: null,

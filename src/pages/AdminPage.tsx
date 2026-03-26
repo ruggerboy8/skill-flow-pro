@@ -27,8 +27,12 @@ export default function AdminPage() {
 
   const checkSetupComplete = useCallback(async () => {
     if (!organizationId || isSuperAdmin) return;
-    const { data } = await supabase.rpc('is_org_setup_complete' as any, { p_org_id: organizationId });
-    setSetupComplete(data === true);
+    try {
+      const { data } = await supabase.rpc('is_org_setup_complete' as any, { p_org_id: organizationId });
+      setSetupComplete(data === true);
+    } catch {
+      // RPC may not exist yet if migration not pushed
+    }
   }, [organizationId, isSuperAdmin]);
 
   useEffect(() => {

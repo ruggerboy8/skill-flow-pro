@@ -239,8 +239,8 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
           name: orgName.trim(),
           slug: slug.trim(),
           practice_type: practiceType,
-          brand_color: brandColor !== '#1a4a7a' ? brandColor : null,
-        })
+          ...(brandColor !== '#1a4a7a' && { brand_color: brandColor }),
+        } as any)
         .select('id')
         .single();
       if (orgErr) throw orgErr;

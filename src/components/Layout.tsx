@@ -33,13 +33,14 @@ export default function Layout() {
     if (!organizationId) return;
     supabase
       .from('organizations')
-      .select('name, logo_url, brand_color' as any)
+      .select('name')
       .eq('id', organizationId)
       .maybeSingle()
       .then(({ data }: any) => {
         if (!data) return;
-        setOrgLogoUrl(data.logo_url ?? null);
         setOrgName(data.name ?? null);
+        // logo_url and brand_color may not exist yet (pending migration)
+        if (data.logo_url) setOrgLogoUrl(data.logo_url);
         if (data.brand_color) {
           const hsl = hexToHsl(data.brand_color);
           if (hsl) document.documentElement.style.setProperty('--primary', hsl);

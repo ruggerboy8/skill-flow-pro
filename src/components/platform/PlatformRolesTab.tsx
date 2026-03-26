@@ -162,6 +162,7 @@ export function PlatformRolesTab() {
   const refreshAll = () => {
     queryClient.invalidateQueries({ queryKey: ['platform-roles'] });
     queryClient.invalidateQueries({ queryKey: ['platform-competencies'] });
+    queryClient.invalidateQueries({ queryKey: ['platform-promove-counts'] });
   };
 
   if (rolesLoading) {
@@ -372,6 +373,17 @@ export function PlatformRolesTab() {
             refreshAll();
             setCloneCompsOpen(false);
           }}
+        />
+      )}
+
+      {selectedRole && (
+        <ProMoveImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          roleId={selectedRole.role_id}
+          roleName={selectedRole.role_name}
+          rolePracticeType={selectedRole.practice_type}
+          onImported={refreshAll}
         />
       )}
 

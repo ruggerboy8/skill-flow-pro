@@ -7,6 +7,7 @@ import { ChevronDown, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const ROLES = [
   { id: 1, label: 'DFI' },
@@ -42,25 +43,28 @@ function WeekOfHeader() {
  * Fetch global weekly_assignments using flat (non-nested) queries to avoid PGRST200.
  * Filters out self_select assignments. Fetches all 3 roles in one batch.
  */
-function useAllRoleAssignments() {
+function useAllRoleAssignments(orgId: string | undefined) {
   return useQuery({
-    queryKey: ['team-weekly-all-roles'],
+    queryKey: ['team-weekly-all-roles', orgId],
     queryFn: async (): Promise<Record<number, SimpleAssignment[]>> => {
       const mondayStr = getThisMonday();
       const result: Record<number, SimpleAssignment[]> = { 1: [], 2: [], 3: [] };
 
-      // 1. Get locked global assignments for all 3 roles, exclude self_select
-      const { data: rows, error } = await supabase
+      if (!orgId) return result;
+
+      // 1. Get locked org-scoped assignments for all 3 roles, exclude self_select
+      let q = supabase
         .from('weekly_assignments')
         .select('id, action_id, display_order, role_id, self_select')
-        .eq('source', 'global')
         .in('role_id', [1, 2, 3])
         .eq('week_start_date', mondayStr)
         .eq('status', 'locked')
         .eq('self_select', false)
-        .is('org_id', null)
+        .eq('org_id', orgId)
         .is('superseded_at', null)
         .order('display_order');
+
+      const { data: rows, error } = await q;
 
       if (error) throw error;
       if (!rows?.length) return result;
@@ -180,7 +184,8 @@ function AssignmentCard({ assignment, onOpenDrawer }: { assignment: SimpleAssign
 }
 
 export default function TeamWeeklyFocus() {
-  const { data: assignmentsByRole, isLoading } = useAllRoleAssignments();
+  const { organizationId } = useUserRole();
+  const { data: assignmentsByRole, isLoading } = useAllRoleAssignments(organizationId);
   const [drawerItem, setDrawerItem] = useState<SimpleAssignment | null>(null);
 
   return (

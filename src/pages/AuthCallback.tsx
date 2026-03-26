@@ -49,14 +49,24 @@ export default function AuthCallback() {
         // Method 2: PKCE/OAuth code flow (?code=...)
         if (!routed && window.location.search.includes("code=")) {
           console.log("Processing PKCE code flow");
-          await supabase.auth.exchangeCodeForSession(window.location.href);
-          window.history.replaceState({}, "", window.location.pathname);
-          
-          // Check for next parameter
           const urlParams = new URLSearchParams(window.location.search);
           const next = urlParams.get("next");
-          navigate(next || "/", { replace: true });
-          routed = true;
+          
+          try {
+            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(window.location.href);
+            if (exchangeError) throw exchangeError;
+            
+            window.history.replaceState({}, "", window.location.pathname);
+            navigate(next || "/", { replace: true });
+            routed = true;
+          } catch (pkceError) {
+            console.warn("PKCE exchange failed (likely browser mismatch):", pkceError);
+            // If this was a recovery flow, send user to OTP code entry instead
+            if (next === "/reset-password") {
+              navigate("/reset-password", { replace: true });
+              routed = true;
+            }
+          }
         }
 
         if (!routed) {

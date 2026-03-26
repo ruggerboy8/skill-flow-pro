@@ -24,11 +24,10 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   roles: Role[];
   targetRoleId: number;
-  targetRoleCode: string;
   onCloned: () => void;
 }
 
-export function CloneCompetenciesDialog({ open, onOpenChange, roles, targetRoleId, targetRoleCode, onCloned }: Props) {
+export function CloneCompetenciesDialog({ open, onOpenChange, roles, targetRoleId, onCloned }: Props) {
   const [sourceRoleId, setSourceRoleId] = useState<string>('');
   const [isCloning, setIsCloning] = useState(false);
 

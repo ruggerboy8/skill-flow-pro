@@ -75,7 +75,7 @@ interface RoleOption {
 }
 
 interface CompetencyOption {
-  id: number;
+  competency_id: number;
   name: string;
 }
 

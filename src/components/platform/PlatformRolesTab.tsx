@@ -235,6 +235,13 @@ export function PlatformRolesTab() {
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => setImportOpen(true)}
+                  >
+                    <Upload className="h-4 w-4 mr-1" /> Import Pro Moves
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() => setCloneCompsOpen(true)}
                   >
                     <Copy className="h-4 w-4 mr-1" /> Clone Competencies

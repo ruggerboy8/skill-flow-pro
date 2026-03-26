@@ -26,6 +26,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { nextMondayInTimezone } from '@/lib/dateUtils';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -234,6 +235,17 @@ export function OrgSetupWizard({
         }
         setLocationEdits(edits);
         setSchedules(scheds);
+
+        // Resume from the furthest completed step rather than always starting at 1
+        const rolesComplete = (existingOverrides ?? []).length > 0;
+        const locationsComplete = locs.length > 0;
+        const scheduleComplete = locs.length > 0 && locs.every((l) => l.conf_due_day !== null);
+        const resumeStep = scheduleComplete ? 4 : locationsComplete ? 3 : rolesComplete ? 2 : 1;
+        setStep(resumeStep);
+      } else {
+        // No locations yet — start at step 1 or wherever roles left off
+        const rolesComplete = (existingOverrides ?? []).length > 0;
+        setStep(rolesComplete ? 2 : 1);
       }
     } catch (err) {
       console.error('OrgSetupWizard: error loading data', err);
@@ -244,7 +256,6 @@ export function OrgSetupWizard({
 
   useEffect(() => {
     if (open) {
-      setStep(1);
       setEditingLocationId(null);
       setShowAddLocation(false);
       setNewLocation({ name: '', timezone: 'America/Chicago' });
@@ -385,12 +396,7 @@ export function OrgSetupWizard({
     setAddingLocation(true);
     try {
       const slug = newLocation.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysUntilMonday = dayOfWeek === 1 ? 7 : ((8 - dayOfWeek) % 7) || 7;
-      const monday = new Date(now);
-      monday.setDate(now.getDate() + daysUntilMonday);
-      const startDate = monday.toISOString().split('T')[0];
+      const startDate = nextMondayInTimezone(newLocation.timezone);
 
       const { data, error } = await supabase
         .from('locations')

@@ -27,11 +27,8 @@ export default function AdminPage() {
 
   const checkSetupComplete = useCallback(async () => {
     if (!organizationId || isSuperAdmin) return;
-    const { count } = await supabase
-      .from("organization_role_names")
-      .select("*", { count: "exact", head: true })
-      .eq("org_id", organizationId);
-    setSetupComplete((count ?? 0) > 0);
+    const { data } = await supabase.rpc('is_org_setup_complete', { p_org_id: organizationId });
+    setSetupComplete(data === true);
   }, [organizationId, isSuperAdmin]);
 
   useEffect(() => {

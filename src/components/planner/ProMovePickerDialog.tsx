@@ -10,22 +10,24 @@ import { getDomainColor } from '@/lib/domainColors';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
 
 interface ProMove {
-  action_id: number;
+  action_id: number | null;   // null for org-custom moves (they use UUID id)
+  org_move_id: string | null; // UUID for org-custom moves
   action_statement: string;
-  competency_id: number;
+  competency_id: number | null;
   competencies: {
     name: string;
     domain_id: number;
     domains: { domain_name: string };
   } | null;
+  source: 'platform' | 'org';
 }
 
 interface ProMovePickerDialogProps {
   open: boolean;
   onClose: () => void;
   roleId: number;
-  onSelect: (actionId: number) => void;
-  orgId?: string;
+  onSelect: (actionId: number | null, orgMoveId?: string) => void;
+  orgId?: string; // When provided, hides moves the org has marked not-visible, and adds org custom moves
   practiceType?: string;
 }
 
@@ -56,36 +58,45 @@ export function ProMovePickerDialog({
     setLoading(true);
     setHiddenCount(0);
 
-    let visibleMoves: { action_id: number; action_statement: string; competency_id: number }[] = [];
+    // 1) Platform moves for this role
+    let movesQuery = supabase
+      .from('pro_moves')
+      .select('action_id, action_statement, competency_id')
+      .eq('role_id', roleId)
+      .eq('active', true);
 
-    if (orgId) {
-      // Server-resolved: uses org practice_type + hidden overrides + org-custom moves
-      const { data: orgMoves, error } = await supabase
-        .rpc('org_visible_pro_moves', { p_org_id: orgId, p_role_id: roleId });
-      if (!error && orgMoves) {
-        visibleMoves = orgMoves.map((m: any) => ({
-          action_id: m.action_id,
-          action_statement: m.action_statement,
-          competency_id: m.competency_id,
-        }));
-      }
-    } else {
-      // Legacy fallback: client-side filtering
-      let movesQuery = supabase
-        .from('pro_moves')
-        .select('action_id, action_statement, competency_id')
-        .eq('role_id', roleId)
-        .eq('active', true);
-
-      if (practiceType) {
-        movesQuery = movesQuery.contains('practice_types', [practiceType]);
-      }
-
-      const { data: movesData } = await movesQuery;
-      visibleMoves = movesData ?? [];
+    // When no org context, filter by practiceType if provided
+    if (!orgId && practiceType) {
+      movesQuery = movesQuery.contains('practice_types', [practiceType]);
     }
 
-    // 3) competencies + domains for visible moves only
+    const { data: movesData } = await movesQuery;
+
+    // 2) Org visibility overrides — exclude hidden moves; also apply content overrides
+    let hiddenIds = new Set<number>();
+    const contentOverrideMap = new Map<number, string>(); // action_id → custom_statement
+    if (orgId && movesData && movesData.length > 0) {
+      const [{ data: overrides }, { data: contentOverrides }] = await Promise.all([
+        (supabase as any)
+          .from('organization_pro_move_overrides')
+          .select('pro_move_id')
+          .eq('org_id', orgId)
+          .eq('is_hidden', true),
+        (supabase as any)
+          .from('organization_pro_move_content_overrides')
+          .select('pro_move_id, custom_statement')
+          .eq('org_id', orgId),
+      ]);
+      hiddenIds = new Set((overrides ?? []).map((o: any) => o.pro_move_id));
+      for (const co of contentOverrides ?? []) {
+        if (co.custom_statement) contentOverrideMap.set(co.pro_move_id, co.custom_statement);
+      }
+    }
+
+    const visibleMoves = (movesData ?? []).filter(m => !hiddenIds.has(m.action_id));
+    setHiddenCount((movesData ?? []).length - visibleMoves.length);
+
+    // 3) Competencies + domains for visible platform moves
     const competencyIds = [...new Set(visibleMoves.map(m => m.competency_id))];
     const { data: competenciesData } = await supabase
       .from('competencies')
@@ -105,29 +116,59 @@ export function ProMovePickerDialog({
       ])
     );
 
-    const enriched = visibleMoves.map(m => ({
+    const platformEnriched: ProMove[] = visibleMoves.map(m => ({
       action_id: m.action_id,
-      action_statement: m.action_statement,
+      org_move_id: null,
+      // Use org's custom text if available, otherwise platform text
+      action_statement: contentOverrideMap.get(m.action_id) ?? m.action_statement,
       competency_id: m.competency_id,
       competencies: compMap.get(m.competency_id) || null,
+      source: 'platform',
     }));
 
-    // sort: domain (by DOMAIN_ORDER) → competency_id → action_id
-    enriched.sort((a, b) => {
+    // 4) Org custom moves for this role (if orgId provided)
+    let orgCustomEnriched: ProMove[] = [];
+    if (orgId) {
+      const { data: orgMoves } = await (supabase as any)
+        .from('organization_pro_moves')
+        .select('id, action_statement, competency_id, competencies!organization_pro_moves_competency_id_fkey(id, name, domain_id)')
+        .eq('org_id', orgId)
+        .eq('role_id', roleId)
+        .eq('active', true);
+
+      orgCustomEnriched = (orgMoves ?? []).map((m: any) => ({
+        action_id: null,
+        org_move_id: m.id,
+        action_statement: m.action_statement,
+        competency_id: m.competency_id ?? null,
+        competencies: m.competencies
+          ? { name: m.competencies.name, domain_id: m.competencies.domain_id, domains: { domain_name: '' } }
+          : null,
+        source: 'org',
+      }));
+    }
+
+    const allMoves = [...platformEnriched, ...orgCustomEnriched];
+
+    // Sort: domain order → competency_id → action_id
+    allMoves.sort((a, b) => {
       const dA = a.competencies?.domains?.domain_name || '';
       const dB = b.competencies?.domains?.domain_name || '';
       const orderA = getDomainOrderIndex(dA);
       const orderB = getDomainOrderIndex(dB);
       if (orderA !== orderB) return orderA - orderB;
 
-      const compIdA = a.competency_id;
-      const compIdB = b.competency_id;
+      const compIdA = a.competency_id ?? 0;
+      const compIdB = b.competency_id ?? 0;
       if (compIdA !== compIdB) return compIdA - compIdB;
 
-      return a.action_id - b.action_id;
+      // Org moves always come after platform moves within the same competency
+      if (a.source !== b.source) return a.source === 'org' ? 1 : -1;
+
+      return (a.action_id ?? 0) - (b.action_id ?? 0);
     });
 
-    setProMoves(enriched);
+    setProMoves(allMoves);
     setLoading(false);
   };
 
@@ -222,9 +263,9 @@ export function ProMovePickerDialog({
                   const compName = (pm.competencies as any)?.name || '';
                   return (
                     <button
-                      key={pm.action_id}
+                      key={pm.org_move_id ?? pm.action_id}
                       onClick={() => {
-                        onSelect(pm.action_id);
+                        onSelect(pm.action_id, pm.org_move_id ?? undefined);
                         onClose();
                       }}
                       className="
@@ -238,6 +279,11 @@ export function ProMovePickerDialog({
                           <span className="break-words">{pm.action_statement}</span>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
+                          {pm.source === 'org' && (
+                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+                              Org custom
+                            </Badge>
+                          )}
                           {domain && (
                             <Badge
                               variant="secondary"

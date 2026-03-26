@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import alcanLogo from '@/assets/alcan-logo.png';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,10 +7,13 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoleRefresh } from '@/hooks/useRoleRefresh';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useRoutePersistence } from '@/hooks/useRoutePersistence';
 import { useSim } from '@/devtools/SimProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
+import { supabase } from '@/integrations/supabase/client';
+import { hexToHsl } from '@/lib/colorUtils';
 import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 // Server-side backfill detection via RPC
@@ -20,6 +23,29 @@ export default function Layout() {
   const { overrides } = useSim();
   const [isSimConsoleOpen, setIsSimConsoleOpen] = useState(false);
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  const { organizationId } = useUserRole();
+
+  // Org branding
+  const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!organizationId) return;
+    supabase
+      .from('organizations')
+      .select('name, logo_url, brand_color')
+      .eq('id', organizationId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        setOrgLogoUrl(data.logo_url ?? null);
+        setOrgName(data.name ?? null);
+        if (data.brand_color) {
+          const hsl = hexToHsl(data.brand_color);
+          if (hsl) document.documentElement.style.setProperty('--primary', hsl);
+        }
+      });
+  }, [organizationId]);
   
   // When masquerading, use the simulated user's roles; otherwise use auth roles
   const isMasquerading = overrides.enabled && overrides.masqueradeStaffId;
@@ -154,9 +180,13 @@ export default function Layout() {
             <header className="h-16 flex items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 sticky top-0 z-10">
               <SidebarTrigger />
               
-              {/* Centered logo */}
+              {/* Org logo — falls back to default if org hasn't uploaded one */}
               <div className="absolute left-1/2 -translate-x-1/2">
-                <img src={alcanLogo} alt="Pro-Moves" className="h-6 dark:invert" />
+                <img
+                  src={orgLogoUrl ?? alcanLogo}
+                  alt={orgName ?? 'Pro-Moves'}
+                  className="h-6 object-contain dark:invert"
+                />
               </div>
               
               <div className="flex-1" />

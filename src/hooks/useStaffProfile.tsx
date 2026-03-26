@@ -95,6 +95,7 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           name,
           role_id,
           primary_location_id,
+          organization_id,
           coach_scope_type,
           coach_scope_id,
           is_super_admin,

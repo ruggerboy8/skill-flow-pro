@@ -705,7 +705,7 @@ export function OrgProMoveLibraryTab() {
                   </SelectTrigger>
                   <SelectContent>
                     {competencyOptions.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
+                      <SelectItem key={c.competency_id} value={String(c.competency_id)}>
                         {c.name}
                       </SelectItem>
                     ))}

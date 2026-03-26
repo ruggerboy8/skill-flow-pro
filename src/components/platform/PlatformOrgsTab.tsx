@@ -64,7 +64,7 @@ export function PlatformOrgsTab() {
       const [{ data: orgsData, error }, { data: groupCounts }] = await Promise.all([
         supabase
           .from('organizations')
-          .select('id, name, slug, practice_type, timezone, logo_url, brand_color, created_at' as any)
+          .select('id, name, slug, practice_type, created_at')
           .order('name'),
         supabase
           .from('practice_groups')
@@ -82,8 +82,15 @@ export function PlatformOrgsTab() {
         }
       }
 
-      const rows: OrgRow[] = (orgsData as any[] ?? []).map((o: any) => ({
-        ...o,
+      const rows: OrgRow[] = (orgsData ?? []).map((o: any) => ({
+        id: o.id,
+        name: o.name,
+        slug: o.slug,
+        practice_type: o.practice_type,
+        created_at: o.created_at,
+        timezone: o.timezone ?? undefined,
+        logo_url: o.logo_url ?? null,
+        brand_color: o.brand_color ?? null,
         group_count: countMap.get(o.id) ?? 0,
         setup_complete: null,
       }));
@@ -92,10 +99,14 @@ export function PlatformOrgsTab() {
 
       // Fetch setup status for each org in parallel (non-blocking)
       rows.forEach(async (row) => {
-        const { data } = await supabase.rpc('is_org_setup_complete' as any, { p_org_id: row.id });
-        setOrgs((prev) =>
-          prev.map((o) => (o.id === row.id ? { ...o, setup_complete: data === true } : o))
-        );
+        try {
+          const { data } = await supabase.rpc('is_org_setup_complete' as any, { p_org_id: row.id });
+          setOrgs((prev) =>
+            prev.map((o) => (o.id === row.id ? { ...o, setup_complete: data === true } : o))
+          );
+        } catch {
+          // RPC may not exist yet
+        }
       });
     } catch (err: any) {
       toast({

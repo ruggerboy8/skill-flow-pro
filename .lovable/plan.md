@@ -1,83 +1,65 @@
 
 
-# Guided Paste Import for Pro Moves
+# Database Table Retirement Assessment
 
-## Approach
+## Investigation Method
+Searched all `.ts`/`.tsx` files for references to each table name (excluding `types.ts` which is auto-generated). Tables that only appear in `types.ts` and/or cleanup code in `admin-users` are strong retirement candidates.
 
-Replace the file-upload step with a two-step flow: (1) select target role + practice types, (2) paste tab-separated data from a spreadsheet. The existing preview/apply steps stay the same.
+## Safe to Drop (no application code references)
 
-When you copy cells from Excel/Google Sheets, the clipboard contains tab-separated values (TSV). This is simpler than CSV parsing and maps directly to the copy-paste workflow.
+| Table | Type | Why safe |
+|---|---|---|
+| `weekly_scores_backup_20241124` | Table | Backup from Nov 2024. Only in `types.ts`. Has a security finding for broken RLS. No code reads it. |
+| `learning_resources_legacy` | Table | Only in `types.ts`. The active system uses `pro_move_resources`. |
+| `pro_move_resources_legacy` | Table | Only in `types.ts`. Junction table for the old learning resources. |
+| `action_usage_stats` | View | Only in `types.ts`. No code queries it. Also flagged as missing RLS. |
+| `pro_move_usage_view` | View | Only in `types.ts`. No code queries it. Also flagged as missing RLS. |
+| `orphaned_scores_log` | Table | Only in `types.ts`. Was a debugging aid during migration. No code reads it. |
 
-## User flow
+## Likely safe but need a decision
 
-```text
-Step 1: Configure
-  - Select target role (dropdown)
-  - Select practice type(s) (checkboxes)
-  → competencies are fetched for the selected role
+| Table | References | Notes |
+|---|---|---|
+| `alcan_weekly_plan` | `admin-users` cleanup code (2 lines) | Predecessor to `weekly_plan`. Only referenced in user-delete nullification. The cleanup lines can be removed in the same migration. |
+| `manager_priorities` | `admin-users` cleanup code (1 line) | Coach priority weights. Was it ever used in production? Only referenced in user-delete. If not actively used, safe to drop. |
 
-Step 2: Paste
-  - Large textarea: "Paste rows from your spreadsheet"
-  - Expected columns shown above textarea:
-    competency_name | text | description | intervention_text | script
-  - Only competency_name and text are required
-  - Parse on paste or on "Review" button click
+## NOT safe to drop yet (still actively queried)
 
-Step 3: Review (existing preview table)
-  - Validate competency names against selected role's competencies
-  - Show fuzzy-match suggestions for unmatched names
-  - New/update/error badges as before
+| Table | Status | Why |
+|---|---|---|
+| `weekly_focus` | Deprecated | Still queried by `siteState.ts`, `sequencer-rank`, `HistoryPanel`, `ConfidenceWizard` for cycles 1-3 historical data. Needs code migration first. |
+| `weekly_plan` | Deprecated | Still queried by `WeekBuilderPanel`, `PlanHistory`, `MonthView`, `GlobalPlanManager`, `ConfidenceWizard`, `sequencer-rank`, `SequencerTestConsole`, `useReliableSubmission`. Heavy usage — not ready to drop. |
+| `app_kv` | Active | Used for global settings (performance time gate). Keep. |
+| `reminder_templates` | Active | Used by coach reminders and clinical scheduling. Keep. |
+| `coaching_agenda_templates` | Active | Used by clinical director prep. Keep. |
+| `excused_locations` | Active | Heavily used across confidence/performance wizards, coach reminders. Keep. |
 
-Step 4: Apply (existing)
+## Recommended Plan
+
+### Migration 1: Drop unused tables/views
+
+```sql
+-- Views first (no dependencies)
+DROP VIEW IF EXISTS action_usage_stats;
+DROP VIEW IF EXISTS pro_move_usage_view;
+
+-- Tables with no code references
+DROP TABLE IF EXISTS weekly_scores_backup_20241124;
+DROP TABLE IF EXISTS learning_resources_legacy CASCADE;
+DROP TABLE IF EXISTS pro_move_resources_legacy;
+DROP TABLE IF EXISTS orphaned_scores_log;
+DROP TABLE IF EXISTS alcan_weekly_plan;
 ```
 
-## Changes
+### Migration 2: Clean up admin-users references
 
-### `src/components/admin/BulkUpload.tsx` — rewrite
+Remove the 2 `alcan_weekly_plan` lines and optionally the `manager_priorities` delete line from `admin-users/index.ts`.
 
-**Step state**: Change from `'upload' | 'preview' | 'complete'` to `'config' | 'paste' | 'preview' | 'complete'`
+### After migration: Regenerate types
 
-**Step 1 — Config UI**:
-- Role dropdown (fetched from `roles` table, passed as prop — already available)
-- Practice type checkboxes for `pediatric_us`, `general_us`, `general_uk`
-- When role is selected, fetch that role's competencies from Supabase (scoped query)
-- "Next" button enabled when role + at least one practice type selected
+Run `npx supabase gen types` to clean up `types.ts` — this alone will significantly reduce the file size and make the schema easier to read.
 
-**Step 2 — Paste UI**:
-- Show expected column headers as a reference strip
-- Large `<Textarea>` with placeholder showing tab-separated example
-- "Review" button parses the pasted text
+### Total reduction: 7 tables/views dropped
 
-**Paste parsing logic**:
-- Split by newlines, then split each line by tabs
-- First row = headers (auto-detect by matching known column names)
-- If no header row detected (no "competency_name" in first row), assume column order: `competency_name, text, description, intervention_text, script`
-- `role_name` and `practice_types` are NOT expected in paste — they come from Step 1
-
-**Competency validation**:
-- Match `competency_name` against only the selected role's competencies (case-insensitive)
-- For unmatched names, do a simple substring/similarity check and show "Did you mean: X?" in the error column
-
-**Apply step**:
-- Inject `role_id` from Step 1 selection into every row
-- Inject `practice_types` from Step 1 into every row
-- Pass to existing `bulk_upsert_pro_moves` RPC as before
-
-### `src/components/admin/ProMoveLibrary.tsx`
-
-- Keep the "Bulk Upload" button but rename to "Import Pro Moves"
-- No other changes needed — BulkUpload props stay the same
-
-### No RPC changes needed
-
-The existing `bulk_upsert_pro_moves` RPC already accepts `role_name` and `practice_types` per row. We just populate them from the wizard context instead of requiring them in the paste data.
-
-### Keep CSV upload as fallback
-
-Add a small "or upload CSV" link on the paste step for backward compatibility. If clicked, show the existing file input. The CSV path still works as before.
-
-## What stays the same
-- Preview table UI (status icons, badges, error download)
-- Apply logic and RPC call
-- Complete step with results summary
+This removes 7 objects from the schema without affecting any user-facing functionality. The `weekly_focus` and `weekly_plan` tables are the biggest clutter contributors but still have active code paths — those need a separate code migration effort before they can be retired.
 

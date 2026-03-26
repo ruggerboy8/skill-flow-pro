@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Plus, Copy, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Copy, Pencil, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { RoleFormDrawer } from './RoleFormDrawer';
 import { CompetencyFormDrawer } from './CompetencyFormDrawer';
 import { CloneCompetenciesDialog } from './CloneCompetenciesDialog';
+import { ProMoveImportDialog } from './ProMoveImportDialog';
 import { DOMAIN_ORDER } from '@/lib/domainUtils';
 import {
   AlertDialog,
@@ -59,6 +60,7 @@ export function PlatformRolesTab() {
   const [editingComp, setEditingComp] = useState<Competency | null>(null);
   const [cloneCompsOpen, setCloneCompsOpen] = useState(false);
   const [deleteCompId, setDeleteCompId] = useState<number | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: roles, isLoading: rolesLoading } = useQuery({
     queryKey: ['platform-roles'],

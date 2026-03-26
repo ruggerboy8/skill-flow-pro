@@ -141,7 +141,7 @@ export function OrgDetailPanel({ org, onClose, onRefresh }: OrgDetailPanelProps)
           .select('*', { count: 'exact', head: true })
           .in('group_id', groupIds)
           .eq('active', true),
-        supabase
+        (supabase as any)
           .from('staff')
           .select('*', { count: 'exact', head: true })
           .in('primary_location_id', groupIds.length > 0 ? await getLocationIds(groupIds) : [])

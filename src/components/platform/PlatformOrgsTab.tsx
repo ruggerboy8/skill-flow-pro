@@ -28,19 +28,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useToast } from '@/hooks/use-toast';
 import { OrgBootstrapDrawer } from './OrgBootstrapDrawer';
+import { OrgDetailPanel } from './OrgDetailPanel';
 
 interface OrgRow {
   id: string;
   name: string;
   slug: string;
   practice_type: string;
+  timezone?: string;
+  logo_url?: string | null;
+  brand_color?: string | null;
   created_at: string;
   group_count: number;
+  setup_complete: boolean | null; // null = still loading
 }
 
 export function PlatformOrgsTab() {
@@ -51,6 +56,7 @@ export function PlatformOrgsTab() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orgToDelete, setOrgToDelete] = useState<OrgRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState<OrgRow | null>(null);
 
   const loadOrgs = async () => {
     setLoading(true);
@@ -58,7 +64,7 @@ export function PlatformOrgsTab() {
       const [{ data: orgsData, error }, { data: groupCounts }] = await Promise.all([
         supabase
           .from('organizations')
-          .select('id, name, slug, practice_type, created_at')
+          .select('id, name, slug, practice_type, timezone, logo_url, brand_color, created_at')
           .order('name'),
         supabase
           .from('practice_groups')
@@ -76,12 +82,21 @@ export function PlatformOrgsTab() {
         }
       }
 
-      setOrgs(
-        (orgsData ?? []).map((o) => ({
-          ...o,
-          group_count: countMap.get(o.id) ?? 0,
-        }))
-      );
+      const rows: OrgRow[] = (orgsData ?? []).map((o) => ({
+        ...o,
+        group_count: countMap.get(o.id) ?? 0,
+        setup_complete: null,
+      }));
+
+      setOrgs(rows);
+
+      // Fetch setup status for each org in parallel (non-blocking)
+      rows.forEach(async (row) => {
+        const { data } = await supabase.rpc('is_org_setup_complete', { p_org_id: row.id });
+        setOrgs((prev) =>
+          prev.map((o) => (o.id === row.id ? { ...o, setup_complete: data === true } : o))
+        );
+      });
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -93,8 +108,9 @@ export function PlatformOrgsTab() {
     }
   };
 
-  const handleDeleteClick = async (org: OrgRow) => {
-    // Pre-flight: check for existing groups (includes inactive)
+  const handleDeleteClick = async (e: React.MouseEvent, org: OrgRow) => {
+    e.stopPropagation(); // Don't open detail panel
+
     const { count, error } = await supabase
       .from('practice_groups')
       .select('*', { count: 'exact', head: true })
@@ -132,6 +148,7 @@ export function PlatformOrgsTab() {
       toast({ title: 'Deleted', description: `"${orgToDelete.name}" has been removed.` });
       setDeleteDialogOpen(false);
       setOrgToDelete(null);
+      if (selectedOrg?.id === orgToDelete.id) setSelectedOrg(null);
       loadOrgs();
     } catch (err: any) {
       toast({
@@ -195,6 +212,7 @@ export function PlatformOrgsTab() {
                   </SortableTableHead>
                   <TableHead>Slug</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Setup</TableHead>
                   <TableHead>Groups</TableHead>
                   <SortableTableHead
                     sortKey="created_at"
@@ -210,21 +228,40 @@ export function PlatformOrgsTab() {
               <TableBody>
                 {sortedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No organizations yet
                     </TableCell>
                   </TableRow>
                 ) : (
                   sortedData.map((org) => (
-                    <TableRow key={org.id}>
+                    <TableRow
+                      key={org.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedOrg(org)}
+                    >
                       <TableCell className="font-medium">{org.name}</TableCell>
                       <TableCell className="text-muted-foreground font-mono text-xs">
                         {org.slug}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {org.practice_type === 'pediatric_us' ? 'Pediatric – US' : org.practice_type === 'general_us' ? 'General – US' : org.practice_type === 'general_uk' ? 'General – UK' : org.practice_type}
+                          {org.practice_type === 'pediatric_us'
+                            ? 'Pediatric – US'
+                            : org.practice_type === 'general_us'
+                            ? 'General – US'
+                            : org.practice_type === 'general_uk'
+                            ? 'General – UK'
+                            : org.practice_type}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {org.setup_complete === null ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : org.setup_complete ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" title="Setup complete" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-amber-500" title="Setup incomplete" />
+                        )}
                       </TableCell>
                       <TableCell>{org.group_count}</TableCell>
                       <TableCell>
@@ -235,7 +272,7 @@ export function PlatformOrgsTab() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteClick(org)}
+                          onClick={(e) => handleDeleteClick(e, org)}
                           title="Delete organization"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -257,6 +294,12 @@ export function PlatformOrgsTab() {
           setDrawerOpen(false);
           loadOrgs();
         }}
+      />
+
+      <OrgDetailPanel
+        org={selectedOrg}
+        onClose={() => setSelectedOrg(null)}
+        onRefresh={loadOrgs}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

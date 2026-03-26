@@ -121,7 +121,7 @@ export function OrgDetailPanel({ org, onClose, onRefresh }: OrgDetailPanelProps)
     // Setup complete check
     supabase.rpc('is_org_setup_complete' as any, { p_org_id: orgId }).then(({ data }: any) => {
       setSetupComplete(data === true);
-    });
+    }).catch(() => { /* RPC may not exist yet */ });
 
     // Stats: location + staff counts
     const [{ data: groups }, adminsResult] = await Promise.all([

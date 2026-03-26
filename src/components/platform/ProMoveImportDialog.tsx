@@ -236,11 +236,9 @@ export function ProMoveImportDialog({ open, onOpenChange, roleId, roleName, role
 
     setLoading(true);
     try {
-      const roleName_ = (await supabase.from('roles').select('role_name').eq('role_id', roleId).single()).data?.role_name ?? '';
-
       const data = validRows.map(row => ({
         action_id: row.data.action_id?.trim() ? parseInt(row.data.action_id) : null,
-        role_name: roleName_,
+        role_id: roleId,
         competency_name: row.data.competency_name,
         action_statement: row.data.text,
         description: row.data.description || null,

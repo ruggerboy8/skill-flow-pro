@@ -119,9 +119,10 @@ export function OrgDetailPanel({ org, onClose, onRefresh }: OrgDetailPanelProps)
 
   const loadPanelData = async (orgId: string) => {
     // Setup complete check
-    supabase.rpc('is_org_setup_complete' as any, { p_org_id: orgId }).then(({ data }: any) => {
-      setSetupComplete(data === true);
-    }).catch(() => { /* RPC may not exist yet */ });
+    try {
+      const { data: setupData } = await (supabase.rpc as any)('is_org_setup_complete', { p_org_id: orgId });
+      setSetupComplete(setupData === true);
+    } catch { /* RPC may not exist yet */ }
 
     // Stats: location + staff counts
     const [{ data: groups }, adminsResult] = await Promise.all([
@@ -225,9 +226,9 @@ export function OrgDetailPanel({ org, onClose, onRefresh }: OrgDetailPanelProps)
           name: editName.trim(),
           practice_type: editPracticeType,
           ...(editTimezone && { timezone: editTimezone }),
-          brand_color: editBrandColor !== '#1a4a7a' ? editBrandColor : null,
+          ...(editBrandColor !== '#1a4a7a' && { brand_color: editBrandColor }),
           ...(newLogoUrl !== org.logo_url && { logo_url: newLogoUrl }),
-        })
+        } as any)
         .eq('id', org.id);
 
       if (error) throw error;

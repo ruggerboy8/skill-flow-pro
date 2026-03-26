@@ -1269,7 +1269,7 @@ serve(async (req: Request) => {
           );
 
           await requireDelete("coach scopes", admin.from("coach_scopes").delete().eq("staff_id", sid));
-          await requireDelete("manager priorities", admin.from("manager_priorities").delete().eq("coach_staff_id", sid));
+          // manager_priorities table retained but cleanup skipped (no active UI usage)
           await requireDelete("excused submissions", admin.from("excused_submissions").delete().eq("staff_id", sid));
           await requireDelete("admin audit (staff)", admin.from("admin_audit").delete().eq("staff_id", sid));
           await requireDelete("admin audit (changed_by)", admin.from("admin_audit").delete().eq("changed_by", sid));
@@ -1299,8 +1299,7 @@ serve(async (req: Request) => {
           admin.from("excused_submissions").update({ created_by: null }).eq("created_by", user_id),
           admin.from("excused_weeks").update({ created_by: null }).eq("created_by", user_id),
           admin.from("organizations").update({ created_by: null }).eq("created_by", user_id),
-          admin.from("alcan_weekly_plan").update({ computed_by: null }).eq("computed_by", user_id),
-          admin.from("alcan_weekly_plan").update({ published_by: null }).eq("published_by", user_id),
+          // alcan_weekly_plan dropped — no longer exists
           admin.from("staff").update({ baseline_released_by: null }).eq("baseline_released_by", user_id),
         ];
         const nullResults = await Promise.all(nullifyOps);

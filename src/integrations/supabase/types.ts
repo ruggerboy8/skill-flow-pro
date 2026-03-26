@@ -100,57 +100,6 @@ export type Database = {
           },
         ]
       }
-      alcan_weekly_plan: {
-        Row: {
-          action_ids: number[]
-          computed_at: string
-          computed_by: string | null
-          created_at: string
-          engine_config: Json | null
-          id: string
-          locked_until: string | null
-          logs: Json | null
-          published_at: string | null
-          published_by: string | null
-          role_id: number
-          status: Database["public"]["Enums"]["plan_status"]
-          updated_at: string
-          week_start: string
-        }
-        Insert: {
-          action_ids: number[]
-          computed_at?: string
-          computed_by?: string | null
-          created_at?: string
-          engine_config?: Json | null
-          id?: string
-          locked_until?: string | null
-          logs?: Json | null
-          published_at?: string | null
-          published_by?: string | null
-          role_id: number
-          status?: Database["public"]["Enums"]["plan_status"]
-          updated_at?: string
-          week_start: string
-        }
-        Update: {
-          action_ids?: number[]
-          computed_at?: string
-          computed_by?: string | null
-          created_at?: string
-          engine_config?: Json | null
-          id?: string
-          locked_until?: string | null
-          logs?: Json | null
-          published_at?: string | null
-          published_by?: string | null
-          role_id?: number
-          status?: Database["public"]["Enums"]["plan_status"]
-          updated_at?: string
-          week_start?: string
-        }
-        Relationships: []
-      }
       app_kv: {
         Row: {
           key: string
@@ -1032,73 +981,6 @@ export type Database = {
         }
         Relationships: []
       }
-      learning_resources_legacy: {
-        Row: {
-          body_md: string | null
-          created_at: string
-          id: string
-          is_primary: boolean
-          org_id: string | null
-          role_id: number | null
-          status: string
-          tags: string[] | null
-          title: string
-          type: string
-          updated_at: string
-          url: string | null
-        }
-        Insert: {
-          body_md?: string | null
-          created_at?: string
-          id?: string
-          is_primary?: boolean
-          org_id?: string | null
-          role_id?: number | null
-          status?: string
-          tags?: string[] | null
-          title: string
-          type: string
-          updated_at?: string
-          url?: string | null
-        }
-        Update: {
-          body_md?: string | null
-          created_at?: string
-          id?: string
-          is_primary?: boolean
-          org_id?: string | null
-          role_id?: number | null
-          status?: string
-          tags?: string[] | null
-          title?: string
-          type?: string
-          updated_at?: string
-          url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "learning_resources_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "practice_groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "learning_resources_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "roles"
-            referencedColumns: ["role_id"]
-          },
-          {
-            foreignKeyName: "learning_resources_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "v_onboarding_progress"
-            referencedColumns: ["role_id"]
-          },
-        ]
-      }
       locations: {
         Row: {
           active: boolean | null
@@ -1361,36 +1243,6 @@ export type Database = {
         }
         Relationships: []
       }
-      orphaned_scores_log: {
-        Row: {
-          action_id: number | null
-          assignment_id: string | null
-          logged_at: string | null
-          reason: string | null
-          score_id: string | null
-          staff_id: string | null
-          week_of: string | null
-        }
-        Insert: {
-          action_id?: number | null
-          assignment_id?: string | null
-          logged_at?: string | null
-          reason?: string | null
-          score_id?: string | null
-          staff_id?: string | null
-          week_of?: string | null
-        }
-        Update: {
-          action_id?: number | null
-          assignment_id?: string | null
-          logged_at?: string | null
-          reason?: string | null
-          score_id?: string | null
-          staff_id?: string | null
-          week_of?: string | null
-        }
-        Relationships: []
-      }
       practice_groups: {
         Row: {
           active: boolean | null
@@ -1482,39 +1334,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pro_moves"
             referencedColumns: ["action_id"]
-          },
-        ]
-      }
-      pro_move_resources_legacy: {
-        Row: {
-          action_id: number
-          resource_id: string
-          sort_order: number
-        }
-        Insert: {
-          action_id: number
-          resource_id: string
-          sort_order?: number
-        }
-        Update: {
-          action_id?: number
-          resource_id?: string
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pro_move_resources_action_id_fkey"
-            columns: ["action_id"]
-            isOneToOne: false
-            referencedRelation: "pro_moves"
-            referencedColumns: ["action_id"]
-          },
-          {
-            foreignKeyName: "pro_move_resources_resource_id_fkey"
-            columns: ["resource_id"]
-            isOneToOne: false
-            referencedRelation: "learning_resources_legacy"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -1717,13 +1536,6 @@ export type Database = {
           staff_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "resource_events_resource_id_fkey"
-            columns: ["resource_id"]
-            isOneToOne: false
-            referencedRelation: "learning_resources_legacy"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "resource_events_staff_id_fkey"
             columns: ["staff_id"]
@@ -2605,73 +2417,6 @@ export type Database = {
           },
         ]
       }
-      weekly_scores_backup_20241124: {
-        Row: {
-          assignment_id: string | null
-          confidence_date: string | null
-          confidence_late: boolean | null
-          confidence_score: number | null
-          confidence_source: Database["public"]["Enums"]["score_source"] | null
-          created_at: string | null
-          entered_by: string | null
-          id: string | null
-          performance_date: string | null
-          performance_late: boolean | null
-          performance_score: number | null
-          performance_source: Database["public"]["Enums"]["score_source"] | null
-          selected_action_id: number | null
-          site_action_id: number | null
-          staff_id: string | null
-          updated_at: string | null
-          week_of: string | null
-          weekly_focus_id: string | null
-        }
-        Insert: {
-          assignment_id?: string | null
-          confidence_date?: string | null
-          confidence_late?: boolean | null
-          confidence_score?: number | null
-          confidence_source?: Database["public"]["Enums"]["score_source"] | null
-          created_at?: string | null
-          entered_by?: string | null
-          id?: string | null
-          performance_date?: string | null
-          performance_late?: boolean | null
-          performance_score?: number | null
-          performance_source?:
-            | Database["public"]["Enums"]["score_source"]
-            | null
-          selected_action_id?: number | null
-          site_action_id?: number | null
-          staff_id?: string | null
-          updated_at?: string | null
-          week_of?: string | null
-          weekly_focus_id?: string | null
-        }
-        Update: {
-          assignment_id?: string | null
-          confidence_date?: string | null
-          confidence_late?: boolean | null
-          confidence_score?: number | null
-          confidence_source?: Database["public"]["Enums"]["score_source"] | null
-          created_at?: string | null
-          entered_by?: string | null
-          id?: string | null
-          performance_date?: string | null
-          performance_late?: boolean | null
-          performance_score?: number | null
-          performance_source?:
-            | Database["public"]["Enums"]["score_source"]
-            | null
-          selected_action_id?: number | null
-          site_action_id?: number | null
-          staff_id?: string | null
-          updated_at?: string | null
-          week_of?: string | null
-          weekly_focus_id?: string | null
-        }
-        Relationships: []
-      }
       weekly_self_select: {
         Row: {
           created_at: string
@@ -2707,28 +2452,6 @@ export type Database = {
       }
     }
     Views: {
-      action_usage_stats: {
-        Row: {
-          action_id: number | null
-          avg_confidence: number | null
-          first_assigned: string | null
-          last_assigned: string | null
-          role_id: number | null
-          total_attempts: number | null
-          unique_users: number | null
-          weeks_assigned: number | null
-        }
-        Relationships: []
-      }
-      pro_move_usage_view: {
-        Row: {
-          action_id: number | null
-          attempts: number | null
-          avg_confidence: number | null
-          last_score_date: string | null
-        }
-        Relationships: []
-      }
       v_onboarding_progress: {
         Row: {
           current_cycle: number | null

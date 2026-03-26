@@ -1,25 +1,25 @@
 
 
-# Add practice_types to the Pro Move Library Template Download
+# Remove Competency Code Field
 
-## Problem
-The "Template" download button in the Admin Pro Move Library generates a CSV inline (lines 100-116 of `ProMoveLibrary.tsx`) that is missing the `practice_types` column. The static file `public/pro-moves-template.csv` has it with full documentation, but the download button doesn't use that file.
+## Changes
 
-## Solution
-Replace the inline CSV generation in `ProMoveLibrary.tsx` `downloadTemplate()` with a redirect to the static template file (`/pro-moves-template.csv`), which already includes `practice_types` with pipe-delimited format documentation, valid values, and examples.
+### 1. `src/components/platform/CompetencyFormDrawer.tsx`
+- Remove `code` from `FormValues` interface and default values
+- Remove the Code input field from the form
+- Remove `code` from the submit payload (set to `null`)
 
-## Technical Details
+### 2. `src/components/platform/CloneCompetenciesDialog.tsx`
+- Stop rewriting code prefixes during clone — just pass through `code` as-is (or set to `null`)
 
-### File: `src/components/admin/ProMoveLibrary.tsx`
-- Replace the `downloadTemplate()` function body (lines 100-117) to fetch and download `/pro-moves-template.csv` directly instead of generating CSV inline
-- Simple approach: change to `window.open('/pro-moves-template.csv', '_blank')` or use an anchor download pointing to the static file
+### 3. `src/hooks/useDomainDetail.ts`
+- Remove `code` from the competencies select query
+- Remove `code` from `CompetencyDetail` interface
+- Stop mapping `code` in the result builder
 
-### Verification
-- The static template at `public/pro-moves-template.csv` already includes:
-  - `practice_types` column with pipe-delimited format
-  - Valid values: `pediatric_us`, `general_us`, `general_uk`
-  - Comment header explaining the format
-  - Example rows showing single and multi-type entries
+### 4. `src/hooks/useDoctorDomainDetail.ts`
+- Same cleanup: remove `code` from select, interface, and mapping
 
-This is a one-line fix.
+### 5. `src/components/platform/PlatformRolesTab.tsx`
+- Remove `code` from the competencies query select and `Competency` interface if not used in display
 

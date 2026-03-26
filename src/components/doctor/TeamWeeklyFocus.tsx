@@ -7,6 +7,7 @@ import { ChevronDown, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const ROLES = [
   { id: 1, label: 'DFI' },

@@ -332,7 +332,6 @@ export function PlatformRolesTab() {
           onOpenChange={setCloneCompsOpen}
           roles={roles ?? []}
           targetRoleId={selectedRole.role_id}
-          targetRoleCode={selectedRole.role_code}
           onCloned={() => {
             refreshAll();
             setCloneCompsOpen(false);

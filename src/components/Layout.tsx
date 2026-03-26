@@ -33,10 +33,10 @@ export default function Layout() {
     if (!organizationId) return;
     supabase
       .from('organizations')
-      .select('name, logo_url, brand_color')
+      .select('name, logo_url, brand_color' as any)
       .eq('id', organizationId)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (!data) return;
         setOrgLogoUrl(data.logo_url ?? null);
         setOrgName(data.name ?? null);

@@ -27,7 +27,7 @@ export default function AdminPage() {
 
   const checkSetupComplete = useCallback(async () => {
     if (!organizationId || isSuperAdmin) return;
-    const { data } = await supabase.rpc('is_org_setup_complete', { p_org_id: organizationId });
+    const { data } = await supabase.rpc('is_org_setup_complete' as any, { p_org_id: organizationId });
     setSetupComplete(data === true);
   }, [organizationId, isSuperAdmin]);
 

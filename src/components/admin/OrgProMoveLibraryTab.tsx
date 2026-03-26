@@ -75,7 +75,7 @@ interface RoleOption {
 }
 
 interface CompetencyOption {
-  id: number;
+  competency_id: number;
   name: string;
 }
 
@@ -256,7 +256,7 @@ export function OrgProMoveLibraryTab() {
     if (!newMove.role_id) { setCompetencyOptions([]); return; }
     supabase
       .from('competencies')
-      .select('id, name')
+      .select('competency_id, name')
       .eq('role_id', Number(newMove.role_id))
       .then(({ data }) => setCompetencyOptions(data ?? []));
   }, [newMove.role_id]);
@@ -705,7 +705,7 @@ export function OrgProMoveLibraryTab() {
                   </SelectTrigger>
                   <SelectContent>
                     {competencyOptions.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
+                      <SelectItem key={c.competency_id} value={String(c.competency_id)}>
                         {c.name}
                       </SelectItem>
                     ))}

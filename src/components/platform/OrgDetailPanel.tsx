@@ -119,7 +119,7 @@ export function OrgDetailPanel({ org, onClose, onRefresh }: OrgDetailPanelProps)
 
   const loadPanelData = async (orgId: string) => {
     // Setup complete check
-    supabase.rpc('is_org_setup_complete', { p_org_id: orgId }).then(({ data }) => {
+    supabase.rpc('is_org_setup_complete' as any, { p_org_id: orgId }).then(({ data }: any) => {
       setSetupComplete(data === true);
     });
 
@@ -141,7 +141,7 @@ export function OrgDetailPanel({ org, onClose, onRefresh }: OrgDetailPanelProps)
           .select('*', { count: 'exact', head: true })
           .in('group_id', groupIds)
           .eq('active', true),
-        supabase
+        (supabase as any)
           .from('staff')
           .select('*', { count: 'exact', head: true })
           .in('primary_location_id', groupIds.length > 0 ? await getLocationIds(groupIds) : [])

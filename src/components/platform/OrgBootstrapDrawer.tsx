@@ -256,7 +256,7 @@ export function OrgBootstrapDrawer({ open, onClose, onSuccess }: OrgBootstrapDra
           const { data: urlData } = supabase.storage.from('org-assets').getPublicUrl(path);
           await supabase
             .from('organizations')
-            .update({ logo_url: urlData.publicUrl })
+            .update({ logo_url: urlData.publicUrl } as any)
             .eq('id', org.id);
         }
         // Logo upload failure is non-fatal — org is already created

@@ -26,6 +26,7 @@ export interface StaffProfile {
   name?: string;
   role_id: number | null;
   primary_location_id: string | null;
+  organization_id: string | null;
   coach_scope_type: string | null;
   coach_scope_id: string | null;
   is_super_admin: boolean;

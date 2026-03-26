@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Plus, Copy, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Copy, Pencil, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { RoleFormDrawer } from './RoleFormDrawer';
 import { CompetencyFormDrawer } from './CompetencyFormDrawer';
 import { CloneCompetenciesDialog } from './CloneCompetenciesDialog';
+import { ProMoveImportDialog } from './ProMoveImportDialog';
 import { DOMAIN_ORDER } from '@/lib/domainUtils';
 import {
   AlertDialog,
@@ -59,6 +60,7 @@ export function PlatformRolesTab() {
   const [editingComp, setEditingComp] = useState<Competency | null>(null);
   const [cloneCompsOpen, setCloneCompsOpen] = useState(false);
   const [deleteCompId, setDeleteCompId] = useState<number | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: roles, isLoading: rolesLoading } = useQuery({
     queryKey: ['platform-roles'],
@@ -96,6 +98,26 @@ export function PlatformRolesTab() {
         .order('competency_id');
       if (error) throw error;
       return data as Competency[];
+    },
+    enabled: !!selectedRoleId,
+  });
+
+  // Pro move counts per competency
+  const { data: proMoveCounts } = useQuery({
+    queryKey: ['platform-promove-counts', selectedRoleId],
+    queryFn: async () => {
+      if (!selectedRoleId) return {};
+      const { data, error } = await supabase
+        .from('pro_moves')
+        .select('competency_id')
+        .eq('role_id', selectedRoleId)
+        .eq('active', true);
+      if (error) throw error;
+      const counts: Record<number, number> = {};
+      (data ?? []).forEach(pm => {
+        if (pm.competency_id) counts[pm.competency_id] = (counts[pm.competency_id] || 0) + 1;
+      });
+      return counts;
     },
     enabled: !!selectedRoleId,
   });
@@ -140,6 +162,7 @@ export function PlatformRolesTab() {
   const refreshAll = () => {
     queryClient.invalidateQueries({ queryKey: ['platform-roles'] });
     queryClient.invalidateQueries({ queryKey: ['platform-competencies'] });
+    queryClient.invalidateQueries({ queryKey: ['platform-promove-counts'] });
   };
 
   if (rolesLoading) {
@@ -213,6 +236,13 @@ export function PlatformRolesTab() {
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => setImportOpen(true)}
+                  >
+                    <Upload className="h-4 w-4 mr-1" /> Import Pro Moves
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() => setCloneCompsOpen(true)}
                   >
                     <Copy className="h-4 w-4 mr-1" /> Clone Competencies
@@ -261,10 +291,17 @@ export function PlatformRolesTab() {
                               key={comp.competency_id}
                               className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-muted/50 group"
                             >
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{comp.name}</p>
-                                {comp.tagline && (
-                                  <p className="text-xs text-muted-foreground truncate">{comp.tagline}</p>
+                              <div className="min-w-0 flex items-center gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium truncate">{comp.name}</p>
+                                  {comp.tagline && (
+                                    <p className="text-xs text-muted-foreground truncate">{comp.tagline}</p>
+                                  )}
+                                </div>
+                                {(proMoveCounts?.[comp.competency_id] ?? 0) > 0 && (
+                                  <Badge variant="secondary" className="text-2xs shrink-0">
+                                    {proMoveCounts[comp.competency_id]} PM
+                                  </Badge>
                                 )}
                               </div>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -336,6 +373,17 @@ export function PlatformRolesTab() {
             refreshAll();
             setCloneCompsOpen(false);
           }}
+        />
+      )}
+
+      {selectedRole && (
+        <ProMoveImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          roleId={selectedRole.role_id}
+          roleName={selectedRole.role_name}
+          rolePracticeType={selectedRole.practice_type}
+          onImported={refreshAll}
         />
       )}
 

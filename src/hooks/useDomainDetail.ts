@@ -13,7 +13,6 @@ export interface ProMoveDetail {
 
 export interface CompetencyDetail {
   competency_id: number;
-  code: string;
   title: string;
   subtitle: string | null;
   description: string | null;
@@ -48,7 +47,7 @@ export function useDomainDetail(domainSlug: string) {
       // 1. Fetch competencies for this domain and role
       const { data: competencies, error: compError } = await supabase
         .from('competencies')
-        .select('competency_id, code, name, tagline, friendly_description')
+        .select('competency_id, name, tagline, friendly_description')
         .eq('domain_id', domainId)
         .eq('role_id', staffProfile.role_id)
         .eq('status', 'Active')
@@ -177,7 +176,6 @@ export function useDomainDetail(domainSlug: string) {
       // 6. Build the competency details
       const competencyDetails: CompetencyDetail[] = (competencies || []).map(c => ({
         competency_id: c.competency_id,
-        code: c.code || '',
         title: c.name || '',
         subtitle: c.tagline,
         description: (c as any).friendly_description || null,

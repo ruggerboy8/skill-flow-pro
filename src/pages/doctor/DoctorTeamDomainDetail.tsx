@@ -36,7 +36,7 @@ export default function DoctorTeamDomainDetail() {
 
       const { data: competencies } = await supabase
         .from('competencies')
-        .select('competency_id, code, name, tagline, friendly_description')
+        .select('competency_id, name, tagline, friendly_description')
         .eq('domain_id', domainId)
         .eq('role_id', role.roleId)
         .eq('status', 'Active')
@@ -68,7 +68,6 @@ export default function DoctorTeamDomainDetail() {
       return {
         competencies: (competencies || []).map(c => ({
           competency_id: c.competency_id,
-          code: c.code || '',
           title: c.name || '',
           subtitle: c.tagline,
           description: (c as any).friendly_description || null,

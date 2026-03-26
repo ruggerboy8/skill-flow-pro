@@ -36,7 +36,7 @@ interface Competency {
   role_id: number;
   domain_id: number;
   name: string;
-  code: string | null;
+  
   tagline: string | null;
   description: string | null;
   friendly_description: string | null;
@@ -90,7 +90,7 @@ export function PlatformRolesTab() {
       if (!selectedRoleId) return [];
       const { data, error } = await supabase
         .from('competencies')
-        .select('competency_id, role_id, domain_id, name, code, tagline, description, friendly_description, interview_prompt, status')
+        .select('competency_id, role_id, domain_id, name, tagline, description, friendly_description, interview_prompt, status')
         .eq('role_id', selectedRoleId)
         .order('domain_id')
         .order('competency_id');
@@ -332,7 +332,6 @@ export function PlatformRolesTab() {
           onOpenChange={setCloneCompsOpen}
           roles={roles ?? []}
           targetRoleId={selectedRole.role_id}
-          targetRoleCode={selectedRole.role_code}
           onCloned={() => {
             refreshAll();
             setCloneCompsOpen(false);

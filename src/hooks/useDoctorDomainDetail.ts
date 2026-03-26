@@ -10,7 +10,6 @@ export interface DoctorProMoveDetail {
 
 export interface DoctorCompetencyDetail {
   competency_id: number;
-  code: string;
   title: string;
   subtitle: string | null;
   description: string | null;
@@ -44,7 +43,7 @@ export function useDoctorDomainDetail(domainSlug: string) {
       // 1. Fetch competencies for this domain and doctor role
       const { data: competencies, error: compError } = await supabase
         .from('competencies')
-        .select('competency_id, code, name, tagline, friendly_description')
+        .select('competency_id, name, tagline, friendly_description')
         .eq('domain_id', domainId)
         .eq('role_id', DOCTOR_ROLE_ID)
         .ilike('status', 'active')
@@ -83,7 +82,6 @@ export function useDoctorDomainDetail(domainSlug: string) {
       // 3. Build the competency details (no scores - passive library)
       const competencyDetails: DoctorCompetencyDetail[] = (competencies || []).map(c => ({
         competency_id: c.competency_id,
-        code: c.code || '',
         title: c.name || '',
         subtitle: c.tagline,
         description: (c as any).friendly_description || null,

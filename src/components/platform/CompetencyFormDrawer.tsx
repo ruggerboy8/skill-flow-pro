@@ -20,7 +20,6 @@ interface Competency {
   role_id: number;
   domain_id: number;
   name: string;
-  code: string | null;
   tagline: string | null;
   description: string | null;
   friendly_description: string | null;

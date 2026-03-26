@@ -44,7 +44,6 @@ interface Props {
 
 interface FormValues {
   name: string;
-  code: string;
   tagline: string;
   description: string;
   friendly_description: string;
@@ -56,7 +55,7 @@ export function CompetencyFormDrawer({ open, onOpenChange, competency, roleId, d
   const isEditing = !!competency;
   const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } = useForm<FormValues>({
     defaultValues: {
-      name: '', code: '', tagline: '', description: '',
+      name: '', tagline: '', description: '',
       friendly_description: '', interview_prompt: '', domain_id: '',
     },
   });
@@ -68,7 +67,6 @@ export function CompetencyFormDrawer({ open, onOpenChange, competency, roleId, d
       if (competency) {
         reset({
           name: competency.name ?? '',
-          code: competency.code ?? '',
           tagline: competency.tagline ?? '',
           description: competency.description ?? '',
           friendly_description: competency.friendly_description ?? '',
@@ -77,7 +75,7 @@ export function CompetencyFormDrawer({ open, onOpenChange, competency, roleId, d
         });
       } else {
         reset({
-          name: '', code: '', tagline: '', description: '',
+          name: '', tagline: '', description: '',
           friendly_description: '', interview_prompt: '',
           domain_id: domains[0] ? String(domains[0].domain_id) : '',
         });
@@ -88,7 +86,6 @@ export function CompetencyFormDrawer({ open, onOpenChange, competency, roleId, d
   const onSubmit = async (values: FormValues) => {
     const payload = {
       name: values.name,
-      code: values.code || null,
       tagline: values.tagline || null,
       description: values.description || null,
       friendly_description: values.friendly_description || null,
@@ -146,10 +143,6 @@ export function CompetencyFormDrawer({ open, onOpenChange, competency, roleId, d
           <div className="space-y-2">
             <Label>Name</Label>
             <Input {...register('name', { required: true })} placeholder="e.g. Patient Flow Coordination" />
-          </div>
-          <div className="space-y-2">
-            <Label>Code</Label>
-            <Input {...register('code')} placeholder="e.g. DFI.CLIN 1" />
           </div>
           <div className="space-y-2">
             <Label>Tagline</Label>

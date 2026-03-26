@@ -44,7 +44,7 @@ export function CloneCompetenciesDialog({ open, onOpenChange, roles, targetRoleI
     try {
       const { data: sourceComps, error: compErr } = await supabase
         .from('competencies')
-        .select('domain_id, name, code, tagline, description, friendly_description, interview_prompt, status')
+        .select('domain_id, name, tagline, description, friendly_description, interview_prompt, status')
         .eq('role_id', Number(sourceRoleId));
 
       if (compErr) throw compErr;
@@ -54,13 +54,9 @@ export function CloneCompetenciesDialog({ open, onOpenChange, roles, targetRoleI
         return;
       }
 
-      const sourceRole = roles.find((r) => r.role_id === Number(sourceRoleId));
-      const sourcePrefix = sourceRole?.role_code ?? '';
-
       const cloned = sourceComps.map((c) => ({
         ...c,
         role_id: targetRoleId,
-        code: c.code ? c.code.replace(new RegExp(`^${sourcePrefix}\\.`), `${targetRoleCode}.`) : c.code,
       }));
 
       const { error: insertErr } = await supabase.from('competencies').insert(cloned);

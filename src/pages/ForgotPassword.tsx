@@ -46,15 +46,20 @@ export default function ForgotPassword() {
             </div>
             <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
             <CardDescription>
-              We've sent password reset instructions to {email}
+              We've sent a 6-digit code to {email}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground text-center">
-              Click the link in the email to reset your password. If you don't see it, check your spam folder.
+              Enter the code from your email to reset your password. If you don't see it, check your spam folder.
             </p>
+            <Link to={`/reset-password?email=${encodeURIComponent(email)}`} className="block">
+              <Button className="w-full">
+                Enter reset code
+              </Button>
+            </Link>
             <Link to="/login" className="block">
-              <Button variant="outline" className="w-full">
+              <Button variant="ghost" className="w-full">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to sign in
               </Button>

@@ -256,7 +256,7 @@ export function OrgProMoveLibraryTab() {
     if (!newMove.role_id) { setCompetencyOptions([]); return; }
     supabase
       .from('competencies')
-      .select('id, name')
+      .select('competency_id, name')
       .eq('role_id', Number(newMove.role_id))
       .then(({ data }) => setCompetencyOptions(data ?? []));
   }, [newMove.role_id]);

@@ -119,7 +119,7 @@ export function OrgDetailPanel({ org, onClose, onRefresh }: OrgDetailPanelProps)
 
   const loadPanelData = async (orgId: string) => {
     // Setup complete check
-    supabase.rpc('is_org_setup_complete', { p_org_id: orgId }).then(({ data }) => {
+    supabase.rpc('is_org_setup_complete' as any, { p_org_id: orgId }).then(({ data }: any) => {
       setSetupComplete(data === true);
     });
 

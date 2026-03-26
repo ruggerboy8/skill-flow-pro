@@ -64,7 +64,7 @@ export function PlatformOrgsTab() {
       const [{ data: orgsData, error }, { data: groupCounts }] = await Promise.all([
         supabase
           .from('organizations')
-          .select('id, name, slug, practice_type, timezone, logo_url, brand_color, created_at')
+          .select('id, name, slug, practice_type, timezone, logo_url, brand_color, created_at' as any)
           .order('name'),
         supabase
           .from('practice_groups')
@@ -82,7 +82,7 @@ export function PlatformOrgsTab() {
         }
       }
 
-      const rows: OrgRow[] = (orgsData ?? []).map((o) => ({
+      const rows: OrgRow[] = (orgsData as any[] ?? []).map((o: any) => ({
         ...o,
         group_count: countMap.get(o.id) ?? 0,
         setup_complete: null,
@@ -92,7 +92,7 @@ export function PlatformOrgsTab() {
 
       // Fetch setup status for each org in parallel (non-blocking)
       rows.forEach(async (row) => {
-        const { data } = await supabase.rpc('is_org_setup_complete', { p_org_id: row.id });
+        const { data } = await supabase.rpc('is_org_setup_complete' as any, { p_org_id: row.id });
         setOrgs((prev) =>
           prev.map((o) => (o.id === row.id ? { ...o, setup_complete: data === true } : o))
         );
@@ -258,9 +258,9 @@ export function PlatformOrgsTab() {
                         {org.setup_complete === null ? (
                           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         ) : org.setup_complete ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" title="Setup complete" />
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
                         ) : (
-                          <AlertTriangle className="h-4 w-4 text-amber-500" title="Setup incomplete" />
+                          <AlertTriangle className="h-4 w-4 text-amber-500" />
                         )}
                       </TableCell>
                       <TableCell>{org.group_count}</TableCell>

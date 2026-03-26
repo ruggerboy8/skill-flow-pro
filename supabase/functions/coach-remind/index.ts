@@ -144,7 +144,7 @@ serve(async (req) => {
             .single();
           
           if ((staffData?.locations as any)?.timezone) {
-            recipientTimezone = (staffData.locations as any).timezone;
+            recipientTimezone = (staffData!.locations as any).timezone;
             weekLabelForRecipient = getWeekLabelForTimezone(recipientTimezone);
           }
           const org = (staffData?.locations as any)?.practice_groups?.organizations;

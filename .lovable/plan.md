@@ -1,79 +1,83 @@
 
 
-# Fix "My Team" Tab for Roaming Doctors
+# Guided Paste Import for Pro Moves
 
-## Problem
-Two issues combine to show zero pro moves in the doctor "My Team → This Week" tab:
+## Approach
 
-1. **Org-scoped assignments**: All `weekly_assignments` now have `org_id` set (e.g., `a1ca0000-...`). The `TeamWeeklyFocus` component queries for `org_id IS NULL`, which matches nothing.
+Replace the file-upload step with a two-step flow: (1) select target role + practice types, (2) paste tab-separated data from a spreadsheet. The existing preview/apply steps stay the same.
 
-2. **Roaming doctors have no org**: Roaming doctors have `primary_location_id = null`, so the org resolution chain (`staff → locations → practice_groups → organization_id`) returns `undefined`. Even if we fix the query to use `org_id`, there's no org to filter by.
+When you copy cells from Excel/Google Sheets, the clipboard contains tab-separated values (TSV). This is simpler than CSV parsing and maps directly to the copy-paste workflow.
 
-## Solution
+## User flow
 
-Update `TeamWeeklyFocus` to resolve the doctor's organization and query org-scoped assignments.
+```text
+Step 1: Configure
+  - Select target role (dropdown)
+  - Select practice type(s) (checkboxes)
+  → competencies are fetched for the selected role
 
-### File: `src/components/doctor/TeamWeeklyFocus.tsx`
+Step 2: Paste
+  - Large textarea: "Paste rows from your spreadsheet"
+  - Expected columns shown above textarea:
+    competency_name | text | description | intervention_text | script
+  - Only competency_name and text are required
+  - Parse on paste or on "Review" button click
 
-**Step 1 — Resolve the doctor's org ID**
+Step 3: Review (existing preview table)
+  - Validate competency names against selected role's competencies
+  - Show fuzzy-match suggestions for unmatched names
+  - New/update/error badges as before
 
-Use `useUserRole()` (or `useStaffProfile()`) to get `organizationId`. For roaming doctors where this is `undefined`, add a fallback: query `practice_groups` to find orgs the doctor is associated with (via a simple RPC or direct query). Since all current doctors belong to one org, a practical approach is:
-
-- If `organizationId` exists from `useUserRole()` → use it
-- If not (roaming), query `organizations` table to get the single org (or use a new lightweight query joining through `coach_scopes` or the doctor's `practice_groups` association)
-
-Given the current data model doesn't store org on the staff record for roaming doctors, the cleanest fix is:
-
-**Option A (recommended)**: Add a `organization_id` column to the `staff` table for direct org membership, populated during doctor invite. This is the proper long-term fix.
-
-**Option B (quick fix)**: Since there's currently only one active org, query the first organization and use its ID. This works now but won't scale.
-
-**I recommend Option A** — a migration + backfill + code update.
-
-### Migration: Add `organization_id` to `staff`
-
-```sql
-ALTER TABLE public.staff ADD COLUMN organization_id uuid REFERENCES organizations(id);
-
--- Backfill from location chain for non-roaming staff
-UPDATE staff s
-SET organization_id = pg.organization_id
-FROM locations l
-JOIN practice_groups pg ON pg.id = l.group_id
-WHERE l.id = s.primary_location_id
-  AND s.organization_id IS NULL;
-
--- Backfill roaming doctors to the single known org
-UPDATE staff
-SET organization_id = 'a1ca0000-0000-0000-0000-000000000001'
-WHERE is_doctor = true
-  AND primary_location_id IS NULL
-  AND organization_id IS NULL;
+Step 4: Apply (existing)
 ```
 
-### Update: `TeamWeeklyFocus.tsx`
+## Changes
 
-- Import `useStaffProfile` to get the doctor's `organization_id` (either from the new column or from the existing location chain)
-- Replace `.is('org_id', null)` with `.eq('org_id', orgId)` in the assignments query
-- Replace `.eq('source', 'global')` with `.eq('source', 'org')` (since all assignments are org-scoped now)
-- Pass `orgId` into the query key for proper cache invalidation
+### `src/components/admin/BulkUpload.tsx` — rewrite
 
-### Update: `supabase/functions/admin-users/index.ts`
+**Step state**: Change from `'upload' | 'preview' | 'complete'` to `'config' | 'paste' | 'preview' | 'complete'`
 
-- When creating a doctor via invite, also set `organization_id` on the staff record (resolved from the selected `group_id → practice_groups.organization_id`)
+**Step 1 — Config UI**:
+- Role dropdown (fetched from `roles` table, passed as prop — already available)
+- Practice type checkboxes for `pediatric_us`, `general_us`, `general_uk`
+- When role is selected, fetch that role's competencies from Supabase (scoped query)
+- "Next" button enabled when role + at least one practice type selected
 
-### Update: `useStaffProfile.tsx`
+**Step 2 — Paste UI**:
+- Show expected column headers as a reference strip
+- Large `<Textarea>` with placeholder showing tab-separated example
+- "Review" button parses the pasted text
 
-- Add `organization_id` to the staff select query so it's available directly (useful for roaming doctors where the location chain is null)
+**Paste parsing logic**:
+- Split by newlines, then split each line by tabs
+- First row = headers (auto-detect by matching known column names)
+- If no header row detected (no "competency_name" in first row), assume column order: `competency_name, text, description, intervention_text, script`
+- `role_name` and `practice_types` are NOT expected in paste — they come from Step 1
 
-## Technical Details
+**Competency validation**:
+- Match `competency_name` against only the selected role's competencies (case-insensitive)
+- For unmatched names, do a simple substring/similarity check and show "Did you mean: X?" in the error column
 
-| Change | File |
-|---|---|
-| Add `organization_id` column to `staff` | New migration |
-| Backfill existing staff | Same migration |
-| Set org on doctor invite | `admin-users/index.ts` |
-| Include `organization_id` in profile query | `useStaffProfile.tsx` |
-| Query org-scoped assignments | `TeamWeeklyFocus.tsx` |
-| Expose `organizationId` for roaming doctors | `useUserRole.tsx` fallback |
+**Apply step**:
+- Inject `role_id` from Step 1 selection into every row
+- Inject `practice_types` from Step 1 into every row
+- Pass to existing `bulk_upsert_pro_moves` RPC as before
+
+### `src/components/admin/ProMoveLibrary.tsx`
+
+- Keep the "Bulk Upload" button but rename to "Import Pro Moves"
+- No other changes needed — BulkUpload props stay the same
+
+### No RPC changes needed
+
+The existing `bulk_upsert_pro_moves` RPC already accepts `role_name` and `practice_types` per row. We just populate them from the wizard context instead of requiring them in the paste data.
+
+### Keep CSV upload as fallback
+
+Add a small "or upload CSV" link on the paste step for backward compatibility. If clicked, show the existing file input. The CSV path still works as before.
+
+## What stays the same
+- Preview table UI (status icons, badges, error download)
+- Apply logic and RPC call
+- Complete step with results summary
 

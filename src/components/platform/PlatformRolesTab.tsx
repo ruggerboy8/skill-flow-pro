@@ -102,6 +102,26 @@ export function PlatformRolesTab() {
     enabled: !!selectedRoleId,
   });
 
+  // Pro move counts per competency
+  const { data: proMoveCounts } = useQuery({
+    queryKey: ['platform-promove-counts', selectedRoleId],
+    queryFn: async () => {
+      if (!selectedRoleId) return {};
+      const { data, error } = await supabase
+        .from('pro_moves')
+        .select('competency_id')
+        .eq('role_id', selectedRoleId)
+        .eq('active', true);
+      if (error) throw error;
+      const counts: Record<number, number> = {};
+      (data ?? []).forEach(pm => {
+        if (pm.competency_id) counts[pm.competency_id] = (counts[pm.competency_id] || 0) + 1;
+      });
+      return counts;
+    },
+    enabled: !!selectedRoleId,
+  });
+
   // Auto-select first role
   if (roles?.length && selectedRoleId === null) {
     setSelectedRoleId(roles[0].role_id);

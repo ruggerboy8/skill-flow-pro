@@ -364,6 +364,28 @@ serve(async (req: Request) => {
           is_participant: isParticipantUser,
           user_id: invite.user.id,
         };
+
+        // Resolve organization_id from the location chain
+        if (resolvedLocationId) {
+          const { data: locData } = await admin
+            .from('locations')
+            .select('group_id')
+            .eq('id', resolvedLocationId)
+            .single();
+          if (locData?.group_id) {
+            const { data: pgData } = await admin
+              .from('practice_groups')
+              .select('organization_id')
+              .eq('id', locData.group_id)
+              .single();
+            if (pgData?.organization_id) {
+              staffInsert.organization_id = pgData.organization_id;
+            }
+          }
+        } else if (organization_id) {
+          staffInsert.organization_id = organization_id;
+        }
+
         if (role_id) {
           staffInsert.role_id = role_id;
           staffInsert.is_office_manager = isOfficeManager;

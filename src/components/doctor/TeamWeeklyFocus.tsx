@@ -184,7 +184,8 @@ function AssignmentCard({ assignment, onOpenDrawer }: { assignment: SimpleAssign
 }
 
 export default function TeamWeeklyFocus() {
-  const { data: assignmentsByRole, isLoading } = useAllRoleAssignments();
+  const { organizationId } = useUserRole();
+  const { data: assignmentsByRole, isLoading } = useAllRoleAssignments(organizationId);
   const [drawerItem, setDrawerItem] = useState<SimpleAssignment | null>(null);
 
   return (

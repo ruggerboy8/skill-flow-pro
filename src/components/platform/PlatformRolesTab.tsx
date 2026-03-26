@@ -10,7 +10,7 @@ import { Plus, Copy, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { RoleFormDrawer } from './RoleFormDrawer';
 import { CompetencyFormDrawer } from './CompetencyFormDrawer';
-import { CloneRoleDialog } from './CloneRoleDialog';
+import { CloneCompetenciesDialog } from './CloneCompetenciesDialog';
 import { DOMAIN_ORDER } from '@/lib/domainUtils';
 import {
   AlertDialog,
@@ -57,7 +57,7 @@ export function PlatformRolesTab() {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [compDrawerOpen, setCompDrawerOpen] = useState(false);
   const [editingComp, setEditingComp] = useState<Competency | null>(null);
-  const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  const [cloneCompsOpen, setCloneCompsOpen] = useState(false);
   const [deleteCompId, setDeleteCompId] = useState<number | null>(null);
 
   const { data: roles, isLoading: rolesLoading } = useQuery({
@@ -159,9 +159,6 @@ export function PlatformRolesTab() {
           <Button size="sm" onClick={() => { setEditingRole(null); setRoleDrawerOpen(true); }}>
             <Plus className="h-4 w-4 mr-1" /> New Role
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setCloneDialogOpen(true)}>
-            <Copy className="h-4 w-4 mr-1" /> Clone
-          </Button>
         </div>
 
         <div className="space-y-2">
@@ -212,15 +209,24 @@ export function PlatformRolesTab() {
                 <CardTitle className="text-lg">
                   Competencies for {selectedRole.role_name}
                 </CardTitle>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setEditingComp(null);
-                    setCompDrawerOpen(true);
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" /> Add Competency
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCloneCompsOpen(true)}
+                  >
+                    <Copy className="h-4 w-4 mr-1" /> Clone Competencies
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingComp(null);
+                      setCompDrawerOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Add Competency
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -320,16 +326,19 @@ export function PlatformRolesTab() {
         }}
       />
 
-      <CloneRoleDialog
-        open={cloneDialogOpen}
-        onOpenChange={setCloneDialogOpen}
-        roles={roles ?? []}
-        onCloned={(newRoleId) => {
-          refreshAll();
-          setSelectedRoleId(newRoleId);
-          setCloneDialogOpen(false);
-        }}
-      />
+      {selectedRole && (
+        <CloneCompetenciesDialog
+          open={cloneCompsOpen}
+          onOpenChange={setCloneCompsOpen}
+          roles={roles ?? []}
+          targetRoleId={selectedRole.role_id}
+          targetRoleCode={selectedRole.role_code}
+          onCloned={() => {
+            refreshAll();
+            setCloneCompsOpen(false);
+          }}
+        />
+      )}
 
       <AlertDialog open={deleteCompId !== null} onOpenChange={(o) => !o && setDeleteCompId(null)}>
         <AlertDialogContent>

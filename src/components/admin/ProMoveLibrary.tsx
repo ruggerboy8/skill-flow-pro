@@ -98,22 +98,12 @@ export function ProMoveLibrary() {
   };
 
   const downloadTemplate = () => {
-    const competencyNames = competencies.map(c => c.name).join('", "');
-    const csvContent = `role_name,competency_name,text,description,resources_url,intervention_text,script,active
-DFI,"Example Competency","Example pro-move text","Optional description","Optional URL","Optional intervention text","Optional script for audio",true
-RDA,"Example Competency","Example pro-move text","Optional description","Optional URL","Optional intervention text","Optional script for audio",true
-
-# Available competency names: "${competencyNames}"`;
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
+    link.href = '/pro-moves-template.csv';
     link.download = 'pro-moves-template.csv';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   const downloadCurrentLibrary = async () => {

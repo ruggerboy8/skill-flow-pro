@@ -290,10 +290,17 @@ export function PlatformRolesTab() {
                               key={comp.competency_id}
                               className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-muted/50 group"
                             >
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{comp.name}</p>
-                                {comp.tagline && (
-                                  <p className="text-xs text-muted-foreground truncate">{comp.tagline}</p>
+                              <div className="min-w-0 flex items-center gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium truncate">{comp.name}</p>
+                                  {comp.tagline && (
+                                    <p className="text-xs text-muted-foreground truncate">{comp.tagline}</p>
+                                  )}
+                                </div>
+                                {(proMoveCounts?.[comp.competency_id] ?? 0) > 0 && (
+                                  <Badge variant="secondary" className="text-2xs shrink-0">
+                                    {proMoveCounts[comp.competency_id]} PM
+                                  </Badge>
                                 )}
                               </div>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

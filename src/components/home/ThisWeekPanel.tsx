@@ -471,16 +471,6 @@ export default function ThisWeekPanel() {
                     </p>
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
                       <ConfPerfDelta confidence={scores?.confidence_score} performance={scores?.performance_score} />
-                      <button
-                        className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/confidence/current/step/1?roleId=${parentRoleId}`);
-                        }}
-                      >
-                        Score
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </button>
                     </div>
                   </div>
                 </div>

@@ -169,7 +169,7 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedArc
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!archetypeCode || !formData.competency_id || !formData.action_statement.trim()) {
-      toast({ title: 'Validation Error', description: 'Archetype, Competency, and Pro-Move text are required.', variant: 'destructive' });
+      toast({ title: 'Validation Error', description: 'Role, Competency, and Pro-Move text are required.', variant: 'destructive' });
       return;
     }
 
@@ -255,22 +255,22 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedArc
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Pro-Move' : 'Add New Pro-Move'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Archetype picker — full width */}
+          {/* Role type picker — full width */}
           <div className="space-y-2">
-            <Label>Archetype *</Label>
+            <Label>Role *</Label>
             <Select
               value={archetypeCode}
               onValueChange={code => applyArchetype(code)}
               disabled={isEditing}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select archetype" />
+                <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent className="bg-background z-50">
                 {archetypesInUse.map(opt => (

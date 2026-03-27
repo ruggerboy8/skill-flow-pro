@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useToast } from '@/hooks/use-toast';
 import {
   Card,
@@ -84,6 +85,7 @@ interface CompetencyOption {
 export function OrgProMoveLibraryTab() {
   const { toast } = useToast();
   const { organizationId } = useUserRole();
+  const { resolve: resolveRoleName } = useRoleDisplayNames();
 
   const [rows, setRows] = useState<ProMoveRow[]>([]);
   const [customMoves, setCustomMoves] = useState<OrgCustomMove[]>([]);
@@ -525,7 +527,7 @@ export function OrgProMoveLibraryTab() {
                                 </div>
                               )}
                             </TableCell>
-                            <TableCell className="text-sm align-top">{row.role_name}</TableCell>
+                            <TableCell className="text-sm align-top">{resolveRoleName(row.role_id ?? 0, row.role_name)}</TableCell>
                             <TableCell className="text-sm align-top">{row.domain_name}</TableCell>
                             <TableCell className="text-sm align-top">{row.competency_name}</TableCell>
                             <TableCell className="align-top">
@@ -621,7 +623,7 @@ export function OrgProMoveLibraryTab() {
                               Org custom
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-sm">{move.role_name}</TableCell>
+                          <TableCell className="text-sm">{resolveRoleName(move.role_id ?? 0, move.role_name)}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">—</TableCell>
                           <TableCell className="text-sm">{move.competency_name}</TableCell>
                           <TableCell>

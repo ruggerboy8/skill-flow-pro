@@ -49,6 +49,8 @@ export function ProMoveLibrary() {
   const [editingProMove, setEditingProMove] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [generating, setGenerating] = useState(false);
+  const [weightProgress, setWeightProgress] = useState<{ scored: number; total: number } | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Derived values — must be declared before the useEffects that depend on them
   const roleIdsForArchetype = useMemo(() => {

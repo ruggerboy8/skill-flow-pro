@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { getArchetype } from '@/lib/roleArchetypes';
 
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,6 +46,8 @@ export default function ThisWeekPanel() {
   const [weekContext, setWeekContext] = useState<StaffStatus | null>(null);
   const [locationWeekContext, setLocationWeekContext] = useState<LocationWeekContext | null>(null);
   const [weekAssignments, setWeekAssignments] = useState<WeekAssignment[]>([]);
+  const [parentWeekAssignments, setParentWeekAssignments] = useState<WeekAssignment[]>([]);
+  const [parentRoleId, setParentRoleId] = useState<number | null>(null);
   const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [weekOfDate, setWeekOfDate] = useState<string>('');
@@ -99,6 +102,40 @@ export default function ThisWeekPanel() {
         now: effectiveNow,
       });
       
+      // Look up archetype for dual-panel detection (Lead Dental Assistant)
+      let resolvedParentRoleId: number | null = null;
+      if (staff.role_id) {
+        const { data: roleRow } = await supabase
+          .from('roles')
+          .select('archetype_code')
+          .eq('role_id', staff.role_id)
+          .maybeSingle();
+
+        const archetype = getArchetype(roleRow?.archetype_code);
+        if (archetype?.dualPanel && archetype.parentArchetype && staff.organization_id) {
+          // Step 1: find all global role_ids with the parent archetype_code
+          const { data: parentRoleRows } = await supabase
+            .from('roles')
+            .select('role_id')
+            .eq('archetype_code', archetype.parentArchetype)
+            .eq('active', true);
+
+          const parentRoleIdList = (parentRoleRows ?? []).map(r => r.role_id);
+
+          // Step 2: find which of those is configured for this org
+          if (parentRoleIdList.length > 0) {
+            const { data: orgParentRole } = await supabase
+              .from('organization_role_names')
+              .select('role_id')
+              .eq('org_id', staff.organization_id)
+              .in('role_id', parentRoleIdList)
+              .maybeSingle();
+            if (orgParentRole) resolvedParentRoleId = orgParentRole.role_id;
+          }
+        }
+      }
+      setParentRoleId(resolvedParentRoleId);
+
       // Load current week assignments and context based on user progress
       const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(
         user.id,
@@ -110,6 +147,22 @@ export default function ThisWeekPanel() {
         overrides
       );
       setWeekAssignments(assignments);
+
+      // For Lead Dental Assistant: also load the parent role's (dental_assistant) assignments
+      if (resolvedParentRoleId) {
+        const { assignments: parentAssignments } = await assembleCurrentWeek(
+          user.id,
+          {
+            id: staff.id,
+            role_id: resolvedParentRoleId,
+            primary_location_id: staff.primary_location_id!
+          },
+          overrides
+        );
+        setParentWeekAssignments(parentAssignments);
+      } else {
+        setParentWeekAssignments([]);
+      }
 
       // Fetch resource counts for pro-moves
       const actionIds = assignments
@@ -179,17 +232,17 @@ export default function ThisWeekPanel() {
       console.log('Week context:', context);
       setWeekContext(context);
 
-      // Load weekly scores for the assignments
-      if (assignments.length > 0) {
-        const focusIds = assignments.map(a => a.weekly_focus_id);
-        
-        // Query scores by both assignment_id and weekly_focus_id to catch V2 + legacy
+      // Load weekly scores for all assignments (own + parent panel)
+      const allFocusIds = [
+        ...assignments.map(a => a.weekly_focus_id),
+        ...(resolvedParentRoleId ? [] : []), // parent assignments loaded separately above
+      ];
+      if (allFocusIds.length > 0 || resolvedParentRoleId) {
         const { data: scores } = await supabase
           .from('weekly_scores')
           .select('weekly_focus_id, assignment_id, confidence_score, performance_score')
-          .eq('staff_id', staff.id)
-          .or(focusIds.map(id => `assignment_id.eq.${id},weekly_focus_id.eq.${id}`).join(','));
-        
+          .eq('staff_id', staff.id);
+
         setWeeklyScores(scores || []);
       } else {
         setWeeklyScores([]);
@@ -341,6 +394,77 @@ export default function ThisWeekPanel() {
 
       {/* Content */}
       <div className="px-2.5 py-3 md:p-6 space-y-3">
+
+        {/* ── Lead Dental Assistant: parent (team) panel ─────────────────── */}
+        {parentWeekAssignments.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
+              Team Pro Move
+            </p>
+            {parentWeekAssignments.map((assignment) => {
+              const domainName = assignment.domain_name;
+              const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
+              const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+              const scores = weeklyScores.find(s =>
+                s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
+              );
+              const resourceCount = assignment.pro_move_id ? (resourceCounts[assignment.pro_move_id] || 0) : 0;
+
+              return (
+                <div
+                  key={`parent-${assignment.weekly_focus_id}`}
+                  className={cn(
+                    "relative flex bg-white dark:bg-slate-800",
+                    "backdrop-blur-sm rounded-xl overflow-hidden",
+                    "border border-border/50 dark:border-slate-700/50",
+                    "shadow-sm transition-colors",
+                    resourceCount > 0 && "cursor-pointer hover:shadow-md active:scale-[0.99]"
+                  )}
+                  onClick={() => {
+                    if (resourceCount > 0) {
+                      setSelectedLearnAssignment(assignment);
+                      setLearnDrawerOpen(true);
+                    }
+                  }}
+                  role={resourceCount > 0 ? "button" : undefined}
+                  tabIndex={resourceCount > 0 ? 0 : undefined}
+                >
+                  <div className="w-8 shrink-0 flex flex-col items-center justify-center" style={{ backgroundColor: domainColor }}>
+                    <span className="text-2xs font-bold tracking-widest uppercase" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}>
+                      {domainName}
+                    </span>
+                  </div>
+                  <div className="flex-1 p-3 md:p-4">
+                    <p className="text-sm font-medium leading-relaxed text-foreground/90">
+                      {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
+                    </p>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
+                      <ConfPerfDelta confidence={scores?.confidence_score} performance={scores?.performance_score} />
+                      <button
+                        className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/confidence/current/step/1?roleId=${parentRoleId}`);
+                        }}
+                      >
+                        Score
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Section label when dual panel is active */}
+        {parentWeekAssignments.length > 0 && (
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1 pt-1">
+            Lead Pro Move
+          </p>
+        )}
+
         {/* Pro Moves list - Spine Layout */}
         {displayAssignments.map((assignment) => {
           const domainName = assignment.domain_name;

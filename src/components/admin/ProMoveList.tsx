@@ -70,7 +70,7 @@ interface ProMoveListProps {
   activeOnly: boolean;
   resourceFilters?: string[];
   sortBy: 'domain' | 'competency' | 'updated';
-  practiceTypeFilter?: string;
+  practiceTypeFilter?: string[];
   onEdit: (proMove: ProMove) => void;
 }
 
@@ -81,7 +81,7 @@ export function ProMoveList({
   activeOnly,
   resourceFilters = [],
   sortBy,
-  practiceTypeFilter = 'all',
+  practiceTypeFilter = [],
   onEdit
 }: ProMoveListProps) {
   const { toast } = useToast();
@@ -95,7 +95,7 @@ export function ProMoveList({
 
   useEffect(() => {
     loadProMoves();
-  }, [roleFilter, competencyFilter, searchTerm, activeOnly, sortBy, practiceTypeFilter]);
+  }, [roleFilter, competencyFilter, searchTerm, activeOnly, sortBy, practiceTypeFilter.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadProMoves = async () => {
     setLoading(true);
@@ -132,8 +132,8 @@ export function ProMoveList({
       }
 
       // Filter by practice type (platform admin tool shows all by default)
-      if (practiceTypeFilter && practiceTypeFilter !== 'all') {
-        query = query.overlaps('practice_types', [practiceTypeFilter]);
+      if (practiceTypeFilter && practiceTypeFilter.length > 0) {
+        query = query.overlaps('practice_types', practiceTypeFilter);
       }
 
       const { data, error } = await query;

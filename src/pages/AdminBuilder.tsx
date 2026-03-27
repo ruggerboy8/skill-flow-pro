@@ -1,19 +1,90 @@
+import { useState, useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
-import { ProMoveLibrary } from "@/components/admin/ProMoveLibrary";
 import { OrgProMoveLibraryTab } from "@/components/admin/OrgProMoveLibraryTab";
 import { RecommenderPanel } from "@/components/planner/RecommenderPanel";
 import { WeekBuilderPanel } from "@/components/planner/WeekBuilderPanel";
+import { supabase } from "@/integrations/supabase/client";
+import { ARCHETYPES, type ArchetypeCode } from "@/lib/roleArchetypes";
+
+interface PlannerRole {
+  role_id: number;
+  display_name: string;
+  archetype_code: string;
+}
+
+// Tailwind grid-cols classes for known tab counts (planner roles + library)
+const GRID_COLS: Record<number, string> = {
+  1: 'grid-cols-2',
+  2: 'grid-cols-3',
+  3: 'grid-cols-4',
+  4: 'grid-cols-5',
+  5: 'grid-cols-6',
+};
 
 export default function AdminBuilder() {
   const navigate = useNavigate();
-  const { canManageAssignments, organizationId, practiceType, isSuperAdmin, isLoading } = useUserRole();
+  const { canManageAssignments, organizationId, practiceType, isLoading, isSuperAdmin } = useUserRole();
+  const [plannerRoles, setPlannerRoles] = useState<PlannerRole[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (isLoading) return;
+    loadPlannerRoles();
+  }, [organizationId, practiceType, isLoading]);
+
+  async function loadPlannerRoles() {
+    setRolesLoading(true);
+
+    if (organizationId) {
+      // Load org's configured roles with archetype_code via join
+      const { data } = await supabase
+        .from('organization_role_names')
+        .select('role_id, display_name, roles!inner(archetype_code)')
+        .eq('org_id', organizationId);
+
+      const filtered = (data ?? [])
+        .filter(r => ARCHETYPES[(r.roles as any).archetype_code as ArchetypeCode]?.hasPlannerTab)
+        .map(r => ({
+          role_id: r.role_id,
+          display_name: r.display_name,
+          archetype_code: (r.roles as any).archetype_code as string,
+        }));
+
+      setPlannerRoles(filtered);
+    } else {
+      // Super admin without org context: load from global roles filtered by practice type
+      const query = supabase
+        .from('roles')
+        .select('role_id, role_name, archetype_code')
+        .eq('active', true)
+        .not('archetype_code', 'is', null);
+
+      if (practiceType) {
+        query.eq('practice_type', practiceType);
+      }
+
+      const { data } = await query;
+
+      const filtered = (data ?? [])
+        .filter(r => r.archetype_code && ARCHETYPES[r.archetype_code as ArchetypeCode]?.hasPlannerTab)
+        .map(r => ({
+          role_id: r.role_id,
+          display_name: r.role_name,
+          archetype_code: r.archetype_code as string,
+        }));
+
+      setPlannerRoles(filtered);
+    }
+
+    setRolesLoading(false);
+  }
+
+  if (isLoading || rolesLoading) {
     return (
       <div className="container mx-auto p-6 space-y-4">
         <Skeleton className="h-10 w-64" />
@@ -27,6 +98,10 @@ export default function AdminBuilder() {
     return <Navigate to="/" replace />;
   }
 
+  const totalTabs = plannerRoles.length + 1; // +1 for Library
+  const gridClass = GRID_COLS[totalTabs] ?? 'grid-cols-4';
+  const defaultTab = plannerRoles.length > 0 ? `role-${plannerRoles[0].role_id}` : 'library';
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -37,29 +112,30 @@ export default function AdminBuilder() {
         </Button>
       </div>
 
-      <Tabs defaultValue="dfi-planner" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="dfi-planner">DFI Planner</TabsTrigger>
-          <TabsTrigger value="rda-planner">RDA Planner</TabsTrigger>
-          <TabsTrigger value="om-planner">OM Planner</TabsTrigger>
+      <Tabs defaultValue={defaultTab} className="w-full">
+        <TabsList className={`grid w-full ${gridClass}`}>
+          {plannerRoles.map(r => (
+            <TabsTrigger key={r.role_id} value={`role-${r.role_id}`}>
+              {r.display_name}
+            </TabsTrigger>
+          ))}
           <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dfi-planner" className="space-y-6">
-          <PlannerTabContent roleId={1} roleName="DFI" orgId={organizationId} practiceType={practiceType} />
-        </TabsContent>
-
-        <TabsContent value="rda-planner" className="space-y-6">
-          <PlannerTabContent roleId={2} roleName="RDA" orgId={organizationId} practiceType={practiceType} />
-        </TabsContent>
-
-        <TabsContent value="om-planner" className="space-y-6">
-          <PlannerTabContent roleId={3} roleName="Office Manager" orgId={organizationId} practiceType={practiceType} />
-        </TabsContent>
+        {plannerRoles.map(r => (
+          <TabsContent key={r.role_id} value={`role-${r.role_id}`} className="space-y-6">
+            <PlannerTabContent
+              roleId={r.role_id}
+              roleName={r.display_name}
+              orgId={organizationId}
+              practiceType={practiceType}
+            />
+          </TabsContent>
+        ))}
 
         <TabsContent value="library" className="space-y-6">
           <h2 className="text-xl font-semibold">Pro-Move Library</h2>
-          {isSuperAdmin ? <ProMoveLibrary /> : <OrgProMoveLibraryTab />}
+          <OrgProMoveLibraryTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -38,7 +38,7 @@ export function ProMoveLibrary() {
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
-  const [practiceTypeFilter, setPracticeTypeFilter] = useState<string>('all');
+  const [practiceTypeFilter, setPracticeTypeFilter] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'domain' | 'competency' | 'updated'>('updated');
   const [resourceFilters, setResourceFilters] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -252,28 +252,17 @@ export function ProMoveLibrary() {
         </div>
       </div>
 
-      {/* Practice type filter chips */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground font-medium">Practice type:</span>
-        {([
-          { value: 'all', label: 'All' },
-          { value: 'pediatric_us', label: 'Pediatric – US' },
-          { value: 'general_us', label: 'General – US' },
-          { value: 'general_uk', label: 'General – UK' },
-        ]).map(({ value, label }) => (
-          <Button
-            key={value}
-            variant={practiceTypeFilter === value ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setPracticeTypeFilter(value)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 bg-muted/50 rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-7 gap-4 p-4 bg-muted/50 rounded-lg">
+        <div className="space-y-2">
+          <Label>Search</Label>
+          <Input
+            placeholder="Search pro-moves..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
         <div className="space-y-2">
           <Label>Role</Label>
           <Select value={selectedRole} onValueChange={setSelectedRole}>
@@ -302,8 +291,8 @@ export function ProMoveLibrary() {
               {competencies.map(competency => (
                 <SelectItem key={competency.competency_id} value={competency.competency_id.toString()}>
                   <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
+                    <div
+                      className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: getDomainColor(competency.domain_name || '') }}
                     />
                     {competency.name}
@@ -315,12 +304,52 @@ export function ProMoveLibrary() {
         </div>
 
         <div className="space-y-2">
-          <Label>Search</Label>
-          <Input
-            placeholder="Search pro-moves..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <Label>Practice Type</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-between">
+                <span className="flex items-center gap-2">
+                  <Filter className="w-4 h-4" />
+                  {practiceTypeFilter.length === 0 ? 'All types' : `${practiceTypeFilter.length} selected`}
+                </span>
+                <ChevronDown className="w-4 h-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-3" align="start">
+              <div className="space-y-2">
+                {[
+                  { value: 'pediatric_us', label: 'Pediatric – US' },
+                  { value: 'general_us',   label: 'General – US'  },
+                  { value: 'general_uk',   label: 'General – UK'  },
+                ].map(option => (
+                  <div key={option.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`pt-${option.value}`}
+                      checked={practiceTypeFilter.includes(option.value)}
+                      onCheckedChange={(checked) => {
+                        setPracticeTypeFilter(prev =>
+                          checked
+                            ? [...prev, option.value]
+                            : prev.filter(f => f !== option.value)
+                        );
+                      }}
+                    />
+                    <label htmlFor={`pt-${option.value}`} className="text-sm cursor-pointer">{option.label}</label>
+                  </div>
+                ))}
+                {practiceTypeFilter.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-1"
+                    onClick={() => setPracticeTypeFilter([])}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-2">

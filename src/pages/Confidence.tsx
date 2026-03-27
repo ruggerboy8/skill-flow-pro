@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -17,6 +17,7 @@ import { getDomainColor } from '@/lib/domainColors';
 
 export default function Confidence() {
   const { week } = useParams();
+  const [searchParams] = useSearchParams();
   const [scores, setScores] = useState<{ [key: string]: number }>({});
   const [submitting, setSubmitting] = useState(false);
   const [submittedCount, setSubmittedCount] = useState(0);
@@ -26,13 +27,17 @@ export default function Confidence() {
   const { data: staff, isLoading: staffLoading } = useStaffProfile();
   const { toast } = useToast();
   const navigate = useNavigate();
-  
 
   const weekNum = Number(week); // week param is now just "1", "2", etc.
 
+  // Allow ?roleId= override so Lead Dental Assistants can score their
+  // dental_assistant assignment independently of their lead assignment.
+  const roleIdOverride = searchParams.get('roleId') ? Number(searchParams.get('roleId')) : null;
+  const effectiveRoleId = roleIdOverride ?? staff?.role_id;
+
   // Fetch weekly assignments using the shared hook
   const { data: weeklyFocus = [], isLoading: assignmentsLoading } = useWeeklyAssignments({
-    roleId: staff?.role_id,
+    roleId: effectiveRoleId,
     enabled: !!staff && !staffLoading,
   });
 

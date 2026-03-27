@@ -1555,6 +1555,7 @@ export type Database = {
       roles: {
         Row: {
           active: boolean
+          archetype_code: string | null
           practice_type: string
           role_code: string | null
           role_id: number
@@ -1562,6 +1563,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          archetype_code?: string | null
           practice_type?: string
           role_code?: string | null
           role_id?: number
@@ -1569,6 +1571,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          archetype_code?: string | null
           practice_type?: string
           role_code?: string | null
           role_id?: number

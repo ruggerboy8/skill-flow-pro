@@ -396,7 +396,7 @@ export function PlatformRolesTab() {
               </CardContent>
             </Card>
           ) : (
-            <p className="text-muted-foreground text-sm">Select an archetype to view its competencies.</p>
+            <p className="text-muted-foreground text-sm">Select a role to view its competencies.</p>
           )}
         </div>
       </div>

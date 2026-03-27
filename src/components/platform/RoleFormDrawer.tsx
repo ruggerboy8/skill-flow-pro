@@ -126,21 +126,21 @@ export function RoleFormDrawer({ open, onOpenChange, role, onSaved }: Props) {
           <SheetTitle>{isEditing ? 'Edit Role' : 'New Role'}</SheetTitle>
           <SheetDescription>
             {isEditing
-              ? 'Update role name, archetype, and status.'
-              : 'Create a new role. Choose an archetype first — it determines how the system treats this role.'}
+              ? 'Update role name, type, and status.'
+              : 'Create a new role. Choose a role type first — it determines how the system treats this role.'}
           </SheetDescription>
         </SheetHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-6">
 
-          {/* Archetype */}
+          {/* Role type */}
           <div className="space-y-2">
-            <Label>Archetype</Label>
+            <Label>Role Type</Label>
             <Select
               value={archetypeValue}
               onValueChange={(v) => {
                 setValue('archetype_code', v);
-                // Pre-fill role name from archetype label if blank
+                // Pre-fill role name from label if blank
                 const current = watch('role_name');
                 if (!current) {
                   const opt = ARCHETYPE_OPTIONS.find(a => a.value === v);
@@ -149,7 +149,7 @@ export function RoleFormDrawer({ open, onOpenChange, role, onSaved }: Props) {
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select archetype…" />
+                <SelectValue placeholder="Select role type…" />
               </SelectTrigger>
               <SelectContent className="bg-background z-50">
                 {ARCHETYPE_OPTIONS.map(({ value, label }) => (
@@ -158,7 +158,7 @@ export function RoleFormDrawer({ open, onOpenChange, role, onSaved }: Props) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Archetype controls system behavior (weekly cadence, planner tab, dual panel).
+              Role type controls system behavior (weekly cadence, planner tab, dual panel).
             </p>
           </div>
 

@@ -472,12 +472,6 @@ export default function CoachDashboardV2({
     <div className="space-y-4">
       {!hideHeader && <h1 className="text-3xl font-bold">Coach Dashboard</h1>}
 
-      <div className="flex items-center justify-end">
-        <Button variant="outline" size="sm" onClick={reload}>
-          <RotateCw className="h-4 w-4 mr-2" />
-          Reload
-        </Button>
-      </div>
 
       {/* Filter controls — collapsible */}
       <Collapsible defaultOpen={hasActiveFilters}>
@@ -554,6 +548,10 @@ export default function CoachDashboardV2({
           <div className="flex items-center justify-between">
             <CardTitle>{sortedRows.length} Staff</CardTitle>
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={reload}>
+                <RotateCw className="h-4 w-4 mr-1" />
+                Reload
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

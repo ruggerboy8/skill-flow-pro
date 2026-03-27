@@ -297,6 +297,33 @@ export function ProMoveLibrary() {
 
   return (
     <div className="space-y-6">
+      {/* AI Weight Generation Progress Dialog */}
+      <Dialog open={generating} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              Generating AI Weights
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Scoring each pro move with OpenAI. This may take a few minutes on first run…
+            </p>
+            {weightProgress && weightProgress.total > 0 && (
+              <>
+                <Progress value={(weightProgress.scored / weightProgress.total) * 100} className="h-2" />
+                <p className="text-sm font-medium text-center">
+                  {weightProgress.scored} / {weightProgress.total} scored ({Math.round((weightProgress.scored / weightProgress.total) * 100)}%)
+                </p>
+              </>
+            )}
+            {weightProgress && weightProgress.total === 0 && (
+              <p className="text-sm text-muted-foreground text-center">Initializing…</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-wrap gap-2">

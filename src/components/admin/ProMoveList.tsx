@@ -117,7 +117,9 @@ export function ProMoveList({
           updated_at,
           role_id,
           competency_id,
-          practice_types
+          practice_types,
+          curriculum_priority,
+          curriculum_priority_rationale
         `)
         .order('updated_at', { ascending: false });
 

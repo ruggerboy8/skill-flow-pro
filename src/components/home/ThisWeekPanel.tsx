@@ -426,66 +426,6 @@ export default function ThisWeekPanel() {
       {/* Content */}
       <div className="px-2.5 py-3 md:p-6 space-y-3">
 
-        {/* ── Lead Dental Assistant: parent (team) panel ─────────────────── */}
-        {parentWeekAssignments.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-              Lead Pro Move
-            </p>
-            {parentWeekAssignments.map((assignment) => {
-              const domainName = assignment.domain_name;
-              const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
-              const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
-              const scores = weeklyScores.find(s =>
-                s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
-              );
-              const resourceCount = assignment.pro_move_id ? (resourceCounts[assignment.pro_move_id] || 0) : 0;
-
-              return (
-                <div
-                  key={`parent-${assignment.weekly_focus_id}`}
-                  className={cn(
-                    "relative flex bg-white dark:bg-slate-800",
-                    "backdrop-blur-sm rounded-xl overflow-hidden",
-                    "border border-border/50 dark:border-slate-700/50",
-                    "shadow-sm transition-colors",
-                    resourceCount > 0 && "cursor-pointer hover:shadow-md active:scale-[0.99]"
-                  )}
-                  onClick={() => {
-                    if (resourceCount > 0) {
-                      setSelectedLearnAssignment(assignment);
-                      setLearnDrawerOpen(true);
-                    }
-                  }}
-                  role={resourceCount > 0 ? "button" : undefined}
-                  tabIndex={resourceCount > 0 ? 0 : undefined}
-                >
-                  <div className="w-8 shrink-0 flex flex-col items-center justify-center" style={{ backgroundColor: domainColor }}>
-                    <span className="text-2xs font-bold tracking-widest uppercase" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}>
-                      {domainName}
-                    </span>
-                  </div>
-                  <div className="flex-1 p-3 md:p-4">
-                    <p className="text-sm font-medium leading-relaxed text-foreground/90">
-                      {assignment.action_statement || 'Check-In to choose this Pro-Move for the week.'}
-                    </p>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
-                      <ConfPerfDelta confidence={scores?.confidence_score} performance={scores?.performance_score} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Section label when dual panel is active */}
-        {parentWeekAssignments.length > 0 && (
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1 pt-1">
-            Team Pro Moves
-          </p>
-        )}
-
         {/* Pro Moves list - Spine Layout */}
         {displayAssignments.map((assignment) => {
           const domainName = assignment.domain_name;
@@ -590,21 +530,74 @@ export default function ThisWeekPanel() {
           </div>
         )}
 
-        {/* Lead Pro Move CTA Banner — appears below the main CTA */}
-        {leadBanner && (
-          <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-slate-700/40">
-            <p className="text-sm font-medium text-center mb-3 text-foreground">
-              {leadBanner.message}
+        {/* ── Lead Pro Move card + CTA — below the main flow ─────────────── */}
+        {parentWeekAssignments.length > 0 && (
+          <div className="space-y-3 pt-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
+              Lead Pro Move
             </p>
-            {leadBanner.cta && (
-              <Button
-                variant="outline"
-                className="w-full rounded-full"
-                onClick={() => navigate(leadBanner.cta!.to)}
-              >
-                {leadBanner.cta.label}
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+            {parentWeekAssignments.map((assignment) => {
+              const domainName = assignment.domain_name;
+              const domainColor = domainName ? getDomainColor(domainName) : 'hsl(var(--primary))';
+              const domainColorRich = domainName ? `hsl(${getDomainColorRichRaw(domainName)})` : 'hsl(var(--primary))';
+              const scores = weeklyScores.find(s =>
+                s.assignment_id === assignment.weekly_focus_id || s.weekly_focus_id === assignment.weekly_focus_id
+              );
+              const resourceCount = assignment.pro_move_id ? (resourceCounts[assignment.pro_move_id] || 0) : 0;
+
+              return (
+                <div
+                  key={`parent-${assignment.weekly_focus_id}`}
+                  className={cn(
+                    "relative flex bg-white dark:bg-slate-800",
+                    "backdrop-blur-sm rounded-xl overflow-hidden",
+                    "border border-border/50 dark:border-slate-700/50",
+                    "shadow-sm transition-colors",
+                    resourceCount > 0 && "cursor-pointer hover:shadow-md active:scale-[0.99]"
+                  )}
+                  onClick={() => {
+                    if (resourceCount > 0) {
+                      setSelectedLearnAssignment(assignment);
+                      setLearnDrawerOpen(true);
+                    }
+                  }}
+                  role={resourceCount > 0 ? "button" : undefined}
+                  tabIndex={resourceCount > 0 ? 0 : undefined}
+                >
+                  <div className="w-8 shrink-0 flex flex-col items-center justify-center" style={{ backgroundColor: domainColor }}>
+                    <span className="text-2xs font-bold tracking-widest uppercase" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: domainColorRich }}>
+                      {domainName}
+                    </span>
+                  </div>
+                  <div className="flex-1 p-3 md:p-4">
+                    <p className="text-sm font-medium leading-relaxed text-foreground/90">
+                      {assignment.action_statement || 'Pro Move'}
+                    </p>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
+                      <ConfPerfDelta confidence={scores?.confidence_score} performance={scores?.performance_score} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Lead CTA Banner */}
+            {leadBanner && (
+              <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-slate-700/40">
+                <p className="text-sm font-medium text-center mb-3 text-foreground">
+                  {leadBanner.message}
+                </p>
+                {leadBanner.cta && (
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-full"
+                    onClick={() => navigate(leadBanner.cta!.to)}
+                  >
+                    {leadBanner.cta.label}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         )}

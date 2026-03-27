@@ -245,8 +245,33 @@ export function ProMoveLibrary() {
     setShowBulkUpload(false);
   };
 
+  const pollWeightProgress = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      const { count: totalCount } = await supabase
+        .from('pro_moves')
+        .select('*', { count: 'exact', head: true })
+        .eq('active', true);
+      const { count: scoredCount } = await supabase
+        .from('pro_moves')
+        .select('*', { count: 'exact', head: true })
+        .eq('active', true)
+        .not('curriculum_priority_generated_at' as any, 'is', null);
+      setWeightProgress({ scored: scoredCount ?? 0, total: totalCount ?? 0 });
+    }, 2000);
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
   const handleGenerateWeights = async () => {
     setGenerating(true);
+    setWeightProgress({ scored: 0, total: 0 });
+    pollWeightProgress();
     try {
       const { data, error } = await supabase.functions.invoke('generate-pro-move-weights', {
         body: {},
@@ -264,7 +289,9 @@ export function ProMoveLibrary() {
         variant: 'destructive',
       });
     } finally {
+      stopPolling();
       setGenerating(false);
+      setWeightProgress(null);
     }
   };
 

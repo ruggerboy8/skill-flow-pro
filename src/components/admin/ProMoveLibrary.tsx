@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Download, Filter, ChevronDown, Sparkles } from 'lucide-react';
+import { Plus, Upload, Download, Filter, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { ARCHETYPE_OPTIONS, type ArchetypeCode } from '@/lib/roleArchetypes';
 
@@ -47,6 +49,8 @@ export function ProMoveLibrary() {
   const [editingProMove, setEditingProMove] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [generating, setGenerating] = useState(false);
+  const [weightProgress, setWeightProgress] = useState<{ scored: number; total: number } | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Derived values — must be declared before the useEffects that depend on them
   const roleIdsForArchetype = useMemo(() => {
@@ -241,8 +245,33 @@ export function ProMoveLibrary() {
     setShowBulkUpload(false);
   };
 
+  const pollWeightProgress = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      const { count: totalCount } = await supabase
+        .from('pro_moves')
+        .select('*', { count: 'exact', head: true })
+        .eq('active', true);
+      const { count: scoredCount } = await supabase
+        .from('pro_moves')
+        .select('*', { count: 'exact', head: true })
+        .eq('active', true)
+        .not('curriculum_priority_generated_at' as any, 'is', null);
+      setWeightProgress({ scored: scoredCount ?? 0, total: totalCount ?? 0 });
+    }, 2000);
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
   const handleGenerateWeights = async () => {
     setGenerating(true);
+    setWeightProgress({ scored: 0, total: 0 });
+    pollWeightProgress();
     try {
       const { data, error } = await supabase.functions.invoke('generate-pro-move-weights', {
         body: {},
@@ -260,12 +289,41 @@ export function ProMoveLibrary() {
         variant: 'destructive',
       });
     } finally {
+      stopPolling();
       setGenerating(false);
+      setWeightProgress(null);
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* AI Weight Generation Progress Dialog */}
+      <Dialog open={generating} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              Generating AI Weights
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Scoring each pro move with OpenAI. This may take a few minutes on first run…
+            </p>
+            {weightProgress && weightProgress.total > 0 && (
+              <>
+                <Progress value={(weightProgress.scored / weightProgress.total) * 100} className="h-2" />
+                <p className="text-sm font-medium text-center">
+                  {weightProgress.scored} / {weightProgress.total} scored ({Math.round((weightProgress.scored / weightProgress.total) * 100)}%)
+                </p>
+              </>
+            )}
+            {weightProgress && weightProgress.total === 0 && (
+              <p className="text-sm text-muted-foreground text-center">Initializing…</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-wrap gap-2">

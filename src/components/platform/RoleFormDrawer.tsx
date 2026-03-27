@@ -133,14 +133,14 @@ export function RoleFormDrawer({ open, onOpenChange, role, onSaved }: Props) {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-6">
 
-          {/* Archetype */}
+          {/* Role type */}
           <div className="space-y-2">
-            <Label>Archetype</Label>
+            <Label>Role Type</Label>
             <Select
               value={archetypeValue}
               onValueChange={(v) => {
                 setValue('archetype_code', v);
-                // Pre-fill role name from archetype label if blank
+                // Pre-fill role name from label if blank
                 const current = watch('role_name');
                 if (!current) {
                   const opt = ARCHETYPE_OPTIONS.find(a => a.value === v);
@@ -149,7 +149,7 @@ export function RoleFormDrawer({ open, onOpenChange, role, onSaved }: Props) {
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select archetype…" />
+                <SelectValue placeholder="Select role type…" />
               </SelectTrigger>
               <SelectContent className="bg-background z-50">
                 {ARCHETYPE_OPTIONS.map(({ value, label }) => (
@@ -158,7 +158,7 @@ export function RoleFormDrawer({ open, onOpenChange, role, onSaved }: Props) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Archetype controls system behavior (weekly cadence, planner tab, dual panel).
+              Role type controls system behavior (weekly cadence, planner tab, dual panel).
             </p>
           </div>
 

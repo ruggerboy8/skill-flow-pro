@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Download, Filter, ChevronDown, Sparkles } from 'lucide-react';
+import { Plus, Upload, Download, Filter, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { ARCHETYPE_OPTIONS, type ArchetypeCode } from '@/lib/roleArchetypes';
 

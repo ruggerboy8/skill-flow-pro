@@ -185,8 +185,8 @@ export function ProMoveList({
         role_name: rolesMap.get(item.role_id) || 'Unknown',
         competency_name: competenciesMap.get(item.competency_id)?.name || 'Unknown',
         domain_name: competenciesMap.get(item.competency_id)?.domain_name || 'Unknown',
-        curriculum_priority: (item as any).curriculum_priority ?? null,
-        curriculum_priority_rationale: (item as any).curriculum_priority_rationale ?? null,
+        curriculum_priority: item.curriculum_priority ?? null,
+        curriculum_priority_rationale: item.curriculum_priority_rationale ?? null,
       })) || [];
       
       // Apply sorting

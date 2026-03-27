@@ -4,7 +4,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, BarChart2 } from "lucide-react";
 import { OrgProMoveLibraryTab } from "@/components/admin/OrgProMoveLibraryTab";
 import { RecommenderPanel } from "@/components/planner/RecommenderPanel";
 import { WeekBuilderPanel } from "@/components/planner/WeekBuilderPanel";
@@ -153,18 +153,25 @@ function PlannerTabContent({
   orgId?: string;
   practiceType?: string;
 }) {
-  return (
-    <div className="flex gap-4">
-      {/* Left: Recommender */}
-      <div className="w-1/2 shrink-0">
-        <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
-          <RecommenderPanel roleId={roleId} roleName={roleName} practiceType={practiceType} orgId={orgId} />
-        </div>
-      </div>
+  const [showRecommender, setShowRecommender] = useState(false);
 
-      {/* Right: Week Builder with integrated controls */}
-      <div className="flex-1 min-w-0">
-        <WeekBuilderPanel roleId={roleId} roleName={roleName} orgId={orgId} practiceType={practiceType} />
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setShowRecommender(v => !v)}>
+          <BarChart2 className="h-4 w-4 mr-2" />
+          {showRecommender ? 'Hide Recommender' : 'Recommender'}
+        </Button>
+      </div>
+      <div className="flex gap-4">
+        {showRecommender && (
+          <div className="w-[380px] flex-none h-[calc(100vh-280px)] overflow-y-auto">
+            <RecommenderPanel roleId={roleId} roleName={roleName} practiceType={practiceType} orgId={orgId} />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <WeekBuilderPanel roleId={roleId} roleName={roleName} orgId={orgId} practiceType={practiceType} />
+        </div>
       </div>
     </div>
   );

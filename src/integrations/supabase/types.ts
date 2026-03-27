@@ -1344,6 +1344,12 @@ export type Database = {
           active: boolean | null
           competency_id: number | null
           copied_from_action_id: number | null
+          curriculum_priority: number | null
+          curriculum_priority_foundational: number | null
+          curriculum_priority_generated_at: string | null
+          curriculum_priority_patient_exp: number | null
+          curriculum_priority_rationale: string | null
+          curriculum_priority_revenue: number | null
           date_added: string | null
           description: string | null
           intervention_text: string | null
@@ -1366,6 +1372,12 @@ export type Database = {
           active?: boolean | null
           competency_id?: number | null
           copied_from_action_id?: number | null
+          curriculum_priority?: number | null
+          curriculum_priority_foundational?: number | null
+          curriculum_priority_generated_at?: string | null
+          curriculum_priority_patient_exp?: number | null
+          curriculum_priority_rationale?: string | null
+          curriculum_priority_revenue?: number | null
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null
@@ -1388,6 +1400,12 @@ export type Database = {
           active?: boolean | null
           competency_id?: number | null
           copied_from_action_id?: number | null
+          curriculum_priority?: number | null
+          curriculum_priority_foundational?: number | null
+          curriculum_priority_generated_at?: string | null
+          curriculum_priority_patient_exp?: number | null
+          curriculum_priority_rationale?: string | null
+          curriculum_priority_revenue?: number | null
           date_added?: string | null
           description?: string | null
           intervention_text?: string | null

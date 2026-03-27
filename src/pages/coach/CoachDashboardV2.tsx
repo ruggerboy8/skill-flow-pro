@@ -472,25 +472,7 @@ export default function CoachDashboardV2({
     <div className="space-y-4">
       {!hideHeader && <h1 className="text-3xl font-bold">Coach Dashboard</h1>}
 
-      {/* Week Navigation - Compact inline */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={handlePreviousWeek}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="font-semibold">
-            Week of {format(selectedWeek, 'MMM d, yyyy')}
-          </div>
-          <Button variant="outline" size="sm" onClick={handleNextWeek}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          {isWeekExempt && (
-            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
-              <CalendarOff className="h-3 w-3 mr-1" />
-              Exempt Week
-            </Badge>
-          )}
-        </div>
+      <div className="flex items-center justify-end">
         <Button variant="outline" size="sm" onClick={reload}>
           <RotateCw className="h-4 w-4 mr-2" />
           Reload

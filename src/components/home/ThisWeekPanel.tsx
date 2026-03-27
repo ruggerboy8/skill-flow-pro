@@ -102,39 +102,25 @@ export default function ThisWeekPanel() {
         now: effectiveNow,
       });
       
-      // Look up archetype for dual-panel detection (Lead Dental Assistant)
-      let resolvedParentRoleId: number | null = null;
-      if (staff.role_id) {
-        const { data: roleRow } = await supabase
-          .from('roles')
-          .select('archetype_code')
-          .eq('role_id', staff.role_id)
-          .maybeSingle();
-
-        const archetype = getArchetype(roleRow?.archetype_code);
-        if (archetype?.dualPanel && archetype.parentArchetype && staff.organization_id) {
-          // Step 1: find all global role_ids with the parent archetype_code
-          const { data: parentRoleRows } = await supabase
+      // Lead Dental Assistant dual-panel detection
+      // Lead DAs have is_lead=true but role_id is the regular DA role.
+      // We need to resolve the lead_dental_assistant role for their practice_type
+      // and fetch that role's assignments as the "Lead Pro Move" panel.
+      let resolvedLeadRoleId: number | null = null;
+      if (staff.is_lead && staff.role_id) {
+        const practiceType = staff.locations?.practice_groups?.organizations?.practice_type;
+        if (practiceType) {
+          const { data: leadRole } = await supabase
             .from('roles')
             .select('role_id')
-            .eq('archetype_code', archetype.parentArchetype)
-            .eq('active', true);
-
-          const parentRoleIdList = (parentRoleRows ?? []).map(r => r.role_id);
-
-          // Step 2: find which of those is configured for this org
-          if (parentRoleIdList.length > 0) {
-            const { data: orgParentRole } = await supabase
-              .from('organization_role_names')
-              .select('role_id')
-              .eq('org_id', staff.organization_id)
-              .in('role_id', parentRoleIdList)
-              .maybeSingle();
-            if (orgParentRole) resolvedParentRoleId = orgParentRole.role_id;
-          }
+            .eq('archetype_code', 'lead_dental_assistant')
+            .eq('practice_type', practiceType)
+            .eq('active', true)
+            .maybeSingle();
+          if (leadRole) resolvedLeadRoleId = leadRole.role_id;
         }
       }
-      setParentRoleId(resolvedParentRoleId);
+      setParentRoleId(resolvedLeadRoleId);
 
       // Load current week assignments and context based on user progress
       const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(
@@ -148,18 +134,18 @@ export default function ThisWeekPanel() {
       );
       setWeekAssignments(assignments);
 
-      // For Lead Dental Assistant: also load the parent role's (dental_assistant) assignments
-      if (resolvedParentRoleId) {
-        const { assignments: parentAssignments } = await assembleCurrentWeek(
+      // For Lead Dental Assistant: also load the lead role's assignments
+      if (resolvedLeadRoleId) {
+        const { assignments: leadAssignments } = await assembleCurrentWeek(
           user.id,
           {
             id: staff.id,
-            role_id: resolvedParentRoleId,
+            role_id: resolvedLeadRoleId,
             primary_location_id: staff.primary_location_id!
           },
           overrides
         );
-        setParentWeekAssignments(parentAssignments);
+        setParentWeekAssignments(leadAssignments);
       } else {
         setParentWeekAssignments([]);
       }

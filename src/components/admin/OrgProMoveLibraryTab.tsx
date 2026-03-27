@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useToast } from '@/hooks/use-toast';
 import {
   Card,

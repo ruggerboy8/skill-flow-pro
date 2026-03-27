@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2, Unlock, CalendarOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2, Unlock, CalendarOff, Sparkles } from 'lucide-react';
 import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
 import { fetchProMoveMetaByIds } from '@/lib/proMoves';
@@ -26,11 +26,13 @@ interface WeekSlot {
   isLocked: boolean;
   planId?: number | string | null; // Support both weekly_plan (number) and weekly_assignments (string)
   rankSnapshot?: {
-    parts: { C: number; R: number; E: number; D: number; T: number };
+    parts: { C: number; R: number; E: number; D: number; T: number; B?: number };
     final: number;
     reason_tags: string[];
     version: string;
   };
+  generatedBy?: 'manual' | 'auto';
+  aiRationale?: string | null;
 }
 
 interface WeekAssignment {
@@ -67,6 +69,7 @@ export function WeekBuilderPanel({
   const [slotToUnlock, setSlotToUnlock] = useState<{ weekStart: string; displayOrder: number; planId: number | string | null } | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [excusedWeeks, setExcusedWeeks] = useState<Set<string>>(new Set());
+  const [autoFillingWeek, setAutoFillingWeek] = useState<string | null>(null);
 
   const currentMonday = normalizeToPlannerWeek(new Date());
 
@@ -108,7 +111,7 @@ export function WeekBuilderPanel({
     // Use weekly_assignments table — scope to this org if orgId is present, else global
     let weekQuery = supabase
       .from('weekly_assignments')
-      .select('id, display_order, action_id, status, week_start_date')
+      .select('id, display_order, action_id, status, week_start_date, generated_by, ai_rationale')
       .is('location_id', null)
       .eq('role_id', roleId)
       .in('week_start_date', mondays)
@@ -169,13 +172,15 @@ export function WeekBuilderPanel({
     }));
 
     // Fill in from assignmentRows
-    (assignmentRows || []).forEach(row => {
+    (assignmentRows || []).forEach((row: any) => {
       const week = weeks.find(w => w.weekStart === row.week_start_date);
       if (week && row.display_order >= 1 && row.display_order <= 3) {
         const slot = week.slots[row.display_order - 1];
         slot.actionId = row.action_id || null;
         slot.status = row.status || 'proposed';
         slot.planId = row.id;
+        slot.generatedBy = row.generated_by === 'auto' ? 'auto' : 'manual';
+        slot.aiRationale = row.ai_rationale ?? null;
         const key = `${row.week_start_date}-${row.display_order}`;
         slot.isLocked = scoresBySlot.has(key);
       }
@@ -337,6 +342,41 @@ export function WeekBuilderPanel({
     
     setWeeks(updatedWeeks);
     setHasUnsavedChanges(true);
+  };
+
+  const handleAutoFill = async (weekStart: string) => {
+    if (!orgId) {
+      toast({ title: 'Auto-fill requires an org context', variant: 'destructive' });
+      return;
+    }
+    setAutoFillingWeek(weekStart);
+    try {
+      const { data, error } = await supabase.functions.invoke('sequencer-auto-assign', {
+        body: { orgId, roleId, weekStartDate: weekStart, numSlots: 3 },
+      });
+      if (error) throw error;
+
+      if (!data.assigned?.length) {
+        toast({
+          title: 'Nothing to fill',
+          description: data.message || 'All slots are locked or no eligible moves found.',
+        });
+        return;
+      }
+
+      // Reload the week to pick up the new draft assignments from DB
+      await loadWeeks(selectedMonday);
+
+      toast({
+        title: `${data.assigned.length} move${data.assigned.length !== 1 ? 's' : ''} suggested`,
+        description: 'Review and save when ready.',
+      });
+      setHasUnsavedChanges(true);
+    } catch (err: any) {
+      toast({ title: 'Auto-fill failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setAutoFillingWeek(null);
+    }
   };
 
   const handleSaveAll = async () => {
@@ -707,6 +747,19 @@ export function WeekBuilderPanel({
                           Exempt
                         </Badge>
                       )}
+                      {orgId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAutoFill(week.weekStart)}
+                          disabled={autoFillingWeek === week.weekStart || week.slots.every(s => s.isLocked)}
+                        >
+                          {autoFillingWeek === week.weekStart
+                            ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                            : <Sparkles className="h-3.5 w-3.5 mr-1" />}
+                          Auto-fill
+                        </Button>
+                      )}
                       {isSuperAdmin && (
                         <Button
                           variant={isExempt ? "default" : "outline"}
@@ -770,12 +823,14 @@ export function WeekBuilderPanel({
                                   ...w,
                                   slots: w.slots.map(s => 
                                     s.displayOrder === slot.displayOrder
-                                      ? { 
-                                          ...s, 
+                                      ? {
+                                          ...s,
                                           actionId: data.actionId,
                                           actionStatement: meta?.statement || data.actionStatement || '',
                                           domainName: meta?.domain || data.domainName || '',
                                           rankSnapshot: data.rankSnapshot || null,
+                                          generatedBy: 'manual' as const,
+                                          aiRationale: null,
                                         }
                                       : s
                                   )
@@ -821,7 +876,13 @@ export function WeekBuilderPanel({
                             )}
                           </div>
                         )}
-                        {!slot.isLocked && slot.actionId && (
+                        {slot.generatedBy === 'auto' && !slot.isLocked && (
+                          <Badge variant="outline" className="text-xs gap-1 border-violet-300 text-violet-700">
+                            <Sparkles className="h-2.5 w-2.5" />
+                            AI
+                          </Badge>
+                        )}
+                        {!slot.isLocked && slot.actionId && slot.generatedBy !== 'auto' && (
                           <Badge variant="outline" className="text-xs gap-1">
                             <Edit3 className="h-3 w-3" />
                             Editable
@@ -835,8 +896,8 @@ export function WeekBuilderPanel({
                             {slot.actionStatement || 'Pro-Move'}
                           </div>
                           {slot.domainName && (
-                            <Badge 
-                              variant="secondary" 
+                            <Badge
+                              variant="secondary"
                               className={`text-xs ring-1 ring-border/50 text-foreground ${isPastWeek ? 'opacity-60' : ''}`}
                               style={{
                                 backgroundColor: getDomainColor(slot.domainName),
@@ -844,6 +905,11 @@ export function WeekBuilderPanel({
                             >
                               {slot.domainName}
                             </Badge>
+                          )}
+                          {slot.aiRationale && !slot.isLocked && (
+                            <p className="text-xs text-muted-foreground italic leading-snug">
+                              {slot.aiRationale}
+                            </p>
                           )}
                           {!slot.isLocked && (
                             <div className="flex gap-1 pt-1">

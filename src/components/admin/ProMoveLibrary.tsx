@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Upload, Download, Filter, ChevronDown } from 'lucide-react';
+import { Plus, Upload, Download, Filter, ChevronDown, Sparkles } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
 import { ARCHETYPE_OPTIONS, type ArchetypeCode } from '@/lib/roleArchetypes';
 
@@ -46,6 +46,7 @@ export function ProMoveLibrary() {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingProMove, setEditingProMove] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [generating, setGenerating] = useState(false);
 
   // Derived values — must be declared before the useEffects that depend on them
   const roleIdsForArchetype = useMemo(() => {
@@ -240,6 +241,29 @@ export function ProMoveLibrary() {
     setShowBulkUpload(false);
   };
 
+  const handleGenerateWeights = async () => {
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-pro-move-weights', {
+        body: {},
+      });
+      if (error) throw error;
+      toast({
+        title: 'AI Weights Generated',
+        description: `Scored ${data.processed} of ${data.total} pro-moves.${data.errors?.length ? ` (${data.errors.length} failed)` : ''}`,
+      });
+      setRefreshKey(prev => prev + 1);
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to generate AI weights.',
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -256,6 +280,10 @@ export function ProMoveLibrary() {
           <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Bulk Upload
+          </Button>
+          <Button variant="outline" onClick={handleGenerateWeights} disabled={generating}>
+            <Sparkles className="w-4 h-4 mr-2" />
+            {generating ? 'Scoring…' : 'Generate AI Weights'}
           </Button>
           <Button onClick={handleAddProMove}>
             <Plus className="w-4 h-4 mr-2" />

@@ -61,24 +61,29 @@ serve(async (req) => {
     const lookbackWeeks = body.lookbackWeeks ?? 9;
     const preset = body.preset || 'balanced';
     
-    // Map presets to weights
-    const presetWeights: Record<string, { C: number; R: number; E: number; D: number }> = {
-      balanced: { C: 0.55, R: 0.25, E: 0.15, D: 0.05 },
-      confidence_recovery: { C: 0.70, R: 0.15, E: 0.10, D: 0.05 },
-      eval_focus: { C: 0.40, R: 0.20, E: 0.35, D: 0.05 },
-      variety_first: { C: 0.45, R: 0.20, E: 0.05, D: 0.30 },
+    // Map presets to weights (B = curriculum priority, held constant at 0.10 as tiebreaker)
+    const presetWeights: Record<string, { C: number; R: number; E: number; D: number; B: number }> = {
+      balanced:            { C: 0.50, R: 0.22, E: 0.13, D: 0.05, B: 0.10 },
+      confidence_recovery: { C: 0.62, R: 0.13, E: 0.10, D: 0.05, B: 0.10 },
+      eval_focus:          { C: 0.37, R: 0.18, E: 0.30, D: 0.05, B: 0.10 },
+      variety_first:       { C: 0.40, R: 0.18, E: 0.05, D: 0.27, B: 0.10 },
     };
-    
+
     // Use preset weights if no custom weights provided
-    let weights = body.weights || presetWeights[preset] || presetWeights.balanced;
+    // Legacy body.weights (no B) is wrapped to add B: 0.10
+    const rawWeights = body.weights
+      ? { ...body.weights, B: (body.weights as any).B ?? 0.10 }
+      : presetWeights[preset] || presetWeights.balanced;
+    let weights = rawWeights;
     const receivedWeights = JSON.stringify(body.weights || preset);
-    const sum = weights.C + weights.R + weights.E + weights.D;
+    const sum = weights.C + weights.R + weights.E + weights.D + weights.B;
     if (Math.abs(sum - 1.0) > 0.001) {
       weights = {
         C: weights.C / sum,
         R: weights.R / sum,
         E: weights.E / sum,
         D: weights.D / sum,
+        B: weights.B / sum,
       };
     }
 
@@ -99,7 +104,7 @@ serve(async (req) => {
     };
 
     const logs: string[] = [];
-    const rankVersion = 'v4.1-unified'; // Updated version after unification
+    const rankVersion = 'v5.0-curriculum-priority'; // v5: added B (curriculum_priority) component
     const rulesApplied: string[] = [
       `cooldown=${config.cooldownWeeks}w`,
       `minDistinctDomains=${config.diversityMinDomainsPerWeek}`,
@@ -108,7 +113,7 @@ serve(async (req) => {
     
     logs.push(`Starting ranking for role ${body.roleId} on ${effectiveDate} (${preset})`);
     logs.push(`Received: ${receivedWeights}`);
-    logs.push(`Normalized weights: C=${weights.C.toFixed(3)}, R=${weights.R.toFixed(3)}, E=${weights.E.toFixed(3)}, D=${weights.D.toFixed(3)}`);
+    logs.push(`Normalized weights: C=${weights.C.toFixed(3)}, R=${weights.R.toFixed(3)}, E=${weights.E.toFixed(3)}, D=${weights.D.toFixed(3)}, B=${weights.B.toFixed(3)}`);
     if (weights.R === 0) {
       logs.push('Recency disabled (wR=0) - cooldown and diversity still apply');
     }
@@ -135,13 +140,28 @@ serve(async (req) => {
         actionId: m.action_id,
         statement: m.action_statement,
         competencyId: m.competency_id,
+        curriculumPriority: m.curriculum_priority ?? null,
       }));
       logs.push(`Using org_visible_pro_moves RPC for org ${orgId}: ${eligible.length} moves`);
+
+      // Supplement with curriculum_priority if RPC didn't return it
+      if (eligible.some((m: any) => m.curriculumPriority === null) && eligible.length > 0) {
+        const actionIds = eligible.map((m: any) => m.actionId);
+        const { data: cpData } = await supabase
+          .from('pro_moves')
+          .select('action_id, curriculum_priority')
+          .in('action_id', actionIds);
+        const cpMap = new Map((cpData || []).map((r: any) => [r.action_id, r.curriculum_priority]));
+        eligible = eligible.map((m: any) => ({
+          ...m,
+          curriculumPriority: cpMap.has(m.actionId) ? cpMap.get(m.actionId) : m.curriculumPriority,
+        }));
+      }
     } else {
       // Legacy path: client-provided practiceType filter
       let movesQuery = supabase
         .from('pro_moves')
-        .select('action_id, action_statement, competency_id')
+        .select('action_id, action_statement, competency_id, curriculum_priority')
         .eq('active', true)
         .eq('role_id', body.roleId);
 
@@ -157,6 +177,7 @@ serve(async (req) => {
         actionId: m.action_id,
         statement: m.action_statement,
         competencyId: m.competency_id,
+        curriculumPriority: m.curriculum_priority ?? null,
       }));
     }
 
@@ -185,6 +206,7 @@ serve(async (req) => {
         competencyId: m.competencyId,
         domainId: comp?.domainId || 0,
         domainName: comp?.domainName || 'Unknown',
+        curriculumPriority: m.curriculumPriority,
       };
     });
 
@@ -533,7 +555,10 @@ serve(async (req) => {
       primaryReasonValue = weeksSince;
     }
 
-      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib + T;
+      // B (Curriculum Priority) — tiebreaker from AI-generated importance score
+      const B = move.curriculumPriority != null ? Number(move.curriculumPriority) : 0.50;
+
+      const final = (C * weights.C) + (R * weights.R) + (D * weights.D) + eContrib + T + (B * weights.B);
 
       const components = [
         { key: 'C', value: C * weights.C },
@@ -541,12 +566,13 @@ serve(async (req) => {
         { key: 'E', value: eContrib },
         { key: 'D', value: D * weights.D },
         { key: 'T', value: T },
+        { key: 'B', value: B * weights.B },
       ];
       components.sort((a, b) => b.value - a.value);
       const drivers = components.slice(0, 2).map(c => c.key);
 
-    return { 
-      C, R, E: E_raw, D, eContrib, final, drivers, weeksSince, T,
+    return {
+      C, R, E: E_raw, D, B, eContrib, final, drivers, weeksSince, T,
       lowConfShare, avgConfLast, retestDue,
       primaryReasonCode, primaryReasonValue
     };
@@ -572,7 +598,7 @@ serve(async (req) => {
       const sample = scored[0];
       logs.push(`Sample breakdown [${sample.name}]:`);
       logs.push(`  Raw: C=${sample.C.toFixed(3)}, R=${sample.R.toFixed(3)}, E_raw=${sample.E.toFixed(3)}, D=${sample.D.toFixed(3)}, T=${sample.T.toFixed(3)}`);
-      logs.push(`  Weighted: C*w=${(sample.C * weights.C).toFixed(3)}, R*w=${(sample.R * weights.R).toFixed(3)}, E_contrib=${sample.eContrib.toFixed(3)}, D*w=${(sample.D * weights.D).toFixed(3)}, T=${sample.T.toFixed(3)}`);
+      logs.push(`  Weighted: C*w=${(sample.C * weights.C).toFixed(3)}, R*w=${(sample.R * weights.R).toFixed(3)}, E_contrib=${sample.eContrib.toFixed(3)}, D*w=${(sample.D * weights.D).toFixed(3)}, T=${sample.T.toFixed(3)}, B*w=${(sample.B * weights.B).toFixed(3)}`);
       logs.push(`  Final: ${sample.final.toFixed(3)}, Drivers: ${sample.drivers.join(', ')}`);
     }
 
@@ -641,8 +667,8 @@ serve(async (req) => {
       const R_long = Math.min(weeksSince / TRICKLE_LONG, 1) * TRICKLE_WEIGHT;
       R = Math.min(R + R_long, 1);
 
-      const final = (base.C * weights.C) + (R * weights.R) + (base.D * weights.D) + base.eContrib + base.T;
-      
+      const final = (base.C * weights.C) + (R * weights.R) + (base.D * weights.D) + base.eContrib + base.T + (base.B * weights.B);
+
       return { ...base, R, final, weeksSince };
     };
 
@@ -695,6 +721,7 @@ serve(async (req) => {
         E: m.E,
         D: m.D,
         T: m.T,
+        B: m.B,
       },
       finalScore: Math.round(m.final * 100),
       drivers: m.drivers,
@@ -734,7 +761,7 @@ serve(async (req) => {
         name: m.name,
         domainId: m.domainId,
         domainName: m.domainName,
-        parts: { C: m.C, R: m.R, E: m.E, D: m.D, T: m.T },
+        parts: { C: m.C, R: m.R, E: m.E, D: m.D, T: m.T, B: m.B },
         finalScore: Math.round(m.final * 100),
         drivers: m.drivers,
         lastSeen: lastSelected.find(ls => ls.proMoveId === m.id)?.weekStart || null,

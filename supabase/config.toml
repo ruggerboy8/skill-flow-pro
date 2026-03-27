@@ -62,3 +62,9 @@ verify_jwt = true
 
 [functions.map-baseline-domain-notes]
 verify_jwt = true
+
+[functions.generate-pro-move-weights]
+verify_jwt = true
+
+[functions.sequencer-auto-assign]
+verify_jwt = true

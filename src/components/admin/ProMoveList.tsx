@@ -54,6 +54,8 @@ interface ProMove {
   role_name: string;
   competency_name: string;
   domain_name: string;
+  curriculum_priority: number | null;
+  curriculum_priority_rationale: string | null;
 }
 
 interface ResourceStatus {
@@ -112,7 +114,9 @@ export function ProMoveList({
           active,
           updated_at,
           role_id,
-          competency_id
+          competency_id,
+          curriculum_priority,
+          curriculum_priority_rationale
         `)
         .order('updated_at', { ascending: false });
 
@@ -177,7 +181,9 @@ export function ProMoveList({
         competency_id: item.competency_id,
         role_name: rolesMap.get(item.role_id) || 'Unknown',
         competency_name: competenciesMap.get(item.competency_id)?.name || 'Unknown',
-        domain_name: competenciesMap.get(item.competency_id)?.domain_name || 'Unknown'
+        domain_name: competenciesMap.get(item.competency_id)?.domain_name || 'Unknown',
+        curriculum_priority: (item as any).curriculum_priority ?? null,
+        curriculum_priority_rationale: (item as any).curriculum_priority_rationale ?? null,
       })) || [];
       
       // Apply sorting
@@ -404,11 +410,12 @@ export function ProMoveList({
       <Table>
         <TableHeader>
           <TableRow>
-            <SortableTableHead sortKey="action_statement" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-[40%]">
+            <SortableTableHead sortKey="action_statement" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-[38%]">
               Pro-Move
             </SortableTableHead>
-            <TableHead className="w-[25%]">Details</TableHead>
-            <TableHead className="w-[15%]">Materials</TableHead>
+            <TableHead className="w-[22%]">Details</TableHead>
+            <TableHead className="w-[12%]">Materials</TableHead>
+            <TableHead className="w-[8%] text-center">Priority</TableHead>
             <SortableTableHead sortKey="updated_at" currentSortKey={sortConfig.key} sortOrder={sortConfig.order} onSort={handleSort} className="w-[10%]">
               Updated
             </SortableTableHead>
@@ -504,6 +511,34 @@ export function ProMoveList({
                       </Tooltip>
                     </TooltipProvider>
                   </div>
+                </TableCell>
+
+                {/* Priority Column */}
+                <TableCell className="align-top pt-3 text-center">
+                  {proMove.curriculum_priority != null ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={`inline-block text-xs font-medium px-1.5 py-0.5 rounded cursor-default ${
+                            proMove.curriculum_priority >= 0.7
+                              ? 'bg-green-100 text-green-800'
+                              : proMove.curriculum_priority >= 0.4
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            P{Math.round(proMove.curriculum_priority * 10)}
+                          </span>
+                        </TooltipTrigger>
+                        {proMove.curriculum_priority_rationale && (
+                          <TooltipContent className="max-w-xs">
+                            <p>{proMove.curriculum_priority_rationale}</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <span className="text-muted-foreground/30 text-xs">—</span>
+                  )}
                 </TableCell>
 
                 <TableCell className="text-sm text-muted-foreground align-top pt-3">

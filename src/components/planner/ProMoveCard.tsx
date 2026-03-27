@@ -45,6 +45,26 @@ export function ProMoveCard({ move, highPriority }: ProMoveCardProps) {
                 </Tooltip>
               </TooltipProvider>
             )}
+            {move.curriculumPriority != null && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={`px-1.5 py-0.5 text-2xs rounded cursor-help ${
+                      move.curriculumPriority >= 0.7
+                        ? 'bg-green-100 text-green-800'
+                        : move.curriculumPriority >= 0.4
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      P{Math.round(move.curriculumPriority * 10)}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <span className="text-xs">Curriculum priority {Math.round(move.curriculumPriority * 100)}%</span>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
         </div>
       </div>

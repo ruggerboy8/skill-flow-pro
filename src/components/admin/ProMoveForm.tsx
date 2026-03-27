@@ -227,8 +227,18 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedArc
           return;
         }
 
-        const { error } = await supabase.from('pro_moves').insert(inserts as any);
+        const { data: inserted, error } = await supabase
+          .from('pro_moves')
+          .insert(inserts as any)
+          .select('action_id');
         if (error) throw error;
+
+        // Fire-and-forget: score new moves in background
+        const newIds = (inserted || []).map((r: any) => r.action_id).filter(Boolean);
+        if (newIds.length > 0) {
+          supabase.functions.invoke('generate-pro-move-weights', { body: { action_ids: newIds } })
+            .catch(() => { /* ignore scoring errors */ });
+        }
 
         const skipped = targetRoles.length - inserts.length;
         toast({

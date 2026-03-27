@@ -12,6 +12,7 @@ export interface RankedMove {
   retestDue: boolean;
   primaryReasonCode: 'LOW_CONF' | 'RETEST' | 'NEVER' | 'STALE' | 'TIE';
   primaryReasonValue: number | null;
+  curriculumPriority: number | null;
 }
 
 export function adaptSequencerRow(x: any): RankedMove {
@@ -28,5 +29,6 @@ export function adaptSequencerRow(x: any): RankedMove {
     retestDue: !!x.retestDue,
     primaryReasonCode: x.primaryReasonCode || 'TIE',
     primaryReasonValue: x.primaryReasonValue ?? null,
+    curriculumPriority: x.parts?.B != null ? x.parts.B : null,
   };
 }

@@ -506,7 +506,7 @@ export default function CoachDashboardV2({
               Filters
               {hasActiveFilters && (
                 <Badge variant="secondary" className="h-5 px-1.5 text-2xs">
-                  {[selectedOrganizations.length, selectedLocations.length, selectedRoles.length, search.trim() ? 1 : 0].reduce((a, b) => a + b, 0)}
+                  {[selectedOrganizations.length, selectedLocations.length, selectedRoles.length].reduce((a, b) => a + b, 0)}
                 </Badge>
               )}
             </Button>
@@ -522,6 +522,12 @@ export default function CoachDashboardV2({
               Clear
             </Button>
           )}
+          <Input
+            placeholder="Search by name or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="ml-auto w-[260px]"
+          />
         </div>
         <CollapsibleContent className="pt-3">
           <div className="flex items-center gap-3 flex-wrap">
@@ -556,12 +562,6 @@ export default function CoachDashboardV2({
               className="min-w-[160px]"
             />
 
-            <Input
-              placeholder="Search by name or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-[240px]"
-            />
           </div>
         </CollapsibleContent>
       </Collapsible>

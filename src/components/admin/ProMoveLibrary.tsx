@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Upload, Download, Filter, ChevronDown } from 'lucide-react';
 import { getDomainColor } from '@/lib/domainColors';
+import { ARCHETYPE_OPTIONS, type ArchetypeCode } from '@/lib/roleArchetypes';
 
 import { ProMoveList } from '@/components/admin/ProMoveList';
 import { ProMoveForm } from '@/components/admin/ProMoveForm';
@@ -19,6 +19,8 @@ import { BulkUpload } from '@/components/admin/BulkUpload';
 interface Role {
   role_id: number;
   role_name: string;
+  archetype_code?: string | null;
+  practice_type?: string | null;
 }
 
 interface Competency {
@@ -29,12 +31,11 @@ interface Competency {
 
 export function ProMoveLibrary() {
   const { toast } = useToast();
-  const { resolve: resolveRole } = useRoleDisplayNames();
   
   // State management
   const [roles, setRoles] = useState<Role[]>([]);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
-  const [selectedRole, setSelectedRole] = useState<string>('all');
+  const [selectedArchetype, setSelectedArchetype] = useState<string>('all');
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showActiveOnly, setShowActiveOnly] = useState(true);
@@ -46,26 +47,37 @@ export function ProMoveLibrary() {
   const [editingProMove, setEditingProMove] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Derived values — must be declared before the useEffects that depend on them
+  const roleIdsForArchetype = useMemo(() => {
+    if (selectedArchetype === 'all') return [];
+    return roles.filter(r => r.archetype_code === selectedArchetype).map(r => r.role_id);
+  }, [roles, selectedArchetype]);
+
+  const archetypesInUse = useMemo(() => {
+    const codes = new Set(roles.map(r => r.archetype_code).filter(Boolean));
+    return ARCHETYPE_OPTIONS.filter(o => codes.has(o.value));
+  }, [roles]);
+
   // Load initial data
   useEffect(() => {
     console.log('=== PROMOVE LIBRARY MOUNTING ===');
     loadRoles();
     loadCompetencies();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reload competencies when role selection changes
+  // Reload competencies when archetype selection changes
   useEffect(() => {
     loadCompetencies();
-    // Reset competency selection when role changes
     setSelectedCompetency('all');
-  }, [selectedRole]);
+  }, [selectedArchetype, roleIdsForArchetype.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadRoles = async () => {
     const { data } = await supabase
       .from('roles')
-      .select('role_id, role_name')
+      .select('role_id, role_name, archetype_code, practice_type')
+      .eq('active', true)
       .order('role_name');
-    
+
     if (data) setRoles(data);
   };
 
@@ -73,16 +85,16 @@ export function ProMoveLibrary() {
     let query = supabase
       .from('competencies')
       .select(`
-        competency_id, 
+        competency_id,
         name,
         domains!competencies_domain_id_fkey (
           domain_name
         )
       `);
 
-    // Filter by role if one is selected
-    if (selectedRole !== 'all') {
-      query = query.eq('role_id', parseInt(selectedRole));
+    // Filter by archetype's role_ids if one is selected
+    if (selectedArchetype !== 'all' && roleIdsForArchetype.length > 0) {
+      query = query.in('role_id', roleIdsForArchetype);
     }
 
     const { data } = await query.order('competency_id');
@@ -264,16 +276,16 @@ export function ProMoveLibrary() {
         </div>
 
         <div className="space-y-2">
-          <Label>Role</Label>
-          <Select value={selectedRole} onValueChange={setSelectedRole}>
+          <Label>Archetype</Label>
+          <Select value={selectedArchetype} onValueChange={setSelectedArchetype}>
             <SelectTrigger>
-              <SelectValue placeholder="All roles" />
+              <SelectValue placeholder="All archetypes" />
             </SelectTrigger>
             <SelectContent className="bg-background z-50">
-              <SelectItem value="all">All roles</SelectItem>
-              {roles.map(role => (
-              <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                  {resolveRole(role.role_id, role.role_name)}
+              <SelectItem value="all">All archetypes</SelectItem>
+              {archetypesInUse.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -456,7 +468,8 @@ export function ProMoveLibrary() {
         <h3 className="text-lg font-semibold mb-4">Pro-Move List</h3>
         <ProMoveList
           key={refreshKey}
-          roleFilter={selectedRole}
+          archetypeFilter={selectedArchetype}
+          roleIdsForArchetype={roleIdsForArchetype}
           competencyFilter={selectedCompetency}
           searchTerm={searchTerm}
           activeOnly={showActiveOnly}
@@ -474,7 +487,7 @@ export function ProMoveLibrary() {
           onClose={handleFormClose}
           roles={roles}
           competencies={competencies}
-          selectedRole={selectedRole}
+          selectedArchetype={selectedArchetype !== 'all' ? selectedArchetype : undefined}
         />
       )}
 

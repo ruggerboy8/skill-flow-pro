@@ -12,7 +12,7 @@ import { TabbedPageShell, type TabDefinition } from '@/components/shared/TabbedP
 const TABS: TabDefinition[] = [
   { value: 'organizations', label: 'Organizations', icon: Building2, content: <PlatformOrgsTab /> },
   { value: 'users', label: 'Users', icon: Users, content: <PlatformUsersTab /> },
-  { value: 'roles', label: 'Roles', icon: Blocks, content: <PlatformRolesTab /> },
+  { value: 'roles', label: 'Archetypes', icon: Blocks, content: <PlatformRolesTab /> },
   { value: 'pro-moves', label: 'Pro Moves', icon: BookOpen, content: <ProMoveLibrary /> },
   { value: 'impersonation', label: 'Impersonation', icon: UserCog, content: <ImpersonationTab /> },
 ];

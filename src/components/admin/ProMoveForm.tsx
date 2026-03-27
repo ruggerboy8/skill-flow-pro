@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { getDomainColor } from '@/lib/domainColors';
+import { ARCHETYPE_OPTIONS, type ArchetypeCode } from '@/lib/roleArchetypes';
 import {
   Dialog,
   DialogContent,
@@ -14,9 +15,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
+const PT_LABELS: Record<string, string> = {
+  pediatric_us: 'Pediatric – US',
+  general_us:   'General – US',
+  general_uk:   'General – UK',
+};
+
 interface Role {
   role_id: number;
   role_name: string;
+  archetype_code?: string | null;
+  practice_type?: string | null;
 }
 
 interface Competency {
@@ -43,299 +52,336 @@ interface ProMoveFormProps {
   onClose: () => void;
   roles: Role[];
   competencies: Competency[];
-  selectedRole?: string; // Add role filter support
+  selectedArchetype?: string; // optional pre-selection hint from library filter
 }
 
-export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRole }: ProMoveFormProps) {
+export function ProMoveForm({ proMove, onClose, roles, competencies, selectedArchetype: initialArchetype }: ProMoveFormProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+
+  // Archetype / practice type selection
+  const [archetypeCode, setArchetypeCode] = useState('');
+  const [availablePracticeTypes, setAvailablePracticeTypes] = useState<{ value: string; label: string }[]>([]);
+  const [selectedPracticeTypes, setSelectedPracticeTypes] = useState<string[]>([]);
+
+  // Representative role for competency loading (first match for the selected archetype)
+  const [representativeRoleId, setRepresentativeRoleId] = useState<string>('');
+
+  // Competency tracking — we need the name for cross-role matching on multi-insert
+  const [selectedCompetencyName, setSelectedCompetencyName] = useState('');
+
   const [formData, setFormData] = useState({
-    role_id: '',
     competency_id: '',
     action_statement: '',
     description: '',
     resources_url: '',
     intervention_text: '',
-    practice_types: ['pediatric_us'] as string[]
   });
   const [filteredCompetencies, setFilteredCompetencies] = useState<Competency[]>(competencies);
 
+  // Archetype options filtered to archetypes that actually have roles in the DB
+  const archetypesInUse = ARCHETYPE_OPTIONS.filter(o =>
+    roles.some(r => r.archetype_code === o.value)
+  );
+
+  // ── Archetype selection handler ───────────────────────────────────────────
+  const applyArchetype = (code: string, practiceTypes?: string[]) => {
+    const matching = roles.filter(r => r.archetype_code === code && r.practice_type);
+    const pts = matching.map(r => ({ value: r.practice_type!, label: PT_LABELS[r.practice_type!] ?? r.practice_type! }));
+    setArchetypeCode(code);
+    setAvailablePracticeTypes(pts);
+    const selected = practiceTypes ?? pts.map(p => p.value);
+    setSelectedPracticeTypes(selected);
+    const rep = matching.find(r => r.practice_type === 'pediatric_us') ?? matching[0];
+    setRepresentativeRoleId(rep?.role_id?.toString() ?? '');
+    setFormData(prev => ({ ...prev, competency_id: '' }));
+    setSelectedCompetencyName('');
+  };
+
+  // ── Initialize form ───────────────────────────────────────────────────────
   useEffect(() => {
     if (proMove) {
+      // EDIT mode: derive archetype from the existing role_id
+      const role = roles.find(r => r.role_id === proMove.role_id);
+      const code = role?.archetype_code ?? '';
+      applyArchetype(code, role?.practice_type ? [role.practice_type] : []);
+      setRepresentativeRoleId(proMove.role_id?.toString() ?? '');
       setFormData({
-        role_id: proMove.role_id?.toString() || '',
-        competency_id: proMove.competency_id?.toString() || '',
-        action_statement: proMove.action_statement || '',
-        description: proMove.description || '',
-        resources_url: proMove.resources_url || '',
-        intervention_text: proMove.intervention_text || '',
-        practice_types: proMove.practice_types ?? ['pediatric_us']
+        competency_id: proMove.competency_id?.toString() ?? '',
+        action_statement: proMove.action_statement ?? '',
+        description: proMove.description ?? '',
+        resources_url: proMove.resources_url ?? '',
+        intervention_text: proMove.intervention_text ?? '',
       });
-    } else if (selectedRole && selectedRole !== 'all') {
-      setFormData(prev => ({ ...prev, role_id: selectedRole }));
+      // Capture competency name for display (not needed for cross-role matching on edit)
+      const comp = competencies.find(c => c.competency_id === proMove.competency_id);
+      setSelectedCompetencyName(comp?.name ?? '');
+    } else if (initialArchetype) {
+      applyArchetype(initialArchetype);
     }
-  }, [proMove, selectedRole]);
+  }, [proMove, roles]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filter competencies by selected role
+  // ── Load competencies for the representative role ─────────────────────────
   useEffect(() => {
-    const loadFilteredCompetencies = async () => {
-      if (!formData.role_id || formData.role_id === 'all') {
+    const load = async () => {
+      if (!representativeRoleId || representativeRoleId === 'all') {
         setFilteredCompetencies(competencies);
         return;
       }
-
       try {
-        console.log('Loading competencies for role_id:', formData.role_id);
-        
         const { data, error } = await supabase
           .from('competencies')
-          .select(`
-            competency_id, 
-            name,
-            domain_id
-          `)
-          .eq('role_id', parseInt(formData.role_id))
+          .select('competency_id, name, domain_id')
+          .eq('role_id', parseInt(representativeRoleId))
           .order('competency_id');
+        if (error) throw error;
 
-        if (error) {
-          console.error('Competencies query error:', error);
-          throw error;
-        }
-
-        console.log('Raw competencies data:', data);
-
-        // Get domain names for each competency
-        const competenciesWithDomains = await Promise.all(
-          (data || []).map(async (competency) => {
-            if (!competency.domain_id) {
-              return {
-                ...competency,
-                domain_name: 'General'
-              };
-            }
-
-            const { data: domainData } = await supabase
+        const withDomains = await Promise.all(
+          (data || []).map(async (c) => {
+            if (!c.domain_id) return { ...c, domain_name: 'General' };
+            const { data: d } = await supabase
               .from('domains')
               .select('domain_name')
-              .eq('domain_id', competency.domain_id)
+              .eq('domain_id', c.domain_id)
               .maybeSingle();
-
-            return {
-              ...competency,
-              domain_name: domainData?.domain_name || 'General'
-            };
+            return { ...c, domain_name: d?.domain_name ?? 'General' };
           })
         );
-        
-        console.log('Processed competencies with domains:', competenciesWithDomains);
-        setFilteredCompetencies(competenciesWithDomains);
-        
-        // Clear competency selection if current one doesn't match role
+        setFilteredCompetencies(withDomains);
+
+        // Clear competency if it no longer belongs to this role
         if (formData.competency_id) {
-          const isValidCompetency = competenciesWithDomains.some(c => c.competency_id.toString() === formData.competency_id);
-          if (!isValidCompetency) {
+          const valid = withDomains.some(c => c.competency_id.toString() === formData.competency_id);
+          if (!valid) {
             setFormData(prev => ({ ...prev, competency_id: '' }));
+            setSelectedCompetencyName('');
           }
         }
-      } catch (error) {
-        console.error('Error loading competencies:', error);
+      } catch {
         setFilteredCompetencies([]);
-        toast({
-          title: "Error",
-          description: "Failed to load competencies for selected role",
-          variant: "destructive"
-        });
+        toast({ title: 'Error', description: 'Failed to load competencies', variant: 'destructive' });
       }
     };
+    load();
+  }, [representativeRoleId, competencies]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    loadFilteredCompetencies();
-  }, [formData.role_id, competencies, toast]);
-
+  // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.role_id || !formData.competency_id || !formData.action_statement.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Role, Competency, and Pro-Move text are required.",
-        variant: "destructive"
-      });
+    if (!archetypeCode || !formData.competency_id || !formData.action_statement.trim()) {
+      toast({ title: 'Validation Error', description: 'Archetype, Competency, and Pro-Move text are required.', variant: 'destructive' });
       return;
     }
 
     setLoading(true);
     try {
-      const submitData = {
-        role_id: parseInt(formData.role_id),
-        competency_id: parseInt(formData.competency_id),
+      const sharedFields = {
         action_statement: formData.action_statement.trim(),
         description: formData.description.trim() || null,
         resources_url: formData.resources_url.trim() || null,
         intervention_text: formData.intervention_text.trim() || null,
-        practice_types: formData.practice_types,
-        active: true
+        active: true,
       };
 
       if (proMove?.action_id) {
-        // Update existing pro-move
+        // EDIT — single-row update
         const { error } = await supabase
           .from('pro_moves')
-          .update(submitData)
+          .update({
+            ...sharedFields,
+            role_id: parseInt(representativeRoleId),
+            competency_id: parseInt(formData.competency_id),
+            practice_types: selectedPracticeTypes,
+          })
           .eq('action_id', proMove.action_id);
-
         if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Pro-move updated successfully!",
-        });
+        toast({ title: 'Success', description: 'Pro-move updated.' });
       } else {
-        // Create new pro-move - insert without action_id
-        const { error } = await supabase
-          .from('pro_moves')
-          .insert(submitData as any);
+        // CREATE — one insert per selected practice type
+        const targetRoles = roles.filter(
+          r => r.archetype_code === archetypeCode && r.practice_type && selectedPracticeTypes.includes(r.practice_type)
+        );
 
+        const inserts = (
+          await Promise.all(
+            targetRoles.map(async (role) => {
+              const { data: comps } = await supabase
+                .from('competencies')
+                .select('competency_id, name')
+                .eq('role_id', role.role_id);
+              const comp = comps?.find(c => c.name === selectedCompetencyName);
+              if (!comp) return null;
+              return {
+                ...sharedFields,
+                role_id: role.role_id,
+                competency_id: comp.competency_id,
+                practice_types: [role.practice_type!],
+              };
+            })
+          )
+        ).filter(Boolean) as object[];
+
+        if (inserts.length === 0) {
+          toast({ title: 'Error', description: 'No matching competencies found in the selected practice types.', variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
+
+        const { error } = await supabase.from('pro_moves').insert(inserts as any);
         if (error) throw error;
 
+        const skipped = targetRoles.length - inserts.length;
         toast({
-          title: "Success",
-          description: "Pro-move created successfully!",
+          title: 'Success',
+          description: `Created ${inserts.length} pro-move${inserts.length > 1 ? 's' : ''}.${skipped > 0 ? ` (${skipped} skipped — no matching competency)` : ''}`,
         });
       }
 
       onClose();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save pro-move.",
-        variant: "destructive"
-      });
+      toast({ title: 'Error', description: 'Failed to save pro-move.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
+  const isEditing = !!proMove?.action_id;
+
+  const canSubmit =
+    !!archetypeCode &&
+    selectedPracticeTypes.length > 0 &&
+    !!formData.competency_id &&
+    !!formData.action_statement.trim();
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>
-            {proMove ? 'Edit Pro-Move' : 'Add New Pro-Move'}
-          </DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Pro-Move' : 'Add New Pro-Move'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="role">Role *</Label>
-              <Select
-                value={formData.role_id}
-                onValueChange={(value) => setFormData({ ...formData, role_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent className="bg-background z-50">
-                  {roles.map(role => (
-                    <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                      {role.role_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="competency">Competency *</Label>
-              <Select
-                value={formData.competency_id}
-                onValueChange={(value) => setFormData({ ...formData, competency_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select competency" />
-                </SelectTrigger>
-                <SelectContent className="bg-background z-50">
-                  {filteredCompetencies.map(competency => (
-                    <SelectItem key={competency.competency_id} value={competency.competency_id.toString()}>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: getDomainColor(competency.domain_name || '') }}
-                        />
-                        {competency.name}
-                        {competency.domain_name && (
-                          <span className="text-xs text-muted-foreground ml-1">({competency.domain_name})</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
+          {/* Archetype picker — full width */}
           <div className="space-y-2">
-            <Label>Practice Types *</Label>
-            <div className="flex flex-col gap-2">
-              {([
-                { value: 'pediatric_us', label: 'Pediatric – US' },
-                { value: 'general_us', label: 'General – US' },
-                { value: 'general_uk', label: 'General – UK' },
-              ] as const).map(({ value, label }) => (
-                <label key={value} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.practice_types.includes(value)}
-                    onChange={(e) => {
-                      const next = e.target.checked
-                        ? [...formData.practice_types, value]
-                        : formData.practice_types.filter(t => t !== value);
-                      setFormData({ ...formData, practice_types: next });
-                    }}
-                    className="rounded border-border"
-                  />
-                  {label}
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">Controls which org types see this pro move</p>
+            <Label>Archetype *</Label>
+            <Select
+              value={archetypeCode}
+              onValueChange={code => applyArchetype(code)}
+              disabled={isEditing}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select archetype" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                {archetypesInUse.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
+          {/* Practice type checkboxes */}
+          {availablePracticeTypes.length > 0 && (
+            <div className="space-y-2">
+              <Label>Practice Types *{isEditing && <span className="text-muted-foreground font-normal ml-1">(read-only on edit)</span>}</Label>
+              <div className="flex flex-wrap gap-4">
+                {availablePracticeTypes.map(pt => (
+                  <label key={pt.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedPracticeTypes.includes(pt.value)}
+                      disabled={isEditing}
+                      onChange={e => {
+                        if (isEditing) return;
+                        setSelectedPracticeTypes(prev =>
+                          e.target.checked ? [...prev, pt.value] : prev.filter(v => v !== pt.value)
+                        );
+                      }}
+                      className="rounded border-border"
+                    />
+                    {pt.label}
+                  </label>
+                ))}
+              </div>
+              {!isEditing && (
+                <p className="text-xs text-muted-foreground">Creates one pro-move per selected practice type</p>
+              )}
+            </div>
+          )}
+
+          {/* Competency picker */}
+          <div className="space-y-2">
+            <Label>Competency *</Label>
+            <Select
+              value={formData.competency_id}
+              onValueChange={value => {
+                const comp = filteredCompetencies.find(c => c.competency_id.toString() === value);
+                setSelectedCompetencyName(comp?.name ?? '');
+                setFormData(prev => ({ ...prev, competency_id: value }));
+              }}
+              disabled={!archetypeCode}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={archetypeCode ? 'Select competency' : 'Select archetype first'} />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                {filteredCompetencies.map(c => (
+                  <SelectItem key={c.competency_id} value={c.competency_id.toString()}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: getDomainColor(c.domain_name || '') }}
+                      />
+                      {c.name}
+                      {c.domain_name && (
+                        <span className="text-xs text-muted-foreground ml-1">({c.domain_name})</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Pro-Move text */}
           <div className="space-y-2">
             <Label htmlFor="text">Pro-Move Text *</Label>
             <Textarea
               id="text"
               placeholder="Enter the pro-move statement..."
               value={formData.action_statement}
-              onChange={(e) => setFormData({ ...formData, action_statement: e.target.value })}
+              onChange={e => setFormData(prev => ({ ...prev, action_statement: e.target.value }))}
               rows={3}
             />
           </div>
 
+          {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               placeholder="Why this matters..."
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
               rows={3}
             />
             <p className="text-xs text-muted-foreground">Shown to learners as "Why this matters"</p>
           </div>
 
+          {/* Intervention text */}
           <div className="space-y-2">
             <Label htmlFor="intervention">Intervention Text</Label>
             <Textarea
               id="intervention"
               placeholder="Guidance for coaching interventions..."
               value={formData.intervention_text}
-              onChange={(e) => setFormData({ ...formData, intervention_text: e.target.value })}
+              onChange={e => setFormData(prev => ({ ...prev, intervention_text: e.target.value }))}
               rows={3}
             />
             <p className="text-xs text-muted-foreground">Used for coaching and performance interventions</p>
           </div>
 
+          {/* Resources URL */}
           <div className="space-y-2">
             <Label htmlFor="resources">Resources URL</Label>
             <Input
@@ -343,24 +389,16 @@ export function ProMoveForm({ proMove, onClose, roles, competencies, selectedRol
               type="url"
               placeholder="https://example.com/training-materials"
               value={formData.resources_url}
-              onChange={(e) => setFormData({ ...formData, resources_url: e.target.value })}
+              onChange={e => setFormData(prev => ({ ...prev, resources_url: e.target.value }))}
             />
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-            >
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={loading || !formData.role_id || !formData.competency_id || !formData.action_statement.trim()}
-            >
-              {loading ? "Saving..." : (proMove ? "Update" : "Create")}
+            <Button type="submit" disabled={loading || !canSubmit}>
+              {loading ? 'Saving...' : isEditing ? 'Update' : 'Create'}
             </Button>
           </div>
         </form>

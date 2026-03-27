@@ -64,7 +64,8 @@ interface ResourceStatus {
 }
 
 interface ProMoveListProps {
-  roleFilter: string;
+  archetypeFilter: string;
+  roleIdsForArchetype: number[];
   competencyFilter: string;
   searchTerm: string;
   activeOnly: boolean;
@@ -75,7 +76,8 @@ interface ProMoveListProps {
 }
 
 export function ProMoveList({
-  roleFilter,
+  archetypeFilter,
+  roleIdsForArchetype,
   competencyFilter,
   searchTerm,
   activeOnly,
@@ -95,7 +97,7 @@ export function ProMoveList({
 
   useEffect(() => {
     loadProMoves();
-  }, [roleFilter, competencyFilter, searchTerm, activeOnly, sortBy, practiceTypeFilter.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [archetypeFilter, roleIdsForArchetype.join(','), competencyFilter, searchTerm, activeOnly, sortBy, practiceTypeFilter.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadProMoves = async () => {
     setLoading(true);
@@ -115,8 +117,8 @@ export function ProMoveList({
         .order('updated_at', { ascending: false });
 
       // Apply filters
-      if (roleFilter && roleFilter !== 'all') {
-        query = query.eq('role_id', parseInt(roleFilter));
+      if (archetypeFilter && archetypeFilter !== 'all' && roleIdsForArchetype.length > 0) {
+        query = query.in('role_id', roleIdsForArchetype);
       }
       
       if (competencyFilter && competencyFilter !== 'all') {

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useLeadRoleId } from '@/hooks/useLeadRoleId';
 import { getDomainIdFromSlug, getDomainNameFromSlug } from '@/lib/domainUtils';
 import { format, parseISO } from 'date-fns';
 
@@ -33,23 +34,31 @@ export function useDomainDetail(domainSlug: string) {
     redirectToSetup: false,
     showErrorToast: false
   });
+  const { data: leadRoleId, isLoading: leadRoleLoading } = useLeadRoleId();
 
   const domainId = getDomainIdFromSlug(domainSlug);
   const domainName = getDomainNameFromSlug(domainSlug) || '';
 
+  // Determine which role IDs to query competencies for
+  const roleIds: number[] = [];
+  if (staffProfile?.role_id) roleIds.push(staffProfile.role_id);
+  if (staffProfile?.is_lead && leadRoleId && !roleIds.includes(leadRoleId)) {
+    roleIds.push(leadRoleId);
+  }
+
   return useQuery({
-    queryKey: ['domain-detail', domainSlug, staffProfile?.id, staffProfile?.role_id],
+    queryKey: ['domain-detail', domainSlug, staffProfile?.id, roleIds],
     queryFn: async (): Promise<DomainDetailData> => {
-      if (!staffProfile?.id || !staffProfile?.role_id || !domainId) {
+      if (!staffProfile?.id || roleIds.length === 0 || !domainId) {
         return { domainName, domainId: domainId || 0, competencies: [], averageScore: null, lastEvaluated: null };
       }
 
-      // 1. Fetch competencies for this domain and role
+      // 1. Fetch competencies for this domain and ALL applicable roles
       const { data: competencies, error: compError } = await supabase
         .from('competencies')
         .select('competency_id, name, tagline, friendly_description')
         .eq('domain_id', domainId)
-        .eq('role_id', staffProfile.role_id)
+        .in('role_id', roleIds)
         .eq('status', 'Active')
         .order('competency_id');
 
@@ -197,6 +206,6 @@ export function useDomainDetail(domainSlug: string) {
         lastEvaluated: mostRecentDate
       };
     },
-    enabled: !profileLoading && !!staffProfile?.id && !!domainId
+    enabled: !profileLoading && !leadRoleLoading && !!staffProfile?.id && !!domainId
   });
 }

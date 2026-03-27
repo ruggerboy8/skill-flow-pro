@@ -34,6 +34,7 @@ export default function MyRoleLayout() {
 
   // Determine role subtitle
   const roleSubtitle = 
+    staffProfile?.is_lead && staffProfile?.role_id === 2 ? 'Lead RDA Competency Blueprint' :
     staffProfile?.role_id === 1 ? 'DFI Competency Blueprint' :
     staffProfile?.role_id === 2 ? 'RDA Competency Blueprint' :
     'Office Manager Competency Blueprint';

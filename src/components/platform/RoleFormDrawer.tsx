@@ -126,8 +126,8 @@ export function RoleFormDrawer({ open, onOpenChange, role, onSaved }: Props) {
           <SheetTitle>{isEditing ? 'Edit Role' : 'New Role'}</SheetTitle>
           <SheetDescription>
             {isEditing
-              ? 'Update role name, archetype, and status.'
-              : 'Create a new role. Choose an archetype first — it determines how the system treats this role.'}
+              ? 'Update role name, type, and status.'
+              : 'Create a new role. Choose a role type first — it determines how the system treats this role.'}
           </SheetDescription>
         </SheetHeader>
 

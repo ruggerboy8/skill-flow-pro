@@ -221,9 +221,9 @@ export default function ThisWeekPanel() {
       // Load weekly scores for all assignments (own + parent panel)
       const allFocusIds = [
         ...assignments.map(a => a.weekly_focus_id),
-        ...(resolvedParentRoleId ? [] : []), // parent assignments loaded separately above
+        ...(resolvedLeadRoleId ? [] : []), // lead assignments loaded separately above
       ];
-      if (allFocusIds.length > 0 || resolvedParentRoleId) {
+      if (allFocusIds.length > 0 || resolvedLeadRoleId) {
         const { data: scores } = await supabase
           .from('weekly_scores')
           .select('weekly_focus_id, assignment_id, confidence_score, performance_score')

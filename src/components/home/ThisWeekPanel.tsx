@@ -254,6 +254,51 @@ export default function ThisWeekPanel() {
     });
   }, [weekContext, locationWeekContext, now]);
 
+  // Lead-specific CTA: same time gates, but checks lead assignment scores
+  const leadBanner = useMemo(() => {
+    if (!parentWeekAssignments.length || !locationWeekContext || !parentRoleId) return null;
+
+    const leadScores = parentWeekAssignments.map(a =>
+      weeklyScores.find(s =>
+        s.assignment_id === a.weekly_focus_id || s.weekly_focus_id === a.weekly_focus_id
+      )
+    );
+
+    const allConfDone = leadScores.every(s => s?.confidence_score != null);
+    const allPerfDone = leadScores.every(s => s?.performance_score != null);
+    const { anchors } = locationWeekContext;
+    const effectiveNow = now;
+
+    const confOpen = effectiveNow >= anchors.checkin_open;
+    const perfOpen = effectiveNow >= anchors.checkout_open;
+
+    if (allConfDone && allPerfDone) return null; // done
+
+    if (!allConfDone && confOpen) {
+      const isLate = effectiveNow >= anchors.checkin_due;
+      return {
+        message: isLate
+          ? 'Lead confidence is late — you can still submit it now.'
+          : 'Rate your confidence for the Lead Pro Move.',
+        cta: { label: 'Rate Lead Confidence', to: `/confidence/current/step/1?roleId=${parentRoleId}` },
+      };
+    }
+
+    if (allConfDone && !perfOpen) return null; // waiting for Thu
+
+    if (allConfDone && !allPerfDone && perfOpen) {
+      const isLate = effectiveNow >= anchors.checkout_due;
+      return {
+        message: isLate
+          ? 'Lead performance is late — add it now to wrap things up.'
+          : 'Rate your performance for the Lead Pro Move.',
+        cta: { label: 'Rate Lead Performance', to: `/performance/current/step/1?roleId=${parentRoleId}` },
+      };
+    }
+
+    return null;
+  }, [parentWeekAssignments, weeklyScores, locationWeekContext, parentRoleId, now]);
+
   // Show loading state (but allow non-participants through even without weekContext)
   if (loading || !staff || (!weekContext && isParticipant)) {
     return (

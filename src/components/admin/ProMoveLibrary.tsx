@@ -306,6 +306,7 @@ export function ProMoveLibrary() {
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
               Generating AI Weights
             </DialogTitle>
+            <DialogDescription>Scoring each pro move with OpenAI. This may take a few minutes on first run.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-muted-foreground">

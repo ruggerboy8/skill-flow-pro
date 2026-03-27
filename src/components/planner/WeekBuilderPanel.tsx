@@ -111,7 +111,7 @@ export function WeekBuilderPanel({
     // Use weekly_assignments table — scope to this org if orgId is present, else global
     let weekQuery = supabase
       .from('weekly_assignments')
-      .select('id, display_order, action_id, status, week_start_date, generated_by, ai_rationale')
+      .select('id, display_order, action_id, status, week_start_date')
       .is('location_id', null)
       .eq('role_id', roleId)
       .in('week_start_date', mondays)

@@ -590,6 +590,25 @@ export default function ThisWeekPanel() {
           </div>
         )}
 
+        {/* Lead Pro Move CTA Banner — appears below the main CTA */}
+        {leadBanner && (
+          <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-slate-700/40">
+            <p className="text-sm font-medium text-center mb-3 text-foreground">
+              {leadBanner.message}
+            </p>
+            {leadBanner.cta && (
+              <Button
+                variant="outline"
+                className="w-full rounded-full"
+                onClick={() => navigate(leadBanner.cta!.to)}
+              >
+                {leadBanner.cta.label}
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Simulation status */}
         {SimBannerComponent && <SimBannerComponent />}
       </div>

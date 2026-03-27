@@ -1,9 +1,9 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, BarChart2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { RecommenderPanel } from '@/components/planner/RecommenderPanel';
 import { WeekBuilderPanel } from '@/components/planner/WeekBuilderPanel';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { useUserRole } from '@/hooks/useUserRole';
 
 interface PlannerPageProps {
@@ -14,6 +14,7 @@ interface PlannerPageProps {
 export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
   const navigate = useNavigate();
   const { practiceType } = useUserRole();
+  const [showRecommender, setShowRecommender] = useState(false);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -24,36 +25,37 @@ export default function PlannerPage({ roleId, roleName }: PlannerPageProps) {
             Analyze, recommend, and assign global pro-moves
           </p>
         </div>
-        
-        <Button variant="outline" onClick={() => navigate('/builder')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Builder
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowRecommender(v => !v)}>
+            <BarChart2 className="h-4 w-4 mr-2" />
+            {showRecommender ? 'Hide Recommender' : 'Recommender'}
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/builder')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Builder
+          </Button>
+        </div>
       </div>
 
-      <ResizablePanelGroup direction="horizontal" className="gap-4" storage={null}>
-        <ResizablePanel defaultSize={50} minSize={40}>
-          <div className="h-[calc(100vh-180px)] overflow-y-auto pr-2">
+      <div className="flex gap-4">
+        {showRecommender && (
+          <div className="w-[380px] flex-none h-[calc(100vh-180px)] overflow-y-auto">
             <RecommenderPanel
               roleId={roleId}
               roleName={roleName}
               practiceType={practiceType}
             />
           </div>
-        </ResizablePanel>
-        
-        <ResizableHandle withHandle />
-        
-        <ResizablePanel defaultSize={50} minSize={25}>
-          <div className="h-full overflow-y-auto pl-2">
-            <WeekBuilderPanel 
-              roleId={roleId} 
-              roleName={roleName}
-              practiceType={practiceType}
-            />
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        )}
+        <div className="flex-1 min-w-0 h-[calc(100vh-180px)] overflow-y-auto">
+          <WeekBuilderPanel
+            roleId={roleId}
+            roleName={roleName}
+            practiceType={practiceType}
+          />
+        </div>
+      </div>
     </div>
   );
 }

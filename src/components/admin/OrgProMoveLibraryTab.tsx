@@ -61,7 +61,7 @@ interface ProMoveRow {
 interface OrgCustomMove {
   id: string;
   action_statement: string;
-  context: string | null;
+  description: string | null;
   role_id: number | null;
   role_name: string;
   competency_id: number | null;
@@ -104,7 +104,7 @@ export function OrgProMoveLibraryTab() {
   const [competencyOptions, setCompetencyOptions] = useState<CompetencyOption[]>([]);
   const [newMove, setNewMove] = useState({
     action_statement: '',
-    context: '',
+    description: '',
     role_id: '',
     competency_id: '',
   });
@@ -204,7 +204,7 @@ export function OrgProMoveLibraryTab() {
       const { data: orgMoves } = await (supabase as any)
         .from('organization_pro_moves')
         .select(`
-          id, action_statement, context, role_id, competency_id, practice_types,
+          id, action_statement, description, role_id, competency_id, practice_types,
           roles!organization_pro_moves_role_id_fkey(role_name),
           competencies!organization_pro_moves_competency_id_fkey(name)
         `)
@@ -216,7 +216,7 @@ export function OrgProMoveLibraryTab() {
         (orgMoves ?? []).map((m: any) => ({
           id: m.id,
           action_statement: m.action_statement,
-          context: m.context ?? null,
+          description: m.description ?? null,
           role_id: m.role_id ?? null,
           role_name: m.roles?.role_name ?? '—',
           competency_id: m.competency_id ?? null,
@@ -396,7 +396,7 @@ export function OrgProMoveLibraryTab() {
         .insert({
           org_id: organizationId,
           action_statement: newMove.action_statement.trim(),
-          context: newMove.context.trim() || null,
+          description: newMove.description.trim() || null,
           role_id: newMove.role_id ? Number(newMove.role_id) : null,
           competency_id: newMove.competency_id ? Number(newMove.competency_id) : null,
           practice_types: orgData?.practice_type ? [orgData.practice_type] : [],
@@ -408,7 +408,7 @@ export function OrgProMoveLibraryTab() {
 
       toast({ title: 'Created', description: 'Custom pro move added.' });
       setShowNewMoveDialog(false);
-      setNewMove({ action_statement: '', context: '', role_id: '', competency_id: '' });
+      setNewMove({ action_statement: '', description: '', role_id: '', competency_id: '' });
       load();
     } catch (err: any) {
       toast({ title: 'Error', description: err.message || 'Failed to create', variant: 'destructive' });
@@ -665,11 +665,11 @@ export function OrgProMoveLibraryTab() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="new-context">Context / notes (optional)</Label>
+              <Label htmlFor="new-description">Description (optional)</Label>
               <Textarea
-                id="new-context"
-                value={newMove.context}
-                onChange={(e) => setNewMove((p) => ({ ...p, context: e.target.value }))}
+                id="new-description"
+                value={newMove.description}
+                onChange={(e) => setNewMove((p) => ({ ...p, description: e.target.value }))}
                 placeholder="Additional guidance for staff or coaches"
                 rows={2}
               />
@@ -677,7 +677,7 @@ export function OrgProMoveLibraryTab() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Role (optional)</Label>
+                <Label>Role *</Label>
                 <Select
                   value={newMove.role_id}
                   onValueChange={(v) => setNewMove((p) => ({ ...p, role_id: v, competency_id: '' }))}
@@ -696,7 +696,7 @@ export function OrgProMoveLibraryTab() {
               </div>
 
               <div className="space-y-2">
-                <Label>Competency (optional)</Label>
+                <Label>Competency *</Label>
                 <Select
                   value={newMove.competency_id}
                   onValueChange={(v) => setNewMove((p) => ({ ...p, competency_id: v }))}
@@ -723,7 +723,7 @@ export function OrgProMoveLibraryTab() {
             </Button>
             <Button
               onClick={handleCreateCustomMove}
-              disabled={savingNewMove || !newMove.action_statement.trim()}
+              disabled={savingNewMove || !newMove.action_statement.trim() || !newMove.role_id || !newMove.competency_id}
             >
               {savingNewMove && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Create Move

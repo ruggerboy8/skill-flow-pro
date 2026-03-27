@@ -257,7 +257,7 @@ export function PlatformRolesTab() {
                 <CardContent className="p-3 flex items-center justify-between">
                   <div>
                     <p className="font-medium text-sm">{label}</p>
-                    <p className="text-xs text-muted-foreground">{role.role_code}</p>
+                    
                   </div>
                   {!role.active && (
                     <Badge variant="secondary" className="text-xs">Inactive</Badge>

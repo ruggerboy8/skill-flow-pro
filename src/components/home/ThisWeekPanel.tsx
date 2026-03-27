@@ -385,7 +385,7 @@ export default function ThisWeekPanel() {
         {parentWeekAssignments.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-              Team Pro Move
+              Lead Pro Move
             </p>
             {parentWeekAssignments.map((assignment) => {
               const domainName = assignment.domain_name;
@@ -447,7 +447,7 @@ export default function ThisWeekPanel() {
         {/* Section label when dual panel is active */}
         {parentWeekAssignments.length > 0 && (
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1 pt-1">
-            Lead Pro Move
+            Team Pro Moves
           </p>
         )}
 

@@ -85,6 +85,7 @@ interface CompetencyOption {
 export function OrgProMoveLibraryTab() {
   const { toast } = useToast();
   const { organizationId } = useUserRole();
+  const { resolve: resolveRoleName } = useRoleDisplayNames();
 
   const [rows, setRows] = useState<ProMoveRow[]>([]);
   const [customMoves, setCustomMoves] = useState<OrgCustomMove[]>([]);

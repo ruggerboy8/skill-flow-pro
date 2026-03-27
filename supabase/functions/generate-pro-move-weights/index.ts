@@ -249,7 +249,10 @@ serve(async (req) => {
         const move = batch[idx];
         if (result.status === 'fulfilled' && result.value) {
           const s = result.value;
-          const priority = Math.max(s.revenue, s.patient_exp, s.foundational);
+          // Weighted: 60% best of revenue/PX, 30% other of revenue/PX, 10% foundational
+          const rpMax = Math.max(s.revenue, s.patient_exp);
+          const rpMin = Math.min(s.revenue, s.patient_exp);
+          const priority = 0.60 * rpMax + 0.30 * rpMin + 0.10 * s.foundational;
           upserts.push({
             action_id: move.action_id,
             curriculum_priority: Math.round(priority * 100) / 100,

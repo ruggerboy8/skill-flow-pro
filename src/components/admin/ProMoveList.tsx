@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -90,6 +91,7 @@ export function ProMoveList({
 }: ProMoveListProps) {
   const { toast } = useToast();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  const { resolve: resolveRoleName } = useRoleDisplayNames();
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
   const [loading, setLoading] = useState(true);
   const [resourceStatus, setResourceStatus] = useState<Map<number, ResourceStatus>>(new Map());
@@ -115,8 +117,7 @@ export function ProMoveList({
           updated_at,
           role_id,
           competency_id,
-          curriculum_priority,
-          curriculum_priority_rationale
+          practice_types
         `)
         .order('updated_at', { ascending: false });
 
@@ -440,7 +441,7 @@ export function ProMoveList({
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="text-xs font-normal">
-                        {proMove.role_name}
+                        {resolveRoleName(proMove.role_id, proMove.role_name)}
                       </Badge>
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <div 

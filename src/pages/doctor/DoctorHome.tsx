@@ -104,6 +104,32 @@ export default function DoctorHome() {
       );
     }
 
+    if (baseline?.status === 'in_progress') {
+      return (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <ClipboardCheck className="h-8 w-8 text-primary" />
+              <div>
+                <CardTitle>Continue Your Baseline</CardTitle>
+                <CardDescription>
+                  You have an in-progress baseline self-assessment. Pick up where you left off.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Your progress has been saved. Jump back in to finish rating your Pro Moves.
+            </p>
+            <Link to="/doctor/baseline">
+              <Button className="w-full">Continue Baseline Assessment</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      );
+    }
+
     if (staff?.baseline_released_at && !baseline) {
       return (
         <Card className="border-primary/30 bg-primary/5">

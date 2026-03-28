@@ -2123,6 +2123,7 @@ export type Database = {
           status: string
           superseded_at: string | null
           updated_at: string
+          updated_by: string | null
           week_start_date: string
         }
         Insert: {
@@ -2140,6 +2141,7 @@ export type Database = {
           status?: string
           superseded_at?: string | null
           updated_at?: string
+          updated_by?: string | null
           week_start_date: string
         }
         Update: {
@@ -2157,6 +2159,7 @@ export type Database = {
           status?: string
           superseded_at?: string | null
           updated_at?: string
+          updated_by?: string | null
           week_start_date?: string
         }
         Relationships: [

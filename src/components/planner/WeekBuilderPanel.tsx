@@ -949,7 +949,7 @@ export function WeekBuilderPanel({
                           }}
                           className="w-full text-xs"
                         >
-                          Choose from Library
+                          Choose Pro Move
                         </Button>
                       )}
                     </div>

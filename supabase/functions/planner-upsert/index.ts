@@ -159,7 +159,8 @@ Deno.serve(async (req) => {
               .update({
                 action_id: pick.actionId,
                 competency_id: competencyId,
-                updated_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              updated_by: updaterUserId ?? null,
               })
               .eq('id', existing.id)
 
@@ -192,6 +193,7 @@ Deno.serve(async (req) => {
               source: orgId ? 'org' : 'global',
               status: 'locked',
               self_select: false,
+              updated_by: updaterUserId ?? null,
             })
             .select('id')
             .single()

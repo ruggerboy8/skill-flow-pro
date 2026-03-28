@@ -17,12 +17,13 @@ interface RecommenderPanelProps {
   roleName: string;
   practiceType?: string;
   orgId?: string;
+  rankedMovesOverride?: RankedMove[];
 }
 
 
 const PAGE_SIZE = 12;
 
-export function RecommenderPanel({ roleId, roleName, practiceType, orgId }: RecommenderPanelProps) {
+export function RecommenderPanel({ roleId, roleName, practiceType, orgId, rankedMovesOverride }: RecommenderPanelProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rankedAll, setRankedAll] = useState<RankedMove[]>([]);
@@ -33,8 +34,13 @@ export function RecommenderPanel({ roleId, roleName, practiceType, orgId }: Reco
   const [preset, setPreset] = useState<string>('balanced');
 
   useEffect(() => {
+    if (rankedMovesOverride) {
+      setRankedAll(rankedMovesOverride);
+      setTop6Ids(new Set(rankedMovesOverride.slice(0, 6).map(m => m.proMoveId)));
+      return;
+    }
     loadRecommendations();
-  }, [roleId, preset, practiceType, orgId]);
+  }, [roleId, preset, practiceType, orgId, rankedMovesOverride]);
 
   const loadRecommendations = async () => {
     setLoading(true);

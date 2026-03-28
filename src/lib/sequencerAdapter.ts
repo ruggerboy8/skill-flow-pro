@@ -15,6 +15,10 @@ export interface RankedMove {
   curriculumPriority: number | null;
 }
 
+export function adaptSequencerResponse(data: any): RankedMove[] {
+  return (data?.ranked ?? []).map(adaptSequencerRow);
+}
+
 export function adaptSequencerRow(x: any): RankedMove {
   // The edge function already returns data in the correct camelCase format
   return {

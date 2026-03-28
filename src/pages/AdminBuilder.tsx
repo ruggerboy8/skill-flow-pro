@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,8 +8,10 @@ import { ArrowLeft, BarChart2 } from "lucide-react";
 import { OrgProMoveLibraryTab } from "@/components/admin/OrgProMoveLibraryTab";
 import { RecommenderPanel } from "@/components/planner/RecommenderPanel";
 import { WeekBuilderPanel } from "@/components/planner/WeekBuilderPanel";
+import { WeekSignalSummary } from "@/components/planner/WeekSignalSummary";
 import { supabase } from "@/integrations/supabase/client";
 import { ARCHETYPES, type ArchetypeCode } from "@/lib/roleArchetypes";
+import { adaptSequencerResponse, type RankedMove } from "@/lib/sequencerAdapter";
 
 interface PlannerRole {
   role_id: number;
@@ -153,24 +155,66 @@ function PlannerTabContent({
   orgId?: string;
   practiceType?: string;
 }) {
-  const [showRecommender, setShowRecommender] = useState(false);
+  const [rankedMoves, setRankedMoves] = useState<RankedMove[]>([]);
+  const [rankLoading, setRankLoading] = useState(false);
+  const [showSignalView, setShowSignalView] = useState(false);
+
+  const loadRankedMoves = useCallback(async () => {
+    setRankLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sequencer-rank', {
+        body: {
+          roleId,
+          orgId,
+          preset: 'balanced',
+          lookbackWeeks: 9,
+          practiceType,
+          constraints: { cooldownWeeks: 4, minDistinctDomains: 2 },
+        },
+      });
+      if (error) throw error;
+      const adapted = adaptSequencerResponse(data);
+      setRankedMoves(adapted);
+    } catch {
+      setRankedMoves([]);
+    } finally {
+      setRankLoading(false);
+    }
+  }, [roleId, orgId, practiceType]);
+
+  useEffect(() => {
+    loadRankedMoves();
+  }, [loadRankedMoves]);
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={() => setShowRecommender(v => !v)}>
-          <BarChart2 className="h-4 w-4 mr-2" />
-          {showRecommender ? 'Hide Recommender' : 'Recommender'}
+      <div className="flex items-center justify-end">
+        <Button variant="ghost" size="sm" onClick={() => setShowSignalView(v => !v)}>
+          <BarChart2 className="h-4 w-4 mr-1.5" />
+          {showSignalView ? 'Hide Signal View' : 'Signal View'}
         </Button>
       </div>
+      <WeekSignalSummary rankedMoves={rankedMoves} loading={rankLoading} roleName={roleName} />
       <div className="flex gap-4">
-        {showRecommender && (
-          <div className="w-[380px] flex-none h-[calc(100vh-280px)] overflow-y-auto">
-            <RecommenderPanel roleId={roleId} roleName={roleName} practiceType={practiceType} orgId={orgId} />
+        {showSignalView && (
+          <div className="w-[360px] flex-none max-h-[calc(100vh-280px)] overflow-y-auto">
+            <RecommenderPanel
+              roleId={roleId}
+              roleName={roleName}
+              practiceType={practiceType}
+              orgId={orgId}
+              rankedMovesOverride={rankedMoves}
+            />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <WeekBuilderPanel roleId={roleId} roleName={roleName} orgId={orgId} practiceType={practiceType} />
+          <WeekBuilderPanel
+            roleId={roleId}
+            roleName={roleName}
+            orgId={orgId}
+            practiceType={practiceType}
+            rankedMoves={rankedMoves}
+          />
         </div>
       </div>
     </div>

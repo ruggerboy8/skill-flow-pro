@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Loader2, Lock, Edit3, X, Trash2, Unlock, CalendarOff, Sparkles } from 'lucide-react';
 import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
+import { SmartSlotPicker } from './SmartSlotPicker';
+import type { RankedMove } from '@/lib/sequencerAdapter';
 import { fetchProMoveMetaByIds } from '@/lib/proMoves';
 import { getDomainColor } from '@/lib/domainColors';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -45,6 +47,7 @@ interface WeekBuilderPanelProps {
   roleName: string;
   orgId?: string;
   practiceType?: string;
+  rankedMoves?: RankedMove[];
 }
 
 export function WeekBuilderPanel({
@@ -52,6 +55,7 @@ export function WeekBuilderPanel({
   roleName,
   orgId,
   practiceType,
+  rankedMoves,
 }: WeekBuilderPanelProps) {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
@@ -959,9 +963,32 @@ export function WeekBuilderPanel({
         </CardContent>
       </Card>
 
-      {pickerOpen && (
-        <ProMovePickerDialog
+      {pickerOpen && selectedSlot ? (
+        <SmartSlotPicker
           open={pickerOpen}
+          onClose={() => { setPickerOpen(false); setSelectedSlot(null); }}
+          onSelect={(actionId, actionStatement, _source) => {
+            if (selectedSlot) {
+              handleSelectProMove(actionId, selectedSlot.weekStart, selectedSlot.displayOrder);
+            }
+            setPickerOpen(false);
+            setSelectedSlot(null);
+          }}
+          slot={selectedSlot as { weekStart: string; displayOrder: 1 | 2 | 3 }}
+          roleId={roleId}
+          roleName={roleName}
+          orgId={orgId ?? ''}
+          practiceType={practiceType}
+          rankedMoves={rankedMoves ?? []}
+          excludeActionIds={
+            (weeks.find(w => w.weekStart === selectedSlot.weekStart)?.slots ?? [])
+              .map(s => s.actionId)
+              .filter((id): id is number => id !== null)
+          }
+        />
+      ) : (
+        <ProMovePickerDialog
+          open={pickerOpen && !selectedSlot}
           onClose={() => setPickerOpen(false)}
           roleId={roleId}
           onSelect={handleSelectProMove}

@@ -127,7 +127,7 @@ export function SmartSlotPicker({
           </TabsList>
 
           {/* Recommended tab */}
-          <TabsContent value="recommended" className="flex-1 overflow-y-auto px-6 pb-6 mt-0">
+          <TabsContent value="recommended" className="flex-1 overflow-y-auto px-6 pb-6 mt-0 min-h-0">
             {filteredRanked.length === 0 ? (
               <p className="text-sm text-muted-foreground mt-4">No recommendations available.</p>
             ) : (
@@ -164,7 +164,7 @@ export function SmartSlotPicker({
           </TabsContent>
 
           {/* Ask AI tab */}
-          <TabsContent value="ai" className="flex-1 overflow-y-auto px-6 pb-6 mt-0 flex flex-col">
+          <TabsContent value="ai" className="flex-1 overflow-y-auto px-6 pb-6 mt-0 flex flex-col min-h-0">
             <div className="mt-3 space-y-3">
               <Textarea
                 placeholder={`Describe an issue or goal for your ${roleName}s…\ne.g. "Schedule is looking sparse this week" or "Patients aren't rescheduling at checkout"`}

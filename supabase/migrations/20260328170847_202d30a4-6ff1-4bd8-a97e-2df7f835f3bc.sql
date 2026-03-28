@@ -1,0 +1,1 @@
+ALTER TABLE public.weekly_assignments ADD COLUMN IF NOT EXISTS updated_by uuid REFERENCES auth.users(id);

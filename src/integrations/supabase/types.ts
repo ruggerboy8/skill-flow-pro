@@ -2110,13 +2110,16 @@ export type Database = {
       weekly_assignments: {
         Row: {
           action_id: number | null
+          ai_rationale: string | null
           competency_id: number | null
           created_at: string
           display_order: number
+          generated_by: string | null
           id: string
           legacy_focus_id: string | null
           location_id: string | null
           org_id: string | null
+          rank_snapshot: Json | null
           role_id: number
           self_select: boolean
           source: string
@@ -2128,13 +2131,16 @@ export type Database = {
         }
         Insert: {
           action_id?: number | null
+          ai_rationale?: string | null
           competency_id?: number | null
           created_at?: string
           display_order: number
+          generated_by?: string | null
           id?: string
           legacy_focus_id?: string | null
           location_id?: string | null
           org_id?: string | null
+          rank_snapshot?: Json | null
           role_id: number
           self_select?: boolean
           source: string
@@ -2146,13 +2152,16 @@ export type Database = {
         }
         Update: {
           action_id?: number | null
+          ai_rationale?: string | null
           competency_id?: number | null
           created_at?: string
           display_order?: number
+          generated_by?: string | null
           id?: string
           legacy_focus_id?: string | null
           location_id?: string | null
           org_id?: string | null
+          rank_snapshot?: Json | null
           role_id?: number
           self_select?: boolean
           source?: string

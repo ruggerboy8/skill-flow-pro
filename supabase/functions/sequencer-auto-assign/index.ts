@@ -112,14 +112,13 @@ serve(async (req) => {
       });
     }
 
-    // ── Call sequencer-rank ───────────────────────────────────────────────────
+    // ── Call sequencer-rank (forward caller's JWT so RLS resolves correctly) ──
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     const rankRes = await fetch(`${SUPABASE_URL}/functions/v1/sequencer-rank`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        Authorization: authHeader,
         'Content-Type': 'application/json',
         apikey: Deno.env.get('SUPABASE_ANON_KEY')!,
       },

@@ -232,7 +232,7 @@ export function SmartSlotPicker({
           </TabsContent>
 
           {/* Browse tab */}
-          <TabsContent value="browse" className="flex-1 overflow-y-auto px-6 pb-6 mt-0 flex flex-col">
+          <TabsContent value="browse" className="flex-1 overflow-hidden px-6 pb-6 mt-0 flex flex-col">
             <div className="mt-3 relative flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -247,7 +247,7 @@ export function SmartSlotPicker({
                 {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
               </div>
             ) : (
-              <div className="mt-3 space-y-2 overflow-y-auto">
+              <div className="mt-3 space-y-2 flex-1 overflow-y-auto min-h-0">
                 {filteredBrowse.map(m => {
                   const domainColor = getDomainColor(m.domain_name);
                   return (

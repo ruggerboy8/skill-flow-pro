@@ -138,6 +138,11 @@ export function OrgSetupWizard({
   const [emailSignOff, setEmailSignOff] = useState('');
   const [replyToEmail, setReplyToEmail] = useState('');
   const [orgName, setOrgName] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [brandColor, setBrandColor] = useState('#1a4a7a');
+  const [orgSlug, setOrgSlug] = useState('');
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // ── Data loading ─────────────────────────────────────────────────────────────
 

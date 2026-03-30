@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -6,10 +6,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Clock, Tag } from "lucide-react";
+import { AlertTriangle, Clock, Tag, Palette, Mail, Upload, X, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import { useUserRole } from "@/hooks/useUserRole";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -35,12 +36,27 @@ export function AdminGlobalSettingsTab() {
   const [rolesLoading, setRolesLoading] = useState(true);
   const [rolesSaving, setRolesSaving] = useState(false);
 
+  // Branding state
+  const [brandLoading, setBrandLoading] = useState(true);
+  const [brandSaving, setBrandSaving] = useState(false);
+  const [appDisplayName, setAppDisplayName] = useState('');
+  const [emailSignOff, setEmailSignOff] = useState('');
+  const [replyToEmail, setReplyToEmail] = useState('');
+  const [brandColor, setBrandColor] = useState('#1a4a7a');
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [orgSlug, setOrgSlug] = useState('');
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     loadSettings();
   }, []);
 
   useEffect(() => {
-    if (organizationId) loadRoleAliases();
+    if (organizationId) {
+      loadRoleAliases();
+      loadBranding();
+    }
   }, [organizationId]);
 
   const loadRoleAliases = async () => {
@@ -85,6 +101,81 @@ export function AdminGlobalSettingsTab() {
       }))
     );
     setRolesLoading(false);
+  };
+
+  const loadBranding = async () => {
+    if (!organizationId) return;
+    setBrandLoading(true);
+    try {
+      const { data } = await (supabase
+        .from('organizations')
+        .select('slug, app_display_name, email_sign_off, reply_to_email') as any)
+        .eq('id', organizationId)
+        .single();
+      if (data) {
+        setOrgSlug(data.slug || '');
+        setAppDisplayName(data.app_display_name || '');
+        setEmailSignOff(data.email_sign_off || '');
+        setReplyToEmail(data.reply_to_email || '');
+        setLogoPreview((data as any).logo_url || null);
+        setBrandColor((data as any).brand_color || '#1a4a7a');
+      }
+    } catch (err) {
+      console.error('Error loading branding:', err);
+    } finally {
+      setBrandLoading(false);
+    }
+  };
+
+  const handleSaveBranding = async () => {
+    if (!organizationId) return;
+    setBrandSaving(true);
+    try {
+      let logoUrl: string | undefined;
+      if (logoFile) {
+        const ext = logoFile.name.split('.').pop() ?? 'png';
+        const path = `${orgSlug || organizationId}/logo.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('org-assets')
+          .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('org-assets').getPublicUrl(path);
+          logoUrl = urlData.publicUrl;
+        }
+      }
+
+      const payload: Record<string, any> = {
+        app_display_name: appDisplayName.trim() || null,
+        email_sign_off: emailSignOff.trim() || null,
+        reply_to_email: replyToEmail.trim() || null,
+        brand_color: brandColor,
+      };
+      if (logoUrl) payload.logo_url = logoUrl;
+
+      const { error } = await supabase
+        .from('organizations')
+        .update(payload as any)
+        .eq('id', organizationId);
+      if (error) throw error;
+
+      setLogoFile(null);
+      toast({ title: 'Saved', description: 'Branding settings updated.' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to save branding.', variant: 'destructive' });
+    } finally {
+      setBrandSaving(false);
+    }
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Logo must be under 2 MB.', variant: 'destructive' });
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
   };
 
   const handleAliasChange = (roleId: number, value: string) => {
@@ -329,6 +420,136 @@ export function AdminGlobalSettingsTab() {
                     disabled={rolesSaving}
                   >
                     {rolesSaving ? "Saving…" : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Branding */}
+      {organizationId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Branding
+            </CardTitle>
+            <CardDescription>
+              Logo, accent color, and email appearance
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {brandLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Logo */}
+                <div className="space-y-2">
+                  <Label>Logo</Label>
+                  {logoPreview && (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={logoPreview}
+                        alt="Logo"
+                        className="h-10 max-w-[120px] object-contain rounded border bg-muted/30 p-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setLogoFile(null);
+                          setLogoPreview(null);
+                          if (logoInputRef.current) logoInputRef.current.value = '';
+                        }}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-4 w-4 mr-1" /> Remove
+                      </Button>
+                    </div>
+                  )}
+                  <label className="cursor-pointer inline-block">
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <span>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {logoPreview ? 'Replace logo' : 'Upload logo'}
+                      </span>
+                    </Button>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml"
+                      onChange={handleLogoSelect}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, or SVG — max 2 MB</p>
+                </div>
+
+                {/* Brand color */}
+                <div className="space-y-2">
+                  <Label>Accent Color</Label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={brandColor}
+                      onChange={(e) => setBrandColor(e.target.value)}
+                      className="h-9 w-14 rounded border cursor-pointer"
+                    />
+                    <span className="font-mono text-sm text-muted-foreground">{brandColor}</span>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Email branding */}
+                <div className="space-y-1 mb-3">
+                  <Label className="flex items-center gap-2 text-sm font-semibold">
+                    <Mail className="h-4 w-4" />
+                    Email Appearance
+                  </Label>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Display Name</Label>
+                    <Input
+                      value={appDisplayName}
+                      onChange={(e) => setAppDisplayName(e.target.value)}
+                      placeholder="Your Organization"
+                      className="max-w-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Email Sign-off</Label>
+                    <Input
+                      value={emailSignOff}
+                      onChange={(e) => setEmailSignOff(e.target.value)}
+                      placeholder="The Your Team"
+                      className="max-w-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Reply-to Email</Label>
+                    <Input
+                      value={replyToEmail}
+                      onChange={(e) => setReplyToEmail(e.target.value)}
+                      placeholder="manager@yourpractice.com"
+                      type="email"
+                      className="max-w-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button onClick={handleSaveBranding} disabled={brandSaving}>
+                    {brandSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    {brandSaving ? 'Saving…' : 'Save Branding'}
                   </Button>
                 </div>
               </div>

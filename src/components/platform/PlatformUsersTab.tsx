@@ -276,6 +276,7 @@ export function PlatformUsersTab() {
                   </SortableTableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Flags</TableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>

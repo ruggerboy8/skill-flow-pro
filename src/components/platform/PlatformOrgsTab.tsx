@@ -302,9 +302,9 @@ export function PlatformOrgsTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{orgToDelete?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the organization record. This action cannot be undone.
-              <br /><br />
-              Any cascading data (role names, weekly plans) will also be removed.
+              This will permanently delete the organization, <strong>all groups, locations,
+              users, and their data</strong> (scores, evaluations, coaching records, etc.).
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

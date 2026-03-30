@@ -427,6 +427,136 @@ export function AdminGlobalSettingsTab() {
           </CardContent>
         </Card>
       )}
+
+      {/* Branding */}
+      {organizationId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Branding
+            </CardTitle>
+            <CardDescription>
+              Logo, accent color, and email appearance
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {brandLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Logo */}
+                <div className="space-y-2">
+                  <Label>Logo</Label>
+                  {logoPreview && (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={logoPreview}
+                        alt="Logo"
+                        className="h-10 max-w-[120px] object-contain rounded border bg-muted/30 p-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setLogoFile(null);
+                          setLogoPreview(null);
+                          if (logoInputRef.current) logoInputRef.current.value = '';
+                        }}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-4 w-4 mr-1" /> Remove
+                      </Button>
+                    </div>
+                  )}
+                  <label className="cursor-pointer inline-block">
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <span>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {logoPreview ? 'Replace logo' : 'Upload logo'}
+                      </span>
+                    </Button>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml"
+                      onChange={handleLogoSelect}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, or SVG — max 2 MB</p>
+                </div>
+
+                {/* Brand color */}
+                <div className="space-y-2">
+                  <Label>Accent Color</Label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={brandColor}
+                      onChange={(e) => setBrandColor(e.target.value)}
+                      className="h-9 w-14 rounded border cursor-pointer"
+                    />
+                    <span className="font-mono text-sm text-muted-foreground">{brandColor}</span>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Email branding */}
+                <div className="space-y-1 mb-3">
+                  <Label className="flex items-center gap-2 text-sm font-semibold">
+                    <Mail className="h-4 w-4" />
+                    Email Appearance
+                  </Label>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Display Name</Label>
+                    <Input
+                      value={appDisplayName}
+                      onChange={(e) => setAppDisplayName(e.target.value)}
+                      placeholder="Your Organization"
+                      className="max-w-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Email Sign-off</Label>
+                    <Input
+                      value={emailSignOff}
+                      onChange={(e) => setEmailSignOff(e.target.value)}
+                      placeholder="The Your Team"
+                      className="max-w-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Reply-to Email</Label>
+                    <Input
+                      value={replyToEmail}
+                      onChange={(e) => setReplyToEmail(e.target.value)}
+                      placeholder="manager@yourpractice.com"
+                      type="email"
+                      className="max-w-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button onClick={handleSaveBranding} disabled={brandSaving}>
+                    {brandSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    {brandSaving ? 'Saving…' : 'Save Branding'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

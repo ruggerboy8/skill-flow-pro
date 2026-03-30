@@ -130,6 +130,56 @@ export function PlatformUsersTab() {
 
   const { sortedData, sortConfig, handleSort } = useTableSort(users);
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete?.user_id) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'delete_user', user_id: userToDelete.user_id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: 'Deleted', description: `${userToDelete.name} has been removed.` });
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+      loadUsers(currentPage);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to delete user', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleResetPassword = async (user: User) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'reset_link', user_id: user.user_id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: 'Sent', description: `Password reset email sent to ${user.email || user.name}.` });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to send reset email', variant: 'destructive' });
+    }
+  };
+
+  const handleResendInvite = async (user: User) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'resend_invite', user_id: user.user_id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: 'Sent', description: `Invitation resent to ${user.email || user.name}.` });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to resend invite', variant: 'destructive' });
+    }
+  };
+
   const getStatusBadge = (user: User) => {
     if (user.is_paused)
       return <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">Paused</Badge>;

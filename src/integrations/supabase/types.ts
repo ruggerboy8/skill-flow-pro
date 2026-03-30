@@ -1210,10 +1210,12 @@ export type Database = {
       organizations: {
         Row: {
           app_display_name: string | null
+          brand_color: string | null
           created_at: string
           created_by: string | null
           email_sign_off: string | null
           id: string
+          logo_url: string | null
           name: string
           practice_type: string
           reply_to_email: string | null
@@ -1221,10 +1223,12 @@ export type Database = {
         }
         Insert: {
           app_display_name?: string | null
+          brand_color?: string | null
           created_at?: string
           created_by?: string | null
           email_sign_off?: string | null
           id?: string
+          logo_url?: string | null
           name: string
           practice_type?: string
           reply_to_email?: string | null
@@ -1232,10 +1236,12 @@ export type Database = {
         }
         Update: {
           app_display_name?: string | null
+          brand_color?: string | null
           created_at?: string
           created_by?: string | null
           email_sign_off?: string | null
           id?: string
+          logo_url?: string | null
           name?: string
           practice_type?: string
           reply_to_email?: string | null

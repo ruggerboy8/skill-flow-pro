@@ -422,12 +422,23 @@ export function OrgProMoveLibraryTab() {
 
   // ── Filter ────────────────────────────────────────────────────────────────────
 
-  const filtered = rows.filter(
-    (r) =>
+  // Derive unique roles and domains for filter dropdowns
+  const uniqueRoles = [...new Set(rows.map((r) => r.role_name))].sort();
+  const uniqueDomains = [...new Set(rows.map((r) => r.domain_name))].filter((d) => d !== '—').sort();
+
+  const filtered = rows.filter((r) => {
+    const matchesSearch =
       (r.custom_statement ?? r.action_statement).toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.role_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.competency_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      r.competency_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' || r.role_name === roleFilter;
+    const matchesDomain = domainFilter === 'all' || r.domain_name === domainFilter;
+    const matchesVisibility =
+      visibilityFilter === 'all' ||
+      (visibilityFilter === 'visible' && !r.is_hidden) ||
+      (visibilityFilter === 'hidden' && r.is_hidden);
+    return matchesSearch && matchesRole && matchesDomain && matchesVisibility;
+  });
 
   const filteredCustom = customMoves.filter(
     (m) =>

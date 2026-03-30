@@ -36,6 +36,18 @@ export function AdminGlobalSettingsTab() {
   const [rolesLoading, setRolesLoading] = useState(true);
   const [rolesSaving, setRolesSaving] = useState(false);
 
+  // Branding state
+  const [brandLoading, setBrandLoading] = useState(true);
+  const [brandSaving, setBrandSaving] = useState(false);
+  const [appDisplayName, setAppDisplayName] = useState('');
+  const [emailSignOff, setEmailSignOff] = useState('');
+  const [replyToEmail, setReplyToEmail] = useState('');
+  const [brandColor, setBrandColor] = useState('#1a4a7a');
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [orgSlug, setOrgSlug] = useState('');
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     loadSettings();
   }, []);

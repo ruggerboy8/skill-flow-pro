@@ -151,18 +151,22 @@ export function OrgSetupWizard({
     setLoadingData(true);
     try {
       // Org practice_type + branding fields
-      const { data: orgData } = await supabase
+      const { data: orgData } = await (supabase
         .from('organizations')
-        .select('practice_type, name, app_display_name, email_sign_off, reply_to_email')
+        .select('practice_type, name, slug, app_display_name, email_sign_off, reply_to_email') as any)
         .eq('id', organizationId)
         .single();
 
       // Pre-populate branding fields
       const oName = orgData?.name || '';
       setOrgName(oName);
+      setOrgSlug(orgData?.slug || '');
       setAppDisplayName(orgData?.app_display_name || oName);
       setEmailSignOff(orgData?.email_sign_off || `The ${oName} Team`);
       setReplyToEmail(orgData?.reply_to_email || '');
+      setLogoPreview((orgData as any)?.logo_url || null);
+      setBrandColor((orgData as any)?.brand_color || '#1a4a7a');
+      setLogoFile(null);
 
       // Load roles for this practice type; fall back to all active roles if none match
       const { data: typedRoles } = await supabase

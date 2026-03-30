@@ -91,6 +91,7 @@ export function OrgProMoveLibraryTab() {
   const [customMoves, setCustomMoves] = useState<OrgCustomMove[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [savingId, setSavingId] = useState<number | null>(null);
   const [roleFilter, setRoleFilter] = useState('all');
   const [domainFilter, setDomainFilter] = useState('all');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>('all');

@@ -103,6 +103,81 @@ export function AdminGlobalSettingsTab() {
     setRolesLoading(false);
   };
 
+  const loadBranding = async () => {
+    if (!organizationId) return;
+    setBrandLoading(true);
+    try {
+      const { data } = await (supabase
+        .from('organizations')
+        .select('slug, app_display_name, email_sign_off, reply_to_email') as any)
+        .eq('id', organizationId)
+        .single();
+      if (data) {
+        setOrgSlug(data.slug || '');
+        setAppDisplayName(data.app_display_name || '');
+        setEmailSignOff(data.email_sign_off || '');
+        setReplyToEmail(data.reply_to_email || '');
+        setLogoPreview((data as any).logo_url || null);
+        setBrandColor((data as any).brand_color || '#1a4a7a');
+      }
+    } catch (err) {
+      console.error('Error loading branding:', err);
+    } finally {
+      setBrandLoading(false);
+    }
+  };
+
+  const handleSaveBranding = async () => {
+    if (!organizationId) return;
+    setBrandSaving(true);
+    try {
+      let logoUrl: string | undefined;
+      if (logoFile) {
+        const ext = logoFile.name.split('.').pop() ?? 'png';
+        const path = `${orgSlug || organizationId}/logo.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('org-assets')
+          .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('org-assets').getPublicUrl(path);
+          logoUrl = urlData.publicUrl;
+        }
+      }
+
+      const payload: Record<string, any> = {
+        app_display_name: appDisplayName.trim() || null,
+        email_sign_off: emailSignOff.trim() || null,
+        reply_to_email: replyToEmail.trim() || null,
+        brand_color: brandColor,
+      };
+      if (logoUrl) payload.logo_url = logoUrl;
+
+      const { error } = await supabase
+        .from('organizations')
+        .update(payload as any)
+        .eq('id', organizationId);
+      if (error) throw error;
+
+      setLogoFile(null);
+      toast({ title: 'Saved', description: 'Branding settings updated.' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to save branding.', variant: 'destructive' });
+    } finally {
+      setBrandSaving(false);
+    }
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Logo must be under 2 MB.', variant: 'destructive' });
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
   const handleAliasChange = (roleId: number, value: string) => {
     setRoles((prev) =>
       prev.map((r) =>

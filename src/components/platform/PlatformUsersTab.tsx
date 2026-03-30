@@ -26,10 +26,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useToast } from '@/hooks/use-toast';
-import { Search } from 'lucide-react';
+import { Search, MoreHorizontal, Trash2, KeyRound, Mail } from 'lucide-react';
 
 interface User {
   staff_id: string;

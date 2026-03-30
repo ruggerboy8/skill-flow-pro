@@ -121,26 +121,6 @@ export function PlatformOrgsTab() {
 
   const handleDeleteClick = async (e: React.MouseEvent, org: OrgRow) => {
     e.stopPropagation(); // Don't open detail panel
-
-    const { count, error } = await supabase
-      .from('practice_groups')
-      .select('*', { count: 'exact', head: true })
-      .eq('organization_id', org.id);
-
-    if (error) {
-      toast({ title: 'Error', description: 'Failed to check org dependencies', variant: 'destructive' });
-      return;
-    }
-
-    if ((count ?? 0) > 0) {
-      toast({
-        title: 'Cannot delete',
-        description: `"${org.name}" has ${count} group(s). Remove all groups, locations, and users first.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setOrgToDelete(org);
     setDeleteDialogOpen(true);
   };
@@ -149,14 +129,18 @@ export function PlatformOrgsTab() {
     if (!orgToDelete) return;
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from('organizations')
-        .delete()
-        .eq('id', orgToDelete.id);
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'delete_organization', organization_id: orgToDelete.id },
+      });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      toast({ title: 'Deleted', description: `"${orgToDelete.name}" has been removed.` });
+      const d = data.deleted || {};
+      toast({
+        title: 'Organization deleted',
+        description: `Removed "${orgToDelete.name}" along with ${d.users ?? 0} user(s), ${d.locations ?? 0} location(s), and ${d.groups ?? 0} group(s).`,
+      });
       setDeleteDialogOpen(false);
       setOrgToDelete(null);
       if (selectedOrg?.id === orgToDelete.id) setSelectedOrg(null);
@@ -318,9 +302,9 @@ export function PlatformOrgsTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{orgToDelete?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the organization record. This action cannot be undone.
-              <br /><br />
-              Any cascading data (role names, weekly plans) will also be removed.
+              This will permanently delete the organization, <strong>all groups, locations,
+              users, and their data</strong> (scores, evaluations, coaching records, etc.).
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

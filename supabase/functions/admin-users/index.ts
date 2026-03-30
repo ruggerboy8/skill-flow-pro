@@ -1315,6 +1315,185 @@ serve(async (req: Request) => {
         return json({ ok: true });
       }
 
+      case "delete_organization": {
+        const { organization_id } = payload ?? {};
+        if (!organization_id) return json({ error: "organization_id required" }, 400);
+
+        // Only super admins can cascade-delete an org
+        if (!me.is_super_admin) {
+          return json({ error: "Only super admins can delete organizations" }, 403);
+        }
+
+        console.log(`🗑️ Cascade deleting organization ${organization_id}`);
+
+        // 1. Resolve all practice groups
+        const { data: groups, error: gErr } = await admin
+          .from("practice_groups")
+          .select("id")
+          .eq("organization_id", organization_id);
+        if (gErr) throw new Error(`Failed to load groups: ${gErr.message}`);
+        const groupIds = (groups ?? []).map((g: any) => g.id);
+
+        // 2. Resolve all locations
+        let locationIds: string[] = [];
+        if (groupIds.length > 0) {
+          const { data: locs, error: lErr } = await admin
+            .from("locations")
+            .select("id")
+            .in("group_id", groupIds);
+          if (lErr) throw new Error(`Failed to load locations: ${lErr.message}`);
+          locationIds = (locs ?? []).map((l: any) => l.id);
+        }
+
+        // 3. Resolve all staff (by location or by organization_id on staff table)
+        let staffRows: { id: string; user_id: string | null }[] = [];
+        if (locationIds.length > 0) {
+          const { data: s1, error: sErr } = await admin
+            .from("staff")
+            .select("id, user_id")
+            .in("primary_location_id", locationIds);
+          if (sErr) throw new Error(`Failed to load staff by location: ${sErr.message}`);
+          staffRows = s1 ?? [];
+        }
+        // Also check staff with organization_id column directly
+        const { data: s2 } = await admin
+          .from("staff")
+          .select("id, user_id")
+          .eq("organization_id", organization_id);
+        if (s2) {
+          const existingIds = new Set(staffRows.map((s) => s.id));
+          for (const s of s2) {
+            if (!existingIds.has(s.id)) staffRows.push(s);
+          }
+        }
+
+        console.log(`Found: ${groupIds.length} groups, ${locationIds.length} locations, ${staffRows.length} staff`);
+
+        const requireDelete = async (label: string, op: PromiseLike<{ error: { message: string } | null }>) => {
+          const { error } = await op;
+          if (error) console.warn(`Warning deleting ${label}: ${error.message}`);
+        };
+
+        // 4. Delete each staff member's data (same cascade as delete_user)
+        for (const staff of staffRows) {
+          const sid = staff.id;
+          const uid = staff.user_id;
+
+          // Coaching sessions
+          const { data: sessions } = await admin
+            .from("coaching_sessions")
+            .select("id")
+            .or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+          const sessionIds = (sessions ?? []).map((s: any) => s.id);
+          if (sessionIds.length > 0) {
+            await requireDelete("meeting records", admin.from("coaching_meeting_records").delete().in("session_id", sessionIds));
+            await requireDelete("session selections", admin.from("coaching_session_selections").delete().in("session_id", sessionIds));
+          }
+          await requireDelete("sessions (doctor)", admin.from("coaching_sessions").delete().eq("doctor_staff_id", sid));
+          await requireDelete("sessions (coach)", admin.from("coaching_sessions").delete().eq("coach_staff_id", sid));
+
+          // Baselines
+          const { data: coachBaselines } = await admin.from("coach_baseline_assessments").select("id").or(`coach_staff_id.eq.${sid},doctor_staff_id.eq.${sid}`);
+          if ((coachBaselines ?? []).length > 0) {
+            await requireDelete("coach baseline items", admin.from("coach_baseline_items").delete().in("assessment_id", (coachBaselines ?? []).map((b: any) => b.id)));
+          }
+          await requireDelete("coach baselines (doctor)", admin.from("coach_baseline_assessments").delete().eq("doctor_staff_id", sid));
+          await requireDelete("coach baselines (coach)", admin.from("coach_baseline_assessments").delete().eq("coach_staff_id", sid));
+
+          const { data: doctorBaselines } = await admin.from("doctor_baseline_assessments").select("id").eq("doctor_staff_id", sid);
+          if ((doctorBaselines ?? []).length > 0) {
+            await requireDelete("doctor baseline items", admin.from("doctor_baseline_items").delete().in("assessment_id", (doctorBaselines ?? []).map((b: any) => b.id)));
+          }
+          await requireDelete("doctor baselines", admin.from("doctor_baseline_assessments").delete().eq("doctor_staff_id", sid));
+
+          // Evaluations
+          const { data: evals } = await admin.from("evaluations").select("id").or(`staff_id.eq.${sid},evaluator_id.eq.${sid},released_by.eq.${sid}`);
+          if ((evals ?? []).length > 0) {
+            await requireDelete("eval items", admin.from("evaluation_items").delete().in("evaluation_id", (evals ?? []).map((e: any) => e.id)));
+          }
+          await requireDelete("evals (staff)", admin.from("evaluations").delete().eq("staff_id", sid));
+          await requireDelete("evals (evaluator)", admin.from("evaluations").delete().eq("evaluator_id", sid));
+          await requireDelete("evals (released_by)", admin.from("evaluations").delete().eq("released_by", sid));
+
+          // Other staff-linked data
+          await requireDelete("coach scopes", admin.from("coach_scopes").delete().eq("staff_id", sid));
+          await requireDelete("excused submissions", admin.from("excused_submissions").delete().eq("staff_id", sid));
+          await requireDelete("admin audit (staff)", admin.from("admin_audit").delete().eq("staff_id", sid));
+          await requireDelete("admin audit (changed_by)", admin.from("admin_audit").delete().eq("changed_by", sid));
+          await requireDelete("resource events", admin.from("resource_events").delete().eq("staff_id", sid));
+          await requireDelete("org role names (updated_by)", admin.from("organization_role_names").delete().eq("updated_by", sid));
+          await requireDelete("pro moves (retired_by)", admin.from("pro_moves").update({ retired_by: null }).eq("retired_by", sid));
+          await requireDelete("staff audit", admin.from("staff_audit").delete().eq("staff_id", sid));
+          await requireDelete("staff quarter focus", admin.from("staff_quarter_focus").delete().eq("staff_id", sid));
+          await requireDelete("user backlog", admin.from("user_backlog_v2").delete().eq("staff_id", sid));
+          await requireDelete("user capabilities", admin.from("user_capabilities").delete().eq("staff_id", sid));
+          await requireDelete("weekly scores", admin.from("weekly_scores").delete().eq("staff_id", sid));
+          await requireDelete("manager priorities", admin.from("manager_priorities").delete().eq("coach_staff_id", sid));
+          await requireDelete("coaching agenda templates", admin.from("coaching_agenda_templates").delete().eq("staff_id", sid));
+
+          // Delete staff record
+          await requireDelete("staff", admin.from("staff").delete().eq("id", sid));
+
+          // Delete auth user if exists
+          if (uid) {
+            // Nullify FK references from auth user
+            await Promise.all([
+              admin.from("reminder_log").delete().eq("sender_user_id", uid),
+              admin.from("reminder_log").delete().eq("target_user_id", uid),
+              admin.from("reminder_templates").update({ updated_by: null }).eq("updated_by", uid),
+              admin.from("excused_locations").update({ created_by: null }).eq("created_by", uid),
+              admin.from("excused_submissions").update({ created_by: null }).eq("created_by", uid),
+              admin.from("excused_weeks").update({ created_by: null }).eq("created_by", uid),
+              admin.from("organizations").update({ created_by: null }).eq("created_by", uid),
+              admin.from("staff").update({ baseline_released_by: null }).eq("baseline_released_by", uid),
+            ]);
+
+            const { error: delAuthErr } = await admin.auth.admin.deleteUser(uid);
+            if (delAuthErr) console.warn(`Warning deleting auth user ${uid}: ${delAuthErr.message}`);
+          }
+        }
+
+        // 5. Delete excused locations for these locations
+        if (locationIds.length > 0) {
+          await requireDelete("excused locations", admin.from("excused_locations").delete().in("location_id", locationIds));
+        }
+
+        // 6. Delete locations
+        if (locationIds.length > 0) {
+          await requireDelete("locations", admin.from("locations").delete().in("id", locationIds));
+        }
+
+        // 7. Delete sequencer runs for these groups
+        if (groupIds.length > 0) {
+          await requireDelete("sequencer runs", admin.from("sequencer_runs").delete().in("org_id", groupIds));
+        }
+
+        // 8. Delete practice groups
+        if (groupIds.length > 0) {
+          await requireDelete("practice groups", admin.from("practice_groups").delete().in("id", groupIds));
+        }
+
+        // 9. Delete org-level data
+        await requireDelete("org role names", admin.from("organization_role_names").delete().eq("org_id", organization_id));
+        await requireDelete("org pro move overrides", admin.from("organization_pro_move_overrides").delete().eq("org_id", organization_id));
+        // Delete org-owned pro moves
+        await requireDelete("org pro moves", admin.from("pro_moves").delete().eq("owner_org_id", organization_id));
+
+        // 10. Delete the organization itself
+        const { error: orgDelErr } = await admin.from("organizations").delete().eq("id", organization_id);
+        if (orgDelErr) throw new Error(`Failed to delete organization: ${orgDelErr.message}`);
+
+        console.log(`✅ Cascade deleted organization ${organization_id}: ${staffRows.length} users, ${locationIds.length} locations, ${groupIds.length} groups`);
+        return json({
+          ok: true,
+          deleted: {
+            users: staffRows.length,
+            locations: locationIds.length,
+            groups: groupIds.length,
+          },
+        });
+      }
+
       default:
         return json({ error: "Unknown action" }, 400);
     }

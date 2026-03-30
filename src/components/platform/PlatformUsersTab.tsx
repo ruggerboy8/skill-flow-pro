@@ -26,10 +26,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useToast } from '@/hooks/use-toast';
-import { Search } from 'lucide-react';
+import { Search, MoreHorizontal, Trash2, KeyRound, Mail } from 'lucide-react';
 
 interface User {
   staff_id: string;
@@ -113,6 +129,56 @@ export function PlatformUsersTab() {
   }, [debouncedSearch, selectedOrgId]);
 
   const { sortedData, sortConfig, handleSort } = useTableSort(users);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete?.user_id) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'delete_user', user_id: userToDelete.user_id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: 'Deleted', description: `${userToDelete.name} has been removed.` });
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+      loadUsers(currentPage);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to delete user', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleResetPassword = async (user: User) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'reset_link', user_id: user.user_id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: 'Sent', description: `Password reset email sent to ${user.email || user.name}.` });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to send reset email', variant: 'destructive' });
+    }
+  };
+
+  const handleResendInvite = async (user: User) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'resend_invite', user_id: user.user_id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: 'Sent', description: `Invitation resent to ${user.email || user.name}.` });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to resend invite', variant: 'destructive' });
+    }
+  };
 
   const getStatusBadge = (user: User) => {
     if (user.is_paused)
@@ -210,12 +276,13 @@ export function PlatformUsersTab() {
                   </SortableTableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Flags</TableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -242,6 +309,40 @@ export function PlatformUsersTab() {
                             </Badge>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {user.user_id && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {!user.email_confirmed_at ? (
+                                <DropdownMenuItem onClick={() => handleResendInvite(user)}>
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  Resend Invite
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                                  <KeyRound className="h-4 w-4 mr-2" />
+                                  Send Password Reset
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => {
+                                  setUserToDelete(user);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete User
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -279,6 +380,28 @@ export function PlatformUsersTab() {
           </div>
         )}
       </CardContent>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{userToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the user, their staff record, all scores,
+              evaluations, and associated data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

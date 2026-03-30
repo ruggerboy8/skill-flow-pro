@@ -53,7 +53,10 @@ export function AdminGlobalSettingsTab() {
   }, []);
 
   useEffect(() => {
-    if (organizationId) loadRoleAliases();
+    if (organizationId) {
+      loadRoleAliases();
+      loadBranding();
+    }
   }, [organizationId]);
 
   const loadRoleAliases = async () => {

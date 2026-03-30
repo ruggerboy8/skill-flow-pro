@@ -310,6 +310,40 @@ export function PlatformUsersTab() {
                           )}
                         </div>
                       </TableCell>
+                      <TableCell className="text-right">
+                        {user.user_id && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {!user.email_confirmed_at ? (
+                                <DropdownMenuItem onClick={() => handleResendInvite(user)}>
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  Resend Invite
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                                  <KeyRound className="h-4 w-4 mr-2" />
+                                  Send Password Reset
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => {
+                                  setUserToDelete(user);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete User
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}

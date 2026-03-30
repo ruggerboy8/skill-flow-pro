@@ -369,13 +369,35 @@ export function OrgSetupWizard({
   const saveBranding = async (): Promise<boolean> => {
     setSaving(true);
     try {
+      // Upload logo if a new file was selected
+      let logoUrl: string | null | undefined = undefined; // undefined = don't change
+      if (logoFile) {
+        const ext = logoFile.name.split('.').pop() ?? 'png';
+        const path = `${orgSlug || organizationId}/logo.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('org-assets')
+          .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
+        if (uploadErr) {
+          console.warn('Logo upload failed:', uploadErr.message);
+        } else {
+          const { data: urlData } = supabase.storage.from('org-assets').getPublicUrl(path);
+          logoUrl = urlData.publicUrl;
+        }
+      }
+
+      const updatePayload: Record<string, any> = {
+        app_display_name: appDisplayName.trim() || null,
+        email_sign_off: emailSignOff.trim() || null,
+        reply_to_email: replyToEmail.trim() || null,
+        brand_color: brandColor,
+      };
+      if (logoUrl !== undefined) {
+        updatePayload.logo_url = logoUrl;
+      }
+
       const { error } = await supabase
         .from('organizations')
-        .update({
-          app_display_name: appDisplayName.trim() || null,
-          email_sign_off: emailSignOff.trim() || null,
-          reply_to_email: replyToEmail.trim() || null,
-        })
+        .update(updatePayload as any)
         .eq('id', organizationId);
       if (error) throw error;
       return true;
@@ -385,6 +407,23 @@ export function OrgSetupWizard({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Logo must be under 2 MB.', variant: 'destructive' });
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const clearLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
   const handleNext = async () => {

@@ -22,6 +22,9 @@ import {
   ChevronRight,
   ChevronLeft,
   PartyPopper,
+  Upload,
+  Palette,
+  X,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';

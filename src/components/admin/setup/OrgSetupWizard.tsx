@@ -837,63 +837,118 @@ export function OrgSetupWizard({
   // ── Step 4: Branding ──────────────────────────────────────────────────────────
 
   const renderStep4 = () => (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* ── Visual branding ─────────────────────────────────────────────── */}
       <div>
         <h3 className="text-base font-semibold flex items-center gap-2">
-          <Mail className="h-4 w-4 text-primary" />
-          Email branding
+          <Palette className="h-4 w-4 text-primary" />
+          Brand &amp; appearance
         </h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Customize how your organization appears in emails sent to staff.
+          Upload your logo and choose an accent color. These appear in the app header and on reports.
         </p>
       </div>
 
       <div className="space-y-3">
+        {/* Logo */}
         <div className="space-y-1.5">
-          <Label className="text-xs">Display Name</Label>
-          <Input
-            value={appDisplayName}
-            onChange={(e) => setAppDisplayName(e.target.value)}
-            placeholder={orgName || 'Your Organization'}
-            className="h-9 text-sm"
-          />
-          <p className="text-2xs text-muted-foreground">
-            How should we refer to your organization in emails?
-          </p>
+          <Label className="text-xs">Logo</Label>
+          {logoPreview ? (
+            <div className="flex items-center gap-3">
+              <img
+                src={logoPreview}
+                alt="Logo preview"
+                className="h-10 max-w-[120px] object-contain rounded border bg-muted/30 p-1"
+              />
+              <Button type="button" variant="ghost" size="sm" onClick={clearLogo} className="text-muted-foreground hover:text-destructive">
+                <X className="h-4 w-4 mr-1" /> Remove
+              </Button>
+            </div>
+          ) : null}
+          <label className="cursor-pointer inline-block">
+            <Button type="button" variant="outline" size="sm" asChild>
+              <span>
+                <Upload className="h-4 w-4 mr-2" />
+                {logoPreview ? 'Replace logo' : 'Upload logo'}
+              </span>
+            </Button>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml"
+              onChange={handleLogoSelect}
+              className="hidden"
+            />
+          </label>
+          <p className="text-2xs text-muted-foreground">PNG, JPG, or SVG — max 2 MB</p>
         </div>
 
+        {/* Brand color */}
         <div className="space-y-1.5">
-          <Label className="text-xs">Email Sign-off</Label>
-          <Input
-            value={emailSignOff}
-            onChange={(e) => setEmailSignOff(e.target.value)}
-            placeholder={`The ${orgName || 'Your'} Team`}
-            className="h-9 text-sm"
-          />
+          <Label className="text-xs">Accent color</Label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={brandColor}
+              onChange={(e) => setBrandColor(e.target.value)}
+              className="h-9 w-14 rounded border cursor-pointer"
+            />
+            <span className="font-mono text-sm text-muted-foreground">{brandColor}</span>
+          </div>
           <p className="text-2xs text-muted-foreground">
-            Appears at the bottom of emails, e.g. "— The Kids Tooth Team"
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label className="text-xs">Reply-to Email (optional)</Label>
-          <Input
-            value={replyToEmail}
-            onChange={(e) => setReplyToEmail(e.target.value)}
-            placeholder="e.g. manager@yourpractice.com"
-            type="email"
-            className="h-9 text-sm"
-          />
-          <p className="text-2xs text-muted-foreground">
-            Where should staff replies go? Leave blank to use the platform default.
+            Used for buttons and highlights across the app.
           </p>
         </div>
       </div>
 
-      <div className="rounded-md border border-dashed border-muted-foreground/30 p-3 mt-2">
-        <p className="text-2xs text-muted-foreground text-center">
-          🎨 Logo upload and accent colors coming soon
-        </p>
+      {/* ── Email branding ──────────────────────────────────────────────── */}
+      <div className="pt-2 border-t">
+        <h3 className="text-base font-semibold flex items-center gap-2 mb-3">
+          <Mail className="h-4 w-4 text-primary" />
+          Email branding
+        </h3>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Display Name</Label>
+            <Input
+              value={appDisplayName}
+              onChange={(e) => setAppDisplayName(e.target.value)}
+              placeholder={orgName || 'Your Organization'}
+              className="h-9 text-sm"
+            />
+            <p className="text-2xs text-muted-foreground">
+              How should we refer to your organization in emails?
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Email Sign-off</Label>
+            <Input
+              value={emailSignOff}
+              onChange={(e) => setEmailSignOff(e.target.value)}
+              placeholder={`The ${orgName || 'Your'} Team`}
+              className="h-9 text-sm"
+            />
+            <p className="text-2xs text-muted-foreground">
+              Appears at the bottom of emails, e.g. "— The Kids Tooth Team"
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Reply-to Email (optional)</Label>
+            <Input
+              value={replyToEmail}
+              onChange={(e) => setReplyToEmail(e.target.value)}
+              placeholder="e.g. manager@yourpractice.com"
+              type="email"
+              className="h-9 text-sm"
+            />
+            <p className="text-2xs text-muted-foreground">
+              Where should staff replies go? Leave blank to use the platform default.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

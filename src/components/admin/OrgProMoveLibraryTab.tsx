@@ -469,9 +469,9 @@ export function OrgProMoveLibraryTab() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Search + summary */}
+          {/* Filters */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search pro moves…"
@@ -480,9 +480,42 @@ export function OrgProMoveLibraryTab() {
                 className="pl-9"
               />
             </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="All Roles" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                {uniqueRoles.map((r) => (
+                  <SelectItem key={r} value={r}>{resolveRoleName ? resolveRoleName(0, r) : r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={domainFilter} onValueChange={setDomainFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="All Domains" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Domains</SelectItem>
+                {uniqueDomains.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={visibilityFilter} onValueChange={(v) => setVisibilityFilter(v as any)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="visible">Visible</SelectItem>
+                <SelectItem value="hidden">Hidden</SelectItem>
+              </SelectContent>
+            </Select>
             <span className="text-sm text-muted-foreground ml-auto">
-              {visibleCount} of {rows.length} platform moves visible
+              {visibleCount} of {rows.length} visible
               {customMoves.length > 0 && ` · ${customMoves.length} custom`}
+              {filtered.length !== rows.length && ` · ${filtered.length} shown`}
             </span>
           </div>
 

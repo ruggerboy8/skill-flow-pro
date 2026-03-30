@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,9 @@ import {
   ChevronRight,
   ChevronLeft,
   PartyPopper,
+  Upload,
+  Palette,
+  X,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -135,6 +138,11 @@ export function OrgSetupWizard({
   const [emailSignOff, setEmailSignOff] = useState('');
   const [replyToEmail, setReplyToEmail] = useState('');
   const [orgName, setOrgName] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [brandColor, setBrandColor] = useState('#1a4a7a');
+  const [orgSlug, setOrgSlug] = useState('');
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // ── Data loading ─────────────────────────────────────────────────────────────
 
@@ -143,18 +151,22 @@ export function OrgSetupWizard({
     setLoadingData(true);
     try {
       // Org practice_type + branding fields
-      const { data: orgData } = await supabase
+      const { data: orgData } = await (supabase
         .from('organizations')
-        .select('practice_type, name, app_display_name, email_sign_off, reply_to_email')
+        .select('practice_type, name, slug, app_display_name, email_sign_off, reply_to_email') as any)
         .eq('id', organizationId)
         .single();
 
       // Pre-populate branding fields
       const oName = orgData?.name || '';
       setOrgName(oName);
+      setOrgSlug(orgData?.slug || '');
       setAppDisplayName(orgData?.app_display_name || oName);
       setEmailSignOff(orgData?.email_sign_off || `The ${oName} Team`);
       setReplyToEmail(orgData?.reply_to_email || '');
+      setLogoPreview((orgData as any)?.logo_url || null);
+      setBrandColor((orgData as any)?.brand_color || '#1a4a7a');
+      setLogoFile(null);
 
       // Load roles for this practice type; fall back to all active roles if none match
       const { data: typedRoles } = await supabase
@@ -357,13 +369,35 @@ export function OrgSetupWizard({
   const saveBranding = async (): Promise<boolean> => {
     setSaving(true);
     try {
+      // Upload logo if a new file was selected
+      let logoUrl: string | null | undefined = undefined; // undefined = don't change
+      if (logoFile) {
+        const ext = logoFile.name.split('.').pop() ?? 'png';
+        const path = `${orgSlug || organizationId}/logo.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('org-assets')
+          .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
+        if (uploadErr) {
+          console.warn('Logo upload failed:', uploadErr.message);
+        } else {
+          const { data: urlData } = supabase.storage.from('org-assets').getPublicUrl(path);
+          logoUrl = urlData.publicUrl;
+        }
+      }
+
+      const updatePayload: Record<string, any> = {
+        app_display_name: appDisplayName.trim() || null,
+        email_sign_off: emailSignOff.trim() || null,
+        reply_to_email: replyToEmail.trim() || null,
+        brand_color: brandColor,
+      };
+      if (logoUrl !== undefined) {
+        updatePayload.logo_url = logoUrl;
+      }
+
       const { error } = await supabase
         .from('organizations')
-        .update({
-          app_display_name: appDisplayName.trim() || null,
-          email_sign_off: emailSignOff.trim() || null,
-          reply_to_email: replyToEmail.trim() || null,
-        })
+        .update(updatePayload as any)
         .eq('id', organizationId);
       if (error) throw error;
       return true;
@@ -373,6 +407,23 @@ export function OrgSetupWizard({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Logo must be under 2 MB.', variant: 'destructive' });
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const clearLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
   const handleNext = async () => {
@@ -786,63 +837,118 @@ export function OrgSetupWizard({
   // ── Step 4: Branding ──────────────────────────────────────────────────────────
 
   const renderStep4 = () => (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* ── Visual branding ─────────────────────────────────────────────── */}
       <div>
         <h3 className="text-base font-semibold flex items-center gap-2">
-          <Mail className="h-4 w-4 text-primary" />
-          Email branding
+          <Palette className="h-4 w-4 text-primary" />
+          Brand &amp; appearance
         </h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Customize how your organization appears in emails sent to staff.
+          Upload your logo and choose an accent color. These appear in the app header and on reports.
         </p>
       </div>
 
       <div className="space-y-3">
+        {/* Logo */}
         <div className="space-y-1.5">
-          <Label className="text-xs">Display Name</Label>
-          <Input
-            value={appDisplayName}
-            onChange={(e) => setAppDisplayName(e.target.value)}
-            placeholder={orgName || 'Your Organization'}
-            className="h-9 text-sm"
-          />
-          <p className="text-2xs text-muted-foreground">
-            How should we refer to your organization in emails?
-          </p>
+          <Label className="text-xs">Logo</Label>
+          {logoPreview ? (
+            <div className="flex items-center gap-3">
+              <img
+                src={logoPreview}
+                alt="Logo preview"
+                className="h-10 max-w-[120px] object-contain rounded border bg-muted/30 p-1"
+              />
+              <Button type="button" variant="ghost" size="sm" onClick={clearLogo} className="text-muted-foreground hover:text-destructive">
+                <X className="h-4 w-4 mr-1" /> Remove
+              </Button>
+            </div>
+          ) : null}
+          <label className="cursor-pointer inline-block">
+            <Button type="button" variant="outline" size="sm" asChild>
+              <span>
+                <Upload className="h-4 w-4 mr-2" />
+                {logoPreview ? 'Replace logo' : 'Upload logo'}
+              </span>
+            </Button>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml"
+              onChange={handleLogoSelect}
+              className="hidden"
+            />
+          </label>
+          <p className="text-2xs text-muted-foreground">PNG, JPG, or SVG — max 2 MB</p>
         </div>
 
+        {/* Brand color */}
         <div className="space-y-1.5">
-          <Label className="text-xs">Email Sign-off</Label>
-          <Input
-            value={emailSignOff}
-            onChange={(e) => setEmailSignOff(e.target.value)}
-            placeholder={`The ${orgName || 'Your'} Team`}
-            className="h-9 text-sm"
-          />
+          <Label className="text-xs">Accent color</Label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={brandColor}
+              onChange={(e) => setBrandColor(e.target.value)}
+              className="h-9 w-14 rounded border cursor-pointer"
+            />
+            <span className="font-mono text-sm text-muted-foreground">{brandColor}</span>
+          </div>
           <p className="text-2xs text-muted-foreground">
-            Appears at the bottom of emails, e.g. "— The Kids Tooth Team"
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label className="text-xs">Reply-to Email (optional)</Label>
-          <Input
-            value={replyToEmail}
-            onChange={(e) => setReplyToEmail(e.target.value)}
-            placeholder="e.g. manager@yourpractice.com"
-            type="email"
-            className="h-9 text-sm"
-          />
-          <p className="text-2xs text-muted-foreground">
-            Where should staff replies go? Leave blank to use the platform default.
+            Used for buttons and highlights across the app.
           </p>
         </div>
       </div>
 
-      <div className="rounded-md border border-dashed border-muted-foreground/30 p-3 mt-2">
-        <p className="text-2xs text-muted-foreground text-center">
-          🎨 Logo upload and accent colors coming soon
-        </p>
+      {/* ── Email branding ──────────────────────────────────────────────── */}
+      <div className="pt-2 border-t">
+        <h3 className="text-base font-semibold flex items-center gap-2 mb-3">
+          <Mail className="h-4 w-4 text-primary" />
+          Email branding
+        </h3>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Display Name</Label>
+            <Input
+              value={appDisplayName}
+              onChange={(e) => setAppDisplayName(e.target.value)}
+              placeholder={orgName || 'Your Organization'}
+              className="h-9 text-sm"
+            />
+            <p className="text-2xs text-muted-foreground">
+              How should we refer to your organization in emails?
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Email Sign-off</Label>
+            <Input
+              value={emailSignOff}
+              onChange={(e) => setEmailSignOff(e.target.value)}
+              placeholder={`The ${orgName || 'Your'} Team`}
+              className="h-9 text-sm"
+            />
+            <p className="text-2xs text-muted-foreground">
+              Appears at the bottom of emails, e.g. "— The Kids Tooth Team"
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Reply-to Email (optional)</Label>
+            <Input
+              value={replyToEmail}
+              onChange={(e) => setReplyToEmail(e.target.value)}
+              placeholder="e.g. manager@yourpractice.com"
+              type="email"
+              className="h-9 text-sm"
+            />
+            <p className="text-2xs text-muted-foreground">
+              Where should staff replies go? Leave blank to use the platform default.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -164,7 +164,7 @@ export function SmartSlotPicker({
           </TabsContent>
 
           {/* Ask AI tab */}
-          <TabsContent value="ai" className="flex-1 overflow-y-auto px-6 pb-6 mt-0 flex flex-col min-h-0">
+          <TabsContent value="ai" className="flex-1 overflow-y-auto px-6 pb-6 mt-0 flex flex-col min-h-0 data-[state=inactive]:hidden">
             <div className="mt-3 space-y-3">
               <Textarea
                 placeholder={`Describe an issue or goal for your ${roleName}s…\ne.g. "Schedule is looking sparse this week" or "Patients aren't rescheduling at checkout"`}

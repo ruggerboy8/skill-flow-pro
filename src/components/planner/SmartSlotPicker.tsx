@@ -114,12 +114,12 @@ export function SmartSlotPicker({
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="w-[480px] sm:max-w-[480px] flex flex-col p-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b">
+      <SheetContent side="right" className="w-full sm:w-[480px] sm:max-w-[480px] h-[100dvh] flex flex-col p-0 gap-0">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b flex-none">
           <SheetTitle className="text-base">Pick a move — {slotLabel}</SheetTitle>
         </SheetHeader>
 
-        <Tabs defaultValue="recommended" className="flex-1 flex flex-col overflow-hidden">
+        <Tabs defaultValue="recommended" className="flex-1 flex flex-col min-h-0">
           <TabsList className="mx-6 mt-4 flex-none">
             <TabsTrigger value="recommended">Recommended</TabsTrigger>
             <TabsTrigger value="ai">Ask AI</TabsTrigger>
@@ -127,7 +127,7 @@ export function SmartSlotPicker({
           </TabsList>
 
           {/* Recommended tab */}
-          <TabsContent value="recommended" className="flex-1 overflow-y-auto px-6 pb-6 mt-0 min-h-0">
+          <TabsContent value="recommended" className="flex-1 overflow-y-auto px-6 pb-6 mt-0 min-h-0 data-[state=inactive]:hidden">
             {filteredRanked.length === 0 ? (
               <p className="text-sm text-muted-foreground mt-4">No recommendations available.</p>
             ) : (

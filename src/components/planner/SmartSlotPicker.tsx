@@ -232,7 +232,7 @@ export function SmartSlotPicker({
           </TabsContent>
 
           {/* Browse tab */}
-          <TabsContent value="browse" className="flex-1 overflow-hidden px-6 pb-6 mt-0 flex flex-col">
+          <TabsContent value="browse" className="flex-1 px-6 pb-6 mt-0 flex flex-col min-h-0 data-[state=inactive]:hidden">
             <div className="mt-3 relative flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -243,7 +243,7 @@ export function SmartSlotPicker({
               />
             </div>
             {browseLoading ? (
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 space-y-2 overflow-y-auto flex-1 min-h-0">
                 {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
               </div>
             ) : (

@@ -154,7 +154,7 @@ export default function CoachDashboardV2({
     if (!isCurrentWeek) return 'missing';
     
     const gates = locationGatesMap.get(locationId);
-    if (!gates) return 'missing'; // fallback
+    if (!gates) return 'pending'; // fallback: don't alarm coaches while configs load
     
     if (metric === 'confidence') {
       return gates.isPastConfidenceDeadline ? 'missing' : 'pending';

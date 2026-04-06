@@ -415,8 +415,20 @@ export default function ConfidenceWizard() {
         // If no location-specific onboarding, try global assignments
         let assignData = onboardingData;
         if (!onboardingData || onboardingData.length === 0) {
-          console.log('No onboarding assignments, trying global assignments');
-          const { data: globalData, error: globalError } = await supabase
+          // Try org-scoped assignments
+          const repairOrgId = staffData.organization_id || (staffData.locations as any)?.group_id
+            ? await (async () => {
+                if (staffData.organization_id) return staffData.organization_id;
+                const { data: pg } = await supabase
+                  .from('practice_groups')
+                  .select('organization_id')
+                  .eq('id', (staffData.locations as any).group_id)
+                  .maybeSingle();
+                return pg?.organization_id ?? null;
+              })()
+            : null;
+          console.log('No onboarding assignments, trying org-scoped assignments, orgId:', repairOrgId);
+          let orgQuery = supabase
             .from('weekly_assignments')
             .select(`
               id,
@@ -441,13 +453,17 @@ export default function ConfidenceWizard() {
             `)
             .eq('role_id', staffData.role_id)
             .eq('week_start_date', weekOf)
-            .eq('source', 'global')
             .eq('status', 'locked')
-            .is('org_id', null)
             .is('superseded_at', null)
             .order('display_order');
 
-          console.log('Repair query result (global assignments):', { globalData, globalError });
+          orgQuery = repairOrgId
+            ? orgQuery.eq('org_id', repairOrgId)
+            : orgQuery.is('org_id', null);
+
+          const { data: globalData, error: globalError } = await orgQuery;
+
+          console.log('Repair query result (org-scoped assignments):', { globalData, globalError });
           assignData = globalData;
         }
 

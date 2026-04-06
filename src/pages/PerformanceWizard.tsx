@@ -228,7 +228,7 @@ export default function PerformanceWizard() {
     // Load staff profile with location info (including timezone for time gating and onboarding_active)
     let queryBuilder = supabase
       .from('staff')
-      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks, timezone, onboarding_active)');
+      .select('id, role_id, primary_location_id, organization_id, locations(program_start_date, cycle_length_weeks, timezone, onboarding_active, group_id)');
     
     if (masqueradeStaffId) {
       queryBuilder = queryBuilder.eq('id', masqueradeStaffId);

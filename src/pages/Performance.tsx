@@ -44,6 +44,7 @@ export default function Performance() {
   // Fetch weekly assignments using the shared hook
   const { data: weeklyFocus = [], isLoading: assignmentsLoading } = useWeeklyAssignments({
     roleId: staff?.role_id,
+    orgId: staff?.organization_id,
     enabled: !!staff && !staffLoading,
   });
 

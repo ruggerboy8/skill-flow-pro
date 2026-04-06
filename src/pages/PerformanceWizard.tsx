@@ -565,8 +565,6 @@ export default function PerformanceWizard() {
             };
           });
         }
-          };
-        });
         
         // Set cycle/week to unknown for display
         cycleNumber = 0;

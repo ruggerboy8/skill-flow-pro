@@ -14,7 +14,18 @@ export interface WeeklyAssignment {
 
 interface UseWeeklyAssignmentsParams {
   roleId: number | null | undefined;
+  orgId?: string | null;
   enabled?: boolean;
+}
+
+function getCurrentMondayString() {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const thisMonday = new Date(now);
+  thisMonday.setDate(now.getDate() + daysToMonday);
+  thisMonday.setHours(0, 0, 0, 0);
+  return thisMonday.toISOString().split('T')[0];
 }
 
 /**
@@ -23,25 +34,19 @@ interface UseWeeklyAssignmentsParams {
  */
 export function useWeeklyAssignments({
   roleId,
+  orgId,
   enabled = true,
 }: UseWeeklyAssignmentsParams) {
+  const mondayStr = getCurrentMondayString();
+
   return useQuery({
-    queryKey: ['weekly-assignments', roleId],
+    queryKey: ['weekly-assignments', roleId, orgId ?? 'global', mondayStr],
     queryFn: async () => {
       if (!roleId) {
         throw new Error('Role ID is required');
       }
 
-      // Calculate current Monday
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const thisMonday = new Date(now);
-      thisMonday.setDate(now.getDate() + daysToMonday);
-      thisMonday.setHours(0, 0, 0, 0);
-      const mondayStr = thisMonday.toISOString().split('T')[0];
-
-      const { data: assignmentsData, error: assignmentsError } = await supabase
+      let assignmentsQuery = supabase
         .from('weekly_assignments')
         .select(`
           id,
@@ -74,13 +79,17 @@ export function useWeeklyAssignments({
             )
           )
         `)
-        .eq('source', 'global')
         .eq('role_id', roleId)
         .eq('week_start_date', mondayStr)
         .eq('status', 'locked')
-        .is('org_id', null)
         .is('superseded_at', null)
         .order('display_order');
+
+      assignmentsQuery = orgId
+        ? assignmentsQuery.eq('org_id', orgId).eq('source', 'org')
+        : assignmentsQuery.is('org_id', null).eq('source', 'global');
+
+      const { data: assignmentsData, error: assignmentsError } = await assignmentsQuery;
 
       if (assignmentsError) {
         throw assignmentsError;
@@ -103,5 +112,7 @@ export function useWeeklyAssignments({
     },
     enabled: enabled && !!roleId,
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+    refetchOnMount: 'always',
+    refetchOnReconnect: 'always',
   });
 }

@@ -1,0 +1,1 @@
+UPDATE weekly_assignments SET status = 'locked' WHERE org_id = 'c5c355d8-e17b-4e89-9d82-51632c8befba' AND status = 'draft';

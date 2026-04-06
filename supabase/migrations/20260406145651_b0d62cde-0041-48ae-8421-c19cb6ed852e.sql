@@ -1,0 +1,1 @@
+UPDATE weekly_assignments SET source = 'org' WHERE org_id IS NOT NULL AND source = 'global';

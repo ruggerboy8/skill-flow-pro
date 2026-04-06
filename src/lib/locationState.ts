@@ -113,14 +113,21 @@ export async function assembleWeek(params: {
 }): Promise<any[]> {
   const { userId, roleId, locationId, cycleNumber, weekInCycle } = params;
 
+  console.info(`🔎 [assembleWeek] START — userId=${userId} roleId=${roleId} locationId=${locationId} cycle=${cycleNumber} week=${weekInCycle}`);
+
   // Fetch location timezone
-  const { data: locationData } = await supabase
+  const { data: locationData, error: locErr } = await supabase
     .from('locations')
     .select('timezone, group_id, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
     .eq('id', locationId)
     .maybeSingle();
 
-  if (!locationData) return [];
+  if (!locationData) {
+    console.warn('[assembleWeek] ❌ Location not found for id=%s error=%o', locationId, locErr);
+    return [];
+  }
+
+  console.info('[assembleWeek] Location resolved — group_id=%s tz=%s', locationData.group_id, locationData.timezone);
 
   const now = params.simOverrides?.enabled && params.simOverrides?.nowISO 
     ? new Date(params.simOverrides.nowISO) 
@@ -129,8 +136,10 @@ export async function assembleWeek(params: {
   const anchors = getWeekAnchors(now, locationData.timezone, offsets2);
   const mondayStr = formatInTimeZone(anchors.mondayZ, locationData.timezone, 'yyyy-MM-dd');
 
+  console.info('[assembleWeek] Computed mondayStr=%s from now=%s tz=%s', mondayStr, now.toISOString(), locationData.timezone);
+
   // Resolve the location's organization_id
-  const { data: pgData } = await supabase
+  const { data: pgData, error: pgErr } = await supabase
     .from('practice_groups')
     .select('organization_id')
     .eq('id', locationData.group_id)
@@ -138,22 +147,25 @@ export async function assembleWeek(params: {
 
   const orgId = pgData?.organization_id;
 
-  console.info(`[assembleWeek] Using weekly_assignments for role=${roleId} week=${mondayStr} org=${orgId}`);
+  console.info(`[assembleWeek] Org resolution — group_id=${locationData.group_id} → organization_id=${orgId} (pgErr=${pgErr?.message ?? 'none'})`);
   
   if (!orgId) {
-    console.warn('[assembleWeek] ❌ No organization_id found for location=%s', locationId);
+    console.warn('[assembleWeek] ❌ No organization_id found for location=%s group_id=%s', locationId, locationData.group_id);
     return [];
   }
 
   // Query weekly_assignments scoped to the organization (no fallback)
+  console.info('[assembleWeek] Querying weekly_assignments — role_id=%d week=%s status=locked org_id=%s', roleId, mondayStr, orgId);
   const { data: assignData, error: assignErr } = await supabase
     .from('weekly_assignments')
-    .select('id, display_order, action_id, self_select')
+    .select('id, display_order, action_id, self_select, status, source, org_id')
     .eq('role_id', roleId)
     .eq('week_start_date', mondayStr)
     .eq('status', 'locked')
     .eq('org_id', orgId)
     .order('display_order');
+
+  console.info('[assembleWeek] Query result — rows=%d error=%s rawData=%o', assignData?.length ?? 0, assignErr?.message ?? 'none', assignData);
 
   if (!assignErr && assignData && assignData.length > 0) {
     console.info('[assembleWeek] ✅ Found %d locked rows for week=%s', assignData.length, mondayStr);

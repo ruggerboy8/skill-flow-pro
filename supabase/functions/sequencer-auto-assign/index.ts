@@ -243,7 +243,7 @@ serve(async (req) => {
           display_order: displayOrder,
           action_id: pick.proMoveId,
           competency_id: competencyId,
-          source: 'global',
+          source: 'org',
           status: 'draft',
           self_select: false,
           generated_by: 'auto',

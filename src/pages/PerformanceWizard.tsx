@@ -228,7 +228,7 @@ export default function PerformanceWizard() {
     // Load staff profile with location info (including timezone for time gating and onboarding_active)
     let queryBuilder = supabase
       .from('staff')
-      .select('id, role_id, primary_location_id, locations(program_start_date, cycle_length_weeks, timezone, onboarding_active)');
+      .select('id, role_id, primary_location_id, organization_id, locations(program_start_date, cycle_length_weeks, timezone, onboarding_active, group_id)');
     
     if (masqueradeStaffId) {
       queryBuilder = queryBuilder.eq('id', masqueradeStaffId);
@@ -325,7 +325,190 @@ export default function PerformanceWizard() {
             };
           });
         } else {
-          // Query weekly_plan for cycle 4+
+          // Try org-scoped weekly_assignments first, then fall back to weekly_plan
+          const repairOrgId = staffData.organization_id || (staffData.locations as any)?.group_id
+            ? await (async () => {
+                if (staffData.organization_id) return staffData.organization_id;
+                const { data: pg } = await supabase
+                  .from('practice_groups')
+                  .select('organization_id')
+                  .eq('id', (staffData.locations as any).group_id)
+                  .maybeSingle();
+                return pg?.organization_id ?? null;
+              })()
+            : null;
+
+          let assignQuery = supabase
+            .from('weekly_assignments')
+            .select(`
+              id,
+              display_order,
+              competency_id,
+              self_select,
+              action_id,
+              pro_moves!weekly_assignments_action_id_fkey ( 
+                action_statement,
+                competencies ( 
+                  name,
+                  domains!competencies_domain_id_fkey ( domain_name )
+                )
+              ),
+              competencies ( 
+                name,
+                domains!competencies_domain_id_fkey ( domain_name )
+              )
+            `)
+            .eq('role_id', staffData.role_id)
+            .eq('week_start_date', weekOf)
+            .eq('status', 'locked')
+            .is('superseded_at', null)
+            .order('display_order');
+
+          assignQuery = repairOrgId
+            ? assignQuery.eq('org_id', repairOrgId)
+            : assignQuery.is('org_id', null);
+
+          const { data: assignData } = await assignQuery;
+          console.log('Repair query result (org-scoped assignments):', { assignData });
+
+          if (assignData && assignData.length > 0) {
+            weekAssignments = assignData.map((item: any) => {
+              let domainName = 'Unknown';
+              if (item.pro_moves?.competencies?.domains?.domain_name) {
+                domainName = item.pro_moves.competencies.domains.domain_name;
+              } else if (item.competencies?.domains?.domain_name) {
+                domainName = item.competencies.domains.domain_name;
+              }
+              return {
+                weekly_focus_id: `assign:${item.id}`,
+                type: item.self_select ? 'self_select' : 'site',
+                display_order: item.display_order,
+                action_statement: item.pro_moves?.action_statement || '',
+                domain_name: domainName,
+                required: true,
+                locked: false
+              };
+            });
+          } else {
+            // Fall back to weekly_plan for legacy data
+            const { data: planData } = await supabase
+              .from('weekly_plan')
+              .select(`
+                id,
+                display_order,
+                competency_id,
+                self_select,
+                action_id,
+                pro_moves!weekly_plan_action_id_fkey ( 
+                  action_statement,
+                  competencies ( 
+                    name,
+                    domains!competencies_domain_id_fkey ( domain_name )
+                  )
+                ),
+                competencies ( 
+                  name,
+                  domains!competencies_domain_id_fkey ( domain_name )
+                )
+              `)
+              .eq('role_id', staffData.role_id)
+              .eq('week_start_date', weekOf)
+              .eq('status', 'locked')
+              .order('display_order');
+
+            console.log('Repair query result (plan fallback):', { planData });
+
+            weekAssignments = (planData || []).map((item: any) => {
+              let domainName = 'Unknown';
+              if (item.pro_moves?.competencies?.domains?.domain_name) {
+                domainName = item.pro_moves.competencies.domains.domain_name;
+              } else if (item.competencies?.domains?.domain_name) {
+                domainName = item.competencies.domains.domain_name;
+              }
+              return {
+                weekly_focus_id: `plan:${item.id}`,
+                type: item.self_select ? 'self_select' : 'site',
+                display_order: item.display_order,
+                action_statement: item.pro_moves?.action_statement || '',
+                domain_name: domainName,
+                required: true,
+                locked: false
+              };
+            });
+          }
+        }
+        
+        cycleNumber = targetCycle;
+        weekInCycle = targetWeek;
+      } else {
+        // No cycle/week - try org-scoped weekly_assignments first, then weekly_plan
+        console.log('No cycle/week params, trying org-scoped assignments first');
+        
+        const repairOrgId2 = staffData.organization_id || (staffData.locations as any)?.group_id
+          ? await (async () => {
+              if (staffData.organization_id) return staffData.organization_id;
+              const { data: pg } = await supabase
+                .from('practice_groups')
+                .select('organization_id')
+                .eq('id', (staffData.locations as any).group_id)
+                .maybeSingle();
+              return pg?.organization_id ?? null;
+            })()
+          : null;
+
+        let assignQuery2 = supabase
+          .from('weekly_assignments')
+          .select(`
+            id,
+            display_order,
+            competency_id,
+            self_select,
+            action_id,
+            pro_moves!weekly_assignments_action_id_fkey ( 
+              action_statement,
+              competencies ( 
+                name,
+                domains!competencies_domain_id_fkey ( domain_name )
+              )
+            ),
+            competencies ( 
+              name,
+              domains!competencies_domain_id_fkey ( domain_name )
+            )
+          `)
+          .eq('role_id', staffData.role_id)
+          .eq('week_start_date', weekOf)
+          .eq('status', 'locked')
+          .is('superseded_at', null)
+          .order('display_order');
+
+        assignQuery2 = repairOrgId2
+          ? assignQuery2.eq('org_id', repairOrgId2)
+          : assignQuery2.is('org_id', null);
+
+        const { data: assignData2 } = await assignQuery2;
+        console.log('Repair query result (org-scoped by weekOf):', { assignData2 });
+
+        if (assignData2 && assignData2.length > 0) {
+          weekAssignments = assignData2.map((item: any) => {
+            let domainName = 'Unknown';
+            if (item.pro_moves?.competencies?.domains?.domain_name) {
+              domainName = item.pro_moves.competencies.domains.domain_name;
+            } else if (item.competencies?.domains?.domain_name) {
+              domainName = item.competencies.domains.domain_name;
+            }
+            return {
+              weekly_focus_id: `assign:${item.id}`,
+              type: item.self_select ? 'self_select' : 'site',
+              display_order: item.display_order,
+              action_statement: item.pro_moves?.action_statement || '',
+              domain_name: domainName,
+              required: true,
+              locked: false
+            };
+          });
+        } else {
+          // Fall back to weekly_plan for legacy data
           const { data: planData } = await supabase
             .from('weekly_plan')
             .select(`
@@ -351,16 +534,26 @@ export default function PerformanceWizard() {
             .eq('status', 'locked')
             .order('display_order');
 
-          console.log('Repair query result (plan):', { planData });
+          console.log('Repair query result (plan by weekOf):', { planData });
 
-          weekAssignments = (planData || []).map((item: any) => {
+          if (!planData || planData.length === 0) {
+            console.error('No assignments found for weekOf:', weekOf);
+            toast({
+              title: 'Error',
+              description: 'No assignments found for this week. Please try again.',
+              variant: 'destructive'
+            });
+            setLoading(false);
+            return;
+          }
+
+          weekAssignments = planData.map((item: any) => {
             let domainName = 'Unknown';
             if (item.pro_moves?.competencies?.domains?.domain_name) {
               domainName = item.pro_moves.competencies.domains.domain_name;
             } else if (item.competencies?.domains?.domain_name) {
               domainName = item.competencies.domains.domain_name;
             }
-
             return {
               weekly_focus_id: `plan:${item.id}`,
               type: item.self_select ? 'self_select' : 'site',
@@ -372,69 +565,6 @@ export default function PerformanceWizard() {
             };
           });
         }
-        
-        cycleNumber = targetCycle;
-        weekInCycle = targetWeek;
-      } else {
-        // No cycle/week - query weekly_plan by weekOf (assume ongoing phase)
-        console.log('No cycle/week params, querying weekly_plan by weekOf');
-        
-        const { data: planData } = await supabase
-          .from('weekly_plan')
-          .select(`
-            id,
-            display_order,
-            competency_id,
-            self_select,
-            action_id,
-            pro_moves!weekly_plan_action_id_fkey ( 
-              action_statement,
-              competencies ( 
-                name,
-                domains!competencies_domain_id_fkey ( domain_name )
-              )
-            ),
-            competencies ( 
-              name,
-              domains!competencies_domain_id_fkey ( domain_name )
-            )
-          `)
-          .eq('role_id', staffData.role_id)
-          .eq('week_start_date', weekOf)
-          .eq('status', 'locked')
-          .order('display_order');
-
-        console.log('Repair query result (plan by weekOf):', { planData });
-
-        if (!planData || planData.length === 0) {
-          console.error('No weekly_plan data found for weekOf:', weekOf);
-          toast({
-            title: 'Error',
-            description: 'No assignments found for this week. Please try again.',
-            variant: 'destructive'
-          });
-          setLoading(false);
-          return;
-        }
-
-        weekAssignments = (planData || []).map((item: any) => {
-          let domainName = 'Unknown';
-          if (item.pro_moves?.competencies?.domains?.domain_name) {
-            domainName = item.pro_moves.competencies.domains.domain_name;
-          } else if (item.competencies?.domains?.domain_name) {
-            domainName = item.competencies.domains.domain_name;
-          }
-
-          return {
-            weekly_focus_id: `plan:${item.id}`,
-            type: item.self_select ? 'self_select' : 'site',
-            display_order: item.display_order,
-            action_statement: item.pro_moves?.action_statement || '',
-            domain_name: domainName,
-            required: true,
-            locked: false
-          };
-        });
         
         // Set cycle/week to unknown for display
         cycleNumber = 0;

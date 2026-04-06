@@ -159,6 +159,7 @@ Deno.serve(async (req) => {
               .update({
                 action_id: pick.actionId,
                 competency_id: competencyId,
+                source: orgId ? 'org' : 'global',
                 status: 'locked',
                 updated_at: new Date().toISOString(),
                 updated_by: updaterUserId ?? null,

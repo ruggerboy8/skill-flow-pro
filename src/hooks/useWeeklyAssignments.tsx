@@ -86,8 +86,8 @@ export function useWeeklyAssignments({
         .order('display_order');
 
       assignmentsQuery = orgId
-        ? assignmentsQuery.eq('org_id', orgId).eq('source', 'org')
-        : assignmentsQuery.is('org_id', null).eq('source', 'global');
+        ? assignmentsQuery.eq('org_id', orgId)
+        : assignmentsQuery.is('org_id', null);
 
       const { data: assignmentsData, error: assignmentsError } = await assignmentsQuery;
 

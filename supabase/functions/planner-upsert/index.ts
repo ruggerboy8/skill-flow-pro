@@ -159,8 +159,9 @@ Deno.serve(async (req) => {
               .update({
                 action_id: pick.actionId,
                 competency_id: competencyId,
-              updated_at: new Date().toISOString(),
-              updated_by: updaterUserId ?? null,
+                status: 'locked',
+                updated_at: new Date().toISOString(),
+                updated_by: updaterUserId ?? null,
               })
               .eq('id', existing.id)
 

@@ -192,7 +192,7 @@ export default function ConfidenceWizard() {
     // Load staff profile with location info (including onboarding_active and allow_backfill_until)
     let queryBuilder = supabase
       .from('staff')
-      .select('id, role_id, primary_location_id, allow_backfill_until, locations(program_start_date, cycle_length_weeks, onboarding_active)');
+      .select('id, role_id, primary_location_id, organization_id, allow_backfill_until, locations(program_start_date, cycle_length_weeks, onboarding_active, group_id)');
     
     if (masqueradeStaffId) {
       queryBuilder = queryBuilder.eq('id', masqueradeStaffId);

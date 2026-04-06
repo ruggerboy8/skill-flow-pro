@@ -1,0 +1,1 @@
+UPDATE weekly_assignments SET status = 'locked' WHERE org_id = 'a1ca0000-0000-0000-0000-000000000001' AND role_id = 2 AND status = 'draft' AND week_start_date = '2026-04-06';

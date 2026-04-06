@@ -84,14 +84,21 @@ export default function ThisWeekPanel() {
     setLoading(true);
 
     try {
-      console.log('=== DEBUGGING THISWEEKPANEL ===');
-      console.log('Current time (now):', now);
-      console.log('Staff:', staff);
+      console.log('=== 🔎 THISWEEKPANEL MASQUERADE DEBUG ===');
+      console.log('user.id (auth):', user.id);
+      console.log('staff.id:', staff.id);
+      console.log('staff.name:', staff.name);
+      console.log('staff.role_id:', staff.role_id);
+      console.log('staff.primary_location_id:', staff.primary_location_id);
+      console.log('staff.organization_id:', staff.organization_id);
+      console.log('staff.locations?.group_id:', staff.locations?.group_id);
+      console.log('staff.locations?.practice_groups?.organization_id:', staff.locations?.practice_groups?.organization_id);
       console.log('Simulation overrides:', overrides);
+      console.log('Is masquerade?:', !!overrides.enabled && !!overrides.masqueradeStaffId);
 
       // Use simulated time if available
       const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
-      console.log('Effective time being used:', effectiveNow);
+      console.log('Effective time being used:', effectiveNow.toISOString());
       
       // Enforce weekly rollover (idempotent)
       await enforceWeeklyRolloverNow({
@@ -123,6 +130,12 @@ export default function ThisWeekPanel() {
       setParentRoleId(resolvedLeadRoleId);
 
       // Load current week assignments and context based on user progress
+      console.log('🔎 [ThisWeekPanel] Calling assembleCurrentWeek with:', {
+        userId: user.id,
+        staffId: staff.id,
+        roleId: staff.role_id,
+        locationId: staff.primary_location_id,
+      });
       const { assignments, cycleNumber, weekInCycle } = await assembleCurrentWeek(
         user.id,
         {
@@ -132,6 +145,12 @@ export default function ThisWeekPanel() {
         },
         overrides
       );
+      console.log('🔎 [ThisWeekPanel] assembleCurrentWeek returned:', {
+        assignmentCount: assignments.length,
+        cycleNumber,
+        weekInCycle,
+        assignments: assignments.map(a => ({ id: a.weekly_focus_id, action: a.action_statement, domain: a.domain_name })),
+      });
       setWeekAssignments(assignments);
 
       // For Lead Dental Assistant: also load the lead role's assignments

@@ -54,21 +54,59 @@ export function ExcuseSubmissionsDialog({
   const goToPrevWeek = () => setWeekMonday(prev => addDays(prev, -7));
   const goToNextWeek = () => setWeekMonday(prev => addDays(prev, 7));
   
-  // Fetch locations the user can manage
+  // Fetch locations the user can manage (scoped to org)
   const { data: locations = [], isLoading: locationsLoading } = useQuery({
-    queryKey: ['managed-locations', managedOrgIds, isSuperAdmin],
+    queryKey: ['managed-locations-excuse', managedOrgIds, isSuperAdmin],
     queryFn: async () => {
-      let query = supabase
+      if (!isSuperAdmin) {
+        // Resolve the user's organization, then get its practice groups
+        const { data: staffRow } = await supabase
+          .from('staff')
+          .select('organization_id, primary_location_id')
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+          .maybeSingle();
+
+        let orgId = staffRow?.organization_id as string | null;
+
+        // Fallback: resolve via location → practice_group
+        if (!orgId && staffRow?.primary_location_id) {
+          const { data: loc } = await supabase
+            .from('locations')
+            .select('group_id, practice_groups!locations_org_fkey(organization_id)')
+            .eq('id', staffRow.primary_location_id)
+            .maybeSingle();
+          orgId = (loc?.practice_groups as any)?.organization_id ?? null;
+        }
+
+        if (!orgId) return [];
+
+        // Get practice groups for this org
+        const { data: groups } = await supabase
+          .from('practice_groups')
+          .select('id')
+          .eq('organization_id', orgId);
+
+        const groupIds = (groups || []).map(g => g.id);
+        if (groupIds.length === 0) return [];
+
+        const { data, error } = await supabase
+          .from('locations')
+          .select('id, name, group_id')
+          .eq('active', true)
+          .in('group_id', groupIds)
+          .order('name');
+
+        if (error) throw error;
+        return data || [];
+      }
+
+      // Super admin sees all
+      const { data, error } = await supabase
         .from('locations')
         .select('id, name, group_id')
         .eq('active', true)
         .order('name');
-      
-      if (!isSuperAdmin && managedOrgIds.length > 0) {
-        query = query.in('group_id', managedOrgIds);
-      }
-      
-      const { data, error } = await query;
+
       if (error) throw error;
       return data || [];
     },

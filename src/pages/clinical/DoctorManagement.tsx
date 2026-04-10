@@ -28,6 +28,7 @@ interface DoctorRow {
 type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
 
 export default function DoctorManagement() {
+  const { toast } = useToast();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useState<FilterValue>('all');
   const navigate = useNavigate();

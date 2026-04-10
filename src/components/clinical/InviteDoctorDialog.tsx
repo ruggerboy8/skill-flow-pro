@@ -66,33 +66,20 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
 
   const inviteMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: {
+          action: 'invite_doctor',
+          email: email.trim(),
+          name: name.trim(),
+          group_id: groupId,
+          location_id: locationId === '__roaming__' ? null : locationId,
+          release_baseline: releaseBaseline,
+        },
+      });
 
-      const response = await fetch(
-        `https://yeypngaufuualdfzcjpk.supabase.co/functions/v1/admin-users`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            action: 'invite_doctor',
-            email: email.trim(),
-            name: name.trim(),
-            group_id: groupId,
-            location_id: locationId === '__roaming__' ? null : locationId,
-            release_baseline: releaseBaseline,
-          }),
-        }
-      );
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to invite doctor');
-      }
-      return result;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
     onSuccess: () => {
       toast({

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,17 +17,18 @@ import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStat
 
 interface DoctorRow {
   id: string;
+  user_id: string | null;
   name: string;
   email: string;
   location_name: string | null;
   created_at: string;
   journeyStatus: DoctorJourneyStatus;
-  
 }
 
 type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
 
 export default function DoctorManagement() {
+  const { toast } = useToast();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useState<FilterValue>('all');
   const navigate = useNavigate();
@@ -36,7 +38,7 @@ export default function DoctorManagement() {
     queryFn: async (): Promise<DoctorRow[]> => {
       const { data: staffData, error: staffErr } = await supabase
         .from('staff')
-        .select(`id, name, email, created_at, baseline_released_at, locations (name)`)
+        .select(`id, user_id, name, email, created_at, baseline_released_at, locations (name)`)
         .eq('is_doctor', true)
         .order('name');
       
@@ -91,6 +93,7 @@ export default function DoctorManagement() {
 
         return {
           id: s.id,
+          user_id: s.user_id,
           name: s.name,
           email: s.email,
           location_name: (s.locations as any)?.name || null,
@@ -269,7 +272,19 @@ export default function DoctorManagement() {
                           }}>
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const { data, error } = await supabase.functions.invoke('admin-users', {
+                                body: { action: 'resend_invite', user_id: doctor.user_id },
+                              });
+                              if (error) throw error;
+                              if (data?.error) throw new Error(data.error);
+                              toast({ title: 'Sent', description: `Invitation resent to ${doctor.email}` });
+                            } catch (err: any) {
+                              toast({ title: 'Error', description: err.message || 'Failed to resend invite', variant: 'destructive' });
+                            }
+                          }}>
                             <Mail className="h-4 w-4 mr-2" />
                             Resend Invite
                           </DropdownMenuItem>

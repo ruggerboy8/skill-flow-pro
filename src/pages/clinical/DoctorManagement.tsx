@@ -276,7 +276,7 @@ export default function DoctorManagement() {
                             e.stopPropagation();
                             try {
                               const { data, error } = await supabase.functions.invoke('admin-users', {
-                                body: { action: 'resend_invite', user_id: doctor.id },
+                                body: { action: 'resend_invite', user_id: doctor.user_id },
                               });
                               if (error) throw error;
                               if (data?.error) throw new Error(data.error);

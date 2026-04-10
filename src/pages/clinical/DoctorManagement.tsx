@@ -93,6 +93,7 @@ export default function DoctorManagement() {
 
         return {
           id: s.id,
+          user_id: s.user_id,
           name: s.name,
           email: s.email,
           location_name: (s.locations as any)?.name || null,

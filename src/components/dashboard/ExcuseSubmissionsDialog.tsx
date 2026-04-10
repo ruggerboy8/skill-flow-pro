@@ -33,7 +33,15 @@ export function ExcuseSubmissionsDialog({
   onOpenChange,
   initialWeekOf,
 }: ExcuseSubmissionsDialogProps) {
-  const { managedOrgIds, isSuperAdmin } = useUserRole();
+  const {
+    staffId,
+    organizationId,
+    managedLocationIds,
+    managedOrgIds,
+    isSuperAdmin,
+    isOrgAdmin,
+    isLoading: roleLoading,
+  } = useUserRole();
   const tz = useLocationTimezone();
 
   // State
@@ -56,37 +64,47 @@ export function ExcuseSubmissionsDialog({
   
   // Fetch locations the user can manage (scoped to org)
   const { data: locations = [], isLoading: locationsLoading } = useQuery({
-    queryKey: ['managed-locations-excuse', managedOrgIds, isSuperAdmin],
+    queryKey: [
+      'managed-locations-excuse',
+      staffId ?? null,
+      organizationId ?? null,
+      [...managedOrgIds].sort().join(','),
+      [...managedLocationIds].sort().join(','),
+      isSuperAdmin,
+      isOrgAdmin,
+    ],
     queryFn: async () => {
-      if (!isSuperAdmin) {
-        // Resolve the user's organization, then get its practice groups
-        const { data: staffRow } = await supabase
-          .from('staff')
-          .select('organization_id, primary_location_id')
-          .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
-          .maybeSingle();
+      console.log('[ExcuseProMoves] resolving location scope', {
+        staffId,
+        organizationId,
+        managedOrgIds,
+        managedLocationIds,
+        isSuperAdmin,
+        isOrgAdmin,
+      });
 
-        let orgId = staffRow?.organization_id as string | null;
+      if (isSuperAdmin) {
+        const { data, error } = await supabase
+          .from('locations')
+          .select('id, name, group_id')
+          .eq('active', true)
+          .order('name');
 
-        // Fallback: resolve via location → practice_group
-        if (!orgId && staffRow?.primary_location_id) {
-          const { data: loc } = await supabase
-            .from('locations')
-            .select('group_id, practice_groups!locations_org_fkey(organization_id)')
-            .eq('id', staffRow.primary_location_id)
-            .maybeSingle();
-          orgId = (loc?.practice_groups as any)?.organization_id ?? null;
-        }
+        if (error) throw error;
+        return data || [];
+      }
 
-        if (!orgId) return [];
-
-        // Get practice groups for this org
-        const { data: groups } = await supabase
+      const scopedOrgIds = organizationId ? [organizationId] : managedOrgIds;
+      if (scopedOrgIds.length > 0) {
+        const { data: groups, error: groupsError } = await supabase
           .from('practice_groups')
           .select('id')
-          .eq('organization_id', orgId);
+          .in('organization_id', scopedOrgIds)
+          .eq('active', true);
 
-        const groupIds = (groups || []).map(g => g.id);
+        if (groupsError) throw groupsError;
+
+        const groupIds = (groups || []).map((group) => group.id);
         if (groupIds.length === 0) return [];
 
         const { data, error } = await supabase
@@ -97,20 +115,44 @@ export function ExcuseSubmissionsDialog({
           .order('name');
 
         if (error) throw error;
+
+        console.log('[ExcuseProMoves] org-scoped locations loaded', {
+          scopedOrgIds,
+          groupIds,
+          count: data?.length ?? 0,
+        });
+
         return data || [];
       }
 
-      // Super admin sees all
-      const { data, error } = await supabase
-        .from('locations')
-        .select('id, name, group_id')
-        .eq('active', true)
-        .order('name');
+      if (managedLocationIds.length > 0) {
+        const { data, error } = await supabase
+          .from('locations')
+          .select('id, name, group_id')
+          .eq('active', true)
+          .in('id', managedLocationIds)
+          .order('name');
 
-      if (error) throw error;
-      return data || [];
+        if (error) throw error;
+
+        console.log('[ExcuseProMoves] location-scoped locations loaded', {
+          managedLocationIds,
+          count: data?.length ?? 0,
+        });
+
+        return data || [];
+      }
+
+      console.warn('[ExcuseProMoves] no org/location scope resolved; returning no locations', {
+        staffId,
+        organizationId,
+        managedOrgIds,
+        managedLocationIds,
+      });
+
+      return [];
     },
-    enabled: open,
+    enabled: open && !roleLoading,
   });
   
   const filteredLocations = useMemo(() => {

@@ -17,12 +17,12 @@ import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStat
 
 interface DoctorRow {
   id: string;
+  user_id: string | null;
   name: string;
   email: string;
   location_name: string | null;
   created_at: string;
   journeyStatus: DoctorJourneyStatus;
-  
 }
 
 type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
@@ -38,7 +38,7 @@ export default function DoctorManagement() {
     queryFn: async (): Promise<DoctorRow[]> => {
       const { data: staffData, error: staffErr } = await supabase
         .from('staff')
-        .select(`id, name, email, created_at, baseline_released_at, locations (name)`)
+        .select(`id, user_id, name, email, created_at, baseline_released_at, locations (name)`)
         .eq('is_doctor', true)
         .order('name');
       

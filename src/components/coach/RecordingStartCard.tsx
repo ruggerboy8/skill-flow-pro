@@ -113,7 +113,7 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Record verbal feedback as you scroll through competencies
+                      Tap a competency, speak your feedback, then tap the next one
                     </p>
                   )}
                 </div>
@@ -204,8 +204,9 @@ export const RecordingStartCard = forwardRef<HTMLDivElement, RecordingStartCardP
               <div className="mt-4 pt-3 border-t text-sm text-muted-foreground space-y-1.5">
                 <p className="font-medium text-foreground text-xs">How this works:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-xs">
-                  <li>The recorder follows you as you scroll</li>
-                  <li>Speak clearly about strengths and growth areas for each competency</li>
+                  <li>Tap a competency to start talking about it</li>
+                  <li>Speak clearly about strengths and growth areas</li>
+                  <li>Tap the next competency when you move on</li>
                   <li>Your feedback will be automatically mapped to each competency's notes</li>
                 </ul>
               </div>

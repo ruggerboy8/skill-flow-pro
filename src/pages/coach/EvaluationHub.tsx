@@ -136,8 +136,7 @@ export function EvaluationHub() {
   const [competencyTimeline, setCompetencyTimeline] = useState<{ competency_id: number; t_start_ms: number }[]>([]);
   const rowRefs = useRef(new Map<number, HTMLElement>());
   const recordingStartTimeRef = useRef<number>(0);
-  const activeCompetencyIdRef = useRef<number | null>(null);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // debounceTimerRef and activeCompetencyIdRef removed — click-to-select model
   const { setOpen: setSidebarOpen } = useSidebar();
 
   // Segment upload callback for observer notes
@@ -281,64 +280,18 @@ export function EvaluationHub() {
     }
   }, [recordingState.isRecording, setSidebarOpen]);
 
-  // IntersectionObserver for competency-aware recording
-  useEffect(() => {
-    if (!recordingState.isRecording || recordingState.isPaused || activeTab !== 'observation') {
-      return;
-    }
+  // Click-to-select handler for competency-aware recording
+  const handleCompetencyTap = useCallback((competencyId: number) => {
+    if (!recordingState.isRecording || recordingStartTimeRef.current === 0) return;
 
-    const visibilityMap = new Map<number, { ratio: number; top: number }>();
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const id = Number((entry.target as HTMLElement).dataset.competencyId);
-          if (!Number.isFinite(id)) continue;
-          if (entry.isIntersecting) {
-            visibilityMap.set(id, { ratio: entry.intersectionRatio, top: entry.boundingClientRect.top });
-          } else {
-            visibilityMap.delete(id);
-          }
-        }
-
-        // Pick best: highest ratio, tie-break by closest to top
-        let bestId: number | null = null;
-        let bestRatio = 0;
-        let bestTop = Infinity;
-
-        visibilityMap.forEach(({ ratio, top }, id) => {
-          if (ratio > bestRatio || (ratio === bestRatio && Math.abs(top) < Math.abs(bestTop))) {
-            bestId = id;
-            bestRatio = ratio;
-            bestTop = top;
-          }
-        });
-
-        // Debounce updates
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = setTimeout(() => {
-          if (bestId !== activeCompetencyIdRef.current) {
-            activeCompetencyIdRef.current = bestId;
-            setActiveCompetencyId(bestId);
-            if (bestId !== null && recordingStartTimeRef.current > 0) {
-              setCompetencyTimeline(prev => [...prev, {
-                competency_id: bestId!,
-                t_start_ms: Date.now() - recordingStartTimeRef.current,
-              }]);
-            }
-          }
-        }, 200);
-      },
-      { threshold: [0, 0.2, 0.5, 0.8, 1], rootMargin: '-10% 0px -35% 0px' }
-    );
-
-    rowRefs.current.forEach(el => observer.observe(el));
-
-    return () => {
-      observer.disconnect();
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
-  }, [recordingState.isRecording, recordingState.isPaused, activeTab, evaluation?.items]);
+    const elapsed = Date.now() - recordingStartTimeRef.current;
+    const newId = activeCompetencyId === competencyId ? null : competencyId;
+    setActiveCompetencyId(newId);
+    setCompetencyTimeline(prev => [...prev, {
+      competency_id: newId ?? 0,
+      t_start_ms: elapsed,
+    }]);
+  }, [recordingState.isRecording, activeCompetencyId]);
 
   // Scroll to process section when "Done?" is clicked
   const scrollToProcessSection = useCallback(() => {
@@ -1809,6 +1762,20 @@ export function EvaluationHub() {
               onPauseToggle={recordingControls.togglePause}
               onDoneClick={scrollToProcessSection}
               activeCompetencyLabel={activeCompetencyLabel}
+              showArrow
+              alwaysShowStartOver
+              onStartOver={() => {
+                recordingControls.resetRecording();
+                setActiveCompetencyId(null);
+                setCompetencyTimeline([]);
+                recordingStartTimeRef.current = 0;
+              }}
+              anchorTop={activeCompetencyId != null ? (() => {
+                const el = rowRefs.current.get(activeCompetencyId);
+                if (!el) return null;
+                const rect = el.getBoundingClientRect();
+                return rect.top + rect.height / 2;
+              })() : null}
             />
           )}
 
@@ -1841,7 +1808,10 @@ export function EvaluationHub() {
               <CardTitle>Observation Scores & Notes</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {evaluation.items.map((item) => (
+              {evaluation.items.map((item) => {
+                const isActive = recordingState.isRecording && activeCompetencyId === item.competency_id;
+                const domainColor = item.domain_name ? getDomainColor(item.domain_name) : undefined;
+                return (
                 <div 
                   key={item.competency_id} 
                   data-competency-id={item.competency_id}
@@ -1849,10 +1819,16 @@ export function EvaluationHub() {
                     if (el) rowRefs.current.set(item.competency_id, el);
                     else rowRefs.current.delete(item.competency_id);
                   }}
+                  onClick={() => handleCompetencyTap(item.competency_id)}
                   className={cn(
-                    "border rounded-lg p-4 space-y-4 transition-shadow",
-                    recordingState.isRecording && activeCompetencyId === item.competency_id && "ring-2 ring-primary/30"
+                    "border rounded-lg p-4 space-y-4 transition-all",
+                    recordingState.isRecording && !isActive && "border-dashed cursor-pointer hover:bg-muted/40",
+                    isActive && "ring-2 shadow-md cursor-pointer"
                   )}
+                  style={isActive && domainColor ? {
+                    outline: `3px solid ${domainColor}`,
+                    boxShadow: `0 0 12px ${domainColor}40`,
+                  } : undefined}
                 >
                   <div className="flex items-center gap-3 mb-1">
                     <h4 className="font-medium">{item.competency_name_snapshot}</h4>
@@ -1888,7 +1864,7 @@ export function EvaluationHub() {
                   <div className="flex space-x-2 flex-wrap gap-y-2">
                     {/* N/A Button */}
                     <button
-                      onClick={() => !isReadOnly && handleObserverNAChange(item.competency_id, !item.observer_is_na)}
+                      onClick={(e) => { e.stopPropagation(); !isReadOnly && handleObserverNAChange(item.competency_id, !item.observer_is_na); }}
                       disabled={isReadOnly || saving}
                       className={cn(
                         "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
@@ -1903,7 +1879,7 @@ export function EvaluationHub() {
                     {SCORE_OPTIONS.map((option) => (
                       <button
                         key={option.value}
-                        onClick={() => !isReadOnly && handleObserverScoreChange(item.competency_id, option.value)}
+                        onClick={(e) => { e.stopPropagation(); !isReadOnly && handleObserverScoreChange(item.competency_id, option.value); }}
                         disabled={isReadOnly || saving}
                         className={cn(
                           "px-3 py-2 rounded-md text-sm font-medium border transition-colors",
@@ -1926,8 +1902,8 @@ export function EvaluationHub() {
                      const shouldShowTextarea = showObserverNotes[item.competency_id] || isLowScore || (isReadOnly && item.observer_note && item.observer_note.trim());
                      
                      return shouldShowTextarea ? (
-                       <div className="space-y-1">
-                         <Textarea
+                        <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                          <Textarea
                            placeholder={isLowScore ? "Note required for scores of 1-2..." : "Add your notes..."}
                            value={noteValue}
                            onChange={(e) => draftObserverNote(item.competency_id, e.target.value)}
@@ -1951,7 +1927,7 @@ export function EvaluationHub() {
                        <Button
                          variant="outline"
                          size="sm"
-                         onClick={() => setShowObserverNotes(prev => ({ ...prev, [item.competency_id]: true }))}
+                         onClick={(e) => { e.stopPropagation(); setShowObserverNotes(prev => ({ ...prev, [item.competency_id]: true })); }}
                          disabled={isReadOnly}
                          className="flex items-center gap-2"
                        >
@@ -1961,7 +1937,8 @@ export function EvaluationHub() {
                      );
                    })()}
                 </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
 

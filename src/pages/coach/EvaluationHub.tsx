@@ -1902,8 +1902,8 @@ export function EvaluationHub() {
                      const shouldShowTextarea = showObserverNotes[item.competency_id] || isLowScore || (isReadOnly && item.observer_note && item.observer_note.trim());
                      
                      return shouldShowTextarea ? (
-                       <div className="space-y-1">
-                         <Textarea
+                        <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                          <Textarea
                            placeholder={isLowScore ? "Note required for scores of 1-2..." : "Add your notes..."}
                            value={noteValue}
                            onChange={(e) => draftObserverNote(item.competency_id, e.target.value)}

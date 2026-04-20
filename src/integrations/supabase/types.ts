@@ -554,6 +554,131 @@ export type Database = {
           },
         ]
       }
+      deputy_connections: {
+        Row: {
+          access_token: string
+          connected_at: string | null
+          connected_by: string | null
+          deputy_install: string
+          deputy_region: string
+          id: string
+          last_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          organization_id: string
+          refresh_token: string
+          token_expires_at: string
+        }
+        Insert: {
+          access_token: string
+          connected_at?: string | null
+          connected_by?: string | null
+          deputy_install: string
+          deputy_region: string
+          id?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          organization_id: string
+          refresh_token: string
+          token_expires_at: string
+        }
+        Update: {
+          access_token?: string
+          connected_at?: string | null
+          connected_by?: string | null
+          deputy_install?: string
+          deputy_region?: string
+          id?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          organization_id?: string
+          refresh_token?: string
+          token_expires_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deputy_connections_connected_by_fkey"
+            columns: ["connected_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deputy_connections_connected_by_fkey"
+            columns: ["connected_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "deputy_connections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deputy_employee_mappings: {
+        Row: {
+          created_at: string | null
+          deputy_display_name: string
+          deputy_employee_id: number
+          id: string
+          is_confirmed: boolean
+          is_ignored: boolean
+          organization_id: string
+          staff_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deputy_display_name: string
+          deputy_employee_id: number
+          id?: string
+          is_confirmed?: boolean
+          is_ignored?: boolean
+          organization_id: string
+          staff_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deputy_display_name?: string
+          deputy_employee_id?: number
+          id?: string
+          is_confirmed?: boolean
+          is_ignored?: boolean
+          organization_id?: string
+          staff_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deputy_employee_mappings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deputy_employee_mappings_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deputy_employee_mappings_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       doctor_baseline_assessments: {
         Row: {
           completed_at: string | null

@@ -67,7 +67,7 @@ export function DeputyConnectionCard({ organizationId }: Props) {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("deputy-sync", { body: {} });
+      const { data, error } = await supabase.functions.invoke("deputy-sync", { body: { dry_run: false } });
       if (error) throw error;
       const excused = data?.staff_absent_all_week ?? data?.excused_count ?? 0;
       const weekOf = data?.week_of ? ` for week of ${data.week_of}` : "";

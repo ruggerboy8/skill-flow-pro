@@ -60,7 +60,7 @@ export function DeputyMappingsTable({ organizationId }: Props) {
   const { data: staff = [] } = useQuery({
     queryKey: ["org-staff-for-mapping", organizationId],
     queryFn: async (): Promise<StaffOption[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("staff")
         .select("id, name")
         .eq("organization_id", organizationId)

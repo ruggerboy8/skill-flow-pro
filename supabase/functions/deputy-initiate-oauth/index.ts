@@ -18,6 +18,23 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const deputyClientId = Deno.env.get('DEPUTY_CLIENT_ID');
+    const deputyClientSecret = Deno.env.get('DEPUTY_CLIENT_SECRET');
+
+    // Diagnostic: log credential fingerprints (NOT the actual values)
+    console.log('Deputy credential fingerprints:', JSON.stringify({
+      client_id: deputyClientId ? {
+        length: deputyClientId.length,
+        prefix: deputyClientId.substring(0, 6),
+        suffix: deputyClientId.substring(deputyClientId.length - 4),
+        has_whitespace: /\s/.test(deputyClientId),
+      } : null,
+      client_secret: deputyClientSecret ? {
+        length: deputyClientSecret.length,
+        prefix: deputyClientSecret.substring(0, 6),
+        suffix: deputyClientSecret.substring(deputyClientSecret.length - 4),
+        has_whitespace: /\s/.test(deputyClientSecret),
+      } : null,
+    }));
 
     if (!deputyClientId) {
       console.error('Deputy OAuth missing DEPUTY_CLIENT_ID');

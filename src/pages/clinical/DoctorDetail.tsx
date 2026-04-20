@@ -11,6 +11,7 @@ import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStat
 import { drName } from '@/lib/doctorDisplayName';
 
 import { DoctorDetailOverview } from '@/components/clinical/DoctorDetailOverview';
+import { DoctorLocationEditor } from '@/components/clinical/DoctorLocationEditor';
 import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
 import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
@@ -31,7 +32,7 @@ export default function DoctorDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('staff')
-        .select(`id, name, email, created_at, baseline_released_at, locations (name)`)
+        .select(`id, name, email, created_at, baseline_released_at, primary_location_id, locations (id, name)`)
         .eq('id', staffId)
         .eq('is_doctor', true)
         .single();
@@ -148,7 +149,12 @@ export default function DoctorDetail() {
           </div>
           <p className="text-sm text-muted-foreground flex items-center gap-1">
             <MapPin className="h-3.5 w-3.5" />
-            {(doctor.locations as any)?.name || 'Roaming'}
+            <span>{(doctor.locations as any)?.name || 'Roaming'}</span>
+            <DoctorLocationEditor
+              doctorStaffId={staffId!}
+              currentLocationId={(doctor as any).primary_location_id ?? null}
+              currentLocationName={(doctor.locations as any)?.name ?? null}
+            />
           </p>
         </div>
       </div>

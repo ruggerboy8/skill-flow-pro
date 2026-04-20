@@ -158,6 +158,7 @@ function AppRoutes() {
         </Route>
 
         <Route path="admin" element={<AdminPage />} />
+        <Route path="settings/integrations" element={<Navigate to="/admin?tab=integrations" replace />} />
         <Route path="platform" element={<PlatformPage />} />
         <Route path="admin/evaluations" element={<EvalResultsV2 />} />
         {/* Legacy redirects for old eval results paths */}

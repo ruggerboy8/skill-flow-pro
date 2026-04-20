@@ -42,7 +42,9 @@ async function refreshDeputyToken(
   clientSecret: string,
   supabase: ReturnType<typeof createClient>
 ): Promise<string> {
-  const refreshUrl = `https://${connection.deputy_install}.${connection.deputy_region}.deputy.com/oauth/access_token`;
+  const cleanInstall = String(connection.deputy_install).replace(/^https?:\/\//i, '').replace(/\.deputy\.com.*$/i, '').replace(/\..*$/, '').trim();
+  const cleanRegion = String(connection.deputy_region).replace(/[^a-z0-9-]/gi, '').trim();
+  const refreshUrl = `https://${cleanInstall}.${cleanRegion}.deputy.com/oauth/access_token`;
 
   const body = new URLSearchParams({
     client_id: clientId,
@@ -185,7 +187,9 @@ serve(async (req) => {
       accessToken = await refreshDeputyToken(connection, deputyClientId, deputyClientSecret, supabase as any);
     }
 
-    const deputyBaseUrl = `https://${connection.deputy_install}.${connection.deputy_region}.deputy.com`;
+    const cleanInstall2 = String(connection.deputy_install).replace(/^https?:\/\//i, '').replace(/\.deputy\.com.*$/i, '').replace(/\..*$/, '').trim();
+    const cleanRegion2 = String(connection.deputy_region).replace(/[^a-z0-9-]/gi, '').trim();
+    const deputyBaseUrl = `https://${cleanInstall2}.${cleanRegion2}.deputy.com`;
 
     // ── Query Deputy timesheets for the target week ───────────────────────────
     const timesheetRes = await fetch(`${deputyBaseUrl}/api/v1/resource/Timesheet/QUERY`, {

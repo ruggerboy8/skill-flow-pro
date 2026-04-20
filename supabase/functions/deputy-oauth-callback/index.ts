@@ -7,7 +7,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 const CALLBACK_URL = 'https://yeypngaufuualdfzcjpk.supabase.co/functions/v1/deputy-oauth-callback';
 
 serve(async (req) => {
-  const appUrl = Deno.env.get('APP_URL') || 'https://mypromoves.com';
+  let appUrl = Deno.env.get('APP_URL') || 'https://mypromoves.com';
+  // Tolerate APP_URL without scheme (e.g. "mypromoves.com")
+  if (!/^https?:\/\//i.test(appUrl)) appUrl = `https://${appUrl}`;
+  // Strip trailing slash
+  appUrl = appUrl.replace(/\/+$/, '');
   const redirectBase = `${appUrl}/settings/integrations`;
 
   const url = new URL(req.url);

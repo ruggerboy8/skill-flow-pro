@@ -56,7 +56,15 @@ serve(async (req) => {
     if (connError) return json(500, { ok: false, error: `DB error: ${connError.message}` });
     if (!connection) return json(404, { ok: false, error: 'No Deputy connection found. Connect first.' });
 
-    const baseUrl = `https://${connection.deputy_install}.${connection.deputy_region}.deputy.com`;
+    // Strip any accidental scheme/host that may have been stored in deputy_install
+    const cleanInstall = String(connection.deputy_install)
+      .replace(/^https?:\/\//i, '')
+      .replace(/\.deputy\.com.*$/i, '')
+      .replace(/\..*$/, '') // keep only the subdomain part if a region got appended
+      .trim();
+    const cleanRegion = String(connection.deputy_region).replace(/[^a-z0-9-]/gi, '').trim();
+    const baseUrl = `https://${cleanInstall}.${cleanRegion}.deputy.com`;
+    console.log('Deputy baseUrl:', baseUrl);
 
     // Refresh token if expired or near expiry (within 60s)
     let accessToken = connection.access_token;

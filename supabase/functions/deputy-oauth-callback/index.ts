@@ -67,7 +67,7 @@ serve(async (req) => {
       scope: 'longlife_refresh_token',
     });
 
-    const tokenResponse = await fetch('https://once.deputy.com/my/oauth/access_token', {
+    const tokenResponse = await fetch(`https://${deputyInstall}.${deputyRegion}.deputy.com/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: tokenBody.toString(),

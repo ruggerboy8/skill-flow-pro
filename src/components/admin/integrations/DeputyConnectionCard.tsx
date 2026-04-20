@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { Plug, RefreshCw, Loader2, Unplug, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plug, RefreshCw, Loader2, Unplug, CheckCircle2, AlertCircle, Beaker } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,8 @@ export function DeputyConnectionCard({ organizationId }: Props) {
   const qc = useQueryClient();
   const [syncing, setSyncing] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   const { data: connection, isLoading } = useQuery({
@@ -76,6 +78,30 @@ export function DeputyConnectionCard({ organizationId }: Props) {
       toast.error("Sync failed", { description: err?.message });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("deputy-test-connection", { body: {} });
+      if (error) throw error;
+      setTestResult(data);
+      if (data?.ok) {
+        toast.success("Deputy connection works", {
+          description: data.employee_sample
+            ? `Pulled employee: ${data.employee_sample.display_name ?? data.employee_sample.id}`
+            : "Authenticated successfully",
+        });
+      } else {
+        toast.error("Deputy test failed", { description: data?.error ?? "Unknown error" });
+      }
+    } catch (err: any) {
+      setTestResult({ ok: false, error: err?.message });
+      toast.error("Deputy test failed", { description: err?.message });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -176,7 +202,7 @@ export function DeputyConnectionCard({ organizationId }: Props) {
                 )}
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 pt-2 flex-wrap">
                 <Button onClick={handleSync} disabled={syncing}>
                   {syncing ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -184,6 +210,14 @@ export function DeputyConnectionCard({ organizationId }: Props) {
                     <RefreshCw className="h-4 w-4 mr-2" />
                   )}
                   Sync Now
+                </Button>
+                <Button variant="outline" onClick={handleTest} disabled={testing}>
+                  {testing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Beaker className="h-4 w-4 mr-2" />
+                  )}
+                  Test Connection
                 </Button>
                 <Button
                   variant="ghost"
@@ -194,6 +228,24 @@ export function DeputyConnectionCard({ organizationId }: Props) {
                   Disconnect
                 </Button>
               </div>
+
+              {testResult && (
+                <div
+                  className="text-xs rounded p-3 mt-2 border"
+                  style={{
+                    backgroundColor: testResult.ok
+                      ? `hsl(var(--status-complete-bg))`
+                      : `hsl(var(--status-missing-bg))`,
+                    borderColor: testResult.ok
+                      ? `hsl(var(--status-complete) / 0.3)`
+                      : `hsl(var(--status-missing) / 0.3)`,
+                  }}
+                >
+                  <pre className="whitespace-pre-wrap break-all font-mono">
+                    {JSON.stringify(testResult, null, 2)}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

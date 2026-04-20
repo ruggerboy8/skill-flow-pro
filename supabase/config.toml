@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.deputy-sync]
 verify_jwt = true
+
+[functions.deputy-test-connection]
+verify_jwt = true

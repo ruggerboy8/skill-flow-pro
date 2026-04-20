@@ -567,6 +567,8 @@ export type Database = {
           last_sync_status: string | null
           organization_id: string
           refresh_token: string
+          sync_enabled: boolean
+          sync_start_date: string | null
           token_expires_at: string
         }
         Insert: {
@@ -581,6 +583,8 @@ export type Database = {
           last_sync_status?: string | null
           organization_id: string
           refresh_token: string
+          sync_enabled?: boolean
+          sync_start_date?: string | null
           token_expires_at: string
         }
         Update: {
@@ -595,6 +599,8 @@ export type Database = {
           last_sync_status?: string | null
           organization_id?: string
           refresh_token?: string
+          sync_enabled?: boolean
+          sync_start_date?: string | null
           token_expires_at?: string
         }
         Relationships: [

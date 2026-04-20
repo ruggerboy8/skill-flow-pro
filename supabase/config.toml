@@ -71,3 +71,12 @@ verify_jwt = true
 
 [functions.pro-move-suggest]
 verify_jwt = true
+
+[functions.deputy-initiate-oauth]
+verify_jwt = true
+
+[functions.deputy-oauth-callback]
+verify_jwt = false
+
+[functions.deputy-sync]
+verify_jwt = true

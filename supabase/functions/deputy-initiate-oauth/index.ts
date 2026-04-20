@@ -74,8 +74,10 @@ serve(async (req) => {
       state,
     });
 
-    // Using once.deputy.com for the login URL (works for both global and single-install clients)
-    const oauthUrl = `https://once.deputy.com/my/oauth/login?${params.toString()}`;
+    // Single-install app: use the install-specific OAuth login URL
+    const deputyInstall = Deno.env.get('DEPUTY_INSTALL') || 'd2215826013715';
+    const deputyRegion = Deno.env.get('DEPUTY_REGION') || 'na';
+    const oauthUrl = `https://${deputyInstall}.${deputyRegion}.deputy.com/my/oauth/login?${params.toString()}`;
 
     console.log(`Deputy OAuth initiated for org ${staff.organization_id} by staff ${staff.id}`);
 

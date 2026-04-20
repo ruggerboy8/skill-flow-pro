@@ -95,7 +95,8 @@ serve(async (req) => {
     // Single-install app: use the install-specific OAuth login URL
     const deputyInstall = Deno.env.get('DEPUTY_INSTALL') || 'd2215826013715';
     const deputyRegion = Deno.env.get('DEPUTY_REGION') || 'na';
-    const oauthUrl = `https://${deputyInstall}.${deputyRegion}.deputy.com/my/oauth/login?${params.toString()}`;
+    // Note: path is /oauth/login (not /my/oauth/login) on the install domain
+    const oauthUrl = `https://${deputyInstall}.${deputyRegion}.deputy.com/oauth/login?${params.toString()}`;
 
     console.log(
       `Deputy OAuth initiated ${JSON.stringify({

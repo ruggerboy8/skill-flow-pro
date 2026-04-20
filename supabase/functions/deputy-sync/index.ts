@@ -140,10 +140,15 @@ serve(async (req) => {
     const orgId = callerStaff.organization_id;
 
     // ── Parse request body ────────────────────────────────────────────────────
-    // Optional: { week_of: "YYYY-MM-DD" } to sync a specific week.
-    // Defaults to the current week.
+    // Supported params:
+    //   week_of: "YYYY-MM-DD"  — sync a specific week (defaults to current week)
+    //   dry_run: boolean       — if true (DEFAULT), report what would happen without
+    //                            writing any excusal records. Set to false explicitly
+    //                            to enable live excusal creation.
     let body: Record<string, any> = {};
     try { body = await req.json(); } catch { /* empty body is fine */ }
+
+    const dryRun: boolean = body.dry_run !== false; // default true
 
     const targetWeekMonday = body.week_of
       ? getWeekMonday(new Date(body.week_of))
@@ -156,7 +161,7 @@ serve(async (req) => {
     const startUnix = Math.floor(targetWeekMonday.getTime() / 1000);
     const endUnix = Math.floor(nextMonday.getTime() / 1000);
 
-    console.log(`Deputy sync started — org ${orgId}, week of ${weekOfStr}`);
+    console.log(`Deputy sync started — org ${orgId}, week of ${weekOfStr}, dry_run=${dryRun}`);
 
     // ── Load connection ───────────────────────────────────────────────────────
     const { data: connection, error: connError } = await supabase
@@ -183,8 +188,6 @@ serve(async (req) => {
     const deputyBaseUrl = `https://${connection.deputy_install}.${connection.deputy_region}.deputy.com`;
 
     // ── Query Deputy timesheets for the target week ───────────────────────────
-    // Returns up to 500 results. For a practice with ≤50 staff this is sufficient.
-    // TODO: add pagination if > 500 timesheets/week ever becomes possible.
     const timesheetRes = await fetch(`${deputyBaseUrl}/api/v1/resource/Timesheet/QUERY`, {
       method: 'POST',
       headers: {
@@ -201,11 +204,13 @@ serve(async (req) => {
 
     if (!timesheetRes.ok) {
       const errText = await timesheetRes.text();
-      await supabase.from('deputy_connections').update({
-        last_sync_at: new Date().toISOString(),
-        last_sync_status: 'error',
-        last_sync_error: `Timesheet query failed (${timesheetRes.status}): ${errText.slice(0, 500)}`,
-      }).eq('organization_id', orgId);
+      if (!dryRun) {
+        await supabase.from('deputy_connections').update({
+          last_sync_at: new Date().toISOString(),
+          last_sync_status: 'error',
+          last_sync_error: `Timesheet query failed (${timesheetRes.status}): ${errText.slice(0, 500)}`,
+        }).eq('organization_id', orgId);
+      }
       throw new Error(`Deputy timesheet query failed: ${errText}`);
     }
 
@@ -213,8 +218,6 @@ serve(async (req) => {
     console.log(`Retrieved ${timesheets.length} timesheets from Deputy`);
 
     // ── Build employee maps ───────────────────────────────────────────────────
-    // allSeenEmployees: every Deputy employee who appears in any timesheet this week
-    // employeesWhoWorked: employees with at least one non-voided timesheet
     const allSeenEmployees = new Map<number, string>();    // deputyId → displayName
     const employeesWhoWorked = new Set<number>();           // deputyIds
 
@@ -232,7 +235,6 @@ serve(async (req) => {
     }
 
     // ── Auto-match new employees ──────────────────────────────────────────────
-    // Load all active, participating staff for name-matching
     const { data: allStaff } = await supabase
       .from('staff')
       .select('id, name')
@@ -252,31 +254,32 @@ serve(async (req) => {
         .maybeSingle();
 
       if (!existing) {
-        // Attempt name match by normalising both sides (strips DDS, DMD, etc.)
         const normalizedDeputy = normalizeName(displayName);
         const matchedStaff = staffList.find(
           (s) => normalizeName(s.name) === normalizedDeputy
         );
 
-        await supabase.from('deputy_employee_mappings').insert({
-          organization_id: orgId,
-          deputy_employee_id: deputyEmpId,
-          deputy_display_name: displayName,
-          staff_id: matchedStaff?.id ?? null,
-          is_confirmed: false,
-          is_ignored: false,
-        });
+        if (!dryRun) {
+          await supabase.from('deputy_employee_mappings').insert({
+            organization_id: orgId,
+            deputy_employee_id: deputyEmpId,
+            deputy_display_name: displayName,
+            staff_id: matchedStaff?.id ?? null,
+            is_confirmed: false,
+            is_ignored: false,
+          });
+        }
 
         newMappingsCreated++;
         console.log(
-          `New mapping: "${displayName}" → ${matchedStaff ? `"${matchedStaff.name}"` : 'unmatched'}`
+          `${dryRun ? '[DRY RUN] Would create' : 'New'} mapping: "${displayName}" → ${
+            matchedStaff ? `"${matchedStaff.name}"` : 'unmatched'
+          }`
         );
       }
     }
 
-    // ── Create excusals for absent confirmed staff ─────────────────────────────
-    // PHASE 1: whole-week absence only.
-    // If an employee has zero non-discarded timesheets → excuse both metrics.
+    // ── Compute excusals for absent confirmed staff ───────────────────────────
     const { data: confirmedMappings } = await supabase
       .from('deputy_employee_mappings')
       .select('deputy_employee_id, staff_id, deputy_display_name')
@@ -290,7 +293,6 @@ serve(async (req) => {
 
     for (const mapping of mappings) {
       if (!employeesWhoWorked.has(mapping.deputy_employee_id)) {
-        // No timesheets found for this employee this week → absent
         excusalInserts.push({
           staff_id: mapping.staff_id,
           week_of: weekOfStr,
@@ -305,12 +307,13 @@ serve(async (req) => {
           reason: 'Absent per Deputy attendance data (auto-synced)',
           created_by: null,
         });
-        console.log(`Absent all week: ${mapping.deputy_display_name}`);
+        console.log(`${
+          dryRun ? '[DRY RUN] Would excuse' : 'Absent all week'
+        }: ${mapping.deputy_display_name}`);
       }
     }
 
-    if (excusalInserts.length > 0) {
-      // ignoreDuplicates: true — safe to re-run; won't clobber manually created excusals
+    if (!dryRun && excusalInserts.length > 0) {
       const { error: excusalError } = await supabase
         .from('excused_submissions')
         .upsert(excusalInserts, {
@@ -323,25 +326,34 @@ serve(async (req) => {
       }
     }
 
-    // ── Update sync metadata ──────────────────────────────────────────────────
-    await supabase
-      .from('deputy_connections')
-      .update({
-        last_sync_at: new Date().toISOString(),
-        last_sync_status: 'success',
-        last_sync_error: null,
-      })
-      .eq('organization_id', orgId);
+    // ── Update sync metadata (only on real runs) ──────────────────────────────
+    if (!dryRun) {
+      await supabase
+        .from('deputy_connections')
+        .update({
+          last_sync_at: new Date().toISOString(),
+          last_sync_status: 'success',
+          last_sync_error: null,
+        })
+        .eq('organization_id', orgId);
+    }
 
     const summary = {
       ok: true,
+      dry_run: dryRun,
       week_of: weekOfStr,
       timesheets_retrieved: timesheets.length,
       deputy_employees_seen: allSeenEmployees.size,
-      new_mappings_created: newMappingsCreated,
+      employees_who_worked: employeesWhoWorked.size,
+      new_mappings_created: dryRun ? 0 : newMappingsCreated,
+      new_mappings_would_create: dryRun ? newMappingsCreated : undefined,
       confirmed_mappings_checked: mappings.length,
-      staff_absent_all_week: excusalInserts.length / 2,   // 2 records per person
-      excusal_records_created: excusalInserts.length,
+      staff_absent_all_week: excusalInserts.length / 2,
+      excusal_records_created: dryRun ? 0 : excusalInserts.length,
+      excusal_records_would_create: dryRun ? excusalInserts.length : undefined,
+      note: dryRun
+        ? 'DRY RUN — no data was written. Pass dry_run: false to create mappings and excusals.'
+        : undefined,
     };
 
     console.log('Deputy sync complete:', summary);

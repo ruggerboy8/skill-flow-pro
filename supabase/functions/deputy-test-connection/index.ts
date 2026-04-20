@@ -102,16 +102,18 @@ serve(async (req) => {
     }
 
     // Call Deputy /api/v1/me to verify the token
+    // Deputy OAuth 2.0 access tokens use the standard Bearer scheme
     const meResp = await fetch(`${baseUrl}/api/v1/me`, {
       headers: {
-        Authorization: `OAuth ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         Accept: 'application/json',
       },
     });
 
     const bodyText = await meResp.text();
     if (!meResp.ok) {
-      return json(meResp.status, {
+      // Return 200 so the frontend receives the JSON body (not a FunctionsHttpError)
+      return json(200, {
         ok: false,
         step: 'api_call',
         status: meResp.status,
@@ -127,7 +129,7 @@ serve(async (req) => {
     const empResp = await fetch(`${baseUrl}/api/v1/resource/Employee/QUERY`, {
       method: 'POST',
       headers: {
-        Authorization: `OAuth ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },

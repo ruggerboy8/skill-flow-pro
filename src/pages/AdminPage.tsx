@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Shield, Users, MapPin, Building, Settings, Building2, BookOpen, Wand2, X } from "lucide-react";
+import { Shield, Users, MapPin, Building, Settings, Building2, BookOpen, Wand2, X, Plug } from "lucide-react";
 import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
 import { AdminLocationsTab } from "@/components/admin/AdminLocationsTab";
 import { AdminOrganizationsTab } from "@/components/admin/AdminOrganizationsTab";
 import { AdminGlobalSettingsTab } from "@/components/admin/AdminGlobalSettingsTab";
 import { OrgProMoveLibraryTab } from "@/components/admin/OrgProMoveLibraryTab";
+import { AdminIntegrationsTab } from "@/components/admin/AdminIntegrationsTab";
 import { OrgSetupWizard } from "@/components/admin/setup/OrgSetupWizard";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +52,7 @@ export default function AdminPage() {
     { value: "locations", label: "Locations", icon: MapPin, content: <AdminLocationsTab /> },
     { value: "organizations", label: "Groups", icon: Building, content: <AdminOrganizationsTab /> },
     { value: "pro-moves", label: "Pro Moves", icon: BookOpen, content: <OrgProMoveLibraryTab /> },
+    { value: "integrations", label: "Integrations", icon: Plug, content: <AdminIntegrationsTab /> },
     { value: "settings", label: "Settings", icon: Settings, content: <AdminGlobalSettingsTab /> },
   ], []);
 

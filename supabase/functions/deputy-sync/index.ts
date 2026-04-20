@@ -68,13 +68,13 @@ async function refreshDeputyToken(
   const tokenExpiresAt = new Date(Date.now() + (data.expires_in ?? 86400) * 1000).toISOString();
 
   // Persist the new token pair — refresh token rotates on every use
-  await supabase
+  await (supabase as any)
     .from('deputy_connections')
     .update({
       access_token: data.access_token,
       refresh_token: data.refresh_token,
       token_expires_at: tokenExpiresAt,
-    })
+    } as any)
     .eq('organization_id', connection.organization_id);
 
   console.log('Deputy token refreshed successfully');
@@ -177,7 +177,7 @@ serve(async (req) => {
     const expiresAt = new Date(connection.token_expires_at).getTime();
     if (expiresAt < Date.now() + 5 * 60 * 1000) {
       console.log('Access token expiring soon — refreshing');
-      accessToken = await refreshDeputyToken(connection, deputyClientId, deputyClientSecret, supabase);
+      accessToken = await refreshDeputyToken(connection, deputyClientId, deputyClientSecret, supabase as any);
     }
 
     const deputyBaseUrl = `https://${connection.deputy_install}.${connection.deputy_region}.deputy.com`;

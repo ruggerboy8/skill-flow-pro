@@ -15,6 +15,17 @@ serve(async (req) => {
   const state = url.searchParams.get('state');
   const errorParam = url.searchParams.get('error');
 
+  console.log(
+    `Deputy callback received ${JSON.stringify({
+      has_code: Boolean(code),
+      has_state: Boolean(state),
+      error: errorParam,
+      redirect_base: redirectBase,
+      path: url.pathname,
+      host: url.host,
+    })}`
+  );
+
   // Deputy returned an error
   if (errorParam) {
     console.error('Deputy OAuth error returned:', errorParam);
@@ -67,7 +78,17 @@ serve(async (req) => {
       scope: 'longlife_refresh_token',
     });
 
-    const tokenResponse = await fetch(`https://${deputyInstall}.${deputyRegion}.deputy.com/oauth/access_token`, {
+    const tokenUrl = `https://${deputyInstall}.${deputyRegion}.deputy.com/oauth/access_token`;
+    console.log(
+      `Deputy token exchange start ${JSON.stringify({
+        org_id: orgId,
+        deputy_install: deputyInstall,
+        deputy_region: deputyRegion,
+        token_url: tokenUrl,
+      })}`
+    );
+
+    const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: tokenBody.toString(),

@@ -20,6 +20,7 @@ serve(async (req) => {
     const deputyClientId = Deno.env.get('DEPUTY_CLIENT_ID');
 
     if (!deputyClientId) {
+      console.error('Deputy OAuth missing DEPUTY_CLIENT_ID');
       return new Response(
         JSON.stringify({ error: 'Deputy not configured. Add DEPUTY_CLIENT_ID to env vars.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -79,10 +80,26 @@ serve(async (req) => {
     const deputyRegion = Deno.env.get('DEPUTY_REGION') || 'na';
     const oauthUrl = `https://${deputyInstall}.${deputyRegion}.deputy.com/my/oauth/login?${params.toString()}`;
 
-    console.log(`Deputy OAuth initiated for org ${staff.organization_id} by staff ${staff.id}`);
+    console.log(
+      `Deputy OAuth initiated ${JSON.stringify({
+        org_id: staff.organization_id,
+        staff_id: staff.id,
+        deputy_install: deputyInstall,
+        deputy_region: deputyRegion,
+        callback_url: CALLBACK_URL,
+        oauth_url: oauthUrl,
+      })}`
+    );
 
     return new Response(
-      JSON.stringify({ url: oauthUrl }),
+      JSON.stringify({
+        url: oauthUrl,
+        diagnostics: {
+          deputy_install: deputyInstall,
+          deputy_region: deputyRegion,
+          callback_url: CALLBACK_URL,
+        },
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {

@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info, AlertTriangle, Check, X, RotateCcw, Loader2 } from "lucide-react";
+import { Info, AlertTriangle, Check, X, RotateCcw, Loader2, CheckCheck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +42,7 @@ interface StaffOption {
 
 export function DeputyMappingsTable({ organizationId }: Props) {
   const qc = useQueryClient();
+  const [bulkConfirming, setBulkConfirming] = useState(false);
 
   const { data: mappings = [], isLoading } = useQuery({
     queryKey: ["deputy-mappings", organizationId],
@@ -78,8 +79,22 @@ export function DeputyMappingsTable({ organizationId }: Props) {
     return m;
   }, [staff]);
 
-  const needsReviewCount = useMemo(
-    () => mappings.filter((m) => !m.is_confirmed && !m.is_ignored && m.staff_id).length,
+  const counts = useMemo(() => {
+    let confirmed = 0,
+      needsReview = 0,
+      ignored = 0,
+      unmatched = 0;
+    for (const m of mappings) {
+      if (m.is_ignored) ignored++;
+      else if (m.is_confirmed) confirmed++;
+      else if (m.staff_id) needsReview++;
+      else unmatched++;
+    }
+    return { confirmed, needsReview, ignored, unmatched };
+  }, [mappings]);
+
+  const suggestedToConfirm = useMemo(
+    () => mappings.filter((m) => !m.is_confirmed && !m.is_ignored && m.staff_id),
     [mappings]
   );
 
@@ -91,33 +106,76 @@ export function DeputyMappingsTable({ organizationId }: Props) {
         .eq("id", id);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["deputy-mappings", organizationId] });
+      qc.invalidateQueries({ queryKey: ["deputy-mappings-needs-review", organizationId] });
     } catch (err: any) {
       toast.error("Update failed", { description: err?.message });
+    }
+  };
+
+  const handleBulkConfirm = async () => {
+    if (suggestedToConfirm.length === 0) return;
+    setBulkConfirming(true);
+    try {
+      const ids = suggestedToConfirm.map((m) => m.id);
+      const { error } = await (supabase as any)
+        .from("deputy_employee_mappings")
+        .update({ is_confirmed: true })
+        .in("id", ids);
+      if (error) throw error;
+      toast.success(`Confirmed ${ids.length} mapping${ids.length === 1 ? "" : "s"}`);
+      qc.invalidateQueries({ queryKey: ["deputy-mappings", organizationId] });
+      qc.invalidateQueries({ queryKey: ["deputy-mappings-needs-review", organizationId] });
+    } catch (err: any) {
+      toast.error("Bulk confirm failed", { description: err?.message });
+    } finally {
+      setBulkConfirming(false);
     }
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Employee Mappings</CardTitle>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <CardTitle className="text-lg">Employee Mappings</CardTitle>
+          {mappings.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 text-xs">
+              <CountChip label="Confirmed" value={counts.confirmed} tone="complete" />
+              <CountChip label="Need review" value={counts.needsReview} tone="pending" />
+              <CountChip label="Unmatched" value={counts.unmatched} tone="missing" />
+              <CountChip label="Ignored" value={counts.ignored} tone="muted" />
+            </div>
+          )}
+        </div>
         <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md p-3 mt-2">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>Only confirmed mappings trigger automatic excusals. Run a sync first to populate this list.</span>
+          <span>
+            Only confirmed mappings trigger automatic excusals. Auto-suggested matches are pre-selected — review and
+            confirm them below.
+          </span>
         </div>
-        {needsReviewCount > 0 && (
+        {counts.needsReview > 0 && (
           <div
-            className="flex items-start gap-2 text-sm rounded-md p-3 mt-2 border"
+            className="flex items-start justify-between gap-3 text-sm rounded-md p-3 mt-2 border flex-wrap"
             style={{
               backgroundColor: `hsl(var(--status-pending-bg))`,
               borderColor: `hsl(var(--status-pending) / 0.3)`,
               color: `hsl(var(--status-pending))`,
             }}
           >
-            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>
-              {needsReviewCount} employee mapping{needsReviewCount === 1 ? "" : "s"} need your review before
-              auto-excusals will apply.
-            </span>
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                {counts.needsReview} suggested mapping{counts.needsReview === 1 ? "" : "s"} ready to confirm.
+              </span>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleBulkConfirm} disabled={bulkConfirming}>
+              {bulkConfirming ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <CheckCheck className="h-4 w-4 mr-1" />
+              )}
+              Confirm All Suggested
+            </Button>
           </div>
         )}
       </CardHeader>
@@ -128,7 +186,7 @@ export function DeputyMappingsTable({ organizationId }: Props) {
           </div>
         ) : mappings.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No employee mappings yet. Run a sync to import staff from Deputy.
+            No employee mappings yet. Use “Import Deputy Employees” above to pull the active roster.
           </p>
         ) : (
           <Table>
@@ -237,6 +295,35 @@ export function DeputyMappingsTable({ organizationId }: Props) {
   );
 }
 
+function CountChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "complete" | "pending" | "missing" | "muted";
+}) {
+  if (tone === "muted") {
+    return (
+      <Badge variant="secondary">
+        {value} {label}
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      className="border-0"
+      style={{
+        backgroundColor: `hsl(var(--status-${tone}-bg))`,
+        color: `hsl(var(--status-${tone}))`,
+      }}
+    >
+      {value} {label}
+    </Badge>
+  );
+}
+
 function StatusPill({ mapping }: { mapping: Mapping }) {
   if (mapping.is_confirmed) {
     return (
@@ -252,8 +339,19 @@ function StatusPill({ mapping }: { mapping: Mapping }) {
     );
   }
   if (mapping.is_ignored) {
+    return <Badge variant="secondary">Ignored</Badge>;
+  }
+  if (!mapping.staff_id) {
     return (
-      <Badge variant="secondary">Ignored</Badge>
+      <Badge
+        className="border-0"
+        style={{
+          backgroundColor: `hsl(var(--status-missing-bg))`,
+          color: `hsl(var(--status-missing))`,
+        }}
+      >
+        Unmatched
+      </Badge>
     );
   }
   return (
@@ -264,7 +362,7 @@ function StatusPill({ mapping }: { mapping: Mapping }) {
         color: `hsl(var(--status-pending))`,
       }}
     >
-      Needs review
+      Suggested
     </Badge>
   );
 }

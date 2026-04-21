@@ -15,6 +15,7 @@ import { getEvaluation, isLegacyInterviewEval } from '@/lib/evaluations';
 import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvaluationWithItems, ExtractedInsights, InsightsPerspective, DomainInsight } from '@/lib/evaluations';
+import { ParticipationSnapshotCard, type ParticipationSnapshot } from '@/components/evaluations/ParticipationSnapshotCard';
 
 const SCORE_PILLS = [
   { v: 1, cls: 'bg-red-100 text-red-800 border-red-200' },

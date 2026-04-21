@@ -515,23 +515,23 @@ export function isEvaluationComplete(evaluation: EvaluationWithItems): {
   const observerComplete = evaluation.items.every(
     item => item.observer_score !== null || item.observer_is_na === true
   );
-  const selfComplete = evaluation.items.every(
-    item => item.self_score !== null || item.self_is_na === true
-  );
-  
+  // Self-scores are now auto-aggregated from weekly performance submissions.
+  // They no longer gate submission. Kept in the return shape for back-compat.
+  const selfComplete = true;
+
   const observerNaCount = evaluation.items.filter(item => item.observer_is_na === true).length;
-  const selfNaCount = evaluation.items.filter(item => item.self_is_na === true).length;
-  const naCount = observerNaCount + selfNaCount;
-  
+  const selfNaCount = 0;
+  const naCount = observerNaCount;
+
   // Count items with observer score of 1 or 2 that are missing notes
   const missingObserverNotes = evaluation.items.filter(
     item => item.observer_score !== null && item.observer_score <= 2 && (!item.observer_note || item.observer_note.trim() === '')
   ).length;
-  
+
   return {
     observerComplete,
     selfComplete,
-    canSubmit: observerComplete && selfComplete && missingObserverNotes === 0,
+    canSubmit: observerComplete && missingObserverNotes === 0,
     observerNaCount,
     selfNaCount,
     naCount,

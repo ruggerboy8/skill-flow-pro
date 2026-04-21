@@ -820,6 +820,8 @@ export type Database = {
           self_is_na: boolean | null
           self_note: string | null
           self_score: number | null
+          self_score_avg: number | null
+          self_score_sample_size: number | null
         }
         Insert: {
           competency_description_snapshot?: string | null
@@ -835,6 +837,8 @@ export type Database = {
           self_is_na?: boolean | null
           self_note?: string | null
           self_score?: number | null
+          self_score_avg?: number | null
+          self_score_sample_size?: number | null
         }
         Update: {
           competency_description_snapshot?: string | null
@@ -850,6 +854,8 @@ export type Database = {
           self_is_na?: boolean | null
           self_note?: string | null
           self_score?: number | null
+          self_score_avg?: number | null
+          self_score_sample_size?: number | null
         }
         Relationships: [
           {
@@ -3019,6 +3025,10 @@ export type Database = {
       compute_and_store_review_payload: {
         Args: { p_eval_id: string }
         Returns: Json
+      }
+      compute_eval_self_scores: {
+        Args: { p_eval_id: string }
+        Returns: undefined
       }
       current_user_org_id: { Args: never; Returns: string }
       delete_latest_week_data: { Args: { p_user_id: string }; Returns: Json }

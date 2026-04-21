@@ -1,92 +1,73 @@
 
 
-# Deputy Integration Rollout — Detailed Build Plan
+# Aggregated Self-Score from Weekly Performance Submissions
 
-## Phase 1 — Preview (no DB writes)
+## What changes
 
-**Goal:** Confirm we're talking to Deputy correctly and the data shape is what we expect, without writing anything.
+The "Self-Assessment Interview" tab disappears. Self-scores on **Quarterly** evaluations are auto-computed from the staff member's weekly `performance_score` submissions during the quarter. **Baseline** evaluations drop self-scores entirely (observer-only). Historical evals with interview-sourced self-scores stay intact and get an info tooltip.
 
-**UI changes** — `DeputyConnectionCard.tsx`:
-- Add a **"Pull 7-Day Preview"** button (only visible when connected)
-- Calls `deputy-sync` with `{ dry_run: true, days: 7 }`
-- Renders an inline preview panel with:
-  - Employee count (e.g. "69 employees found in Deputy")
-  - First 5 employees: name, Deputy ID, active status
-  - Timesheet count for last 7 days (e.g. "142 timesheets in last 7 days")
-  - First 5 timesheets: employee name, date, start/end, total hours
-  - "Absent all week" candidates: count + names
-- Collapsible "View raw response" details for debugging
+## Calculation rules (Quarterly only)
 
-**Edge function changes** — `deputy-sync/index.ts`:
-- Honor existing `dry_run: true` flag (already supported) — confirm it returns sample data, not just counts
-- Accept new optional `days` parameter (default 7) to scope the timesheet query window
-- Response shape: `{ dry_run, employee_count, employee_sample, timesheet_count, timesheet_sample, absent_all_week_sample, week_of }`
+For each competency on the eval:
+- Average all `performance_score` rows from `view_weekly_scores_with_competency` where:
+  - `staff_id` matches
+  - `competency_id` matches
+  - `week_of` falls in the quarter window (e.g. Q1 = Jan 1 – Mar 31, location tz)
+  - `performance_score > 0` (excludes N/A)
+- Round to 1 decimal, store sample size
 
----
+**Insufficient data threshold:** n < 3 → display "Not enough data" inline at the competency row instead of a number. No tooltips, no caveats — just a clear flag.
 
-## Phase 2 — Mapping
+**Recompute trigger:** silently on eval creation, and again silently right before submit. No manual refresh button.
 
-**Goal:** Get every Deputy employee correctly tied to a staff record (or marked ignore) before any metric writes happen.
+## UI changes
 
-**One-time import** — new button **"Import Deputy Employees"** on the connection card:
-- Calls `deputy-sync` with `{ dry_run: false, employees_only: true }` — pulls roster, writes to `deputy_employee_mappings`, **does not** touch excused_submissions
-- For each new mapping, runs name-similarity match against org's `staff` (active, participant) and pre-fills `staff_id` with the best suggestion (token-overlap on first+last name, normalized — same `normalizeName` helper already in the function)
-- Leaves `is_confirmed = false` so suggestions still need approval
+### Coach — `EvaluationHub.tsx`
+- Remove the **Self** tab entirely (interview recorder, transcript, paste, AI extraction — all gone)
+- Tabs reduce to **Observation** + **Summary**
+- Observation rows show the aggregated self-score read-only (e.g. `3.4`) or "Not enough data" pill when n<3 or n=0
+- Submit gating no longer requires self-scores or self-notes
+- For **Baseline** type: hide the entire self column
 
-**Mapping table changes** — `DeputyMappingsTable.tsx`:
-- Auto-suggested `staff_id` is shown pre-selected in the dropdown (not blank)
-- New **"Confirm All Suggested"** bulk button at top — confirms all rows where `staff_id IS NOT NULL AND is_confirmed = false AND is_ignored = false`
-- Per-row Ignore checkbox (uses existing `is_ignored` column)
-- Status summary at top: `X confirmed · Y need review · Z ignored · W unmatched`
-- The existing manual confirm/ignore/change-match controls stay
+### Staff — `EvaluationViewer.tsx` + `EvaluationReview.tsx`
+- Score table keeps Coach / Self / Gap columns for Quarterly evals
+- Cells with insufficient data show "Not enough data" instead of a number; gap row collapses
+- Baseline evals: hide Self/Gap columns entirely
+- One-line explainer above table: *"Your self-score is the average performance score you submitted during this quarter."*
+- Remove the "Self-Assessment Insights" panel for new evals
+- **Legacy interview-sourced evals:** show an info `(i)` icon at the top of the score section with hover tooltip:
+  > *"Self-scores in this evaluation were collected through a self-assessment interview. We've since moved to averaging your weekly performance submissions."*
+  - Detection: eval has `interview_transcript` or `extracted_insights.self_assessment` populated
 
-**Edge function changes** — `deputy-sync/index.ts`:
-- Accept `employees_only: true` to skip timesheet processing entirely
-- When inserting a new `deputy_employee_mappings` row with no exact match, do fuzzy matching against org staff and write the suggested `staff_id` (still `is_confirmed = false`)
+### Admin
+- `eval-results-v2/` panels continue to work — same `evaluation_items.self_score` field
+- Calibration footnote: *"Self-scores aggregated from weekly performance submissions."*
 
----
+## Backend / data model
 
-## Phase 3 — Go Live
+- Add to `evaluation_items`: `self_score_avg numeric(2,1)`, `self_score_sample_size int` (preserves decimal precision; existing `self_score` int kept for export back-compat, populated with rounded value)
+- New SQL function `compute_eval_self_scores(p_eval_id uuid)` — quarter-aware, location-tz-aware, skips `Baseline` type
+- Wire into `createDraftEvaluation()` and `submitEvaluation()` (silent, no UI surface)
+- Stop writing `interview_transcript`, `draft_interview_audio_path`, `extracted_insights.self_assessment` (kept for historical reads only)
 
-**Goal:** Explicit, deliberate switch-on with a date floor, so turning it on doesn't retroactively excuse anyone.
+## Files affected
 
-**UI changes** — `DeputyConnectionCard.tsx`:
-- New **"Sync Settings"** section visible when connected:
-  - **Sync enabled** toggle (`Switch` component) — writes `deputy_connections.sync_enabled`
-  - **Sync data from** date picker — writes `deputy_connections.sync_start_date`; defaults to today on first enable
-  - Helper text: "Timesheets before this date will be ignored even if Deputy returns them"
-- Existing "Sync Now" button:
-  - Disabled with tooltip when `sync_enabled = false`
-  - Disabled with tooltip when there are unconfirmed mappings (`needsReviewCount > 0`)
-  - When enabled, runs full sync (`{ dry_run: false }`)
+**New:**
+- `supabase/migrations/<ts>_eval_self_score_aggregation.sql` — columns + `compute_eval_self_scores()` function
 
-**Edge function changes** — `deputy-sync/index.ts`:
-- Read `sync_enabled` and `sync_start_date` from the connection row
-- If `sync_enabled = false` AND `dry_run = false` AND `employees_only = false` → return `{ skipped: true, reason: 'sync_disabled' }`
-- Filter timesheets where `date < sync_start_date` before creating any `excused_submissions`
-- Only process mappings where `is_confirmed = true AND is_ignored = false` for excusal writes
+**Modified:**
+- `src/lib/evaluations.ts` — hook aggregator into create/submit, drop self-fields from submit gate
+- `src/pages/coach/EvaluationHub.tsx` — remove Self tab + interview UI, simplify gating, hide self column for Baseline
+- `src/components/coach/SummaryTab.tsx` — drop self-assessment perspective
+- `src/components/coach/InsightsDisplay.tsx` — drop self-assessment card
+- `src/pages/EvaluationViewer.tsx` — render aggregated self / "Not enough data" / hide for Baseline / legacy info tooltip
+- `src/pages/EvaluationReview.tsx` — same handling in review flow
+- `src/components/coach/QuarterlyEvalsTab.tsx` — copy update
 
----
+## Out of scope
 
-## Phase 4 — Backfill *(deferred, not built)*
-
----
-
-## Technical details
-
-**Files to edit:**
-- `src/components/admin/integrations/DeputyConnectionCard.tsx` — add Preview panel, Import button, Sync Settings section, gating on Sync Now
-- `src/components/admin/integrations/DeputyMappingsTable.tsx` — pre-fill suggestions, bulk confirm, ignore checkbox refinements, status summary
-- `supabase/functions/deputy-sync/index.ts` — `dry_run` returns samples, `employees_only` short-circuit, fuzzy-match on insert, honor `sync_enabled` + `sync_start_date`
-
-**No new tables or migrations** — `sync_enabled` and `sync_start_date` columns already added in the prior approved migration; `is_confirmed` and `is_ignored` already exist on `deputy_employee_mappings`.
-
-**Defensive querying:** `deputy_connections` and `deputy_employee_mappings` aren't in `types.ts` yet, so all client queries use `(supabase as any).from(...)` per project convention.
-
-**Name matching:** Reuse the existing `normalizeName()` helper in `deputy-sync`. Suggestion algorithm: normalize both sides, then exact match on `first + last`; if no exact match, score by token overlap (Jaccard) and pick the top scorer above a 0.6 threshold.
-
-**Ordering of work (each phase independently shippable):**
-1. Phase 1 first — you preview, confirm shape is correct
-2. Phase 2 next — you import + map your roster
-3. Phase 3 last — flip the toggle when you're ready
+- Backfilling already-submitted Q1 evals
+- Manual refresh button
+- Configurable lookback / threshold per org (hardcoded n<3)
+- Optional free-text "self-reflection note" replacement field
 

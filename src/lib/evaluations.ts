@@ -482,16 +482,17 @@ export async function updateInterviewTranscript(
 }
 
 /**
- * Submit an evaluation (mark as completed) AND release it to the staff member.
- * Refreshes aggregated self-scores first, then flips status, then calls the
- * release RPC so the staff member can immediately see their results.
+ * Submit an evaluation (mark as completed). Refreshes aggregated self-scores
+ * and the participation snapshot first, then flips status to `submitted`.
  *
- * @param evalId - the evaluation id
- * @param releasedByStaffId - staff.id of the coach submitting (for released_by)
+ * Does NOT release to staff — release is a deliberate admin action handled
+ * separately via the Delivery tab in EvalResults v2.
  */
-export async function submitEvaluation(evalId: string, releasedByStaffId?: string) {
-  // Best-effort silent recompute right before flipping status
+export async function submitEvaluation(evalId: string, _releasedByStaffId?: string) {
+  // Best-effort silent recomputes right before flipping status so the snapshot
+  // and aggregated self-scores are frozen at submission time.
   await refreshEvalSelfScores(evalId);
+  await refreshEvalParticipationSnapshot(evalId);
 
   const { error } = await supabase
     .from('evaluations')
@@ -500,16 +501,6 @@ export async function submitEvaluation(evalId: string, releasedByStaffId?: strin
 
   if (error) {
     throw new Error(`Failed to submit evaluation: ${error.message}`);
-  }
-
-  // Auto-release to staff. Self-assessment interview no longer exists, so
-  // there's no reason to hold the eval back from the staff member.
-  if (releasedByStaffId) {
-    try {
-      await setEvaluationVisibility(evalId, true, releasedByStaffId);
-    } catch (err) {
-      console.warn('Auto-release after submit failed:', err);
-    }
   }
 }
 

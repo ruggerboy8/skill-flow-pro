@@ -1690,8 +1690,6 @@ export function EvaluationHub() {
                    </span>
                 </div>
               </div>
-
-              </div>
               <Button 
                 onClick={handleSubmitClick}
                 disabled={!completionStatus.canSubmit || isSubmitting}

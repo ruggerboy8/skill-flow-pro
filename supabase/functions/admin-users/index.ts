@@ -1568,3 +1568,29 @@ function json(body: any, status = 200) {
     },
   });
 }
+
+/**
+ * Returns the Monday-of-week (YYYY-MM-DD) for the given instant, evaluated in `tz`.
+ * Uses Intl to read the local weekday + date, then walks back to Monday.
+ */
+function mondayOfWeekInTz(instant: Date, tz: string): string {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  });
+  const parts = fmt.formatToParts(instant);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const y = Number(get("year"));
+  const m = Number(get("month"));
+  const d = Number(get("day"));
+  const wkShort = get("weekday"); // "Mon" .. "Sun"
+  const map: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+  const offset = map[wkShort] ?? 0;
+  // Build a UTC date for the local Y-M-D, then subtract offset days.
+  const local = new Date(Date.UTC(y, m - 1, d));
+  local.setUTCDate(local.getUTCDate() - offset);
+  return local.toISOString().slice(0, 10);
+}

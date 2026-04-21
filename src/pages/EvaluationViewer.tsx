@@ -509,58 +509,57 @@ export default function EvaluationViewer() {
           })}
         </TabsContent>
 
-        {/* Insights Tab */}
-        <TabsContent value="insights" className="space-y-6">
-          {hasAnyInsights ? (
-            <>
-              {/* Legacy summary feedback display */}
-              {(evaluation as any).summary_feedback && !selfAssessmentPerspective && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Overall Feedback
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div 
-                      className="prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize((evaluation as any).summary_feedback || '') }}
-                    />
-                  </CardContent>
-                </Card>
-              )}
+        {/* Insights Tab — only rendered when legacy data exists */}
+        {hasAnyInsights && (
+          <TabsContent value="insights" className="space-y-6">
+            {/* Legacy summary feedback display */}
+            {(evaluation as any).summary_feedback && !selfAssessmentPerspective && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Overall Feedback
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div 
+                    className="prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize((evaluation as any).summary_feedback || '') }}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
-              {/* Self-Assessment Insights */}
-              {selfAssessmentPerspective && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <User className="w-5 h-5" />
-                      Self-Assessment Insights
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <PerspectiveCard 
-                      title="" 
-                      icon={User}
-                      perspective={selfAssessmentPerspective}
-                    />
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          ) : (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <AlertCircle className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
-                <p className="text-muted-foreground">
-                  Complete the self-assessment interview to see insights here.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+            {/* Self-Assessment Insights (legacy interview-sourced only) */}
+            {selfAssessmentPerspective && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="w-5 h-5" />
+                    Self-Assessment Insights
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          These insights came from the legacy self-assessment interview flow. We've since moved to averaging weekly performance submissions.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PerspectiveCard 
+                    title="" 
+                    icon={User}
+                    perspective={selfAssessmentPerspective}
+                  />
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

@@ -653,16 +653,16 @@ export function getQuarterWindow(now: Date, timezone: string): QuarterWindow {
 export async function isDraftComplete(evalId: string): Promise<boolean> {
   const { data: items, error } = await supabase
     .from('evaluation_items')
-    .select('observer_score, self_score, observer_is_na, self_is_na')
+    .select('observer_score, observer_is_na')
     .eq('evaluation_id', evalId);
 
   if (error || !items || items.length === 0) {
     return false;
   }
 
-  return items.every(item => 
-    (item.observer_score !== null || item.observer_is_na === true) && 
-    (item.self_score !== null || item.self_is_na === true)
+  // Self-scores no longer gate completion (auto-aggregated from weekly scores).
+  return items.every(item =>
+    item.observer_score !== null || item.observer_is_na === true
   );
 }
 

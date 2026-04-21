@@ -363,6 +363,29 @@ export default function EvaluationViewer() {
 
         {/* Scores Tab */}
         <TabsContent value="scores" className="space-y-6">
+          {/* Self-score explainer / legacy notice */}
+          {!isBaseline && (
+            <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2">
+              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              {isLegacy ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help underline decoration-dotted underline-offset-2">
+                        Self-scores in this evaluation came from a self-assessment interview.
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      Self-scores in this evaluation were collected through a self-assessment interview. We've since moved to averaging your weekly performance submissions.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <span>Your self-score is the average performance score you submitted during this quarter.</span>
+              )}
+            </div>
+          )}
+
           {sortedDomains.map(domainName => {
             const domainItems = groupedByDomain[domainName];
             
@@ -381,7 +404,7 @@ export default function EvaluationViewer() {
                   text: item.observer_note 
                 });
               }
-              if (item.self_note) {
+              if (!isBaseline && item.self_note) {
                 out.push({ 
                   source: 'Self', 
                   competency: item.competency_name_snapshot, 
@@ -418,8 +441,8 @@ export default function EvaluationViewer() {
                   {/* Header row */}
                   <div className="grid grid-cols-12 text-xs text-muted-foreground">
                     <div className="col-span-7">Competency</div>
-                    <div className="col-span-2 text-center">Observer</div>
-                    <div className="col-span-3 text-center">Self</div>
+                    <div className={isBaseline ? "col-span-5 text-center" : "col-span-2 text-center"}>Observer</div>
+                    {!isBaseline && <div className="col-span-3 text-center">Self</div>}
                   </div>
 
                   {/* Competency rows */}
@@ -432,12 +455,18 @@ export default function EvaluationViewer() {
                             <div className="text-xs text-muted-foreground italic">{item.competency_description_snapshot}</div>
                           )}
                         </div>
-                        <div className="col-span-2 flex justify-center">
+                        <div className={isBaseline ? "col-span-5 flex justify-center" : "col-span-2 flex justify-center"}>
                           <ReadOnlyScore value={item.observer_score} />
                         </div>
-                        <div className="col-span-3 flex justify-center">
-                          <ReadOnlyScore value={item.self_score} />
-                        </div>
+                        {!isBaseline && (
+                          <div className="col-span-3 flex justify-center">
+                            {item.self_score == null ? (
+                              <span className="text-xs text-muted-foreground italic">Not enough data</span>
+                            ) : (
+                              <ReadOnlyScore value={item.self_score} />
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -445,8 +474,8 @@ export default function EvaluationViewer() {
                   {/* Averages row */}
                   <div className="grid grid-cols-12 items-center pt-2 border-t">
                     <div className="col-span-7 text-sm font-medium">Averages</div>
-                    <div className="col-span-2 text-center text-sm">{avgObserver ?? '—'}</div>
-                    <div className="col-span-3 text-center text-sm">{avgSelf ?? '—'}</div>
+                    <div className={isBaseline ? "col-span-5 text-center text-sm" : "col-span-2 text-center text-sm"}>{avgObserver ?? '—'}</div>
+                    {!isBaseline && <div className="col-span-3 text-center text-sm">{avgSelf ?? '—'}</div>}
                   </div>
 
                   {/* Notes accordion */}

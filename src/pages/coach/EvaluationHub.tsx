@@ -2066,6 +2066,8 @@ export function EvaluationHub() {
             summaryFeedback={summaryFeedback}
             extractedInsights={evaluation?.extracted_insights || null}
             interviewTranscript={interviewTranscript}
+            participationSnapshot={(evaluation as any)?.participation_snapshot || null}
+            evalType={evaluation?.type || null}
           />
         </TabsContent>
       </Tabs>

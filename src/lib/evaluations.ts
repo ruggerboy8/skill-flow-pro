@@ -193,6 +193,9 @@ export async function createDraftEvaluation({
     throw new Error(`Failed to create evaluation items: ${itemsError.message}`);
   }
 
+  // Silently aggregate weekly self-scores for Quarterly evals (no-op for Baseline).
+  await refreshEvalSelfScores(evaluation.id);
+
   return { evaluation, items: items || [] };
 }
 
@@ -455,9 +458,13 @@ export async function updateInterviewTranscript(
 }
 
 /**
- * Submit an evaluation (mark as completed)
+ * Submit an evaluation (mark as completed). Refreshes aggregated self-scores
+ * one last time to capture any late weekly submissions.
  */
 export async function submitEvaluation(evalId: string) {
+  // Best-effort silent recompute right before flipping status
+  await refreshEvalSelfScores(evalId);
+
   const { error } = await supabase
     .from('evaluations')
     .update({ status: 'submitted' })

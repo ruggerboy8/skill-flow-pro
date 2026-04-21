@@ -955,27 +955,47 @@ serve(async (req: Request) => {
         const { user_id, reason } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
 
-        // Get current staff record
+        // Get current staff record (with location tz for excuse anchoring)
         const { data: currentStaff, error: fetchErr } = await admin
           .from("staff")
-          .select("id, is_paused, name")
+          .select("id, is_paused, name, primary_location_id, locations:primary_location_id(timezone)")
           .eq("user_id", user_id)
           .maybeSingle();
-        
+
         if (fetchErr) throw fetchErr;
         if (!currentStaff) return json({ error: "Staff not found" }, 404);
+
+        const pausedAt = new Date();
 
         // Update to paused state
         const { error: updateErr } = await admin
           .from("staff")
           .update({
             is_paused: true,
-            paused_at: new Date().toISOString(),
+            paused_at: pausedAt.toISOString(),
             pause_reason: reason || null,
           })
           .eq("user_id", user_id);
-        
+
         if (updateErr) throw updateErr;
+
+        // Excuse the current week (both metrics) so paused staff aren't penalized
+        try {
+          // deno-lint-ignore no-explicit-any
+          const tz = ((currentStaff as any).locations?.timezone as string | undefined) ?? "America/Chicago";
+          const monday = mondayOfWeekInTz(pausedAt, tz);
+          const reasonText = reason || "Paused";
+          const rows = [
+            { staff_id: currentStaff.id, week_of: monday, metric: "confidence", reason: reasonText, created_by: authUser.user.id },
+            { staff_id: currentStaff.id, week_of: monday, metric: "performance", reason: reasonText, created_by: authUser.user.id },
+          ];
+          const { error: excuseErr } = await admin
+            .from("excused_submissions")
+            .upsert(rows, { onConflict: "staff_id,week_of,metric", ignoreDuplicates: true });
+          if (excuseErr) console.warn("Failed to insert pause excuses:", excuseErr);
+        } catch (excuseErr) {
+          console.warn("Failed to insert pause excuses:", excuseErr);
+        }
 
         // Audit log
         try {
@@ -984,7 +1004,7 @@ serve(async (req: Request) => {
             .select("id")
             .eq("user_id", authUser.user.id)
             .maybeSingle();
-          
+
           if (changerStaff) {
             await admin.from("admin_audit").insert({
               staff_id: currentStaff.id,
@@ -1006,15 +1026,48 @@ serve(async (req: Request) => {
         const { user_id } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
 
-        // Get current staff record
+        // Get current staff record (with paused_at + location tz for backfill)
         const { data: currentStaff, error: fetchErr } = await admin
           .from("staff")
-          .select("id, is_paused, name, pause_reason")
+          .select("id, is_paused, name, pause_reason, paused_at, primary_location_id, locations:primary_location_id(timezone)")
           .eq("user_id", user_id)
           .maybeSingle();
-        
+
         if (fetchErr) throw fetchErr;
         if (!currentStaff) return json({ error: "Staff not found" }, 404);
+
+        // Backfill excuses for every week between paused_at and now
+        try {
+          // deno-lint-ignore no-explicit-any
+          const tz = ((currentStaff as any).locations?.timezone as string | undefined) ?? "America/Chicago";
+          const pausedAt = currentStaff.paused_at ? new Date(currentStaff.paused_at) : null;
+          if (pausedAt) {
+            const startMonday = mondayOfWeekInTz(pausedAt, tz);
+            const endMonday = mondayOfWeekInTz(new Date(), tz);
+            const weeks: string[] = [];
+            // Iterate using UTC math on Monday dates (safe since all are Monday 00:00 UTC dates)
+            let cursor = new Date(startMonday + "T00:00:00Z");
+            const end = new Date(endMonday + "T00:00:00Z");
+            while (cursor <= end) {
+              weeks.push(cursor.toISOString().slice(0, 10));
+              cursor = new Date(cursor.getTime() + 7 * 24 * 60 * 60 * 1000);
+            }
+            const reasonText = currentStaff.pause_reason || "Paused";
+            const rows = weeks.flatMap((week_of) => [
+              { staff_id: currentStaff.id, week_of, metric: "confidence", reason: reasonText, created_by: authUser.user.id },
+              { staff_id: currentStaff.id, week_of, metric: "performance", reason: reasonText, created_by: authUser.user.id },
+            ]);
+            if (rows.length > 0) {
+              const { error: excuseErr } = await admin
+                .from("excused_submissions")
+                .upsert(rows, { onConflict: "staff_id,week_of,metric", ignoreDuplicates: true });
+              if (excuseErr) console.warn("Failed to backfill unpause excuses:", excuseErr);
+              else console.log(`✅ Backfilled ${rows.length} excuse rows across ${weeks.length} weeks for ${currentStaff.name}`);
+            }
+          }
+        } catch (excuseErr) {
+          console.warn("Failed to backfill unpause excuses:", excuseErr);
+        }
 
         // Update to unpaused state
         const { error: updateErr } = await admin
@@ -1025,7 +1078,7 @@ serve(async (req: Request) => {
             pause_reason: null,
           })
           .eq("user_id", user_id);
-        
+
         if (updateErr) throw updateErr;
 
         // Audit log
@@ -1035,7 +1088,7 @@ serve(async (req: Request) => {
             .select("id")
             .eq("user_id", authUser.user.id)
             .maybeSingle();
-          
+
           if (changerStaff) {
             await admin.from("admin_audit").insert({
               staff_id: currentStaff.id,

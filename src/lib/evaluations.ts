@@ -70,6 +70,30 @@ export async function refreshEvalSelfScores(evalId: string): Promise<void> {
   }
 }
 
+/**
+ * Silently recompute the participation snapshot (12-week submission history)
+ * frozen onto the evaluation. No-op for Baseline. Best-effort.
+ */
+export async function refreshEvalParticipationSnapshot(evalId: string): Promise<void> {
+  try {
+    const { error } = await supabase.rpc('compute_eval_participation_snapshot' as any, { p_eval_id: evalId });
+    if (error) console.warn('compute_eval_participation_snapshot failed:', error.message);
+  } catch (err) {
+    console.warn('compute_eval_participation_snapshot threw:', err);
+  }
+}
+
+export interface ParticipationSnapshot {
+  window_start: string;
+  window_end: string;
+  weeks_in_window: number;
+  confidence_completed: number;
+  performance_completed: number;
+  on_time_count: number;
+  total_self_score_submissions: number;
+  competencies_with_data: number;
+}
+
 export interface QuarterWindow {
   isInWindow: boolean;
   targetQuarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';

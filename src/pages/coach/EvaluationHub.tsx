@@ -1696,9 +1696,9 @@ export function EvaluationHub() {
                 onClick={handleSubmitClick}
                 disabled={!completionStatus.canSubmit || isSubmitting}
                 className="bg-primary hover:bg-primary/90"
-                title="Submit and release results to the staff member"
+                title="Submit. Release to staff later from the Delivery tab."
               >
-                {isSubmitting ? "Submitting..." : "Submit & Release to Staff"}
+                {isSubmitting ? "Submitting..." : "Submit Evaluation"}
               </Button>
             </div>
           </CardContent>

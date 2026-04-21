@@ -1893,6 +1893,28 @@ export function EvaluationHub() {
                     ))}
                   </div>
 
+                  {/* Aggregated self-score (read-only, from weekly performance submissions). */}
+                  {evaluation.type === 'Quarterly' && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-2 text-xs text-muted-foreground"
+                    >
+                      <span className="font-medium uppercase tracking-wide">Their self-score:</span>
+                      {(item as any).self_score_sample_size && (item as any).self_score_sample_size >= 3 ? (
+                        <>
+                          <span className="px-2 py-0.5 rounded bg-muted text-foreground font-medium">
+                            {(item as any).self_score_avg ?? item.self_score}
+                          </span>
+                          <span>
+                            avg of {(item as any).self_score_sample_size} weekly submission{(item as any).self_score_sample_size === 1 ? '' : 's'}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="italic">Not enough data</span>
+                      )}
+                    </div>
+                  )}
+
                    {/* Conditional Notes */}
                    {(() => {
                      const isLowScore = item.observer_score !== null && item.observer_score <= 2;

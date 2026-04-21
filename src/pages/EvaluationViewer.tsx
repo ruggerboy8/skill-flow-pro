@@ -337,7 +337,8 @@ export default function EvaluationViewer() {
             Submitted {submittedDate}
           </p>
           <p className="text-sm text-muted-foreground">
-            Observer items scored {observerScored}/{totalItems} • Self items scored {selfScored}/{totalItems}
+            Observer items scored {observerScored}/{totalItems}
+            {!isBaseline && <> • Self items scored {selfScored}/{totalItems}</>}
           </p>
         </div>
         {needsReview && (
@@ -357,7 +358,7 @@ export default function EvaluationViewer() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="scores">Your Scores</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
+          {hasAnyInsights && <TabsTrigger value="insights">Insights</TabsTrigger>}
         </TabsList>
 
         {/* Scores Tab */}

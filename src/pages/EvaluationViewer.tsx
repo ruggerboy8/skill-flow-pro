@@ -364,6 +364,14 @@ export default function EvaluationViewer() {
 
         {/* Scores Tab */}
         <TabsContent value="scores" className="space-y-6">
+          {/* Participation snapshot — frozen at submit time */}
+          {!isBaseline && (
+            <ParticipationSnapshotCard
+              snapshot={(evaluation as any).participation_snapshot as ParticipationSnapshot | null}
+              evalType={evaluation.type}
+            />
+          )}
+
           {/* Self-score explainer / legacy notice */}
           {!isBaseline && (
             <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2">

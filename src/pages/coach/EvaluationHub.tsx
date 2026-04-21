@@ -1689,22 +1689,8 @@ export function EvaluationHub() {
                      )}
                    </span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  {completionStatus.selfComplete ? (
-                    <Check className="w-5 h-5 text-green-600" />
-                  ) : (
-                    <div className="w-5 h-5 rounded-full border-2 border-muted-foreground"></div>
-                  )}
-                  <span className={cn(
-                    "font-medium",
-                    completionStatus.selfComplete ? "text-green-600" : "text-muted-foreground"
-                  )}>
-                    Self-Assessment ({selfScoresCount}/{totalItems})
-                    {completionStatus.selfNaCount > 0 && (
-                      <span className="text-muted-foreground font-normal"> · {completionStatus.selfNaCount} N/A</span>
-                    )}
-                  </span>
-                </div>
+              </div>
+
               </div>
               <Button 
                 onClick={handleSubmitClick}

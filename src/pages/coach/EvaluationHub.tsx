@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText, Sparkles, ClipboardPaste } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
 import { supabase } from '@/integrations/supabase/client';
@@ -68,6 +69,7 @@ export function EvaluationHub() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
   const [staffName, setStaffName] = useState<string>('');

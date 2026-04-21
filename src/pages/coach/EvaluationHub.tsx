@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, CalendarIcon, Upload, Mic, FileAudio, Download, X, Loader2, FileText, Sparkles, ClipboardPaste } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { getDomainColor } from '@/lib/domainColors';
 import { supabase } from '@/integrations/supabase/client';
@@ -68,6 +69,7 @@ export function EvaluationHub() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
   const [staffName, setStaffName] = useState<string>('');
@@ -884,22 +886,35 @@ export function EvaluationHub() {
   };
 
   const handleSubmitEvaluation = async () => {
-    if (!evalId || !evaluation) return;
-    
+    if (!evalId || !evaluation || !user) return;
+
     try {
       setIsSubmitting(true);
       setShowNaConfirmDialog(false);
 
-      await submitEvaluation(evalId);
-      
+      // Resolve the coach's staff.id for released_by attribution
+      let coachStaffId: string | undefined;
+      try {
+        const { data: coachStaff } = await supabase
+          .from('staff')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        coachStaffId = coachStaff?.id;
+      } catch (err) {
+        console.warn('Failed to resolve coach staff id for release:', err);
+      }
+
+      await submitEvaluation(evalId, coachStaffId);
+
       toast({
-        title: "Success",
-        description: "Evaluation submitted successfully",
+        title: "Submitted & released",
+        description: `${staffName || 'The staff member'} can now view the results.`,
         variant: "default"
       });
 
-      // Refresh evaluation data
-      await loadEvaluation();
+      // Navigate the coach to the same view the staff member sees
+      navigate(`/evaluation/${evalId}?returnTo=/coach/${staffId}`);
     } catch (error) {
       console.error('Failed to submit evaluation:', error);
       toast({
@@ -1690,12 +1705,13 @@ export function EvaluationHub() {
                    </span>
                 </div>
               </div>
-              <Button 
+              <Button
                 onClick={handleSubmitClick}
                 disabled={!completionStatus.canSubmit || isSubmitting}
                 className="bg-primary hover:bg-primary/90"
+                title="Submit and release results to the staff member"
               >
-                {isSubmitting ? "Submitting..." : "Submit Evaluation"}
+                {isSubmitting ? "Submitting..." : "Submit & Release to Staff"}
               </Button>
             </div>
           </CardContent>
@@ -1877,6 +1893,28 @@ export function EvaluationHub() {
                     ))}
                   </div>
 
+                  {/* Aggregated self-score (read-only, from weekly performance submissions). */}
+                  {evaluation.type === 'Quarterly' && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-2 text-xs text-muted-foreground"
+                    >
+                      <span className="font-medium uppercase tracking-wide">Their self-score:</span>
+                      {(item as any).self_score_sample_size && (item as any).self_score_sample_size >= 3 ? (
+                        <>
+                          <span className="px-2 py-0.5 rounded bg-muted text-foreground font-medium">
+                            {(item as any).self_score_avg ?? item.self_score}
+                          </span>
+                          <span>
+                            avg of {(item as any).self_score_sample_size} weekly submission{(item as any).self_score_sample_size === 1 ? '' : 's'}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="italic">Not enough data</span>
+                      )}
+                    </div>
+                  )}
+
                    {/* Conditional Notes */}
                    {(() => {
                      const isLowScore = item.observer_score !== null && item.observer_score <= 2;
@@ -2040,6 +2078,7 @@ export function EvaluationHub() {
           <SummaryTab
             summaryFeedback={summaryFeedback}
             extractedInsights={evaluation?.extracted_insights || null}
+            interviewTranscript={interviewTranscript}
           />
         </TabsContent>
       </Tabs>

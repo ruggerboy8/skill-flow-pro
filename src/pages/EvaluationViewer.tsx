@@ -7,10 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText, User, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, FileText, User, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { getEvaluation } from '@/lib/evaluations';
+import { getEvaluation, isLegacyInterviewEval } from '@/lib/evaluations';
 import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvaluationWithItems, ExtractedInsights, InsightsPerspective, DomainInsight } from '@/lib/evaluations';
@@ -305,11 +306,16 @@ export default function EvaluationViewer() {
   const observerScored = evaluation.items.filter(item => item.observer_score != null).length;
   const selfScored = evaluation.items.filter(item => item.self_score != null).length;
 
-  // Get insights perspectives
+  // Type detection
+  const isBaseline = evaluation.type === 'Baseline';
+  const isLegacy = isLegacyInterviewEval(evaluation as any);
+
+  // Get insights perspectives (only relevant for legacy interview-sourced evals)
   const extractedInsights = evaluation.extracted_insights;
-  // Check for self-assessment insights - either in unified structure or legacy format
-  const selfAssessmentPerspective = extractedInsights?.self_assessment || getLegacyAsSelfAssessment(extractedInsights || {});
-  const hasAnyInsights = selfAssessmentPerspective || (evaluation as any).summary_feedback;
+  const selfAssessmentPerspective = isLegacy
+    ? (extractedInsights?.self_assessment || getLegacyAsSelfAssessment(extractedInsights || {}))
+    : null;
+  const hasAnyInsights = selfAssessmentPerspective || (isLegacy && (evaluation as any).summary_feedback);
 
   return (
     <div className="space-y-6">
@@ -331,7 +337,8 @@ export default function EvaluationViewer() {
             Submitted {submittedDate}
           </p>
           <p className="text-sm text-muted-foreground">
-            Observer items scored {observerScored}/{totalItems} • Self items scored {selfScored}/{totalItems}
+            Observer items scored {observerScored}/{totalItems}
+            {!isBaseline && <> • Self items scored {selfScored}/{totalItems}</>}
           </p>
         </div>
         {needsReview && (
@@ -351,11 +358,34 @@ export default function EvaluationViewer() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="scores">Your Scores</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
+          {hasAnyInsights && <TabsTrigger value="insights">Insights</TabsTrigger>}
         </TabsList>
 
         {/* Scores Tab */}
         <TabsContent value="scores" className="space-y-6">
+          {/* Self-score explainer / legacy notice */}
+          {!isBaseline && (
+            <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2">
+              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              {isLegacy ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help underline decoration-dotted underline-offset-2">
+                        Self-scores in this evaluation came from a self-assessment interview.
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      Self-scores in this evaluation were collected through a self-assessment interview. We've since moved to averaging your weekly performance submissions.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <span>Your self-score is the average performance score you submitted during this quarter.</span>
+              )}
+            </div>
+          )}
+
           {sortedDomains.map(domainName => {
             const domainItems = groupedByDomain[domainName];
             
@@ -374,7 +404,7 @@ export default function EvaluationViewer() {
                   text: item.observer_note 
                 });
               }
-              if (item.self_note) {
+              if (!isBaseline && item.self_note) {
                 out.push({ 
                   source: 'Self', 
                   competency: item.competency_name_snapshot, 
@@ -411,8 +441,8 @@ export default function EvaluationViewer() {
                   {/* Header row */}
                   <div className="grid grid-cols-12 text-xs text-muted-foreground">
                     <div className="col-span-7">Competency</div>
-                    <div className="col-span-2 text-center">Observer</div>
-                    <div className="col-span-3 text-center">Self</div>
+                    <div className={isBaseline ? "col-span-5 text-center" : "col-span-2 text-center"}>Observer</div>
+                    {!isBaseline && <div className="col-span-3 text-center">Self</div>}
                   </div>
 
                   {/* Competency rows */}
@@ -425,12 +455,18 @@ export default function EvaluationViewer() {
                             <div className="text-xs text-muted-foreground italic">{item.competency_description_snapshot}</div>
                           )}
                         </div>
-                        <div className="col-span-2 flex justify-center">
+                        <div className={isBaseline ? "col-span-5 flex justify-center" : "col-span-2 flex justify-center"}>
                           <ReadOnlyScore value={item.observer_score} />
                         </div>
-                        <div className="col-span-3 flex justify-center">
-                          <ReadOnlyScore value={item.self_score} />
-                        </div>
+                        {!isBaseline && (
+                          <div className="col-span-3 flex justify-center">
+                            {item.self_score == null ? (
+                              <span className="text-xs text-muted-foreground italic">Not enough data</span>
+                            ) : (
+                              <ReadOnlyScore value={item.self_score} />
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -438,8 +474,8 @@ export default function EvaluationViewer() {
                   {/* Averages row */}
                   <div className="grid grid-cols-12 items-center pt-2 border-t">
                     <div className="col-span-7 text-sm font-medium">Averages</div>
-                    <div className="col-span-2 text-center text-sm">{avgObserver ?? '—'}</div>
-                    <div className="col-span-3 text-center text-sm">{avgSelf ?? '—'}</div>
+                    <div className={isBaseline ? "col-span-5 text-center text-sm" : "col-span-2 text-center text-sm"}>{avgObserver ?? '—'}</div>
+                    {!isBaseline && <div className="col-span-3 text-center text-sm">{avgSelf ?? '—'}</div>}
                   </div>
 
                   {/* Notes accordion */}
@@ -473,58 +509,57 @@ export default function EvaluationViewer() {
           })}
         </TabsContent>
 
-        {/* Insights Tab */}
-        <TabsContent value="insights" className="space-y-6">
-          {hasAnyInsights ? (
-            <>
-              {/* Legacy summary feedback display */}
-              {(evaluation as any).summary_feedback && !selfAssessmentPerspective && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Overall Feedback
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div 
-                      className="prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize((evaluation as any).summary_feedback || '') }}
-                    />
-                  </CardContent>
-                </Card>
-              )}
+        {/* Insights Tab — only rendered when legacy data exists */}
+        {hasAnyInsights && (
+          <TabsContent value="insights" className="space-y-6">
+            {/* Legacy summary feedback display */}
+            {(evaluation as any).summary_feedback && !selfAssessmentPerspective && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Overall Feedback
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div 
+                    className="prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize((evaluation as any).summary_feedback || '') }}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
-              {/* Self-Assessment Insights */}
-              {selfAssessmentPerspective && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <User className="w-5 h-5" />
-                      Self-Assessment Insights
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <PerspectiveCard 
-                      title="" 
-                      icon={User}
-                      perspective={selfAssessmentPerspective}
-                    />
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          ) : (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <AlertCircle className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
-                <p className="text-muted-foreground">
-                  Complete the self-assessment interview to see insights here.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+            {/* Self-Assessment Insights (legacy interview-sourced only) */}
+            {selfAssessmentPerspective && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="w-5 h-5" />
+                    Self-Assessment Insights
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          These insights came from the legacy self-assessment interview flow. We've since moved to averaging weekly performance submissions.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PerspectiveCard 
+                    title="" 
+                    icon={User}
+                    perspective={selfAssessmentPerspective}
+                  />
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

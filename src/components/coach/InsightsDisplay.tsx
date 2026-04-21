@@ -2,7 +2,8 @@ import React from 'react';
 import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, AlertCircle, FileText } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { User, FileText, Info } from 'lucide-react';
 import { getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import type { ExtractedInsights, DomainInsight, InsightsPerspective } from '@/lib/evaluations';
 
@@ -22,14 +23,9 @@ function getLegacyAsSelfAssessment(insights: ExtractedInsights): InsightsPerspec
   return null;
 }
 
-function PerspectiveCard({ 
-  perspective 
-}: { 
-  perspective: InsightsPerspective;
-}) {
+function PerspectiveCard({ perspective }: { perspective: InsightsPerspective }) {
   return (
     <div className="space-y-4">
-      {/* Summary */}
       {perspective.summary_html && (
         <div 
           className="prose prose-sm max-w-none text-sm"
@@ -37,7 +33,6 @@ function PerspectiveCard({
         />
       )}
       
-      {/* Domain Insights */}
       {perspective.domain_insights && perspective.domain_insights.length > 0 && (
         <div className="space-y-3">
           {perspective.domain_insights.map((insight, idx) => {
@@ -105,16 +100,28 @@ function PerspectiveCard({
 }
 
 export function InsightsDisplay({ summaryFeedback, extractedInsights }: InsightsDisplayProps) {
-  // Self-assessment insights (unified or legacy)
+  // Self-assessment insights (unified or legacy interview-sourced only)
   const selfAssessmentPerspective = extractedInsights?.self_assessment || 
     (extractedInsights ? getLegacyAsSelfAssessment(extractedInsights) : null);
 
-  // Legacy observation summary - only show for old evals that have summary_feedback but no self-assessment insights
   const hasLegacySummary = !!summaryFeedback && !selfAssessmentPerspective;
+  const hasAnyContent = !!selfAssessmentPerspective || hasLegacySummary;
+
+  // No legacy content → render nothing. New evals don't use interview insights.
+  if (!hasAnyContent) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-muted-foreground">
+          Self-scores are now aggregated automatically from weekly performance submissions.
+          No interview insights to display.
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Legacy Observation Summary - historical fallback only */}
+      {/* Legacy Observation Summary */}
       {hasLegacySummary && (
         <Card>
           <CardHeader>
@@ -132,26 +139,27 @@ export function InsightsDisplay({ summaryFeedback, extractedInsights }: Insights
         </Card>
       )}
 
-      {/* Self-Assessment Insights */}
-      {selfAssessmentPerspective ? (
+      {/* Self-Assessment Insights — legacy only */}
+      {selfAssessmentPerspective && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <User className="w-5 h-5" />
               Self-Assessment Insights
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    These insights came from the legacy self-assessment interview flow. We've since moved to averaging weekly performance submissions.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <PerspectiveCard perspective={selfAssessmentPerspective} />
-          </CardContent>
-        </Card>
-      ) : !hasLegacySummary && (
-        <Card>
-          <CardContent className="py-8">
-            <div className="flex items-center gap-3 justify-center text-muted-foreground">
-              <AlertCircle className="w-5 h-5" />
-              <p>Complete the self-assessment interview to see insights here.</p>
-            </div>
           </CardContent>
         </Card>
       )}

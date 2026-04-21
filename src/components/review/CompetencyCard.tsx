@@ -48,10 +48,12 @@ export function CompetencyCard({ item, selected, onSelect, disabled, readOnly }:
       {/* Scores row */}
       <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
         <span>Coach: <strong className="text-foreground">{item.observer_score}</strong></span>
-        {item.self_score != null && (
+        {item.self_score != null ? (
           <span>Self: <strong className="text-foreground">{item.self_score}</strong></span>
+        ) : (
+          <span className="italic">Self: Not enough data</span>
         )}
-        {item.gap != null && (
+        {item.gap != null && item.self_score != null && (
           <span className="text-muted-foreground">Gap: {item.gap > 0 ? '+' : ''}{item.gap}</span>
         )}
       </div>

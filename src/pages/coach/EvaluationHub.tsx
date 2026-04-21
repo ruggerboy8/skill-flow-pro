@@ -1705,12 +1705,13 @@ export function EvaluationHub() {
                    </span>
                 </div>
               </div>
-              <Button 
+              <Button
                 onClick={handleSubmitClick}
                 disabled={!completionStatus.canSubmit || isSubmitting}
                 className="bg-primary hover:bg-primary/90"
+                title="Submit and release results to the staff member"
               >
-                {isSubmitting ? "Submitting..." : "Submit Evaluation"}
+                {isSubmitting ? "Submitting..." : "Submit & Release to Staff"}
               </Button>
             </div>
           </CardContent>
@@ -2055,6 +2056,7 @@ export function EvaluationHub() {
           <SummaryTab
             summaryFeedback={summaryFeedback}
             extractedInsights={evaluation?.extracted_insights || null}
+            interviewTranscript={interviewTranscript}
           />
         </TabsContent>
       </Tabs>

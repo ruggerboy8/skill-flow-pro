@@ -35,8 +35,39 @@ export interface EvaluationWithItems extends Omit<Evaluation, 'extracted_insight
     tagline?: string;
     observer_is_na?: boolean;
     self_is_na?: boolean;
+    self_score_avg?: number | null;
+    self_score_sample_size?: number | null;
   })[];
   extracted_insights?: ExtractedInsights | null;
+}
+
+/**
+ * Detect whether an evaluation's self-scores were sourced from the legacy
+ * self-assessment interview flow (vs. aggregated weekly performance scores).
+ */
+export function isLegacyInterviewEval(evalData: {
+  interview_transcript?: string | null;
+  extracted_insights?: ExtractedInsights | null;
+}): boolean {
+  if (evalData.interview_transcript && evalData.interview_transcript.trim()) return true;
+  const insights = evalData.extracted_insights;
+  if (insights?.self_assessment) return true;
+  // Legacy structure that became the self-assessment perspective
+  if (insights?.evaluation_summary_html && insights?.domain_insights) return true;
+  return false;
+}
+
+/**
+ * Silently recompute aggregated self-scores from weekly performance submissions.
+ * No-op for Baseline evals. Errors are swallowed (best-effort background task).
+ */
+export async function refreshEvalSelfScores(evalId: string): Promise<void> {
+  try {
+    const { error } = await supabase.rpc('compute_eval_self_scores' as any, { p_eval_id: evalId });
+    if (error) console.warn('compute_eval_self_scores failed:', error.message);
+  } catch (err) {
+    console.warn('compute_eval_self_scores threw:', err);
+  }
 }
 
 export interface QuarterWindow {

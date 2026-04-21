@@ -904,6 +904,7 @@ export type Database = {
           learner_note: string | null
           location_id: string
           observed_at: string | null
+          participation_snapshot: Json | null
           program_year: number
           quarter: string | null
           released_at: string | null
@@ -933,6 +934,7 @@ export type Database = {
           learner_note?: string | null
           location_id: string
           observed_at?: string | null
+          participation_snapshot?: Json | null
           program_year: number
           quarter?: string | null
           released_at?: string | null
@@ -962,6 +964,7 @@ export type Database = {
           learner_note?: string | null
           location_id?: string
           observed_at?: string | null
+          participation_snapshot?: Json | null
           program_year?: number
           quarter?: string | null
           released_at?: string | null
@@ -3025,6 +3028,10 @@ export type Database = {
       compute_and_store_review_payload: {
         Args: { p_eval_id: string }
         Returns: Json
+      }
+      compute_eval_participation_snapshot: {
+        Args: { p_eval_id: string }
+        Returns: undefined
       }
       compute_eval_self_scores: {
         Args: { p_eval_id: string }

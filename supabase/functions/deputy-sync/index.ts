@@ -290,7 +290,7 @@ serve(async (req) => {
 
       for (const emp of employees) {
         const empId: number = emp.Id;
-        const displayName: string = emp.DisplayName ?? `${emp.FirstName ?? ''} ${emp.LastName ?? ''}`.trim() || `Employee ${empId}`;
+        const displayName: string = (emp.DisplayName ?? `${emp.FirstName ?? ''} ${emp.LastName ?? ''}`.trim()) || `Employee ${empId}`;
 
         if (employeeSample.length < 5) {
           employeeSample.push({ id: empId, display_name: displayName, active: !!emp.Active });

@@ -21,6 +21,44 @@ function normalizeName(name: string): string {
 }
 
 /**
+ * Token-overlap (Jaccard) similarity between two normalized names.
+ */
+function nameSimilarity(a: string, b: string): number {
+  const ta = new Set(normalizeName(a).split(/\s+/).filter(Boolean));
+  const tb = new Set(normalizeName(b).split(/\s+/).filter(Boolean));
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  const union = new Set([...ta, ...tb]).size;
+  return inter / union;
+}
+
+/**
+ * Find the best staff match for a Deputy display name.
+ * Returns exact match if available, otherwise top-scoring fuzzy match above threshold.
+ */
+function suggestStaffMatch(
+  deputyName: string,
+  staffList: Array<{ id: string; name: string }>,
+  threshold = 0.6
+): { id: string; name: string } | null {
+  const normDeputy = normalizeName(deputyName);
+  const exact = staffList.find((s) => normalizeName(s.name) === normDeputy);
+  if (exact) return exact;
+
+  let best: { id: string; name: string } | null = null;
+  let bestScore = 0;
+  for (const s of staffList) {
+    const score = nameSimilarity(deputyName, s.name);
+    if (score > bestScore) {
+      bestScore = score;
+      best = s;
+    }
+  }
+  return bestScore >= threshold ? best : null;
+}
+
+/**
  * Returns the Monday (UTC) of the week containing `date`.
  */
 function getWeekMonday(date: Date): Date {
@@ -69,7 +107,6 @@ async function refreshDeputyToken(
   const data = await response.json();
   const tokenExpiresAt = new Date(Date.now() + (data.expires_in ?? 86400) * 1000).toISOString();
 
-  // Persist the new token pair — refresh token rotates on every use
   await (supabase as any)
     .from('deputy_connections')
     .update({
@@ -104,7 +141,6 @@ serve(async (req) => {
       );
     }
 
-    // ── Auth ──────────────────────────────────────────────────────────────────
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -125,7 +161,6 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // ── Verify org admin ──────────────────────────────────────────────────────
     const { data: callerStaff, error: staffError } = await supabase
       .from('staff')
       .select('id, organization_id, is_org_admin, is_super_admin')
@@ -143,27 +178,41 @@ serve(async (req) => {
 
     // ── Parse request body ────────────────────────────────────────────────────
     // Supported params:
-    //   week_of: "YYYY-MM-DD"  — sync a specific week (defaults to current week)
-    //   dry_run: boolean       — if true (DEFAULT), report what would happen without
-    //                            writing any excusal records. Set to false explicitly
-    //                            to enable live excusal creation.
+    //   week_of: "YYYY-MM-DD"   — sync a specific week (defaults to current week)
+    //   dry_run: boolean        — if true (DEFAULT), report without writing.
+    //   employees_only: boolean — if true, only import employee mappings; skip
+    //                              timesheet processing and excusal writes.
+    //   days: number            — preview window in days (default 7); only used
+    //                              when dry_run is true.
     let body: Record<string, any> = {};
     try { body = await req.json(); } catch { /* empty body is fine */ }
 
     const dryRun: boolean = body.dry_run !== false; // default true
+    const employeesOnly: boolean = body.employees_only === true;
+    const previewDays: number = Math.max(1, Math.min(31, Number(body.days ?? 7)));
 
     const targetWeekMonday = body.week_of
       ? getWeekMonday(new Date(body.week_of))
       : getWeekMonday(new Date());
 
-    const weekOfStr = targetWeekMonday.toISOString().split('T')[0]; // "YYYY-MM-DD"
+    const weekOfStr = targetWeekMonday.toISOString().split('T')[0];
     const nextMonday = new Date(targetWeekMonday);
     nextMonday.setUTCDate(nextMonday.getUTCDate() + 7);
 
-    const startUnix = Math.floor(targetWeekMonday.getTime() / 1000);
-    const endUnix = Math.floor(nextMonday.getTime() / 1000);
+    // For dry-run preview: use a rolling N-day window ending now.
+    // For real sync: use the target week (Mon..Mon).
+    const windowStart = dryRun
+      ? new Date(Date.now() - previewDays * 24 * 60 * 60 * 1000)
+      : targetWeekMonday;
+    const windowEnd = dryRun ? new Date() : nextMonday;
 
-    console.log(`Deputy sync started — org ${orgId}, week of ${weekOfStr}, dry_run=${dryRun}`);
+    const startUnix = Math.floor(windowStart.getTime() / 1000);
+    const endUnix = Math.floor(windowEnd.getTime() / 1000);
+
+    console.log(
+      `Deputy sync — org ${orgId}, dry_run=${dryRun}, employees_only=${employeesOnly}, ` +
+      `window=${windowStart.toISOString()}..${windowEnd.toISOString()}`
+    );
 
     // ── Load connection ───────────────────────────────────────────────────────
     const { data: connection, error: connError } = await supabase
@@ -179,6 +228,19 @@ serve(async (req) => {
       );
     }
 
+    // ── Go-live gating: block real sync when toggle is off ────────────────────
+    if (!dryRun && !employeesOnly && !(connection as any).sync_enabled) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          skipped: true,
+          reason: 'sync_disabled',
+          message: 'Sync is disabled for this organization. Enable it in the Sync Settings before running a live sync.',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // ── Refresh token if expiring within 5 minutes ────────────────────────────
     let accessToken: string = connection.access_token;
     const expiresAt = new Date(connection.token_expires_at).getTime();
@@ -191,7 +253,91 @@ serve(async (req) => {
     const cleanRegion2 = String(connection.deputy_region).replace(/[^a-z0-9-]/gi, '').trim();
     const deputyBaseUrl = `https://${cleanInstall2}.${cleanRegion2}.deputy.com`;
 
-    // ── Query Deputy timesheets for the target week ───────────────────────────
+    // ── Load org staff (used for matching in all flows) ──────────────────────
+    const { data: allStaff } = await supabase
+      .from('staff')
+      .select('id, name')
+      .eq('organization_id', orgId)
+      .eq('active', true)
+      .eq('is_participant', true);
+    const staffList = (allStaff ?? []) as Array<{ id: string; name: string }>;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // EMPLOYEES-ONLY FLOW: pull roster, write/refresh mappings with suggestions
+    // ─────────────────────────────────────────────────────────────────────────
+    if (employeesOnly) {
+      const empRes = await fetch(`${deputyBaseUrl}/api/v1/resource/Employee/QUERY`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          search: { s1: { field: 'Active', data: true, type: 'eq' } },
+        }),
+      });
+
+      if (!empRes.ok) {
+        const errText = await empRes.text();
+        throw new Error(`Deputy employee query failed (${empRes.status}): ${errText}`);
+      }
+
+      const employees: any[] = await empRes.json();
+
+      let createdCount = 0;
+      let suggestedCount = 0;
+      const employeeSample: any[] = [];
+
+      for (const emp of employees) {
+        const empId: number = emp.Id;
+        const displayName: string = emp.DisplayName ?? `${emp.FirstName ?? ''} ${emp.LastName ?? ''}`.trim() || `Employee ${empId}`;
+
+        if (employeeSample.length < 5) {
+          employeeSample.push({ id: empId, display_name: displayName, active: !!emp.Active });
+        }
+
+        const { data: existing } = await supabase
+          .from('deputy_employee_mappings')
+          .select('id, staff_id, is_confirmed')
+          .eq('organization_id', orgId)
+          .eq('deputy_employee_id', empId)
+          .maybeSingle();
+
+        if (!existing) {
+          const suggested = suggestStaffMatch(displayName, staffList);
+          if (suggested) suggestedCount++;
+          createdCount++;
+          if (!dryRun) {
+            await supabase.from('deputy_employee_mappings').insert({
+              organization_id: orgId,
+              deputy_employee_id: empId,
+              deputy_display_name: displayName,
+              staff_id: suggested?.id ?? null,
+              is_confirmed: false,
+              is_ignored: false,
+            });
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({
+        ok: true,
+        employees_only: true,
+        dry_run: dryRun,
+        employee_count: employees.length,
+        new_mappings_created: dryRun ? 0 : createdCount,
+        new_mappings_would_create: dryRun ? createdCount : undefined,
+        auto_suggested: suggestedCount,
+        employee_sample: employeeSample,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // TIMESHEET FLOW (preview or real sync)
+    // ─────────────────────────────────────────────────────────────────────────
     const timesheetRes = await fetch(`${deputyBaseUrl}/api/v1/resource/Timesheet/QUERY`, {
       method: 'POST',
       headers: {
@@ -221,9 +367,9 @@ serve(async (req) => {
     const timesheets: any[] = await timesheetRes.json();
     console.log(`Retrieved ${timesheets.length} timesheets from Deputy`);
 
-    // ── Build employee maps ───────────────────────────────────────────────────
-    const allSeenEmployees = new Map<number, string>();    // deputyId → displayName
-    const employeesWhoWorked = new Set<number>();           // deputyIds
+    const allSeenEmployees = new Map<number, string>();
+    const employeesWhoWorked = new Set<number>();
+    const timesheetSample: any[] = [];
 
     for (const ts of timesheets) {
       const empId: number = ts.Employee;
@@ -236,67 +382,55 @@ serve(async (req) => {
       if (!ts.Discarded) {
         employeesWhoWorked.add(empId);
       }
-    }
 
-    // ── Auto-match new employees ──────────────────────────────────────────────
-    const { data: allStaff } = await supabase
-      .from('staff')
-      .select('id, name')
-      .eq('organization_id', orgId)
-      .eq('active', true)
-      .eq('is_participant', true);
-
-    const staffList = allStaff ?? [];
-
-    let newMappingsCreated = 0;
-    for (const [deputyEmpId, displayName] of allSeenEmployees.entries()) {
-      const { data: existing } = await supabase
-        .from('deputy_employee_mappings')
-        .select('id')
-        .eq('organization_id', orgId)
-        .eq('deputy_employee_id', deputyEmpId)
-        .maybeSingle();
-
-      if (!existing) {
-        const normalizedDeputy = normalizeName(displayName);
-        const matchedStaff = staffList.find(
-          (s) => normalizeName(s.name) === normalizedDeputy
-        );
-
-        if (!dryRun) {
-          await supabase.from('deputy_employee_mappings').insert({
-            organization_id: orgId,
-            deputy_employee_id: deputyEmpId,
-            deputy_display_name: displayName,
-            staff_id: matchedStaff?.id ?? null,
-            is_confirmed: false,
-            is_ignored: false,
-          });
-        }
-
-        newMappingsCreated++;
-        console.log(
-          `${dryRun ? '[DRY RUN] Would create' : 'New'} mapping: "${displayName}" → ${
-            matchedStaff ? `"${matchedStaff.name}"` : 'unmatched'
-          }`
-        );
+      if (timesheetSample.length < 5) {
+        const start = ts.StartTime ? new Date(ts.StartTime * 1000).toISOString() : null;
+        const end = ts.EndTime ? new Date(ts.EndTime * 1000).toISOString() : null;
+        const totalHours = ts.TotalTime != null ? Number(ts.TotalTime) : null;
+        timesheetSample.push({
+          employee_id: empId,
+          employee_name: displayName,
+          start,
+          end,
+          total_hours: totalHours,
+          discarded: !!ts.Discarded,
+        });
       }
     }
 
-    // ── Compute excusals for absent confirmed staff ───────────────────────────
-    const { data: confirmedMappings } = await supabase
+    // ── Determine "absent all week" candidates ───────────────────────────────
+    // For preview: use ALL existing mappings with a staff_id (regardless of
+    // confirmation) so the admin can see what would happen once they confirm.
+    // For real sync: only confirmed, non-ignored mappings.
+    const mappingsQuery = supabase
       .from('deputy_employee_mappings')
-      .select('deputy_employee_id, staff_id, deputy_display_name')
+      .select('deputy_employee_id, staff_id, deputy_display_name, is_confirmed, is_ignored')
       .eq('organization_id', orgId)
-      .eq('is_confirmed', true)
-      .eq('is_ignored', false)
       .not('staff_id', 'is', null);
 
-    const mappings = confirmedMappings ?? [];
+    const { data: mappingRows } = dryRun
+      ? await mappingsQuery
+      : await mappingsQuery.eq('is_confirmed', true).eq('is_ignored', false);
+
+    const mappings = (mappingRows ?? []) as any[];
+    const absentSample: string[] = [];
     const excusalInserts: Record<string, any>[] = [];
+    let absentCount = 0;
+
+    const syncStartDate: string | null = (connection as any).sync_start_date ?? null;
+    const beforeStartFloor = !dryRun && syncStartDate
+      ? syncStartDate > weekOfStr // string compare on YYYY-MM-DD is safe
+      : false;
 
     for (const mapping of mappings) {
-      if (!employeesWhoWorked.has(mapping.deputy_employee_id)) {
+      if (employeesWhoWorked.has(mapping.deputy_employee_id)) continue;
+      // For real sync: skip unconfirmed/ignored
+      if (!dryRun && (!mapping.is_confirmed || mapping.is_ignored)) continue;
+
+      absentCount++;
+      if (absentSample.length < 10) absentSample.push(mapping.deputy_display_name);
+
+      if (!dryRun && !beforeStartFloor) {
         excusalInserts.push({
           staff_id: mapping.staff_id,
           week_of: weekOfStr,
@@ -311,27 +445,44 @@ serve(async (req) => {
           reason: 'Absent per Deputy attendance data (auto-synced)',
           created_by: null,
         });
-        console.log(`${
-          dryRun ? '[DRY RUN] Would excuse' : 'Absent all week'
-        }: ${mapping.deputy_display_name}`);
       }
     }
 
-    if (!dryRun && excusalInserts.length > 0) {
-      const { error: excusalError } = await supabase
-        .from('excused_submissions')
-        .upsert(excusalInserts, {
-          onConflict: 'staff_id,week_of,metric',
-          ignoreDuplicates: true,
-        });
-
-      if (excusalError) {
-        console.error('Error inserting excusal records:', excusalError);
-      }
-    }
-
-    // ── Update sync metadata (only on real runs) ──────────────────────────────
+    // ── Auto-create new mappings for never-seen Deputy employees (real sync only)
+    let newMappingsCreated = 0;
     if (!dryRun) {
+      for (const [deputyEmpId, displayName] of allSeenEmployees.entries()) {
+        const { data: existing } = await supabase
+          .from('deputy_employee_mappings')
+          .select('id')
+          .eq('organization_id', orgId)
+          .eq('deputy_employee_id', deputyEmpId)
+          .maybeSingle();
+
+        if (!existing) {
+          const suggested = suggestStaffMatch(displayName, staffList);
+          await supabase.from('deputy_employee_mappings').insert({
+            organization_id: orgId,
+            deputy_employee_id: deputyEmpId,
+            deputy_display_name: displayName,
+            staff_id: suggested?.id ?? null,
+            is_confirmed: false,
+            is_ignored: false,
+          });
+          newMappingsCreated++;
+        }
+      }
+
+      if (excusalInserts.length > 0) {
+        const { error: excusalError } = await supabase
+          .from('excused_submissions')
+          .upsert(excusalInserts, {
+            onConflict: 'staff_id,week_of,metric',
+            ignoreDuplicates: true,
+          });
+        if (excusalError) console.error('Error inserting excusal records:', excusalError);
+      }
+
       await supabase
         .from('deputy_connections')
         .update({
@@ -342,21 +493,28 @@ serve(async (req) => {
         .eq('organization_id', orgId);
     }
 
-    const summary = {
+    const summary: Record<string, any> = {
       ok: true,
       dry_run: dryRun,
       week_of: weekOfStr,
-      timesheets_retrieved: timesheets.length,
-      deputy_employees_seen: allSeenEmployees.size,
+      window_start: windowStart.toISOString(),
+      window_end: windowEnd.toISOString(),
+      preview_days: dryRun ? previewDays : undefined,
+      timesheet_count: timesheets.length,
+      timesheet_sample: dryRun ? timesheetSample : undefined,
+      employee_count: allSeenEmployees.size,
+      employee_sample: dryRun
+        ? Array.from(allSeenEmployees.entries()).slice(0, 5).map(([id, name]) => ({ id, display_name: name }))
+        : undefined,
       employees_who_worked: employeesWhoWorked.size,
+      absent_all_week_count: absentCount,
+      absent_all_week_sample: dryRun ? absentSample : undefined,
+      sync_start_date: syncStartDate,
+      skipped_before_start_date: beforeStartFloor || undefined,
       new_mappings_created: dryRun ? 0 : newMappingsCreated,
-      new_mappings_would_create: dryRun ? newMappingsCreated : undefined,
-      confirmed_mappings_checked: mappings.length,
-      staff_absent_all_week: excusalInserts.length / 2,
       excusal_records_created: dryRun ? 0 : excusalInserts.length,
-      excusal_records_would_create: dryRun ? excusalInserts.length : undefined,
       note: dryRun
-        ? 'DRY RUN — no data was written. Pass dry_run: false to create mappings and excusals.'
+        ? 'DRY RUN — no data was written. Use this to verify the data shape before going live.'
         : undefined,
     };
 

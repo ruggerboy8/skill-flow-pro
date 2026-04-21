@@ -886,22 +886,35 @@ export function EvaluationHub() {
   };
 
   const handleSubmitEvaluation = async () => {
-    if (!evalId || !evaluation) return;
-    
+    if (!evalId || !evaluation || !user) return;
+
     try {
       setIsSubmitting(true);
       setShowNaConfirmDialog(false);
 
-      await submitEvaluation(evalId);
-      
+      // Resolve the coach's staff.id for released_by attribution
+      let coachStaffId: string | undefined;
+      try {
+        const { data: coachStaff } = await supabase
+          .from('staff')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        coachStaffId = coachStaff?.id;
+      } catch (err) {
+        console.warn('Failed to resolve coach staff id for release:', err);
+      }
+
+      await submitEvaluation(evalId, coachStaffId);
+
       toast({
-        title: "Success",
-        description: "Evaluation submitted successfully",
+        title: "Submitted & released",
+        description: `${staffName || 'The staff member'} can now view the results.`,
         variant: "default"
       });
 
-      // Refresh evaluation data
-      await loadEvaluation();
+      // Navigate the coach to the same view the staff member sees
+      navigate(`/evaluation/${evalId}?returnTo=/coach/${staffId}`);
     } catch (error) {
       console.error('Failed to submit evaluation:', error);
       toast({

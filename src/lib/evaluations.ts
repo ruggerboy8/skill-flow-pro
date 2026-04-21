@@ -35,8 +35,39 @@ export interface EvaluationWithItems extends Omit<Evaluation, 'extracted_insight
     tagline?: string;
     observer_is_na?: boolean;
     self_is_na?: boolean;
+    self_score_avg?: number | null;
+    self_score_sample_size?: number | null;
   })[];
   extracted_insights?: ExtractedInsights | null;
+}
+
+/**
+ * Detect whether an evaluation's self-scores were sourced from the legacy
+ * self-assessment interview flow (vs. aggregated weekly performance scores).
+ */
+export function isLegacyInterviewEval(evalData: {
+  interview_transcript?: string | null;
+  extracted_insights?: ExtractedInsights | null;
+}): boolean {
+  if (evalData.interview_transcript && evalData.interview_transcript.trim()) return true;
+  const insights = evalData.extracted_insights;
+  if (insights?.self_assessment) return true;
+  // Legacy structure that became the self-assessment perspective
+  if (insights?.evaluation_summary_html && insights?.domain_insights) return true;
+  return false;
+}
+
+/**
+ * Silently recompute aggregated self-scores from weekly performance submissions.
+ * No-op for Baseline evals. Errors are swallowed (best-effort background task).
+ */
+export async function refreshEvalSelfScores(evalId: string): Promise<void> {
+  try {
+    const { error } = await supabase.rpc('compute_eval_self_scores' as any, { p_eval_id: evalId });
+    if (error) console.warn('compute_eval_self_scores failed:', error.message);
+  } catch (err) {
+    console.warn('compute_eval_self_scores threw:', err);
+  }
 }
 
 export interface QuarterWindow {
@@ -161,6 +192,9 @@ export async function createDraftEvaluation({
   if (itemsError) {
     throw new Error(`Failed to create evaluation items: ${itemsError.message}`);
   }
+
+  // Silently aggregate weekly self-scores for Quarterly evals (no-op for Baseline).
+  await refreshEvalSelfScores(evaluation.id);
 
   return { evaluation, items: items || [] };
 }
@@ -424,9 +458,13 @@ export async function updateInterviewTranscript(
 }
 
 /**
- * Submit an evaluation (mark as completed)
+ * Submit an evaluation (mark as completed). Refreshes aggregated self-scores
+ * one last time to capture any late weekly submissions.
  */
 export async function submitEvaluation(evalId: string) {
+  // Best-effort silent recompute right before flipping status
+  await refreshEvalSelfScores(evalId);
+
   const { error } = await supabase
     .from('evaluations')
     .update({ status: 'submitted' })
@@ -477,23 +515,23 @@ export function isEvaluationComplete(evaluation: EvaluationWithItems): {
   const observerComplete = evaluation.items.every(
     item => item.observer_score !== null || item.observer_is_na === true
   );
-  const selfComplete = evaluation.items.every(
-    item => item.self_score !== null || item.self_is_na === true
-  );
-  
+  // Self-scores are now auto-aggregated from weekly performance submissions.
+  // They no longer gate submission. Kept in the return shape for back-compat.
+  const selfComplete = true;
+
   const observerNaCount = evaluation.items.filter(item => item.observer_is_na === true).length;
-  const selfNaCount = evaluation.items.filter(item => item.self_is_na === true).length;
-  const naCount = observerNaCount + selfNaCount;
-  
+  const selfNaCount = 0;
+  const naCount = observerNaCount;
+
   // Count items with observer score of 1 or 2 that are missing notes
   const missingObserverNotes = evaluation.items.filter(
     item => item.observer_score !== null && item.observer_score <= 2 && (!item.observer_note || item.observer_note.trim() === '')
   ).length;
-  
+
   return {
     observerComplete,
     selfComplete,
-    canSubmit: observerComplete && selfComplete && missingObserverNotes === 0,
+    canSubmit: observerComplete && missingObserverNotes === 0,
     observerNaCount,
     selfNaCount,
     naCount,
@@ -615,16 +653,16 @@ export function getQuarterWindow(now: Date, timezone: string): QuarterWindow {
 export async function isDraftComplete(evalId: string): Promise<boolean> {
   const { data: items, error } = await supabase
     .from('evaluation_items')
-    .select('observer_score, self_score, observer_is_na, self_is_na')
+    .select('observer_score, observer_is_na')
     .eq('evaluation_id', evalId);
 
   if (error || !items || items.length === 0) {
     return false;
   }
 
-  return items.every(item => 
-    (item.observer_score !== null || item.observer_is_na === true) && 
-    (item.self_score !== null || item.self_is_na === true)
+  // Self-scores no longer gate completion (auto-aggregated from weekly scores).
+  return items.every(item =>
+    item.observer_score !== null || item.observer_is_na === true
   );
 }
 

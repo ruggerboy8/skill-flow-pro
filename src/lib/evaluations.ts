@@ -70,6 +70,30 @@ export async function refreshEvalSelfScores(evalId: string): Promise<void> {
   }
 }
 
+/**
+ * Silently recompute the participation snapshot (12-week submission history)
+ * frozen onto the evaluation. No-op for Baseline. Best-effort.
+ */
+export async function refreshEvalParticipationSnapshot(evalId: string): Promise<void> {
+  try {
+    const { error } = await supabase.rpc('compute_eval_participation_snapshot' as any, { p_eval_id: evalId });
+    if (error) console.warn('compute_eval_participation_snapshot failed:', error.message);
+  } catch (err) {
+    console.warn('compute_eval_participation_snapshot threw:', err);
+  }
+}
+
+export interface ParticipationSnapshot {
+  window_start: string;
+  window_end: string;
+  weeks_in_window: number;
+  confidence_completed: number;
+  performance_completed: number;
+  on_time_count: number;
+  total_self_score_submissions: number;
+  competencies_with_data: number;
+}
+
 export interface QuarterWindow {
   isInWindow: boolean;
   targetQuarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
@@ -458,16 +482,17 @@ export async function updateInterviewTranscript(
 }
 
 /**
- * Submit an evaluation (mark as completed) AND release it to the staff member.
- * Refreshes aggregated self-scores first, then flips status, then calls the
- * release RPC so the staff member can immediately see their results.
+ * Submit an evaluation (mark as completed). Refreshes aggregated self-scores
+ * and the participation snapshot first, then flips status to `submitted`.
  *
- * @param evalId - the evaluation id
- * @param releasedByStaffId - staff.id of the coach submitting (for released_by)
+ * Does NOT release to staff — release is a deliberate admin action handled
+ * separately via the Delivery tab in EvalResults v2.
  */
-export async function submitEvaluation(evalId: string, releasedByStaffId?: string) {
-  // Best-effort silent recompute right before flipping status
+export async function submitEvaluation(evalId: string, _releasedByStaffId?: string) {
+  // Best-effort silent recomputes right before flipping status so the snapshot
+  // and aggregated self-scores are frozen at submission time.
   await refreshEvalSelfScores(evalId);
+  await refreshEvalParticipationSnapshot(evalId);
 
   const { error } = await supabase
     .from('evaluations')
@@ -476,16 +501,6 @@ export async function submitEvaluation(evalId: string, releasedByStaffId?: strin
 
   if (error) {
     throw new Error(`Failed to submit evaluation: ${error.message}`);
-  }
-
-  // Auto-release to staff. Self-assessment interview no longer exists, so
-  // there's no reason to hold the eval back from the staff member.
-  if (releasedByStaffId) {
-    try {
-      await setEvaluationVisibility(evalId, true, releasedByStaffId);
-    } catch (err) {
-      console.warn('Auto-release after submit failed:', err);
-    }
   }
 }
 

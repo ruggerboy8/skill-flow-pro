@@ -15,6 +15,7 @@ import { getEvaluation, isLegacyInterviewEval } from '@/lib/evaluations';
 import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainOrderIndex } from '@/lib/domainUtils';
 import type { EvaluationWithItems, ExtractedInsights, InsightsPerspective, DomainInsight } from '@/lib/evaluations';
+import { ParticipationSnapshotCard, type ParticipationSnapshot } from '@/components/evaluations/ParticipationSnapshotCard';
 
 const SCORE_PILLS = [
   { v: 1, cls: 'bg-red-100 text-red-800 border-red-200' },
@@ -363,6 +364,14 @@ export default function EvaluationViewer() {
 
         {/* Scores Tab */}
         <TabsContent value="scores" className="space-y-6">
+          {/* Participation snapshot — frozen at submit time */}
+          {!isBaseline && (
+            <ParticipationSnapshotCard
+              snapshot={(evaluation as any).participation_snapshot as ParticipationSnapshot | null}
+              evalType={evaluation.type}
+            />
+          )}
+
           {/* Self-score explainer / legacy notice */}
           {!isBaseline && (
             <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2">

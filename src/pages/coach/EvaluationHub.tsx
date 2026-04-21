@@ -892,29 +892,16 @@ export function EvaluationHub() {
       setIsSubmitting(true);
       setShowNaConfirmDialog(false);
 
-      // Resolve the coach's staff.id for released_by attribution
-      let coachStaffId: string | undefined;
-      try {
-        const { data: coachStaff } = await supabase
-          .from('staff')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        coachStaffId = coachStaff?.id;
-      } catch (err) {
-        console.warn('Failed to resolve coach staff id for release:', err);
-      }
-
-      await submitEvaluation(evalId, coachStaffId);
+      await submitEvaluation(evalId);
 
       toast({
-        title: "Submitted & released",
-        description: `${staffName || 'The staff member'} can now view the results.`,
+        title: "Evaluation submitted",
+        description: `Release ${staffName || 'the staff member'}'s results from the Delivery tab when ready.`,
         variant: "default"
       });
 
-      // Navigate the coach to the same view the staff member sees
-      navigate(`/evaluation/${evalId}?returnTo=/coach/${staffId}`);
+      // Return coach to the staff hub list, not the staff-facing eval view.
+      navigate(`/coach/${staffId}`);
     } catch (error) {
       console.error('Failed to submit evaluation:', error);
       toast({
@@ -1709,9 +1696,9 @@ export function EvaluationHub() {
                 onClick={handleSubmitClick}
                 disabled={!completionStatus.canSubmit || isSubmitting}
                 className="bg-primary hover:bg-primary/90"
-                title="Submit and release results to the staff member"
+                title="Submit. Release to staff later from the Delivery tab."
               >
-                {isSubmitting ? "Submitting..." : "Submit & Release to Staff"}
+                {isSubmitting ? "Submitting..." : "Submit Evaluation"}
               </Button>
             </div>
           </CardContent>
@@ -2079,6 +2066,8 @@ export function EvaluationHub() {
             summaryFeedback={summaryFeedback}
             extractedInsights={evaluation?.extracted_insights || null}
             interviewTranscript={interviewTranscript}
+            participationSnapshot={(evaluation as any)?.participation_snapshot || null}
+            evalType={evaluation?.type || null}
           />
         </TabsContent>
       </Tabs>

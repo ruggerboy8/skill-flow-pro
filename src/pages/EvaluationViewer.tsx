@@ -306,11 +306,16 @@ export default function EvaluationViewer() {
   const observerScored = evaluation.items.filter(item => item.observer_score != null).length;
   const selfScored = evaluation.items.filter(item => item.self_score != null).length;
 
-  // Get insights perspectives
+  // Type detection
+  const isBaseline = evaluation.type === 'Baseline';
+  const isLegacy = isLegacyInterviewEval(evaluation as any);
+
+  // Get insights perspectives (only relevant for legacy interview-sourced evals)
   const extractedInsights = evaluation.extracted_insights;
-  // Check for self-assessment insights - either in unified structure or legacy format
-  const selfAssessmentPerspective = extractedInsights?.self_assessment || getLegacyAsSelfAssessment(extractedInsights || {});
-  const hasAnyInsights = selfAssessmentPerspective || (evaluation as any).summary_feedback;
+  const selfAssessmentPerspective = isLegacy
+    ? (extractedInsights?.self_assessment || getLegacyAsSelfAssessment(extractedInsights || {}))
+    : null;
+  const hasAnyInsights = selfAssessmentPerspective || (isLegacy && (evaluation as any).summary_feedback);
 
   return (
     <div className="space-y-6">

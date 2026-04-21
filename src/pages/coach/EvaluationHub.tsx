@@ -1740,7 +1740,6 @@ export function EvaluationHub() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
           <TabsTrigger value="observation">Observation</TabsTrigger>
-          <TabsTrigger value="self-assessment">Self-Assessment</TabsTrigger>
           <TabsTrigger value="summary" className="flex items-center gap-2">
             Summary
             {recordingState.isRecording && (

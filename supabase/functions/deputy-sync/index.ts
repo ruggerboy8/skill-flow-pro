@@ -431,7 +431,7 @@ serve(async (req) => {
           await supabase.from('deputy_employee_mappings').insert({
             organization_id: orgId,
             staff_id: p.id,
-            deputy_employee_id: finalSuggested?.id ?? 0, // 0 = unmapped placeholder
+            deputy_employee_id: finalSuggested?.id ?? null, // NULL = unmapped placeholder
             deputy_display_name: finalSuggested?.display_name ?? '— not yet matched —',
             is_confirmed: false,
             is_ignored: false,
@@ -542,7 +542,7 @@ serve(async (req) => {
       : await mappingsQuery.eq('is_confirmed', true).eq('is_ignored', false);
 
     const mappings = (mappingRows ?? []).filter(
-      (m: any) => m.deputy_employee_id && m.deputy_employee_id !== 0
+      (m: any) => m.deputy_employee_id != null
     ) as any[];
 
     // ── Pre-load existing weekly_scores for the target week ─────────────────

@@ -383,6 +383,23 @@ export default function EvaluationViewer() {
             />
           )}
 
+          {/* Evaluator's free-form final note */}
+          {(evaluation as any).evaluator_note && (evaluation as any).evaluator_note.trim() && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  A note from {evaluatorName || 'your evaluator'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">
+                  {(evaluation as any).evaluator_note}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Self-score explainer / legacy notice */}
           {!isBaseline && (
             <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2">

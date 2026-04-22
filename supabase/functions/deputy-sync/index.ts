@@ -10,9 +10,6 @@ const CALLBACK_URL = 'https://yeypngaufuualdfzcjpk.supabase.co/functions/v1/depu
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/**
- * Strip professional suffixes so "Alex Otto, DDS" matches "Alex Otto".
- */
 function normalizeName(name: string): string {
   return name
     .replace(/,?\s*(DDS|DMD|MD|RDH|RDHA|DA|CDA|OM|OMS)\.?/gi, '')
@@ -20,9 +17,6 @@ function normalizeName(name: string): string {
     .toLowerCase();
 }
 
-/**
- * Token-overlap (Jaccard) similarity between two normalized names.
- */
 function nameSimilarity(a: string, b: string): number {
   const ta = new Set(normalizeName(a).split(/\s+/).filter(Boolean));
   const tb = new Set(normalizeName(b).split(/\s+/).filter(Boolean));
@@ -33,47 +27,59 @@ function nameSimilarity(a: string, b: string): number {
   return inter / union;
 }
 
+interface DeputyEmployee {
+  id: number;
+  display_name: string;
+  email: string | null;
+  position: string | null;
+  operational_unit_name: string | null;
+}
+
 /**
- * Find the best staff match for a Deputy display name.
- * Returns exact match if available, otherwise top-scoring fuzzy match above threshold.
+ * Find best Deputy employee for an SFP staff member.
+ * Priority: exact email > exact normalized name > fuzzy name (Jaccard ≥ threshold).
  */
-function suggestStaffMatch(
-  deputyName: string,
-  staffList: Array<{ id: string; name: string }>,
+function suggestDeputyForStaff(
+  staff: { name: string; email: string | null },
+  deputyEmployees: DeputyEmployee[],
   threshold = 0.6
-): { id: string; name: string } | null {
-  const normDeputy = normalizeName(deputyName);
-  const exact = staffList.find((s) => normalizeName(s.name) === normDeputy);
+): DeputyEmployee | null {
+  // 1. Email exact match (case-insensitive)
+  if (staff.email) {
+    const lower = staff.email.toLowerCase();
+    const byEmail = deputyEmployees.find(
+      (d) => d.email && d.email.toLowerCase() === lower
+    );
+    if (byEmail) return byEmail;
+  }
+
+  // 2. Exact normalized name
+  const normStaff = normalizeName(staff.name);
+  const exact = deputyEmployees.find((d) => normalizeName(d.display_name) === normStaff);
   if (exact) return exact;
 
-  let best: { id: string; name: string } | null = null;
+  // 3. Best fuzzy name match
+  let best: DeputyEmployee | null = null;
   let bestScore = 0;
-  for (const s of staffList) {
-    const score = nameSimilarity(deputyName, s.name);
+  for (const d of deputyEmployees) {
+    const score = nameSimilarity(staff.name, d.display_name);
     if (score > bestScore) {
       bestScore = score;
-      best = s;
+      best = d;
     }
   }
   return bestScore >= threshold ? best : null;
 }
 
-/**
- * Returns the Monday (UTC) of the week containing `date`.
- */
 function getWeekMonday(date: Date): Date {
   const d = new Date(date);
-  const day = d.getUTCDay(); // 0=Sun, 1=Mon…6=Sat
+  const day = d.getUTCDay();
   const daysToMonday = day === 0 ? -6 : 1 - day;
   d.setUTCDate(d.getUTCDate() + daysToMonday);
   d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 
-/**
- * Refresh Deputy access token using the stored refresh token.
- * Updates the deputy_connections row in place and returns the new access token.
- */
 async function refreshDeputyToken(
   connection: Record<string, any>,
   clientId: string,
@@ -120,6 +126,107 @@ async function refreshDeputyToken(
   return data.access_token;
 }
 
+/**
+ * Fetch Deputy employees enriched with Position name and OperationalUnit (home location) name.
+ * Deputy returns numeric IDs for Position/OperationalUnit; we resolve them to display names
+ * via separate lookups so admins can disambiguate same-name staff.
+ */
+async function fetchEnrichedDeputyEmployees(
+  baseUrl: string,
+  accessToken: string
+): Promise<DeputyEmployee[]> {
+  const empRes = await fetch(`${baseUrl}/api/v1/resource/Employee/QUERY`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      search: { s1: { field: 'Active', data: true, type: 'eq' } },
+    }),
+  });
+
+  if (!empRes.ok) {
+    const errText = await empRes.text();
+    throw new Error(`Deputy employee query failed (${empRes.status}): ${errText}`);
+  }
+
+  const employees: any[] = await empRes.json();
+
+  // Collect referenced Position + OperationalUnit IDs to resolve in batch.
+  const positionIds = new Set<number>();
+  const opUnitIds = new Set<number>();
+  for (const e of employees) {
+    if (e.Position) positionIds.add(e.Position);
+    if (e.OperationalUnit) opUnitIds.add(e.OperationalUnit);
+  }
+
+  const positionNames = new Map<number, string>();
+  const opUnitNames = new Map<number, string>();
+
+  // Resolve Positions
+  if (positionIds.size > 0) {
+    try {
+      const posRes = await fetch(`${baseUrl}/api/v1/resource/CompanyPeriod/QUERY`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      // CompanyPeriod won't return positions; use the proper endpoint instead
+      void posRes;
+    } catch {/* ignore */}
+
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/resource/EmployeeRole`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        const roles: any[] = await res.json();
+        for (const r of roles) {
+          if (r.Id && r.Role) positionNames.set(r.Id, String(r.Role));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to resolve EmployeeRole names:', err);
+    }
+  }
+
+  // Resolve OperationalUnits (home location / area)
+  if (opUnitIds.size > 0) {
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/resource/OperationalUnit`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        const units: any[] = await res.json();
+        for (const u of units) {
+          if (u.Id) {
+            const label = u.OperationalUnitName ?? u.Code ?? `Unit ${u.Id}`;
+            opUnitNames.set(u.Id, String(label));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to resolve OperationalUnit names:', err);
+    }
+  }
+
+  return employees.map((e: any): DeputyEmployee => {
+    const id: number = e.Id;
+    const displayName: string =
+      (e.DisplayName ?? `${e.FirstName ?? ''} ${e.LastName ?? ''}`.trim()) || `Employee ${id}`;
+    return {
+      id,
+      display_name: displayName,
+      email: e.Email ?? e.UserEmail ?? null,
+      position: e.Position ? positionNames.get(e.Position) ?? null : null,
+      operational_unit_name: e.OperationalUnit ? opUnitNames.get(e.OperationalUnit) ?? null : null,
+    };
+  });
+}
+
 // ─── Main handler ────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -161,9 +268,6 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // NOTE: a single auth user can have multiple staff rows (super-admin who
-    // also belongs to a partner org). Pick the row with admin rights + org_id,
-    // prioritising super_admin > org_admin > any.
     const { data: staffRows, error: staffError } = await supabase
       .from('staff')
       .select('id, organization_id, is_org_admin, is_super_admin')
@@ -197,20 +301,14 @@ serve(async (req) => {
 
     const orgId = callerStaff.organization_id;
 
-    // ── Parse request body ────────────────────────────────────────────────────
-    // Supported params:
-    //   week_of: "YYYY-MM-DD"   — sync a specific week (defaults to current week)
-    //   dry_run: boolean        — if true (DEFAULT), report without writing.
-    //   employees_only: boolean — if true, only import employee mappings; skip
-    //                              timesheet processing and excusal writes.
-    //   days: number            — preview window in days (default 7); only used
-    //                              when dry_run is true.
     let body: Record<string, any> = {};
     try { body = await req.json(); } catch { /* empty body is fine */ }
 
     const dryRun: boolean = body.dry_run !== false; // default true
     const employeesOnly: boolean = body.employees_only === true;
-    const previewDays: number = Math.max(1, Math.min(31, Number(body.days ?? 7)));
+    // Default preview window is 30 days (was 7) — gives admins much better visibility
+    // into who's actually working before flipping the live sync on.
+    const previewDays: number = Math.max(1, Math.min(31, Number(body.days ?? 30)));
 
     const targetWeekMonday = body.week_of
       ? getWeekMonday(new Date(body.week_of))
@@ -220,8 +318,8 @@ serve(async (req) => {
     const nextMonday = new Date(targetWeekMonday);
     nextMonday.setUTCDate(nextMonday.getUTCDate() + 7);
 
-    // For dry-run preview: use a rolling N-day window ending now.
-    // For real sync: use the target week (Mon..Mon).
+    // For dry-run preview: rolling N-day window ending now (visibility).
+    // For real sync: the target week (Mon..Mon).
     const windowStart = dryRun
       ? new Date(Date.now() - previewDays * 24 * 60 * 60 * 1000)
       : targetWeekMonday;
@@ -255,7 +353,6 @@ serve(async (req) => {
       );
     }
 
-    // ── Go-live gating: block real sync when toggle is off ────────────────────
     if (!dryRun && !employeesOnly && !(connection as any).sync_enabled) {
       return new Response(
         JSON.stringify({
@@ -268,7 +365,6 @@ serve(async (req) => {
       );
     }
 
-    // ── Refresh token if expiring within 5 minutes ────────────────────────────
     let accessToken: string = connection.access_token;
     const expiresAt = new Date(connection.token_expires_at).getTime();
     if (expiresAt < Date.now() + 5 * 60 * 1000) {
@@ -280,70 +376,66 @@ serve(async (req) => {
     const cleanRegion2 = String(connection.deputy_region).replace(/[^a-z0-9-]/gi, '').trim();
     const deputyBaseUrl = `https://${cleanInstall2}.${cleanRegion2}.deputy.com`;
 
-    // ── Load org staff (used for matching in all flows) ──────────────────────
-    const { data: allStaff } = await supabase
+    // ── Load org PARTICIPANTS (the universe we care about) ───────────────────
+    // Excusal logic only matters for staff who actually fill out Pro Moves.
+    // We pivot the model: iterate participants, find their Deputy match — not
+    // the other way around.
+    const { data: participantsRaw } = await supabase
       .from('staff')
-      .select('id, name')
+      .select('id, name, email')
       .eq('organization_id', orgId)
       .eq('active', true)
-      .eq('is_participant', true);
-    const staffList = (allStaff ?? []) as Array<{ id: string; name: string }>;
+      .eq('is_participant', true)
+      .order('name');
+    const participants = (participantsRaw ?? []) as Array<{ id: string; name: string; email: string | null }>;
 
     // ─────────────────────────────────────────────────────────────────────────
-    // EMPLOYEES-ONLY FLOW: pull roster, write/refresh mappings with suggestions
+    // EMPLOYEES-ONLY FLOW
+    // Fetch enriched Deputy roster, then ensure every SFP participant has
+    // exactly one mapping row (auto-suggested where possible).
     // ─────────────────────────────────────────────────────────────────────────
     if (employeesOnly) {
-      const empRes = await fetch(`${deputyBaseUrl}/api/v1/resource/Employee/QUERY`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          search: { s1: { field: 'Active', data: true, type: 'eq' } },
-        }),
-      });
+      const deputyEmployees = await fetchEnrichedDeputyEmployees(deputyBaseUrl, accessToken);
 
-      if (!empRes.ok) {
-        const errText = await empRes.text();
-        throw new Error(`Deputy employee query failed (${empRes.status}): ${errText}`);
+      // Persist enrichment on existing rows + suggested mappings for participants
+      // missing one. We never create rows keyed only on a Deputy employee — every
+      // mapping row anchors to an SFP participant.
+      const { data: existingMappings } = await supabase
+        .from('deputy_employee_mappings')
+        .select('id, staff_id, deputy_employee_id')
+        .eq('organization_id', orgId);
+      const existingByStaff = new Map<string, any>();
+      const claimedDeputyIds = new Set<number>();
+      for (const m of existingMappings ?? []) {
+        if ((m as any).staff_id) existingByStaff.set((m as any).staff_id, m);
+        if ((m as any).deputy_employee_id) claimedDeputyIds.add((m as any).deputy_employee_id);
       }
-
-      const employees: any[] = await empRes.json();
 
       let createdCount = 0;
       let suggestedCount = 0;
-      const employeeSample: any[] = [];
 
-      for (const emp of employees) {
-        const empId: number = emp.Id;
-        const displayName: string = (emp.DisplayName ?? `${emp.FirstName ?? ''} ${emp.LastName ?? ''}`.trim()) || `Employee ${empId}`;
+      for (const p of participants) {
+        if (existingByStaff.has(p.id)) continue;
 
-        if (employeeSample.length < 5) {
-          employeeSample.push({ id: empId, display_name: displayName, active: !!emp.Active });
+        const suggested = suggestDeputyForStaff(p, deputyEmployees);
+        // Don't suggest the same Deputy employee for two participants
+        const finalSuggested = suggested && !claimedDeputyIds.has(suggested.id) ? suggested : null;
+
+        if (finalSuggested) {
+          suggestedCount++;
+          claimedDeputyIds.add(finalSuggested.id);
         }
+        createdCount++;
 
-        const { data: existing } = await supabase
-          .from('deputy_employee_mappings')
-          .select('id, staff_id, is_confirmed')
-          .eq('organization_id', orgId)
-          .eq('deputy_employee_id', empId)
-          .maybeSingle();
-
-        if (!existing) {
-          const suggested = suggestStaffMatch(displayName, staffList);
-          if (suggested) suggestedCount++;
-          createdCount++;
-          if (!dryRun) {
-            await supabase.from('deputy_employee_mappings').insert({
-              organization_id: orgId,
-              deputy_employee_id: empId,
-              deputy_display_name: displayName,
-              staff_id: suggested?.id ?? null,
-              is_confirmed: false,
-              is_ignored: false,
-            });
-          }
+        if (!dryRun) {
+          await supabase.from('deputy_employee_mappings').insert({
+            organization_id: orgId,
+            staff_id: p.id,
+            deputy_employee_id: finalSuggested?.id ?? null, // NULL = unmapped placeholder
+            deputy_display_name: finalSuggested?.display_name ?? '— not yet matched —',
+            is_confirmed: false,
+            is_ignored: false,
+          });
         }
       }
 
@@ -351,11 +443,12 @@ serve(async (req) => {
         ok: true,
         employees_only: true,
         dry_run: dryRun,
-        employee_count: employees.length,
+        deputy_employee_count: deputyEmployees.length,
+        participant_count: participants.length,
         new_mappings_created: dryRun ? 0 : createdCount,
         new_mappings_would_create: dryRun ? createdCount : undefined,
         auto_suggested: suggestedCount,
-        employee_sample: employeeSample,
+        deputy_employees: deputyEmployees, // full enriched roster — UI dropdown source
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -394,14 +487,7 @@ serve(async (req) => {
     const timesheets: any[] = await timesheetRes.json();
     console.log(`Retrieved ${timesheets.length} timesheets from Deputy`);
 
-    // ── Per-employee day-of-week aggregation ─────────────────────────────────
-    // For each Deputy employee, collect the set of weekdays (1=Mon..5=Fri, UTC)
-    // on which they have at least one NON-DISCARDED timesheet within the
-    // sync window. We use this to determine per-metric excusal eligibility:
-    //   - Confidence excused → no overlap with {Mon, Tue, Wed}
-    //   - Performance excused → no overlap with {Thu, Fri}
-    //     EXCEPT Friday-only ({5}) → "expected_extended_deadline", NOT excused
-    //   - Both excused → daysWorked is empty (absent all week)
+    // ── Per-Deputy-employee day-of-week aggregation ──────────────────────────
     const allSeenEmployees = new Map<number, string>();
     const daysWorkedByEmployee = new Map<number, Set<number>>();
     const timesheetSample: any[] = [];
@@ -417,7 +503,7 @@ serve(async (req) => {
       }
 
       if (!ts.Discarded && ts.StartTime) {
-        const dow = new Date(ts.StartTime * 1000).getUTCDay(); // 0=Sun..6=Sat
+        const dow = new Date(ts.StartTime * 1000).getUTCDay();
         if (dow >= 1 && dow <= 5) {
           if (!daysWorkedByEmployee.has(empId)) {
             daysWorkedByEmployee.set(empId, new Set<number>());
@@ -442,19 +528,9 @@ serve(async (req) => {
       }
     }
 
-    // ── Compute per-mapping decisions ────────────────────────────────────────
-    // Decision matrix per the confirmed rules:
-    //
-    //   daysWorked        | confidence            | performance
-    //   ------------------|-----------------------|------------------------------
-    //   ∅ (absent)        | excused               | excused
-    //   {5} (Fri only)    | excused               | expected_extended_deadline
-    //   any incl Mon/Tue/Wed | expected           | (depends on Thu/Fri)
-    //   any incl Thu/Fri  | (depends on M/T/W)    | expected
-    //
-    // For dry-run preview: include ALL mappings with a staff_id (regardless of
-    // confirmation) so admins can see what WILL happen once they confirm.
-    // For real sync: only confirmed, non-ignored mappings produce excusals.
+    // ── Load all participant mappings (one row per SFP participant) ─────────
+    // For dry-run preview: include all mappings so admins see what WILL happen.
+    // For real sync: only confirmed, non-ignored mappings drive excusals.
     const mappingsQuery = supabase
       .from('deputy_employee_mappings')
       .select('deputy_employee_id, staff_id, deputy_display_name, is_confirmed, is_ignored')
@@ -465,11 +541,33 @@ serve(async (req) => {
       ? await mappingsQuery
       : await mappingsQuery.eq('is_confirmed', true).eq('is_ignored', false);
 
-    const mappings = (mappingRows ?? []) as any[];
+    const mappings = (mappingRows ?? []).filter(
+      (m: any) => m.deputy_employee_id != null
+    ) as any[];
+
+    // ── Pre-load existing weekly_scores for the target week ─────────────────
+    // We never want to mark a metric "excused" if the staff member has already
+    // submitted a real score for that week. (e.g., walked in Thursday, filled
+    // out both confidence and performance — confidence was technically "excused"
+    // by attendance rules but we have the data, so keep it.)
+    const staffIdsForWeek = mappings.map((m: any) => m.staff_id);
+    const submittedConfidence = new Set<string>();
+    const submittedPerformance = new Set<string>();
+    if (!dryRun && staffIdsForWeek.length > 0) {
+      const { data: existingScores } = await supabase
+        .from('weekly_scores')
+        .select('staff_id, confidence_score, performance_score')
+        .in('staff_id', staffIdsForWeek)
+        .eq('week_of', weekOfStr);
+      for (const row of existingScores ?? []) {
+        if ((row as any).confidence_score != null) submittedConfidence.add((row as any).staff_id);
+        if ((row as any).performance_score != null) submittedPerformance.add((row as any).staff_id);
+      }
+    }
 
     const syncStartDate: string | null = (connection as any).sync_start_date ?? null;
     const beforeStartFloor = !dryRun && syncStartDate
-      ? syncStartDate > weekOfStr // YYYY-MM-DD string compare is safe
+      ? syncStartDate > weekOfStr
       : false;
 
     type EmpDecision = {
@@ -477,8 +575,8 @@ serve(async (req) => {
       deputy_name: string;
       sfp_staff_id: string;
       days_worked: string[];
-      confidence: 'expected' | 'excused';
-      performance: 'expected' | 'excused' | 'expected_extended_deadline';
+      confidence: 'expected' | 'excused' | 'already_submitted';
+      performance: 'expected' | 'excused' | 'expected_extended_deadline' | 'already_submitted';
       is_confirmed: boolean;
     };
 
@@ -488,6 +586,7 @@ serve(async (req) => {
     let fridayExtensionCount = 0;
     let confidenceExcusedCount = 0;
     let performanceExcusedCount = 0;
+    let skippedAlreadySubmitted = 0;
 
     for (const mapping of mappings) {
       const days = daysWorkedByEmployee.get(mapping.deputy_employee_id) ?? new Set<number>();
@@ -495,9 +594,13 @@ serve(async (req) => {
       const hasThuFri = days.has(4) || days.has(5);
       const isFridayOnly = days.size === 1 && days.has(5);
 
-      const confidence: 'expected' | 'excused' = hasMonTueWed ? 'expected' : 'excused';
-      let performance: 'expected' | 'excused' | 'expected_extended_deadline';
-      if (hasThuFri && !isFridayOnly) performance = 'expected';
+      let confidence: EmpDecision['confidence'];
+      if (submittedConfidence.has(mapping.staff_id)) confidence = 'already_submitted';
+      else confidence = hasMonTueWed ? 'expected' : 'excused';
+
+      let performance: EmpDecision['performance'];
+      if (submittedPerformance.has(mapping.staff_id)) performance = 'already_submitted';
+      else if (hasThuFri && !isFridayOnly) performance = 'expected';
       else if (isFridayOnly) performance = 'expected_extended_deadline';
       else performance = 'excused';
 
@@ -505,6 +608,9 @@ serve(async (req) => {
       if (isFridayOnly) fridayExtensionCount++;
       if (confidence === 'excused') confidenceExcusedCount++;
       if (performance === 'excused') performanceExcusedCount++;
+      if (confidence === 'already_submitted' || performance === 'already_submitted') {
+        skippedAlreadySubmitted++;
+      }
 
       details.push({
         deputy_employee_id: mapping.deputy_employee_id,
@@ -516,10 +622,6 @@ serve(async (req) => {
         is_confirmed: !!mapping.is_confirmed,
       });
 
-      // Only WRITE excusals on real sync, for confirmed mappings, and only
-      // when we're in/after the sync_start_date floor. The "extended deadline"
-      // case is intentionally NOT written — it's a deadline adjustment, not
-      // an excusal. (Display/sequencer handling is a Phase-2 concern.)
       if (!dryRun && mapping.is_confirmed && !mapping.is_ignored && !beforeStartFloor) {
         if (confidence === 'excused') {
           excusalInserts.push({
@@ -546,31 +648,7 @@ serve(async (req) => {
       }
     }
 
-    // ── Auto-create new mappings for never-seen Deputy employees (real sync only)
-    let newMappingsCreated = 0;
     if (!dryRun) {
-      for (const [deputyEmpId, displayName] of allSeenEmployees.entries()) {
-        const { data: existing } = await supabase
-          .from('deputy_employee_mappings')
-          .select('id')
-          .eq('organization_id', orgId)
-          .eq('deputy_employee_id', deputyEmpId)
-          .maybeSingle();
-
-        if (!existing) {
-          const suggested = suggestStaffMatch(displayName, staffList);
-          await supabase.from('deputy_employee_mappings').insert({
-            organization_id: orgId,
-            deputy_employee_id: deputyEmpId,
-            deputy_display_name: displayName,
-            staff_id: suggested?.id ?? null,
-            is_confirmed: false,
-            is_ignored: false,
-          });
-          newMappingsCreated++;
-        }
-      }
-
       if (excusalInserts.length > 0) {
         const { error: excusalError } = await supabase
           .from('excused_submissions')
@@ -591,7 +669,6 @@ serve(async (req) => {
         .eq('organization_id', orgId);
     }
 
-    // Sort details: unconfirmed first (admin attention), then alpha by name
     details.sort((a, b) => {
       if (a.is_confirmed !== b.is_confirmed) return a.is_confirmed ? 1 : -1;
       return a.deputy_name.localeCompare(b.deputy_name);
@@ -607,25 +684,27 @@ serve(async (req) => {
       timesheet_count: timesheets.length,
       timesheet_sample: dryRun ? timesheetSample : undefined,
       employee_count: allSeenEmployees.size,
+      participant_count: participants.length,
       mapped_employee_count: mappings.length,
-      confirmed_mapping_count: mappings.filter((m) => m.is_confirmed).length,
+      confirmed_mapping_count: mappings.filter((m: any) => m.is_confirmed).length,
       absent_all_week_count: absentCount,
       friday_only_extension_count: fridayExtensionCount,
       would_excuse_confidence: confidenceExcusedCount,
       would_excuse_performance: performanceExcusedCount,
+      skipped_already_submitted: skippedAlreadySubmitted,
       details,
       sync_start_date: syncStartDate,
       skipped_before_start_date: beforeStartFloor || undefined,
-      new_mappings_created: dryRun ? 0 : newMappingsCreated,
       excusal_records_created: dryRun ? 0 : excusalInserts.length,
       note: dryRun
-        ? 'DRY RUN — no data was written. The `details` array shows the per-employee decision that WOULD be applied for confirmed mappings on a real sync.'
+        ? 'DRY RUN — no data was written. Excusals are skipped for staff who already submitted that metric this week.'
         : undefined,
     };
 
     console.log(
       `Deputy sync complete: ${timesheets.length} timesheets, ${mappings.length} mappings, ` +
-      `${absentCount} absent, ${fridayExtensionCount} Fri-only, ${excusalInserts.length} excusals written`
+      `${absentCount} absent, ${fridayExtensionCount} Fri-only, ${excusalInserts.length} excusals written, ` +
+      `${skippedAlreadySubmitted} skipped (already submitted)`
     );
     return new Response(JSON.stringify(summary), {
       status: 200,

@@ -127,7 +127,7 @@ export function DeputyConnectionCard({ organizationId }: Props) {
     setPreviewResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("deputy-sync", {
-        body: { dry_run: true, days: 7 },
+        body: { dry_run: true, days: 30 },
       });
       if (error) throw error;
       setPreviewResult(data);
@@ -338,7 +338,7 @@ export function DeputyConnectionCard({ organizationId }: Props) {
                       Step 1 — Preview Deputy data
                     </h4>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Pulls a 7-day sample with no DB writes. Confirm the data shape before importing.
+                      Pulls a 30-day sample with no DB writes. Confirm the data shape before importing.
                     </p>
                   </div>
                   <Button size="sm" variant="outline" onClick={handlePreview} disabled={previewing}>
@@ -347,7 +347,7 @@ export function DeputyConnectionCard({ organizationId }: Props) {
                     ) : (
                       <Eye className="h-4 w-4 mr-2" />
                     )}
-                    Pull 7-Day Preview
+                    Pull 30-Day Preview
                   </Button>
                 </div>
                 {previewResult && <PreviewPanel data={previewResult} />}

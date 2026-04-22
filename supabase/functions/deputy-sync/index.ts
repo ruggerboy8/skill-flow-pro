@@ -621,6 +621,15 @@ serve(async (req) => {
           last_sync_status: 'error',
           last_sync_error: insErr.message.slice(0, 500),
         }).eq('organization_id', orgId);
+        if (runId) {
+          await admin.from('deputy_sync_runs').update({
+            status: 'error',
+            error_message: insErr.message.slice(0, 500),
+            timesheet_count: timesheets.length,
+            mapped_participant_count: activeMappings.length,
+            finished_at: new Date().toISOString(),
+          }).eq('id', runId);
+        }
         return json(500, { ok: false, error: `Excusal insert failed: ${insErr.message}` });
       }
       inserted = count ?? inserts.length;
@@ -631,6 +640,17 @@ serve(async (req) => {
       last_sync_status: 'success',
       last_sync_error: null,
     }).eq('organization_id', orgId);
+
+    if (runId) {
+      await admin.from('deputy_sync_runs').update({
+        status: 'success',
+        timesheet_count: timesheets.length,
+        mapped_participant_count: activeMappings.length,
+        excusals_inserted: inserted,
+        excusals_already_existed: inserts.length - inserted,
+        finished_at: new Date().toISOString(),
+      }).eq('id', runId);
+    }
 
     return json(200, {
       ok: true,

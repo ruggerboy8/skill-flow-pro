@@ -32,13 +32,25 @@ serve(async (req) => {
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify org admin and get organization_id
-    const { data: staff, error: staffError } = await admin
+    // NOTE: a single auth user can have multiple staff rows (e.g. super-admin
+    // who also belongs to a partner org). Pick the row that has admin rights
+    // and an organization_id, prioritising super_admin > org_admin.
+    const { data: staffRows, error: staffError } = await admin
       .from('staff')
       .select('id, organization_id, is_org_admin, is_super_admin')
-      .eq('user_id', user.id)
-      .single();
+      .eq('user_id', user.id);
 
-    if (staffError || !staff) return json(403, { ok: false, error: 'Staff record not found' });
+    if (staffError) return json(500, { ok: false, error: `Staff lookup failed: ${staffError.message}` });
+    if (!staffRows || staffRows.length === 0) {
+      return json(403, { ok: false, error: 'Staff record not found for this user' });
+    }
+
+    const staff =
+      staffRows.find((s) => s.is_super_admin && s.organization_id) ??
+      staffRows.find((s) => s.is_org_admin && s.organization_id) ??
+      staffRows.find((s) => s.organization_id) ??
+      staffRows[0];
+
     if (!staff.is_org_admin && !staff.is_super_admin) {
       return json(403, { ok: false, error: 'Org admin required' });
     }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,12 +13,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useRoleDisplayNames } from "@/hooks/useRoleDisplayNames";
 import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CheckCircle, Mail, ChevronDown } from "lucide-react";
+import { Loader2, CheckCircle, Mail, ChevronDown, Plug } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  suggestEmployeeWithConfidence,
+  type DeputyEmployee,
+  type MatchConfidence,
+} from "@/lib/deputyMatching";
 
 interface Role {
   role_id: number;

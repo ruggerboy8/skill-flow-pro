@@ -377,13 +377,17 @@ export function DeputyWizard({ organizationId }: Props) {
 
     try {
       if (existing) {
-        const { error } = await (supabase as any)
+        const { data: updated, error } = await (supabase as any)
           .from("deputy_employee_mappings")
           .update(patch as any)
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .select("id, staff_id, deputy_employee_id, deputy_display_name, is_confirmed, is_ignored");
         if (error) throw error;
+        if (!updated || updated.length === 0) {
+          throw new Error("Update silently affected 0 rows (RLS or stale id)");
+        }
       } else {
-        const { error } = await (supabase as any)
+        const { data: inserted, error } = await (supabase as any)
           .from("deputy_employee_mappings")
           .insert({
             organization_id: organizationId,
@@ -392,14 +396,19 @@ export function DeputyWizard({ organizationId }: Props) {
             deputy_display_name: patch.deputy_display_name ?? PLACEHOLDER,
             is_confirmed: patch.is_confirmed ?? false,
             is_ignored: patch.is_ignored ?? false,
-          });
+          })
+          .select("id, staff_id, deputy_employee_id, deputy_display_name, is_confirmed, is_ignored");
         if (error) throw error;
+        if (!inserted || inserted.length === 0) {
+          throw new Error("Insert returned no rows (RLS or constraint)");
+        }
       }
       qc.invalidateQueries({ queryKey });
     } catch (err: any) {
       // Roll back optimistic update on failure
       qc.setQueryData(queryKey, previous);
-      toast.error("Update failed", { description: err?.message });
+      console.error("[DeputyWizard] upsertMapping failed", { staffId, patch, err });
+      toast.error("Update failed", { description: err?.message ?? "Unknown error" });
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,12 +13,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useRoleDisplayNames } from "@/hooks/useRoleDisplayNames";
 import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CheckCircle, Mail, ChevronDown } from "lucide-react";
+import { Loader2, CheckCircle, Mail, ChevronDown, Plug } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  suggestEmployeeWithConfidence,
+  type DeputyEmployee,
+  type MatchConfidence,
+} from "@/lib/deputyMatching";
 
 interface Role {
   role_id: number;
@@ -144,7 +150,96 @@ export function InviteUserDialog({
   // Permissions accordion open state
   const [showPermissions, setShowPermissions] = useState(false);
 
+  // ── Deputy integration state ──────────────────────────────────────────────
+  const [deputyConnected, setDeputyConnected] = useState(false);
+  const [deputyRoster, setDeputyRoster] = useState<DeputyEmployee[]>([]);
+  const [deputyMappedIds, setDeputyMappedIds] = useState<Set<number>>(new Set());
+  const [deputyLoading, setDeputyLoading] = useState(false);
+  const [selectedDeputyId, setSelectedDeputyId] = useState<string>("__none__");
+  const [autoConfidence, setAutoConfidence] = useState<MatchConfidence>("none");
+  const [deputyTouched, setDeputyTouched] = useState(false);
+
   const isCentralOffice = userType === "central";
+
+  // Detect Deputy connection + load roster when dialog opens
+  useEffect(() => {
+    if (!open || !organizationId) return;
+    let cancelled = false;
+    (async () => {
+      setDeputyLoading(true);
+      try {
+        const { data: conn } = await (supabase as any)
+          .from("deputy_connections")
+          .select("id")
+          .eq("organization_id", organizationId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (!conn) {
+          setDeputyConnected(false);
+          setDeputyRoster([]);
+          setDeputyMappedIds(new Set());
+          return;
+        }
+        setDeputyConnected(true);
+
+        const [rosterRes, mappingsRes] = await Promise.all([
+          supabase.functions.invoke("deputy-get-employees", {
+            body: { organization_id: organizationId },
+          }),
+          (supabase as any)
+            .from("deputy_employee_mappings")
+            .select("deputy_employee_id")
+            .eq("organization_id", organizationId)
+            .not("deputy_employee_id", "is", null),
+        ]);
+        if (cancelled) return;
+        const employees: DeputyEmployee[] =
+          (rosterRes.data as any)?.employees ?? (rosterRes.data as any) ?? [];
+        setDeputyRoster(Array.isArray(employees) ? employees : []);
+        const mappedIds = new Set<number>(
+          (mappingsRes.data ?? [])
+            .map((m: any) => m.deputy_employee_id)
+            .filter((v: any) => typeof v === "number"),
+        );
+        setDeputyMappedIds(mappedIds);
+      } catch (err) {
+        console.warn("[InviteUserDialog] Deputy lookup failed", err);
+        if (!cancelled) {
+          setDeputyConnected(false);
+          setDeputyRoster([]);
+        }
+      } finally {
+        if (!cancelled) setDeputyLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, organizationId]);
+
+  // Available roster = roster minus already-mapped employees
+  const availableDeputyRoster = useMemo(
+    () => deputyRoster.filter((e) => !deputyMappedIds.has(e.deputy_employee_id)),
+    [deputyRoster, deputyMappedIds],
+  );
+
+  // Auto-suggest based on name/email — only if user hasn't manually picked yet
+  useEffect(() => {
+    if (!deputyConnected || deputyTouched) return;
+    if (!formData.name.trim() && !formData.email.trim()) {
+      setSelectedDeputyId("__none__");
+      setAutoConfidence("none");
+      return;
+    }
+    const result = suggestEmployeeWithConfidence(
+      { name: formData.name, email: formData.email || null },
+      availableDeputyRoster,
+    );
+    setAutoConfidence(result.confidence);
+    setSelectedDeputyId(
+      result.employee ? String(result.employee.deputy_employee_id) : "__none__",
+    );
+  }, [formData.name, formData.email, availableDeputyRoster, deputyConnected, deputyTouched]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -250,6 +345,40 @@ export function InviteUserDialog({
         throw new Error(data.error);
       }
 
+      // Deputy auto-mapping: if a Deputy employee was selected, link it now.
+      const newStaffId: string | undefined = data?.staff_id;
+      if (deputyConnected && newStaffId && selectedDeputyId !== "__none__") {
+        const deputyId = Number(selectedDeputyId);
+        const employee = deputyRoster.find((e) => e.deputy_employee_id === deputyId);
+        if (employee) {
+          // Auto-confirm only when the auto-suggestion was an exact match AND the
+          // admin didn't override it. Manual picks always require confirmation
+          // on the integrations page.
+          const autoConfirm = !deputyTouched && autoConfidence === "exact";
+          try {
+            const { error: mapErr } = await (supabase as any)
+              .from("deputy_employee_mappings")
+              .insert({
+                organization_id: organizationId,
+                staff_id: newStaffId,
+                deputy_employee_id: deputyId,
+                deputy_display_name: employee.display_name,
+                is_confirmed: autoConfirm,
+                is_ignored: false,
+              });
+            if (mapErr) {
+              console.warn("[InviteUserDialog] Deputy mapping insert failed", mapErr);
+              toast({
+                title: "Deputy link skipped",
+                description: "Invite sent, but we couldn't link the Deputy employee. You can do this from the Integrations page.",
+              });
+            }
+          } catch (mapErr) {
+            console.warn("[InviteUserDialog] Deputy mapping insert error", mapErr);
+          }
+        }
+      }
+
       setInvitedName(formData.name);
       setInviteSent(true);
 
@@ -279,6 +408,9 @@ export function InviteUserDialog({
     setShowPermissions(false);
     setInviteSent(false);
     setInvitedName("");
+    setSelectedDeputyId("__none__");
+    setAutoConfidence("none");
+    setDeputyTouched(false);
     onClose();
   };
 
@@ -493,6 +625,64 @@ export function InviteUserDialog({
                 )}
               </div>
             </>
+          )}
+
+          {/* ── Deputy mapping (only when org has Deputy connected and inviting clinic staff) ── */}
+          {!isCentralOffice && deputyConnected && (
+            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="flex items-center gap-2">
+                  <Plug className="h-4 w-4 text-muted-foreground" />
+                  Deputy employee
+                  <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                {!deputyTouched && autoConfidence !== "none" && selectedDeputyId !== "__none__" && (
+                  <Badge
+                    variant={autoConfidence === "exact" ? "default" : "secondary"}
+                    className="text-2xs"
+                  >
+                    {autoConfidence === "exact"
+                      ? "Exact match"
+                      : autoConfidence === "strong"
+                      ? "Strong match"
+                      : "Weak match"}
+                  </Badge>
+                )}
+              </div>
+              <Select
+                value={selectedDeputyId}
+                onValueChange={(v) => {
+                  setSelectedDeputyId(v);
+                  setDeputyTouched(true);
+                }}
+                disabled={deputyLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={deputyLoading ? "Loading Deputy roster…" : "No link"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No link (skip mapping)</SelectItem>
+                  {availableDeputyRoster.map((emp) => (
+                    <SelectItem
+                      key={emp.deputy_employee_id}
+                      value={String(emp.deputy_employee_id)}
+                    >
+                      {emp.display_name}
+                      {!emp.active ? " (inactive)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {selectedDeputyId !== "__none__" && !deputyTouched && autoConfidence === "exact"
+                  ? "Auto-confirmed — attendance will sync immediately."
+                  : selectedDeputyId !== "__none__"
+                  ? "Will be saved as unconfirmed — review on the Integrations page."
+                  : "Link this teammate to a Deputy employee so timesheet excusals sync automatically."}
+              </p>
+            </div>
           )}
 
           {/* ── Additional permissions (collapsible) ── */}

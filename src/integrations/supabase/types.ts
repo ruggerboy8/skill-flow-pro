@@ -631,7 +631,7 @@ export type Database = {
         Row: {
           created_at: string | null
           deputy_display_name: string
-          deputy_employee_id: number
+          deputy_employee_id: number | null
           id: string
           is_confirmed: boolean
           is_ignored: boolean
@@ -642,7 +642,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           deputy_display_name: string
-          deputy_employee_id: number
+          deputy_employee_id?: number | null
           id?: string
           is_confirmed?: boolean
           is_ignored?: boolean
@@ -653,7 +653,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           deputy_display_name?: string
-          deputy_employee_id?: number
+          deputy_employee_id?: number | null
           id?: string
           is_confirmed?: boolean
           is_ignored?: boolean

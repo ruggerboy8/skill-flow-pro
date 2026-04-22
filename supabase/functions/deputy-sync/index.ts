@@ -161,13 +161,34 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: callerStaff, error: staffError } = await supabase
+    // NOTE: a single auth user can have multiple staff rows (super-admin who
+    // also belongs to a partner org). Pick the row with admin rights + org_id,
+    // prioritising super_admin > org_admin > any.
+    const { data: staffRows, error: staffError } = await supabase
       .from('staff')
       .select('id, organization_id, is_org_admin, is_super_admin')
-      .eq('user_id', user.id)
-      .single();
+      .eq('user_id', user.id);
 
-    if (staffError || !callerStaff || (!callerStaff.is_org_admin && !callerStaff.is_super_admin)) {
+    if (staffError) {
+      return new Response(
+        JSON.stringify({ error: `Staff lookup failed: ${staffError.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!staffRows || staffRows.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Staff record not found for this user.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const callerStaff =
+      staffRows.find((s: any) => s.is_super_admin && s.organization_id) ??
+      staffRows.find((s: any) => s.is_org_admin && s.organization_id) ??
+      staffRows.find((s: any) => s.organization_id) ??
+      staffRows[0];
+
+    if ((!callerStaff.is_org_admin && !callerStaff.is_super_admin) || !callerStaff.organization_id) {
       return new Response(
         JSON.stringify({ error: 'Access denied. Org admin required.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -557,6 +557,7 @@ export type Database = {
       deputy_connections: {
         Row: {
           access_token: string
+          auto_sync_enabled: boolean
           connected_at: string | null
           connected_by: string | null
           deputy_install: string
@@ -573,6 +574,7 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          auto_sync_enabled?: boolean
           connected_at?: string | null
           connected_by?: string | null
           deputy_install: string
@@ -589,6 +591,7 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          auto_sync_enabled?: boolean
           connected_at?: string | null
           connected_by?: string | null
           deputy_install?: string

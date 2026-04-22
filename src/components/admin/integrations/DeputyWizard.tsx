@@ -343,8 +343,39 @@ export function DeputyWizard({ organizationId }: Props) {
     staffId: string,
     patch: Partial<Mapping> & { deputy_employee_id?: number | null; deputy_display_name?: string }
   ) => {
+    const queryKey = ["deputy-mappings", organizationId];
+    const previous = qc.getQueryData<Mapping[]>(queryKey) ?? [];
+    const existing = previous.find((m) => m.staff_id === staffId);
+
+    // Optimistic cache update so the Select trigger reflects the choice instantly.
+    const optimistic: Mapping[] = existing
+      ? previous.map((m) =>
+          m.staff_id === staffId
+            ? {
+                ...m,
+                ...patch,
+                deputy_employee_id:
+                  patch.deputy_employee_id !== undefined ? patch.deputy_employee_id : m.deputy_employee_id,
+                deputy_display_name: patch.deputy_display_name ?? m.deputy_display_name,
+                is_confirmed: patch.is_confirmed ?? m.is_confirmed,
+                is_ignored: patch.is_ignored ?? m.is_ignored,
+              }
+            : m
+        )
+      : [
+          ...previous,
+          {
+            id: `optimistic-${staffId}`,
+            staff_id: staffId,
+            deputy_employee_id: patch.deputy_employee_id ?? null,
+            deputy_display_name: patch.deputy_display_name ?? PLACEHOLDER,
+            is_confirmed: patch.is_confirmed ?? false,
+            is_ignored: patch.is_ignored ?? false,
+          },
+        ];
+    qc.setQueryData(queryKey, optimistic);
+
     try {
-      const existing = mappingByStaff.get(staffId);
       if (existing) {
         const { error } = await (supabase as any)
           .from("deputy_employee_mappings")
@@ -364,8 +395,10 @@ export function DeputyWizard({ organizationId }: Props) {
           });
         if (error) throw error;
       }
-      qc.invalidateQueries({ queryKey: ["deputy-mappings", organizationId] });
+      qc.invalidateQueries({ queryKey });
     } catch (err: any) {
+      // Roll back optimistic update on failure
+      qc.setQueryData(queryKey, previous);
       toast.error("Update failed", { description: err?.message });
     }
   };

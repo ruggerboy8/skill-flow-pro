@@ -83,3 +83,6 @@ verify_jwt = true
 
 [functions.deputy-test-connection]
 verify_jwt = true
+
+[functions.deputy-get-employees]
+verify_jwt = true

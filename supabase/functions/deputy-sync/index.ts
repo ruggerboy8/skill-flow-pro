@@ -198,36 +198,52 @@ serve(async (req) => {
     const clientSecret = Deno.env.get('DEPUTY_CLIENT_SECRET');
     if (!clientId || !clientSecret) return json(500, { ok: false, error: 'Deputy credentials not configured' });
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return json(401, { ok: false, error: 'Missing authorization header' });
-
-    const userClient = createClient(supabaseUrl, anon);
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
-    if (authErr || !user) return json(401, { ok: false, error: 'Unauthorized' });
-
     const admin = createClient(supabaseUrl, svc);
 
-    const { data: staffRows, error: sErr } = await admin
-      .from('staff')
-      .select('id, organization_id, is_org_admin, is_super_admin')
-      .eq('user_id', user.id);
-    if (sErr) return json(500, { ok: false, error: `Staff lookup failed: ${sErr.message}` });
-    if (!staffRows?.length) return json(403, { ok: false, error: 'Staff record not found' });
-
-    const caller =
-      staffRows.find((s: any) => s.is_super_admin && s.organization_id) ??
-      staffRows.find((s: any) => s.is_org_admin && s.organization_id) ??
-      staffRows.find((s: any) => s.organization_id) ??
-      staffRows[0];
-    if ((!caller.is_org_admin && !caller.is_super_admin) || !caller.organization_id) {
-      return json(403, { ok: false, error: 'Org admin required' });
-    }
-    const orgId = caller.organization_id as string;
-
-    // ── Parse body ──────────────────────────────────────────────────────────
+    // ── Parse body first (we need to know if this is a system/cron call) ──
     let body: Record<string, any> = {};
     try { body = await req.json(); } catch { /* allow empty */ }
+
+    // Service-role bypass: dispatcher (cron) calls with the service-role key
+    // and { system: true, organization_id: '<uuid>', trigger: 'cron' }.
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const isSystemCall = body.system === true && authHeader.includes(svc);
+
+    let orgId: string;
+    let callerStaffId: string | null = null;
+
+    if (isSystemCall) {
+      if (!body.organization_id) {
+        return json(400, { ok: false, error: 'system call requires organization_id' });
+      }
+      orgId = String(body.organization_id);
+    } else {
+      if (!authHeader) return json(401, { ok: false, error: 'Missing authorization header' });
+      const userClient = createClient(supabaseUrl, anon);
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
+      if (authErr || !user) return json(401, { ok: false, error: 'Unauthorized' });
+
+      const { data: staffRows, error: sErr } = await admin
+        .from('staff')
+        .select('id, organization_id, is_org_admin, is_super_admin')
+        .eq('user_id', user.id);
+      if (sErr) return json(500, { ok: false, error: `Staff lookup failed: ${sErr.message}` });
+      if (!staffRows?.length) return json(403, { ok: false, error: 'Staff record not found' });
+
+      const caller =
+        staffRows.find((s: any) => s.is_super_admin && s.organization_id) ??
+        staffRows.find((s: any) => s.is_org_admin && s.organization_id) ??
+        staffRows.find((s: any) => s.organization_id) ??
+        staffRows[0];
+      if ((!caller.is_org_admin && !caller.is_super_admin) || !caller.organization_id) {
+        return json(403, { ok: false, error: 'Org admin required' });
+      }
+      orgId = caller.organization_id as string;
+      callerStaffId = caller.id as string;
+    }
+
+    const triggerSource = (body.trigger as string) ?? (isSystemCall ? 'cron' : 'manual');
 
     type Mode = 'preview_data' | 'preview_excusals' | 'apply_week' | 'apply_retroactive';
     const mode: Mode = (body.mode as Mode) ?? 'preview_data';

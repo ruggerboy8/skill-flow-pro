@@ -194,7 +194,6 @@ export function DeputyWizard({ organizationId }: Props) {
         .from("staff")
         .select("id, name, email")
         .eq("organization_id", organizationId)
-        .eq("active", true)
         .eq("is_participant", true)
         .order("name");
       if (error) throw error;

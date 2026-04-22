@@ -528,17 +528,81 @@ export function DeputyConnectionCard({ organizationId }: Props) {
 function PreviewPanel({ data }: { data: any }) {
   const employees: any[] = data?.employee_sample ?? [];
   const timesheets: any[] = data?.timesheet_sample ?? [];
-  const absent: string[] = data?.absent_all_week_sample ?? [];
+  const details: any[] = data?.details ?? [];
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <PreviewStat label="Employees seen" value={data?.employee_count ?? 0} />
-        <PreviewStat label="Timesheets (7d)" value={data?.timesheet_count ?? 0} />
-        <PreviewStat label="Absent all week" value={data?.absent_all_week_count ?? 0} />
+        <PreviewStat label="Timesheets" value={data?.timesheet_count ?? 0} />
+        <PreviewStat label="Would excuse — Conf" value={data?.would_excuse_confidence ?? 0} />
+        <PreviewStat label="Would excuse — Perf" value={data?.would_excuse_performance ?? 0} />
       </div>
 
-      {employees.length > 0 && (
+      {(data?.absent_all_week_count > 0 || data?.friday_only_extension_count > 0) && (
+        <div className="grid grid-cols-2 gap-3">
+          <PreviewStat label="Absent all week" value={data?.absent_all_week_count ?? 0} />
+          <PreviewStat label="Friday-only (deadline extended)" value={data?.friday_only_extension_count ?? 0} />
+        </div>
+      )}
+
+      {details.length > 0 && (
+        <div className="text-xs">
+          <p className="font-medium mb-1 text-muted-foreground">
+            Per-employee decision ({details.length} mapped)
+          </p>
+          <div className="rounded border bg-background overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/50">
+                <tr className="text-left">
+                  <th className="px-2 py-1.5 font-medium">Employee</th>
+                  <th className="px-2 py-1.5 font-medium">Days worked</th>
+                  <th className="px-2 py-1.5 font-medium">Confidence</th>
+                  <th className="px-2 py-1.5 font-medium">Performance</th>
+                  <th className="px-2 py-1.5 font-medium text-right">Mapping</th>
+                </tr>
+              </thead>
+              <tbody>
+                {details.map((d, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="px-2 py-1.5">{d.deputy_name}</td>
+                    <td className="px-2 py-1.5 text-muted-foreground">
+                      {d.days_worked.length === 0 ? "— absent —" : d.days_worked.join(", ")}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <DecisionPill kind={d.confidence} />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <DecisionPill kind={d.performance} />
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      {d.is_confirmed ? (
+                        <span className="text-2xs text-muted-foreground">confirmed</span>
+                      ) : (
+                        <span
+                          className="text-2xs px-1.5 py-0.5 rounded"
+                          style={{
+                            backgroundColor: `hsl(var(--status-pending-bg))`,
+                            color: `hsl(var(--status-pending))`,
+                          }}
+                        >
+                          pending review
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-2xs text-muted-foreground mt-1">
+            Excusals are only written for <span className="font-medium">confirmed</span> mappings on a real sync.
+            Friday-only entries are <span className="font-medium">not</span> excused — the deadline is extended instead.
+          </p>
+        </div>
+      )}
+
+      {employees.length > 0 && details.length === 0 && (
         <div className="text-xs">
           <p className="font-medium mb-1 text-muted-foreground">Sample employees</p>
           <ul className="space-y-1 bg-background rounded border p-2">
@@ -560,23 +624,11 @@ function PreviewPanel({ data }: { data: any }) {
               <li key={i} className="flex justify-between gap-2">
                 <span className="truncate">{t.employee_name}</span>
                 <span className="text-muted-foreground">
+                  {t.day_of_week ? `${t.day_of_week} · ` : ""}
                   {t.start ? new Date(t.start).toLocaleString() : "—"} ·{" "}
                   {t.total_hours != null ? `${Number(t.total_hours).toFixed(1)}h` : "—"}
                 </span>
               </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {absent.length > 0 && (
-        <div className="text-xs">
-          <p className="font-medium mb-1 text-muted-foreground">
-            Would be marked absent (based on existing mappings)
-          </p>
-          <ul className="space-y-1 bg-background rounded border p-2">
-            {absent.map((name, i) => (
-              <li key={i}>{name}</li>
             ))}
           </ul>
         </div>
@@ -594,6 +646,35 @@ function PreviewPanel({ data }: { data: any }) {
         </CollapsibleContent>
       </Collapsible>
     </div>
+  );
+}
+
+function DecisionPill({ kind }: { kind: string }) {
+  const config = {
+    expected: {
+      label: "Expected",
+      bg: "var(--status-complete-bg)",
+      fg: "var(--status-complete)",
+    },
+    excused: {
+      label: "Excused",
+      bg: "var(--status-excused-bg)",
+      fg: "var(--status-excused)",
+    },
+    expected_extended_deadline: {
+      label: "Extended (Fri)",
+      bg: "var(--status-late-bg)",
+      fg: "var(--status-late)",
+    },
+  }[kind] ?? { label: kind, bg: "var(--muted)", fg: "var(--muted-foreground)" };
+
+  return (
+    <span
+      className="text-2xs px-1.5 py-0.5 rounded font-medium"
+      style={{ backgroundColor: `hsl(${config.bg})`, color: `hsl(${config.fg})` }}
+    >
+      {config.label}
+    </span>
   );
 }
 

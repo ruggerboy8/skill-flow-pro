@@ -627,6 +627,64 @@ export function InviteUserDialog({
             </>
           )}
 
+          {/* ── Deputy mapping (only when org has Deputy connected and inviting clinic staff) ── */}
+          {!isCentralOffice && deputyConnected && (
+            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="flex items-center gap-2">
+                  <Plug className="h-4 w-4 text-muted-foreground" />
+                  Deputy employee
+                  <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                {!deputyTouched && autoConfidence !== "none" && selectedDeputyId !== "__none__" && (
+                  <Badge
+                    variant={autoConfidence === "exact" ? "default" : "secondary"}
+                    className="text-2xs"
+                  >
+                    {autoConfidence === "exact"
+                      ? "Exact match"
+                      : autoConfidence === "strong"
+                      ? "Strong match"
+                      : "Weak match"}
+                  </Badge>
+                )}
+              </div>
+              <Select
+                value={selectedDeputyId}
+                onValueChange={(v) => {
+                  setSelectedDeputyId(v);
+                  setDeputyTouched(true);
+                }}
+                disabled={deputyLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={deputyLoading ? "Loading Deputy roster…" : "No link"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No link (skip mapping)</SelectItem>
+                  {availableDeputyRoster.map((emp) => (
+                    <SelectItem
+                      key={emp.deputy_employee_id}
+                      value={String(emp.deputy_employee_id)}
+                    >
+                      {emp.display_name}
+                      {!emp.active ? " (inactive)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {selectedDeputyId !== "__none__" && !deputyTouched && autoConfidence === "exact"
+                  ? "Auto-confirmed — attendance will sync immediately."
+                  : selectedDeputyId !== "__none__"
+                  ? "Will be saved as unconfirmed — review on the Integrations page."
+                  : "Link this teammate to a Deputy employee so timesheet excusals sync automatically."}
+              </p>
+            </div>
+          )}
+
           {/* ── Additional permissions (collapsible) ── */}
           <div className="rounded-lg border border-border overflow-hidden">
             <button

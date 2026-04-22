@@ -303,16 +303,36 @@ serve(async (req) => {
       });
     }
 
-    // ── Resolve participant names for display ─────────────────────────────
+    // ── Resolve participant names + per-staff participation floor ─────────
+    // Each staff member has their own start date (participation_start_at, falling
+    // back to hire_date). We must NOT generate excusals for weeks before that
+    // date — the user wasn't in the program yet, so they had no assignments.
     const staffIds = activeMappings.map((m) => m.staff_id);
     const staffNameById = new Map<string, string>();
+    const staffFloorById = new Map<string, Date>(); // earliest Monday eligible per staff
     if (staffIds.length > 0) {
       const { data: staffRows2 } = await admin
         .from('staff')
-        .select('id, name')
+        .select('id, name, participation_start_at, hire_date')
         .in('id', staffIds);
-      for (const s of staffRows2 ?? []) staffNameById.set((s as any).id, (s as any).name);
+      for (const s of staffRows2 ?? []) {
+        const row = s as any;
+        staffNameById.set(row.id, row.name);
+        const raw = row.participation_start_at ?? row.hire_date ?? null;
+        if (raw) {
+          // Normalize to that week's Monday so the comparison is week-aligned.
+          const d = new Date(typeof raw === 'string' && raw.length === 10 ? `${raw}T00:00:00Z` : raw);
+          if (!isNaN(d.getTime())) staffFloorById.set(row.id, getWeekMonday(d));
+        }
+      }
     }
+
+    // Helper: is this week's Monday on/after the staff member's participation floor?
+    const weekIsEligible = (staffId: string, monday: Date): boolean => {
+      const floor = staffFloorById.get(staffId);
+      if (!floor) return true; // no floor configured → behave as before
+      return monday.getTime() >= floor.getTime();
+    };
 
     // ── Fetch timesheets for the requested window ─────────────────────────
     const startUnix = Math.floor(startDate.getTime() / 1000);

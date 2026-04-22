@@ -339,6 +339,10 @@ export function DeputyWizard({ organizationId }: Props) {
   const allMapped = participants.length > 0 && counts.unmatched === 0 && counts.suggested === 0;
 
   // ── Mapping mutations ───────────────────────────────────────────────────
+  // The table has unique indexes on (org, staff_id) and (org, deputy_employee_id).
+  // Deputy-side rows may already exist with staff_id=null (created by deputy-get-employees).
+  // When a user picks a Deputy person, we attach staff_id to THAT row instead of
+  // inserting a new one, otherwise the (org, deputy_employee_id) unique index rejects it.
   const upsertMapping = async (
     staffId: string,
     patch: Partial<Mapping> & { deputy_employee_id?: number | null; deputy_display_name?: string }
@@ -376,14 +380,44 @@ export function DeputyWizard({ organizationId }: Props) {
     qc.setQueryData(queryKey, optimistic);
 
     try {
+      const newDeputyId = patch.deputy_employee_id;
+
+      // If we're attaching to a different Deputy employee than what's currently held,
+      // clear the row that owns that deputy_employee_id (may be staff_id=null roster row,
+      // or attached to another staff which we'll detach).
+      if (
+        newDeputyId != null &&
+        (!existing || existing.deputy_employee_id !== newDeputyId)
+      ) {
+        const { data: conflict, error: lookupErr } = await (supabase as any)
+          .from("deputy_employee_mappings")
+          .select("id, staff_id")
+          .eq("organization_id", organizationId)
+          .eq("deputy_employee_id", newDeputyId)
+          .maybeSingle();
+        if (lookupErr) throw lookupErr;
+        if (conflict && conflict.staff_id !== staffId) {
+          // Delete the conflicting row to free up the unique (org, deputy_employee_id).
+          const { error: delErr } = await (supabase as any)
+            .from("deputy_employee_mappings")
+            .delete()
+            .eq("id", conflict.id);
+          if (delErr) throw delErr;
+        }
+      }
+
       if (existing) {
-        const { error } = await (supabase as any)
+        const { data: updated, error } = await (supabase as any)
           .from("deputy_employee_mappings")
           .update(patch as any)
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .select("id");
         if (error) throw error;
+        if (!updated || updated.length === 0) {
+          throw new Error("Update affected 0 rows (RLS or stale id)");
+        }
       } else {
-        const { error } = await (supabase as any)
+        const { data: inserted, error } = await (supabase as any)
           .from("deputy_employee_mappings")
           .insert({
             organization_id: organizationId,
@@ -392,14 +426,19 @@ export function DeputyWizard({ organizationId }: Props) {
             deputy_display_name: patch.deputy_display_name ?? PLACEHOLDER,
             is_confirmed: patch.is_confirmed ?? false,
             is_ignored: patch.is_ignored ?? false,
-          });
+          })
+          .select("id");
         if (error) throw error;
+        if (!inserted || inserted.length === 0) {
+          throw new Error("Insert returned no rows (RLS or constraint)");
+        }
       }
       qc.invalidateQueries({ queryKey });
     } catch (err: any) {
       // Roll back optimistic update on failure
       qc.setQueryData(queryKey, previous);
-      toast.error("Update failed", { description: err?.message });
+      console.error("[DeputyWizard] upsertMapping failed", { staffId, patch, err });
+      toast.error("Update failed", { description: err?.message ?? "Unknown error" });
     }
   };
 

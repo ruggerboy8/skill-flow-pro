@@ -896,6 +896,7 @@ export type Database = {
           draft_interview_audio_path: string | null
           draft_observation_audio_path: string | null
           evaluator_id: string
+          evaluator_note: string | null
           extracted_insights: Json | null
           focus_selected_at: string | null
           id: string
@@ -926,6 +927,7 @@ export type Database = {
           draft_interview_audio_path?: string | null
           draft_observation_audio_path?: string | null
           evaluator_id: string
+          evaluator_note?: string | null
           extracted_insights?: Json | null
           focus_selected_at?: string | null
           id?: string
@@ -956,6 +958,7 @@ export type Database = {
           draft_interview_audio_path?: string | null
           draft_observation_audio_path?: string | null
           evaluator_id?: string
+          evaluator_note?: string | null
           extracted_insights?: Json | null
           focus_selected_at?: string | null
           id?: string

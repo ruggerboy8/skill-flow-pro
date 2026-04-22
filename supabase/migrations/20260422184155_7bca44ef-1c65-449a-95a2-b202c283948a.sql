@@ -1,0 +1,1 @@
+ALTER TABLE public.evaluations ADD COLUMN IF NOT EXISTS evaluator_note text;

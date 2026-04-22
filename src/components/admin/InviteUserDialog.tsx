@@ -408,6 +408,9 @@ export function InviteUserDialog({
     setShowPermissions(false);
     setInviteSent(false);
     setInvitedName("");
+    setSelectedDeputyId("__none__");
+    setAutoConfidence("none");
+    setDeputyTouched(false);
     onClose();
   };
 

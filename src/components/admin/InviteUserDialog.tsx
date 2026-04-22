@@ -150,7 +150,96 @@ export function InviteUserDialog({
   // Permissions accordion open state
   const [showPermissions, setShowPermissions] = useState(false);
 
+  // ── Deputy integration state ──────────────────────────────────────────────
+  const [deputyConnected, setDeputyConnected] = useState(false);
+  const [deputyRoster, setDeputyRoster] = useState<DeputyEmployee[]>([]);
+  const [deputyMappedIds, setDeputyMappedIds] = useState<Set<number>>(new Set());
+  const [deputyLoading, setDeputyLoading] = useState(false);
+  const [selectedDeputyId, setSelectedDeputyId] = useState<string>("__none__");
+  const [autoConfidence, setAutoConfidence] = useState<MatchConfidence>("none");
+  const [deputyTouched, setDeputyTouched] = useState(false);
+
   const isCentralOffice = userType === "central";
+
+  // Detect Deputy connection + load roster when dialog opens
+  useEffect(() => {
+    if (!open || !organizationId) return;
+    let cancelled = false;
+    (async () => {
+      setDeputyLoading(true);
+      try {
+        const { data: conn } = await (supabase as any)
+          .from("deputy_connections")
+          .select("id")
+          .eq("organization_id", organizationId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (!conn) {
+          setDeputyConnected(false);
+          setDeputyRoster([]);
+          setDeputyMappedIds(new Set());
+          return;
+        }
+        setDeputyConnected(true);
+
+        const [rosterRes, mappingsRes] = await Promise.all([
+          supabase.functions.invoke("deputy-get-employees", {
+            body: { organization_id: organizationId },
+          }),
+          (supabase as any)
+            .from("deputy_employee_mappings")
+            .select("deputy_employee_id")
+            .eq("organization_id", organizationId)
+            .not("deputy_employee_id", "is", null),
+        ]);
+        if (cancelled) return;
+        const employees: DeputyEmployee[] =
+          (rosterRes.data as any)?.employees ?? (rosterRes.data as any) ?? [];
+        setDeputyRoster(Array.isArray(employees) ? employees : []);
+        const mappedIds = new Set<number>(
+          (mappingsRes.data ?? [])
+            .map((m: any) => m.deputy_employee_id)
+            .filter((v: any) => typeof v === "number"),
+        );
+        setDeputyMappedIds(mappedIds);
+      } catch (err) {
+        console.warn("[InviteUserDialog] Deputy lookup failed", err);
+        if (!cancelled) {
+          setDeputyConnected(false);
+          setDeputyRoster([]);
+        }
+      } finally {
+        if (!cancelled) setDeputyLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, organizationId]);
+
+  // Available roster = roster minus already-mapped employees
+  const availableDeputyRoster = useMemo(
+    () => deputyRoster.filter((e) => !deputyMappedIds.has(e.deputy_employee_id)),
+    [deputyRoster, deputyMappedIds],
+  );
+
+  // Auto-suggest based on name/email — only if user hasn't manually picked yet
+  useEffect(() => {
+    if (!deputyConnected || deputyTouched) return;
+    if (!formData.name.trim() && !formData.email.trim()) {
+      setSelectedDeputyId("__none__");
+      setAutoConfidence("none");
+      return;
+    }
+    const result = suggestEmployeeWithConfidence(
+      { name: formData.name, email: formData.email || null },
+      availableDeputyRoster,
+    );
+    setAutoConfidence(result.confidence);
+    setSelectedDeputyId(
+      result.employee ? String(result.employee.deputy_employee_id) : "__none__",
+    );
+  }, [formData.name, formData.email, availableDeputyRoster, deputyConnected, deputyTouched]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
 

@@ -533,6 +533,23 @@ serve(async (req) => {
     // ─────────────────────────────────────────────────────────────────────
     // MODE: apply_week / apply_retroactive
     // ─────────────────────────────────────────────────────────────────────
+
+    // Open run-history record so admins can audit every apply, manual or cron.
+    const { data: runRow } = await admin
+      .from('deputy_sync_runs')
+      .insert({
+        organization_id: orgId,
+        mode,
+        trigger: triggerSource,
+        week_start: isoDate(startDate),
+        week_end: isoDate(endDate),
+        status: 'running',
+        triggered_by: callerStaffId,
+      })
+      .select('id')
+      .single();
+    const runId = (runRow as any)?.id ?? null;
+
     const inserts: Array<{ staff_id: string; week_of: string; metric: string; reason: string; created_by: null }> = [];
     const perStaffSummary: any[] = [];
 

@@ -63,20 +63,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  type DeputyEmployee,
+  suggestEmployee,
+} from "@/lib/deputyMatching";
 
 interface Props {
   organizationId: string;
-}
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-interface DeputyEmployee {
-  deputy_employee_id: number;
-  display_name: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  active: boolean;
 }
 
 interface Mapping {

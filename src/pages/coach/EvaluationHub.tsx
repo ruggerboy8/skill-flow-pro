@@ -40,6 +40,7 @@ import {
   isEvaluationComplete,
   updateEvaluationMetadata,
   updateSummaryFeedback,
+  updateEvaluatorNote,
   updateInterviewTranscript,
   updateExtractedInsights,
   type EvaluationWithItems,
@@ -73,6 +74,8 @@ export function EvaluationHub() {
 
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
   const [staffName, setStaffName] = useState<string>('');
+  const [evaluatorName, setEvaluatorName] = useState<string>('');
+  const [evaluatorNote, setEvaluatorNote] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -616,10 +619,23 @@ export function EvaluationHub() {
         setStaffName(staffData.name);
       }
 
+      // Fetch evaluator name (the coach who created the evaluation)
+      if (data.evaluator_id) {
+        const { data: evaluatorData } = await supabase
+          .from('staff')
+          .select('name')
+          .eq('id', data.evaluator_id)
+          .maybeSingle();
+        if (evaluatorData) setEvaluatorName(evaluatorData.name);
+      }
+
       // Initialize edit fields
       setEditType(data.type);
       setEditQuarter(data.quarter);
       setEditDate(data.observed_at ? new Date(data.observed_at) : undefined);
+
+      // Initialize evaluator note
+      setEvaluatorNote((data as any).evaluator_note || '');
 
       // Initialize summary fields
       setSummaryFeedback((data as any).summary_feedback || null);
@@ -2068,6 +2084,22 @@ export function EvaluationHub() {
             interviewTranscript={interviewTranscript}
             participationSnapshot={(evaluation as any)?.participation_snapshot || null}
             evalType={evaluation?.type || null}
+            evaluatorNote={evaluatorNote}
+            evaluatorName={evaluatorName}
+            onEvaluatorNoteChange={async (note) => {
+              if (!evalId) return;
+              try {
+                await updateEvaluatorNote(evalId, note);
+                setEvaluatorNote(note);
+              } catch (error) {
+                console.error('Failed to save evaluator note:', error);
+                toast({
+                  title: 'Failed to save note',
+                  description: error instanceof Error ? error.message : 'Please try again.',
+                  variant: 'destructive',
+                });
+              }
+            }}
           />
         </TabsContent>
       </Tabs>

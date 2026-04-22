@@ -465,6 +465,24 @@ export async function updateSummaryFeedback(
 }
 
 /**
+ * Update the evaluator's free-form final note for an evaluation.
+ * Visible to the staff member once the evaluation is released.
+ */
+export async function updateEvaluatorNote(
+  evalId: string,
+  evaluatorNote: string
+) {
+  const { error } = await supabase
+    .from('evaluations')
+    .update({ evaluator_note: evaluatorNote } as any)
+    .eq('id', evalId);
+
+  if (error) {
+    throw new Error(`Failed to update evaluator note: ${error.message}`);
+  }
+}
+
+/**
  * Update the interview transcript from audio transcription
  */
 export async function updateInterviewTranscript(

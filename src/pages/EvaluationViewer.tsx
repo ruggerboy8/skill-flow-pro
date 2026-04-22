@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText, User, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { ArrowLeft, FileText, User, AlertCircle, CheckCircle2, Info, MessageSquare } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -160,6 +160,7 @@ export default function EvaluationViewer() {
   const [loading, setLoading] = useState(true);
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
   const [staffName, setStaffName] = useState<string>('');
+  const [evaluatorName, setEvaluatorName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [backUrl, setBackUrl] = useState('/stats/evaluations');
   const [activeTab, setActiveTab] = useState('scores');
@@ -219,6 +220,16 @@ export default function EvaluationViewer() {
 
         if (staffData) {
           setStaffName(staffData.name);
+        }
+
+        // Fetch evaluator name
+        if (evalData.evaluator_id) {
+          const { data: evaluatorData } = await supabase
+            .from('staff')
+            .select('name')
+            .eq('id', evalData.evaluator_id)
+            .maybeSingle();
+          if (evaluatorData) setEvaluatorName(evaluatorData.name);
         }
 
         // Set back URL: if coach viewing another staff's evaluation, go to that staff's page
@@ -370,6 +381,23 @@ export default function EvaluationViewer() {
               snapshot={(evaluation as any).participation_snapshot as ParticipationSnapshot | null}
               evalType={evaluation.type}
             />
+          )}
+
+          {/* Evaluator's free-form final note */}
+          {(evaluation as any).evaluator_note && (evaluation as any).evaluator_note.trim() && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  A note from {evaluatorName || 'your evaluator'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">
+                  {(evaluation as any).evaluator_note}
+                </p>
+              </CardContent>
+            </Card>
           )}
 
           {/* Self-score explainer / legacy notice */}

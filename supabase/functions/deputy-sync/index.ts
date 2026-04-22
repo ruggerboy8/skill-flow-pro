@@ -529,6 +529,7 @@ serve(async (req) => {
       let fridayExt = 0;
 
       for (const monday of mondaysBetween(startDate, endDate)) {
+        if (!weekIsEligible(m.staff_id, monday)) continue;
         const weekIso = isoDate(monday);
         const days = byWeek.get(weekIso) ?? new Set<number>();
         const dec = decide(

@@ -1,5 +1,8 @@
-import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import React, { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { MessageSquare } from 'lucide-react';
 import { InsightsDisplay, ExtractedInsights } from './InsightsDisplay';
 import { isLegacyInterviewEval } from '@/lib/evaluations';
 import {
@@ -13,10 +16,14 @@ interface SummaryTabProps {
   interviewTranscript?: string | null;
   participationSnapshot?: ParticipationSnapshot | null;
   evalType?: string | null;
+  evaluatorNote?: string | null;
+  evaluatorName?: string | null;
+  onEvaluatorNoteChange?: (note: string) => void | Promise<void>;
+  readOnly?: boolean;
 }
 
 /**
- * SummaryTab — read-only results.
+ * SummaryTab — read-only results + evaluator's free-form final note.
  * For new (post-interview) evals we show the participation snapshot the staff
  * member will see, so coaches can preview before submitting.
  * Legacy evals with interview-sourced insights still render the rich display.
@@ -27,6 +34,10 @@ export function SummaryTab({
   interviewTranscript,
   participationSnapshot,
   evalType,
+  evaluatorNote,
+  evaluatorName,
+  onEvaluatorNoteChange,
+  readOnly = false,
 }: SummaryTabProps) {
   const isLegacy = isLegacyInterviewEval({
     interview_transcript: interviewTranscript ?? null,
@@ -34,6 +45,53 @@ export function SummaryTab({
   });
 
   const isBaseline = evalType === 'Baseline';
+  const [draftNote, setDraftNote] = useState(evaluatorNote ?? '');
+
+  useEffect(() => {
+    setDraftNote(evaluatorNote ?? '');
+  }, [evaluatorNote]);
+
+  const evaluatorNoteCard = (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <MessageSquare className="h-4 w-4" />
+          A note from {evaluatorName || 'the evaluator'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {readOnly ? (
+          draftNote.trim() ? (
+            <p className="text-sm whitespace-pre-wrap">{draftNote}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">No note added.</p>
+          )
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="evaluator-note" className="sr-only">
+              Final note to staff member
+            </Label>
+            <Textarea
+              id="evaluator-note"
+              placeholder="Free-form thoughts, encouragement, or context to share with the staff member. They'll see this on their copy of the evaluation."
+              value={draftNote}
+              onChange={(e) => setDraftNote(e.target.value)}
+              onBlur={() => {
+                if ((evaluatorNote ?? '') !== draftNote) {
+                  onEvaluatorNoteChange?.(draftNote);
+                }
+              }}
+              rows={5}
+              className="resize-y"
+            />
+            <p className="text-xs text-muted-foreground">
+              Saves automatically when you click away. Visible to the staff member after release.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   if (!isLegacy) {
     return (
@@ -44,6 +102,7 @@ export function SummaryTab({
             evalType={evalType ?? null}
           />
         )}
+        {evaluatorNoteCard}
         {!summaryFeedback && (
           <Card>
             <CardContent className="py-12 text-center text-sm text-muted-foreground">
@@ -58,9 +117,12 @@ export function SummaryTab({
   }
 
   return (
-    <InsightsDisplay
-      summaryFeedback={summaryFeedback}
-      extractedInsights={extractedInsights}
-    />
+    <div className="space-y-4">
+      {evaluatorNoteCard}
+      <InsightsDisplay
+        summaryFeedback={summaryFeedback}
+        extractedInsights={extractedInsights}
+      />
+    </div>
   );
 }

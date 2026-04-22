@@ -345,6 +345,40 @@ export function InviteUserDialog({
         throw new Error(data.error);
       }
 
+      // Deputy auto-mapping: if a Deputy employee was selected, link it now.
+      const newStaffId: string | undefined = data?.staff_id;
+      if (deputyConnected && newStaffId && selectedDeputyId !== "__none__") {
+        const deputyId = Number(selectedDeputyId);
+        const employee = deputyRoster.find((e) => e.deputy_employee_id === deputyId);
+        if (employee) {
+          // Auto-confirm only when the auto-suggestion was an exact match AND the
+          // admin didn't override it. Manual picks always require confirmation
+          // on the integrations page.
+          const autoConfirm = !deputyTouched && autoConfidence === "exact";
+          try {
+            const { error: mapErr } = await (supabase as any)
+              .from("deputy_employee_mappings")
+              .insert({
+                organization_id: organizationId,
+                staff_id: newStaffId,
+                deputy_employee_id: deputyId,
+                deputy_display_name: employee.display_name,
+                is_confirmed: autoConfirm,
+                is_ignored: false,
+              });
+            if (mapErr) {
+              console.warn("[InviteUserDialog] Deputy mapping insert failed", mapErr);
+              toast({
+                title: "Deputy link skipped",
+                description: "Invite sent, but we couldn't link the Deputy employee. You can do this from the Integrations page.",
+              });
+            }
+          } catch (mapErr) {
+            console.warn("[InviteUserDialog] Deputy mapping insert error", mapErr);
+          }
+        }
+      }
+
       setInvitedName(formData.name);
       setInviteSent(true);
 

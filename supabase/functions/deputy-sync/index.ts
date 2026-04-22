@@ -394,9 +394,18 @@ serve(async (req) => {
     const timesheets: any[] = await timesheetRes.json();
     console.log(`Retrieved ${timesheets.length} timesheets from Deputy`);
 
+    // ── Per-employee day-of-week aggregation ─────────────────────────────────
+    // For each Deputy employee, collect the set of weekdays (1=Mon..5=Fri, UTC)
+    // on which they have at least one NON-DISCARDED timesheet within the
+    // sync window. We use this to determine per-metric excusal eligibility:
+    //   - Confidence excused → no overlap with {Mon, Tue, Wed}
+    //   - Performance excused → no overlap with {Thu, Fri}
+    //     EXCEPT Friday-only ({5}) → "expected_extended_deadline", NOT excused
+    //   - Both excused → daysWorked is empty (absent all week)
     const allSeenEmployees = new Map<number, string>();
-    const employeesWhoWorked = new Set<number>();
+    const daysWorkedByEmployee = new Map<number, Set<number>>();
     const timesheetSample: any[] = [];
+    const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     for (const ts of timesheets) {
       const empId: number = ts.Employee;
@@ -406,8 +415,15 @@ serve(async (req) => {
       if (!allSeenEmployees.has(empId)) {
         allSeenEmployees.set(empId, displayName);
       }
-      if (!ts.Discarded) {
-        employeesWhoWorked.add(empId);
+
+      if (!ts.Discarded && ts.StartTime) {
+        const dow = new Date(ts.StartTime * 1000).getUTCDay(); // 0=Sun..6=Sat
+        if (dow >= 1 && dow <= 5) {
+          if (!daysWorkedByEmployee.has(empId)) {
+            daysWorkedByEmployee.set(empId, new Set<number>());
+          }
+          daysWorkedByEmployee.get(empId)!.add(dow);
+        }
       }
 
       if (timesheetSample.length < 5) {
@@ -420,15 +436,25 @@ serve(async (req) => {
           start,
           end,
           total_hours: totalHours,
+          day_of_week: ts.StartTime ? DAY_LABELS[new Date(ts.StartTime * 1000).getUTCDay()] : null,
           discarded: !!ts.Discarded,
         });
       }
     }
 
-    // ── Determine "absent all week" candidates ───────────────────────────────
-    // For preview: use ALL existing mappings with a staff_id (regardless of
-    // confirmation) so the admin can see what would happen once they confirm.
-    // For real sync: only confirmed, non-ignored mappings.
+    // ── Compute per-mapping decisions ────────────────────────────────────────
+    // Decision matrix per the confirmed rules:
+    //
+    //   daysWorked        | confidence            | performance
+    //   ------------------|-----------------------|------------------------------
+    //   ∅ (absent)        | excused               | excused
+    //   {5} (Fri only)    | excused               | expected_extended_deadline
+    //   any incl Mon/Tue/Wed | expected           | (depends on Thu/Fri)
+    //   any incl Thu/Fri  | (depends on M/T/W)    | expected
+    //
+    // For dry-run preview: include ALL mappings with a staff_id (regardless of
+    // confirmation) so admins can see what WILL happen once they confirm.
+    // For real sync: only confirmed, non-ignored mappings produce excusals.
     const mappingsQuery = supabase
       .from('deputy_employee_mappings')
       .select('deputy_employee_id, staff_id, deputy_display_name, is_confirmed, is_ignored')
@@ -440,38 +466,83 @@ serve(async (req) => {
       : await mappingsQuery.eq('is_confirmed', true).eq('is_ignored', false);
 
     const mappings = (mappingRows ?? []) as any[];
-    const absentSample: string[] = [];
-    const excusalInserts: Record<string, any>[] = [];
-    let absentCount = 0;
 
     const syncStartDate: string | null = (connection as any).sync_start_date ?? null;
     const beforeStartFloor = !dryRun && syncStartDate
-      ? syncStartDate > weekOfStr // string compare on YYYY-MM-DD is safe
+      ? syncStartDate > weekOfStr // YYYY-MM-DD string compare is safe
       : false;
 
+    type EmpDecision = {
+      deputy_employee_id: number;
+      deputy_name: string;
+      sfp_staff_id: string;
+      days_worked: string[];
+      confidence: 'expected' | 'excused';
+      performance: 'expected' | 'excused' | 'expected_extended_deadline';
+      is_confirmed: boolean;
+    };
+
+    const details: EmpDecision[] = [];
+    const excusalInserts: Record<string, any>[] = [];
+    let absentCount = 0;
+    let fridayExtensionCount = 0;
+    let confidenceExcusedCount = 0;
+    let performanceExcusedCount = 0;
+
     for (const mapping of mappings) {
-      if (employeesWhoWorked.has(mapping.deputy_employee_id)) continue;
-      // For real sync: skip unconfirmed/ignored
-      if (!dryRun && (!mapping.is_confirmed || mapping.is_ignored)) continue;
+      const days = daysWorkedByEmployee.get(mapping.deputy_employee_id) ?? new Set<number>();
+      const hasMonTueWed = days.has(1) || days.has(2) || days.has(3);
+      const hasThuFri = days.has(4) || days.has(5);
+      const isFridayOnly = days.size === 1 && days.has(5);
 
-      absentCount++;
-      if (absentSample.length < 10) absentSample.push(mapping.deputy_display_name);
+      const confidence: 'expected' | 'excused' = hasMonTueWed ? 'expected' : 'excused';
+      let performance: 'expected' | 'excused' | 'expected_extended_deadline';
+      if (hasThuFri && !isFridayOnly) performance = 'expected';
+      else if (isFridayOnly) performance = 'expected_extended_deadline';
+      else performance = 'excused';
 
-      if (!dryRun && !beforeStartFloor) {
-        excusalInserts.push({
-          staff_id: mapping.staff_id,
-          week_of: weekOfStr,
-          metric: 'confidence',
-          reason: 'Absent per Deputy attendance data (auto-synced)',
-          created_by: null,
-        });
-        excusalInserts.push({
-          staff_id: mapping.staff_id,
-          week_of: weekOfStr,
-          metric: 'performance',
-          reason: 'Absent per Deputy attendance data (auto-synced)',
-          created_by: null,
-        });
+      if (days.size === 0) absentCount++;
+      if (isFridayOnly) fridayExtensionCount++;
+      if (confidence === 'excused') confidenceExcusedCount++;
+      if (performance === 'excused') performanceExcusedCount++;
+
+      details.push({
+        deputy_employee_id: mapping.deputy_employee_id,
+        deputy_name: mapping.deputy_display_name,
+        sfp_staff_id: mapping.staff_id,
+        days_worked: Array.from(days).sort().map((d) => DAY_LABELS[d]),
+        confidence,
+        performance,
+        is_confirmed: !!mapping.is_confirmed,
+      });
+
+      // Only WRITE excusals on real sync, for confirmed mappings, and only
+      // when we're in/after the sync_start_date floor. The "extended deadline"
+      // case is intentionally NOT written — it's a deadline adjustment, not
+      // an excusal. (Display/sequencer handling is a Phase-2 concern.)
+      if (!dryRun && mapping.is_confirmed && !mapping.is_ignored && !beforeStartFloor) {
+        if (confidence === 'excused') {
+          excusalInserts.push({
+            staff_id: mapping.staff_id,
+            week_of: weekOfStr,
+            metric: 'confidence',
+            reason: days.size === 0
+              ? 'Absent all week per Deputy attendance (auto-synced)'
+              : 'Did not work Mon–Wed per Deputy attendance (auto-synced)',
+            created_by: null,
+          });
+        }
+        if (performance === 'excused') {
+          excusalInserts.push({
+            staff_id: mapping.staff_id,
+            week_of: weekOfStr,
+            metric: 'performance',
+            reason: days.size === 0
+              ? 'Absent all week per Deputy attendance (auto-synced)'
+              : 'Did not work Thu–Fri per Deputy attendance (auto-synced)',
+            created_by: null,
+          });
+        }
       }
     }
 
@@ -520,6 +591,12 @@ serve(async (req) => {
         .eq('organization_id', orgId);
     }
 
+    // Sort details: unconfirmed first (admin attention), then alpha by name
+    details.sort((a, b) => {
+      if (a.is_confirmed !== b.is_confirmed) return a.is_confirmed ? 1 : -1;
+      return a.deputy_name.localeCompare(b.deputy_name);
+    });
+
     const summary: Record<string, any> = {
       ok: true,
       dry_run: dryRun,
@@ -530,22 +607,26 @@ serve(async (req) => {
       timesheet_count: timesheets.length,
       timesheet_sample: dryRun ? timesheetSample : undefined,
       employee_count: allSeenEmployees.size,
-      employee_sample: dryRun
-        ? Array.from(allSeenEmployees.entries()).slice(0, 5).map(([id, name]) => ({ id, display_name: name }))
-        : undefined,
-      employees_who_worked: employeesWhoWorked.size,
+      mapped_employee_count: mappings.length,
+      confirmed_mapping_count: mappings.filter((m) => m.is_confirmed).length,
       absent_all_week_count: absentCount,
-      absent_all_week_sample: dryRun ? absentSample : undefined,
+      friday_only_extension_count: fridayExtensionCount,
+      would_excuse_confidence: confidenceExcusedCount,
+      would_excuse_performance: performanceExcusedCount,
+      details,
       sync_start_date: syncStartDate,
       skipped_before_start_date: beforeStartFloor || undefined,
       new_mappings_created: dryRun ? 0 : newMappingsCreated,
       excusal_records_created: dryRun ? 0 : excusalInserts.length,
       note: dryRun
-        ? 'DRY RUN — no data was written. Use this to verify the data shape before going live.'
+        ? 'DRY RUN — no data was written. The `details` array shows the per-employee decision that WOULD be applied for confirmed mappings on a real sync.'
         : undefined,
     };
 
-    console.log('Deputy sync complete:', summary);
+    console.log(
+      `Deputy sync complete: ${timesheets.length} timesheets, ${mappings.length} mappings, ` +
+      `${absentCount} absent, ${fridayExtensionCount} Fri-only, ${excusalInserts.length} excusals written`
+    );
     return new Response(JSON.stringify(summary), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

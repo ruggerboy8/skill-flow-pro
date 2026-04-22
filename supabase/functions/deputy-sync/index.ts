@@ -240,9 +240,15 @@ serve(async (req) => {
       .from('deputy_connections')
       .select('*')
       .eq('organization_id', orgId)
-      .single();
+      .maybeSingle();
 
-    if (connError || !connection) {
+    if (connError) {
+      return new Response(
+        JSON.stringify({ error: `Connection lookup failed: ${connError.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!connection) {
       return new Response(
         JSON.stringify({ error: 'No Deputy connection found. Please connect Deputy first.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -132,7 +132,7 @@ export function DeputyConnectionCard({ organizationId }: Props) {
       if (error) throw error;
       setPreviewResult(data);
       toast.success("Preview pulled", {
-        description: `${data?.employee_count ?? 0} employees · ${data?.timesheet_count ?? 0} timesheets · ${data?.absent_all_week_count ?? 0} absent`,
+        description: `${data?.timesheet_count ?? 0} timesheets · ${data?.would_excuse_confidence ?? 0} would excuse Conf · ${data?.would_excuse_performance ?? 0} would excuse Perf`,
       });
     } catch (err: any) {
       toast.error("Preview failed", { description: err?.message });

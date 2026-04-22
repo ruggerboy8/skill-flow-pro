@@ -688,6 +688,71 @@ export type Database = {
           },
         ]
       }
+      deputy_sync_runs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          excusals_already_existed: number | null
+          excusals_inserted: number | null
+          finished_at: string | null
+          id: string
+          mapped_participant_count: number | null
+          mode: string
+          organization_id: string
+          started_at: string
+          status: string
+          timesheet_count: number | null
+          trigger: string
+          triggered_by: string | null
+          week_end: string | null
+          week_start: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          excusals_already_existed?: number | null
+          excusals_inserted?: number | null
+          finished_at?: string | null
+          id?: string
+          mapped_participant_count?: number | null
+          mode: string
+          organization_id: string
+          started_at?: string
+          status?: string
+          timesheet_count?: number | null
+          trigger?: string
+          triggered_by?: string | null
+          week_end?: string | null
+          week_start?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          excusals_already_existed?: number | null
+          excusals_inserted?: number | null
+          finished_at?: string | null
+          id?: string
+          mapped_participant_count?: number | null
+          mode?: string
+          organization_id?: string
+          started_at?: string
+          status?: string
+          timesheet_count?: number | null
+          trigger?: string
+          triggered_by?: string | null
+          week_end?: string | null
+          week_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deputy_sync_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       doctor_baseline_assessments: {
         Row: {
           completed_at: string | null

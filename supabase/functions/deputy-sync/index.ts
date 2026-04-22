@@ -94,19 +94,35 @@ async function fetchTimesheets(
   startUnix: number,
   endUnix: number
 ): Promise<any[]> {
-  const r = await fetch(`${baseUrl}/api/v1/resource/Timesheet/QUERY`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      search: {
-        s1: { field: 'StartTime', data: startUnix, type: 'gt' },
-        s2: { field: 'StartTime', data: endUnix, type: 'lt' },
-      },
-      max: 500,
-    }),
-  });
-  if (!r.ok) throw new Error(`Deputy timesheet query failed (${r.status}): ${(await r.text()).slice(0, 500)}`);
-  return await r.json();
+  const PAGE_SIZE = 500;
+  const MAX_PAGES = 40; // hard safety cap → up to 20k shifts
+  const all: any[] = [];
+  let start = 0;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const r = await fetch(`${baseUrl}/api/v1/resource/Timesheet/QUERY`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        search: {
+          s1: { field: 'StartTime', data: startUnix, type: 'gt' },
+          s2: { field: 'StartTime', data: endUnix, type: 'lt' },
+        },
+        sort: { StartTime: 'asc' },
+        max: PAGE_SIZE,
+        start,
+      }),
+    });
+    if (!r.ok) throw new Error(`Deputy timesheet query failed (${r.status}): ${(await r.text()).slice(0, 500)}`);
+    const batch = await r.json();
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+    start += PAGE_SIZE;
+  }
+
+  console.log(`fetchTimesheets: paginated ${all.length} shifts across ${Math.ceil(all.length / PAGE_SIZE)} page(s)`);
+  return all;
 }
 
 /** Bucket non-discarded timesheets into Map<empId, Map<weekISO, Set<dow 1..5>>>. */

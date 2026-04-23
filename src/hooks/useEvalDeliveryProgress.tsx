@@ -75,16 +75,13 @@ export function useEvalDeliveryProgress(
       // Org has no active groups yet — return empty rather than all locations
       if (allowedGroupIds.length === 0) return [];
 
-      // 2. Get active locations, optionally filtered by allowed groups
-      let locQuery = supabase
+      // 2. Get active locations within the allowed groups
+      const locQuery = supabase
         .from('locations')
         .select('id, name, group_id, practice_group:practice_groups!locations_org_fkey(name)')
         .eq('active', true)
+        .in('group_id', allowedGroupIds)
         .order('name');
-
-      if (allowedGroupIds !== null) {
-        locQuery = locQuery.in('group_id', allowedGroupIds);
-      }
 
       const { data: locations, error: locError } = await locQuery;
       if (locError) throw locError;

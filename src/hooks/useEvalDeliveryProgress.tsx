@@ -52,28 +52,28 @@ function deriveStatus(eval_: {
 export function useEvalDeliveryProgress(
   period: EvaluationPeriod | null
 ): UseEvalDeliveryProgressResult {
-  const { isSuperAdmin, organizationId: callerOrgId, isLoading: roleLoading } = useUserRole();
+  const { organizationId: callerOrgId, isLoading: roleLoading } = useUserRole();
 
   const query = useQuery({
-    queryKey: ['eval-delivery-progress', period?.type, period?.quarter, period?.year, isSuperAdmin, callerOrgId],
+    queryKey: ['eval-delivery-progress', period?.type, period?.quarter, period?.year, callerOrgId],
     queryFn: async (): Promise<LocationProgress[]> => {
       if (!period) return [];
+      if (!callerOrgId) return [];
 
-      // 1. Scope to the caller's org groups (super admins see all)
-      let allowedGroupIds: string[] | null = null;
-      if (!isSuperAdmin && callerOrgId) {
-        const { data: groups, error: groupsError } = await supabase
-          .from('practice_groups')
-          .select('id')
-          .eq('organization_id', callerOrgId)
-          .eq('active', true);
+      // Scope to the caller's organization. Super admins are also scoped to their
+      // own org here — cross-tenant viewing belongs in the Platform Console, not
+      // the org-level Evaluation Delivery page.
+      const { data: groups, error: groupsError } = await supabase
+        .from('practice_groups')
+        .select('id')
+        .eq('organization_id', callerOrgId)
+        .eq('active', true);
 
-        if (groupsError) throw groupsError;
-        allowedGroupIds = (groups || []).map(g => g.id);
+      if (groupsError) throw groupsError;
+      const allowedGroupIds: string[] = (groups || []).map(g => g.id);
 
-        // Org has no active groups yet — return empty rather than all locations
-        if (allowedGroupIds.length === 0) return [];
-      }
+      // Org has no active groups yet — return empty rather than all locations
+      if (allowedGroupIds.length === 0) return [];
 
       // 2. Get active locations, optionally filtered by allowed groups
       let locQuery = supabase

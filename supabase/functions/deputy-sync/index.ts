@@ -500,9 +500,11 @@ serve(async (req) => {
           const weekIso = isoDate(monday);
           const days = byWeek.get(weekIso) ?? new Set<number>();
           const dec = decide(
+            monday,
             days,
             submittedConf.has(`${m.staff_id}|${weekIso}`),
-            submittedPerf.has(`${m.staff_id}|${weekIso}`)
+            submittedPerf.has(`${m.staff_id}|${weekIso}`),
+            now,
           );
 
           if (dec.confidence === 'excused') {
@@ -598,9 +600,11 @@ serve(async (req) => {
         const weekIso = isoDate(monday);
         const days = byWeek.get(weekIso) ?? new Set<number>();
         const dec = decide(
+          monday,
           days,
           submittedConf.has(`${m.staff_id}|${weekIso}`),
-          submittedPerf.has(`${m.staff_id}|${weekIso}`)
+          submittedPerf.has(`${m.staff_id}|${weekIso}`),
+          now,
         );
 
         if (dec.confidence === 'excused' && !existingExcusalKey.has(`${m.staff_id}|${weekIso}|confidence`)) {

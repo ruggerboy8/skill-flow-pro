@@ -146,26 +146,58 @@ function bucketTimesheetsByWeek(timesheets: any[]): Map<number, Map<string, Set<
 }
 
 type Decision = {
-  confidence: 'expected' | 'excused' | 'already_submitted';
-  performance: 'expected' | 'excused' | 'expected_extended_deadline' | 'already_submitted';
+  confidence: 'expected' | 'excused' | 'already_submitted' | 'window_open';
+  performance: 'expected' | 'excused' | 'expected_extended_deadline' | 'already_submitted' | 'window_open';
   isFridayOnly: boolean;
   isAbsent: boolean;
 };
 
-function decide(days: Set<number>, hasConfSubmission: boolean, hasPerfSubmission: boolean): Decision {
+/**
+ * Decide excusal status for a single (employee, week).
+ *
+ * IMPORTANT: We only emit an `excused` verdict when the relevant attendance
+ * window has fully closed in real time. Otherwise "no shifts logged" is
+ * indistinguishable from "the days haven't happened yet" and we'd produce
+ * false-positive excusals (the 4/22/26 incident).
+ *
+ * Window-closed thresholds (UTC, conservative):
+ *   - confidence (Mon–Wed)  → closed once `now` is past the following Thursday 00:00 UTC
+ *                              (one full day after Wed UTC ends)
+ *   - performance (Thu–Fri) → closed once `now` is past the following Saturday 00:00 UTC
+ */
+function decide(
+  weekMonday: Date,
+  days: Set<number>,
+  hasConfSubmission: boolean,
+  hasPerfSubmission: boolean,
+  now: Date,
+): Decision {
   const hasMonTueWed = days.has(1) || days.has(2) || days.has(3);
   const hasThuFri = days.has(4) || days.has(5);
   const isFridayOnly = days.size === 1 && days.has(5);
   const isAbsent = days.size === 0;
 
+  // Confidence window closes at next Thu 00:00 UTC (Monday + 3 days)
+  const confWindowClose = new Date(weekMonday);
+  confWindowClose.setUTCDate(confWindowClose.getUTCDate() + 3);
+  const confClosed = now.getTime() >= confWindowClose.getTime();
+
+  // Performance window closes at next Sat 00:00 UTC (Monday + 5 days)
+  const perfWindowClose = new Date(weekMonday);
+  perfWindowClose.setUTCDate(perfWindowClose.getUTCDate() + 5);
+  const perfClosed = now.getTime() >= perfWindowClose.getTime();
+
   let confidence: Decision['confidence'];
   if (hasConfSubmission) confidence = 'already_submitted';
-  else confidence = hasMonTueWed ? 'expected' : 'excused';
+  else if (hasMonTueWed) confidence = 'expected';
+  else if (!confClosed) confidence = 'window_open';
+  else confidence = 'excused';
 
   let performance: Decision['performance'];
   if (hasPerfSubmission) performance = 'already_submitted';
   else if (isFridayOnly) performance = 'expected_extended_deadline';
   else if (hasThuFri) performance = 'expected';
+  else if (!perfClosed) performance = 'window_open';
   else performance = 'excused';
 
   return { confidence, performance, isFridayOnly, isAbsent };

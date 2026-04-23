@@ -155,10 +155,22 @@ type Decision = {
 /**
  * Decide excusal status for a single (employee, week).
  *
- * IMPORTANT: We only emit an `excused` verdict when the relevant attendance
- * window has fully closed in real time. Otherwise "no shifts logged" is
- * indistinguishable from "the days haven't happened yet" and we'd produce
- * false-positive excusals (the 4/22/26 incident).
+ * IMPORTANT: We only emit an `excused` verdict when:
+ *   1. The relevant attendance window has fully closed in real time, AND
+ *   2. The employee logged at least one shift somewhere in the week
+ *      (i.e. they "showed up to work" at some point).
+ *
+ * Rationale: Deputy is a scheduling system, and not everyone is scheduled —
+ * casual/PRN staff or anyone who picks up a last-minute cover shift may have
+ * zero scheduled hours but still work. If we excuse based purely on absence
+ * from Deputy we'd let those folks off the hook for pro moves they should be
+ * completing. So a "ghost week" (no shifts at all) is treated as inconclusive
+ * — we leave the assignment in place and the user/coach can manually excuse
+ * if it really was a true no-show.
+ *
+ * The split-day verdicts (worked Mon–Wed but not Thu–Fri, or vice versa) are
+ * still emitted because in those cases Deputy is positively telling us the
+ * person worked part of the week and was off the rest.
  *
  * Window-closed thresholds (UTC, conservative):
  *   - confidence (Mon–Wed)  → closed once `now` is past the following Thursday 00:00 UTC
@@ -191,14 +203,16 @@ function decide(
   if (hasConfSubmission) confidence = 'already_submitted';
   else if (hasMonTueWed) confidence = 'expected';
   else if (!confClosed) confidence = 'window_open';
-  else confidence = 'excused';
+  else if (isAbsent) confidence = 'window_open'; // no shifts anywhere → inconclusive, don't auto-excuse
+  else confidence = 'excused'; // worked Thu/Fri but not Mon–Wed → genuine partial absence
 
   let performance: Decision['performance'];
   if (hasPerfSubmission) performance = 'already_submitted';
   else if (isFridayOnly) performance = 'expected_extended_deadline';
   else if (hasThuFri) performance = 'expected';
   else if (!perfClosed) performance = 'window_open';
-  else performance = 'excused';
+  else if (isAbsent) performance = 'window_open'; // no shifts anywhere → inconclusive
+  else performance = 'excused'; // worked Mon–Wed but not Thu/Fri → genuine partial absence
 
   return { confidence, performance, isFridayOnly, isAbsent };
 }

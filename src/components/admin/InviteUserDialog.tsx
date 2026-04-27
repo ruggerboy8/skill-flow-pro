@@ -198,6 +198,7 @@ export function InviteUserDialog({
         setDeputyRoster(Array.isArray(employees) ? employees : []);
         const mappedIds = new Set<number>(
           (mappingsRes.data ?? [])
+            .filter((m: any) => m.staff_id != null) // only treat as mapped if actually linked to a staff record
             .map((m: any) => m.deputy_employee_id)
             .filter((v: any) => typeof v === "number"),
         );

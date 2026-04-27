@@ -52,7 +52,7 @@ import { SummaryTab } from '@/components/coach/SummaryTab';
 import { RecordingStartCard } from '@/components/coach/RecordingStartCard';
 import { RecordingProcessCard } from '@/components/coach/RecordingProcessCard';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
-import { InterviewRecorder } from '@/components/coach/InterviewRecorder';
+
 import { useAudioRecording, type AudioSegment } from '@/hooks/useAudioRecording';
 import { transcribeWithChunking, type ChunkProgress, CHUNK_SIZE_BYTES } from '@/lib/audioChunking';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -105,17 +105,7 @@ export function EvaluationHub() {
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
   const [isObservationTranscriptExpanded, setIsObservationTranscriptExpanded] = useState(false);
   const [draftObservationAudioPath, setDraftObservationAudioPath] = useState<string | null>(null);
-  const [draftInterviewAudioPath, setDraftInterviewAudioPath] = useState<string | null>(null);
   const [showNaConfirmDialog, setShowNaConfirmDialog] = useState(false);
-  
-  // Interview-specific recording flow states (mirrors observation flow)
-  const [isTranscribingInterview, setIsTranscribingInterview] = useState(false);
-  const [transcriptionJustCompletedInterview, setTranscriptionJustCompletedInterview] = useState(false);
-  const [analysisJustCompletedInterview, setAnalysisJustCompletedInterview] = useState(false);
-  
-  // Paste transcript dialog state
-  const [showPasteTranscriptDialog, setShowPasteTranscriptDialog] = useState(false);
-  const [pastedTranscript, setPastedTranscript] = useState('');
 
   // Recording state for split recording UI
   const [restoredAudioUrl, setRestoredAudioUrl] = useState<string | null>(null);
@@ -642,7 +632,7 @@ export function EvaluationHub() {
       setSummaryRawTranscript((data as any).summary_raw_transcript || null);
       setInterviewTranscript((data as any).interview_transcript || null);
       setDraftObservationAudioPath((data as any).draft_observation_audio_path || null);
-      setDraftInterviewAudioPath((data as any).draft_interview_audio_path || null);
+      
 
       // Load audio recording if exists
       if (data.audio_recording_path) {
@@ -1151,222 +1141,8 @@ export function EvaluationHub() {
     }
   };
 
-  // Draft interview audio handlers
-  const handleDraftInterviewAudioSaved = async (path: string) => {
-    if (!evalId) return;
-    try {
-      await supabase
-        .from('evaluations')
-        .update({ draft_interview_audio_path: path })
-        .eq('id', evalId);
-      setDraftInterviewAudioPath(path);
-    } catch (error) {
-      console.error('Failed to save draft interview audio path:', error);
-    }
-  };
-
-  const handleDraftInterviewAudioCleared = async () => {
-    if (!evalId) return;
-    try {
-      await supabase
-        .from('evaluations')
-        .update({ draft_interview_audio_path: null })
-        .eq('id', evalId);
-      setDraftInterviewAudioPath(null);
-    } catch (error) {
-      console.error('Failed to clear draft interview audio path:', error);
-    }
-  };
-
-  const handleInterviewRecordingFinalized = async (path: string) => {
-    if (!evalId) return;
-    try {
-      // Update the audio_recording_path (main interview recording)
-      const { error: updateError } = await supabase
-        .from('evaluations')
-        .update({ audio_recording_path: path })
-        .eq('id', evalId);
-      
-      if (updateError) throw updateError;
-      
-      setEvaluation(prev => prev ? {
-        ...prev,
-        audio_recording_path: path
-      } : prev);
-      
-      await loadCurrentRecording(path);
-    } catch (error) {
-      console.error('Failed to finalize interview recording:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save recording path',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  // Step 2: Transcribe interview audio only (no insight extraction)
-  const handleTranscribeInterview = async () => {
-    if (!evaluation?.audio_recording_path || !evalId) return;
-    
-    setIsTranscribingInterview(true);
-    setChunkProgress(null);
-
-    try {
-      // Step 1: Download the audio file
-      const { data: audioData, error: downloadError } = await supabase.storage
-        .from('evaluation-recordings')
-        .download(evaluation.audio_recording_path);
-      
-      if (downloadError) throw downloadError;
-      
-      // Step 2: Transcribe with automatic chunking for large files
-      const result = await transcribeWithChunking(audioData, (progress) => {
-        setChunkProgress(progress);
-      });
-      
-      const rawTranscript = result.transcript;
-      if (!rawTranscript) {
-        throw new Error('No transcript returned from transcription');
-      }
-
-      if (result.chunked) {
-        console.log(`[EvaluationHub] Large interview transcribed in ${result.totalChunks} chunks`);
-      }
-      
-      // Step 3: Parse the transcript to identify speakers
-      const { data: parseData, error: parseError } = await supabase.functions.invoke('parse-interview', {
-        body: { transcript: rawTranscript },
-      });
-      
-      if (parseError) throw parseError;
-      
-      const parsedTranscript = parseData?.parsedTranscript;
-      if (!parsedTranscript) {
-        throw new Error('No parsed transcript returned');
-      }
-      
-      // Step 4: Save to database
-      await updateInterviewTranscript(evalId, parsedTranscript);
-      setInterviewTranscript(parsedTranscript);
-      
-      // Show transcription complete state and auto-expand transcript
-      setTranscriptionJustCompletedInterview(true);
-      setIsTranscriptExpanded(true);
-      
-      toast({
-        title: 'Transcription Complete',
-        description: 'Review and edit the transcript, then click "Analyze" to extract insights.',
-      });
-    } catch (error) {
-      console.error('Transcription/parsing failed:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to transcribe interview",
-        variant: "destructive"
-      });
-    } finally {
-      setIsTranscribingInterview(false);
-      setChunkProgress(null);
-    }
-  };
-
-  // Step 3: Analyze interview transcript to extract insights (separate from transcription)
-  const handleAnalyzeInterview = async () => {
-    if (!evalId || !interviewTranscript) return;
-    
-    setIsParsing(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('extract-insights', {
-        body: { transcript: interviewTranscript, staffName, source: 'interview' },
-      });
-      
-      if (error) throw error;
-      
-      if (data?.insights) {
-        // Save under self_assessment key
-        const currentInsights = (evaluation?.extracted_insights as any) || {};
-        const updatedInsights = {
-          ...currentInsights,
-          self_assessment: {
-            summary_html: data.insights.summary_html,
-            domain_insights: data.insights.domain_insights
-          }
-        };
-        await updateExtractedInsights(evalId, updatedInsights);
-        setEvaluation(prev => prev ? { ...prev, extracted_insights: updatedInsights } : prev);
-        
-        // Show analysis complete state
-        setTranscriptionJustCompletedInterview(false);
-        setAnalysisJustCompletedInterview(true);
-        
-        toast({ 
-          title: 'Analysis Complete', 
-          description: 'Self-assessment insights have been extracted.' 
-        });
-      }
-    } catch (err) {
-      console.error('Extract insights failed:', err);
-      toast({ title: 'Error', description: 'Failed to extract insights', variant: 'destructive' });
-    } finally {
-      setIsParsing(false);
-    }
-  };
-
-  // Handler for View Insights button (interview)
-  const handleViewInterviewInsights = useCallback(() => {
-    setAnalysisJustCompletedInterview(false);
-    setActiveTab('summary');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-
-  // Handler for Review Transcript button (interview)
-  const handleReviewInterviewTranscript = useCallback(() => {
-    setTranscriptionJustCompletedInterview(false);
-    setIsTranscriptExpanded(true);
-  }, []);
-
-  // Handler for pasting transcript (bypasses audio recording)
-  const handlePasteTranscript = async () => {
-    if (!evalId || !pastedTranscript.trim()) return;
-    
-    try {
-      // Save the pasted transcript directly
-      await updateInterviewTranscript(evalId, pastedTranscript.trim());
-      setInterviewTranscript(pastedTranscript.trim());
-      
-      // Show transcription complete state and auto-expand transcript
-      setTranscriptionJustCompletedInterview(true);
-      setIsTranscriptExpanded(true);
-      
-      // Close dialog and reset
-      setShowPasteTranscriptDialog(false);
-      setPastedTranscript('');
-      
-      toast({
-        title: 'Transcript Saved',
-        description: 'Review the transcript, then click "Analyze" to extract insights.',
-      });
-    } catch (error) {
-      console.error('Failed to save pasted transcript:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save transcript",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleInterviewTranscriptChange = async (value: string) => {
-    if (!evalId) return;
-    setInterviewTranscript(value);
-    try {
-      await updateInterviewTranscript(evalId, value);
-    } catch (error) {
-      console.error('Failed to save interview transcript:', error);
-    }
-  };
+  // Interview/transcript handlers were removed — self-assessment is now derived
+  // from weekly performance averages, no recording or transcription needed.
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';

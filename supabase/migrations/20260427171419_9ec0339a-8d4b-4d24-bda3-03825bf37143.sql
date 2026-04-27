@@ -1,0 +1,1 @@
+UPDATE organizations SET reply_to_email = 'amcdonald@alcandentalcooperative.com' WHERE id = 'a1ca0000-0000-0000-0000-000000000001';

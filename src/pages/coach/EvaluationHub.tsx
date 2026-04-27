@@ -632,7 +632,7 @@ export function EvaluationHub() {
       setSummaryRawTranscript((data as any).summary_raw_transcript || null);
       setInterviewTranscript((data as any).interview_transcript || null);
       setDraftObservationAudioPath((data as any).draft_observation_audio_path || null);
-      setDraftInterviewAudioPath((data as any).draft_interview_audio_path || null);
+      
 
       // Load audio recording if exists
       if (data.audio_recording_path) {

@@ -188,7 +188,7 @@ export function InviteUserDialog({
           }),
           (supabase as any)
             .from("deputy_employee_mappings")
-            .select("deputy_employee_id")
+            .select("deputy_employee_id, staff_id")
             .eq("organization_id", organizationId)
             .not("deputy_employee_id", "is", null),
         ]);

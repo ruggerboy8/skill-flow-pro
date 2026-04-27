@@ -52,7 +52,7 @@ import { SummaryTab } from '@/components/coach/SummaryTab';
 import { RecordingStartCard } from '@/components/coach/RecordingStartCard';
 import { RecordingProcessCard } from '@/components/coach/RecordingProcessCard';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
-import { InterviewRecorder } from '@/components/coach/InterviewRecorder';
+
 import { useAudioRecording, type AudioSegment } from '@/hooks/useAudioRecording';
 import { transcribeWithChunking, type ChunkProgress, CHUNK_SIZE_BYTES } from '@/lib/audioChunking';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -105,17 +105,7 @@ export function EvaluationHub() {
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
   const [isObservationTranscriptExpanded, setIsObservationTranscriptExpanded] = useState(false);
   const [draftObservationAudioPath, setDraftObservationAudioPath] = useState<string | null>(null);
-  const [draftInterviewAudioPath, setDraftInterviewAudioPath] = useState<string | null>(null);
   const [showNaConfirmDialog, setShowNaConfirmDialog] = useState(false);
-  
-  // Interview-specific recording flow states (mirrors observation flow)
-  const [isTranscribingInterview, setIsTranscribingInterview] = useState(false);
-  const [transcriptionJustCompletedInterview, setTranscriptionJustCompletedInterview] = useState(false);
-  const [analysisJustCompletedInterview, setAnalysisJustCompletedInterview] = useState(false);
-  
-  // Paste transcript dialog state
-  const [showPasteTranscriptDialog, setShowPasteTranscriptDialog] = useState(false);
-  const [pastedTranscript, setPastedTranscript] = useState('');
 
   // Recording state for split recording UI
   const [restoredAudioUrl, setRestoredAudioUrl] = useState<string | null>(null);

@@ -25,6 +25,8 @@ import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
 import { nowUtc } from '@/lib/centralTime';
+import { useReminderLog } from '@/hooks/useReminderLog';
+import { formatDistanceToNow } from 'date-fns';
 
 interface CoachDashboardProps {
   forcedLocationId?: string;        // Locks to specific location by UUID
@@ -68,6 +70,9 @@ export default function CoachDashboardV2({
   const [reminderOpen, setReminderOpen] = useState(false);
   const [reminderType, setReminderType] = useState<'confidence' | 'performance'>('confidence');
   const [reminderRecipients, setReminderRecipients] = useState<any[]>([]);
+
+  // Reminder log for the selected week (keyed by `${user_id}|${type}`)
+  const { reminderMap, reload: reloadReminderLog } = useReminderLog(format(selectedWeek, 'yyyy-MM-dd'));
 
   // Expanded rows
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -443,6 +448,25 @@ export default function CoachDashboardV2({
     return <StatusBadge status={status} />;
   }
 
+  // Inline "Reminded Xh ago by Y" line under the status badge.
+  // Only renders when the cell is still missing (not complete/excused) and a log entry exists.
+  function ReminderInlineNote({ userId, locationId, hasAll, isExcused, metric }: {
+    userId: string; locationId: string; hasAll: boolean; isExcused: boolean; metric: 'confidence' | 'performance';
+  }) {
+    if (!userId || hasAll || isExcused) return null;
+    const status = getDeadlineAwareStatus(locationId, hasAll, false, isExcused, metric);
+    // Only show for actionable states (manager might want to nudge)
+    if (status === 'complete' || status === 'excused' || status === 'not_open') return null;
+    const info = reminderMap.get(`${userId}|${metric}`);
+    if (!info) return null;
+    const rel = formatDistanceToNow(new Date(info.sent_at), { addSuffix: true });
+    return (
+      <div className="text-2xs text-muted-foreground mt-1 leading-tight">
+        ↪ Reminded {rel} by {info.sender_name}
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -653,12 +677,26 @@ export default function CoachDashboardV2({
                               isExcused={isMetricExcused(row.staff_id, row.location_id, 'confidence')}
                               metric="confidence"
                             />
+                            <ReminderInlineNote
+                              userId={row.user_id}
+                              locationId={row.location_id}
+                              hasAll={hasAllConf}
+                              isExcused={isMetricExcused(row.staff_id, row.location_id, 'confidence')}
+                              metric="confidence"
+                            />
                           </TableCell>
                           <TableCell className="text-center">
                             <DeadlineStatusPill
                               locationId={row.location_id}
                               hasAll={hasAllPerf}
                               hasAnyLate={row.scores.some(s => s.performance_late)}
+                              isExcused={isMetricExcused(row.staff_id, row.location_id, 'performance')}
+                              metric="performance"
+                            />
+                            <ReminderInlineNote
+                              userId={row.user_id}
+                              locationId={row.location_id}
+                              hasAll={hasAllPerf}
                               isExcused={isMetricExcused(row.staff_id, row.location_id, 'performance')}
                               metric="performance"
                             />
@@ -705,8 +743,13 @@ export default function CoachDashboardV2({
       <ReminderComposer
         type={reminderType}
         recipients={reminderRecipients}
+        reminderMap={reminderMap}
         open={reminderOpen}
-        onOpenChange={setReminderOpen}
+        onOpenChange={(open) => {
+          setReminderOpen(open);
+          if (!open) reloadReminderLog();
+        }}
+        onSent={reloadReminderLog}
       />
     </div>
   );

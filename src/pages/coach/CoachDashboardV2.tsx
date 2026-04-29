@@ -743,8 +743,13 @@ export default function CoachDashboardV2({
       <ReminderComposer
         type={reminderType}
         recipients={reminderRecipients}
+        reminderMap={reminderMap}
         open={reminderOpen}
-        onOpenChange={setReminderOpen}
+        onOpenChange={(open) => {
+          setReminderOpen(open);
+          if (!open) reloadReminderLog();
+        }}
+        onSent={reloadReminderLog}
       />
     </div>
   );

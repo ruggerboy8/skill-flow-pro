@@ -98,6 +98,7 @@ export default function BaselineWizard() {
         .select(`
           action_id,
           action_statement,
+          conditionally_applicable,
           competencies!fk_pro_moves_competency_id (
             name,
             domains!competencies_domain_id_fkey (
@@ -134,6 +135,7 @@ export default function BaselineWizard() {
           action_id: pm.action_id,
           action_statement: pm.action_statement,
           competency_name: competency?.name || '',
+          conditionally_applicable: !!pm.conditionally_applicable,
         });
       });
       

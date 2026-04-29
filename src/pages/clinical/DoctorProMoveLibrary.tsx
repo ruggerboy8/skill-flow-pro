@@ -34,6 +34,7 @@ interface ProMove {
   competency_id: number;
   competency_name: string;
   domain_name: string;
+  conditionally_applicable: boolean;
   resources: {
     has_why: boolean;
     has_script: boolean;

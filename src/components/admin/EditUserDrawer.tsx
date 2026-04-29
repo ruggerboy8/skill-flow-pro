@@ -533,7 +533,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             )}
           </div>
 
-          {/* Doctor Portal Access (additive — works alongside any non-Clinical-Director role) */}
+          {/* Doctor Portal Access (additive — works alongside any role, including Clinical Director) */}
           <div className="space-y-3 p-4 bg-teal-50/50 dark:bg-teal-950/20 rounded-lg border border-teal-200/50 dark:border-teal-800/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -546,17 +546,31 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
                 id="doctor-toggle"
                 checked={doctorPortalAccess}
                 onCheckedChange={setDoctorPortalAccess}
-                disabled={selectedAction === 'clinical_director'}
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              When enabled, this user appears in the Clinical Director portal as a doctor and gets a "Doctor" link in their sidebar. Use this for admins or coaches who are also practicing doctors. Their existing role and permissions are preserved.
+              When enabled, this user appears in the Clinical Director portal as a doctor and gets a "Doctor" link in their sidebar. Use this for any user (admin, coach, or even a Clinical Director) who is also a practicing doctor. Their existing role and permissions are preserved.
             </p>
-            {selectedAction === 'clinical_director' && (
-              <p className="text-xs font-medium text-amber-600">
-                Clinical Directors cannot also be doctors. Choose a different role to enable this.
-              </p>
-            )}
+          </div>
+
+          {/* Clinical Director Access (additive — independent of role preset) */}
+          <div className="space-y-3 p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-lg border border-indigo-200/50 dark:border-indigo-800/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-indigo-600" />
+                <Label htmlFor="cd-toggle" className="text-sm font-semibold cursor-pointer">
+                  Clinical Director Access
+                </Label>
+              </div>
+              <Switch
+                id="cd-toggle"
+                checked={clinicalDirectorAccess}
+                onCheckedChange={setClinicalDirectorAccess}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              When enabled, this user gets a "Clinical" link in their sidebar and can invite and manage doctors from the Clinical Director Portal. Combine with Doctor Portal Access above to let a clinical director also participate as a doctor.
+            </p>
           </div>
 
           {/* Role preset */}

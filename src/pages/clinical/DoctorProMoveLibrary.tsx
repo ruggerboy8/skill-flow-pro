@@ -116,6 +116,7 @@ export default function DoctorProMoveLibrary() {
           description,
           active,
           competency_id,
+          conditionally_applicable,
           competencies!fk_pro_moves_competency_id (
             name,
             domains!competencies_domain_id_fkey (

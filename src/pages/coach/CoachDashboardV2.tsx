@@ -448,6 +448,25 @@ export default function CoachDashboardV2({
     return <StatusBadge status={status} />;
   }
 
+  // Inline "Reminded Xh ago by Y" line under the status badge.
+  // Only renders when the cell is still missing (not complete/excused) and a log entry exists.
+  function ReminderInlineNote({ userId, locationId, hasAll, isExcused, metric }: {
+    userId: string; locationId: string; hasAll: boolean; isExcused: boolean; metric: 'confidence' | 'performance';
+  }) {
+    if (!userId || hasAll || isExcused) return null;
+    const status = getDeadlineAwareStatus(locationId, hasAll, false, isExcused, metric);
+    // Only show for actionable states (manager might want to nudge)
+    if (status === 'complete' || status === 'excused' || status === 'not_open') return null;
+    const info = reminderMap.get(`${userId}|${metric}`);
+    if (!info) return null;
+    const rel = formatDistanceToNow(new Date(info.sent_at), { addSuffix: true });
+    return (
+      <div className="text-2xs text-muted-foreground mt-1 leading-tight">
+        ↪ Reminded {rel} by {info.sender_name}
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">

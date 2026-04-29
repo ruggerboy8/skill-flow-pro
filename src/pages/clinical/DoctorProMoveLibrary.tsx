@@ -445,7 +445,7 @@ export default function DoctorProMoveLibrary() {
                 {/* Main content */}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium">{pm.action_statement}</p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <Badge 
                       className="text-xs text-black dark:text-black"
                       style={{ 
@@ -456,6 +456,11 @@ export default function DoctorProMoveLibrary() {
                       {pm.domain_name}
                     </Badge>
                     <span className="text-sm text-muted-foreground">{pm.competency_name}</span>
+                    {pm.conditionally_applicable && (
+                      <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-400">
+                        Conditional (N/A allowed)
+                      </Badge>
+                    )}
                   </div>
                 </div>
 

@@ -251,7 +251,7 @@ export async function getEvaluationsForStaff(staffId: string) {
  */
 export async function getEvaluation(evalId: string): Promise<EvaluationWithItems | null> {
   // First get the evaluation and basic items
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('evaluations')
     .select(`
       *,
@@ -265,6 +265,19 @@ export async function getEvaluation(evalId: string): Promise<EvaluationWithItems
   }
 
   if (!data) return null;
+
+  // For draft Quarterly evals, lazily refresh aggregated self-scores so any
+  // weekly submissions made after the eval was created show up. Best-effort:
+  // if the recompute fails we still return the existing data.
+  if (data.status === 'draft' && data.type === 'Quarterly' && data.quarter) {
+    await refreshEvalSelfScores(evalId);
+    const { data: refreshed } = await supabase
+      .from('evaluations')
+      .select(`*, evaluation_items(*)`)
+      .eq('id', evalId)
+      .maybeSingle();
+    if (refreshed) data = refreshed;
+  }
 
   const items = data.evaluation_items || [];
 

@@ -1,71 +1,76 @@
 ## Goal
 
-Let Kasey Stark be **both** a participating doctor (just like Sage, Henry, etc.) **and** a Clinical Director (just like Dr. Alex) — managing her own roster of Michigan doctors. No disruption to the doctor experience we just shipped.
+Let clinical directors mark certain doctor Pro Moves as "Conditionally Applicable." When a doctor takes their baseline self-assessment, only those flagged Pro Moves will display an N/A option (so a doctor at a site where the Pro Move is irrelevant — e.g. St. David's documentation — can opt out without skewing scores).
 
-## Good news: very little new code needed
+This is a stopgap to avoid building site-based Pro Move targeting.
 
-The hard work was done in the last change. Kasey already has all the doctor plumbing turned on (`is_doctor=true`, `role_id=4`), and her admin/coach navigation already coexists with a "Doctor" sidebar link. The only missing capability is the **Clinical Director** flag, which gates:
+## Scope & isolation from existing N/A
 
-- The "Clinical" sidebar link (`Layout.tsx` checks `staffProfile.is_clinical_director`)
-- Access to `/clinical/*` routes (`ClinicalLayout` uses `canAccessClinical = isClinicalDirector || isSuperAdmin`)
-- Visibility of all coach baseline assessments / coaching sessions / meeting records (RLS policies key off `is_clinical_director`)
-- The "Invite Doctor" button and doctor management table
+This change touches **only the doctor self-assessment** (`DomainAssessmentStep.tsx`, used by `BaselineWizard.tsx`, writing to `doctor_baseline_items`).
 
-Dr. Alex has exactly this combination today (`is_clinical_director + is_org_admin + is_coach`), so we know it works.
+The clinical director's own baseline assessment of a doctor (`CoachBaselineWizard.tsx`, writing to `coach_baseline_items`) is a separate component that already shows N/A on every Pro Move. **It is not modified** — directors keep full N/A access on every item, exactly as today.
 
-## What changes
+Both flows continue to use score = 0 as the N/A convention, so downstream gap math, recommender filters, and results views are unchanged.
 
-### 1. Data update (Kasey only) — no code
+## Changes
 
-Flip a single flag on her staff record:
+### 1. Database (migration)
+
+Add a new boolean column to `pro_moves`:
 
 ```sql
-UPDATE staff
-SET is_clinical_director = true
-WHERE id = '9b05bd32-4a4a-41b9-8f7b-ed86be9bc50c';
+ALTER TABLE pro_moves
+  ADD COLUMN conditionally_applicable boolean NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN pro_moves.conditionally_applicable IS
+  'When true, doctors may mark this Pro Move N/A (score = 0) during their self-assessment. Stopgap for items that do not apply at every site.';
 ```
 
-Everything else (`is_doctor=true`, `is_org_admin=true`, `is_coach=true`, `role_id=4`, `organization_id`, `primary_location_id`) stays exactly as it is.
+No backfill — existing rows default to `false` (current behavior preserved).
 
-### 2. Admin UI — add a "Clinical Director" toggle to EditUserDrawer
+### 2. Clinical Director Pro Move editor
 
-Right now the only way to grant CD access is the `clinical_director` role preset, which **forces `is_doctor=false`** (would wipe out Kasey's doctor capability). We need a manual toggle, mirroring the "Doctor Portal Access" switch we just added.
+File: `src/components/clinical/DoctorProMoveForm.tsx`
 
-- `src/components/admin/EditUserDrawer.tsx`: add a "Clinical Director access" Switch, defaulted to current `is_clinical_director`. On submit, send it as a top-level `is_clinical_director` field (same pattern as `is_doctor`).
-- `supabase/functions/admin-users/index.ts`: in the `role_preset` handler, accept and apply optional top-level `is_clinical_director` independently of the preset's flag map (same pattern we used for `is_doctor`).
+- Add a `Checkbox` labeled **"Conditionally applicable"** with helper text: *"Doctors can mark this Pro Move N/A during self-assessment (use for items that do not apply to every site, e.g. St. David's-specific documentation)."*
+- Wire into `formData` and include `conditionally_applicable` in insert and update payloads (cast `as any` until Supabase types regenerate).
 
-This means an admin can give any user the CD capability without touching their other flags — no more all-or-nothing preset.
+### 3. Doctor Pro Move library list
 
-## What Kasey will experience
+File: `src/pages/clinical/DoctorProMoveLibrary.tsx`
 
-Sidebar (in order): Home → Dashboard → Builder → Coach → Evaluations → Stats → **Clinical** → **Doctor** → Admin.
+- Include `conditionally_applicable` in the `loadProMoves` select.
+- Show a small "Conditional" badge on rows where the flag is true so directors can scan the library at a glance.
 
-- **Doctor link** (`/doctor`) — full participating-doctor experience: baseline welcome → wizard → results → coaching prep → schedule → meeting confirmation. Dr. Alex (or Ariyana) coaches her exactly like Sage or Henry.
-- **Clinical link** (`/clinical`) — her own Clinical Director Portal: invite doctors, see the doctor table, release baselines, build prep, run sessions for her Michigan doctors.
-- Lands on Command Center (`/dashboard`) on login as before.
+### 4. Doctor baseline self-assessment (the only place behavior changes)
 
-## What Dr. Alex will experience
+File: `src/pages/doctor/BaselineWizard.tsx`
 
-- Kasey continues to appear in his `/clinical/doctors` table as `Dr. Kasey Stark` so he can coach her.
-- New caveat: Kasey will also appear in **her own** `/clinical/doctors` table (the doctor list is global today — we explicitly chose not to silo). Dr. Alex sees Kasey; Kasey sees herself plus everyone else. This matches the brief: "for now let's not worry about siloing doctors."
+- Include `conditionally_applicable` in the `pro_moves` query.
+- Pass the flag through into each `ProMoveItem` in the domain group.
 
-## What stays unchanged
+File: `src/components/doctor/DomainAssessmentStep.tsx`
 
-- All other doctors, admins, coaches, and clinical directors — same experience.
-- Dr. Alex's record — untouched.
-- The `clinical_director` role preset stays as-is for net-new CD invites who aren't also doctors.
-- All RLS policies — no migration needed; `is_clinical_director` already drives them.
-- Routing precedence (admin > doctor) we just shipped.
+- Currently `showNaOption` is an unused prop applied uniformly. Replace with per-row logic:
+  - The N/A column header renders if **any** Pro Move in the domain is conditional.
+  - The per-row N/A button only renders when `pm.conditionally_applicable === true`. Non-conditional rows render an empty placeholder cell to keep column alignment.
+- Drop the now-unused `showNaOption` prop.
 
-## Out of scope (note for later)
+### 5. Type regeneration note
 
-- **Siloing doctors per CD.** Today every CD sees every doctor in the org. When you're ready, we can add a `clinical_director_assignments` table (or reuse `coach_scopes`) so each CD only sees doctors they own. Flag it for a future round.
-- **Hiding self from your own doctor table.** Minor cosmetic — Kasey will see her own row in `/clinical/doctors`. We could add a "you" badge or hide self, but it's not blocking.
+`src/integrations/supabase/types.ts` is auto-managed. Until it regenerates, use the project's existing "defensive querying" cast pattern (`(supabase as any)` or `as any` on the payload) in `DoctorProMoveForm.tsx`.
 
-## Files to change
+## Out of scope
 
-1. `src/components/admin/EditUserDrawer.tsx` — add Clinical Director access switch
-2. `supabase/functions/admin-users/index.ts` — accept optional `is_clinical_director` in role_preset action
-3. Data update on `staff` row `9b05bd32-...` — flip `is_clinical_director` to true
+- Site-based Pro Move targeting (explicitly avoided).
+- Coach/Clinical Director baseline assessment of doctors — unchanged.
+- Other-staff Pro Move flows.
+- Recommender and coaching gap logic — already treats score = 0 as N/A.
 
-Approve and I'll ship the UI/edge-function changes, then run the one-line update for Kasey.
+## Files touched
+
+- new migration under `supabase/migrations/`
+- `src/components/clinical/DoctorProMoveForm.tsx`
+- `src/pages/clinical/DoctorProMoveLibrary.tsx`
+- `src/pages/doctor/BaselineWizard.tsx`
+- `src/components/doctor/DomainAssessmentStep.tsx`

@@ -1560,6 +1560,7 @@ export type Database = {
           action_statement: string | null
           active: boolean | null
           competency_id: number | null
+          conditionally_applicable: boolean
           copied_from_action_id: number | null
           curriculum_priority: number | null
           curriculum_priority_foundational: number | null
@@ -1588,6 +1589,7 @@ export type Database = {
           action_statement?: string | null
           active?: boolean | null
           competency_id?: number | null
+          conditionally_applicable?: boolean
           copied_from_action_id?: number | null
           curriculum_priority?: number | null
           curriculum_priority_foundational?: number | null
@@ -1616,6 +1618,7 @@ export type Database = {
           action_statement?: string | null
           active?: boolean | null
           competency_id?: number | null
+          conditionally_applicable?: boolean
           copied_from_action_id?: number | null
           curriculum_priority?: number | null
           curriculum_priority_foundational?: number | null

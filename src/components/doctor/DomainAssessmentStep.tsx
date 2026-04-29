@@ -31,7 +31,6 @@ interface DomainAssessmentStepProps {
   onComplete?: () => void;
   isCompleting?: boolean;
   forceOpenProMoveId?: number | null;
-  showNaOption?: boolean;
 }
 
 const SCORE_LABELS = [

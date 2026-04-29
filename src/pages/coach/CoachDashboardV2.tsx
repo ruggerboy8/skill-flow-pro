@@ -71,6 +71,9 @@ export default function CoachDashboardV2({
   const [reminderType, setReminderType] = useState<'confidence' | 'performance'>('confidence');
   const [reminderRecipients, setReminderRecipients] = useState<any[]>([]);
 
+  // Reminder log for the selected week (keyed by `${user_id}|${type}`)
+  const { reminderMap, reload: reloadReminderLog } = useReminderLog(format(selectedWeek, 'yyyy-MM-dd'));
+
   // Expanded rows
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   

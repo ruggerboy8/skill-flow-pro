@@ -562,7 +562,7 @@ serve(async (req: Request) => {
       }
 
       case "role_preset": {
-        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date, name, email, allow_backfill, location_id, is_doctor } = payload ?? {};
+        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date, name, email, allow_backfill, location_id, is_doctor, is_clinical_director } = payload ?? {};
         
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
@@ -733,11 +733,19 @@ serve(async (req: Request) => {
           updates.primary_location_id = location_id;
         }
 
-        // Doctor portal access — additive flag, layered on top of any non-clinical-director preset.
-        // The 'doctor' preset already sets is_doctor=true and 'clinical_director' forces is_doctor=false
-        // via the preset config. For all other presets, honour the explicit is_doctor field if provided.
-        if (typeof is_doctor === 'boolean' && preset !== 'doctor' && preset !== 'clinical_director') {
+        // Doctor portal access — additive flag, layered on top of any preset (including clinical_director).
+        // The 'doctor' preset already sets is_doctor=true via the preset config; for all other presets,
+        // honour the explicit is_doctor field if provided.
+        if (typeof is_doctor === 'boolean' && preset !== 'doctor') {
           updates.is_doctor = is_doctor;
+        }
+
+        // Clinical Director access — additive flag, layered on top of any preset.
+        // The 'clinical_director' preset already sets is_clinical_director=true via the preset config;
+        // for all other presets, honour the explicit is_clinical_director field if provided. This lets
+        // an admin grant CD access to a doctor or coach without wiping their other capabilities.
+        if (typeof is_clinical_director === 'boolean' && preset !== 'clinical_director') {
+          updates.is_clinical_director = is_clinical_director;
         }
         
         // Handle backfill permission toggle

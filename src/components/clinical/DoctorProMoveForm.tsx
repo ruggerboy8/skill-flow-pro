@@ -78,14 +78,15 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
         action_statement: formData.action_statement.trim(),
         description: formData.description.trim() || null,
         practice_types: DEFAULT_PRACTICE_TYPES,
-        active: true
+        active: true,
+        conditionally_applicable: formData.conditionally_applicable,
       };
 
       if (proMove?.action_id) {
         // Update existing pro-move
         const { error } = await supabase
           .from('pro_moves')
-          .update(submitData)
+          .update(submitData as any)
           .eq('action_id', proMove.action_id);
 
         if (error) throw error;

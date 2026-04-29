@@ -11,6 +11,7 @@ interface ProMoveItem {
   action_id: number;
   action_statement: string;
   competency_name: string;
+  conditionally_applicable?: boolean;
 }
 
 interface DomainGroup {

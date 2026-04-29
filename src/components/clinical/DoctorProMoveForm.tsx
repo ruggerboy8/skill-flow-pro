@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { getDomainColor } from '@/lib/domainColors';
 import {
@@ -27,6 +28,7 @@ interface ProMove {
   action_statement: string;
   description?: string | null;
   competency_id?: number;
+  conditionally_applicable?: boolean;
 }
 
 interface DoctorProMoveFormProps {
@@ -41,7 +43,8 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
   const [formData, setFormData] = useState({
     competency_id: '',
     action_statement: '',
-    description: ''
+    description: '',
+    conditionally_applicable: false,
   });
 
   useEffect(() => {
@@ -49,7 +52,8 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
       setFormData({
         competency_id: proMove.competency_id?.toString() || '',
         action_statement: proMove.action_statement || '',
-        description: proMove.description || ''
+        description: proMove.description || '',
+        conditionally_applicable: !!proMove.conditionally_applicable,
       });
     }
   }, [proMove]);
@@ -74,14 +78,15 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
         action_statement: formData.action_statement.trim(),
         description: formData.description.trim() || null,
         practice_types: DEFAULT_PRACTICE_TYPES,
-        active: true
+        active: true,
+        conditionally_applicable: formData.conditionally_applicable,
       };
 
       if (proMove?.action_id) {
         // Update existing pro-move
         const { error } = await supabase
           .from('pro_moves')
-          .update(submitData)
+          .update(submitData as any)
           .eq('action_id', proMove.action_id);
 
         if (error) throw error;
@@ -175,6 +180,28 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
               rows={3}
             />
             <p className="text-xs text-muted-foreground">Shown to learners as "Why this matters"</p>
+          </div>
+
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="conditionally-applicable"
+                checked={formData.conditionally_applicable}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, conditionally_applicable: checked === true })
+                }
+                className="mt-0.5"
+              />
+              <div className="space-y-1">
+                <Label htmlFor="conditionally-applicable" className="cursor-pointer font-medium">
+                  Conditionally applicable
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Doctors can mark this Pro Move "N/A" during their self-assessment.
+                  Use for items that don't apply at every site (e.g. St. David's-specific documentation).
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">

@@ -34,6 +34,7 @@ interface ProMove {
   competency_id: number;
   competency_name: string;
   domain_name: string;
+  conditionally_applicable: boolean;
   resources: {
     has_why: boolean;
     has_script: boolean;
@@ -115,6 +116,7 @@ export default function DoctorProMoveLibrary() {
           description,
           active,
           competency_id,
+          conditionally_applicable,
           competencies!fk_pro_moves_competency_id (
             name,
             domains!competencies_domain_id_fkey (
@@ -163,6 +165,7 @@ export default function DoctorProMoveLibrary() {
           competency_id: pm.competency_id || 0,
           competency_name: (pm.competencies as any)?.name || 'Unknown',
           domain_name: (pm.competencies as any)?.domains?.domain_name || 'Unknown',
+          conditionally_applicable: !!(pm as any).conditionally_applicable,
           resources: {
             has_why: types.has('doctor_why'),
             has_script: types.has('doctor_script'),
@@ -214,6 +217,7 @@ export default function DoctorProMoveLibrary() {
       description: proMove.description,
       active: proMove.active,
       competency_id: proMove.competency_id,
+      conditionally_applicable: proMove.conditionally_applicable,
       role_id: DOCTOR_ROLE_ID,
     });
     setShowAddForm(true);
@@ -441,7 +445,7 @@ export default function DoctorProMoveLibrary() {
                 {/* Main content */}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium">{pm.action_statement}</p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <Badge 
                       className="text-xs text-black dark:text-black"
                       style={{ 
@@ -452,6 +456,11 @@ export default function DoctorProMoveLibrary() {
                       {pm.domain_name}
                     </Badge>
                     <span className="text-sm text-muted-foreground">{pm.competency_name}</span>
+                    {pm.conditionally_applicable && (
+                      <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-400">
+                        Conditional (N/A allowed)
+                      </Badge>
+                    )}
                   </div>
                 </div>
 

@@ -11,6 +11,7 @@ interface ProMoveItem {
   action_id: number;
   action_statement: string;
   competency_name: string;
+  conditionally_applicable?: boolean;
 }
 
 interface DomainGroup {
@@ -30,7 +31,6 @@ interface DomainAssessmentStepProps {
   onComplete?: () => void;
   isCompleting?: boolean;
   forceOpenProMoveId?: number | null;
-  showNaOption?: boolean;
 }
 
 const SCORE_LABELS = [
@@ -57,7 +57,6 @@ export function DomainAssessmentStep({
   onComplete,
   isCompleting,
   forceOpenProMoveId,
-  showNaOption,
 }: DomainAssessmentStepProps) {
   const [selectedProMoveId, setSelectedProMoveId] = useState<number | null>(null);
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
@@ -99,6 +98,7 @@ export function DomainAssessmentStep({
     pm => ratings[pm.action_id]?.score !== null && ratings[pm.action_id]?.score !== undefined
   ).length;
   const allDomainRated = domainRatedCount === domain.proMoves.length;
+  const anyConditional = domain.proMoves.some(pm => pm.conditionally_applicable);
 
   const selectedProMove = domain.proMoves.find(pm => pm.action_id === selectedProMoveId);
 
@@ -144,7 +144,7 @@ export function DomainAssessmentStep({
                     {s.short}
                   </div>
                 ))}
-                {showNaOption && (
+                {anyConditional && (
                   <div className="w-10 text-center text-xs">N/A</div>
                 )}
               </div>
@@ -231,24 +231,28 @@ export function DomainAssessmentStep({
                                 </div>
                               ))}
                             </RadioGroup>
-                            {showNaOption && (
-                              <div className="w-10 flex justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => onRatingChange(pm.action_id, 0)}
-                                  className={`
-                                    w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer
-                                    transition-all text-xs font-medium
-                                    ${currentRating === 0
-                                      ? 'bg-muted border-muted-foreground text-foreground'
-                                      : 'border-muted-foreground/30 hover:border-primary/50 text-muted-foreground'
-                                    }
-                                  `}
-                                  title="Not applicable / Haven't observed"
-                                >
-                                  N/A
-                                </button>
-                              </div>
+                            {anyConditional && (
+                              pm.conditionally_applicable ? (
+                                <div className="w-10 flex justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => onRatingChange(pm.action_id, 0)}
+                                    className={`
+                                      w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer
+                                      transition-all text-xs font-medium
+                                      ${currentRating === 0
+                                        ? 'bg-muted border-muted-foreground text-foreground'
+                                        : 'border-muted-foreground/30 hover:border-primary/50 text-muted-foreground'
+                                      }
+                                    `}
+                                    title="Not applicable at my site"
+                                  >
+                                    N/A
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="w-10" aria-hidden="true" />
+                              )
                             )}
                           </div>
                         </div>

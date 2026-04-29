@@ -292,10 +292,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         participation_start_at: PARTICIPANT_PRESETS.includes(selectedAction) && participationStartAt
           ? participationStartAt
           : null,
-        // Doctor portal access is layered on top of any preset (including non-doctor presets).
-        // Only included when the clinical_director preset is NOT selected, since clinical_director
-        // explicitly forces is_doctor=false.
-        is_doctor: selectedAction === 'clinical_director' ? false : doctorPortalAccess,
+        // Doctor portal access and Clinical Director access are layered additively on top of any preset.
+        // A user can be both — e.g. a Clinical Director who is also a participating doctor.
+        is_doctor: doctorPortalAccess,
+        is_clinical_director: clinicalDirectorAccess,
       };
 
       if (selectedAction === 'lead' || selectedAction === 'coach' ||

@@ -233,24 +233,28 @@ export function DomainAssessmentStep({
                                 </div>
                               ))}
                             </RadioGroup>
-                            {showNaOption && (
-                              <div className="w-10 flex justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => onRatingChange(pm.action_id, 0)}
-                                  className={`
-                                    w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer
-                                    transition-all text-xs font-medium
-                                    ${currentRating === 0
-                                      ? 'bg-muted border-muted-foreground text-foreground'
-                                      : 'border-muted-foreground/30 hover:border-primary/50 text-muted-foreground'
-                                    }
-                                  `}
-                                  title="Not applicable / Haven't observed"
-                                >
-                                  N/A
-                                </button>
-                              </div>
+                            {anyConditional && (
+                              pm.conditionally_applicable ? (
+                                <div className="w-10 flex justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => onRatingChange(pm.action_id, 0)}
+                                    className={`
+                                      w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer
+                                      transition-all text-xs font-medium
+                                      ${currentRating === 0
+                                        ? 'bg-muted border-muted-foreground text-foreground'
+                                        : 'border-muted-foreground/30 hover:border-primary/50 text-muted-foreground'
+                                      }
+                                    `}
+                                    title="Not applicable at my site"
+                                  >
+                                    N/A
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="w-10" aria-hidden="true" />
+                              )
                             )}
                           </div>
                         </div>

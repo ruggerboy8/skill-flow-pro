@@ -57,7 +57,6 @@ export function DomainAssessmentStep({
   onComplete,
   isCompleting,
   forceOpenProMoveId,
-  showNaOption,
 }: DomainAssessmentStepProps) {
   const [selectedProMoveId, setSelectedProMoveId] = useState<number | null>(null);
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);

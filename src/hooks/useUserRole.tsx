@@ -121,8 +121,8 @@ export function useUserRole() {
   const managedOrgIds = orgScopes.map(s => s.scope_id);
 
   // ─── Dashboard visibility ─────────────────────────────────────────────────
-  // Non-participants who are coaches/regional managers (but not doctors)
-  const showRegionalDashboard = !isParticipant && !isDoctor && (isRegional || isCoach);
+  // Non-participants who are coaches/regional managers (admin role wins over doctor)
+  const showRegionalDashboard = !isParticipant && (isRegional || isCoach);
 
   // Office managers who are NOT coaches or regional managers
   const showLocationDashboard = isOfficeManager && !isCoach && !isRegional;
@@ -132,8 +132,12 @@ export function useUserRole() {
   const canAccessClinical = isClinicalDirector || isSuperAdmin;
 
   // ─── Home route ───────────────────────────────────────────────────────────
+  // Admin / regional / coach roles take precedence over isDoctor for landing page.
+  // Pure doctors (no admin/coach role) still land on /doctor.
   let homeRoute = '/';
-  if (isDoctor) {
+  if (isSuperAdmin || isOrgAdmin || isRegional || isCoach) {
+    homeRoute = '/dashboard';
+  } else if (isDoctor) {
     homeRoute = '/doctor';
   } else if (!isParticipant) {
     homeRoute = '/dashboard';

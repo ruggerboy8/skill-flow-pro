@@ -217,6 +217,7 @@ export default function DoctorProMoveLibrary() {
       description: proMove.description,
       active: proMove.active,
       competency_id: proMove.competency_id,
+      conditionally_applicable: proMove.conditionally_applicable,
       role_id: DOCTOR_ROLE_ID,
     });
     setShowAddForm(true);

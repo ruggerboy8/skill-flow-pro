@@ -25,6 +25,8 @@ import { useTableSort } from '@/hooks/useTableSort';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { getLocationSubmissionGates, type SubmissionGates } from '@/lib/submissionStatus';
 import { nowUtc } from '@/lib/centralTime';
+import { useReminderLog } from '@/hooks/useReminderLog';
+import { formatDistanceToNow } from 'date-fns';
 
 interface CoachDashboardProps {
   forcedLocationId?: string;        // Locks to specific location by UUID

@@ -1,88 +1,71 @@
 ## Goal
 
-Make `is_doctor` an **additive** capability so a user can be both a Regional Manager (admin) and a Doctor without losing access to either experience. Then flip the flag on Kasey Stark and set her role to Doctor (role_id = 4).
+Let Kasey Stark be **both** a participating doctor (just like Sage, Henry, etc.) **and** a Clinical Director (just like Dr. Alex) — managing her own roster of Michigan doctors. No disruption to the doctor experience we just shipped.
 
-## Approach
+## Good news: very little new code needed
 
-Today `isDoctor` is treated as mutually exclusive with admin/coach navigation in three places: `Index.tsx` redirects, `Layout.tsx` nav, `useUserRole.homeRoute`. The pattern we want already exists for Clinical Director (admin nav + extra "Clinical" link). We extend that pattern so a doctor-who-is-also-admin keeps the admin nav and gets an additional "Doctor" link.
+The hard work was done in the last change. Kasey already has all the doctor plumbing turned on (`is_doctor=true`, `role_id=4`), and her admin/coach navigation already coexists with a "Doctor" sidebar link. The only missing capability is the **Clinical Director** flag, which gates:
 
-Pure doctors (no admin/coach flags) are unaffected — they keep the doctor-only experience exactly as it is today.
+- The "Clinical" sidebar link (`Layout.tsx` checks `staffProfile.is_clinical_director`)
+- Access to `/clinical/*` routes (`ClinicalLayout` uses `canAccessClinical = isClinicalDirector || isSuperAdmin`)
+- Visibility of all coach baseline assessments / coaching sessions / meeting records (RLS policies key off `is_clinical_director`)
+- The "Invite Doctor" button and doctor management table
 
-## Changes
+Dr. Alex has exactly this combination today (`is_clinical_director + is_org_admin + is_coach`), so we know it works.
 
-### 1. Routing precedence — `src/pages/Index.tsx`
+## What changes
 
-Reorder the redirect logic so admin/regional wins over doctor:
+### 1. Data update (Kasey only) — no code
 
-```
-if (showRegionalDashboard || isOrgAdmin || isSuperAdmin) → render RegionalDashboard
-else if (isDoctor) → <Navigate to="/doctor" />
-else → participant home
-```
-
-Pure doctors still auto-route to `/doctor`. Kasey lands on the Command Center.
-
-### 2. Home route — `src/hooks/useUserRole.tsx`
-
-Update `homeRoute` precedence to match:
-- super admin / org admin / regional → `/dashboard`
-- pure doctor → `/doctor`
-- participant → `/`
-
-Also fix `showRegionalDashboard` to no longer exclude doctors (`!isParticipant && (isRegional || isCoach)`).
-
-### 3. Sidebar nav — `src/components/Layout.tsx`
-
-Replace the top-level `isDoctor ? [doctor-only nav] : ...` ternary with:
-- **Pure doctor** (isDoctor && !isOrgAdmin && !isSuperAdmin && !isCoach) → existing doctor-only nav (unchanged)
-- **Admin/coach who is also a doctor** → existing standard/super-admin nav PLUS a new `{ name: 'Doctor', href: '/doctor', icon: Stethoscope }` item, placed near the Clinical link
-
-Same pattern as the existing conditional Clinical link for clinical directors.
-
-### 4. EditUserDrawer — `src/components/admin/EditUserDrawer.tsx`
-
-Add a "Doctor portal access" toggle (Switch component, mirroring the existing Pause Account / Backfill switches). Independent of the role preset. Defaults to current `is_doctor` value. On submit, send `is_doctor` in the payload.
-
-### 5. admin-users edge function — `supabase/functions/admin-users/index.ts`
-
-In the `role_preset` action handler, accept an optional top-level `is_doctor` field. Apply it to the staff update **independently of the preset's flag map**, so toggling the doctor switch doesn't get clobbered by the preset and the preset doesn't get clobbered by the toggle. (The existing `doctor` preset stays as-is for net-new doctor invites — separate code path.)
-
-### 6. Apply changes to Kasey (data update)
-
-After the UI ships, run a one-time update via the insert tool (Lovable Cloud → Add data):
+Flip a single flag on her staff record:
 
 ```sql
 UPDATE staff
-SET is_doctor = true,
-    role_id = 4
+SET is_clinical_director = true
 WHERE id = '9b05bd32-4a4a-41b9-8f7b-ed86be9bc50c';
 ```
 
-Leaves `is_org_admin`, `is_coach`, `home_route='/dashboard'`, `organization_id`, and `primary_location_id` untouched.
+Everything else (`is_doctor=true`, `is_org_admin=true`, `is_coach=true`, `role_id=4`, `organization_id`, `primary_location_id`) stays exactly as it is.
 
-## What Kasey will experience after the change
+### 2. Admin UI — add a "Clinical Director" toggle to EditUserDrawer
 
-- Lands on Command Center (`/dashboard`) on login. All admin/coach/builder/evaluations nav intact.
-- New **"Doctor"** item in her sidebar → opens `/doctor` Doctor Home with the baseline welcome CTA.
-- Once her clinical director releases her baseline, she completes the full doctor flow (baseline wizard → results → coaching prep → schedule → meeting confirmation) just like Sage, Justin, Henry, Ana.
-- `/doctor/my-role` will load Doctor competencies/ProMoves because `role_id = 4`.
+Right now the only way to grant CD access is the `clinical_director` role preset, which **forces `is_doctor=false`** (would wipe out Kasey's doctor capability). We need a manual toggle, mirroring the "Doctor Portal Access" switch we just added.
 
-## What the clinical director will experience
+- `src/components/admin/EditUserDrawer.tsx`: add a "Clinical Director access" Switch, defaulted to current `is_clinical_director`. On submit, send it as a top-level `is_clinical_director` field (same pattern as `is_doctor`).
+- `supabase/functions/admin-users/index.ts`: in the `role_preset` handler, accept and apply optional top-level `is_clinical_director` independently of the preset's flag map (same pattern we used for `is_doctor`).
 
-- Kasey appears in `/clinical` stats ("Total Doctors" +1) in the **Invited** bucket.
-- Kasey appears in `/clinical/doctors` table as `Dr. Kasey Stark` / Lake Orion / Stage: Invited / Next Step: "Release the baseline when ready for the doctor to begin".
-- `/clinical/doctors/{kasey-id}` opens her full doctor profile with the standard release-baseline → coach-baseline → build-prep → invite-to-schedule → meeting → follow-up workflow.
+This means an admin can give any user the CD capability without touching their other flags — no more all-or-nothing preset.
+
+## What Kasey will experience
+
+Sidebar (in order): Home → Dashboard → Builder → Coach → Evaluations → Stats → **Clinical** → **Doctor** → Admin.
+
+- **Doctor link** (`/doctor`) — full participating-doctor experience: baseline welcome → wizard → results → coaching prep → schedule → meeting confirmation. Dr. Alex (or Ariyana) coaches her exactly like Sage or Henry.
+- **Clinical link** (`/clinical`) — her own Clinical Director Portal: invite doctors, see the doctor table, release baselines, build prep, run sessions for her Michigan doctors.
+- Lands on Command Center (`/dashboard`) on login as before.
+
+## What Dr. Alex will experience
+
+- Kasey continues to appear in his `/clinical/doctors` table as `Dr. Kasey Stark` so he can coach her.
+- New caveat: Kasey will also appear in **her own** `/clinical/doctors` table (the doctor list is global today — we explicitly chose not to silo). Dr. Alex sees Kasey; Kasey sees herself plus everyone else. This matches the brief: "for now let's not worry about siloing doctors."
 
 ## What stays unchanged
 
-- Pure doctors (the existing Alcan + Sprout doctors) — same experience, same nav, same routing.
-- All existing RLS policies — no migration needed (`staff.is_doctor` already exists; doctor-side RLS keys off identity match + flag, both of which Kasey will satisfy).
-- Her admin powers, scopes, location, and organization.
-- `useStaffProfile` resolution (the "is_org_admin record wins" rule still works because she has only one staff row).
+- All other doctors, admins, coaches, and clinical directors — same experience.
+- Dr. Alex's record — untouched.
+- The `clinical_director` role preset stays as-is for net-new CD invites who aren't also doctors.
+- All RLS policies — no migration needed; `is_clinical_director` already drives them.
+- Routing precedence (admin > doctor) we just shipped.
 
-## Out of scope
+## Out of scope (note for later)
 
-- Restructuring `useStaffProfile` to handle multi-staff-row users (not needed — one row covers her).
-- Any changes to the doctor invitation edge function (she's already a user; we're just turning on her doctor capability).
+- **Siloing doctors per CD.** Today every CD sees every doctor in the org. When you're ready, we can add a `clinical_director_assignments` table (or reuse `coach_scopes`) so each CD only sees doctors they own. Flag it for a future round.
+- **Hiding self from your own doctor table.** Minor cosmetic — Kasey will see her own row in `/clinical/doctors`. We could add a "you" badge or hide self, but it's not blocking.
 
-Approve and I'll implement, ship the UI changes first, then run the data update for Kasey.
+## Files to change
+
+1. `src/components/admin/EditUserDrawer.tsx` — add Clinical Director access switch
+2. `supabase/functions/admin-users/index.ts` — accept optional `is_clinical_director` in role_preset action
+3. Data update on `staff` row `9b05bd32-...` — flip `is_clinical_director` to true
+
+Approve and I'll ship the UI/edge-function changes, then run the one-line update for Kasey.

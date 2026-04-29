@@ -100,6 +100,7 @@ export function DomainAssessmentStep({
     pm => ratings[pm.action_id]?.score !== null && ratings[pm.action_id]?.score !== undefined
   ).length;
   const allDomainRated = domainRatedCount === domain.proMoves.length;
+  const anyConditional = domain.proMoves.some(pm => pm.conditionally_applicable);
 
   const selectedProMove = domain.proMoves.find(pm => pm.action_id === selectedProMoveId);
 

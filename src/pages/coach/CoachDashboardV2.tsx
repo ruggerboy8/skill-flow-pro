@@ -677,12 +677,26 @@ export default function CoachDashboardV2({
                               isExcused={isMetricExcused(row.staff_id, row.location_id, 'confidence')}
                               metric="confidence"
                             />
+                            <ReminderInlineNote
+                              userId={row.user_id}
+                              locationId={row.location_id}
+                              hasAll={hasAllConf}
+                              isExcused={isMetricExcused(row.staff_id, row.location_id, 'confidence')}
+                              metric="confidence"
+                            />
                           </TableCell>
                           <TableCell className="text-center">
                             <DeadlineStatusPill
                               locationId={row.location_id}
                               hasAll={hasAllPerf}
                               hasAnyLate={row.scores.some(s => s.performance_late)}
+                              isExcused={isMetricExcused(row.staff_id, row.location_id, 'performance')}
+                              metric="performance"
+                            />
+                            <ReminderInlineNote
+                              userId={row.user_id}
+                              locationId={row.location_id}
+                              hasAll={hasAllPerf}
                               isExcused={isMetricExcused(row.staff_id, row.location_id, 'performance')}
                               metric="performance"
                             />

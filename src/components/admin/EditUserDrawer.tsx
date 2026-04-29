@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, PauseCircle, Wrench, ChevronDown } from "lucide-react";
+import { Loader2, PauseCircle, Wrench, ChevronDown, Stethoscope } from "lucide-react";
 import { format, addDays, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -136,6 +136,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const [pauseReason, setPauseReason] = useState<string>('');
   const [allowBackfill, setAllowBackfill] = useState<boolean>(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const [doctorPortalAccess, setDoctorPortalAccess] = useState<boolean>(false);
 
   // ── New capability state ───────────────────────────────────────────────────
   const [capabilities, setCapabilities] = useState<Capabilities>({ ...DEFAULT_CAPABILITIES });
@@ -154,6 +155,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     setPauseReason(user.pause_reason || '');
     setCapsLoaded(false);
     setShowPermissions(false);
+    setDoctorPortalAccess((user as any).is_doctor ?? false);
 
     const hasActiveBackfill = user.allow_backfill_until && new Date(user.allow_backfill_until) > new Date();
     setAllowBackfill(!!hasActiveBackfill);
@@ -288,6 +290,10 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
         participation_start_at: PARTICIPANT_PRESETS.includes(selectedAction) && participationStartAt
           ? participationStartAt
           : null,
+        // Doctor portal access is layered on top of any preset (including non-doctor presets).
+        // Only included when the clinical_director preset is NOT selected, since clinical_director
+        // explicitly forces is_doctor=false.
+        is_doctor: selectedAction === 'clinical_director' ? false : doctorPortalAccess,
       };
 
       if (selectedAction === 'lead' || selectedAction === 'coach' ||
@@ -521,6 +527,32 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             {allowBackfill && (!user?.allow_backfill_until || new Date(user.allow_backfill_until) <= new Date()) && (
               <p className="text-xs font-medium text-blue-600">
                 Will expire: {format(addDays(new Date(), 7), 'MMM d, yyyy')}
+              </p>
+            )}
+          </div>
+
+          {/* Doctor Portal Access (additive — works alongside any non-Clinical-Director role) */}
+          <div className="space-y-3 p-4 bg-teal-50/50 dark:bg-teal-950/20 rounded-lg border border-teal-200/50 dark:border-teal-800/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Stethoscope className="h-5 w-5 text-teal-600" />
+                <Label htmlFor="doctor-toggle" className="text-sm font-semibold cursor-pointer">
+                  Doctor Portal Access
+                </Label>
+              </div>
+              <Switch
+                id="doctor-toggle"
+                checked={doctorPortalAccess}
+                onCheckedChange={setDoctorPortalAccess}
+                disabled={selectedAction === 'clinical_director'}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              When enabled, this user appears in the Clinical Director portal as a doctor and gets a "Doctor" link in their sidebar. Use this for admins or coaches who are also practicing doctors. Their existing role and permissions are preserved.
+            </p>
+            {selectedAction === 'clinical_director' && (
+              <p className="text-xs font-medium text-amber-600">
+                Clinical Directors cannot also be doctors. Choose a different role to enable this.
               </p>
             )}
           </div>

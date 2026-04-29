@@ -562,7 +562,7 @@ serve(async (req: Request) => {
       }
 
       case "role_preset": {
-        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date, name, email, allow_backfill, location_id } = payload ?? {};
+        const { user_id, preset, coach_scope_type, coach_scope_ids, hire_date, name, email, allow_backfill, location_id, is_doctor } = payload ?? {};
         
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
@@ -731,6 +731,13 @@ serve(async (req: Request) => {
         }
         if (location_id !== undefined) {
           updates.primary_location_id = location_id;
+        }
+
+        // Doctor portal access — additive flag, layered on top of any non-clinical-director preset.
+        // The 'doctor' preset already sets is_doctor=true and 'clinical_director' forces is_doctor=false
+        // via the preset config. For all other presets, honour the explicit is_doctor field if provided.
+        if (typeof is_doctor === 'boolean' && preset !== 'doctor' && preset !== 'clinical_director') {
+          updates.is_doctor = is_doctor;
         }
         
         // Handle backfill permission toggle

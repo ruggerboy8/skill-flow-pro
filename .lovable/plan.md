@@ -1,88 +1,88 @@
-## Context
+## Goal
 
-You already have everything needed to track reminders — `reminder_log` records every send (`target_user_id`, `type`, `sent_at`, `sender_user_id`, `subject`, `body`). The gap is that the Reminders tab doesn't *read* from it, so when Ariyana sends RDA nudges and the coach sends nudges for everyone else, neither knows what the other already did.
+Make `is_doctor` an **additive** capability so a user can be both a Regional Manager (admin) and a Doctor without losing access to either experience. Then flip the flag on Kasey Stark and set her role to Doctor (role_id = 4).
 
-The fix is purely UI + a small query — no new tables.
+## Approach
 
-## Recommendation
+Today `isDoctor` is treated as mutually exclusive with admin/coach navigation in three places: `Index.tsx` redirects, `Layout.tsx` nav, `useUserRole.homeRoute`. The pattern we want already exists for Clinical Director (admin nav + extra "Clinical" link). We extend that pattern so a doctor-who-is-also-admin keeps the admin nav and gets an additional "Doctor" link.
 
-Turn each "Missing X" card from a single bulk-send button into a **per-staff list** that shows reminder status for the current week, and lets the manager pick exactly who to (re-)remind.
+Pure doctors (no admin/coach flags) are unaffected — they keep the doctor-only experience exactly as it is today.
 
-### What each row shows
+## Changes
 
-For every staff member missing the metric this week:
+### 1. Routing precedence — `src/pages/Index.tsx`
 
-```text
-☐  Briana Lopez (RDA)               Not yet reminded
-☑  Mary Payne (RDA)                 Reminded Tue 9:14am by Ariyana
-☐  Wes Johnson (Hygiene)            Reminded Tue 9:14am by Ariyana · 2 days ago
-                                    [Remind again]
+Reorder the redirect logic so admin/regional wins over doctor:
+
+```
+if (showRegionalDashboard || isOrgAdmin || isSuperAdmin) → render RegionalDashboard
+else if (isDoctor) → <Navigate to="/doctor" />
+else → participant home
 ```
 
-- **Checkbox** to include/exclude in the next batch
-- **Status pill**: "Not yet reminded" / "Reminded {relative time} by {sender first name}"
-- **"Remind again" affordance** when last reminder is >24h old (or always available, just visually de-emphasized if recent)
-- Default selection: anyone NOT reminded this week is pre-checked; anyone reminded in the last 24h is unchecked (so the obvious "send to everyone" path doesn't spam).
+Pure doctors still auto-route to `/doctor`. Kasey lands on the Command Center.
 
-### Card header summary
+### 2. Home route — `src/hooks/useUserRole.tsx`
 
-```text
-Missing Performance Scores — Week of Apr 27
-8 missing · 5 already reminded · 3 not yet contacted
-[Select all not-yet-reminded]  [Select all]  [Clear]
+Update `homeRoute` precedence to match:
+- super admin / org admin / regional → `/dashboard`
+- pure doctor → `/doctor`
+- participant → `/`
+
+Also fix `showRegionalDashboard` to no longer exclude doctors (`!isParticipant && (isRegional || isCoach)`).
+
+### 3. Sidebar nav — `src/components/Layout.tsx`
+
+Replace the top-level `isDoctor ? [doctor-only nav] : ...` ternary with:
+- **Pure doctor** (isDoctor && !isOrgAdmin && !isSuperAdmin && !isCoach) → existing doctor-only nav (unchanged)
+- **Admin/coach who is also a doctor** → existing standard/super-admin nav PLUS a new `{ name: 'Doctor', href: '/doctor', icon: Stethoscope }` item, placed near the Clinical link
+
+Same pattern as the existing conditional Clinical link for clinical directors.
+
+### 4. EditUserDrawer — `src/components/admin/EditUserDrawer.tsx`
+
+Add a "Doctor portal access" toggle (Switch component, mirroring the existing Pause Account / Backfill switches). Independent of the role preset. Defaults to current `is_doctor` value. On submit, send `is_doctor` in the payload.
+
+### 5. admin-users edge function — `supabase/functions/admin-users/index.ts`
+
+In the `role_preset` action handler, accept an optional top-level `is_doctor` field. Apply it to the staff update **independently of the preset's flag map**, so toggling the doctor switch doesn't get clobbered by the preset and the preset doesn't get clobbered by the toggle. (The existing `doctor` preset stays as-is for net-new doctor invites — separate code path.)
+
+### 6. Apply changes to Kasey (data update)
+
+After the UI ships, run a one-time update via the insert tool (Lovable Cloud → Add data):
+
+```sql
+UPDATE staff
+SET is_doctor = true,
+    role_id = 4
+WHERE id = '9b05bd32-4a4a-41b9-8f7b-ed86be9bc50c';
 ```
 
-This gives Ariyana an at-a-glance answer to "did anyone already nudge these people?"
+Leaves `is_org_admin`, `is_coach`, `home_route='/dashboard'`, `organization_id`, and `primary_location_id` untouched.
 
-### Send confirmation
+## What Kasey will experience after the change
 
-The existing preview modal stays, but the recipient list reflects the checkboxes. After send, the rows refresh to show the new "Reminded just now by you" status.
+- Lands on Command Center (`/dashboard`) on login. All admin/coach/builder/evaluations nav intact.
+- New **"Doctor"** item in her sidebar → opens `/doctor` Doctor Home with the baseline welcome CTA.
+- Once her clinical director releases her baseline, she completes the full doctor flow (baseline wizard → results → coaching prep → schedule → meeting confirmation) just like Sage, Justin, Henry, Ana.
+- `/doctor/my-role` will load Doctor competencies/ProMoves because `role_id = 4`.
 
-## Why not a separate tracking table or a "sent" flag?
+## What the clinical director will experience
 
-`reminder_log` already *is* the source of truth — it's append-only, scoped by `sent_at`, and queryable by `(target_user_id, type, week)`. Adding a flag elsewhere would duplicate state and drift. The only thing missing is reading it.
+- Kasey appears in `/clinical` stats ("Total Doctors" +1) in the **Invited** bucket.
+- Kasey appears in `/clinical/doctors` table as `Dr. Kasey Stark` / Lake Orion / Stage: Invited / Next Step: "Release the baseline when ready for the doctor to begin".
+- `/clinical/doctors/{kasey-id}` opens her full doctor profile with the standard release-baseline → coach-baseline → build-prep → invite-to-schedule → meeting → follow-up workflow.
 
-## Technical changes
+## What stays unchanged
 
-### 1. Query reminder history alongside staff data
-In `src/pages/coach/RemindersTab.tsx`, after building `needConfidence` / `needPerformance`, fetch reminder_log entries for the current week's Monday→now window:
+- Pure doctors (the existing Alcan + Sprout doctors) — same experience, same nav, same routing.
+- All existing RLS policies — no migration needed (`staff.is_doctor` already exists; doctor-side RLS keys off identity match + flag, both of which Kasey will satisfy).
+- Her admin powers, scopes, location, and organization.
+- `useStaffProfile` resolution (the "is_org_admin record wins" rule still works because she has only one staff row).
 
-```ts
-const { data: logRows } = await supabase
-  .from('reminder_log')
-  .select('target_user_id, type, sent_at, sender_user_id')
-  .in('target_user_id', allTargetUserIds)
-  .in('type', ['confidence','performance'])
-  .gte('sent_at', earliestMondayUtc.toISOString())
-  .order('sent_at', { ascending: false });
-```
+## Out of scope
 
-Build a map `Map<user_id|type, { sent_at, sender_user_id }[]>` keyed to the most recent entry per (target, type).
+- Restructuring `useStaffProfile` to handle multi-staff-row users (not needed — one row covers her).
+- Any changes to the doctor invitation edge function (she's already a user; we're just turning on her doctor capability).
 
-### 2. Resolve sender names
-Collect distinct `sender_user_id`s from the log rows, fetch `staff.name` for each, cache in a `Map<user_id, string>`. Falls back to "a manager" if not found.
-
-### 3. New row-level UI in each card
-Replace the single "Preview & Send (N)" button with a list:
-- Checkbox + name + role + status pill
-- Status pill uses `formatDistanceToNow(sent_at)` from date-fns
-- Header controls: "Select not-yet-reminded" / "Select all" / "Clear"
-- Footer: "Send to N selected" button opens the existing modal pre-populated with the checked recipients
-
-### 4. Refresh after send
-After `coach-remind` succeeds, re-run `loadStaffData()` so the rows reflect the new log entries immediately.
-
-### 5. RLS check
-`reminder_log` already has `Coaches can read reminder logs` policy using `is_coach_or_admin(auth.uid())`. Ariyana is a coach, so this works as-is. No migration needed.
-
-## Out of scope (mention but don't build unless you say go)
-
-- **Cross-week history view** ("show me everyone reminded in the last 4 weeks") — useful for audit but not the immediate need.
-- **Auto-reminder cron** — sending automatically without a human in the loop. Worth a separate conversation; current human-driven flow is intentional.
-- **Per-recipient send confirmation in modal** — the modal already lists recipients; checkbox state from the card is enough.
-
-## Files touched
-
-- `src/pages/coach/RemindersTab.tsx` — add reminder_log query, sender name lookup, per-row checkboxes + status pills, header summary
-- No DB migrations
-- No edge function changes
+Approve and I'll implement, ship the UI changes first, then run the data update for Kasey.

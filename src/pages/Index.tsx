@@ -13,7 +13,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { differenceInDays } from 'date-fns';
 
 export default function Index() {
-  const { isParticipant, showRegionalDashboard, isDoctor, isLoading } = useUserRole();
+  const { isParticipant, showRegionalDashboard, isDoctor, isOrgAdmin, isSuperAdmin, isLoading } = useUserRole();
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
 
   // Check if backfill is currently enabled
@@ -36,14 +36,15 @@ export default function Index() {
     );
   }
 
-  // Doctors → Doctor home (baseline assessment)
-  if (isDoctor) {
-    return <Navigate to="/doctor" replace />;
+  // Admins / regional managers / coaches land on Command Center even if also a doctor.
+  // They can reach /doctor via the sidebar "Doctor" link.
+  if (showRegionalDashboard || isOrgAdmin || isSuperAdmin) {
+    return <RegionalDashboard />;
   }
 
-  // Non-participants (coaches/regional managers) → Command Center
-  if (showRegionalDashboard) {
-    return <RegionalDashboard />;
+  // Pure doctors (no admin/coach role) → Doctor home (baseline assessment)
+  if (isDoctor) {
+    return <Navigate to="/doctor" replace />;
   }
 
   // Participants → Standard experience

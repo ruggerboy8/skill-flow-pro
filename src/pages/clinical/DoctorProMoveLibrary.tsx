@@ -165,6 +165,7 @@ export default function DoctorProMoveLibrary() {
           competency_id: pm.competency_id || 0,
           competency_name: (pm.competencies as any)?.name || 'Unknown',
           domain_name: (pm.competencies as any)?.domains?.domain_name || 'Unknown',
+          conditionally_applicable: !!(pm as any).conditionally_applicable,
           resources: {
             has_why: types.has('doctor_why'),
             has_script: types.has('doctor_script'),

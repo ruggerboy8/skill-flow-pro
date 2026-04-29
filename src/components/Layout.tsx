@@ -87,9 +87,13 @@ export default function Layout() {
   // Office managers who are NOT coaches should see "My Location" link
   const showLocationDashboard = isOfficeManager && !isCoach && !isOrgAdmin;
 
+  // A "pure" doctor has no admin/coach role — they get the doctor-only nav.
+  // Doctors who are also admins/coaches keep their admin nav AND get a Doctor link.
+  const isPureDoctor = isDoctor && !isOrgAdmin && !isSuperAdmin && !isCoach;
+
   // Determine navigation based on user type
-  const navigation = isDoctor ? [
-    // Doctor-specific navigation
+  const navigation = isPureDoctor ? [
+    // Pure doctor navigation
     { name: 'Home', href: '/doctor', icon: Home },
     { name: 'My Role', href: '/doctor/my-role', icon: BookOpen },
     { name: 'My Team', href: '/doctor/my-team', icon: Users },
@@ -99,6 +103,7 @@ export default function Layout() {
     { name: 'Command Center', href: '/dashboard', icon: Building2 },
     { name: 'Coach', href: '/coach', icon: Users },
     { name: 'Clinical', href: '/clinical', icon: Stethoscope },
+    ...(isDoctor ? [{ name: 'Doctor', href: '/doctor', icon: Stethoscope }] : []),
     { name: 'Builder', href: '/builder', icon: SettingsIcon },
     { name: 'Evaluations', href: '/admin/evaluations', icon: TrendingUp },
     { name: 'Admin', href: '/admin', icon: Shield },
@@ -122,6 +127,10 @@ export default function Layout() {
     // Clinical Director portal
     ...(isClinicalDirector ? [
       { name: 'Clinical', href: '/clinical', icon: Stethoscope },
+    ] : []),
+    // Doctor portal — for admins/coaches who are also doctors
+    ...(isDoctor ? [
+      { name: 'Doctor', href: '/doctor', icon: Stethoscope },
     ] : []),
     // Backfill nav removed - keeping function for individual score backfill only
     ...(isCoach || isOrgAdmin || isLead ? [

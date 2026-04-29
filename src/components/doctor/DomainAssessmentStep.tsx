@@ -146,7 +146,7 @@ export function DomainAssessmentStep({
                     {s.short}
                   </div>
                 ))}
-                {showNaOption && (
+                {anyConditional && (
                   <div className="w-10 text-center text-xs">N/A</div>
                 )}
               </div>

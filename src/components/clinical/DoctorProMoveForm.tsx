@@ -182,6 +182,28 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
             <p className="text-xs text-muted-foreground">Shown to learners as "Why this matters"</p>
           </div>
 
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="conditionally-applicable"
+                checked={formData.conditionally_applicable}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, conditionally_applicable: checked === true })
+                }
+                className="mt-0.5"
+              />
+              <div className="space-y-1">
+                <Label htmlFor="conditionally-applicable" className="cursor-pointer font-medium">
+                  Conditionally applicable
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Doctors can mark this Pro Move "N/A" during their self-assessment.
+                  Use for items that don't apply at every site (e.g. St. David's-specific documentation).
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="flex justify-end space-x-2 pt-4">
             <Button
               type="button"

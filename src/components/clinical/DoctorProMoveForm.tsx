@@ -43,7 +43,8 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
   const [formData, setFormData] = useState({
     competency_id: '',
     action_statement: '',
-    description: ''
+    description: '',
+    conditionally_applicable: false,
   });
 
   useEffect(() => {
@@ -51,7 +52,8 @@ export function DoctorProMoveForm({ proMove, onClose, competencies }: DoctorProM
       setFormData({
         competency_id: proMove.competency_id?.toString() || '',
         action_statement: proMove.action_statement || '',
-        description: proMove.description || ''
+        description: proMove.description || '',
+        conditionally_applicable: !!proMove.conditionally_applicable,
       });
     }
   }, [proMove]);

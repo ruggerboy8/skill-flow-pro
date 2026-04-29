@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, PauseCircle, Wrench, ChevronDown, Stethoscope } from "lucide-react";
+import { Loader2, PauseCircle, Wrench, ChevronDown, Stethoscope, Shield } from "lucide-react";
 import { format, addDays, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -137,6 +137,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
   const [allowBackfill, setAllowBackfill] = useState<boolean>(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [doctorPortalAccess, setDoctorPortalAccess] = useState<boolean>(false);
+  const [clinicalDirectorAccess, setClinicalDirectorAccess] = useState<boolean>(false);
 
   // ── New capability state ───────────────────────────────────────────────────
   const [capabilities, setCapabilities] = useState<Capabilities>({ ...DEFAULT_CAPABILITIES });
@@ -156,6 +157,7 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
     setCapsLoaded(false);
     setShowPermissions(false);
     setDoctorPortalAccess((user as any).is_doctor ?? false);
+    setClinicalDirectorAccess((user as any).is_clinical_director ?? false);
 
     const hasActiveBackfill = user.allow_backfill_until && new Date(user.allow_backfill_until) > new Date();
     setAllowBackfill(!!hasActiveBackfill);

@@ -1679,18 +1679,36 @@ export function EvaluationHub() {
                       className="flex items-center gap-2 text-xs text-muted-foreground"
                     >
                       <span className="font-medium uppercase tracking-wide">Their self-score:</span>
-                      {(item as any).self_score_sample_size && (item as any).self_score_sample_size >= 3 ? (
-                        <>
-                          <span className="px-2 py-0.5 rounded bg-muted text-foreground font-medium">
-                            {(item as any).self_score_avg ?? item.self_score}
-                          </span>
-                          <span>
-                            avg of {(item as any).self_score_sample_size} weekly submission{(item as any).self_score_sample_size === 1 ? '' : 's'}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="italic">Not enough data</span>
-                      )}
+                      {(() => {
+                        const n = (item as any).self_score_sample_size as number | null;
+                        const avg = (item as any).self_score_avg ?? item.self_score;
+                        if (!n || n < 1 || avg == null) {
+                          return <span className="italic">No weekly submissions yet</span>;
+                        }
+                        const isLowConfidence = n === 1;
+                        return (
+                          <>
+                            <span className="px-2 py-0.5 rounded bg-muted text-foreground font-medium">
+                              {avg}
+                            </span>
+                            <span>
+                              avg of {n} weekly submission{n === 1 ? '' : 's'}
+                            </span>
+                            {isLowConfidence && (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-2xs font-medium uppercase tracking-wide"
+                                style={{
+                                  backgroundColor: 'hsl(var(--score-2-bg))',
+                                  color: 'hsl(var(--score-2))',
+                                }}
+                                title="Based on a single weekly submission — weigh carefully."
+                              >
+                                Low confidence
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
 

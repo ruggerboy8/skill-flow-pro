@@ -28,6 +28,7 @@ interface ProMove {
   action_statement: string;
   description?: string | null;
   competency_id?: number;
+  conditionally_applicable?: boolean;
 }
 
 interface DoctorProMoveFormProps {

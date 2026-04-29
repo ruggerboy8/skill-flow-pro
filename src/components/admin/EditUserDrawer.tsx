@@ -531,6 +531,32 @@ export function EditUserDrawer({ open, onClose, onSuccess, user, roles, location
             )}
           </div>
 
+          {/* Doctor Portal Access (additive — works alongside any non-Clinical-Director role) */}
+          <div className="space-y-3 p-4 bg-teal-50/50 dark:bg-teal-950/20 rounded-lg border border-teal-200/50 dark:border-teal-800/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Stethoscope className="h-5 w-5 text-teal-600" />
+                <Label htmlFor="doctor-toggle" className="text-sm font-semibold cursor-pointer">
+                  Doctor Portal Access
+                </Label>
+              </div>
+              <Switch
+                id="doctor-toggle"
+                checked={doctorPortalAccess}
+                onCheckedChange={setDoctorPortalAccess}
+                disabled={selectedAction === 'clinical_director'}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              When enabled, this user appears in the Clinical Director portal as a doctor and gets a "Doctor" link in their sidebar. Use this for admins or coaches who are also practicing doctors. Their existing role and permissions are preserved.
+            </p>
+            {selectedAction === 'clinical_director' && (
+              <p className="text-xs font-medium text-amber-600">
+                Clinical Directors cannot also be doctors. Choose a different role to enable this.
+              </p>
+            )}
+          </div>
+
           {/* Role preset */}
           <div className="space-y-3">
             <Label className="text-base font-semibold">Choose new status</Label>

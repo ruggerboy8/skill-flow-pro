@@ -525,6 +525,32 @@ export async function submitEvaluation(evalId: string, _releasedByStaffId?: stri
   await refreshEvalSelfScores(evalId);
   await refreshEvalParticipationSnapshot(evalId);
 
+  // Best-effort: tidy up the evaluator's note formatting (line breaks, paragraph
+  // spacing) without changing any wording. Failures here must not block submission.
+  try {
+    const { data: evalRow } = await supabase
+      .from('evaluations')
+      .select('evaluator_note')
+      .eq('id', evalId)
+      .maybeSingle();
+    const note = (evalRow as any)?.evaluator_note?.trim();
+    if (note && note.length > 0) {
+      const { data: fmt, error: fmtErr } = await supabase.functions.invoke(
+        'format-evaluator-note',
+        { body: { text: note } }
+      );
+      const formatted = (fmt as any)?.formatted?.trim();
+      if (!fmtErr && formatted && formatted !== note) {
+        await supabase
+          .from('evaluations')
+          .update({ evaluator_note: formatted } as any)
+          .eq('id', evalId);
+      }
+    }
+  } catch (e) {
+    console.warn('format-evaluator-note skipped:', e);
+  }
+
   const { error } = await supabase
     .from('evaluations')
     .update({ status: 'submitted' })

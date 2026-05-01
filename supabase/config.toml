@@ -51,6 +51,9 @@ verify_jwt = true
 [functions.format-reflection]
 verify_jwt = false
 
+[functions.format-evaluator-note]
+verify_jwt = true
+
 [functions.map-observation-notes]
 verify_jwt = true
 

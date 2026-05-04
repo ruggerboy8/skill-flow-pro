@@ -141,7 +141,7 @@ export default function EvaluationReview() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: selectedCompIds.length === 2 && step === 5,
+    enabled: selectedCompIds.length === 2 && step === 6,
   });
 
   // Group pro moves by competency

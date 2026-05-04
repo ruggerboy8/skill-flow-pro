@@ -22,23 +22,29 @@ export function EvalReadyCard() {
     queryFn: async () => {
       if (!staffId) return null;
 
+      // Always look at the most recent released evaluation only.
+      // Older unreviewed evals are intentionally ignored — if a participant
+      // missed a prior review window, we don't keep nagging them about it.
       const { data: evals, error } = await supabase
         .from('evaluations')
         .select('id, type, quarter, program_year, viewed_at, acknowledged_at')
         .eq('staff_id', staffId)
         .eq('status', 'submitted')
-        .eq('is_visible_to_staff', true)
-        .is('acknowledged_at', null);
+        .eq('is_visible_to_staff', true);
 
       if (error || !evals || evals.length === 0) return null;
 
-      // Sort by period descending (newest first)
+      // Sort by period descending (newest first) and pick the most recent eval
       const sorted = [...evals].sort((a, b) => {
         if (a.program_year !== b.program_year) return b.program_year - a.program_year;
         return quarterNum(b.quarter) - quarterNum(a.quarter);
       });
 
       const newest = sorted[0];
+      // If the most recent eval is already acknowledged, hide the card —
+      // we don't surface older unacknowledged evals.
+      if (newest.acknowledged_at) return null;
+
       const isViewed = !!newest.viewed_at;
       const periodLabel = newest.type === 'Baseline'
         ? `Baseline ${newest.program_year}`
@@ -48,7 +54,7 @@ export function EvalReadyCard() {
         evalId: newest.id,
         periodLabel,
         isViewed,
-        totalCount: sorted.length,
+        totalCount: 1,
       };
     },
     enabled: !!staffId,

@@ -260,6 +260,9 @@ export default function EvaluationReview() {
   if (!payload) return null;
 
   const evalInfo = evalData!.evaluation;
+  const evaluatorName = evalData!.evaluatorName;
+  const evaluatorNote = ((evalInfo as any).evaluator_note as string | null) || '';
+  const hasEvaluatorNote = evaluatorNote.trim().length > 0;
   const periodLabel = evalInfo.type === 'Baseline' ? 'Baseline' : `${evalInfo.quarter} ${evalInfo.program_year}`;
 
   return (

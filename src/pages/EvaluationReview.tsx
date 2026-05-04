@@ -60,7 +60,7 @@ export default function EvaluationReview() {
       if (!staffId || !evalId) throw new Error('Missing staff or evalId');
       const { data: evaluation, error } = await supabase
         .from('evaluations')
-        .select('id, staff_id, status, is_visible_to_staff, program_year, quarter, type, review_payload, acknowledged_at, viewed_at')
+        .select('id, staff_id, status, is_visible_to_staff, program_year, quarter, type, review_payload, acknowledged_at, viewed_at, evaluator_note, evaluator_id')
         .eq('id', evalId)
         .single();
       if (error) throw error;
@@ -70,7 +70,19 @@ export default function EvaluationReview() {
       if (evaluation.staff_id !== staffId && !isSuperAdmin) throw new Error('Not your evaluation');
       if (evaluation.status !== 'submitted') throw new Error('Evaluation is not submitted');
       if (!evaluation.is_visible_to_staff) throw new Error('Evaluation is not released');
-      return { evaluation, staffId };
+
+      // Resolve evaluator name (best effort)
+      let evaluatorName = '';
+      if ((evaluation as any).evaluator_id) {
+        const { data: ev } = await supabase
+          .from('staff')
+          .select('name')
+          .eq('id', (evaluation as any).evaluator_id)
+          .maybeSingle();
+        if (ev?.name) evaluatorName = ev.name;
+      }
+
+      return { evaluation, staffId, evaluatorName };
     },
     enabled: !!staffId && !!evalId,
   });

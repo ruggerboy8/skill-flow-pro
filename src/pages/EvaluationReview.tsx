@@ -313,14 +313,53 @@ export default function EvaluationReview() {
         </div>
       )}
 
-      {/* ─── Step 1: View Full Evaluation ─────────────────── */}
+      {/* ─── Step 1: Note from Coach ─────────────────────── */}
       {step === 1 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <MessageSquare className="w-6 h-6" />
+              A note from {evaluatorName || 'your coach'}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              {hasEvaluatorNote
+                ? "Before we dig into scores, here's a personal message left for you."
+                : "Your coach didn't leave a written note for this evaluation — that's okay! Your scores and per-competency notes will tell the story."}
+            </p>
+          </div>
+
+          {hasEvaluatorNote ? (
+            <Card>
+              <CardContent className="py-6">
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  {evaluatorNote}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                No written note for this evaluation.
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => setStep(2)}>
+              Next <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Step 2: View Full Evaluation ─────────────────── */}
+      {step === 2 && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold">Review Your Full Evaluation</h1>
           <Card>
             <CardContent className="py-8 space-y-5">
               <p className="text-muted-foreground text-sm">
-                Before we dive in, take a moment to look through all your scores and coach notes. There's no rush — come back whenever you're ready.
+                Take a moment to look through all your scores and per-competency coach notes. There's no rush — come back whenever you're ready.
               </p>
               <Button
                 variant="outline"
@@ -336,18 +375,18 @@ export default function EvaluationReview() {
             </CardContent>
           </Card>
           <div className="flex justify-between pt-2">
-            <Button variant="ghost" size="sm" onClick={() => setStep(2)}>
+            <Button variant="ghost" size="sm" onClick={() => setStep(3)}>
               I've already looked through it — let's keep going
             </Button>
-            <Button onClick={() => setStep(2)}>
+            <Button onClick={() => setStep(3)}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 2: Highlights ─────────────────────────────── */}
-      {step === 2 && (
+      {/* ─── Step 3: Highlights ─────────────────────────────── */}
+      {step === 3 && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold">Highlights</h1>
 
@@ -412,15 +451,15 @@ export default function EvaluationReview() {
           )}
 
           <div className="flex justify-end pt-2">
-            <Button onClick={() => setStep(3)}>
+            <Button onClick={() => setStep(4)}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 3: Keep Crushing (pick 1) ──────────────── */}
-      {step === 3 && (
+      {/* ─── Step 4: Keep Crushing (pick 1) ──────────────── */}
+      {step === 4 && (
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold">
@@ -447,15 +486,15 @@ export default function EvaluationReview() {
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button onClick={() => setStep(4)} disabled={keepCrushingId === null}>
+            <Button onClick={() => setStep(5)} disabled={keepCrushingId === null}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 4: Grow This Quarter (pick 2) ─────────── */}
-      {step === 4 && (
+      {/* ─── Step 5: Grow This Quarter (pick 2) ─────────── */}
+      {step === 5 && (
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold">Grow This Quarter</h1>
@@ -484,22 +523,22 @@ export default function EvaluationReview() {
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button onClick={() => setStep(5)} disabled={improveIds.size < 2}>
+            <Button onClick={() => setStep(6)} disabled={improveIds.size < 2}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 5: ProMoves ────────────────────────────── */}
-      {step === 5 && (
+      {/* ─── Step 6: ProMoves ────────────────────────────── */}
+      {step === 6 && (
         <Step5ProMoves
           payload={payload}
           improveIds={improveIds}
           proMovesByCompetency={proMovesByCompetency}
           selectedActionIds={selectedActionIds}
           onToggle={toggleAction}
-          onNext={() => setStep(6)}
+          onNext={() => setStep(7)}
         />
       )}
 

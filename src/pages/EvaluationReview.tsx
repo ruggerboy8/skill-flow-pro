@@ -8,14 +8,14 @@ import { DomainBadge } from '@/components/ui/domain-badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye, PenLine, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye, PenLine, Sparkles, Loader2, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { parseReviewPayload, type ReviewPayload } from '@/lib/reviewPayload';
 import { CompetencyCard } from '@/components/review/CompetencyCard';
 
-const STEP_LABELS = ['Welcome', 'Full Evaluation', 'Highlights', 'Keep Crushing', 'Grow', 'ProMoves', 'Note to Self'];
+const STEP_LABELS = ['Welcome', 'Note from Coach', 'Full Evaluation', 'Highlights', 'Keep Crushing', 'Grow', 'ProMoves', 'Note to Self'];
 const TOTAL_STEPS = STEP_LABELS.length;
 
 function getStorageKey(evalId: string) {

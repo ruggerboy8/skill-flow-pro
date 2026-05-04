@@ -8,14 +8,14 @@ import { DomainBadge } from '@/components/ui/domain-badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye, PenLine, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Star, Target, CheckCircle2, Eye, PenLine, Sparkles, Loader2, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { parseReviewPayload, type ReviewPayload } from '@/lib/reviewPayload';
 import { CompetencyCard } from '@/components/review/CompetencyCard';
 
-const STEP_LABELS = ['Welcome', 'Full Evaluation', 'Highlights', 'Keep Crushing', 'Grow', 'ProMoves', 'Note to Self'];
+const STEP_LABELS = ['Welcome', 'Note from Coach', 'Full Evaluation', 'Highlights', 'Keep Crushing', 'Grow', 'ProMoves', 'Note to Self'];
 const TOTAL_STEPS = STEP_LABELS.length;
 
 function getStorageKey(evalId: string) {
@@ -60,7 +60,7 @@ export default function EvaluationReview() {
       if (!staffId || !evalId) throw new Error('Missing staff or evalId');
       const { data: evaluation, error } = await supabase
         .from('evaluations')
-        .select('id, staff_id, status, is_visible_to_staff, program_year, quarter, type, review_payload, acknowledged_at, viewed_at')
+        .select('id, staff_id, status, is_visible_to_staff, program_year, quarter, type, review_payload, acknowledged_at, viewed_at, evaluator_note, evaluator_id')
         .eq('id', evalId)
         .single();
       if (error) throw error;
@@ -70,7 +70,19 @@ export default function EvaluationReview() {
       if (evaluation.staff_id !== staffId && !isSuperAdmin) throw new Error('Not your evaluation');
       if (evaluation.status !== 'submitted') throw new Error('Evaluation is not submitted');
       if (!evaluation.is_visible_to_staff) throw new Error('Evaluation is not released');
-      return { evaluation, staffId };
+
+      // Resolve evaluator name (best effort)
+      let evaluatorName = '';
+      if ((evaluation as any).evaluator_id) {
+        const { data: ev } = await supabase
+          .from('staff')
+          .select('name')
+          .eq('id', (evaluation as any).evaluator_id)
+          .maybeSingle();
+        if (ev?.name) evaluatorName = ev.name;
+      }
+
+      return { evaluation, staffId, evaluatorName };
     },
     enabled: !!staffId && !!evalId,
   });
@@ -129,7 +141,7 @@ export default function EvaluationReview() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: selectedCompIds.length === 2 && step === 5,
+    enabled: selectedCompIds.length === 2 && step === 6,
   });
 
   // Group pro moves by competency
@@ -248,6 +260,9 @@ export default function EvaluationReview() {
   if (!payload) return null;
 
   const evalInfo = evalData!.evaluation;
+  const evaluatorName = evalData!.evaluatorName;
+  const evaluatorNote = ((evalInfo as any).evaluator_note as string | null) || '';
+  const hasEvaluatorNote = evaluatorNote.trim().length > 0;
   const periodLabel = evalInfo.type === 'Baseline' ? 'Baseline' : `${evalInfo.quarter} ${evalInfo.program_year}`;
 
   return (
@@ -274,6 +289,7 @@ export default function EvaluationReview() {
               </p>
               <p className="text-sm font-medium">Here's what we'll do together:</p>
               <ol className="space-y-2 text-sm list-decimal list-inside">
+                <li><strong>Read the note from your coach</strong> — their personal takeaways from this evaluation</li>
                 <li><strong>Take a look at your full evaluation</strong> — review all your scores and notes</li>
                 <li><strong>Check out your highlights</strong> — see where you're shining and where you can grow</li>
                 <li><strong>Pick a strength to keep crushing</strong> — choose one area you're already rocking</li>
@@ -297,14 +313,53 @@ export default function EvaluationReview() {
         </div>
       )}
 
-      {/* ─── Step 1: View Full Evaluation ─────────────────── */}
+      {/* ─── Step 1: Note from Coach ─────────────────────── */}
       {step === 1 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <MessageSquare className="w-6 h-6" />
+              A note from {evaluatorName || 'your coach'}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              {hasEvaluatorNote
+                ? "Before we dig into scores, here's a personal message left for you."
+                : "Your coach didn't leave a written note for this evaluation — that's okay! Your scores and per-competency notes will tell the story."}
+            </p>
+          </div>
+
+          {hasEvaluatorNote ? (
+            <Card>
+              <CardContent className="py-6">
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  {evaluatorNote}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                No written note for this evaluation.
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => setStep(2)}>
+              Next <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Step 2: View Full Evaluation ─────────────────── */}
+      {step === 2 && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold">Review Your Full Evaluation</h1>
           <Card>
             <CardContent className="py-8 space-y-5">
               <p className="text-muted-foreground text-sm">
-                Before we dive in, take a moment to look through all your scores and coach notes. There's no rush — come back whenever you're ready.
+                Take a moment to look through all your scores and per-competency coach notes. There's no rush — come back whenever you're ready.
               </p>
               <Button
                 variant="outline"
@@ -320,18 +375,18 @@ export default function EvaluationReview() {
             </CardContent>
           </Card>
           <div className="flex justify-between pt-2">
-            <Button variant="ghost" size="sm" onClick={() => setStep(2)}>
+            <Button variant="ghost" size="sm" onClick={() => setStep(3)}>
               I've already looked through it — let's keep going
             </Button>
-            <Button onClick={() => setStep(2)}>
+            <Button onClick={() => setStep(3)}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 2: Highlights ─────────────────────────────── */}
-      {step === 2 && (
+      {/* ─── Step 3: Highlights ─────────────────────────────── */}
+      {step === 3 && (
         <div className="space-y-6">
           <h1 className="text-2xl font-bold">Highlights</h1>
 
@@ -396,15 +451,15 @@ export default function EvaluationReview() {
           )}
 
           <div className="flex justify-end pt-2">
-            <Button onClick={() => setStep(3)}>
+            <Button onClick={() => setStep(4)}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 3: Keep Crushing (pick 1) ──────────────── */}
-      {step === 3 && (
+      {/* ─── Step 4: Keep Crushing (pick 1) ──────────────── */}
+      {step === 4 && (
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold">
@@ -431,15 +486,15 @@ export default function EvaluationReview() {
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button onClick={() => setStep(4)} disabled={keepCrushingId === null}>
+            <Button onClick={() => setStep(5)} disabled={keepCrushingId === null}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 4: Grow This Quarter (pick 2) ─────────── */}
-      {step === 4 && (
+      {/* ─── Step 5: Grow This Quarter (pick 2) ─────────── */}
+      {step === 5 && (
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold">Grow This Quarter</h1>
@@ -468,27 +523,27 @@ export default function EvaluationReview() {
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button onClick={() => setStep(5)} disabled={improveIds.size < 2}>
+            <Button onClick={() => setStep(6)} disabled={improveIds.size < 2}>
               Next <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ─── Step 5: ProMoves ────────────────────────────── */}
-      {step === 5 && (
+      {/* ─── Step 6: ProMoves ────────────────────────────── */}
+      {step === 6 && (
         <Step5ProMoves
           payload={payload}
           improveIds={improveIds}
           proMovesByCompetency={proMovesByCompetency}
           selectedActionIds={selectedActionIds}
           onToggle={toggleAction}
-          onNext={() => setStep(6)}
+          onNext={() => setStep(7)}
         />
       )}
 
-      {/* ─── Step 6: Note to Self ────────────────────────── */}
-      {step === 6 && (
+      {/* ─── Step 7: Note to Self ────────────────────────── */}
+      {step === 7 && (
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">

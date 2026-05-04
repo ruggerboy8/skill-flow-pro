@@ -286,6 +286,7 @@ export default function EvaluationReview() {
               </p>
               <p className="text-sm font-medium">Here's what we'll do together:</p>
               <ol className="space-y-2 text-sm list-decimal list-inside">
+                <li><strong>Read the note from your coach</strong> — their personal takeaways from this evaluation</li>
                 <li><strong>Take a look at your full evaluation</strong> — review all your scores and notes</li>
                 <li><strong>Check out your highlights</strong> — see where you're shining and where you can grow</li>
                 <li><strong>Pick a strength to keep crushing</strong> — choose one area you're already rocking</li>

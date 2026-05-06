@@ -82,7 +82,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.deputy-sync]
-verify_jwt = true
+verify_jwt = false
 
 [functions.deputy-sync-dispatcher]
 verify_jwt = false

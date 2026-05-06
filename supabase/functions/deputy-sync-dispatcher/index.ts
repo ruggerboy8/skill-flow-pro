@@ -64,6 +64,7 @@ serve(async (req) => {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${svc}`,
+            'apikey': svc,
           },
           body: JSON.stringify({
             mode: 'apply_week',

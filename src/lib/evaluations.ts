@@ -826,6 +826,8 @@ export async function setEvaluationVisibility(
 
   // Send email notification when releasing (not when hiding)
   if (visible) {
+    // Best-effort: re-format the evaluator note in case it was edited after submission.
+    await formatEvaluatorNoteIfPresent(evalId);
     supabase.functions.invoke('notify-eval-release', {
       body: { eval_ids: [evalId] },
     }).catch(err => console.error('Failed to send release notification:', err));

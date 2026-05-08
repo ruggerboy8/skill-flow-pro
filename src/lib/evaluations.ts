@@ -869,6 +869,8 @@ export async function bulkSetVisibilityByLocation(
       .is('viewed_at', null); // only notify for not-yet-viewed ones
 
     if (releasedEvals && releasedEvals.length > 0) {
+      // Best-effort: re-format evaluator notes that may have been edited post-submission.
+      await Promise.all(releasedEvals.map(e => formatEvaluatorNoteIfPresent(e.id)));
       supabase.functions.invoke('notify-eval-release', {
         body: { eval_ids: releasedEvals.map(e => e.id) },
       }).catch(err => console.error('Failed to send release notifications:', err));

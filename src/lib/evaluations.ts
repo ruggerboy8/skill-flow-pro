@@ -496,6 +496,37 @@ export async function updateEvaluatorNote(
 }
 
 /**
+ * Best-effort: re-format the saved evaluator_note for an eval via the
+ * `format-evaluator-note` edge function. Wording is preserved; only
+ * paragraph spacing/line breaks are tidied. Failures are swallowed so this
+ * never blocks the surrounding flow (submit / release).
+ */
+export async function formatEvaluatorNoteIfPresent(evalId: string): Promise<void> {
+  try {
+    const { data: evalRow } = await supabase
+      .from('evaluations')
+      .select('evaluator_note')
+      .eq('id', evalId)
+      .maybeSingle();
+    const note = (evalRow as any)?.evaluator_note?.trim();
+    if (!note) return;
+    const { data: fmt, error: fmtErr } = await supabase.functions.invoke(
+      'format-evaluator-note',
+      { body: { text: note } }
+    );
+    const formatted = (fmt as any)?.formatted?.trim();
+    if (!fmtErr && formatted && formatted !== note) {
+      await supabase
+        .from('evaluations')
+        .update({ evaluator_note: formatted } as any)
+        .eq('id', evalId);
+    }
+  } catch (e) {
+    console.warn('format-evaluator-note skipped:', e);
+  }
+}
+
+/**
  * Update the interview transcript from audio transcription
  */
 export async function updateInterviewTranscript(
@@ -527,29 +558,7 @@ export async function submitEvaluation(evalId: string, _releasedByStaffId?: stri
 
   // Best-effort: tidy up the evaluator's note formatting (line breaks, paragraph
   // spacing) without changing any wording. Failures here must not block submission.
-  try {
-    const { data: evalRow } = await supabase
-      .from('evaluations')
-      .select('evaluator_note')
-      .eq('id', evalId)
-      .maybeSingle();
-    const note = (evalRow as any)?.evaluator_note?.trim();
-    if (note && note.length > 0) {
-      const { data: fmt, error: fmtErr } = await supabase.functions.invoke(
-        'format-evaluator-note',
-        { body: { text: note } }
-      );
-      const formatted = (fmt as any)?.formatted?.trim();
-      if (!fmtErr && formatted && formatted !== note) {
-        await supabase
-          .from('evaluations')
-          .update({ evaluator_note: formatted } as any)
-          .eq('id', evalId);
-      }
-    }
-  } catch (e) {
-    console.warn('format-evaluator-note skipped:', e);
-  }
+  await formatEvaluatorNoteIfPresent(evalId);
 
   const { error } = await supabase
     .from('evaluations')
@@ -817,6 +826,8 @@ export async function setEvaluationVisibility(
 
   // Send email notification when releasing (not when hiding)
   if (visible) {
+    // Best-effort: re-format the evaluator note in case it was edited after submission.
+    await formatEvaluatorNoteIfPresent(evalId);
     supabase.functions.invoke('notify-eval-release', {
       body: { eval_ids: [evalId] },
     }).catch(err => console.error('Failed to send release notification:', err));
@@ -858,6 +869,8 @@ export async function bulkSetVisibilityByLocation(
       .is('viewed_at', null); // only notify for not-yet-viewed ones
 
     if (releasedEvals && releasedEvals.length > 0) {
+      // Best-effort: re-format evaluator notes that may have been edited post-submission.
+      await Promise.all(releasedEvals.map(e => formatEvaluatorNoteIfPresent(e.id)));
       supabase.functions.invoke('notify-eval-release', {
         body: { eval_ids: releasedEvals.map(e => e.id) },
       }).catch(err => console.error('Failed to send release notifications:', err));

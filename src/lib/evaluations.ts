@@ -496,6 +496,37 @@ export async function updateEvaluatorNote(
 }
 
 /**
+ * Best-effort: re-format the saved evaluator_note for an eval via the
+ * `format-evaluator-note` edge function. Wording is preserved; only
+ * paragraph spacing/line breaks are tidied. Failures are swallowed so this
+ * never blocks the surrounding flow (submit / release).
+ */
+export async function formatEvaluatorNoteIfPresent(evalId: string): Promise<void> {
+  try {
+    const { data: evalRow } = await supabase
+      .from('evaluations')
+      .select('evaluator_note')
+      .eq('id', evalId)
+      .maybeSingle();
+    const note = (evalRow as any)?.evaluator_note?.trim();
+    if (!note) return;
+    const { data: fmt, error: fmtErr } = await supabase.functions.invoke(
+      'format-evaluator-note',
+      { body: { text: note } }
+    );
+    const formatted = (fmt as any)?.formatted?.trim();
+    if (!fmtErr && formatted && formatted !== note) {
+      await supabase
+        .from('evaluations')
+        .update({ evaluator_note: formatted } as any)
+        .eq('id', evalId);
+    }
+  } catch (e) {
+    console.warn('format-evaluator-note skipped:', e);
+  }
+}
+
+/**
  * Update the interview transcript from audio transcription
  */
 export async function updateInterviewTranscript(

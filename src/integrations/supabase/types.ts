@@ -1921,6 +1921,7 @@ export type Database = {
           coach_scope_type: string | null
           created_at: string | null
           email: string
+          first_login_at: string | null
           hire_date: string
           home_route: string | null
           id: string
@@ -1955,6 +1956,7 @@ export type Database = {
           coach_scope_type?: string | null
           created_at?: string | null
           email: string
+          first_login_at?: string | null
           hire_date?: string
           home_route?: string | null
           id?: string
@@ -1989,6 +1991,7 @@ export type Database = {
           coach_scope_type?: string | null
           created_at?: string | null
           email?: string
+          first_login_at?: string | null
           hire_date?: string
           home_route?: string | null
           id?: string

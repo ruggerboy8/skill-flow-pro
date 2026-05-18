@@ -85,6 +85,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Check user roles (only fetch if we haven't already or on sign-in)
             if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
               checkUserStatus(session.user.id);
+              // Fire-and-forget: auto-excuse any weeks missed before first login.
+              // Edge function is idempotent (guarded by staff.first_login_at).
+              supabase.functions.invoke('backfill-new-user-excuses').catch((err) => {
+                console.warn('[useAuth] backfill-new-user-excuses failed', err);
+              });
             }
           }
         } else if (event === 'SIGNED_OUT') {

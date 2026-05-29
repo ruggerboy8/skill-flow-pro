@@ -23,9 +23,7 @@ interface RoleAlias {
 }
 
 export function AdminGlobalSettingsTab() {
-  const [performanceTimeGateEnabled, setPerformanceTimeGateEnabled] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { organizationId } = useUserRole();
 

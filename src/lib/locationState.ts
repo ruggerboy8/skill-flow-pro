@@ -401,14 +401,7 @@ export async function computeWeekState(params: {
   // Check for selection pending
   const selectionPending = false; // Simplified for now
 
-  // Check if performance time gate is disabled
-  const { data: timeGateSetting } = await supabase
-    .from('app_kv')
-    .select('value')
-    .eq('key', 'global:performance_time_gate_enabled')
-    .maybeSingle();
-  
-  const isTimeGateEnabled = (timeGateSetting?.value as { enabled?: boolean } | null)?.enabled !== false;
+  // Performance time gate is always enforced — Thursday 00:01 local tz
 
   // State machine (no ISO, only tz-anchors):
 

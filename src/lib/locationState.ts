@@ -495,19 +495,8 @@ export async function computeWeekState(params: {
     };
   }
 
-  // Fallback: if we've submitted confidence before Thu, check time gate
+  // Fallback: if we've submitted confidence before Thu, wait for performance window
   if (confComplete && now < checkout_open) {
-    if (!isTimeGateEnabled) {
-      // Time gate disabled - allow immediate performance submission
-      return {
-        state: 'can_checkout',
-        nextAction: 'Submit performance',
-        deadlineAt: checkout_due,
-        backlogCount,
-        selectionPending,
-        lastActivity,
-      };
-    }
     return {
       state: 'wait_for_thu',
       nextAction: 'Performance opens Thursday',

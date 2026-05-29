@@ -14,9 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { useUserRole } from "@/hooks/useUserRole";
 import type { Json } from "@/integrations/supabase/types";
 
-interface SettingValue {
-  enabled: boolean;
-}
+// (Performance time gate is now always enforced — Thursday 00:01 local tz)
 
 interface RoleAlias {
   role_id: number;

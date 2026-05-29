@@ -427,18 +427,7 @@ export async function computeWeekState(params: {
         lastActivity,
       };
     }
-    // Conf is in - check if time gate is disabled
-    if (!isTimeGateEnabled) {
-      // Time gate disabled - allow immediate performance submission
-      return {
-        state: 'can_checkout',
-        nextAction: 'Submit performance',
-        deadlineAt: checkout_due,
-        backlogCount,
-        selectionPending,
-        lastActivity,
-      };
-    }
+    // Conf is in, waiting for Thu to open performance
     // Conf is in, just waiting for Thu to open performance
     return {
       state: 'wait_for_thu',

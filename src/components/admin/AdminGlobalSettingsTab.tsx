@@ -44,9 +44,6 @@ export function AdminGlobalSettingsTab() {
   const [orgSlug, setOrgSlug] = useState('');
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
 
   useEffect(() => {
     if (organizationId) {

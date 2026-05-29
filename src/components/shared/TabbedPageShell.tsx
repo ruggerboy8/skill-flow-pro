@@ -83,10 +83,19 @@ export function TabbedPageShell({
       ? `grid-cols-${tabs.length}`
       : tabs.length === 4
         ? 'grid-cols-4'
-        : 'grid-cols-5';
+        : tabs.length === 5
+          ? 'grid-cols-5'
+          : 'grid-cols-6';
 
   // Compute max width
-  const maxW = tabs.length <= 3 ? 'lg:w-[480px]' : tabs.length === 4 ? 'lg:w-[640px]' : 'lg:w-[800px]';
+  const maxW =
+    tabs.length <= 3
+      ? 'lg:w-[480px]'
+      : tabs.length === 4
+        ? 'lg:w-[640px]'
+        : tabs.length === 5
+          ? 'lg:w-[800px]'
+          : 'lg:w-[960px]';
 
   return (
     <div className="container mx-auto py-8 space-y-8">

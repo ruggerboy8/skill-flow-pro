@@ -126,6 +126,8 @@ export type Database = {
           doctor_staff_id: string
           domain_notes: Json | null
           id: string
+          last_edited_at: string | null
+          last_edited_by_staff_id: string | null
           recording_transcript: string | null
           started_at: string | null
           status: string | null
@@ -138,6 +140,8 @@ export type Database = {
           doctor_staff_id: string
           domain_notes?: Json | null
           id?: string
+          last_edited_at?: string | null
+          last_edited_by_staff_id?: string | null
           recording_transcript?: string | null
           started_at?: string | null
           status?: string | null
@@ -150,6 +154,8 @@ export type Database = {
           doctor_staff_id?: string
           domain_notes?: Json | null
           id?: string
+          last_edited_at?: string | null
+          last_edited_by_staff_id?: string | null
           recording_transcript?: string | null
           started_at?: string | null
           status?: string | null
@@ -184,6 +190,81 @@ export type Database = {
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
           },
+          {
+            foreignKeyName: "coach_baseline_assessments_last_edited_by_staff_id_fkey"
+            columns: ["last_edited_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_baseline_assessments_last_edited_by_staff_id_fkey"
+            columns: ["last_edited_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
+      coach_baseline_audit: {
+        Row: {
+          action_id: number
+          actor_staff_id: string | null
+          actor_user_id: string | null
+          assessment_id: string
+          changed_at: string
+          id: string
+          new_note: string | null
+          new_rating: number | null
+          old_note: string | null
+          old_rating: number | null
+        }
+        Insert: {
+          action_id: number
+          actor_staff_id?: string | null
+          actor_user_id?: string | null
+          assessment_id: string
+          changed_at?: string
+          id?: string
+          new_note?: string | null
+          new_rating?: number | null
+          old_note?: string | null
+          old_rating?: number | null
+        }
+        Update: {
+          action_id?: number
+          actor_staff_id?: string | null
+          actor_user_id?: string | null
+          assessment_id?: string
+          changed_at?: string
+          id?: string
+          new_note?: string | null
+          new_rating?: number | null
+          old_note?: string | null
+          old_rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_baseline_audit_actor_staff_id_fkey"
+            columns: ["actor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_baseline_audit_actor_staff_id_fkey"
+            columns: ["actor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "coach_baseline_audit_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "coach_baseline_assessments"
+            referencedColumns: ["id"]
+          },
         ]
       }
       coach_baseline_items: {
@@ -191,6 +272,8 @@ export type Database = {
           action_id: number
           assessment_id: string
           id: string
+          last_edited_at: string | null
+          last_edited_by_staff_id: string | null
           note_text: string | null
           rating: number | null
           updated_at: string | null
@@ -199,6 +282,8 @@ export type Database = {
           action_id: number
           assessment_id: string
           id?: string
+          last_edited_at?: string | null
+          last_edited_by_staff_id?: string | null
           note_text?: string | null
           rating?: number | null
           updated_at?: string | null
@@ -207,6 +292,8 @@ export type Database = {
           action_id?: number
           assessment_id?: string
           id?: string
+          last_edited_at?: string | null
+          last_edited_by_staff_id?: string | null
           note_text?: string | null
           rating?: number | null
           updated_at?: string | null
@@ -225,6 +312,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "coach_baseline_assessments"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_baseline_items_last_edited_by_staff_id_fkey"
+            columns: ["last_edited_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_baseline_items_last_edited_by_staff_id_fkey"
+            columns: ["last_edited_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
           },
         ]
       }

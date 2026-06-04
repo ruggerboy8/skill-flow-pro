@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
@@ -99,7 +100,12 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       console.log('[CoachBaseline] Fetching assessment for doctor:', doctorStaffId);
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
-        .select('id, status, recording_transcript, coach_staff_id')
+        .select(`
+          id, status, recording_transcript, coach_staff_id,
+          last_edited_by_staff_id, last_edited_at,
+          owner:staff!coach_baseline_assessments_coach_staff_id_fkey(id, name),
+          last_editor:staff!coach_baseline_assessments_last_edited_by_staff_id_fkey(id, name)
+        `)
         .eq('doctor_staff_id', doctorStaffId)
         .order('created_at', { ascending: true })
         .limit(1)
@@ -109,22 +115,25 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         throw error;
       }
       console.log('[CoachBaseline] Assessment result:', data?.id, data?.status);
-      return data;
+      return data as any;
     },
     enabled: !!staff?.id,
   });
 
-  // Fetch existing items
+  // Fetch existing items (including editor attribution)
   const { data: existingItems } = useQuery({
     queryKey: ['coach-baseline-items', assessmentId],
     queryFn: async () => {
-      if (!assessmentId) return [];
+      if (!assessmentId) return [] as any[];
       const { data, error } = await supabase
         .from('coach_baseline_items')
-        .select('action_id, rating, note_text')
+        .select(`
+          action_id, rating, note_text, last_edited_by_staff_id, last_edited_at,
+          last_editor:staff!coach_baseline_items_last_edited_by_staff_id_fkey(id, name)
+        `)
         .eq('assessment_id', assessmentId);
       if (error) throw error;
-      return data;
+      return (data ?? []) as any[];
     },
     enabled: !!assessmentId,
   });
@@ -204,7 +213,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     if (existingItems?.length) {
       const loaded: Record<number, { score: number | null; note: string }> = {};
       const notesOpen = new Set<number>();
-      existingItems.forEach(item => {
+      existingItems.forEach((item: any) => {
         loaded[item.action_id] = { score: item.rating, note: item.note_text || '' };
         if (item.note_text) notesOpen.add(item.action_id);
       });
@@ -216,6 +225,24 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       }
     }
   }, [existingItems]);
+
+  // Map of action_id -> editor info, for per-card attribution
+  const itemEditors = useMemo(() => {
+    const map = new Map<number, { staffId: string | null; name: string | null; at: string | null }>();
+    (existingItems ?? []).forEach((item: any) => {
+      map.set(item.action_id, {
+        staffId: item.last_edited_by_staff_id ?? null,
+        name: item.last_editor?.name ?? null,
+        at: item.last_edited_at ?? null,
+      });
+    });
+    return map;
+  }, [existingItems]);
+
+  const ownerStaffId: string | null = (existingAssessment as any)?.coach_staff_id ?? null;
+  const ownerName: string | null = (existingAssessment as any)?.owner?.name ?? null;
+  const lastEditorName: string | null = (existingAssessment as any)?.last_editor?.name ?? null;
+  const lastEditedAt: string | null = (existingAssessment as any)?.last_edited_at ?? null;
 
   // Create assessment
   const createMutation = useMutation({
@@ -514,6 +541,22 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
             ? 'You can review and update ratings or notes. Changes will require confirmation before saving.'
             : 'Rate each Pro Move and optionally record verbal feedback. This is visible only to clinical directors.'}
         </p>
+        {(ownerName || lastEditorName) && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {ownerName && (
+              <span>
+                Started by <span className="font-medium text-foreground">{ownerName}</span>
+              </span>
+            )}
+            {lastEditorName && lastEditedAt && (
+              <span>
+                · Last edited by{' '}
+                <span className="font-medium text-foreground">{lastEditorName}</span>{' '}
+                {formatDistanceToNow(new Date(lastEditedAt), { addSuffix: true })}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -616,6 +659,20 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                       <p className="text-sm font-medium">{pm.action_statement}</p>
                       <p className="text-xs text-muted-foreground">{pm.competency_name}</p>
                     </div>
+                    {(() => {
+                      const ed = itemEditors.get(pm.action_id);
+                      if (!ed?.name || !ed.at) return null;
+                      const isDifferentEditor = ownerStaffId && ed.staffId && ed.staffId !== ownerStaffId;
+                      if (!isDifferentEditor) return null;
+                      return (
+                        <span
+                          className="shrink-0 inline-flex items-center gap-1 text-2xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full"
+                          title={`Edited by ${ed.name} ${formatDistanceToNow(new Date(ed.at), { addSuffix: true })}`}
+                        >
+                          Edited by {ed.name.split(' ')[0]}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* Rating buttons — circular, semantic colors matching doctor wizard */}

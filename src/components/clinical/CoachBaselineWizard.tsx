@@ -226,6 +226,24 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     }
   }, [existingItems]);
 
+  // Map of action_id -> editor info, for per-card attribution
+  const itemEditors = useMemo(() => {
+    const map = new Map<number, { staffId: string | null; name: string | null; at: string | null }>();
+    (existingItems ?? []).forEach((item: any) => {
+      map.set(item.action_id, {
+        staffId: item.last_edited_by_staff_id ?? null,
+        name: item.last_editor?.name ?? null,
+        at: item.last_edited_at ?? null,
+      });
+    });
+    return map;
+  }, [existingItems]);
+
+  const ownerStaffId: string | null = (existingAssessment as any)?.coach_staff_id ?? null;
+  const ownerName: string | null = (existingAssessment as any)?.owner?.name ?? null;
+  const lastEditorName: string | null = (existingAssessment as any)?.last_editor?.name ?? null;
+  const lastEditedAt: string | null = (existingAssessment as any)?.last_edited_at ?? null;
+
   // Create assessment
   const createMutation = useMutation({
     mutationFn: async () => {

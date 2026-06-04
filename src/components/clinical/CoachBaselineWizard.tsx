@@ -541,6 +541,22 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
             ? 'You can review and update ratings or notes. Changes will require confirmation before saving.'
             : 'Rate each Pro Move and optionally record verbal feedback. This is visible only to clinical directors.'}
         </p>
+        {(ownerName || lastEditorName) && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {ownerName && (
+              <span>
+                Started by <span className="font-medium text-foreground">{ownerName}</span>
+              </span>
+            )}
+            {lastEditorName && lastEditedAt && (
+              <span>
+                · Last edited by{' '}
+                <span className="font-medium text-foreground">{lastEditorName}</span>{' '}
+                {formatDistanceToNow(new Date(lastEditedAt), { addSuffix: true })}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">

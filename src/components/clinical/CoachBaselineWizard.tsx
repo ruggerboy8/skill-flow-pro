@@ -659,6 +659,20 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                       <p className="text-sm font-medium">{pm.action_statement}</p>
                       <p className="text-xs text-muted-foreground">{pm.competency_name}</p>
                     </div>
+                    {(() => {
+                      const ed = itemEditors.get(pm.action_id);
+                      if (!ed?.name || !ed.at) return null;
+                      const isDifferentEditor = ownerStaffId && ed.staffId && ed.staffId !== ownerStaffId;
+                      if (!isDifferentEditor) return null;
+                      return (
+                        <span
+                          className="shrink-0 inline-flex items-center gap-1 text-2xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full"
+                          title={`Edited by ${ed.name} ${formatDistanceToNow(new Date(ed.at), { addSuffix: true })}`}
+                        >
+                          Edited by {ed.name.split(' ')[0]}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* Rating buttons — circular, semantic colors matching doctor wizard */}

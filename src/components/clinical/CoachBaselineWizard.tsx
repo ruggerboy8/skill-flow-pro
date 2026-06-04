@@ -213,7 +213,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     if (existingItems?.length) {
       const loaded: Record<number, { score: number | null; note: string }> = {};
       const notesOpen = new Set<number>();
-      existingItems.forEach(item => {
+      existingItems.forEach((item: any) => {
         loaded[item.action_id] = { score: item.rating, note: item.note_text || '' };
         if (item.note_text) notesOpen.add(item.action_id);
       });

@@ -99,7 +99,12 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       console.log('[CoachBaseline] Fetching assessment for doctor:', doctorStaffId);
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
-        .select('id, status, recording_transcript, coach_staff_id')
+        .select(`
+          id, status, recording_transcript, coach_staff_id,
+          last_edited_by_staff_id, last_edited_at,
+          owner:staff!coach_baseline_assessments_coach_staff_id_fkey(id, name),
+          last_editor:staff!coach_baseline_assessments_last_edited_by_staff_id_fkey(id, name)
+        `)
         .eq('doctor_staff_id', doctorStaffId)
         .order('created_at', { ascending: true })
         .limit(1)
@@ -109,22 +114,25 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         throw error;
       }
       console.log('[CoachBaseline] Assessment result:', data?.id, data?.status);
-      return data;
+      return data as any;
     },
     enabled: !!staff?.id,
   });
 
-  // Fetch existing items
+  // Fetch existing items (including editor attribution)
   const { data: existingItems } = useQuery({
     queryKey: ['coach-baseline-items', assessmentId],
     queryFn: async () => {
-      if (!assessmentId) return [];
+      if (!assessmentId) return [] as any[];
       const { data, error } = await supabase
         .from('coach_baseline_items')
-        .select('action_id, rating, note_text')
+        .select(`
+          action_id, rating, note_text, last_edited_by_staff_id, last_edited_at,
+          last_editor:staff!coach_baseline_items_last_edited_by_staff_id_fkey(id, name)
+        `)
         .eq('assessment_id', assessmentId);
       if (error) throw error;
-      return data;
+      return (data ?? []) as any[];
     },
     enabled: !!assessmentId,
   });

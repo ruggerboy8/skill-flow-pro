@@ -91,17 +91,18 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     }
   }, [recState.isRecording, recState.recordingTime, activeActionId]);
 
-  // Fetch or create assessment
+  // Fetch the first (owner) assessment for this doctor regardless of which coach started it.
+  // Clinical directors share visibility/edit rights via RLS (first-to-start owns, others co-edit).
   const { data: existingAssessment, error: assessmentError } = useQuery({
-    queryKey: ['coach-baseline-assessment', doctorStaffId, staff?.id],
+    queryKey: ['coach-baseline-assessment', doctorStaffId],
     queryFn: async () => {
-      console.log('[CoachBaseline] Fetching assessment for doctor:', doctorStaffId, 'coach:', staff?.id);
-      if (!staff?.id) return null;
+      console.log('[CoachBaseline] Fetching assessment for doctor:', doctorStaffId);
       const { data, error } = await supabase
         .from('coach_baseline_assessments')
-        .select('id, status, recording_transcript')
+        .select('id, status, recording_transcript, coach_staff_id')
         .eq('doctor_staff_id', doctorStaffId)
-        .eq('coach_staff_id', staff.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
       if (error) {
         console.error('[CoachBaseline] Assessment fetch error:', error);

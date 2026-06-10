@@ -8,7 +8,7 @@ const corsHeaders = {
 // Returns YYYY-MM-DD for Monday of the week containing `d` (UTC-based)
 function mondayOf(d: Date): string {
   const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const dow = x.getUTCDay(); // 0=Sun..6=Sat
+  const dow = x.getUTCDay();
   const diff = dow === 0 ? -6 : 1 - dow;
   x.setUTCDate(x.getUTCDate() + diff);
   return x.toISOString().slice(0, 10);
@@ -18,6 +18,12 @@ function addDaysISO(iso: string, days: number): string {
   const d = new Date(iso + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function daysBetween(aIso: string, bIso: string): number {
+  const a = new Date(aIso).getTime();
+  const b = new Date(bIso).getTime();
+  return Math.abs(a - b) / (1000 * 60 * 60 * 24);
 }
 
 Deno.serve(async (req) => {
@@ -41,7 +47,7 @@ Deno.serve(async (req) => {
 
     const { data: staff, error: staffErr } = await admin
       .from('staff')
-      .select('id, participation_start_at, hire_date, first_login_at')
+      .select('id, participation_start_at, hire_date, first_login_at, created_at')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -58,9 +64,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Stamp first_login_at first (idempotent guard for concurrent calls)
-    await admin.from('staff').update({ first_login_at: new Date().toISOString() }).eq('id', staff.id);
+    const nowIso = new Date().toISOString();
 
+    // Stamp first_login_at first (idempotent guard for concurrent calls)
+    await admin.from('staff').update({ first_login_at: nowIso }).eq('id', staff.id);
+
+    // GUARD: Only auto-excuse if this is a genuinely new invite (first login
+    // happens within 14 days of the staff record being created). If the staff
+    // record was created long ago and the person is only just logging in,
+    // they're a real participant — don't backfill their entire history.
+    if (!staff.created_at || daysBetween(staff.created_at, nowIso) > 14) {
+      return new Response(JSON.stringify({
+        ok: true,
+        skipped: 'not_new_invite',
+        staff_created_at: staff.created_at,
+        first_login_at: nowIso,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Start from the LATER of: staff.created_at (when account was provisioned)
+    // and participation_start_at / hire_date. Never excuse weeks before the
+    // staff record existed.
     const startSource = staff.participation_start_at || staff.hire_date;
     if (!startSource) {
       return new Response(JSON.stringify({ ok: true, reason: 'no_start_date' }), {
@@ -68,10 +92,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const startMonday = mondayOf(new Date(startSource));
+    const effectiveStart = new Date(
+      Math.max(new Date(startSource).getTime(), new Date(staff.created_at).getTime())
+    );
+
+    const startMonday = mondayOf(effectiveStart);
     const currentMonday = mondayOf(new Date());
 
-    // Build list of week_of values strictly before current week
     const weeks: string[] = [];
     let w = startMonday;
     while (w < currentMonday) {
@@ -85,7 +112,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Find existing excuses to avoid duplicates
     const { data: existing } = await admin
       .from('excused_submissions')
       .select('week_of, metric')

@@ -205,7 +205,10 @@ export function BaselineComplete({ onFinish, assessmentId, releaserName, existin
                   <AudioRecorder
                     onRecordingComplete={handleRecordingComplete}
                     disabled={isSubmitting}
+                    externalState={recordingState}
+                    externalControls={recordingControls}
                   />
+
                 )}
                 {reflectionText && reflectionMode === 'voice' && (
                   <div className="space-y-2">

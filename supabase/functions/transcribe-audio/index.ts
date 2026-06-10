@@ -159,8 +159,22 @@ serve(async (req) => {
       service = 'elevenlabs';
     } else {
       console.log('[transcribe-audio] File within Whisper limit, using OpenAI Whisper');
-      result = await transcribeWithWhisper(audioFile, openAIApiKey);
-      service = 'whisper';
+      try {
+        result = await transcribeWithWhisper(audioFile, openAIApiKey);
+        service = 'whisper';
+      } catch (whisperErr) {
+        const msg = whisperErr instanceof Error ? whisperErr.message : String(whisperErr);
+        // Whisper sometimes rejects valid webm produced by paused/resumed MediaRecorder
+        // with a 400 "Invalid file format". Fall back to ElevenLabs Scribe when available.
+        const isFormatRejection = /\b400\b/.test(msg) && /Invalid file format|invalid_request_error/i.test(msg);
+        if (isFormatRejection && elevenLabsApiKey) {
+          console.warn('[transcribe-audio] Whisper rejected the file format; falling back to ElevenLabs Scribe');
+          result = await transcribeWithElevenLabs(audioFile, elevenLabsApiKey);
+          service = 'elevenlabs';
+        } else {
+          throw whisperErr;
+        }
+      }
     }
 
     return new Response(

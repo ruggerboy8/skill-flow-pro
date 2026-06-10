@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Play, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -8,129 +8,36 @@ interface AudioRecorderProps {
   onRecordingComplete: (audioBlob: Blob) => void;
   disabled?: boolean;
   className?: string;
-  // External state management (optional - for persistence across tab switches)
-  externalState?: AudioRecordingState;
-  externalControls?: AudioRecordingControls;
+  /**
+   * Required: the recording lifecycle is fully owned by `useAudioRecording`,
+   * so the parent must pass the hook's state + controls. This keeps the timer,
+   * pause flag, and blob in a single source of truth and prevents drift
+   * between the floating pill, start card, and the recorder UI.
+   */
+  externalState: AudioRecordingState;
+  externalControls: AudioRecordingControls;
 }
 
-export function AudioRecorder({ 
-  onRecordingComplete, 
-  disabled, 
+export function AudioRecorder({
+  onRecordingComplete,
+  disabled,
   className,
   externalState,
   externalControls,
 }: AudioRecorderProps) {
-  // Internal state (used when no external state provided)
-  const [internalIsRecording, setInternalIsRecording] = useState(false);
-  const [internalIsPaused, setInternalIsPaused] = useState(false);
-  const [internalRecordingTime, setInternalRecordingTime] = useState(0);
-  const [internalAudioBlob, setInternalAudioBlob] = useState<Blob | null>(null);
-  const [internalAudioUrl, setInternalAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Use external state if provided, otherwise internal
-  const isRecording = externalState?.isRecording ?? internalIsRecording;
-  const isPaused = externalState?.isPaused ?? internalIsPaused;
-  const recordingTime = externalState?.recordingTime ?? internalRecordingTime;
-  const audioBlob = externalState?.audioBlob ?? internalAudioBlob;
-  const audioUrl = externalState?.audioUrl ?? internalAudioUrl;
+  const { isRecording, isPaused, recordingTime, audioBlob, audioUrl } = externalState;
+  const { startRecording, stopRecording, togglePause, resetRecording } = externalControls;
 
+  // Reset playback state if blob changes / clears
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (internalAudioUrl) URL.revokeObjectURL(internalAudioUrl);
-    };
-  }, [internalAudioUrl]);
-
-  const startRecording = async () => {
-    if (externalControls) {
-      await externalControls.startRecording();
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setInternalAudioBlob(blob);
-        const url = URL.createObjectURL(blob);
-        setInternalAudioUrl(url);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start(1000);
-      setInternalIsRecording(true);
-      setInternalIsPaused(false);
-      setInternalRecordingTime(0);
-      
-      timerRef.current = setInterval(() => {
-        setInternalRecordingTime(prev => prev + 1);
-      }, 1000);
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-    }
-  };
-
-  const stopRecording = () => {
-    if (externalControls) {
-      externalControls.stopRecording();
-      return;
-    }
-
-    if (mediaRecorderRef.current && internalIsRecording) {
-      mediaRecorderRef.current.stop();
-      setInternalIsRecording(false);
-      setInternalIsPaused(false);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-  };
-
-  const togglePause = () => {
-    if (externalControls) {
-      externalControls.togglePause();
-      return;
-    }
-
-    if (!mediaRecorderRef.current || !internalIsRecording) return;
-    
-    if (internalIsPaused) {
-      mediaRecorderRef.current.resume();
-      setInternalIsPaused(false);
-      timerRef.current = setInterval(() => {
-        setInternalRecordingTime(prev => prev + 1);
-      }, 1000);
-    } else {
-      mediaRecorderRef.current.pause();
-      setInternalIsPaused(true);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-  };
+    if (!audioBlob) setIsPlaying(false);
+  }, [audioBlob]);
 
   const togglePlayback = () => {
     if (!audioRef.current || !audioUrl) return;
-    
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -141,24 +48,7 @@ export function AudioRecorder({
   };
 
   const handleSubmit = () => {
-    if (audioBlob) {
-      onRecordingComplete(audioBlob);
-    }
-  };
-
-  const resetRecording = () => {
-    if (externalControls) {
-      externalControls.resetRecording();
-      return;
-    }
-
-    setInternalAudioBlob(null);
-    if (internalAudioUrl) {
-      URL.revokeObjectURL(internalAudioUrl);
-      setInternalAudioUrl(null);
-    }
-    setInternalRecordingTime(0);
-    setIsPlaying(false);
+    if (audioBlob) onRecordingComplete(audioBlob);
   };
 
   const formatTime = (seconds: number) => {
@@ -169,7 +59,6 @@ export function AudioRecorder({
 
   return (
     <div className={cn('space-y-4', className)}>
-      {/* Audio element for playback */}
       {audioUrl && (
         <audio
           ref={audioRef}
@@ -183,7 +72,6 @@ export function AudioRecorder({
         <div className="flex items-center gap-3">
           {!audioBlob ? (
             <>
-              {/* Recording controls */}
               {!isRecording ? (
                 <Button
                   onClick={startRecording}
@@ -228,7 +116,6 @@ export function AudioRecorder({
             </>
           ) : (
             <>
-              {/* Playback controls */}
               <Button
                 onClick={togglePlayback}
                 variant="outline"

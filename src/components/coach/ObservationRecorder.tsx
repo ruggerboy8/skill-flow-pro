@@ -143,8 +143,12 @@ export function ObservationRecorder({
         body: formData,
       });
 
-      if (transcribeResponse.error) {
-        throw new Error(transcribeResponse.error.message || 'Transcription failed');
+      // Prefer the edge function's own error payload over the generic "non-2xx" message
+      const edgeErrorMsg =
+        (transcribeResponse.data as any)?.error ||
+        (transcribeResponse.data as any)?.message;
+      if (transcribeResponse.error || edgeErrorMsg) {
+        throw new Error(edgeErrorMsg || transcribeResponse.error?.message || 'Transcription failed');
       }
 
       const transcript = transcribeResponse.data?.transcript;

@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CheckCircle2, Pencil, Type, Mic, Loader2, ChevronDown, Eye } from 'lucide-react';
 import { AudioRecorder } from '@/components/coach/AudioRecorder';
+import { useAudioRecording } from '@/hooks/useAudioRecording';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -44,6 +45,7 @@ export function BaselineComplete({ onFinish, assessmentId, releaserName, existin
   } : null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const { state: recordingState, controls: recordingControls } = useAudioRecording();
 
   // Format + save reflection
   const submitReflectionMutation = useMutation({
@@ -203,7 +205,10 @@ export function BaselineComplete({ onFinish, assessmentId, releaserName, existin
                   <AudioRecorder
                     onRecordingComplete={handleRecordingComplete}
                     disabled={isSubmitting}
+                    externalState={recordingState}
+                    externalControls={recordingControls}
                   />
+
                 )}
                 {reflectionText && reflectionMode === 'voice' && (
                   <div className="space-y-2">

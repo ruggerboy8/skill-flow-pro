@@ -45,6 +45,7 @@ export function BaselineComplete({ onFinish, assessmentId, releaserName, existin
   } : null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const { state: recordingState, controls: recordingControls } = useAudioRecording();
 
   // Format + save reflection
   const submitReflectionMutation = useMutation({

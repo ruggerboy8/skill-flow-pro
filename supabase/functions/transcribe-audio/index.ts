@@ -187,10 +187,25 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
+    const rawMsg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[transcribe-audio] Error:', error);
+
+    // Detect "corrupted / invalid audio" rejections from either provider so we can
+    // surface a human-friendly message instead of the generic "non-2xx" toast.
+    const looksCorrupted =
+      /Invalid file format|invalid_request_error|invalid_audio|File is corrupted|corrupted|invalid_content/i.test(
+        rawMsg,
+      );
+
+    const friendly = looksCorrupted
+      ? "We couldn't read this recording — the audio file appears to be corrupted (this can happen when a recording is paused and resumed). Please record a new clip in one take and try again."
+      : rawMsg;
+
+    // Return 200 with structured error so the client sees the real message
+    // (supabase.functions.invoke swallows the body on non-2xx responses).
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: friendly, detail: rawMsg, corrupted: looksCorrupted }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

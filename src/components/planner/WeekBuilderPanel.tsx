@@ -69,6 +69,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
   rankedMoves,
   onSlotActivate,
   activeSlot,
+  onActiveWeeksChange,
 }, ref) {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');

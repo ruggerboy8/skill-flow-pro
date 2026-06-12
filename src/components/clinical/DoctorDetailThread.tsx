@@ -380,6 +380,13 @@ function SessionCard({
                 {subtitle && (
                   <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
                 )}
+                {/* Attribution: owner is always shown; surface last editor if different */}
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Owner: <span className="font-medium">{session.coach_name || 'Unknown'}</span>
+                  {session.last_edited_by_staff_id && session.last_edited_by_staff_id !== session.coach_staff_id && session.last_editor_name && (
+                    <> · Last edited by <span className="font-medium">{session.last_editor_name}</span>{session.last_edited_at ? ` ${formatRelative(session.last_edited_at)}` : ''}</>
+                  )}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">

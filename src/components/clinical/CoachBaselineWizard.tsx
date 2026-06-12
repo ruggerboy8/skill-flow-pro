@@ -138,6 +138,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       return (data ?? []) as any[];
     },
     enabled: !!assessmentId,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch doctor pro moves by domain

@@ -1411,6 +1411,48 @@ export type Database = {
           },
         ]
       }
+      organization_pro_move_content_overrides: {
+        Row: {
+          created_at: string
+          custom_statement: string
+          id: string
+          org_id: string
+          pro_move_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custom_statement: string
+          id?: string
+          org_id: string
+          pro_move_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custom_statement?: string
+          id?: string
+          org_id?: string
+          pro_move_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_pro_move_content_overrides_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_pro_move_content_overrides_pro_move_id_fkey"
+            columns: ["pro_move_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+        ]
+      }
       organization_pro_move_overrides: {
         Row: {
           created_at: string
@@ -1453,6 +1495,80 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pro_moves"
             referencedColumns: ["action_id"]
+          },
+        ]
+      }
+      organization_pro_moves: {
+        Row: {
+          action_statement: string
+          active: boolean
+          competency_id: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          org_id: string
+          practice_types: string[]
+          role_id: number | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          action_statement: string
+          active?: boolean
+          competency_id?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          org_id: string
+          practice_types?: string[]
+          role_id?: number | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          action_statement?: string
+          active?: boolean
+          competency_id?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          org_id?: string
+          practice_types?: string[]
+          role_id?: number | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_pro_moves_competency_id_fkey"
+            columns: ["competency_id"]
+            isOneToOne: false
+            referencedRelation: "competencies"
+            referencedColumns: ["competency_id"]
+          },
+          {
+            foreignKeyName: "organization_pro_moves_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_pro_moves_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "organization_pro_moves_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["role_id"]
           },
         ]
       }

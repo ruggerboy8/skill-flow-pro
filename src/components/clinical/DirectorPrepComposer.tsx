@@ -585,6 +585,38 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         </div>
       </div>
 
+      {/* Collaboration smoke signals */}
+      {session && (() => {
+        const s: any = session;
+        const myId = myStaffForOwnership?.id;
+        const recentlyOpened = s.last_opened_by_staff_id
+          && s.last_opened_by_staff_id !== myId
+          && s.last_opened_at
+          && (Date.now() - new Date(s.last_opened_at).getTime()) < 30 * 60 * 1000;
+        const ownedByOther = s.coach_staff_id && myId && s.coach_staff_id !== myId;
+        const lastEditedByOther = s.last_edited_by_staff_id && s.last_edited_by_staff_id !== myId;
+        if (!staleConflict && !recentlyOpened && !ownedByOther && !lastEditedByOther) return null;
+        return (
+          <div className="space-y-2">
+            {staleConflict && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                <p className="font-semibold text-destructive">Conflict — your save was blocked</p>
+                <p className="text-muted-foreground">Someone else saved changes while you were editing. Reload to see their version, then re-apply your changes.</p>
+              </div>
+            )}
+            {(ownedByOther || lastEditedByOther || recentlyOpened) && !staleConflict && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm flex items-start gap-2">
+                <ShieldAlert className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-muted-foreground">
+                  {ownedByOther && <>This session is owned by another director. Your edits will save, but they remain the original owner. </>}
+                  {recentlyOpened && <>Another director opened this recently — check with them before making large changes. </>}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Prior Experiments (for follow-ups) */}
       {priorExperiments && priorExperiments.length > 0 && (
         <Card>

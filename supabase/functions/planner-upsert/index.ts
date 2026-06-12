@@ -110,6 +110,13 @@ Deno.serve(async (req) => {
 
     if (body.action === 'saveWeek') {
       const { roleId, weekStartDate, picks, updaterUserId, orgId } = body
+      console.info('[planner-upsert] saveWeek', {
+        roleId,
+        weekStartDate,
+        orgId: orgId ?? null,
+        pickCount: picks?.length ?? 0,
+        picks,
+      })
       const upserted: Array<{ id: string, displayOrder: number, actionId: number | null }> = []
       const skippedLocked: Array<{ id: string, displayOrder: number, actionId: number | null }> = []
       const deleted: Array<{ id: string, displayOrder: number }> = []

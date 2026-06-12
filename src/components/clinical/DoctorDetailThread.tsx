@@ -148,20 +148,9 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
   return (
     <div className="space-y-3">
 
-      {/* Coach Baseline Assessment CTA — show when doctor baseline is done but coach hasn't completed theirs */}
-      {doctorBaselineComplete && coachAssessment?.status !== 'completed' && (
-        <Button
-          variant="outline"
-          className="w-full h-12 gap-2 border-dashed text-base font-medium"
-          onClick={onStartCoachWizard}
-        >
-          <ShieldCheck className="h-5 w-5" />
-          {!coachAssessment ? 'Start Coach Baseline Assessment' : 'Continue Coach Baseline Assessment'}
-        </Button>
-      )}
-
-      {/* Add session button — hide "Add Baseline Review" until coach assessment is completed */}
-      {(sessions.length > 0 || coachAssessment?.status === 'completed') && (
+      {/* Add session button — unlocked once the doctor's baseline is complete.
+          The private (coach) baseline is now an optional aid, not a gate. */}
+      {(sessions.length > 0 || doctorBaselineComplete) && (
         <Button
           variant="outline"
           className="w-full h-12 gap-2 border-dashed text-base font-medium"
@@ -376,23 +365,12 @@ function SessionCard({
               )}
               <div>
                 <CardTitle className="text-base">{typeLabel}</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {session.scheduled_at
-                    ? `${['meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(session.status) ? 'Met on ' : ''}${formatInTimeZone(new Date(session.scheduled_at), Intl.DateTimeFormat().resolvedOptions().timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a zzz")}`
-                    : (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        {session.status === 'scheduled'
-                          ? 'Draft — build agenda to proceed'
-                          : session.status === 'doctor_prep_submitted'
-                          ? 'Ready for meeting'
-                          : session.status === 'director_prep_ready'
-                          ? 'Send invite to schedule'
-                          : 'Awaiting scheduling'}
-                      </span>
-                    )
-                  }
-                </p>
+                {session.scheduled_at && (
+                  <p className="text-sm text-muted-foreground">
+                    {['meeting_pending', 'doctor_confirmed', 'doctor_revision_requested'].includes(session.status) ? 'Met on ' : ''}
+                    {formatInTimeZone(new Date(session.scheduled_at), Intl.DateTimeFormat().resolvedOptions().timeZone, "EEEE, MMMM d, yyyy 'at' h:mm a zzz")}
+                  </p>
+                )}
                 {subtitle && (
                   <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
                 )}

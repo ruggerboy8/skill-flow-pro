@@ -418,6 +418,10 @@ export type Database = {
           doctor_revision_note: string | null
           experiments: Json | null
           id: string
+          last_edited_at: string | null
+          last_edited_by_staff_id: string | null
+          last_opened_at: string | null
+          last_opened_by_staff_id: string | null
           prior_action_status: Json | null
           session_id: string
           submitted_at: string | null
@@ -430,6 +434,10 @@ export type Database = {
           doctor_revision_note?: string | null
           experiments?: Json | null
           id?: string
+          last_edited_at?: string | null
+          last_edited_by_staff_id?: string | null
+          last_opened_at?: string | null
+          last_opened_by_staff_id?: string | null
           prior_action_status?: Json | null
           session_id: string
           submitted_at?: string | null
@@ -442,12 +450,44 @@ export type Database = {
           doctor_revision_note?: string | null
           experiments?: Json | null
           id?: string
+          last_edited_at?: string | null
+          last_edited_by_staff_id?: string | null
+          last_opened_at?: string | null
+          last_opened_by_staff_id?: string | null
           prior_action_status?: Json | null
           session_id?: string
           submitted_at?: string | null
           summary?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "coaching_meeting_records_last_edited_by_staff_id_fkey"
+            columns: ["last_edited_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_meeting_records_last_edited_by_staff_id_fkey"
+            columns: ["last_edited_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "coaching_meeting_records_last_opened_by_staff_id_fkey"
+            columns: ["last_opened_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_meeting_records_last_opened_by_staff_id_fkey"
+            columns: ["last_opened_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
           {
             foreignKeyName: "coaching_meeting_records_session_id_fkey"
             columns: ["session_id"]
@@ -507,6 +547,10 @@ export type Database = {
           doctor_note: string | null
           doctor_staff_id: string
           id: string
+          last_edited_at: string | null
+          last_edited_by_staff_id: string | null
+          last_opened_at: string | null
+          last_opened_by_staff_id: string | null
           meeting_link: string | null
           scheduled_at: string | null
           sequence_number: number
@@ -521,6 +565,10 @@ export type Database = {
           doctor_note?: string | null
           doctor_staff_id: string
           id?: string
+          last_edited_at?: string | null
+          last_edited_by_staff_id?: string | null
+          last_opened_at?: string | null
+          last_opened_by_staff_id?: string | null
           meeting_link?: string | null
           scheduled_at?: string | null
           sequence_number?: number
@@ -535,6 +583,10 @@ export type Database = {
           doctor_note?: string | null
           doctor_staff_id?: string
           id?: string
+          last_edited_at?: string | null
+          last_edited_by_staff_id?: string | null
+          last_opened_at?: string | null
+          last_opened_by_staff_id?: string | null
           meeting_link?: string | null
           scheduled_at?: string | null
           sequence_number?: number
@@ -567,6 +619,34 @@ export type Database = {
           {
             foreignKeyName: "coaching_sessions_doctor_staff_id_fkey"
             columns: ["doctor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "coaching_sessions_last_edited_by_staff_id_fkey"
+            columns: ["last_edited_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_sessions_last_edited_by_staff_id_fkey"
+            columns: ["last_edited_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "coaching_sessions_last_opened_by_staff_id_fkey"
+            columns: ["last_opened_by_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_sessions_last_opened_by_staff_id_fkey"
+            columns: ["last_opened_by_staff_id"]
             isOneToOne: false
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]

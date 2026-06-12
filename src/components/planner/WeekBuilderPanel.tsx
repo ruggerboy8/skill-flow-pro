@@ -407,9 +407,8 @@ export function WeekBuilderPanel({
 
       toast({
         title: `${data.assigned.length} move${data.assigned.length !== 1 ? 's' : ''} suggested`,
-        description: 'Review and save when ready.',
+        description: 'Saved automatically.',
       });
-      setHasUnsavedChanges(true);
     } catch (err: any) {
       toast({ title: 'Auto-fill failed', description: err.message, variant: 'destructive' });
     } finally {
@@ -417,114 +416,6 @@ export function WeekBuilderPanel({
     }
   };
 
-  const handleSaveAll = async () => {
-    setSavingChanges(true);
-    try {
-      // Check for locked weeks first
-      const weekStartDates = weeks.map(w => w.weekStart);
-      const { data: existingScores } = await supabase
-        .from('weekly_scores')
-        .select('weekly_focus_id')
-        .ilike('weekly_focus_id', 'plan:%');
-
-      // Get plan IDs that have scores
-      const planIdsWithScores = new Set(
-        (existingScores || [])
-          .map((s: any) => s.weekly_focus_id?.replace('plan:', ''))
-          .filter(Boolean)
-      );
-
-      // Check which weeks have scores
-      const { data: existingPlans } = await supabase
-        .from('weekly_plan')
-        .select('id, week_start_date')
-        .eq('role_id', roleId)
-        .is('org_id', null)
-        .in('week_start_date', weekStartDates);
-
-      const lockedWeeks = (existingPlans || [])
-        .filter((p: any) => planIdsWithScores.has(String(p.id)))
-        .map((p: any) => p.week_start_date);
-
-      const editableWeeks = weeks.filter(w => !lockedWeeks.includes(w.weekStart));
-
-      if (editableWeeks.length === 0) {
-        toast({
-          title: 'Cannot save',
-          description: 'All weeks have existing scores and cannot be modified',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (lockedWeeks.length > 0) {
-        toast({
-          title: 'Some weeks locked',
-          description: `${lockedWeeks.length} week(s) with scores skipped. Saving ${editableWeeks.length} editable week(s).`,
-        });
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const week of editableWeeks) {
-        const picks = week.slots.map(s => ({ 
-          displayOrder: s.displayOrder as 1 | 2 | 3, 
-          actionId: s.actionId || null, 
-          generatedBy: 'manual' as const,
-          rankSnapshot: s.rankSnapshot || null,
-        }));
-
-        const { data, error } = await supabase.functions.invoke('planner-upsert', {
-          body: {
-            action: 'saveWeek',
-            roleId,
-            weekStartDate: week.weekStart,
-            picks,
-            updaterUserId: user.id,
-            orgId: orgId ?? null,
-          }
-        });
-
-        if (error || !data?.ok) {
-          errorCount++;
-          console.error(`Failed to save week ${week.weekStart}:`, error || data?.message);
-        } else {
-          if (data.data?.skippedLocked?.length > 0) {
-            toast({
-              title: 'Some slots locked',
-              description: `${data.data.skippedLocked.length} slot(s) in ${week.weekStart} have scores`,
-            });
-          }
-          successCount++;
-        }
-      }
-
-      if (errorCount > 0) {
-        toast({
-          title: 'Partial save',
-          description: `${successCount} week(s) saved, ${errorCount} failed`,
-          variant: 'destructive'
-        });
-      } else {
-        toast({ title: 'Saved', description: `${successCount} week(s) saved successfully` });
-      }
-
-      setHasUnsavedChanges(false);
-      await loadWeeks(selectedMonday);
-    } catch (error: any) {
-      toast({
-        title: 'Error saving changes',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setSavingChanges(false);
-    }
-  };
 
   const handleDeleteWeek = async (weekStart: string) => {
     try {

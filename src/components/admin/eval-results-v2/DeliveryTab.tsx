@@ -248,7 +248,7 @@ function LocationCard({ location, statusFilter, isPending, onBulkRelease, onSing
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="border rounded-lg">
         <CollapsibleTrigger asChild>
-          <button className="w-full grid grid-cols-[minmax(280px,1fr)_minmax(380px,620px)_auto] items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left">
+          <button className="w-full grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_minmax(320px,1fr)_auto] items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left">
             {/* Left cluster */}
             <div className="flex items-center gap-2 min-w-0">
               <ChevronRight className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />

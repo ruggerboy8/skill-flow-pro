@@ -1,12 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Shield, Users, MapPin, Building, Settings, Building2, BookOpen, Wand2, X, Plug } from "lucide-react";
+import { Shield, Users, MapPin, Building, Settings, Building2, Wand2, X, Plug } from "lucide-react";
 import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
 import { AdminLocationsTab } from "@/components/admin/AdminLocationsTab";
 import { AdminOrganizationsTab } from "@/components/admin/AdminOrganizationsTab";
 import { AdminGlobalSettingsTab } from "@/components/admin/AdminGlobalSettingsTab";
-import { OrgProMoveLibraryTab } from "@/components/admin/OrgProMoveLibraryTab";
 import { AdminIntegrationsTab } from "@/components/admin/AdminIntegrationsTab";
 import { OrgSetupWizard } from "@/components/admin/setup/OrgSetupWizard";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,13 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isSuperAdmin, isOrgAdmin, canAccessAdmin, isLoading, organizationId } = useUserRole();
+
+  // Redirect legacy ?tab=pro-moves deep links to Builder, where the library now lives.
+  useEffect(() => {
+    if (searchParams.get("tab") === "pro-moves") {
+      navigate("/builder?tab=library", { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   const activeTab = searchParams.get("tab") || "users";
   const handleTabChange = (value: string) => setSearchParams({ tab: value });

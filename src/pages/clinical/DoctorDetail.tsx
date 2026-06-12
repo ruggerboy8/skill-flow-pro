@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, MapPin, ChevronDown } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronDown, ClipboardCheck, ShieldCheck, CheckCircle2, Circle, Clock } from 'lucide-react';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
@@ -16,9 +16,19 @@ import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
 import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
 import { ClinicalBaselineResults } from '@/components/clinical/ClinicalBaselineResults';
+import { AssessmentTrackCard, AssessmentCardStatus } from '@/components/clinical/AssessmentTrackCard';
+import { AssessmentResultsSheet } from '@/components/clinical/AssessmentResultsSheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+
+type ExpandedAssessmentKey = 'doctor_baseline' | 'coach_baseline' | null;
+
+function toCardStatus(status: string | null | undefined, exists: boolean): AssessmentCardStatus {
+  if (!exists) return 'not_started';
+  if (status === 'completed') return 'completed';
+  return 'in_progress';
+}
 
 export default function DoctorDetail() {
   const { staffId } = useParams<{ staffId: string }>();

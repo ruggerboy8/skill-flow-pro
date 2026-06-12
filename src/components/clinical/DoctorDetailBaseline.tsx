@@ -1,4 +1,3 @@
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShieldCheck, Lock } from 'lucide-react';
@@ -11,10 +10,9 @@ interface Props {
 }
 
 /**
- * Renders only the private (coach-only) baseline card.
- * The doctor's baseline results are rendered directly in DoctorDetail.tsx
- * (above the coaching thread) so the CD's reference material sits at the
- * top of the page where they actually use it during prep.
+ * Renders the private (coach-only) baseline body without outer Card chrome,
+ * so it can be composed inside an AssessmentResultsSheet pop-out.
+ * Summary metadata lives on the AssessmentTrackCard tile that opens it.
  */
 export function DoctorDetailBaseline({ coachAssessment, onStartCoachWizard }: Props) {
   const { data: myStaff } = useStaffProfile();
@@ -26,7 +24,7 @@ export function DoctorDetailBaseline({ coachAssessment, onStartCoachWizard }: Pr
   const getButtonConfig = () => {
     if (!coachAssessment) return { label: 'Start assessment', show: true };
     if (isOwner) {
-      return { label: coachStatus === 'completed' ? 'View assessment' : 'Continue assessment', show: true };
+      return { label: coachStatus === 'completed' ? 'View / edit assessment' : 'Continue assessment', show: true };
     }
     return { label: 'View assessment', show: coachStatus === 'completed' };
   };
@@ -34,12 +32,12 @@ export function DoctorDetailBaseline({ coachAssessment, onStartCoachWizard }: Pr
   const buttonConfig = getButtonConfig();
 
   return (
-    <Card className="border-dashed">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+    <div className="space-y-4">
+      <div className="flex flex-row items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="h-5 w-5 text-muted-foreground mt-0.5" />
           <div>
-            <CardTitle className="text-base">Private baseline (your view)</CardTitle>
+            <h3 className="text-base font-semibold tracking-tight">Private baseline</h3>
             <p className="text-sm text-muted-foreground mt-0.5">
               {!isOwner && coachAssessment
                 ? 'Started by another clinical director — read only'
@@ -48,34 +46,42 @@ export function DoctorDetailBaseline({ coachAssessment, onStartCoachWizard }: Pr
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <Badge variant={coachStatus === 'completed' ? 'default' : 'secondary'}>
-              {coachStatusLabel}
-            </Badge>
-            {coachLastUpdated && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Updated {format(new Date(coachLastUpdated), 'MMM d, yyyy')}
-              </p>
-            )}
-          </div>
-          {buttonConfig.show && (
-            <Button
-              size="sm"
-              variant={coachStatus === 'completed' ? 'outline' : 'default'}
-              onClick={onStartCoachWizard}
-            >
-              {buttonConfig.label}
-            </Button>
-          )}
-          {!isOwner && !buttonConfig.show && (
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Lock className="h-4 w-4" />
-              <span className="text-xs">In progress</span>
-            </div>
+        <div className="text-right shrink-0">
+          <Badge variant={coachStatus === 'completed' ? 'default' : 'secondary'}>
+            {coachStatusLabel}
+          </Badge>
+          {coachLastUpdated && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Updated {format(new Date(coachLastUpdated), 'MMM d, yyyy')}
+            </p>
           )}
         </div>
-      </CardHeader>
-    </Card>
+      </div>
+
+      <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+        <p>
+          The private baseline is your own read of where this doctor stands. It's never
+          shown to the doctor, and stays available across coaching sessions as your
+          calibration reference.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {buttonConfig.show && (
+          <Button
+            variant={coachStatus === 'completed' ? 'outline' : 'default'}
+            onClick={onStartCoachWizard}
+          >
+            {buttonConfig.label}
+          </Button>
+        )}
+        {!isOwner && !buttonConfig.show && (
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Lock className="h-4 w-4" />
+            <span className="text-xs">In progress</span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

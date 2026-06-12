@@ -35,7 +35,7 @@ export default function DoctorDetail() {
   const { data: myStaff } = useStaffProfile();
   const [showCoachWizard, setShowCoachWizard] = useState(false);
   const [expandedAssessment, setExpandedAssessment] = useState<ExpandedAssessmentKey>(null);
-  const [assessmentsOpen, setAssessmentsOpen] = useState<boolean | null>(null);
+  const [assessmentsOpen, setAssessmentsOpen] = useState<boolean | null>(true);
 
   const { data: doctor, isLoading: doctorLoading } = useQuery({
     queryKey: ['doctor-detail', staffId],

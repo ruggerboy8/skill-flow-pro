@@ -228,7 +228,7 @@ export function LibraryPanel({
           const { data: comps } = await supabase
             .from('competencies')
             .select('competency_id, domains:fk_competencies_domain_id(domain_name)')
-            .in('competency_id', compIds);
+            .in('competency_id', compIds as number[]);
           (comps || []).forEach(c => {
             compMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
           });

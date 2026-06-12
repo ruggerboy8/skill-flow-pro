@@ -67,9 +67,44 @@ serve(async (req) => {
       return Response.redirect(`${redirectBase}?deputy=error&reason=invalid_state`, 302);
     }
 
-    if (!orgId) {
+    if (!orgId || !connectedBy) {
       return Response.redirect(`${redirectBase}?deputy=error&reason=missing_org`, 302);
     }
+
+    // Verify the staff_id in state actually belongs to org_id (state is attacker-controllable).
+    const verifySupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+    const { data: verifyStaff } = await verifySupabase
+      .from('staff')
+      .select('id, organization_id, primary_location_id, is_super_admin')
+      .eq('id', connectedBy)
+      .maybeSingle();
+
+    let resolvedOrg: string | null = verifyStaff?.organization_id ?? null;
+    if (!resolvedOrg && verifyStaff?.primary_location_id) {
+      const { data: loc } = await verifySupabase
+        .from('locations')
+        .select('group_id')
+        .eq('id', verifyStaff.primary_location_id)
+        .maybeSingle();
+      if (loc?.group_id) {
+        const { data: pg } = await verifySupabase
+          .from('practice_groups')
+          .select('organization_id')
+          .eq('id', loc.group_id)
+          .maybeSingle();
+        resolvedOrg = pg?.organization_id ?? null;
+      }
+    }
+
+    if (!verifyStaff || (!verifyStaff.is_super_admin && resolvedOrg !== orgId)) {
+      console.error(`Deputy callback: state org/staff mismatch. state.org=${orgId} staff.org=${resolvedOrg} staff_id=${connectedBy}`);
+      return Response.redirect(`${redirectBase}?deputy=error&reason=org_mismatch`, 302);
+    }
+
+
 
     // Exchange authorization code for access + refresh tokens
     // Note: initial exchange uses once.deputy.com; renewals use install-specific URL

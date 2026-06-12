@@ -404,11 +404,24 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         .insert(selections);
       if (selErr) throw selErr;
 
-      const { error: sessErr } = await supabase
+      const updatePayload: any = {
+        coach_note: coachNote,
+        status: 'director_prep_ready',
+        last_edited_by_staff_id: myStaffForOwnership?.id ?? null,
+        last_edited_at: new Date().toISOString(),
+      };
+      let updateQuery = (supabase as any)
         .from('coaching_sessions')
-        .update({ coach_note: coachNote, status: 'director_prep_ready' })
+        .update(updatePayload)
         .eq('id', sessionId);
+      if (loadedUpdatedAt) updateQuery = updateQuery.eq('updated_at', loadedUpdatedAt);
+      const { data: updated, error: sessErr } = await updateQuery.select('id, updated_at');
       if (sessErr) throw sessErr;
+      if (!updated || updated.length === 0) {
+        setStaleConflict(true);
+        throw new Error('Someone else saved changes to this session while you were editing. Reload to see their version before saving again.');
+      }
+      setLoadedUpdatedAt(updated[0].updated_at);
 
       // Save prior action statuses if any exist
       if (priorExperiments && priorExperiments.length > 0 && Object.keys(priorActionStatuses).length > 0) {

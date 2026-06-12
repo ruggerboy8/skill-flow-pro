@@ -295,6 +295,39 @@ export function WeekBuilderPanel({
     }
   };
 
+  const saveWeek = async (week: WeekAssignment) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+    setSavingWeek(week.weekStart);
+    try {
+      const picks = week.slots.map(s => ({
+        displayOrder: s.displayOrder as 1 | 2 | 3,
+        actionId: s.actionId || null,
+        generatedBy: 'manual' as const,
+        rankSnapshot: s.rankSnapshot || null,
+      }));
+      const { data, error } = await supabase.functions.invoke('planner-upsert', {
+        body: {
+          action: 'saveWeek',
+          roleId,
+          weekStartDate: week.weekStart,
+          picks,
+          updaterUserId: user.id,
+          orgId: orgId ?? null,
+        },
+      });
+      if (error || !data?.ok) {
+        throw new Error(error?.message || data?.message || 'Save failed');
+      }
+      return true;
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+      return false;
+    } finally {
+      setSavingWeek(null);
+    }
+  };
+
   const handleSelectProMove = async (actionId: number, weekStart?: string, displayOrder?: number) => {
     const targetWeek = weekStart || selectedSlot?.weekStart;
     const targetOrder = displayOrder || selectedSlot?.displayOrder;
@@ -325,8 +358,9 @@ export function WeekBuilderPanel({
     );
     
     setWeeks(updatedWeeks);
-    setHasUnsavedChanges(true);
     setPickerOpen(false);
+    const updated = updatedWeeks.find(w => w.weekStart === targetWeek);
+    if (updated) await saveWeek(updated);
   };
 
   const handleClearSlot = async (weekStart: string, displayOrder: number) => {
@@ -344,7 +378,8 @@ export function WeekBuilderPanel({
     );
     
     setWeeks(updatedWeeks);
-    setHasUnsavedChanges(true);
+    const updated = updatedWeeks.find(w => w.weekStart === weekStart);
+    if (updated) await saveWeek(updated);
   };
 
   const handleAutoFill = async (weekStart: string) => {

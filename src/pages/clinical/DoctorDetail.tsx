@@ -15,7 +15,7 @@ import { DoctorLocationEditor } from '@/components/clinical/DoctorLocationEditor
 import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
 import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
-import { DoctorGrowthTimeline } from '@/components/clinical/DoctorGrowthTimeline';
+import { ClinicalBaselineResults } from '@/components/clinical/ClinicalBaselineResults';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -24,8 +24,8 @@ export default function DoctorDetail() {
   const { staffId } = useParams<{ staffId: string }>();
   const { data: myStaff } = useStaffProfile();
   const [showCoachWizard, setShowCoachWizard] = useState(false);
-  const [baselineOpen, setBaselineOpen] = useState(true);
-  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [resultsOpen, setResultsOpen] = useState(true);
+  const [privateBaselineOpen, setPrivateBaselineOpen] = useState(false);
 
   const { data: doctor, isLoading: doctorLoading } = useQuery({
     queryKey: ['doctor-detail', staffId],
@@ -137,7 +137,7 @@ export default function DoctorDetail() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header — name + single journey pill + one next-action line */}
       <div className="flex items-center gap-4">
         <Link to="/clinical">
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
@@ -156,9 +156,15 @@ export default function DoctorDetail() {
               currentLocationName={(doctor.locations as any)?.name ?? null}
             />
           </p>
+          {journeyStatus.nextAction && (
+            <p className="text-sm text-muted-foreground mt-1">
+              <span className="font-medium text-foreground">Next:</span> {journeyStatus.nextAction}
+            </p>
+          )}
         </div>
       </div>
-      {/* Pre-session actions (release baseline) */}
+
+      {/* Pre-session actions (release baseline) — only while still invited */}
       <DoctorDetailOverview
         doctor={doctor}
         baseline={baseline}
@@ -166,7 +172,29 @@ export default function DoctorDetail() {
         journeyStatus={journeyStatus}
       />
 
-      {/* Coaching Thread — the single hub for all session actions */}
+      {/* Doctor's baseline results — promoted above the thread since this is
+          the primary reference the CD reads while prepping. */}
+      <Collapsible open={resultsOpen} onOpenChange={setResultsOpen}>
+        <CollapsibleTrigger asChild>
+          <button className="flex items-center gap-3 w-full py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", resultsOpen && "rotate-180")} />
+            <h2 className="text-lg font-semibold">Doctor's baseline results</h2>
+            {baseline?.status === 'completed' && (
+              <Badge variant="secondary" className="ml-auto text-xs">Complete</Badge>
+            )}
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-2">
+          <ClinicalBaselineResults
+            staffId={staffId!}
+            assessmentId={baseline?.id}
+            status={baseline?.status}
+            completedAt={baseline?.completed_at}
+          />
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Coaching Thread — the action hub */}
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Coaching Thread</h2>
         <DoctorDetailThread
@@ -181,23 +209,19 @@ export default function DoctorDetail() {
         />
       </div>
 
-      {/* Growth Timeline — hidden for now (too similar to coaching thread) */}
-
-      {/* Baseline — collapsible section */}
-      <Collapsible open={baselineOpen} onOpenChange={setBaselineOpen}>
+      {/* Private baseline — single entry point */}
+      <Collapsible open={privateBaselineOpen} onOpenChange={setPrivateBaselineOpen}>
         <CollapsibleTrigger asChild>
           <button className="flex items-center gap-3 w-full py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
-            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", baselineOpen && "rotate-180")} />
-            <h2 className="text-lg font-semibold">Baseline Assessment</h2>
-            {baseline?.status === 'completed' && (
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", privateBaselineOpen && "rotate-180")} />
+            <h2 className="text-lg font-semibold">Private baseline (your view)</h2>
+            {coachAssessment?.status === 'completed' && (
               <Badge variant="secondary" className="ml-auto text-xs">Complete</Badge>
             )}
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-2">
           <DoctorDetailBaseline
-            staffId={staffId!}
-            baseline={baseline}
             coachAssessment={coachAssessment}
             onStartCoachWizard={() => setShowCoachWizard(true)}
           />

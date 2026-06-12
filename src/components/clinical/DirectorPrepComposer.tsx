@@ -489,6 +489,9 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     onSuccess: () => {
       toast({ title: 'Draft saved' });
     },
+    onError: (err: any) => {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+    },
   });
 
   // Show loading while creating session

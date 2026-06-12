@@ -1,6 +1,7 @@
 import { getWeekAnchors } from '@/v2/time';
 import { getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
 import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -176,6 +177,7 @@ export async function assembleWeek(params: {
       .select(`
         id,
         action_id,
+        org_move_id,
         display_order,
         self_select,
         pro_moves!weekly_assignments_action_id_fkey (
@@ -200,20 +202,32 @@ export async function assembleWeek(params: {
       return [];
     }
 
-    return enrichedAssign.map((assign: any) => ({
-      weekly_focus_id: `assign:${assign.id}`,
-      type: 'site',
-      pro_move_id: assign.action_id,
-      action_statement: assign.pro_moves?.action_statement || 'Pro Move',
-      intervention_text: assign.pro_moves?.intervention_text || null,
-      competency_name: assign.pro_moves?.competencies?.name || 'General',
-      domain_name: assign.pro_moves?.competencies?.domains?.domain_name || 'General',
-      required: true,
-      locked: !!assign.action_id,
-      display_order: assign.display_order,
-      source: 'assignments',
-      weekLabel: `Week of ${mondayStr}`
-    }));
+    // Resolve org-custom move metadata (rows where org_move_id is set instead of action_id)
+    const orgMoveIds = enrichedAssign
+      .map((a: any) => a.org_move_id)
+      .filter((id: string | null): id is string => !!id);
+    const orgMeta = orgMoveIds.length > 0
+      ? await fetchOrgProMoveMetaByIds(orgMoveIds)
+      : new Map();
+
+    return enrichedAssign.map((assign: any) => {
+      const om = assign.org_move_id ? orgMeta.get(assign.org_move_id) : undefined;
+      return {
+        weekly_focus_id: `assign:${assign.id}`,
+        type: 'site',
+        pro_move_id: assign.action_id,
+        org_move_id: assign.org_move_id ?? null,
+        action_statement: assign.pro_moves?.action_statement || om?.statement || 'Pro Move',
+        intervention_text: assign.pro_moves?.intervention_text || om?.description || null,
+        competency_name: assign.pro_moves?.competencies?.name || om?.competencyName || 'General',
+        domain_name: assign.pro_moves?.competencies?.domains?.domain_name || om?.domain || 'General',
+        required: true,
+        locked: !!(assign.action_id || assign.org_move_id),
+        display_order: assign.display_order,
+        source: 'assignments',
+        weekLabel: `Week of ${mondayStr}`
+      };
+    });
   } else {
     console.warn('[assembleWeek] ❌ No weekly_assignments for week=%s role=%d', mondayStr, roleId);
     return [];

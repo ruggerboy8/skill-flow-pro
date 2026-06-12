@@ -765,7 +765,8 @@ export function WeekBuilderPanel({
                           );
                           
                           setWeeks(updatedWeeks);
-                          setHasUnsavedChanges(true);
+                          const updated = updatedWeeks.find(w => w.weekStart === week.weekStart);
+                          if (updated) await saveWeek(updated);
                         } catch (error) {
                           console.error('Drop error:', error);
                           toast({ title: 'Error', description: 'Failed to assign pro-move', variant: 'destructive' });

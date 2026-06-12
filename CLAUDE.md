@@ -17,24 +17,30 @@ into a multi-tenant SaaS product.
 ## Supabase connection
 
 ```bash
-# One-time link (run from project root):
-SUPABASE_ACCESS_TOKEN="sbp_ba76378959b1c92466fb8d0d27af9bfc2c983829" \
-  npx supabase link --project-ref yeypngaufuualdfzcjpk
+# One-time auth (browser-based — no token in the repo):
+npx supabase login
+npx supabase link --project-ref yeypngaufuualdfzcjpk
 
 # Inspect live schema:
 npx supabase db diff
-
-# Push pending migrations:
-npx supabase db push
 ```
 
 - Project ref: `yeypngaufuualdfzcjpk`
 - URL: `https://yeypngaufuualdfzcjpk.supabase.co`
 - Anon key is in `.env` / `src/integrations/supabase/client.ts`
+- **Never commit access tokens or DB passwords to this repo.** Authenticate
+  locally with `supabase login` (browser flow) instead.
 
-**Note:** The Claude Code sandbox (claude.ai/code tab) has no outbound internet.
-Run `supabase` commands from your local machine or use `npx supabase db diff`
-after linking to validate migrations.
+**Applying migrations:** `supabase db push` does **not** work here. Lovable owns
+migrations and names files `<timestamp>-<uuid>.sql` (hyphen); the CLI requires
+`<timestamp>_name.sql` (underscore) and skips the hyphenated files, so the CLI's
+migration history never reconciles and `db push` fails. To ship a migration,
+either paste its SQL into the Supabase dashboard **SQL Editor** (write it
+idempotently — `IF NOT EXISTS` / `CREATE OR REPLACE`, and apply column adds
+before functions that reference them), or land it on `main` for Lovable to pick
+up. The claude.ai/code sandbox can reach GitHub but not Supabase's management
+API (`api.supabase.com`), so any CLI link/push/deploy must run from a local
+machine.
 
 ## Data model & terminology
 

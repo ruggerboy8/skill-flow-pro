@@ -339,6 +339,12 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
         generatedBy: 'manual' as const,
         rankSnapshot: s.rankSnapshot || null,
       }));
+      console.info('[Planner.save] invoking planner-upsert', {
+        roleId,
+        weekStart: week.weekStart,
+        orgId: orgId ?? null,
+        picks,
+      });
       const { data, error } = await supabase.functions.invoke('planner-upsert', {
         body: {
           action: 'saveWeek',
@@ -349,11 +355,13 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
           orgId: orgId ?? null,
         },
       });
+      console.info('[Planner.save] planner-upsert response', { data, error });
       if (error || !data?.ok) {
         throw new Error(error?.message || data?.message || 'Save failed');
       }
       return true;
     } catch (err: any) {
+      console.error('[Planner.save] save failed', err);
       toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
       return false;
     } finally {

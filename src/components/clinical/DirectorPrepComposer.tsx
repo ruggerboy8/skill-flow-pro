@@ -71,9 +71,11 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [activeDomains, setActiveDomains] = useState<Set<string>>(new Set());
   const sessionId = realSessionId ?? '';
 
-  // Check ownership
+  // Ownership is informational; any clinical director may edit, but we surface
+  // who owns and who last touched it, and apply optimistic concurrency on save.
   const { data: myStaffForOwnership } = useStaffProfile();
-  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null);
+  const [staleConflict, setStaleConflict] = useState(false);
 
   // Auto-create session when sessionId is 'new'
   const { data: myStaff } = useStaffProfile();
@@ -143,12 +145,24 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!sessionId,
   });
 
-  // Set read-only if session belongs to another coach
+  // Capture the snapshot timestamp for optimistic concurrency, and write a
+  // presence heartbeat so other directors see "X opened this N min ago".
   useEffect(() => {
-    if (session && myStaffForOwnership?.id && session.coach_staff_id !== myStaffForOwnership.id) {
-      setIsReadOnly(true);
+    if (!session || !myStaffForOwnership?.id) return;
+    if (loadedUpdatedAt === null) {
+      setLoadedUpdatedAt((session as any).updated_at ?? null);
     }
-  }, [session, myStaffForOwnership?.id]);
+    (async () => {
+      await (supabase as any)
+        .from('coaching_sessions')
+        .update({
+          last_opened_by_staff_id: myStaffForOwnership.id,
+          last_opened_at: new Date().toISOString(),
+        })
+        .eq('id', session.id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, myStaffForOwnership?.id]);
 
   // Fetch doctor's baseline items as the ProMove pool
   const { data: baselineItems } = useQuery({
@@ -390,11 +404,24 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         .insert(selections);
       if (selErr) throw selErr;
 
-      const { error: sessErr } = await supabase
+      const updatePayload: any = {
+        coach_note: coachNote,
+        status: 'director_prep_ready',
+        last_edited_by_staff_id: myStaffForOwnership?.id ?? null,
+        last_edited_at: new Date().toISOString(),
+      };
+      let updateQuery = (supabase as any)
         .from('coaching_sessions')
-        .update({ coach_note: coachNote, status: 'director_prep_ready' })
+        .update(updatePayload)
         .eq('id', sessionId);
+      if (loadedUpdatedAt) updateQuery = updateQuery.eq('updated_at', loadedUpdatedAt);
+      const { data: updated, error: sessErr } = await updateQuery.select('id, updated_at');
       if (sessErr) throw sessErr;
+      if (!updated || updated.length === 0) {
+        setStaleConflict(true);
+        throw new Error('Someone else saved changes to this session while you were editing. Reload to see their version before saving again.');
+      }
+      setLoadedUpdatedAt(updated[0].updated_at);
 
       // Save prior action statuses if any exist
       if (priorExperiments && priorExperiments.length > 0 && Object.keys(priorActionStatuses).length > 0) {
@@ -441,13 +468,29 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         await supabase.from('coaching_session_selections').insert(selections);
       }
 
-      await supabase
+      const draftPayload: any = {
+        coach_note: coachNote,
+        last_edited_by_staff_id: myStaffForOwnership?.id ?? null,
+        last_edited_at: new Date().toISOString(),
+      };
+      let draftQuery = (supabase as any)
         .from('coaching_sessions')
-        .update({ coach_note: coachNote })
+        .update(draftPayload)
         .eq('id', sessionId);
+      if (loadedUpdatedAt) draftQuery = draftQuery.eq('updated_at', loadedUpdatedAt);
+      const { data: updated, error: draftErr } = await draftQuery.select('id, updated_at');
+      if (draftErr) throw draftErr;
+      if (!updated || updated.length === 0) {
+        setStaleConflict(true);
+        throw new Error('Someone else saved changes to this session while you were editing. Reload to see their version before saving again.');
+      }
+      setLoadedUpdatedAt(updated[0].updated_at);
     },
     onSuccess: () => {
       toast({ title: 'Draft saved' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
     },
   });
 
@@ -463,40 +506,9 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   }
 
   // Guard: if doctor has already submitted, don't allow editing — redirect back
-  if (session && !isReadOnly && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
+  if (session && ['doctor_prep_submitted', 'doctor_confirmed', 'meeting_pending'].includes(session.status)) {
     onBack();
     return null;
-  }
-
-  // Read-only view for sessions owned by another coach
-  if (isReadOnly && session) {
-    return (
-      <div className="space-y-6 max-w-2xl mx-auto">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h2 className="text-xl font-bold">Prep for {doctorName}</h2>
-            <Badge variant="secondary" className="text-xs mt-1 gap-1">
-              <ShieldAlert className="h-3 w-3" />
-              Managed by another coach — read only
-            </Badge>
-          </div>
-        </div>
-        {session.coach_note && (
-          <Card>
-            <CardHeader><CardTitle className="text-base">Coach Agenda</CardTitle></CardHeader>
-            <CardContent>
-              <div
-                className="prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(session.coach_note) }}
-              />
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    );
   }
 
   if (published) {
@@ -572,6 +584,38 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
           )}
         </div>
       </div>
+
+      {/* Collaboration smoke signals */}
+      {session && (() => {
+        const s: any = session;
+        const myId = myStaffForOwnership?.id;
+        const recentlyOpened = s.last_opened_by_staff_id
+          && s.last_opened_by_staff_id !== myId
+          && s.last_opened_at
+          && (Date.now() - new Date(s.last_opened_at).getTime()) < 30 * 60 * 1000;
+        const ownedByOther = s.coach_staff_id && myId && s.coach_staff_id !== myId;
+        const lastEditedByOther = s.last_edited_by_staff_id && s.last_edited_by_staff_id !== myId;
+        if (!staleConflict && !recentlyOpened && !ownedByOther && !lastEditedByOther) return null;
+        return (
+          <div className="space-y-2">
+            {staleConflict && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                <p className="font-semibold text-destructive">Conflict — your save was blocked</p>
+                <p className="text-muted-foreground">Someone else saved changes while you were editing. Reload to see their version, then re-apply your changes.</p>
+              </div>
+            )}
+            {(ownedByOther || lastEditedByOther || recentlyOpened) && !staleConflict && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm flex items-start gap-2">
+                <ShieldAlert className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-muted-foreground">
+                  {ownedByOther && <>This session is owned by another director. Your edits will save, but they remain the original owner. </>}
+                  {recentlyOpened && <>Another director opened this recently — check with them before making large changes. </>}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Prior Experiments (for follow-ups) */}
       {priorExperiments && priorExperiments.length > 0 && (

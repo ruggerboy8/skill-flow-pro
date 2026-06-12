@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatInTimeZone } from 'date-fns-tz';
+import { formatDistanceToNow } from 'date-fns';
+const formatRelative = (iso: string) => formatDistanceToNow(new Date(iso), { addSuffix: true });
 import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock, FileText, Mail, Plus, Trash2, ShieldAlert, UserCog } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { MeetingOutcomeCapture } from '@/components/clinical/MeetingOutcomeCapture';
@@ -26,6 +28,10 @@ interface Session {
   meeting_link?: string | null;
   coach_staff_id: string;
   coach_name?: string;
+  last_edited_by_staff_id?: string | null;
+  last_edited_at?: string | null;
+  last_editor_name?: string | null;
+  updated_at?: string | null;
 }
 
 import { SESSION_STATUS_CONFIG, DEFAULT_STATUS } from '@/lib/coachingSessionStatus';
@@ -258,10 +264,12 @@ function SessionCard({
     : `Check-in ${session.sequence_number - 1}`;
 
   const expandableStatus = isExpandable(session.status);
-  const showCapture = isOwner && canCaptureStatus(session.status);
-  const showBuildAgenda = isOwner && canBuildAgenda(session.status);
-  const showInvite = isOwner && canInvite(session.status);
-  const showResendInvite = isOwner && session.status === 'scheduling_invite_sent';
+  // Any clinical director / super admin can edit; ownership is informational.
+  const showCapture = canCaptureStatus(session.status);
+  const showBuildAgenda = canBuildAgenda(session.status);
+  const showInvite = canInvite(session.status);
+  const showResendInvite = session.status === 'scheduling_invite_sent';
+  // Delete stays owner-only to prevent accidental destruction by other directors.
   const showDelete = isOwner;
 
   const handleReassign = async (newCoachId: string) => {
@@ -374,6 +382,13 @@ function SessionCard({
                 {subtitle && (
                   <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
                 )}
+                {/* Attribution: owner is always shown; surface last editor if different */}
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Owner: <span className="font-medium">{session.coach_name || 'Unknown'}</span>
+                  {session.last_edited_by_staff_id && session.last_edited_by_staff_id !== session.coach_staff_id && session.last_editor_name && (
+                    <> · Last edited by <span className="font-medium">{session.last_editor_name}</span>{session.last_edited_at ? ` ${formatRelative(session.last_edited_at)}` : ''}</>
+                  )}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">

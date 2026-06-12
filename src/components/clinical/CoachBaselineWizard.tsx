@@ -118,6 +118,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       return data as any;
     },
     enabled: !!staff?.id,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch existing items (including editor attribution)
@@ -136,6 +138,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       return (data ?? []) as any[];
     },
     enabled: !!assessmentId,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch doctor pro moves by domain
@@ -201,8 +205,14 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     }
   }, [recState.isRecording]);
 
+  // One-time hydration guards — refetches should NOT overwrite in-progress edits
+  const hydratedAssessmentRef = useRef(false);
+  const hydratedItemsRef = useRef(false);
+
   useEffect(() => {
+    if (hydratedAssessmentRef.current) return;
     if (existingAssessment?.id) {
+      hydratedAssessmentRef.current = true;
       setAssessmentId(existingAssessment.id);
       if (existingAssessment.status === 'completed') setIsComplete(true);
       if (existingAssessment.recording_transcript) setTranscript(existingAssessment.recording_transcript);
@@ -210,7 +220,9 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   }, [existingAssessment]);
 
   useEffect(() => {
-    if (existingItems?.length) {
+    if (hydratedItemsRef.current) return;
+    if (existingItems && existingItems.length > 0) {
+      hydratedItemsRef.current = true;
       const loaded: Record<number, { score: number | null; note: string }> = {};
       const notesOpen = new Set<number>();
       existingItems.forEach((item: any) => {
@@ -219,12 +231,14 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       });
       setRatings(loaded);
       setOpenNotes(notesOpen);
-      // Snapshot for dirty detection (only set once)
       if (initialSnapshot === null) {
         setInitialSnapshot(JSON.stringify(loaded));
       }
+    } else if (existingItems && existingItems.length === 0 && assessmentId) {
+      // Empty assessment — still mark hydrated so future refetches don't reset
+      hydratedItemsRef.current = true;
     }
-  }, [existingItems]);
+  }, [existingItems, assessmentId, initialSnapshot]);
 
   // Map of action_id -> editor info, for per-card attribution
   const itemEditors = useMemo(() => {
@@ -839,14 +853,44 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                   {isDirty ? 'Save Changes' : 'Back to Detail'}
                 </Button>
               ) : (
-                <Button
-                  onClick={() => completeMutation.mutate()}
-                  disabled={!allRated || completeMutation.isPending}
-                  size="lg"
-                  className="shadow-lg"
-                >
-                  {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
-                </Button>
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    onClick={() => {
+                      if (allRated) {
+                        completeMutation.mutate();
+                        return;
+                      }
+                      // Scroll to first unrated pro move
+                      const firstUnrated = domains
+                        .flatMap(d => d.proMoves)
+                        .find(pm => ratings[pm.action_id]?.score == null);
+                      if (firstUnrated) {
+                        const el = proMoveRefs.current.get(firstUnrated.action_id);
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          el.style.transition = 'box-shadow 0.3s';
+                          el.style.boxShadow = '0 0 0 3px hsl(var(--primary))';
+                          setTimeout(() => { el.style.boxShadow = ''; }, 1800);
+                        }
+                        toast({
+                          title: `${totalProMoves - ratedCount} Pro Move${totalProMoves - ratedCount !== 1 ? 's' : ''} still need a rating`,
+                          description: 'Use N/A if a Pro Move doesn\'t apply.',
+                        });
+                      }
+                    }}
+                    disabled={completeMutation.isPending}
+                    size="lg"
+                    variant={allRated ? 'default' : 'outline'}
+                    className="shadow-lg"
+                  >
+                    {completeMutation.isPending ? 'Saving…' : 'Complete Assessment'}
+                  </Button>
+                  {!allRated && (
+                    <p className="text-xs text-muted-foreground">
+                      {ratedCount} of {totalProMoves} rated — {totalProMoves - ratedCount} remaining
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}

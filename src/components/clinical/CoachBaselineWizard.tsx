@@ -258,26 +258,25 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const lastEditorName: string | null = (existingAssessment as any)?.last_editor?.name ?? null;
   const lastEditedAt: string | null = (existingAssessment as any)?.last_edited_at ?? null;
 
-  // Create assessment
-  const createMutation = useMutation({
+  // Atomic get-or-create via RPC (replaces the old client-side insert that
+  // could race and produce duplicate rows / RLS errors).
+  const getOrCreateMutation = useMutation({
     mutationFn: async () => {
       if (!staff?.id) throw new Error('No staff ID');
-      console.log('[CoachBaseline] Creating assessment for doctor:', doctorStaffId, 'coach:', staff.id);
-      const { data, error } = await supabase
-        .from('coach_baseline_assessments')
-        .insert({ doctor_staff_id: doctorStaffId, coach_staff_id: staff.id, status: 'in_progress' })
-        .select('id')
-        .single();
-      if (error) {
-        console.error('[CoachBaseline] Create error:', error);
-        throw error;
-      }
-      console.log('[CoachBaseline] Created assessment:', data.id);
-      return data.id;
+      const { data, error } = await (supabase as any)
+        .rpc('get_or_create_coach_baseline_assessment', { _doctor_staff_id: doctorStaffId });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row?.id) throw new Error('No assessment returned');
+      return row as { id: string; status: string | null };
     },
-    onSuccess: (id) => setAssessmentId(id),
+    onSuccess: (row) => {
+      setAssessmentId(row.id);
+      if (row.status === 'completed') setIsComplete(true);
+      queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment', doctorStaffId] });
+    },
     onError: (e: Error) => {
-      console.error('[CoachBaseline] Create mutation failed:', e);
+      console.error('[CoachBaseline] get_or_create failed:', e);
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     },
   });
@@ -315,6 +314,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment'] });
+      queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment', doctorStaffId] });
       queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
       setIsComplete(true);
     },
@@ -470,19 +470,14 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     toast({ title: 'Recording discarded', description: 'You can start a new recording.' });
   }, [recControls]);
 
-  // Auto-create assessment if none exists
+  // Atomically resolve assessment via RPC (replaces the old auto-create insert).
   useEffect(() => {
-    console.log('[CoachBaseline] Auto-create check:', {
-      staffId: staff?.id,
-      existingAssessment,
-      assessmentId,
-      createPending: createMutation.isPending,
-      assessmentError: assessmentError?.message,
-    });
-    if (staff?.id && existingAssessment === null && !assessmentId && !createMutation.isPending) {
-      console.log('[CoachBaseline] Auto-creating assessment...');
-      createMutation.mutate();
-    }
+    if (!staff?.id) return;
+    if (assessmentId) return;
+    if (existingAssessment === undefined) return; // query not loaded yet
+    if (existingAssessment?.id) return; // hydration effect will set assessmentId
+    if (getOrCreateMutation.isPending) return;
+    getOrCreateMutation.mutate();
   }, [staff?.id, existingAssessment, assessmentId]);
 
   // Get active pro move's label for the floating pill

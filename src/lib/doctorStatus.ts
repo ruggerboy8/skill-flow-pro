@@ -1,5 +1,7 @@
 // Derived doctor journey status — computed from baseline + coaching session data
 
+import { SESSION_STATUS_CONFIG } from '@/lib/coachingSessionStatus';
+
 export type DoctorJourneyStage =
   | 'invited'
   | 'baseline_released'
@@ -54,85 +56,46 @@ export function getDoctorJourneyStatus(
     const sorted = [...sessions].sort((a, b) => b.sequence_number - a.sequence_number);
     const latest = sorted[0];
 
-    const isFollowup = latest.session_type === 'followup';
-    const prefix = isFollowup ? 'Follow-up' : 'Baseline review';
+    const isFollowup = latest.session_type === 'follow_up';
 
     // For doctor perspective, sessions that haven't reached the invite stage
     // shouldn't override baseline status — the doctor hasn't been engaged yet
     const preInviteStatuses = ['scheduled', 'director_prep_ready'];
     if (perspective === 'doctor' && preInviteStatuses.includes(latest.status)) {
       // Fall through to baseline checks below
-    } else switch (latest.status) {
-      case 'scheduling_invite_sent':
-        if (perspective === 'doctor') {
-          return {
-            stage: 'scheduling_invite_sent',
-            label: 'Prep Available',
-            variant: 'default',
-            colorClass: 'bg-primary/10 text-primary',
-            nextAction: 'Complete your meeting prep and schedule your session',
-            nextActionUrl: `/doctor/review-prep/${latest.id}`,
-          };
-        }
+    } else {
+      // Doctor-perspective override for the one stage the doctor actually engages
+      if (perspective === 'doctor' && latest.status === 'scheduling_invite_sent') {
         return {
           stage: 'scheduling_invite_sent',
-          label: 'Pending Scheduling',
-          variant: 'outline',
-          colorClass: 'bg-blue-100 text-blue-800',
-          nextAction: 'Waiting for doctor to schedule via the link you sent',
-        };
-      case 'scheduled':
-        return {
-          stage: 'ready_for_prep',
-          label: 'Session Draft',
-          variant: 'secondary',
-          colorClass: 'bg-muted text-muted-foreground',
-          nextAction: 'Build your meeting agenda before inviting to schedule',
-        };
-      case 'doctor_prep_submitted':
-        return {
-          stage: 'meeting_ready',
-          label: 'Doctor Prep Submitted',
+          label: 'Prep Available',
           variant: 'default',
-          colorClass: 'bg-emerald-100 text-emerald-800',
-          nextAction: 'Doctor completed their prep — ready to start meeting',
+          colorClass: 'bg-primary/10 text-primary',
+          nextAction: 'Complete your meeting prep and schedule your session',
+          nextActionUrl: `/doctor/review-prep/${latest.id}`,
         };
-      case 'director_prep_ready':
+      }
+
+      // Canonical labels + next actions come from SESSION_STATUS_CONFIG
+      const cfg = SESSION_STATUS_CONFIG[latest.status];
+      if (cfg) {
+        const stageByStatus: Record<string, DoctorJourneyStage> = {
+          scheduled: 'ready_for_prep',
+          director_prep_ready: 'prep_complete',
+          scheduling_invite_sent: 'scheduling_invite_sent',
+          doctor_prep_submitted: 'meeting_ready',
+          meeting_pending: 'meeting_pending',
+          doctor_confirmed: isFollowup ? 'followup_completed' : 'doctor_confirmed',
+          doctor_revision_requested: 'meeting_pending',
+        };
         return {
-          stage: 'prep_complete',
-          label: 'Agenda Ready',
+          stage: stageByStatus[latest.status] || 'ready_for_prep',
+          label: cfg.label,
           variant: 'default',
-          colorClass: 'bg-amber-100 text-amber-800',
-          nextAction: 'Send scheduling invite to doctor',
+          colorClass: cfg.className,
+          nextAction: cfg.nextAction,
         };
-      case 'meeting_pending':
-        // R1.5: Softened — no longer a blocking gate
-        return {
-          stage: 'meeting_pending',
-          label: 'Summary Shared',
-          variant: 'secondary',
-          colorClass: 'bg-purple-100 text-purple-800',
-          nextAction: 'Doctor can review the summary. You can schedule the next session.',
-        };
-      case 'doctor_confirmed':
-        return {
-          stage: isFollowup ? 'followup_completed' : 'doctor_confirmed',
-          label: 'Completed',
-          variant: 'default',
-          colorClass: 'bg-green-100 text-green-800',
-          nextAction: isFollowup
-            ? 'Schedule next follow-up when ready'
-            : 'Schedule a follow-up to check on progress',
-        };
-      case 'doctor_revision_requested':
-        // R1.5: Softened — treat same as meeting_pending with a note
-        return {
-          stage: 'meeting_pending',
-          label: 'Summary Shared — Doctor Left a Note',
-          variant: 'secondary',
-          colorClass: 'bg-amber-100 text-amber-800',
-          nextAction: 'Review the doctor\'s note. You can still schedule the next session.',
-        };
+      }
     }
   }
 

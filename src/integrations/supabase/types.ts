@@ -3574,6 +3574,13 @@ export type Database = {
         }[]
       }
       get_office_manager_location_id: { Args: never; Returns: string }
+      get_or_create_coach_baseline_assessment: {
+        Args: { _doctor_staff_id: string }
+        Returns: {
+          id: string
+          status: string
+        }[]
+      }
       get_own_staff_flags: {
         Args: never
         Returns: {

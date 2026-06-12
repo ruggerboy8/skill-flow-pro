@@ -225,9 +225,7 @@ export default function DoctorManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Stage</TableHead>
-                  <TableHead>Next Step</TableHead>
                   <TableHead>Action</TableHead>
-                  
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -251,9 +249,6 @@ export default function DoctorManagement() {
                     </TableCell>
                     <TableCell>
                       <DoctorJourneyStatusPill status={doctor.journeyStatus} />
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">{doctor.journeyStatus.nextAction}</span>
                     </TableCell>
                     <TableCell>
                       <InlineAction stage={doctor.journeyStatus.stage} doctorId={doctor.id} navigate={navigate} />
@@ -314,38 +309,45 @@ function InlineAction({ stage, doctorId, navigate }: { stage: string; doctorId: 
     navigate(`/clinical/doctors/${doctorId}`);
   };
 
-  if (['baseline_submitted', 'ready_for_prep', 'prep_complete'].includes(stage)) {
+  if (['baseline_submitted', 'ready_for_prep'].includes(stage)) {
     return (
       <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
-        Build Prep <ArrowRight className="h-3 w-3" />
+        Build agenda <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'prep_complete') {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Send to doctor <ArrowRight className="h-3 w-3" />
       </Button>
     );
   }
   if (stage === 'scheduling_invite_sent') {
     return (
       <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
-        View Details <ArrowRight className="h-3 w-3" />
+        View details <ArrowRight className="h-3 w-3" />
       </Button>
     );
   }
   if (stage === 'meeting_ready') {
     return (
       <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
-        Start Meeting <ArrowRight className="h-3 w-3" />
+        Log meeting <ArrowRight className="h-3 w-3" />
       </Button>
     );
   }
   if (stage === 'meeting_pending') {
     return (
       <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
-        Schedule Next <ArrowRight className="h-3 w-3" />
+        Schedule next <ArrowRight className="h-3 w-3" />
       </Button>
     );
   }
   if (stage === 'doctor_confirmed' || stage === 'followup_completed') {
     return (
       <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
-        Start Follow-up <ArrowRight className="h-3 w-3" />
+        Start follow-up <ArrowRight className="h-3 w-3" />
       </Button>
     );
   }

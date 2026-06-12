@@ -182,27 +182,94 @@ export default function DoctorDetail() {
         journeyStatus={journeyStatus}
       />
 
-      {/* Doctor's baseline results — promoted above the thread since this is
-          the primary reference the CD reads while prepping. */}
-      <Collapsible open={resultsOpen} onOpenChange={setResultsOpen}>
-        <CollapsibleTrigger asChild>
-          <button className="flex items-center gap-3 w-full py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
-            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", resultsOpen && "rotate-180")} />
-            <h2 className="text-lg font-semibold">Doctor's baseline results</h2>
-            {baseline?.status === 'completed' && (
-              <Badge variant="secondary" className="ml-auto text-xs">Complete</Badge>
-            )}
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-2">
-          <ClinicalBaselineResults
-            staffId={staffId!}
-            assessmentId={baseline?.id}
-            status={baseline?.status}
-            completedAt={baseline?.completed_at}
-          />
-        </CollapsibleContent>
-      </Collapsible>
+      {/* Assessments — collapsible module with two columns:
+          left = doctor self-assessments, right = clinical director reviews.
+          Card click opens the detail in a side Sheet. */}
+      {(() => {
+        const doctorBaselineStatus = toCardStatus(baseline?.status, !!baseline);
+        const coachBaselineStatus = toCardStatus(coachAssessment?.status, !!coachAssessment);
+        const bothComplete = doctorBaselineStatus === 'completed' && coachBaselineStatus === 'completed';
+        const open = assessmentsOpen ?? !bothComplete;
+
+        const StatusDot = ({ status }: { status: AssessmentCardStatus }) => {
+          const Icon = status === 'completed' ? CheckCircle2 : status === 'in_progress' ? Clock : Circle;
+          const color =
+            status === 'completed' ? 'text-emerald-600' :
+            status === 'in_progress' ? 'text-amber-600' :
+            'text-muted-foreground';
+          return <Icon className={cn('h-3.5 w-3.5', color)} />;
+        };
+
+        return (
+          <Collapsible open={open} onOpenChange={setAssessmentsOpen}>
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-3 w-full py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
+                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
+                <h2 className="text-lg font-semibold">Assessments</h2>
+                <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <StatusDot status={doctorBaselineStatus} />
+                    Doctor
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <StatusDot status={coachBaselineStatus} />
+                    Director
+                  </span>
+                </div>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Doctor self-assessments column */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
+                    Doctor self-assessments
+                  </h3>
+                  <AssessmentTrackCard
+                    title="Baseline"
+                    subtitle="Doctor's self-assessment"
+                    icon={ClipboardCheck}
+                    status={doctorBaselineStatus}
+                    statusDate={baseline?.completed_at || (baseline as any)?.started_at}
+                    onOpenResults={
+                      baseline ? () => setExpandedAssessment('doctor_baseline') : undefined
+                    }
+                    disabledHint={!baseline ? 'Doctor has not started yet' : undefined}
+                  />
+                </div>
+
+                {/* Clinical director reviews column */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
+                    Clinical director reviews
+                  </h3>
+                  <AssessmentTrackCard
+                    title="Private baseline"
+                    subtitle="Visible only to clinical directors"
+                    icon={ShieldCheck}
+                    status={coachBaselineStatus}
+                    statusDate={coachAssessment?.completed_at || coachAssessment?.updated_at}
+                    onOpenResults={
+                      coachAssessment ? () => setExpandedAssessment('coach_baseline') : undefined
+                    }
+                    primaryAction={
+                      !coachAssessment
+                        ? { label: 'Start assessment', onClick: () => setShowCoachWizard(true) }
+                        : coachAssessment.coach_staff_id === myStaff?.id
+                        ? {
+                            label: coachAssessment.status === 'completed' ? 'Edit' : 'Continue',
+                            onClick: () => setShowCoachWizard(true),
+                            variant: 'outline',
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      })()}
 
       {/* Coaching Thread — the action hub */}
       <div className="space-y-2">
@@ -219,24 +286,37 @@ export default function DoctorDetail() {
         />
       </div>
 
-      {/* Private baseline — single entry point */}
-      <Collapsible open={privateBaselineOpen} onOpenChange={setPrivateBaselineOpen}>
-        <CollapsibleTrigger asChild>
-          <button className="flex items-center gap-3 w-full py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
-            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", privateBaselineOpen && "rotate-180")} />
-            <h2 className="text-lg font-semibold">Private baseline (your view)</h2>
-            {coachAssessment?.status === 'completed' && (
-              <Badge variant="secondary" className="ml-auto text-xs">Complete</Badge>
-            )}
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-2">
-          <DoctorDetailBaseline
-            coachAssessment={coachAssessment}
-            onStartCoachWizard={() => setShowCoachWizard(true)}
+      {/* Pop-out sheets for assessment results */}
+      <AssessmentResultsSheet
+        open={expandedAssessment === 'doctor_baseline'}
+        onOpenChange={(o) => !o && setExpandedAssessment(null)}
+        title={`${drName(doctor.name)} — Baseline results`}
+        description="Doctor's self-assessment"
+      >
+        {baseline && (
+          <ClinicalBaselineResults
+            staffId={staffId!}
+            assessmentId={baseline.id}
+            status={baseline.status}
+            completedAt={baseline.completed_at}
           />
-        </CollapsibleContent>
-      </Collapsible>
+        )}
+      </AssessmentResultsSheet>
+
+      <AssessmentResultsSheet
+        open={expandedAssessment === 'coach_baseline'}
+        onOpenChange={(o) => !o && setExpandedAssessment(null)}
+        title="Private baseline"
+        description="Your read of where this doctor stands. Visible only to clinical directors."
+      >
+        <DoctorDetailBaseline
+          coachAssessment={coachAssessment}
+          onStartCoachWizard={() => {
+            setExpandedAssessment(null);
+            setShowCoachWizard(true);
+          }}
+        />
+      </AssessmentResultsSheet>
     </div>
   );
 }

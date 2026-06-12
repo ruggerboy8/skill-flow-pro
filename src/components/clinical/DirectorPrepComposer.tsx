@@ -71,9 +71,11 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [activeDomains, setActiveDomains] = useState<Set<string>>(new Set());
   const sessionId = realSessionId ?? '';
 
-  // Check ownership
+  // Ownership is informational; any clinical director may edit, but we surface
+  // who owns and who last touched it, and apply optimistic concurrency on save.
   const { data: myStaffForOwnership } = useStaffProfile();
-  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null);
+  const [staleConflict, setStaleConflict] = useState(false);
 
   // Auto-create session when sessionId is 'new'
   const { data: myStaff } = useStaffProfile();

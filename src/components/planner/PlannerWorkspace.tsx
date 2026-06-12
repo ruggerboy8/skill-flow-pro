@@ -1,11 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { WeekBuilderPanel, type WeekBuilderPanelRef } from './WeekBuilderPanel';
 import { LibraryPanel, type BenchId } from './LibraryPanel';
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from '@/components/ui/resizable';
 
 interface PlannerWorkspaceProps {
   roleId: number;
@@ -51,46 +46,32 @@ export function PlannerWorkspace({ roleId, roleName, orgId, practiceType }: Plan
   }, []);
 
   return (
-    <div className="flex flex-col h-full">
-      <ResizablePanelGroup
-        direction="horizontal"
-        autoSaveId={`planner-workspace-${roleId}`}
-        className="flex-1 min-h-0"
-      >
-        {/* Week builder — left */}
-        <ResizablePanel defaultSize={55} minSize={35} className="min-w-0">
-          <div className="h-full overflow-y-auto pr-2">
-            <WeekBuilderPanel
-              ref={weekBuilderRef}
-              roleId={roleId}
-              roleName={roleName}
-              orgId={orgId}
-              practiceType={practiceType}
-              onSlotActivate={handleSlotActivate}
-              activeSlot={selectedSlot}
-              onActiveWeeksChange={handleActiveWeeksChange}
-            />
-          </div>
-        </ResizablePanel>
+    <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+      <div className="flex-[55] min-w-0 overflow-y-auto lg:block">
+        <WeekBuilderPanel
+          ref={weekBuilderRef}
+          roleId={roleId}
+          roleName={roleName}
+          orgId={orgId}
+          practiceType={practiceType}
+          onSlotActivate={handleSlotActivate}
+          activeSlot={selectedSlot}
+          onActiveWeeksChange={handleActiveWeeksChange}
+        />
+      </div>
 
-        <ResizableHandle withHandle className="mx-1" />
-
-        {/* Library panel — right */}
-        <ResizablePanel defaultSize={45} minSize={25} className="min-w-0">
-          <div className="h-full overflow-hidden pl-2">
-            <LibraryPanel
-              roleId={roleId}
-              roleName={roleName}
-              orgId={orgId}
-              practiceType={practiceType}
-              selectedSlot={selectedSlot}
-              onSelect={handleSelectMove}
-              benchIds={benchIds}
-              onBenchToggle={handleBenchToggle}
-            />
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+      <div className="flex-none w-full lg:w-[420px] lg:max-w-[480px] h-full overflow-hidden">
+        <LibraryPanel
+          roleId={roleId}
+          roleName={roleName}
+          orgId={orgId}
+          practiceType={practiceType}
+          selectedSlot={selectedSlot}
+          onSelect={handleSelectMove}
+          benchIds={benchIds}
+          onBenchToggle={handleBenchToggle}
+        />
+      </div>
     </div>
   );
 }

@@ -16,14 +16,6 @@ interface PlannerRole {
   archetype_code: string;
 }
 
-// Tailwind grid-cols classes for known tab counts (planner roles + library)
-const GRID_COLS: Record<number, string> = {
-  1: 'grid-cols-2',
-  2: 'grid-cols-3',
-  3: 'grid-cols-4',
-  4: 'grid-cols-5',
-  5: 'grid-cols-6',
-};
 
 export default function AdminBuilder() {
   const navigate = useNavigate();
@@ -98,8 +90,6 @@ export default function AdminBuilder() {
     return <Navigate to="/" replace />;
   }
 
-  const totalTabs = plannerRoles.length + 1; // +1 for Library
-  const gridClass = GRID_COLS[totalTabs] ?? 'grid-cols-4';
   const fallbackTab = plannerRoles.length > 0 ? `role-${plannerRoles[0].role_id}` : 'library';
   const requestedTab = searchParams.get('tab');
   const activeTab =
@@ -119,17 +109,19 @@ export default function AdminBuilder() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className={`grid w-full ${gridClass}`}>
-          {plannerRoles.map(r => (
-            <TabsTrigger key={r.role_id} value={`role-${r.role_id}`}>
-              {r.display_name}
-            </TabsTrigger>
-          ))}
-          <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="flex h-auto gap-1 bg-muted p-1 rounded-lg w-max min-w-full">
+            {plannerRoles.map(r => (
+              <TabsTrigger key={r.role_id} value={`role-${r.role_id}`}>
+                {r.display_name}
+              </TabsTrigger>
+            ))}
+            <TabsTrigger value="library">Pro-Move Library</TabsTrigger>
+          </TabsList>
+        </div>
 
         {plannerRoles.map(r => (
-          <TabsContent key={r.role_id} value={`role-${r.role_id}`} className="h-[calc(100vh-220px)]">
+          <TabsContent key={r.role_id} value={`role-${r.role_id}`} className="h-[calc(100svh-220px)] lg:h-[calc(100vh-220px)]">
             <PlannerWorkspace
               roleId={r.role_id}
               roleName={r.display_name}

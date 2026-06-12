@@ -77,25 +77,6 @@ export function TabbedPageShell({
     );
   }
 
-  // Compute grid cols based on tab count
-  const colsClass =
-    tabs.length <= 3
-      ? `grid-cols-${tabs.length}`
-      : tabs.length === 4
-        ? 'grid-cols-4'
-        : tabs.length === 5
-          ? 'grid-cols-5'
-          : 'grid-cols-6';
-
-  // Compute max width
-  const maxW =
-    tabs.length <= 3
-      ? 'lg:w-[480px]'
-      : tabs.length === 4
-        ? 'lg:w-[640px]'
-        : tabs.length === 5
-          ? 'lg:w-[800px]'
-          : 'lg:w-[960px]';
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -113,9 +94,9 @@ export function TabbedPageShell({
       {beforeTabs}
 
       <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-6">
-        <TabsList className={`grid w-full ${colsClass} ${maxW}`}>
+        <TabsList className="flex flex-wrap h-auto gap-1 bg-muted p-1 rounded-lg w-full">
           {tabs.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className="flex items-center space-x-2">
+            <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-1.5 flex-none">
               <tab.icon className="h-4 w-4" />
               <span>{tab.label}</span>
             </TabsTrigger>

@@ -205,8 +205,14 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     }
   }, [recState.isRecording]);
 
+  // One-time hydration guards — refetches should NOT overwrite in-progress edits
+  const hydratedAssessmentRef = useRef(false);
+  const hydratedItemsRef = useRef(false);
+
   useEffect(() => {
+    if (hydratedAssessmentRef.current) return;
     if (existingAssessment?.id) {
+      hydratedAssessmentRef.current = true;
       setAssessmentId(existingAssessment.id);
       if (existingAssessment.status === 'completed') setIsComplete(true);
       if (existingAssessment.recording_transcript) setTranscript(existingAssessment.recording_transcript);
@@ -214,7 +220,9 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   }, [existingAssessment]);
 
   useEffect(() => {
-    if (existingItems?.length) {
+    if (hydratedItemsRef.current) return;
+    if (existingItems && existingItems.length > 0) {
+      hydratedItemsRef.current = true;
       const loaded: Record<number, { score: number | null; note: string }> = {};
       const notesOpen = new Set<number>();
       existingItems.forEach((item: any) => {
@@ -223,12 +231,14 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       });
       setRatings(loaded);
       setOpenNotes(notesOpen);
-      // Snapshot for dirty detection (only set once)
       if (initialSnapshot === null) {
         setInitialSnapshot(JSON.stringify(loaded));
       }
+    } else if (existingItems && existingItems.length === 0 && assessmentId) {
+      // Empty assessment — still mark hydrated so future refetches don't reset
+      hydratedItemsRef.current = true;
     }
-  }, [existingItems]);
+  }, [existingItems, assessmentId, initialSnapshot]);
 
   // Map of action_id -> editor info, for per-card attribution
   const itemEditors = useMemo(() => {

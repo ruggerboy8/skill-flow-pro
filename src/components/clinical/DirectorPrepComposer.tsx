@@ -468,10 +468,23 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         await supabase.from('coaching_session_selections').insert(selections);
       }
 
-      await supabase
+      const draftPayload: any = {
+        coach_note: coachNote,
+        last_edited_by_staff_id: myStaffForOwnership?.id ?? null,
+        last_edited_at: new Date().toISOString(),
+      };
+      let draftQuery = (supabase as any)
         .from('coaching_sessions')
-        .update({ coach_note: coachNote })
+        .update(draftPayload)
         .eq('id', sessionId);
+      if (loadedUpdatedAt) draftQuery = draftQuery.eq('updated_at', loadedUpdatedAt);
+      const { data: updated, error: draftErr } = await draftQuery.select('id, updated_at');
+      if (draftErr) throw draftErr;
+      if (!updated || updated.length === 0) {
+        setStaleConflict(true);
+        throw new Error('Someone else saved changes to this session while you were editing. Reload to see their version before saving again.');
+      }
+      setLoadedUpdatedAt(updated[0].updated_at);
     },
     onSuccess: () => {
       toast({ title: 'Draft saved' });

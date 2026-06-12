@@ -26,6 +26,10 @@ interface Session {
   meeting_link?: string | null;
   coach_staff_id: string;
   coach_name?: string;
+  last_edited_by_staff_id?: string | null;
+  last_edited_at?: string | null;
+  last_editor_name?: string | null;
+  updated_at?: string | null;
 }
 
 import { SESSION_STATUS_CONFIG, DEFAULT_STATUS } from '@/lib/coachingSessionStatus';

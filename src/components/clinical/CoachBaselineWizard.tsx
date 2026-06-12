@@ -853,14 +853,44 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
                   {isDirty ? 'Save Changes' : 'Back to Detail'}
                 </Button>
               ) : (
-                <Button
-                  onClick={() => completeMutation.mutate()}
-                  disabled={!allRated || completeMutation.isPending}
-                  size="lg"
-                  className="shadow-lg"
-                >
-                  {completeMutation.isPending ? 'Saving…' : allRated ? 'Complete Assessment' : `${ratedCount}/${totalProMoves} rated`}
-                </Button>
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    onClick={() => {
+                      if (allRated) {
+                        completeMutation.mutate();
+                        return;
+                      }
+                      // Scroll to first unrated pro move
+                      const firstUnrated = domains
+                        .flatMap(d => d.proMoves)
+                        .find(pm => ratings[pm.action_id]?.score == null);
+                      if (firstUnrated) {
+                        const el = proMoveRefs.current.get(firstUnrated.action_id);
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          el.style.transition = 'box-shadow 0.3s';
+                          el.style.boxShadow = '0 0 0 3px hsl(var(--primary))';
+                          setTimeout(() => { el.style.boxShadow = ''; }, 1800);
+                        }
+                        toast({
+                          title: `${totalProMoves - ratedCount} Pro Move${totalProMoves - ratedCount !== 1 ? 's' : ''} still need a rating`,
+                          description: 'Use N/A if a Pro Move doesn\'t apply.',
+                        });
+                      }
+                    }}
+                    disabled={completeMutation.isPending}
+                    size="lg"
+                    variant={allRated ? 'default' : 'outline'}
+                    className="shadow-lg"
+                  >
+                    {completeMutation.isPending ? 'Saving…' : 'Complete Assessment'}
+                  </Button>
+                  {!allRated && (
+                    <p className="text-xs text-muted-foreground">
+                      {ratedCount} of {totalProMoves} rated — {totalProMoves - ratedCount} remaining
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}

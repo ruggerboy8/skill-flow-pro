@@ -423,7 +423,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
             ...w,
             slots: w.slots.map(s => 
               s.displayOrder === displayOrder
-                ? { ...s, actionId: null, actionStatement: '', domainName: '' }
+                ? { ...s, actionId: null, orgMoveId: null, actionStatement: '', domainName: '', status: 'empty' }
                 : s
             )
           }

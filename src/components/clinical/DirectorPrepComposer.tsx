@@ -145,12 +145,24 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!sessionId,
   });
 
-  // Set read-only if session belongs to another coach
+  // Capture the snapshot timestamp for optimistic concurrency, and write a
+  // presence heartbeat so other directors see "X opened this N min ago".
   useEffect(() => {
-    if (session && myStaffForOwnership?.id && session.coach_staff_id !== myStaffForOwnership.id) {
-      setIsReadOnly(true);
+    if (!session || !myStaffForOwnership?.id) return;
+    if (loadedUpdatedAt === null) {
+      setLoadedUpdatedAt((session as any).updated_at ?? null);
     }
-  }, [session, myStaffForOwnership?.id]);
+    (async () => {
+      await (supabase as any)
+        .from('coaching_sessions')
+        .update({
+          last_opened_by_staff_id: myStaffForOwnership.id,
+          last_opened_at: new Date().toISOString(),
+        })
+        .eq('id', session.id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, myStaffForOwnership?.id]);
 
   // Fetch doctor's baseline items as the ProMove pool
   const { data: baselineItems } = useQuery({

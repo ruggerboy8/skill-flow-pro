@@ -3867,6 +3867,8 @@ export type Database = {
         Args: { p_role_id: number; p_staff_id: string }
         Returns: Json
       }
+      org_id_of_location: { Args: { _location_id: string }; Returns: string }
+      org_id_of_staff: { Args: { _staff_id: string }; Returns: string }
       org_visible_pro_moves: {
         Args: { p_org_id: string; p_role_id?: number }
         Returns: {

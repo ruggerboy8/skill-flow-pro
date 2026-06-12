@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RawScoreRow, StaffWeekSummary } from '@/types/coachV2';
 import { aggregateStaffWeekSummary } from '@/lib/coachUtils';
+import { useSim } from '@/devtools/SimProvider';
 
 interface UseStaffWeeklyScoresOptions {
   weekOf?: string | null;
@@ -13,6 +14,8 @@ export function useStaffWeeklyScores(options: UseStaffWeeklyScoresOptions = {}) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const { weekOf } = options;
+  const { overrides } = useSim();
+  const masqueradeStaffId = overrides.enabled ? overrides.masqueradeStaffId : null;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -24,9 +27,21 @@ export function useStaffWeeklyScores(options: UseStaffWeeklyScoresOptions = {}) 
         throw new Error('Not authenticated');
       }
 
+      // If masquerading, resolve the masquerade target's user_id so the RPC
+      // returns the team that user would see, not the real caller's team.
+      let effectiveUserId = user.id;
+      if (masqueradeStaffId) {
+        const { data: target } = await supabase
+          .from('staff')
+          .select('user_id')
+          .eq('id', masqueradeStaffId)
+          .maybeSingle();
+        if (target?.user_id) effectiveUserId = target.user_id;
+      }
+
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_staff_weekly_scores', { 
-          p_coach_user_id: user.id,
+        .rpc('get_staff_weekly_scores', {
+          p_coach_user_id: effectiveUserId,
           p_week_of: weekOf || null
         })
         .limit(10000);
@@ -52,7 +67,7 @@ export function useStaffWeeklyScores(options: UseStaffWeeklyScoresOptions = {}) 
     } finally {
       setLoading(false);
     }
-  }, [weekOf]);
+  }, [weekOf, masqueradeStaffId]);
 
   useEffect(() => {
     load();

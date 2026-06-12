@@ -2559,6 +2559,7 @@ export type Database = {
           legacy_focus_id: string | null
           location_id: string | null
           org_id: string | null
+          org_move_id: string | null
           rank_snapshot: Json | null
           role_id: number
           self_select: boolean
@@ -2580,6 +2581,7 @@ export type Database = {
           legacy_focus_id?: string | null
           location_id?: string | null
           org_id?: string | null
+          org_move_id?: string | null
           rank_snapshot?: Json | null
           role_id: number
           self_select?: boolean
@@ -2601,6 +2603,7 @@ export type Database = {
           legacy_focus_id?: string | null
           location_id?: string | null
           org_id?: string | null
+          org_move_id?: string | null
           rank_snapshot?: Json | null
           role_id?: number
           self_select?: boolean
@@ -2625,6 +2628,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "competencies"
             referencedColumns: ["competency_id"]
+          },
+          {
+            foreignKeyName: "weekly_assignments_org_move_id_fkey"
+            columns: ["org_move_id"]
+            isOneToOne: false
+            referencedRelation: "organization_pro_moves"
+            referencedColumns: ["id"]
           },
         ]
       }

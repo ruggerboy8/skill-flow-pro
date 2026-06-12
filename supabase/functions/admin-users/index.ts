@@ -125,12 +125,25 @@ serve(async (req: Request) => {
           }
         }
 
-        // Org-level scoping: resolve group IDs for the given organization and filter
-        if (organization_id) {
+        // Org-level scoping: resolve group IDs for the given organization and filter.
+        // Non-super-admin callers may ONLY query their own organization — ignore/override any
+        // organization_id supplied in the payload to prevent cross-tenant enumeration.
+        let effectiveOrgId: string | null = organization_id ?? null;
+        if (!me.is_super_admin) {
+          const { data: callerOrgId } = await caller.rpc("current_user_org_id");
+          if (!callerOrgId) {
+            return json({ error: "Forbidden: caller has no organization" }, 403);
+          }
+          if (effectiveOrgId && effectiveOrgId !== callerOrgId) {
+            return json({ error: "Forbidden: cannot query other organizations" }, 403);
+          }
+          effectiveOrgId = callerOrgId as string;
+        }
+        if (effectiveOrgId) {
           const { data: orgGroups } = await admin
             .from("practice_groups")
             .select("id")
-            .eq("organization_id", organization_id);
+            .eq("organization_id", effectiveOrgId);
           const orgGroupIds = (orgGroups ?? []).map((g: any) => g.id);
           if (orgGroupIds.length > 0) {
             // Resolve location IDs from group IDs to filter staff directly

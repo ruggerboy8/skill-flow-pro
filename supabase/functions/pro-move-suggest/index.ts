@@ -10,10 +10,31 @@ Deno.serve(async (req) => {
 
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
+    // Require JWT, then constrain orgId to caller's own org (super admins may pass any).
+    const authHeader = req.headers.get('Authorization') ?? '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const caller = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: claims, error: claimsErr } = await caller.auth.getClaims(
+      authHeader.replace('Bearer ', ''),
+    );
+    if (claimsErr || !claims?.claims?.sub) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const callerUserId = claims.claims.sub as string;
+
     const { description, roleId, orgId, practiceType } = await req.json();
 
     if (!description || !roleId || !orgId) {
@@ -21,6 +42,21 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Verify caller belongs to orgId (or is super admin).
+    const { data: me } = await supabase
+      .from('staff')
+      .select('is_super_admin')
+      .eq('user_id', callerUserId)
+      .maybeSingle();
+    if (!me?.is_super_admin) {
+      const { data: callerOrgId } = await caller.rpc('current_user_org_id');
+      if (!callerOrgId || callerOrgId !== orgId) {
+        return new Response(JSON.stringify({ error: 'Forbidden: org mismatch' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Fetch role name

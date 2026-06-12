@@ -256,18 +256,21 @@ export async function computeWeekState(params: {
   const anchors = getWeekAnchors(now, ctx.timezone);
   const { checkin_open, checkin_due, checkout_open, checkout_due } = anchors;
 
-  // Get staff information with org and timezone
-  // Support masquerade: if staffId is passed, query by id; otherwise query by user_id
+  // Get staff information with org and timezone.
+  // Support masquerade: if staffId is passed, query by id; otherwise query by user_id.
+  // weekly_assignments.org_id stores organizations.id (NOT practice_groups.id), so we must
+  // resolve the true organization id via the location's group → organization chain or fall
+  // back to staff.organization_id directly.
   let staffQuery = supabase
     .from('staff')
-    .select('*, locations!inner(group_id, timezone)');
-  
+    .select('*, locations!inner(group_id, timezone, practice_groups!locations_org_fkey(organization_id))');
+
   if (passedStaffId) {
     staffQuery = staffQuery.eq('id', passedStaffId);
   } else {
     staffQuery = staffQuery.eq('user_id', userId);
   }
-  
+
   const { data: staff } = await staffQuery.maybeSingle();
 
   if (!staff) {
@@ -275,7 +278,10 @@ export async function computeWeekState(params: {
   }
 
   const roleId = params.roleId || staff.role_id;
-  const orgId = (staff.locations as any)?.group_id;
+  const orgId =
+    (staff as any).organization_id ||
+    (staff.locations as any)?.practice_groups?.organization_id ||
+    null;
   const orgTz = (staff.locations as any)?.timezone || 'America/Chicago';
 
   // Check eligibility (onboarding status)

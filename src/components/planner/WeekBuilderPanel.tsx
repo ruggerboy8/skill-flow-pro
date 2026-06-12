@@ -65,8 +65,7 @@ export function WeekBuilderPanel({
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState<{ weekStart: string; displayOrder: number } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [savingChanges, setSavingChanges] = useState(false);
+  const [savingWeek, setSavingWeek] = useState<string | null>(null);
   const [deleteWeekDialogOpen, setDeleteWeekDialogOpen] = useState(false);
   const [weekToDelete, setWeekToDelete] = useState<string | null>(null);
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
@@ -296,6 +295,39 @@ export function WeekBuilderPanel({
     }
   };
 
+  const saveWeek = async (week: WeekAssignment) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+    setSavingWeek(week.weekStart);
+    try {
+      const picks = week.slots.map(s => ({
+        displayOrder: s.displayOrder as 1 | 2 | 3,
+        actionId: s.actionId || null,
+        generatedBy: 'manual' as const,
+        rankSnapshot: s.rankSnapshot || null,
+      }));
+      const { data, error } = await supabase.functions.invoke('planner-upsert', {
+        body: {
+          action: 'saveWeek',
+          roleId,
+          weekStartDate: week.weekStart,
+          picks,
+          updaterUserId: user.id,
+          orgId: orgId ?? null,
+        },
+      });
+      if (error || !data?.ok) {
+        throw new Error(error?.message || data?.message || 'Save failed');
+      }
+      return true;
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+      return false;
+    } finally {
+      setSavingWeek(null);
+    }
+  };
+
   const handleSelectProMove = async (actionId: number, weekStart?: string, displayOrder?: number) => {
     const targetWeek = weekStart || selectedSlot?.weekStart;
     const targetOrder = displayOrder || selectedSlot?.displayOrder;
@@ -326,8 +358,9 @@ export function WeekBuilderPanel({
     );
     
     setWeeks(updatedWeeks);
-    setHasUnsavedChanges(true);
     setPickerOpen(false);
+    const updated = updatedWeeks.find(w => w.weekStart === targetWeek);
+    if (updated) await saveWeek(updated);
   };
 
   const handleClearSlot = async (weekStart: string, displayOrder: number) => {
@@ -345,7 +378,8 @@ export function WeekBuilderPanel({
     );
     
     setWeeks(updatedWeeks);
-    setHasUnsavedChanges(true);
+    const updated = updatedWeeks.find(w => w.weekStart === weekStart);
+    if (updated) await saveWeek(updated);
   };
 
   const handleAutoFill = async (weekStart: string) => {
@@ -373,9 +407,8 @@ export function WeekBuilderPanel({
 
       toast({
         title: `${data.assigned.length} move${data.assigned.length !== 1 ? 's' : ''} suggested`,
-        description: 'Review and save when ready.',
+        description: 'Saved automatically.',
       });
-      setHasUnsavedChanges(true);
     } catch (err: any) {
       toast({ title: 'Auto-fill failed', description: err.message, variant: 'destructive' });
     } finally {
@@ -383,114 +416,6 @@ export function WeekBuilderPanel({
     }
   };
 
-  const handleSaveAll = async () => {
-    setSavingChanges(true);
-    try {
-      // Check for locked weeks first
-      const weekStartDates = weeks.map(w => w.weekStart);
-      const { data: existingScores } = await supabase
-        .from('weekly_scores')
-        .select('weekly_focus_id')
-        .ilike('weekly_focus_id', 'plan:%');
-
-      // Get plan IDs that have scores
-      const planIdsWithScores = new Set(
-        (existingScores || [])
-          .map((s: any) => s.weekly_focus_id?.replace('plan:', ''))
-          .filter(Boolean)
-      );
-
-      // Check which weeks have scores
-      const { data: existingPlans } = await supabase
-        .from('weekly_plan')
-        .select('id, week_start_date')
-        .eq('role_id', roleId)
-        .is('org_id', null)
-        .in('week_start_date', weekStartDates);
-
-      const lockedWeeks = (existingPlans || [])
-        .filter((p: any) => planIdsWithScores.has(String(p.id)))
-        .map((p: any) => p.week_start_date);
-
-      const editableWeeks = weeks.filter(w => !lockedWeeks.includes(w.weekStart));
-
-      if (editableWeeks.length === 0) {
-        toast({
-          title: 'Cannot save',
-          description: 'All weeks have existing scores and cannot be modified',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (lockedWeeks.length > 0) {
-        toast({
-          title: 'Some weeks locked',
-          description: `${lockedWeeks.length} week(s) with scores skipped. Saving ${editableWeeks.length} editable week(s).`,
-        });
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const week of editableWeeks) {
-        const picks = week.slots.map(s => ({ 
-          displayOrder: s.displayOrder as 1 | 2 | 3, 
-          actionId: s.actionId || null, 
-          generatedBy: 'manual' as const,
-          rankSnapshot: s.rankSnapshot || null,
-        }));
-
-        const { data, error } = await supabase.functions.invoke('planner-upsert', {
-          body: {
-            action: 'saveWeek',
-            roleId,
-            weekStartDate: week.weekStart,
-            picks,
-            updaterUserId: user.id,
-            orgId: orgId ?? null,
-          }
-        });
-
-        if (error || !data?.ok) {
-          errorCount++;
-          console.error(`Failed to save week ${week.weekStart}:`, error || data?.message);
-        } else {
-          if (data.data?.skippedLocked?.length > 0) {
-            toast({
-              title: 'Some slots locked',
-              description: `${data.data.skippedLocked.length} slot(s) in ${week.weekStart} have scores`,
-            });
-          }
-          successCount++;
-        }
-      }
-
-      if (errorCount > 0) {
-        toast({
-          title: 'Partial save',
-          description: `${successCount} week(s) saved, ${errorCount} failed`,
-          variant: 'destructive'
-        });
-      } else {
-        toast({ title: 'Saved', description: `${successCount} week(s) saved successfully` });
-      }
-
-      setHasUnsavedChanges(false);
-      await loadWeeks(selectedMonday);
-    } catch (error: any) {
-      toast({
-        title: 'Error saving changes',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setSavingChanges(false);
-    }
-  };
 
   const handleDeleteWeek = async (weekStart: string) => {
     try {
@@ -648,14 +573,11 @@ export function WeekBuilderPanel({
               <CardTitle>Week Builder</CardTitle>
               <CardDescription>Assign pro-moves for {roleName}</CardDescription>
             </div>
-            {hasUnsavedChanges && (
-              <Button 
-                onClick={handleSaveAll} 
-                size="sm"
-                disabled={savingChanges}
-              >
-                {savingChanges ? 'Saving...' : '💾 Save Changes'}
-              </Button>
+            {savingWeek && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Saving…
+              </span>
             )}
           </div>
 
@@ -843,7 +765,8 @@ export function WeekBuilderPanel({
                           );
                           
                           setWeeks(updatedWeeks);
-                          setHasUnsavedChanges(true);
+                          const updated = updatedWeeks.find(w => w.weekStart === week.weekStart);
+                          if (updated) await saveWeek(updated);
                         } catch (error) {
                           console.error('Drop error:', error);
                           toast({ title: 'Error', description: 'Failed to assign pro-move', variant: 'destructive' });

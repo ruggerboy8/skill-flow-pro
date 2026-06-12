@@ -1,36 +1,35 @@
-
 ## Goal
+Remove the manual "Save Changes" button from the Week Builder and make pro-move assignments persist automatically as soon as a move is selected (via picker, drag-and-drop, or slot clear).
 
-The Pro Move Library currently appears in two places for org admins, both rendering the same `OrgProMoveLibraryTab` component:
+## Current behavior
+- Selecting a pro move, dragging one in, or clearing a slot updates local React state and flips `hasUnsavedChanges = true`
+- A 💾 "Save Changes" button appears in the card header; the user must click it to call `handleSaveAll`, which batch-saves all modified weeks via the `planner-upsert` edge function
 
-- `/admin?tab=pro-moves` — Admin page tab
-- `/builder` — last tab on the Admin Builder page
+## Proposed change
+1. **Remove the save button** from the `WeekBuilderPanel` card header (remove the `hasUnsavedChanges` conditional block and the `hasUnsavedChanges` / `savingChanges` state variables).
 
-Per your call, keep it only under **Builder** (it's adjacent to the per-role planner tabs, which is where authoring custom moves is most useful).
+2. **Extract a `saveWeek` helper** from `handleSaveAll` that persists a single week's 3 slots to the `planner-upsert` edge function.
 
-## Changes
+3. **Auto-save on every mutation:**
+   - `handleSelectProMove` → after updating local state, call `saveWeek` for the affected week
+   - `onDrop` (drag-and-drop) → after updating local state, call `saveWeek` for the affected week  
+   - `handleClearSlot` → after updating local state, call `saveWeek` for the affected week
+   - Show a brief toast on success or error so the user knows the action persisted
 
-1. **`src/pages/AdminPage.tsx`**
-   - Remove the `"pro-moves"` tab definition (and the `OrgProMoveLibraryTab` import).
-   - If the default landing tab was `pro-moves`, fall back to the first remaining tab.
+4. **Keep `handleSaveAll` as a thin wrapper** around `saveWeek` for the rare case any other code still calls it, or delete it if unused.
 
-2. **`src/App.tsx`**
-   - Add a redirect so any existing `/admin?tab=pro-moves` deep link bounces to `/builder` with the Library tab selected. Implementation: a small effect on AdminPage that detects `?tab=pro-moves` and `navigate('/builder?tab=library', { replace: true })`. (No router-level change needed.)
-
-3. **`src/pages/AdminBuilder.tsx`**
-   - Read `?tab=` from the URL so deep links can land on `library` directly. Keep the existing default behavior (first role tab) when no `?tab=` is present.
-
-4. **Sidebar / navigation (`src/components/Layout.tsx` and anywhere "Pro Moves" is linked from Admin)**
-   - Audit for direct links to `/admin?tab=pro-moves`. Update them to `/builder?tab=library`. (No new nav entry — Builder is already in the sidebar.)
+5. **Remove `hasUnsavedChanges` and `savingChanges` state** entirely; replace with per-slot lightweight `savingSlot` state if a loading indicator on the specific slot is desired (otherwise drop loading indicators entirely since saves are fast and asynchronous).
 
 ## Out of scope
+- Auto-fill (`handleAutoFill`) already persists server-side via `sequencer-auto-assign`; no change needed
+- Month view is read-only navigation; no change needed
+- Exempt / delete / unlock flows already trigger their own server calls; no change needed
 
-- Platform Console → Pro Moves tab (super-admin global catalog) stays as-is.
-- Doctor / Clinical pro move library (`/clinical/pro-moves`) is a separate audience — untouched.
-- No database, RLS, or component-internal changes. `OrgProMoveLibraryTab` itself is unchanged.
+## Files to change
+- `src/components/planner/WeekBuilderPanel.tsx` — remove save button, add auto-save helpers, wire to picker/drop/clear handlers
 
-## Verification
-
-- As an org admin: `/admin` no longer shows a "Pro Moves" tab; Builder still shows it as the last tab and "New Custom Move" works.
-- Old link `/admin?tab=pro-moves` redirects to `/builder?tab=library`.
-- Super admin's Platform Console "Pro Moves" tab is unaffected.
+## Validation
+- Open Builder → pick a role tab → select a week → click a slot → pick a pro move from the dialog → dialog closes and assignment is persisted immediately without an explicit save step
+- Drag a pro move from the recommender panel into a slot → persists immediately
+- Clear a slot → persists immediately
+- No "Save Changes" button is visible at any point

@@ -87,15 +87,16 @@ export default function DoctorDetail() {
   const { data: sessions } = useQuery({
     queryKey: ['coaching-sessions', staffId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('coaching_sessions')
-        .select('id, session_type, sequence_number, status, scheduled_at, meeting_link, coach_staff_id, coach:staff!coaching_sessions_coach_staff_id_fkey(name)')
+        .select('id, session_type, sequence_number, status, scheduled_at, meeting_link, coach_staff_id, updated_at, last_edited_by_staff_id, last_edited_at, coach:staff!coaching_sessions_coach_staff_id_fkey(name), last_editor:staff!coaching_sessions_last_edited_by_staff_id_fkey(name)')
         .eq('doctor_staff_id', staffId)
         .order('sequence_number', { ascending: false });
       if (error) throw error;
       return (data || []).map((s: any) => ({
         ...s,
         coach_name: s.coach?.name || 'Unknown Coach',
+        last_editor_name: s.last_editor?.name ?? null,
       }));
     },
     enabled: !!staffId,

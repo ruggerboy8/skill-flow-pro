@@ -573,14 +573,11 @@ export function WeekBuilderPanel({
               <CardTitle>Week Builder</CardTitle>
               <CardDescription>Assign pro-moves for {roleName}</CardDescription>
             </div>
-            {hasUnsavedChanges && (
-              <Button 
-                onClick={handleSaveAll} 
-                size="sm"
-                disabled={savingChanges}
-              >
-                {savingChanges ? 'Saving...' : '💾 Save Changes'}
-              </Button>
+            {savingWeek && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Saving…
+              </span>
             )}
           </div>
 

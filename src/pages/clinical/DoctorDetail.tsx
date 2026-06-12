@@ -250,20 +250,27 @@ export default function DoctorDetail() {
                     status={coachBaselineStatus}
                     statusDate={coachAssessment?.completed_at || coachAssessment?.updated_at}
                     onOpenResults={
-                      coachAssessment ? () => setExpandedAssessment('coach_baseline') : undefined
+                      coachAssessment && coachAssessment.coach_staff_id !== myStaff?.id && coachAssessment.status === 'completed'
+                        ? () => setExpandedAssessment('coach_baseline')
+                        : undefined
                     }
                     primaryAction={
                       !coachAssessment
                         ? { label: 'Start assessment', onClick: () => setShowCoachWizard(true) }
                         : coachAssessment.coach_staff_id === myStaff?.id
                         ? {
-                            label: coachAssessment.status === 'completed' ? 'Edit' : 'Continue',
+                            label: coachAssessment.status === 'completed' ? 'Open results' : 'Continue assessment',
                             onClick: () => setShowCoachWizard(true),
-                            variant: 'outline',
                           }
                         : undefined
                     }
+                    disabledHint={
+                      coachAssessment && coachAssessment.coach_staff_id !== myStaff?.id && coachAssessment.status !== 'completed'
+                        ? 'In progress by another director'
+                        : undefined
+                    }
                   />
+
                 </div>
               </div>
             </CollapsibleContent>

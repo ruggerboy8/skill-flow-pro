@@ -63,16 +63,46 @@ async function formatNote(text: string): Promise<string | null> {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { ids, dryRun } = await req.json();
-    if (!Array.isArray(ids)) {
-      return new Response(JSON.stringify({ error: "ids must be array" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Require JWT and verify caller is a super admin (this is a backfill tool).
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const caller = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: claims, error: claimsErr } = await caller.auth.getClaims(
+      authHeader.replace("Bearer ", ""),
+    );
+    if (claimsErr || !claims?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+    const { data: me } = await admin
+      .from("staff")
+      .select("is_super_admin")
+      .eq("user_id", claims.claims.sub)
+      .maybeSingle();
+    if (!me?.is_super_admin) {
+      return new Response(JSON.stringify({ error: "Forbidden: super admin required" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { ids, dryRun } = await req.json();
+    if (!Array.isArray(ids)) {
+      return new Response(JSON.stringify({ error: "ids must be array" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const { data: rows, error } = await admin
       .from("evaluations")
       .select("id, evaluator_note")

@@ -57,7 +57,6 @@ export default function AdminPage() {
     { value: "users", label: "Users", icon: Users, content: <AdminUsersTab /> },
     { value: "locations", label: "Locations", icon: MapPin, content: <AdminLocationsTab /> },
     { value: "organizations", label: "Groups", icon: Building, content: <AdminOrganizationsTab /> },
-    { value: "pro-moves", label: "Pro Moves", icon: BookOpen, content: <OrgProMoveLibraryTab /> },
     { value: "integrations", label: "Integrations", icon: Plug, content: <AdminIntegrationsTab /> },
     { value: "settings", label: "Settings", icon: Settings, content: <AdminGlobalSettingsTab /> },
   ], []);

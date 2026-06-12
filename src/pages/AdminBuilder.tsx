@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ const GRID_COLS: Record<number, string> = {
 
 export default function AdminBuilder() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { canManageAssignments, organizationId, practiceType, isLoading, isSuperAdmin } = useUserRole();
   const [plannerRoles, setPlannerRoles] = useState<PlannerRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
@@ -102,7 +103,13 @@ export default function AdminBuilder() {
 
   const totalTabs = plannerRoles.length + 1; // +1 for Library
   const gridClass = GRID_COLS[totalTabs] ?? 'grid-cols-4';
-  const defaultTab = plannerRoles.length > 0 ? `role-${plannerRoles[0].role_id}` : 'library';
+  const fallbackTab = plannerRoles.length > 0 ? `role-${plannerRoles[0].role_id}` : 'library';
+  const requestedTab = searchParams.get('tab');
+  const activeTab =
+    requestedTab === 'library' || (requestedTab?.startsWith('role-') && plannerRoles.some(r => `role-${r.role_id}` === requestedTab))
+      ? requestedTab
+      : fallbackTab;
+  const handleTabChange = (value: string) => setSearchParams({ tab: value });
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -114,7 +121,7 @@ export default function AdminBuilder() {
         </Button>
       </div>
 
-      <Tabs defaultValue={defaultTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className={`grid w-full ${gridClass}`}>
           {plannerRoles.map(r => (
             <TabsTrigger key={r.role_id} value={`role-${r.role_id}`}>

@@ -90,7 +90,7 @@ export function LibraryCard({
         <Button
           size="sm"
           variant={hasActiveSlot ? 'default' : 'outline'}
-          className="h-6 text-xs px-2"
+          className="h-7 text-xs px-2"
           onClick={onSelect}
         >
           Pick

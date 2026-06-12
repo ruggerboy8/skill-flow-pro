@@ -100,9 +100,9 @@ export default function AdminBuilder() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold">Admin Builder</h1>
-        <Button variant="outline" onClick={() => navigate("/admin")}>
+        <Button variant="outline" size="sm" onClick={() => navigate("/admin")} className="flex-none">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Admin
         </Button>

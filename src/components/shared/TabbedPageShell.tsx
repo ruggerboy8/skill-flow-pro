@@ -80,11 +80,11 @@ export function TabbedPageShell({
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center space-x-3">
-          <Icon className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">{title}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center space-x-3 min-w-0">
+          <Icon className="h-8 w-8 text-primary flex-none" />
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold truncate">{title}</h1>
             <p className="text-muted-foreground">{description}</p>
           </div>
         </div>
@@ -96,9 +96,9 @@ export function TabbedPageShell({
       <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-6">
         <TabsList className="flex flex-wrap h-auto gap-1 bg-muted p-1 rounded-lg w-full">
           {tabs.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-1.5 flex-none">
-              <tab.icon className="h-4 w-4" />
-              <span>{tab.label}</span>
+            <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-1.5 flex-none max-w-[160px] overflow-hidden">
+              <tab.icon className="h-4 w-4 flex-none" />
+              <span className="truncate">{tab.label}</span>
             </TabsTrigger>
           ))}
         </TabsList>

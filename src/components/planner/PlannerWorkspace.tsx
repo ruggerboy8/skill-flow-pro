@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { WeekBuilderPanel, type WeekBuilderPanelRef } from './WeekBuilderPanel';
 import { LibraryPanel, type BenchId } from './LibraryPanel';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 
 interface PlannerWorkspaceProps {
   roleId: number;
@@ -40,38 +41,64 @@ export function PlannerWorkspace({ roleId, roleName, orgId, practiceType }: Plan
     );
   };
 
-  // Clear stale selection when the active week scrolls out of the visible range.
   const handleActiveWeeksChange = useCallback((visibleWeeks: string[]) => {
     setSelectedSlot(prev => (prev && !visibleWeeks.includes(prev.weekStart) ? null : prev));
   }, []);
 
+  const weekBuilder = (
+    <WeekBuilderPanel
+      ref={weekBuilderRef}
+      roleId={roleId}
+      roleName={roleName}
+      orgId={orgId}
+      practiceType={practiceType}
+      onSlotActivate={handleSlotActivate}
+      activeSlot={selectedSlot}
+      onActiveWeeksChange={handleActiveWeeksChange}
+    />
+  );
+
+  const library = (
+    <LibraryPanel
+      roleId={roleId}
+      roleName={roleName}
+      orgId={orgId}
+      practiceType={practiceType}
+      selectedSlot={selectedSlot}
+      onSelect={handleSelectMove}
+      benchIds={benchIds}
+      onBenchToggle={handleBenchToggle}
+    />
+  );
+
   return (
-    <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
-      <div className="flex-[55] min-w-0 overflow-y-auto lg:block">
-        <WeekBuilderPanel
-          ref={weekBuilderRef}
-          roleId={roleId}
-          roleName={roleName}
-          orgId={orgId}
-          practiceType={practiceType}
-          onSlotActivate={handleSlotActivate}
-          activeSlot={selectedSlot}
-          onActiveWeeksChange={handleActiveWeeksChange}
-        />
+    <>
+      {/* Mobile / tablet: stacked, no resizer */}
+      <div className="flex flex-col gap-4 flex-1 min-h-0 lg:hidden">
+        <div className="min-w-0 overflow-y-auto">{weekBuilder}</div>
+        <div className="w-full h-[60vh] overflow-hidden">{library}</div>
       </div>
 
-      <div className="flex-none w-full lg:w-[420px] lg:max-w-[480px] h-full overflow-hidden">
-        <LibraryPanel
-          roleId={roleId}
-          roleName={roleName}
-          orgId={orgId}
-          practiceType={practiceType}
-          selectedSlot={selectedSlot}
-          onSelect={handleSelectMove}
-          benchIds={benchIds}
-          onBenchToggle={handleBenchToggle}
-        />
+      {/* Desktop: resizable split */}
+      <div className="hidden lg:block flex-1 min-h-0">
+        <ResizablePanelGroup
+          direction="horizontal"
+          autoSaveId="planner-workspace-split"
+          className="h-full w-full"
+        >
+          <ResizablePanel defaultSize={58} minSize={35} className="min-w-0">
+            <div className="h-full overflow-y-auto pr-2">{weekBuilder}</div>
+          </ResizablePanel>
+          <ResizableHandle
+            withHandle
+            className="mx-1 bg-border hover:bg-primary/40 transition-colors w-1.5"
+          />
+          <ResizablePanel defaultSize={42} minSize={25} maxSize={60} className="min-w-0">
+            <div className="h-full overflow-hidden pl-2">{library}</div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
-    </div>
+    </>
   );
 }
+

@@ -65,8 +65,7 @@ export function WeekBuilderPanel({
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState<{ weekStart: string; displayOrder: number } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [savingChanges, setSavingChanges] = useState(false);
+  const [savingWeek, setSavingWeek] = useState<string | null>(null);
   const [deleteWeekDialogOpen, setDeleteWeekDialogOpen] = useState(false);
   const [weekToDelete, setWeekToDelete] = useState<string | null>(null);
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);

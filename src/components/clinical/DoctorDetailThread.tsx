@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatInTimeZone } from 'date-fns-tz';
+import { formatDistanceToNow } from 'date-fns';
+const formatRelative = (iso: string) => formatDistanceToNow(new Date(iso), { addSuffix: true });
 import { MessageSquare, ClipboardEdit, ChevronDown, FlaskConical, CheckCircle2, Clock, FileText, Mail, Plus, Trash2, ShieldAlert, UserCog } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { MeetingOutcomeCapture } from '@/components/clinical/MeetingOutcomeCapture';

@@ -262,10 +262,12 @@ function SessionCard({
     : `Check-in ${session.sequence_number - 1}`;
 
   const expandableStatus = isExpandable(session.status);
-  const showCapture = isOwner && canCaptureStatus(session.status);
-  const showBuildAgenda = isOwner && canBuildAgenda(session.status);
-  const showInvite = isOwner && canInvite(session.status);
-  const showResendInvite = isOwner && session.status === 'scheduling_invite_sent';
+  // Any clinical director / super admin can edit; ownership is informational.
+  const showCapture = canCaptureStatus(session.status);
+  const showBuildAgenda = canBuildAgenda(session.status);
+  const showInvite = canInvite(session.status);
+  const showResendInvite = session.status === 'scheduling_invite_sent';
+  // Delete stays owner-only to prevent accidental destruction by other directors.
   const showDelete = isOwner;
 
   const handleReassign = async (newCoachId: string) => {

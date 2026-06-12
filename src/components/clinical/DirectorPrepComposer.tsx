@@ -414,7 +414,8 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
-      setPublished(true);
+      // Open the invite composer immediately — sending is the natural
+      // continuation of publishing, not a second manual step.
       setShowInviteDialog(true);
     },
     onError: (err: any) => {
@@ -504,12 +505,12 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         <Card className="border-green-200 bg-green-50/50">
           <CardContent className="flex flex-col items-center py-8 text-center">
             <CheckCircle2 className="h-12 w-12 text-green-600 mb-4" />
-            <h2 className="text-xl font-bold">Prep Published & Invite Sent</h2>
+            <h2 className="text-xl font-bold">Prep published &amp; invite sent</h2>
             <p className="text-muted-foreground mt-2">
               The doctor can now see your agenda. A scheduling invite has been sent.
             </p>
             <Button variant="outline" className="mt-6" onClick={onBack}>
-              Back to Doctor Detail
+              Back to doctor detail
             </Button>
           </CardContent>
         </Card>
@@ -879,7 +880,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
           onClick={() => saveDraftMutation.mutate()}
           disabled={saveDraftMutation.isPending}
         >
-          Save Draft
+          Save draft
         </Button>
         <Button
           className="flex-1 gap-2"
@@ -887,12 +888,30 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
           disabled={selectedActions.length === 0 || publishMutation.isPending}
         >
           <Send className="h-4 w-4" />
-          {publishMutation.isPending ? 'Publishing...' : 'Ready for Doctor'}
+          {publishMutation.isPending ? 'Sending…' : 'Send to doctor'}
         </Button>
       </div>
       <p className="text-xs text-muted-foreground text-center">
-        Publishing makes your agenda visible to the doctor so they can complete their prep.
+        This publishes your agenda and opens the scheduling invite so you can send both in one step.
       </p>
+
+      {/* Scheduling invite — opens automatically after publish.
+          If the CD sends it, we flip to the published success view; if they
+          dismiss, the session stays at "Agenda Ready" and they can return here. */}
+      <SchedulingInviteComposer
+        open={showInviteDialog && !published}
+        onOpenChange={(open) => setShowInviteDialog(open)}
+        doctorName={doctorName}
+        doctorEmail={doctorEmail}
+        doctorStaffId={doctorStaffId}
+        sessionId={sessionId}
+        sessionType={sessionType}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
+          queryClient.invalidateQueries({ queryKey: ['doctor-detail'] });
+          setPublished(true);
+        }}
+      />
     </div>
   );
 }

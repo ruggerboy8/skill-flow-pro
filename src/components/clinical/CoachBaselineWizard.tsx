@@ -118,6 +118,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       return data as any;
     },
     enabled: !!staff?.id,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch existing items (including editor attribution)

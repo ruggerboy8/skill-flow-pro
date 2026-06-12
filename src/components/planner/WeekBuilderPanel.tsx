@@ -123,6 +123,10 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
       ? [startMonday, getNextMonday(startMonday)]
       : [startMonday];
 
+    onActiveWeeksChange?.(mondays);
+
+
+
     console.log('🔍 [WeekBuilder] Loading weeks:', {
       startMonday,
       roleId,

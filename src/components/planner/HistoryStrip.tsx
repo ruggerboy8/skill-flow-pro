@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
+import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface SlotRecord {
@@ -64,11 +65,11 @@ export function HistoryStrip({ roleId, orgId, onHistoryLoaded }: HistoryStripPro
     let query = supabase
       .from('weekly_assignments')
       .select(`
-        week_start_date, display_order, action_id, id,
-        pro_moves:action_id!inner(
+        week_start_date, display_order, action_id, org_move_id, id,
+        pro_moves:action_id(
           action_statement,
-          competencies:fk_pro_moves_competency_id!inner(
-            domains:fk_competencies_domain_id!inner(domain_name)
+          competencies:fk_pro_moves_competency_id(
+            domains:fk_competencies_domain_id(domain_name)
           )
         )
       `)
@@ -98,16 +99,25 @@ export function HistoryStrip({ roleId, orgId, onHistoryLoaded }: HistoryStripPro
       });
     }
 
+    // Resolve org-custom move metadata (rows with org_move_id instead of action_id)
+    const orgMoveIds = rows
+      .map((r: any) => r.org_move_id)
+      .filter((id: string | null): id is string => !!id);
+    const orgMeta = orgMoveIds.length > 0
+      ? await fetchOrgProMoveMetaByIds(orgMoveIds)
+      : new Map();
+
     // Group by week
     const grouped: Record<string, HistoryWeek> = {};
     rows.forEach((row: any) => {
       const ws = row.week_start_date;
       if (!grouped[ws]) grouped[ws] = { weekStart: ws, slots: [], isLocked: false };
-      const domainName = row.pro_moves?.competencies?.domains?.domain_name ?? '—';
+      const om = row.org_move_id ? orgMeta.get(row.org_move_id) : undefined;
+      const domainName = row.pro_moves?.competencies?.domains?.domain_name ?? om?.domain ?? '—';
       grouped[ws].slots.push({
         displayOrder: row.display_order,
         domainName,
-        name: row.pro_moves?.action_statement ?? '',
+        name: row.pro_moves?.action_statement ?? om?.statement ?? '',
       });
       if (lockedIds.has(row.id)) grouped[ws].isLocked = true;
     });

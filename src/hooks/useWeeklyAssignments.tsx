@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface WeeklyAssignment {
   id: string;
   action_id: number | null;
+  org_move_id: string | null;
   display_order: number;
   self_select: boolean;
   competency_id?: number;
@@ -51,6 +52,7 @@ export function useWeeklyAssignments({
         .select(`
           id,
           action_id,
+          org_move_id,
           display_order,
           self_select,
           competency_id,
@@ -60,6 +62,20 @@ export function useWeeklyAssignments({
             action_statement,
             competency_id,
             competencies!pro_moves_competency_id_fkey (
+              competency_id,
+              name,
+              domain_id,
+              domains!competencies_domain_id_fkey (
+                domain_id,
+                domain_name
+              )
+            )
+          ),
+          organization_pro_moves!weekly_assignments_org_move_id_fkey (
+            id,
+            action_statement,
+            competency_id,
+            competencies!organization_pro_moves_competency_id_fkey (
               competency_id,
               name,
               domain_id,
@@ -100,12 +116,13 @@ export function useWeeklyAssignments({
       const mappedData = (assignmentsData || []).map((item: any) => ({
         id: `assign:${item.id}`,
         action_id: item.action_id,
+        org_move_id: item.org_move_id ?? null,
         display_order: item.display_order,
         self_select: item.self_select,
-        competency_id: item.pro_moves?.competency_id || item.competency_id,
-        competency_name: item.pro_moves?.competencies?.name || item.competencies?.name,
-        domain_name: item.pro_moves?.competencies?.domains?.domain_name || item.competencies?.domains?.domain_name,
-        action_statement: item.pro_moves?.action_statement || '',
+        competency_id: item.pro_moves?.competency_id || item.organization_pro_moves?.competency_id || item.competency_id,
+        competency_name: item.pro_moves?.competencies?.name || item.organization_pro_moves?.competencies?.name || item.competencies?.name,
+        domain_name: item.pro_moves?.competencies?.domains?.domain_name || item.organization_pro_moves?.competencies?.domains?.domain_name || item.competencies?.domains?.domain_name,
+        action_statement: item.pro_moves?.action_statement || item.organization_pro_moves?.action_statement || '',
       }));
 
       return mappedData as WeeklyAssignment[];

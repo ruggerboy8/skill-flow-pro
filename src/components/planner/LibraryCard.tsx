@@ -8,6 +8,7 @@ interface LibraryCardProps {
   name: string;
   domainName: string;
   reason?: string;
+  isOrgCustom?: boolean;
   isPinned?: boolean;
   onPin?: () => void;
   onSelect: () => void;
@@ -20,6 +21,7 @@ export function LibraryCard({
   name,
   domainName,
   reason,
+  isOrgCustom,
   isPinned,
   onPin,
   onSelect,
@@ -46,13 +48,20 @@ export function LibraryCard({
       />
 
       <div className="flex-1 min-w-0 p-3 space-y-1">
-        {/* Domain label */}
-        <span
-          className="text-2xs px-1.5 py-0.5 rounded font-medium"
-          style={{ backgroundColor: domainColor }}
-        >
-          {domainName}
-        </span>
+        {/* Domain label + custom marker */}
+        <div className="flex items-center gap-1.5">
+          <span
+            className="text-2xs px-1.5 py-0.5 rounded font-medium"
+            style={{ backgroundColor: domainColor }}
+          >
+            {domainName}
+          </span>
+          {isOrgCustom && (
+            <span className="text-2xs px-1.5 py-0.5 rounded font-medium border border-primary/40 text-primary">
+              Custom
+            </span>
+          )}
+        </div>
 
         {/* Move name */}
         <p className="text-sm font-medium leading-snug line-clamp-2">{name}</p>
@@ -66,7 +75,7 @@ export function LibraryCard({
       {/* Actions */}
       <div className="flex flex-col items-center justify-center gap-1 px-2 flex-none">
         <GripVertical className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-        {onPin && actionId && (
+        {onPin && (
           <button
             onClick={(e) => { e.stopPropagation(); onPin(); }}
             className="text-muted-foreground/50 hover:text-primary transition-colors"

@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { adaptSequencerResponse, type RankedMove } from '@/lib/sequencerAdapter';
 import { getDomainColor } from '@/lib/domainColors';
 import { LibraryCard } from './LibraryCard';
-import { fetchProMoveMetaByIds } from '@/lib/proMoves';
+import { fetchProMoveMetaByIds, fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
 import { formatWeekOf } from '@/lib/plannerUtils';
 
 interface BrowseMove {
@@ -23,10 +23,15 @@ interface BrowseMove {
 }
 
 interface BenchMove {
-  actionId: number;
+  /** Platform moves use a numeric action_id; org custom moves use a UUID string */
+  id: number | string;
+  isOrgCustom: boolean;
   name: string;
   domainName: string;
 }
+
+/** Bench holds platform action_ids (number) and org custom move UUIDs (string) */
+export type BenchId = number | string;
 
 interface LibraryPanelProps {
   roleId: number;
@@ -35,8 +40,8 @@ interface LibraryPanelProps {
   practiceType?: string;
   selectedSlot: { weekStart: string; displayOrder: number } | null;
   onSelect: (actionId: number | null, orgMoveId?: string | null) => void;
-  benchIds: number[];
-  onBenchToggle: (actionId: number) => void;
+  benchIds: BenchId[];
+  onBenchToggle: (id: BenchId) => void;
   excludeActionIds?: number[];
 }
 
@@ -72,8 +77,8 @@ function LensContent({
 }: {
   moves: RankedMove[];
   loading: boolean;
-  benchIds: number[];
-  onBenchToggle: (id: number) => void;
+  benchIds: BenchId[];
+  onBenchToggle: (id: BenchId) => void;
   onSelect: (id: number) => void;
   hasActiveSlot: boolean;
   emptyMessage: string;
@@ -137,13 +142,22 @@ export function LibraryPanel({
     loadRanked();
   }, [roleId, orgId, practiceType]);
 
-  // Keep bench move metadata in sync with benchIds
+  // Keep bench move metadata in sync with benchIds (mixed platform + org custom)
   useEffect(() => {
     if (benchIds.length === 0) { setBenchMoves([]); return; }
-    fetchProMoveMetaByIds(benchIds).then(meta => {
+    const platformIds = benchIds.filter((id): id is number => typeof id === 'number');
+    const orgIds = benchIds.filter((id): id is string => typeof id === 'string');
+    Promise.all([
+      fetchProMoveMetaByIds(platformIds),
+      fetchOrgProMoveMetaByIds(orgIds),
+    ]).then(([platformMeta, orgMeta]) => {
       setBenchMoves(benchIds.map(id => {
-        const m = meta.get(id);
-        return { actionId: id, name: m?.statement ?? `Move ${id}`, domainName: m?.domain ?? '' };
+        if (typeof id === 'number') {
+          const m = platformMeta.get(id);
+          return { id, isOrgCustom: false, name: m?.statement ?? `Move ${id}`, domainName: m?.domain ?? '' };
+        }
+        const m = orgMeta.get(id);
+        return { id, isOrgCustom: true, name: m?.statement ?? 'Custom move', domainName: m?.domain ?? '' };
       }));
     });
   }, [benchIds]);
@@ -339,13 +353,18 @@ export function LibraryPanel({
             <div className="space-y-2 p-4">
               {benchMoves.map(move => (
                 <LibraryCard
-                  key={move.actionId}
-                  actionId={move.actionId}
+                  key={move.id}
+                  actionId={typeof move.id === 'number' ? move.id : undefined}
+                  orgMoveId={typeof move.id === 'string' ? move.id : undefined}
                   name={move.name}
                   domainName={move.domainName}
+                  isOrgCustom={move.isOrgCustom}
                   isPinned
-                  onPin={() => onBenchToggle(move.actionId)}
-                  onSelect={() => handleSelect(move.actionId)}
+                  onPin={() => onBenchToggle(move.id)}
+                  onSelect={() => handleSelect(
+                    typeof move.id === 'number' ? move.id : null,
+                    typeof move.id === 'string' ? move.id : undefined,
+                  )}
                   hasActiveSlot={hasActiveSlot}
                 />
               ))}
@@ -423,16 +442,17 @@ export function LibraryPanel({
               [1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-16 w-full rounded-lg" />)
             ) : (
               filteredBrowse.map(m => {
-                const cardKey = m.orgMoveId ? `org-${m.orgMoveId}` : `platform-${m.action_id}`;
+                const benchId: BenchId | undefined = m.orgMoveId ?? m.action_id;
                 return (
                   <LibraryCard
-                    key={cardKey}
+                    key={m.orgMoveId ? `org-${m.orgMoveId}` : `platform-${m.action_id}`}
                     actionId={m.action_id}
                     orgMoveId={m.orgMoveId}
-                    name={m.isOrgCustom ? `★ ${m.action_statement}` : m.action_statement}
+                    name={m.action_statement}
                     domainName={m.domain_name}
-                    isPinned={m.action_id ? benchIds.includes(m.action_id) : false}
-                    onPin={m.action_id ? () => onBenchToggle(m.action_id!) : undefined}
+                    isOrgCustom={m.isOrgCustom}
+                    isPinned={benchId !== undefined && benchIds.includes(benchId)}
+                    onPin={benchId !== undefined ? () => onBenchToggle(benchId) : undefined}
                     onSelect={() => handleSelect(m.action_id ?? null, m.orgMoveId)}
                     hasActiveSlot={hasActiveSlot}
                   />

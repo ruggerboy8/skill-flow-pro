@@ -32,32 +32,45 @@ export async function fetchProMoveMetaByIds(actionIds: number[]) {
   return map;
 }
 
+export interface OrgProMoveMeta {
+  statement: string;
+  domain: string;
+  competencyName: string;
+  description: string | null;
+}
+
 export async function fetchOrgProMoveMetaByIds(orgMoveIds: string[]) {
-  if (!orgMoveIds.length) return new Map<string, { statement: string; domain: string }>();
+  if (!orgMoveIds.length) return new Map<string, OrgProMoveMeta>();
 
   const { data: moves } = await supabase
     .from('organization_pro_moves')
-    .select('id, action_statement, competency_id')
+    .select('id, action_statement, description, competency_id')
     .in('id', orgMoveIds);
 
   const compIds = Array.from(new Set((moves || []).map(m => m.competency_id).filter(Boolean)));
-  const compMap = new Map<number, string>();
+  const compMap = new Map<number, { name: string; domain: string }>();
 
   if (compIds.length > 0) {
     const { data: comps } = await supabase
       .from('competencies')
-      .select('competency_id, domains:fk_competencies_domain_id(domain_name)')
+      .select('competency_id, name, domains:fk_competencies_domain_id(domain_name)')
       .in('competency_id', compIds);
-    (comps || []).forEach(c => {
-      compMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
+    (comps || []).forEach((c: any) => {
+      compMap.set(c.competency_id, {
+        name: c.name || '',
+        domain: (c.domains as any)?.domain_name || '',
+      });
     });
   }
 
-  const map = new Map<string, { statement: string; domain: string }>();
+  const map = new Map<string, OrgProMoveMeta>();
   (moves || []).forEach((m: any) => {
+    const comp = compMap.get(m.competency_id);
     map.set(m.id, {
       statement: m.action_statement || '',
-      domain: compMap.get(m.competency_id) || '',
+      domain: comp?.domain || '',
+      competencyName: comp?.name || '',
+      description: m.description ?? null,
     });
   });
   return map;

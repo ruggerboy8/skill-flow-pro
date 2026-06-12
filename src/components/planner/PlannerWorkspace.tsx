@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { WeekBuilderPanel, type WeekBuilderPanelRef } from './WeekBuilderPanel';
-import { LibraryPanel } from './LibraryPanel';
+import { LibraryPanel, type BenchId } from './LibraryPanel';
 import { HistoryStrip } from './HistoryStrip';
 
 interface PlannerWorkspaceProps {
@@ -13,7 +13,7 @@ interface PlannerWorkspaceProps {
 export function PlannerWorkspace({ roleId, roleName, orgId, practiceType }: PlannerWorkspaceProps) {
   const weekBuilderRef = useRef<WeekBuilderPanelRef>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ weekStart: string; displayOrder: number } | null>(null);
-  const [benchIds, setBenchIds] = useState<number[]>([]);
+  const [benchIds, setBenchIds] = useState<BenchId[]>([]);
 
   const handleSlotActivate = (weekStart: string, displayOrder: number) => {
     setSelectedSlot(prev =>
@@ -27,9 +27,9 @@ export function PlannerWorkspace({ roleId, roleName, orgId, practiceType }: Plan
     setSelectedSlot(null);
   };
 
-  const handleBenchToggle = (actionId: number) => {
+  const handleBenchToggle = (benchId: BenchId) => {
     setBenchIds(prev =>
-      prev.includes(actionId) ? prev.filter(id => id !== actionId) : [...prev, actionId]
+      prev.includes(benchId) ? prev.filter(id => id !== benchId) : [...prev, benchId]
     );
   };
 

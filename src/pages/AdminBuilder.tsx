@@ -30,6 +30,7 @@ const GRID_COLS: Record<number, string> = {
 
 export default function AdminBuilder() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { canManageAssignments, organizationId, practiceType, isLoading, isSuperAdmin } = useUserRole();
   const [plannerRoles, setPlannerRoles] = useState<PlannerRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);

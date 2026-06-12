@@ -31,3 +31,34 @@ export async function fetchProMoveMetaByIds(actionIds: number[]) {
   });
   return map;
 }
+
+export async function fetchOrgProMoveMetaByIds(orgMoveIds: string[]) {
+  if (!orgMoveIds.length) return new Map<string, { statement: string; domain: string }>();
+
+  const { data: moves } = await supabase
+    .from('organization_pro_moves')
+    .select('id, action_statement, competency_id')
+    .in('id', orgMoveIds);
+
+  const compIds = Array.from(new Set((moves || []).map(m => m.competency_id).filter(Boolean)));
+  const compMap = new Map<number, string>();
+
+  if (compIds.length > 0) {
+    const { data: comps } = await supabase
+      .from('competencies')
+      .select('competency_id, domains:fk_competencies_domain_id(domain_name)')
+      .in('competency_id', compIds);
+    (comps || []).forEach(c => {
+      compMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
+    });
+  }
+
+  const map = new Map<string, { statement: string; domain: string }>();
+  (moves || []).forEach((m: any) => {
+    map.set(m.id, {
+      statement: m.action_statement || '',
+      domain: compMap.get(m.competency_id) || '',
+    });
+  });
+  return map;
+}

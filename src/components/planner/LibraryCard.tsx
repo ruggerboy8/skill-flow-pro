@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { getDomainColor } from '@/lib/domainColors';
 
 interface LibraryCardProps {
-  actionId: number;
+  actionId?: number;
+  orgMoveId?: string;
   name: string;
   domainName: string;
   reason?: string;
@@ -15,6 +16,7 @@ interface LibraryCardProps {
 
 export function LibraryCard({
   actionId,
+  orgMoveId,
   name,
   domainName,
   reason,
@@ -30,7 +32,10 @@ export function LibraryCard({
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'copy';
-        e.dataTransfer.setData('application/json', JSON.stringify({ actionId }));
+        e.dataTransfer.setData('application/json', JSON.stringify({
+          actionId: actionId ?? null,
+          orgMoveId: orgMoveId ?? null,
+        }));
       }}
       className="group flex items-stretch gap-0 border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-grab active:cursor-grabbing overflow-hidden"
     >
@@ -61,7 +66,7 @@ export function LibraryCard({
       {/* Actions */}
       <div className="flex flex-col items-center justify-center gap-1 px-2 flex-none">
         <GripVertical className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-        {onPin && (
+        {onPin && actionId && (
           <button
             onClick={(e) => { e.stopPropagation(); onPin(); }}
             className="text-muted-foreground/50 hover:text-primary transition-colors"

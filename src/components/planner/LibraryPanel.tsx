@@ -14,10 +14,12 @@ import { fetchProMoveMetaByIds } from '@/lib/proMoves';
 import { formatWeekOf } from '@/lib/plannerUtils';
 
 interface BrowseMove {
-  action_id: number;
+  action_id?: number;
+  orgMoveId?: string;
   action_statement: string;
   domain_name: string;
   competency_name: string;
+  isOrgCustom: boolean;
 }
 
 interface BenchMove {
@@ -32,7 +34,7 @@ interface LibraryPanelProps {
   orgId?: string;
   practiceType?: string;
   selectedSlot: { weekStart: string; displayOrder: number } | null;
-  onSelect: (actionId: number) => void;
+  onSelect: (actionId: number | null, orgMoveId?: string | null) => void;
   benchIds: number[];
   onBenchToggle: (actionId: number) => void;
   excludeActionIds?: number[];
@@ -172,24 +174,62 @@ export function LibraryPanel({
     if (browseMoves.length > 0) return;
     setBrowseLoading(true);
     try {
-      const { data } = await supabase
-        .from('pro_moves')
-        .select(`
-          action_id, action_statement,
-          competencies!fk_pro_moves_competency_id(
-            name,
-            domains!fk_competencies_domain_id(domain_name)
-          )
-        `)
-        .eq('role_id', roleId)
-        .eq('active', true)
-        .order('action_id');
-      setBrowseMoves((data ?? []).map((m: any) => ({
+      const [platformResult, orgResult] = await Promise.all([
+        supabase
+          .from('pro_moves')
+          .select(`
+            action_id, action_statement,
+            competencies!fk_pro_moves_competency_id(
+              name,
+              domains!fk_competencies_domain_id(domain_name)
+            )
+          `)
+          .eq('role_id', roleId)
+          .eq('active', true)
+          .order('action_id'),
+        orgId
+          ? supabase
+              .from('organization_pro_moves')
+              .select('id, action_statement, competency_id')
+              .eq('org_id', orgId)
+              .eq('role_id', roleId)
+              .eq('active', true)
+              .order('sort_order')
+          : Promise.resolve({ data: null }),
+      ]);
+
+      const platformMoves: BrowseMove[] = (platformResult.data ?? []).map((m: any) => ({
         action_id: m.action_id,
         action_statement: m.action_statement,
         domain_name: m.competencies?.domains?.domain_name ?? '—',
         competency_name: m.competencies?.name ?? '—',
-      })));
+        isOrgCustom: false,
+      }));
+
+      let orgMoves: BrowseMove[] = [];
+      if (orgResult.data && orgResult.data.length > 0) {
+        const compIds = Array.from(new Set(orgResult.data.map((m: any) => m.competency_id).filter(Boolean)));
+        const compMap = new Map<number, string>();
+        if (compIds.length > 0) {
+          const { data: comps } = await supabase
+            .from('competencies')
+            .select('competency_id, domains:fk_competencies_domain_id(domain_name)')
+            .in('competency_id', compIds);
+          (comps || []).forEach(c => {
+            compMap.set(c.competency_id, (c.domains as any)?.domain_name || '');
+          });
+        }
+        orgMoves = orgResult.data.map((m: any) => ({
+          orgMoveId: m.id,
+          action_statement: m.action_statement,
+          domain_name: compMap.get(m.competency_id) || '—',
+          competency_name: '—',
+          isOrgCustom: true,
+        }));
+      }
+
+      // Org custom moves appear first
+      setBrowseMoves([...orgMoves, ...platformMoves]);
     } finally {
       setBrowseLoading(false);
     }
@@ -212,12 +252,12 @@ export function LibraryPanel({
     }
   };
 
-  const handleSelect = (actionId: number) => {
+  const handleSelect = (actionId: number | null, orgMoveId?: string | null) => {
     if (!selectedSlot) {
       toast({ title: 'Select a slot first', description: 'Click a slot in the week builder, then pick a move.' });
       return;
     }
-    onSelect(actionId);
+    onSelect(actionId, orgMoveId);
   };
 
   const hasActiveSlot = !!selectedSlot;
@@ -232,7 +272,7 @@ export function LibraryPanel({
     !browseSearch ||
     m.action_statement.toLowerCase().includes(browseSearch.toLowerCase()) ||
     m.domain_name.toLowerCase().includes(browseSearch.toLowerCase()) ||
-    m.competency_name.toLowerCase().includes(browseSearch.toLowerCase())
+    (m.competency_name && m.competency_name.toLowerCase().includes(browseSearch.toLowerCase()))
   );
 
   const tabCount = (n: number) => n > 0 ? ` (${n})` : '';
@@ -382,18 +422,22 @@ export function LibraryPanel({
             {browseLoading ? (
               [1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-16 w-full rounded-lg" />)
             ) : (
-              filteredBrowse.map(m => (
-                <LibraryCard
-                  key={m.action_id}
-                  actionId={m.action_id}
-                  name={m.action_statement}
-                  domainName={m.domain_name}
-                  isPinned={benchIds.includes(m.action_id)}
-                  onPin={() => onBenchToggle(m.action_id)}
-                  onSelect={() => handleSelect(m.action_id)}
-                  hasActiveSlot={hasActiveSlot}
-                />
-              ))
+              filteredBrowse.map(m => {
+                const cardKey = m.orgMoveId ? `org-${m.orgMoveId}` : `platform-${m.action_id}`;
+                return (
+                  <LibraryCard
+                    key={cardKey}
+                    actionId={m.action_id}
+                    orgMoveId={m.orgMoveId}
+                    name={m.isOrgCustom ? `★ ${m.action_statement}` : m.action_statement}
+                    domainName={m.domain_name}
+                    isPinned={m.action_id ? benchIds.includes(m.action_id) : false}
+                    onPin={m.action_id ? () => onBenchToggle(m.action_id!) : undefined}
+                    onSelect={() => handleSelect(m.action_id ?? null, m.orgMoveId)}
+                    hasActiveSlot={hasActiveSlot}
+                  />
+                );
+              })
             )}
             {!browseLoading && filteredBrowse.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-8">No moves match your search.</p>

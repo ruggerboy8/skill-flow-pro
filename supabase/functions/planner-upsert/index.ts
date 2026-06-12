@@ -11,12 +11,27 @@ async function getCompetencyId(supabase: any, actionId: number): Promise<number 
     .select('competency_id')
     .eq('action_id', actionId)
     .single()
-  
+
   if (error || !data) {
     console.error(`Failed to lookup competency_id for action_id ${actionId}:`, error)
     return null
   }
-  
+
+  return data.competency_id
+}
+
+async function getOrgMoveCompetencyId(supabase: any, orgMoveId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('organization_pro_moves')
+    .select('competency_id')
+    .eq('id', orgMoveId)
+    .single()
+
+  if (error || !data) {
+    console.error(`Failed to lookup competency_id for org_move_id ${orgMoveId}:`, error)
+    return null
+  }
+
   return data.competency_id
 }
 
@@ -33,6 +48,7 @@ interface SaveWeekRequest {
   picks: Array<{
     displayOrder: 1 | 2 | 3
     actionId: number | null
+    orgMoveId?: string | null
     generatedBy: 'manual' | 'auto'
     rankSnapshot?: {
       parts: { C: number; R: number; E: number; D: number; T: number }
@@ -116,6 +132,8 @@ Deno.serve(async (req) => {
 
         const { data: existing } = await existingQuery.maybeSingle()
 
+        const hasMove = (pick.actionId && pick.actionId !== 0) || pick.orgMoveId
+
         if (existing) {
           // Check if locked (has scores)
           const { count } = await supabase
@@ -133,8 +151,8 @@ Deno.serve(async (req) => {
             continue
           }
 
-          // If actionId is null, delete the row
-          if (pick.actionId === null || pick.actionId === 0) {
+          // If no move (null/0 actionId and no orgMoveId), delete the row
+          if (!hasMove) {
             const { error: deleteError } = await supabase
               .from('weekly_assignments')
               .delete()
@@ -150,14 +168,17 @@ Deno.serve(async (req) => {
               displayOrder: pick.displayOrder,
             })
           } else {
-            // Lookup competency_id
-            const competencyId = await getCompetencyId(supabase, pick.actionId)
-            
+            // Lookup competency_id from the right source
+            const competencyId = pick.orgMoveId
+              ? await getOrgMoveCompetencyId(supabase, pick.orgMoveId)
+              : await getCompetencyId(supabase, pick.actionId!)
+
             // Update existing row
             const { error: updateError } = await supabase
               .from('weekly_assignments')
               .update({
-                action_id: pick.actionId,
+                action_id: pick.orgMoveId ? null : pick.actionId,
+                org_move_id: pick.orgMoveId ?? null,
                 competency_id: competencyId,
                 source: orgId ? 'org' : 'global',
                 status: 'locked',
@@ -177,11 +198,13 @@ Deno.serve(async (req) => {
               actionId: pick.actionId,
             })
           }
-        } else if (pick.actionId && pick.actionId !== 0) {
-          // Lookup competency_id
-          const competencyId = await getCompetencyId(supabase, pick.actionId)
-          
-          // Insert new row only if actionId is not null/0
+        } else if (hasMove) {
+          // Lookup competency_id from the right source
+          const competencyId = pick.orgMoveId
+            ? await getOrgMoveCompetencyId(supabase, pick.orgMoveId)
+            : await getCompetencyId(supabase, pick.actionId!)
+
+          // Insert new row only when a move is selected
           const { data: inserted, error: insertError } = await supabase
             .from('weekly_assignments')
             .insert({
@@ -190,7 +213,8 @@ Deno.serve(async (req) => {
               role_id: roleId,
               week_start_date: weekStartDate,
               display_order: pick.displayOrder,
-              action_id: pick.actionId,
+              action_id: pick.orgMoveId ? null : pick.actionId,
+              org_move_id: pick.orgMoveId ?? null,
               competency_id: competencyId,
               source: orgId ? 'org' : 'global',
               status: 'locked',

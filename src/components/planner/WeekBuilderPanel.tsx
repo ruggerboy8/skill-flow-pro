@@ -9,7 +9,7 @@ import { normalizeToPlannerWeek, formatWeekOf } from '@/lib/plannerUtils';
 import { ProMovePickerDialog } from './ProMovePickerDialog';
 import { SmartSlotPicker } from './SmartSlotPicker';
 import type { RankedMove } from '@/lib/sequencerAdapter';
-import { fetchProMoveMetaByIds } from '@/lib/proMoves';
+import { fetchProMoveMetaByIds, fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
 import { getDomainColor } from '@/lib/domainColors';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,6 +22,7 @@ import { MonthView } from './MonthView';
 interface WeekSlot {
   displayOrder: 1 | 2 | 3;
   actionId: number | null;
+  orgMoveId: string | null;
   actionStatement: string;
   domainName: string;
   status?: string;
@@ -43,7 +44,7 @@ interface WeekAssignment {
 }
 
 export interface WeekBuilderPanelRef {
-  selectMove: (actionId: number, weekStart: string, displayOrder: number) => Promise<void>;
+  selectMove: (actionId: number | null, weekStart: string, displayOrder: number, orgMoveId?: string | null) => Promise<void>;
 }
 
 interface WeekBuilderPanelProps {
@@ -128,7 +129,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
     // Use weekly_assignments table — scope to this org if orgId is present, else global
     let weekQuery = supabase
       .from('weekly_assignments')
-      .select('id, display_order, action_id, status, week_start_date')
+      .select('id, display_order, action_id, org_move_id, status, week_start_date')
       .is('location_id', null)
       .eq('role_id', roleId)
       .in('week_start_date', mondays)
@@ -168,10 +169,12 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
       });
     }
 
-    // Collect all action IDs for batch fetch
+    // Collect action IDs and org move IDs for batch fetch
     const allActionIds = new Set<number>();
+    const allOrgMoveIds = new Set<string>();
     (assignmentRows || []).forEach(row => {
       if (row.action_id) allActionIds.add(row.action_id);
+      if (row.org_move_id) allOrgMoveIds.add(row.org_move_id);
     });
 
     // Build week structures
@@ -180,6 +183,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
       slots: [1, 2, 3].map(order => ({
         displayOrder: order as 1 | 2 | 3,
         actionId: null,
+        orgMoveId: null,
         actionStatement: '',
         domainName: '',
         status: 'empty',
@@ -194,6 +198,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
       if (week && row.display_order >= 1 && row.display_order <= 3) {
         const slot = week.slots[row.display_order - 1];
         slot.actionId = row.action_id || null;
+        slot.orgMoveId = row.org_move_id || null;
         slot.status = row.status || 'proposed';
         slot.planId = row.id;
         slot.generatedBy = row.generated_by === 'auto' ? 'auto' : 'manual';
@@ -203,19 +208,25 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
       }
     });
 
-    // Fetch pro-move meta for all action_ids
-    if (allActionIds.size > 0) {
-      const meta = await fetchProMoveMetaByIds(Array.from(allActionIds));
-      weeks.forEach(week => {
-        week.slots.forEach(slot => {
-          if (slot.actionId && meta.has(slot.actionId)) {
-            const moveData = meta.get(slot.actionId);
-            slot.actionStatement = moveData?.statement || '';
-            slot.domainName = moveData?.domain || '';
-          }
-        });
+    // Fetch pro-move meta for all action_ids and org_move_ids
+    const [platformMeta, orgMeta] = await Promise.all([
+      allActionIds.size > 0 ? fetchProMoveMetaByIds(Array.from(allActionIds)) : Promise.resolve(new Map()),
+      allOrgMoveIds.size > 0 ? fetchOrgProMoveMetaByIds(Array.from(allOrgMoveIds)) : Promise.resolve(new Map()),
+    ]);
+
+    weeks.forEach(week => {
+      week.slots.forEach(slot => {
+        if (slot.actionId && platformMeta.has(slot.actionId)) {
+          const moveData = platformMeta.get(slot.actionId);
+          slot.actionStatement = moveData?.statement || '';
+          slot.domainName = moveData?.domain || '';
+        } else if (slot.orgMoveId && orgMeta.has(slot.orgMoveId)) {
+          const moveData = orgMeta.get(slot.orgMoveId);
+          slot.actionStatement = moveData?.statement || '';
+          slot.domainName = moveData?.domain || '';
+        }
       });
-    }
+    });
 
     setWeeks(weeks);
     // Load excused weeks
@@ -317,6 +328,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
       const picks = week.slots.map(s => ({
         displayOrder: s.displayOrder as 1 | 2 | 3,
         actionId: s.actionId || null,
+        orgMoveId: s.orgMoveId || null,
         generatedBy: 'manual' as const,
         rankSnapshot: s.rankSnapshot || null,
       }));
@@ -342,35 +354,47 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
     }
   };
 
-  const handleSelectProMove = async (actionId: number, weekStart?: string, displayOrder?: number) => {
+  const handleSelectProMove = async (actionId: number | null, weekStart?: string, displayOrder?: number, orgMoveId?: string | null) => {
     const targetWeek = weekStart || selectedSlot?.weekStart;
     const targetOrder = displayOrder || selectedSlot?.displayOrder;
-    
+
     if (!targetWeek || !targetOrder) return;
 
-    // Fetch pro-move details using unified helper
-    const metaMap = await fetchProMoveMetaByIds([actionId]);
-    const meta = metaMap.get(actionId);
+    // Fetch meta from the appropriate source
+    let statement = '';
+    let domain = '';
+    if (orgMoveId) {
+      const metaMap = await fetchOrgProMoveMetaByIds([orgMoveId]);
+      const meta = metaMap.get(orgMoveId);
+      statement = meta?.statement || '';
+      domain = meta?.domain || '';
+    } else if (actionId) {
+      const metaMap = await fetchProMoveMetaByIds([actionId]);
+      const meta = metaMap.get(actionId);
+      statement = meta?.statement || '';
+      domain = meta?.domain || '';
+    }
 
     // Update local state
-    const updatedWeeks = weeks.map(w => 
-      w.weekStart === targetWeek 
+    const updatedWeeks = weeks.map(w =>
+      w.weekStart === targetWeek
         ? {
             ...w,
-            slots: w.slots.map(s => 
+            slots: w.slots.map(s =>
               s.displayOrder === targetOrder
-                ? { 
-                    ...s, 
-                    actionId,
-                    actionStatement: meta?.statement || '',
-                    domainName: meta?.domain || ''
+                ? {
+                    ...s,
+                    actionId: orgMoveId ? null : actionId,
+                    orgMoveId: orgMoveId ?? null,
+                    actionStatement: statement,
+                    domainName: domain,
                   }
                 : s
             )
           }
         : w
     );
-    
+
     setWeeks(updatedWeeks);
     setPickerOpen(false);
     const updated = updatedWeeks.find(w => w.weekStart === targetWeek);
@@ -755,23 +779,35 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
                         try {
                           const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
                           const data = JSON.parse(raw);
-                          
-                          // Fetch pro-move details
-                          const metaMap = await fetchProMoveMetaByIds([data.actionId]);
-                          const meta = metaMap.get(data.actionId);
-                          
+
+                          // Fetch pro-move details from the right source
+                          let statement = '';
+                          let domain = '';
+                          if (data.orgMoveId) {
+                            const metaMap = await fetchOrgProMoveMetaByIds([data.orgMoveId]);
+                            const meta = metaMap.get(data.orgMoveId);
+                            statement = meta?.statement || '';
+                            domain = meta?.domain || '';
+                          } else if (data.actionId) {
+                            const metaMap = await fetchProMoveMetaByIds([data.actionId]);
+                            const meta = metaMap.get(data.actionId);
+                            statement = meta?.statement || data.actionStatement || '';
+                            domain = meta?.domain || data.domainName || '';
+                          }
+
                           // Update local state with rankSnapshot
-                          const updatedWeeks = weeks.map(w => 
-                            w.weekStart === week.weekStart 
+                          const updatedWeeks = weeks.map(w =>
+                            w.weekStart === week.weekStart
                               ? {
                                   ...w,
-                                  slots: w.slots.map(s => 
+                                  slots: w.slots.map(s =>
                                     s.displayOrder === slot.displayOrder
                                       ? {
                                           ...s,
-                                          actionId: data.actionId,
-                                          actionStatement: meta?.statement || data.actionStatement || '',
-                                          domainName: meta?.domain || data.domainName || '',
+                                          actionId: data.orgMoveId ? null : (data.actionId || null),
+                                          orgMoveId: data.orgMoveId || null,
+                                          actionStatement: statement,
+                                          domainName: domain,
                                           rankSnapshot: data.rankSnapshot || null,
                                           generatedBy: 'manual' as const,
                                           aiRationale: null,
@@ -827,7 +863,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
                             AI
                           </Badge>
                         )}
-                        {!slot.isLocked && slot.actionId && slot.generatedBy !== 'auto' && (
+                        {!slot.isLocked && (slot.actionId || slot.orgMoveId) && slot.generatedBy !== 'auto' && (
                           <Badge variant="outline" className="text-xs gap-1">
                             <Edit3 className="h-3 w-3" />
                             Editable
@@ -835,7 +871,7 @@ export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanel
                         )}
                       </div>
 
-                      {slot.actionId ? (
+                      {(slot.actionId || slot.orgMoveId) ? (
                         <div className="space-y-1">
                           <div className="text-sm font-medium line-clamp-2">
                             {slot.actionStatement || 'Pro-Move'}

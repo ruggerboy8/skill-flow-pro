@@ -21,9 +21,9 @@ export function PlannerWorkspace({ roleId, roleName, orgId, practiceType }: Plan
     );
   };
 
-  const handleSelectMove = async (actionId: number) => {
+  const handleSelectMove = async (actionId: number | null, orgMoveId?: string | null) => {
     if (!selectedSlot) return;
-    await weekBuilderRef.current?.selectMove(actionId, selectedSlot.weekStart, selectedSlot.displayOrder);
+    await weekBuilderRef.current?.selectMove(actionId, selectedSlot.weekStart, selectedSlot.displayOrder, orgMoveId);
     setSelectedSlot(null);
   };
 

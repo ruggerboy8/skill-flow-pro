@@ -57,6 +57,8 @@ interface WeekBuilderPanelProps {
   onSlotActivate?: (weekStart: string, displayOrder: number) => void;
   /** Highlights the currently active slot (set by parent when using integrated library) */
   activeSlot?: { weekStart: string; displayOrder: number } | null;
+  /** Notifies parent of the currently visible week Mondays so stale selections can be cleared. */
+  onActiveWeeksChange?: (weekStarts: string[]) => void;
 }
 
 export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanelProps>(function WeekBuilderPanel({

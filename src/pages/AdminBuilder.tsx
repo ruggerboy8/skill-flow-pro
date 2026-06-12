@@ -1,17 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, BarChart2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { OrgProMoveLibraryTab } from "@/components/admin/OrgProMoveLibraryTab";
-import { RecommenderPanel } from "@/components/planner/RecommenderPanel";
-import { WeekBuilderPanel } from "@/components/planner/WeekBuilderPanel";
-import { WeekSignalSummary } from "@/components/planner/WeekSignalSummary";
+import { PlannerWorkspace } from "@/components/planner/PlannerWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { ARCHETYPES, type ArchetypeCode } from "@/lib/roleArchetypes";
-import { adaptSequencerResponse, type RankedMove } from "@/lib/sequencerAdapter";
 
 interface PlannerRole {
   role_id: number;
@@ -132,8 +129,8 @@ export default function AdminBuilder() {
         </TabsList>
 
         {plannerRoles.map(r => (
-          <TabsContent key={r.role_id} value={`role-${r.role_id}`} className="space-y-6">
-            <PlannerTabContent
+          <TabsContent key={r.role_id} value={`role-${r.role_id}`} className="h-[calc(100vh-220px)]">
+            <PlannerWorkspace
               roleId={r.role_id}
               roleName={r.display_name}
               orgId={organizationId}
@@ -151,79 +148,3 @@ export default function AdminBuilder() {
   );
 }
 
-function PlannerTabContent({
-  roleId,
-  roleName,
-  orgId,
-  practiceType,
-}: {
-  roleId: number;
-  roleName: string;
-  orgId?: string;
-  practiceType?: string;
-}) {
-  const [rankedMoves, setRankedMoves] = useState<RankedMove[]>([]);
-  const [rankLoading, setRankLoading] = useState(false);
-  const [showSignalView, setShowSignalView] = useState(false);
-
-  const loadRankedMoves = useCallback(async () => {
-    setRankLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('sequencer-rank', {
-        body: {
-          roleId,
-          orgId,
-          preset: 'balanced',
-          lookbackWeeks: 9,
-          practiceType,
-          constraints: { cooldownWeeks: 4, minDistinctDomains: 2 },
-        },
-      });
-      if (error) throw error;
-      const adapted = adaptSequencerResponse(data);
-      setRankedMoves(adapted);
-    } catch {
-      setRankedMoves([]);
-    } finally {
-      setRankLoading(false);
-    }
-  }, [roleId, orgId, practiceType]);
-
-  useEffect(() => {
-    loadRankedMoves();
-  }, [loadRankedMoves]);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <Button variant="ghost" size="sm" onClick={() => setShowSignalView(v => !v)}>
-          <BarChart2 className="h-4 w-4 mr-1.5" />
-          {showSignalView ? 'Hide Signal View' : 'Signal View'}
-        </Button>
-      </div>
-      <WeekSignalSummary rankedMoves={rankedMoves} loading={rankLoading} roleName={roleName} />
-      <div className="flex gap-4">
-        {showSignalView && (
-          <div className="w-[360px] flex-none max-h-[calc(100vh-280px)] overflow-y-auto">
-            <RecommenderPanel
-              roleId={roleId}
-              roleName={roleName}
-              practiceType={practiceType}
-              orgId={orgId}
-              rankedMovesOverride={rankedMoves}
-            />
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <WeekBuilderPanel
-            roleId={roleId}
-            roleName={roleName}
-            orgId={orgId}
-            practiceType={practiceType}
-            rankedMoves={rankedMoves}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}

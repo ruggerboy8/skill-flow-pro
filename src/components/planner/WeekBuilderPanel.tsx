@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,21 +42,31 @@ interface WeekAssignment {
   slots: WeekSlot[];
 }
 
+export interface WeekBuilderPanelRef {
+  selectMove: (actionId: number, weekStart: string, displayOrder: number) => Promise<void>;
+}
+
 interface WeekBuilderPanelProps {
   roleId: number;
   roleName: string;
   orgId?: string;
   practiceType?: string;
   rankedMoves?: RankedMove[];
+  /** When provided, slot clicks call this instead of opening the internal picker */
+  onSlotActivate?: (weekStart: string, displayOrder: number) => void;
+  /** Highlights the currently active slot (set by parent when using integrated library) */
+  activeSlot?: { weekStart: string; displayOrder: number } | null;
 }
 
-export function WeekBuilderPanel({
+export const WeekBuilderPanel = forwardRef<WeekBuilderPanelRef, WeekBuilderPanelProps>(function WeekBuilderPanel({
   roleId,
   roleName,
   orgId,
   practiceType,
   rankedMoves,
-}: WeekBuilderPanelProps) {
+  onSlotActivate,
+  activeSlot,
+}, ref) {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [selectedMonday, setSelectedMonday] = useState(normalizeToPlannerWeek(new Date()));
@@ -75,6 +85,10 @@ export function WeekBuilderPanel({
   const [autoFillingWeek, setAutoFillingWeek] = useState<string | null>(null);
 
   const currentMonday = normalizeToPlannerWeek(new Date());
+
+  useImperativeHandle(ref, () => ({
+    selectMove: handleSelectProMove,
+  }));
 
   useEffect(() => {
     checkSuperAdmin();
@@ -715,7 +729,11 @@ export function WeekBuilderPanel({
                   {week.slots.map((slot) => (
                     <div
                       key={slot.displayOrder}
-                      className="border rounded-lg p-3 space-y-2 bg-card"
+                      className={`border rounded-lg p-3 space-y-2 bg-card transition-shadow ${
+                        activeSlot?.weekStart === week.weekStart && activeSlot?.displayOrder === slot.displayOrder
+                          ? 'ring-2 ring-primary ring-offset-1'
+                          : ''
+                      }`}
                       onDragOver={(e) => {
                         if (!slot.isLocked) {
                           e.preventDefault();
@@ -844,8 +862,12 @@ export function WeekBuilderPanel({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
-                                  setSelectedSlot({ weekStart: week.weekStart, displayOrder: slot.displayOrder });
-                                  setPickerOpen(true);
+                                  if (onSlotActivate) {
+                                    onSlotActivate(week.weekStart, slot.displayOrder);
+                                  } else {
+                                    setSelectedSlot({ weekStart: week.weekStart, displayOrder: slot.displayOrder });
+                                    setPickerOpen(true);
+                                  }
                                 }}
                                 className="h-7 text-xs"
                               >
@@ -867,8 +889,12 @@ export function WeekBuilderPanel({
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            setSelectedSlot({ weekStart: week.weekStart, displayOrder: slot.displayOrder });
-                            setPickerOpen(true);
+                            if (onSlotActivate) {
+                              onSlotActivate(week.weekStart, slot.displayOrder);
+                            } else {
+                              setSelectedSlot({ weekStart: week.weekStart, displayOrder: slot.displayOrder });
+                              setPickerOpen(true);
+                            }
                           }}
                           className="w-full text-xs"
                         >
@@ -962,4 +988,4 @@ export function WeekBuilderPanel({
       </AlertDialog>
     </>
   );
-}
+});

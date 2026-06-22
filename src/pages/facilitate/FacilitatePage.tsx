@@ -277,7 +277,7 @@ function MaterialCard({ pm }: { pm: WeekProMove }) {
   const toggleAudio = () => {
     const a = audioRef.current;
     if (!a) return;
-    if (a.paused) a.play(); else a.pause();
+    if (a.paused) a.play().catch(() => setPlaying(false)); else a.pause();
   };
   return (
     <div className={`p-10 flex flex-col ${glass} ${CARD} animate-in slide-in-from-right-4 fade-in duration-300`}>
@@ -310,7 +310,8 @@ function MaterialCard({ pm }: { pm: WeekProMove }) {
             ))}
             {audio && (
               <audio ref={audioRef} src={audio.url!} className="hidden"
-                onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
+                onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
+                onEnded={() => setPlaying(false)} onError={() => setPlaying(false)} />
             )}
           </section>
         )}

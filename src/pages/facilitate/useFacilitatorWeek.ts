@@ -61,8 +61,13 @@ export function useFacilitatorWeek(role: Role) {
           .eq("status", "active")
           .order("display_order");
         (res ?? []).forEach((r: any) => {
-          (byAction[r.action_id] ??= []).push({
-            type: r.type, title: r.title, url: r.url,
+          // Audio urls are storage paths in the public 'pro-move-audio' bucket; resolve
+        // them to playable public URLs (mirrors ProMoveDrawer).
+        const url = r.type === "audio" && r.url
+          ? supabase.storage.from("pro-move-audio").getPublicUrl(r.url).data.publicUrl
+          : r.url;
+        (byAction[r.action_id] ??= []).push({
+            type: r.type, title: r.title, url,
             contentMd: r.content_md, durationMs: r.duration_ms,
           });
         });

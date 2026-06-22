@@ -1,5 +1,14 @@
 # Security & RLS Audit — Skill Flow Pro
 
+> ## ✅ Fixes applied (2026-06-22)
+> The three confirmed holes — **Fix 2 (staff cross-org / super-admin escalation)**, **Fix 1
+> (weekly_scores public backfill UPDATE/DELETE)**, and the **evaluation pre-release read** — were
+> applied to the live database and verified against `pg_policies`. SQL recorded in
+> [applied-rls-fixes-2026-06-22.sql](applied-rls-fixes-2026-06-22.sql) (migration
+> `security_rls_hardening_2026_06_22`). Still open: the hardening backlog (Postgres upgrade,
+> `function_search_path_mutable`, security-definer views, public storage buckets, auth settings)
+> and the latent `user_capabilities` admin-write org scoping.
+>
 > ## ⚠️ Live-verification addendum (2026-06-22, added by main session)
 > The original report below was reconstructed from migrations only (the subagent's live-DB tools
 > were blocked). The main session subsequently queried **live `pg_policies` and Supabase security

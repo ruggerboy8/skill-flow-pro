@@ -6,6 +6,11 @@ discussed, then graduate to the roadmap when we decide to act. Started 2026-06-2
 
 **Status legend:** 🟡 candidate (not yet decided) · 🟢 agreed, queued · 🔵 in progress · ✅ done
 
+> **Current focus (2026-06-22):** building **NF6 — HR offboarding export** (#1) then **NF4 —
+> facilitator presentation** (#2). Specs in [docs/features/](features/). The **evaluation rework**
+> (see [audits/evaluation-flow-analysis.md](audits/evaluation-flow-analysis.md) + EX1–EX4) is
+> **parked next** — do not resurface until the two features above are done.
+
 ---
 
 ## A. Legacy retirement candidates
@@ -78,9 +83,9 @@ exhaustive; cross-referenced to audit findings and other backlog items where the
 | NF1 | **Automated reminders + org-admin notification settings** | Replace manual button-press reminders with a scheduled (cron) job. Give org admins control over how/when their people get notifications & email reminders. (Builds on `coach-remind` / `reminder_*` tables.) | 🟡 |
 | NF2 | **AI insights** | Leverage the growing data (some of this is already documented elsewhere). | 🟡 |
 | NF3 | **Staff free-response reflections** | Let staff record free-text reflections on Pro Moves or their general experience. Triangulate evaluations ↔ staff sentiment ↔ doctor coaching to generate far more insight. (Pairs with NF2.) | 🟡 |
-| NF4 | **Native meeting presentation / facilitation** | Move the Mon/Thu(or Fri) Pro Move meeting deck out of Canva into the app. Must: auto-generate a get-to-know-you question the presenter can click through until satisfied; show the week's Pro Moves for a selected position (RDA / DFI); be visually appealing for facilitation; pull up resources/scripting attached to those Pro Moves. | 🟡 |
+| NF4 | **Native meeting presentation / facilitation** | Move the Mon/Thu(or Fri) Pro Move meeting deck out of Canva into the app. Must: auto-generate a get-to-know-you question the presenter can click through until satisfied; show the week's Pro Moves for a selected position (RDA / DFI); be visually appealing for facilitation; pull up resources/scripting attached to those Pro Moves. **Scoped → [features/facilitator-presentation.md](features/facilitator-presentation.md).** | 🔵 |
 | NF5 | **Staff-facing patient-journey summary** | A scrollable summary of what the patient journey should entail; adopt "patient journey" language more broadly. John has a prototype from another Claude session to show. | 🟡 |
-| NF6 | **User status management / HR integration** | Use the Deputy integration to detect new staff & their positions and provision more automatically. On termination: when a fired user is deleted, roll up all their relevant data and send it to HR for retention *before* deletion. (Ties to GDPR erasure/retention — roadmap S1.) | 🟡 |
+| NF6 | **User status management / HR integration** | Use the Deputy integration to detect new staff & their positions and provision more automatically. On termination: when a fired user is deleted, roll up all their relevant data and send it to HR for retention *before* deletion. (Ties to GDPR erasure/retention — roadmap S1.) **Scoped → [features/hr-offboarding-export.md](features/hr-offboarding-export.md).** | 🔵 |
 
 ---
 

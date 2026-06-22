@@ -19,7 +19,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { gatherStaffRecord } from "@/lib/hrExport";
 import { buildRecordPdf, recordFilename } from "@/lib/hrExportPdf";
 
@@ -86,7 +85,6 @@ export function AdminUsersTab() {
   const [sendToHr, setSendToHr] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const usersPerPage = 25;
@@ -249,15 +247,18 @@ export function AdminUsersTab() {
 
   const handlePreviewRecord = async () => {
     if (!userToDelete) return;
+    // Open a blank tab synchronously (within the click gesture) so popup blockers allow it,
+    // then point it at the generated PDF. A new tab renders reliably; an inline iframe of a
+    // blob PDF can show as a black box.
+    const win = window.open("", "_blank");
     setPreviewing(true);
     try {
       const { doc } = await gatherDoc(userToDelete);
-      const blob = doc.output("blob");
-      setPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return URL.createObjectURL(blob);
-      });
+      const url = URL.createObjectURL(doc.output("blob"));
+      if (win) win.location.href = url;
+      else window.open(url, "_blank");
     } catch (error) {
+      if (win) win.close();
       console.error("Error building record preview:", error);
       toast({ title: "Error", description: "Could not build the record preview", variant: "destructive" });
     } finally {
@@ -697,15 +698,6 @@ const handleResendInvite = async (user: User) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={!!previewUrl} onOpenChange={(o) => { if (!o) { if (previewUrl) URL.revokeObjectURL(previewUrl); setPreviewUrl(null); } }}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Record preview — {userToDelete?.name}</DialogTitle>
-          </DialogHeader>
-          {previewUrl && <iframe src={previewUrl} title="Record preview" className="w-full h-[75vh] rounded-md border" />}
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

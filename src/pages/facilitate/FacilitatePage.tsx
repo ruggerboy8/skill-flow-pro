@@ -157,17 +157,15 @@ export default function FacilitatePage() {
                 </div>
               ) : (
                 <>
-                  {/* Reserve the right slot so the pro-move card (and its toggle) never move */}
-                  <div className="mx-auto flex gap-8 w-[70rem] items-stretch">
+                  {/* Wide + centered by default; shrinks to the paired size when material opens */}
+                  <div className="flex gap-8 justify-center items-stretch">
                     <ProMoveCard pm={proMoves[safeIndex]} index={safeIndex} total={proMoves.length}
                       showMaterial={showMaterial} setShowMaterial={setShowMaterial} />
-                    <div className="w-[34rem] shrink-0">
-                      {showMaterial && proMoves[safeIndex].hasResource && (
-                        <MaterialCard pm={proMoves[safeIndex]} />
-                      )}
-                    </div>
+                    {showMaterial && proMoves[safeIndex].hasResource && (
+                      <MaterialCard pm={proMoves[safeIndex]} />
+                    )}
                   </div>
-                  <div className="mx-auto w-[70rem] flex items-center gap-3 mt-8">
+                  <div className="flex items-center gap-3 mt-8">
                     <Button variant="outline" size="lg" onClick={() => moveTo((safeIndex - 1 + proMoves.length) % proMoves.length)}>
                       <ChevronLeft className="h-4 w-4 mr-1" /> Prev
                     </Button>
@@ -223,7 +221,7 @@ function ProMoveCard({ pm, index, total, showMaterial, setShowMaterial }: {
   const pastel = known ? v(`${cssVar}-pastel`) : v("--muted");
   const onPastel = known ? color : v("--muted-foreground");
   return (
-    <div className={`relative overflow-hidden py-10 pl-14 pr-20 flex flex-col ${glass} ${CARD}`}>
+    <div className={`relative overflow-hidden py-10 pl-14 pr-20 flex flex-col ${glass} h-[38rem] transition-[width] duration-300 ${showMaterial ? "w-[34rem]" : "w-[50rem]"}`}>
       <span className="absolute left-0 top-0 bottom-0 w-2.5" style={{ background: color }} aria-hidden />
       <div className="flex items-center justify-between mb-6 shrink-0">
         <span className="rounded-full px-3.5 py-1 text-sm font-medium" style={{ background: pastel, color: onPastel }}>{pm.domain}</span>

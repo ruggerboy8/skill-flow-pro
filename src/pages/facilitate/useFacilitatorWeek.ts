@@ -1,0 +1,63 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useStaffProfile } from "@/hooks/useStaffProfile";
+import { getLocationWeekContext, assembleWeek } from "@/lib/locationState";
+import { Role } from "./facilitatorData";
+
+// DFI / RDA / OM -> role_id (matches the planner routes in App.tsx)
+const ROLE_ID: Record<Role, number> = { DFI: 1, RDA: 2, OM: 3 };
+
+export interface WeekProMove {
+  proMoveId: number | null;
+  statement: string;
+  domain: string;
+  hasResource: boolean;
+}
+
+// Returns this week's locked pro moves for a role at the facilitator's location,
+// reusing the same assembleWeek logic the participant ThisWeekPanel uses.
+export function useFacilitatorWeek(role: Role) {
+  const { user } = useAuth();
+  const { data: staff } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  const locationId = staff?.primary_location_id ?? null;
+  const roleId = ROLE_ID[role];
+
+  return useQuery<WeekProMove[]>({
+    queryKey: ["facilitator-week", locationId, roleId],
+    enabled: !!user && !!locationId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const ctx = await getLocationWeekContext(locationId!);
+      const rows = await assembleWeek({
+        userId: user!.id,
+        roleId,
+        locationId: locationId!,
+        cycleNumber: ctx.cycleNumber,
+        weekInCycle: ctx.weekInCycle,
+      });
+
+      const site = (rows ?? []).filter((r: any) => r.type === "site");
+
+      // Count attached learning resources per pro move (grad-cap affordance).
+      const ids = site.map((r: any) => r.pro_move_id).filter((id: any): id is number => !!id);
+      const counts: Record<number, number> = {};
+      if (ids.length > 0) {
+        const { data: res } = await supabase
+          .from("pro_move_resources")
+          .select("pro_move_id")
+          .in("pro_move_id", ids);
+        (res ?? []).forEach((r: any) => {
+          counts[r.pro_move_id] = (counts[r.pro_move_id] || 0) + 1;
+        });
+      }
+
+      return site.map((r: any) => ({
+        proMoveId: r.pro_move_id ?? null,
+        statement: r.action_statement ?? "Pro Move",
+        domain: r.domain_name ?? "General",
+        hasResource: r.pro_move_id ? (counts[r.pro_move_id] || 0) > 0 : false,
+      }));
+    },
+  });
+}

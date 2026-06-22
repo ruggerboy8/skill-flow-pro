@@ -10,8 +10,9 @@ import {
 } from "@/components/ui/select";
 import {
   Role, MeetingType, domainVar, scale, roleLabels,
-  proMovesByRole, journeyStages, icebreakers,
+  journeyStages, icebreakers,
 } from "./facilitatorData";
+import { useFacilitatorWeek, WeekProMove } from "./useFacilitatorWeek";
 
 type StepId = "question" | "promoves" | "confidence" | "glows" | "grows" | "performance";
 
@@ -47,7 +48,8 @@ export default function FacilitatePage() {
   const [activeStage, setActiveStage] = useState<number | null>(null);
 
   const steps = STEPS[meeting];
-  const proMoves = proMovesByRole[role];
+  const { data: proMoves = [], isLoading: pmLoading } = useFacilitatorWeek(role);
+  const safeIndex = proMoves.length ? Math.min(pmIndex, proMoves.length - 1) : 0;
   const question = custom || icebreakers[qIndex];
 
   const goStep = (id: StepId) => { setStep(id); setShowJourney(false); };
@@ -137,23 +139,34 @@ export default function FacilitatePage() {
             )}
 
             {step === "promoves" && (
-              <>
-                <ProMoveCard pm={proMoves[pmIndex]} index={pmIndex} total={proMoves.length} />
-                <div className="flex items-center gap-3 mt-8">
-                  <Button variant="outline" size="lg" onClick={() => setPmIndex((pmIndex - 1 + proMoves.length) % proMoves.length)}>
-                    <ChevronLeft className="h-4 w-4 mr-1" /> Prev
-                  </Button>
-                  <Button variant="outline" size="lg" onClick={() => setPmIndex((pmIndex + 1) % proMoves.length)}>
-                    Next <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                  <div className="flex gap-1.5 ml-3 items-center">
-                    {proMoves.map((_, i) => (
-                      <span key={i} className="h-2 rounded-full transition-all"
-                        style={{ width: i === pmIndex ? 28 : 8, background: i === pmIndex ? v("--primary") : v("--border") }} />
-                    ))}
-                  </div>
+              pmLoading ? (
+                <p className="text-2xl text-muted-foreground">Loading this week's pro moves…</p>
+              ) : proMoves.length === 0 ? (
+                <div className="max-w-2xl">
+                  <p className="text-4xl font-semibold tracking-tight mb-3">No pro moves locked yet</p>
+                  <p className="text-lg text-muted-foreground">
+                    There is no locked plan for {roleLabels[role]} this week at your location. Lock it in the planner, then refresh.
+                  </p>
                 </div>
-              </>
+              ) : (
+                <>
+                  <ProMoveCard pm={proMoves[safeIndex]} index={safeIndex} total={proMoves.length} />
+                  <div className="flex items-center gap-3 mt-8">
+                    <Button variant="outline" size="lg" onClick={() => setPmIndex((safeIndex - 1 + proMoves.length) % proMoves.length)}>
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+                    </Button>
+                    <Button variant="outline" size="lg" onClick={() => setPmIndex((safeIndex + 1) % proMoves.length)}>
+                      Next <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                    <div className="flex gap-1.5 ml-3 items-center">
+                      {proMoves.map((_, i) => (
+                        <span key={i} className="h-2 rounded-full transition-all"
+                          style={{ width: i === safeIndex ? 28 : 8, background: i === safeIndex ? v("--primary") : v("--border") }} />
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )
             )}
 
             {(step === "confidence" || step === "performance") && (
@@ -184,20 +197,21 @@ export default function FacilitatePage() {
   );
 }
 
-function ProMoveCard({ pm, index, total }: {
-  pm: typeof proMovesByRole[Role][number]; index: number; total: number;
-}) {
-  const color = v(domainVar[pm.domain]);
-  const pastel = v(`${domainVar[pm.domain]}-pastel`);
+function ProMoveCard({ pm, index, total }: { pm: WeekProMove; index: number; total: number; }) {
+  const cssVar = domainVar[pm.domain as keyof typeof domainVar] ?? "--primary";
+  const known = cssVar !== "--primary";
+  const color = v(cssVar);
+  const pastel = known ? v(`${cssVar}-pastel`) : v("--muted");
+  const onPastel = known ? color : v("--muted-foreground");
   return (
     <div className={`relative overflow-hidden p-12 pl-14 ${glass}`}>
       <span className="absolute left-0 top-0 bottom-0 w-2.5" style={{ background: color }} aria-hidden />
       <div className="flex items-center justify-between mb-6">
-        <span className="rounded-full px-3.5 py-1 text-sm font-medium" style={{ background: pastel, color }}>{pm.domain}</span>
+        <span className="rounded-full px-3.5 py-1 text-sm font-medium" style={{ background: pastel, color: onPastel }}>{pm.domain}</span>
         <span className="text-sm text-muted-foreground">{index + 1} of {total}</span>
       </div>
       <p className="text-5xl font-medium leading-[1.12] tracking-tight">{pm.statement}</p>
-      {pm.hasScript && (
+      {pm.hasResource && (
         <Button variant="outline" size="lg" className="mt-8">
           <GraduationCap className="h-5 w-5 mr-2" /> Learning material
         </Button>

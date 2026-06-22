@@ -43,12 +43,15 @@ export function useFacilitatorWeek(role: Role) {
       const ids = site.map((r: any) => r.pro_move_id).filter((id: any): id is number => !!id);
       const counts: Record<number, number> = {};
       if (ids.length > 0) {
+        // pro_move_resources keys by action_id, and we only count active resources
+        // (mirrors ThisWeekPanel).
         const { data: res } = await supabase
           .from("pro_move_resources")
-          .select("pro_move_id")
-          .in("pro_move_id", ids);
+          .select("action_id")
+          .in("action_id", ids)
+          .eq("status", "active");
         (res ?? []).forEach((r: any) => {
-          counts[r.pro_move_id] = (counts[r.pro_move_id] || 0) + 1;
+          counts[r.action_id] = (counts[r.action_id] || 0) + 1;
         });
       }
 

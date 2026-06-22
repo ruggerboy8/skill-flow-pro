@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
 import { supabase } from '@/integrations/supabase/client';
 import { hexToHsl } from '@/lib/colorUtils';
-import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList } from 'lucide-react';
+import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList, Presentation } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 // Server-side backfill detection via RPC
 
@@ -102,6 +102,7 @@ export default function Layout() {
     // Super admin navigation — Command Center first, no Home/My Role
     { name: 'Command Center', href: '/dashboard', icon: Building2 },
     { name: 'Coach', href: '/coach', icon: Users },
+    { name: 'Facilitate', href: '/facilitate', icon: Presentation },
     { name: 'Clinical', href: '/clinical', icon: Stethoscope },
     ...(isDoctor ? [{ name: 'Doctor', href: '/doctor', icon: Stethoscope }] : []),
     { name: 'Builder', href: '/builder', icon: SettingsIcon },
@@ -135,6 +136,7 @@ export default function Layout() {
     // Backfill nav removed - keeping function for individual score backfill only
     ...(isCoach || isOrgAdmin || isLead ? [
       { name: 'Coach', href: '/coach', icon: Users },
+      { name: 'Facilitate', href: '/facilitate', icon: Presentation },
     ] : []),
     ...(canManageAssignments ? [
       { name: 'Builder', href: '/builder', icon: SettingsIcon },

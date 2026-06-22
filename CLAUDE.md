@@ -6,6 +6,17 @@ Skill Flow Pro is a coaching/training platform for dental practices. It was
 originally built for a single pediatric DSO (Alcan) and is now being expanded
 into a multi-tenant SaaS product.
 
+## Start here — foundational docs (added 2026-06-22)
+
+Read these before making recommendations or changes:
+
+- `docs/system-overview.md` — what the product is, who uses it, the weekly loop
+- `docs/glossary.md` — domain terms (Pro Move, check-in/out, sequencer = recommender, …)
+- `docs/data-model.md` — the database as it actually exists (verified against the live DB)
+- `docs/architecture.md` — codebase structure/routing/auth/roles *(⚠️ being refreshed; see banner)*
+- `docs/improvement-backlog.md` — known weirdness, legacy cleanup candidates, change-mgmt practice
+- `docs/audits/` — security/RLS (live-verified), code-quality, UX *(code audits flagged stale; re-run)*
+
 ## Stack
 
 - **Frontend**: Vite + React + TypeScript, Tailwind + shadcn/ui

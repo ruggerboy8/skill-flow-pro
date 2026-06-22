@@ -26,3 +26,6 @@ dist-ssr
 # Supabase CLI temp files
 supabase/.temp/
 .mcp.json
+
+# Claude Code local worktree copies (large, machine-local; not for git)
+.claude/worktrees/

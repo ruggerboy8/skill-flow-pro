@@ -8,10 +8,19 @@ import { Role } from "./facilitatorData";
 // DFI / RDA / OM -> role_id (matches the planner routes in App.tsx)
 const ROLE_ID: Record<Role, number> = { DFI: 1, RDA: 2, OM: 3 };
 
+export interface ProMoveResource {
+  type: string;
+  title: string | null;
+  url: string | null;
+  contentMd: string | null;
+  durationMs: number | null;
+}
+
 export interface WeekProMove {
   proMoveId: number | null;
   statement: string;
   domain: string;
+  resources: ProMoveResource[];
   hasResource: boolean;
 }
 
@@ -41,26 +50,33 @@ export function useFacilitatorWeek(role: Role) {
 
       // Count attached learning resources per pro move (grad-cap affordance).
       const ids = site.map((r: any) => r.pro_move_id).filter((id: any): id is number => !!id);
-      const counts: Record<number, number> = {};
+      // pro_move_resources keys by action_id; only active resources (mirrors ThisWeekPanel).
+      const byAction: Record<number, ProMoveResource[]> = {};
       if (ids.length > 0) {
-        // pro_move_resources keys by action_id, and we only count active resources
-        // (mirrors ThisWeekPanel).
         const { data: res } = await supabase
           .from("pro_move_resources")
-          .select("action_id")
+          .select("action_id, type, title, url, content_md, duration_ms, display_order")
           .in("action_id", ids)
-          .eq("status", "active");
+          .eq("status", "active")
+          .order("display_order");
         (res ?? []).forEach((r: any) => {
-          counts[r.action_id] = (counts[r.action_id] || 0) + 1;
+          (byAction[r.action_id] ??= []).push({
+            type: r.type, title: r.title, url: r.url,
+            contentMd: r.content_md, durationMs: r.duration_ms,
+          });
         });
       }
 
-      return site.map((r: any) => ({
-        proMoveId: r.pro_move_id ?? null,
-        statement: r.action_statement ?? "Pro Move",
-        domain: r.domain_name ?? "General",
-        hasResource: r.pro_move_id ? (counts[r.pro_move_id] || 0) > 0 : false,
-      }));
+      return site.map((r: any) => {
+        const resources = r.pro_move_id ? (byAction[r.pro_move_id] ?? []) : [];
+        return {
+          proMoveId: r.pro_move_id ?? null,
+          statement: r.action_statement ?? "Pro Move",
+          domain: r.domain_name ?? "General",
+          resources,
+          hasResource: resources.length > 0,
+        };
+      });
     },
   });
 }

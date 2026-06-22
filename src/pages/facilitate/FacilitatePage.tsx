@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 import {
   Sparkles, Target, Smile, PartyPopper, Sprout, ListChecks,
   ChevronLeft, ChevronRight, GraduationCap, FolderOpen, X, ArrowRight,
+  Volume2, FileText, Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +14,7 @@ import {
   Role, MeetingType, domainVar, scale, roleLabels,
   journeyStages, icebreakers,
 } from "./facilitatorData";
-import { useFacilitatorWeek, WeekProMove } from "./useFacilitatorWeek";
+import { useFacilitatorWeek, WeekProMove, ProMoveResource } from "./useFacilitatorWeek";
 
 type StepId = "question" | "promoves" | "confidence" | "glows" | "grows" | "performance";
 
@@ -33,6 +35,9 @@ const STEPS: Record<MeetingType, Step[]> = {
 };
 
 const glass = "bg-glass-gradient backdrop-blur-md border border-white/40 dark:border-slate-700/40 shadow-glass rounded-xl";
+// Shared card footprint so the pro-move card and the learning-material card match,
+// and so Prev/Next don't shift with statement length (sized for ~5 lines).
+const CARD = "w-[34rem] min-h-[32rem]";
 const v = (cssVar: string) => `hsl(var(${cssVar}))`;
 
 export default function FacilitatePage() {
@@ -46,17 +51,19 @@ export default function FacilitatePage() {
   const [pmIndex, setPmIndex] = useState(0);
   const [showJourney, setShowJourney] = useState(false);
   const [activeStage, setActiveStage] = useState<number | null>(null);
+  const [showMaterial, setShowMaterial] = useState(false);
 
   const steps = STEPS[meeting];
   const { data: proMoves = [], isLoading: pmLoading } = useFacilitatorWeek(role);
   const safeIndex = proMoves.length ? Math.min(pmIndex, proMoves.length - 1) : 0;
   const question = custom || icebreakers[qIndex];
 
-  const goStep = (id: StepId) => { setStep(id); setShowJourney(false); };
+  const goStep = (id: StepId) => { setStep(id); setShowJourney(false); setShowMaterial(false); };
   const changeMeeting = (m: MeetingType) => {
-    setMeeting(m); setStep(STEPS[m][0].id); setActiveStage(null); setShowJourney(false);
+    setMeeting(m); setStep(STEPS[m][0].id); setActiveStage(null); setShowJourney(false); setShowMaterial(false);
   };
-  const changeRole = (r: Role) => { setRole(r); setPmIndex(0); };
+  const changeRole = (r: Role) => { setRole(r); setPmIndex(0); setShowMaterial(false); };
+  const moveTo = (i: number) => { setShowMaterial(false); setPmIndex(i); };
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden font-sans">
@@ -119,11 +126,11 @@ export default function FacilitatePage() {
         {/* Teaching canvas: big, centered, only what the student needs */}
         <main className="flex-1 min-w-0 overflow-y-auto">
           <div key={`${meeting}-${step}`}
-            className="mx-auto w-full max-w-5xl min-h-full flex flex-col justify-center px-16 py-12 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            className="mx-auto w-full max-w-7xl min-h-full flex flex-col justify-center px-16 py-12 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
             {step === "question" && (
               <>
-                <p className="text-6xl lg:text-7xl font-semibold leading-[1.05] tracking-tight">{question}</p>
+                <p className="text-6xl lg:text-7xl font-semibold leading-[1.05] tracking-tight max-w-5xl">{question}</p>
                 <div className="flex gap-3 mt-12">
                   <Button size="lg" onClick={() => { setCustom(""); setShowCustom(false); setQIndex((qIndex + 1) % icebreakers.length); }}>
                     Next question <ArrowRight className="h-4 w-4 ml-1" />
@@ -150,12 +157,18 @@ export default function FacilitatePage() {
                 </div>
               ) : (
                 <>
-                  <ProMoveCard pm={proMoves[safeIndex]} index={safeIndex} total={proMoves.length} />
-                  <div className="flex items-center gap-3 mt-8">
-                    <Button variant="outline" size="lg" onClick={() => setPmIndex((safeIndex - 1 + proMoves.length) % proMoves.length)}>
+                  <div className="flex gap-8 justify-center items-stretch">
+                    <ProMoveCard pm={proMoves[safeIndex]} index={safeIndex} total={proMoves.length}
+                      showMaterial={showMaterial} setShowMaterial={setShowMaterial} />
+                    {showMaterial && proMoves[safeIndex].hasResource && (
+                      <MaterialCard resources={proMoves[safeIndex].resources} onClose={() => setShowMaterial(false)} />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-8 justify-center">
+                    <Button variant="outline" size="lg" onClick={() => moveTo((safeIndex - 1 + proMoves.length) % proMoves.length)}>
                       <ChevronLeft className="h-4 w-4 mr-1" /> Prev
                     </Button>
-                    <Button variant="outline" size="lg" onClick={() => setPmIndex((safeIndex + 1) % proMoves.length)}>
+                    <Button variant="outline" size="lg" onClick={() => moveTo((safeIndex + 1) % proMoves.length)}>
                       Next <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                     <div className="flex gap-1.5 ml-3 items-center">
@@ -197,24 +210,66 @@ export default function FacilitatePage() {
   );
 }
 
-function ProMoveCard({ pm, index, total }: { pm: WeekProMove; index: number; total: number; }) {
+function ProMoveCard({ pm, index, total, showMaterial, setShowMaterial }: {
+  pm: WeekProMove; index: number; total: number;
+  showMaterial: boolean; setShowMaterial: (b: boolean) => void;
+}) {
   const cssVar = domainVar[pm.domain as keyof typeof domainVar] ?? "--primary";
   const known = cssVar !== "--primary";
   const color = v(cssVar);
   const pastel = known ? v(`${cssVar}-pastel`) : v("--muted");
   const onPastel = known ? color : v("--muted-foreground");
   return (
-    <div className={`relative overflow-hidden p-12 pl-14 ${glass}`}>
+    <div className={`relative overflow-hidden p-12 pl-14 flex flex-col ${glass} ${CARD}`}>
       <span className="absolute left-0 top-0 bottom-0 w-2.5" style={{ background: color }} aria-hidden />
       <div className="flex items-center justify-between mb-6">
         <span className="rounded-full px-3.5 py-1 text-sm font-medium" style={{ background: pastel, color: onPastel }}>{pm.domain}</span>
         <span className="text-sm text-muted-foreground">{index + 1} of {total}</span>
       </div>
-      <p className="text-5xl font-medium leading-[1.12] tracking-tight">{pm.statement}</p>
+      <p className="text-5xl font-medium leading-[1.12] tracking-tight min-h-[16.8rem]">{pm.statement}</p>
       {pm.hasResource && (
-        <Button variant="outline" size="lg" className="mt-8">
-          <GraduationCap className="h-5 w-5 mr-2" /> Learning material
+        <Button variant="outline" size="lg" className="mt-auto self-start" onClick={() => setShowMaterial(!showMaterial)}>
+          <GraduationCap className="h-5 w-5 mr-2" /> {showMaterial ? "Hide material" : "Learning material"}
         </Button>
+      )}
+    </div>
+  );
+}
+
+function MaterialCard({ resources, onClose }: { resources: ProMoveResource[]; onClose: () => void; }) {
+  return (
+    <div className={`p-10 flex flex-col ${glass} ${CARD} animate-in slide-in-from-right-4 fade-in duration-300`}>
+      <div className="flex items-center justify-between mb-6 shrink-0">
+        <span className="inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          <GraduationCap className="h-4 w-4" /> Learning material
+        </span>
+        <Button variant="ghost" size="icon" aria-label="Close learning material" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+        {resources.map((r, i) => <ResourceBlock key={i} r={r} />)}
+      </div>
+    </div>
+  );
+}
+
+function ResourceBlock({ r }: { r: ProMoveResource }) {
+  const Icon = r.type === "audio" ? Volume2 : r.type === "script" ? FileText : Link2;
+  const header = r.title || (r.type === "script" ? "Script" : r.type === "audio" ? "Audio" : "Resource");
+  return (
+    <div>
+      <div className="text-sm font-medium mb-2 flex items-center gap-2">
+        <Icon className="h-4 w-4 text-muted-foreground" /> {header}
+      </div>
+      {r.type === "audio" && r.url && <audio controls src={r.url} className="w-full" />}
+      {r.contentMd && (
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <ReactMarkdown>{r.contentMd}</ReactMarkdown>
+        </div>
+      )}
+      {r.url && r.type !== "audio" && (
+        <a href={r.url} target="_blank" rel="noreferrer" className="text-sm text-primary underline">Open resource</a>
       )}
     </div>
   );
@@ -246,7 +301,7 @@ function Reflection({ icon: Icon, iconColor, question, showJourney, setShowJourn
     <>
       <div className="flex items-center gap-4">
         <Icon className="h-12 w-12 shrink-0" style={{ color: iconColor }} aria-hidden />
-        <p className="text-6xl font-semibold leading-[1.05] tracking-tight">{question}</p>
+        <p className="text-6xl font-semibold leading-[1.05] tracking-tight max-w-4xl">{question}</p>
       </div>
 
       {showJourney && <JourneyExplorer role={role} active={activeStage} setActive={setActiveStage} />}

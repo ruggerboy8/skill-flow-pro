@@ -15,8 +15,8 @@ deleted. Produce it in **two forms**:
 
 A single person's full development record:
 - **Evaluations** — `evaluations` + `evaluation_items` (scores, notes, summary feedback), and
-  any **feedback provided to them** (released eval content, coach notes). *Open Q: include the
-  audio recordings / transcripts, or just text?*
+  any **feedback provided to them** (released eval content, coach notes), including evaluation
+  **transcripts** (not audio).
 - **Pro Move submissions** — their `weekly_scores` (confidence + performance over time).
 - **Profile basics** — name, role, location, hire date (and termination date).
 - *(Open Q: doctor/coach baselines, reflections, quarter-focus selections — include?)*
@@ -27,19 +27,18 @@ A single person's full development record:
 - **Polished report:** a readable PDF/HTML — header (who/role/location/dates), an evaluation
   summary, a Pro Move performance overview, and the feedback they received.
 
-## Delivery (needs a decision — see safety note)
+## Delivery  *(resolved)*
 
-Options:
-- **(Recommended) Generate a downloadable bundle** the admin reviews and forwards to HR manually.
-  Safest: no automated external send of PII; the admin stays in control.
-- Auto-email to a configured HR address — *higher risk*; emailing PII externally should be a
-  deliberate, confirmed action with a fixed, trusted recipient, not free-form.
+- Generate a downloadable bundle **and** allow the admin to **send it to HR directly from the
+  ProMoves platform** — owner does NOT want to download, attach, and email manually. So the feature
+  packages the export and sends it (e.g. via an edge function + email service) to the HR contact
+  on an admin "Send to HR" action.
+- Owner notes **no PII sensitivity concern** for this internal use, so we don't need the heavy
+  PII-handling guardrails — but still treat send-to-HR as a deliberate, admin-triggered action.
 
-> **Safety / handling notes.** This feature exports **personal data** and is tied to **account
-> deletion** — both sensitive. Build it so the **export is generated and confirmed first**, and
-> deletion is a **separate, explicit step** after the export is secured. Deletion should be its own
-> guarded action (no silent cascade). This also overlaps GDPR "right to erasure + retention"
-> (roadmap S1) — worth designing the retention story once.
+> **Deletion coupling (resolved):** keep **export and delete as separate guarded steps** — export
+> (and send) first, confirm it's secured, then delete as its own explicit action (no silent
+> cascade). Still overlaps GDPR erasure/retention (roadmap S1).
 
 ## Trigger & permissions
 
@@ -48,15 +47,18 @@ Options:
 - *Open Q: is this Alcan-internal HR (US) only for now, or should it be org-aware (each org's own
   HR contact) given the tenancy model?*
 
-## Open questions (for owner)
+## Resolved (2026-06-22)
 
-1. **Audio/transcripts:** include evaluation audio + transcripts in the export, or text only?
-2. **Scope of "everything":** beyond evaluations + feedback + Pro Move submissions — include
+- **Audio/transcripts:** include **transcripts**, not audio.
+- **Delivery:** downloadable **and** sent to HR directly from the platform (admin action).
+- **Deletion:** decoupled from export (separate guarded steps).
+- **PII:** owner sees no special sensitivity for this internal use.
+
+## Still open (revisit when we build this — it's feature #2)
+
+1. **Scope of "everything":** beyond evaluations + feedback + Pro Move submissions — include
    baselines, reflections, quarter-focus? Where's the line?
-3. **Delivery:** downloadable bundle the admin forwards (recommended), or automated email to a
-   fixed HR address?
-4. **Polished format:** PDF or HTML? Any required fields/branding HR expects?
-5. **Deletion coupling:** should "export" and "delete" be one guided flow (export → confirm →
-   delete) or fully separate actions?
-6. **Tenancy:** Alcan-only for now, or per-org HR contact?
-7. **Retention:** any required retention window / format from your HR side we should match?
+2. **Polished format:** PDF or HTML? Any fields/branding HR expects?
+3. **Tenancy:** Alcan-only for now, or per-org HR contact?
+4. **Email mechanism:** which sending service (the project's existing email path, if any)?
+5. **Retention:** any required window/format from HR to match?

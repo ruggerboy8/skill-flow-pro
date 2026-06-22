@@ -6,10 +6,11 @@ discussed, then graduate to the roadmap when we decide to act. Started 2026-06-2
 
 **Status legend:** 🟡 candidate (not yet decided) · 🟢 agreed, queued · 🔵 in progress · ✅ done
 
-> **Current focus (2026-06-22):** building **NF6 — HR offboarding export** (#1) then **NF4 —
-> facilitator presentation** (#2). Specs in [docs/features/](features/). The **evaluation rework**
-> (see [audits/evaluation-flow-analysis.md](audits/evaluation-flow-analysis.md) + EX1–EX4) is
-> **parked next** — do not resurface until the two features above are done.
+> **Current focus (2026-06-22):** building **NF4 — facilitator presentation** (#1, target: usable
+> by Ariana this week) then **NF6 — HR offboarding export** (#2). Specs in
+> [docs/features/](features/). The **evaluation rework** (see
+> [audits/evaluation-flow-analysis.md](audits/evaluation-flow-analysis.md) + EX1–EX4) is **parked
+> next** — do not resurface until the two features above are done.
 
 ---
 

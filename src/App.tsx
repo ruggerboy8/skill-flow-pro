@@ -42,6 +42,7 @@ import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
 import RegionalDashboard from "@/pages/dashboard/RegionalDashboard";
 import MyLocationPage from "@/pages/my-location/MyLocationPage";
+import FacilitatePage from "@/pages/facilitate/FacilitatePage";
 
 // My Role pages
 import MyRoleLayout from "@/pages/my-role/MyRoleLayout";
@@ -93,6 +94,8 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* Full-screen facilitator presentation (no app chrome) */}
+      <Route path="/facilitate" element={<FacilitatePage />} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="welcome" element={<Welcome />} />

@@ -20,6 +20,7 @@ export interface WeekProMove {
   proMoveId: number | null;
   statement: string;
   domain: string;
+  intervention: string | null;
   resources: ProMoveResource[];
   hasResource: boolean;
 }
@@ -73,6 +74,7 @@ export function useFacilitatorWeek(role: Role) {
           proMoveId: r.pro_move_id ?? null,
           statement: r.action_statement ?? "Pro Move",
           domain: r.domain_name ?? "General",
+          intervention: r.intervention_text ?? null,
           resources,
           hasResource: resources.length > 0,
         };

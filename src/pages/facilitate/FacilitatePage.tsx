@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
   Sparkles, Target, Smile, PartyPopper, Sprout, ListChecks,
   ChevronLeft, ChevronRight, GraduationCap, FolderOpen, X, ArrowRight,
-  Volume2, FileText, Link2,
+  FileText, Link2, Play, Pause,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,8 +36,8 @@ const STEPS: Record<MeetingType, Step[]> = {
 
 const glass = "bg-glass-gradient backdrop-blur-md border border-white/40 dark:border-slate-700/40 shadow-glass rounded-xl";
 // Shared card footprint so the pro-move card and the learning-material card match,
-// and so Prev/Next don't shift with statement length (sized for ~5 lines).
-const CARD = "w-[34rem] min-h-[32rem]";
+// and a FIXED height so Prev/Next never shift with statement length.
+const CARD = "w-[34rem] h-[38rem]";
 const v = (cssVar: string) => `hsl(var(${cssVar}))`;
 
 export default function FacilitatePage() {
@@ -157,14 +157,17 @@ export default function FacilitatePage() {
                 </div>
               ) : (
                 <>
-                  <div className="flex gap-8 justify-center items-stretch">
+                  {/* Reserve the right slot so the pro-move card (and its toggle) never move */}
+                  <div className="mx-auto flex gap-8 w-[70rem] items-stretch">
                     <ProMoveCard pm={proMoves[safeIndex]} index={safeIndex} total={proMoves.length}
                       showMaterial={showMaterial} setShowMaterial={setShowMaterial} />
-                    {showMaterial && proMoves[safeIndex].hasResource && (
-                      <MaterialCard resources={proMoves[safeIndex].resources} onClose={() => setShowMaterial(false)} />
-                    )}
+                    <div className="w-[34rem] shrink-0">
+                      {showMaterial && proMoves[safeIndex].hasResource && (
+                        <MaterialCard pm={proMoves[safeIndex]} />
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 mt-8 justify-center">
+                  <div className="mx-auto w-[70rem] flex items-center gap-3 mt-8">
                     <Button variant="outline" size="lg" onClick={() => moveTo((safeIndex - 1 + proMoves.length) % proMoves.length)}>
                       <ChevronLeft className="h-4 w-4 mr-1" /> Prev
                     </Button>
@@ -220,57 +223,78 @@ function ProMoveCard({ pm, index, total, showMaterial, setShowMaterial }: {
   const pastel = known ? v(`${cssVar}-pastel`) : v("--muted");
   const onPastel = known ? color : v("--muted-foreground");
   return (
-    <div className={`relative overflow-hidden p-12 pl-14 flex flex-col ${glass} ${CARD}`}>
+    <div className={`relative overflow-hidden py-10 pl-14 pr-20 flex flex-col ${glass} ${CARD}`}>
       <span className="absolute left-0 top-0 bottom-0 w-2.5" style={{ background: color }} aria-hidden />
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 shrink-0">
         <span className="rounded-full px-3.5 py-1 text-sm font-medium" style={{ background: pastel, color: onPastel }}>{pm.domain}</span>
         <span className="text-sm text-muted-foreground">{index + 1} of {total}</span>
       </div>
-      <p className="text-5xl font-medium leading-[1.12] tracking-tight min-h-[16.8rem]">{pm.statement}</p>
+      <div className="flex-1 flex items-center overflow-y-auto">
+        <p className="text-4xl font-medium leading-[1.15] tracking-tight">{pm.statement}</p>
+      </div>
       {pm.hasResource && (
-        <Button variant="outline" size="lg" className="mt-auto self-start" onClick={() => setShowMaterial(!showMaterial)}>
-          <GraduationCap className="h-5 w-5 mr-2" /> {showMaterial ? "Hide material" : "Learning material"}
-        </Button>
+        <button onClick={() => setShowMaterial(!showMaterial)}
+          aria-label={showMaterial ? "Hide learning material" : "Show learning material"}
+          className="absolute right-5 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full flex items-center justify-center bg-card border border-border shadow-sm text-primary hover:bg-muted transition-colors">
+          {showMaterial ? <X className="h-5 w-5" /> : <GraduationCap className="h-5 w-5" />}
+        </button>
       )}
     </div>
   );
 }
 
-function MaterialCard({ resources, onClose }: { resources: ProMoveResource[]; onClose: () => void; }) {
+function MaterialCard({ pm }: { pm: WeekProMove }) {
+  const audio = pm.resources.find((r) => r.type === "audio" && r.url);
+  const scripts = pm.resources.filter((r) => r.contentMd);
+  const links = pm.resources.filter((r) => r.url && r.type !== "audio");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const toggleAudio = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) a.play(); else a.pause();
+  };
   return (
     <div className={`p-10 flex flex-col ${glass} ${CARD} animate-in slide-in-from-right-4 fade-in duration-300`}>
-      <div className="flex items-center justify-between mb-6 shrink-0">
-        <span className="inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          <GraduationCap className="h-4 w-4" /> Learning material
-        </span>
-        <Button variant="ghost" size="icon" aria-label="Close learning material" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
+      <div className="flex items-center gap-2 mb-6 shrink-0 text-[13px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <GraduationCap className="h-4 w-4" /> Learning material
       </div>
-      <div className="flex-1 overflow-y-auto space-y-6 pr-1">
-        {resources.map((r, i) => <ResourceBlock key={i} r={r} />)}
+      <div className="flex-1 overflow-y-auto pr-1 space-y-7">
+        {pm.intervention && (
+          <section>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Why this matters</div>
+            <p className="text-lg leading-relaxed text-foreground">{pm.intervention}</p>
+          </section>
+        )}
+        {(scripts.length > 0 || audio) && (
+          <section>
+            <div className="flex items-center gap-3 mb-3">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <span className="text-lg font-medium">Script</span>
+              {audio && (
+                <button onClick={toggleAudio} aria-label={playing ? "Pause audio" : "Play audio"}
+                  className="ml-1 h-9 w-9 rounded-full flex items-center justify-center bg-primary text-primary-foreground hover:opacity-90 transition">
+                  {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+                </button>
+              )}
+            </div>
+            {scripts.map((r, i) => (
+              <div key={i} className="prose prose-lg dark:prose-invert max-w-none text-foreground">
+                <ReactMarkdown>{r.contentMd || ""}</ReactMarkdown>
+              </div>
+            ))}
+            {audio && (
+              <audio ref={audioRef} src={audio.url!} className="hidden"
+                onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} />
+            )}
+          </section>
+        )}
+        {links.map((r, i) => (
+          <a key={i} href={r.url!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-base text-primary underline">
+            <Link2 className="h-4 w-4" /> {r.title || "Open resource"}
+          </a>
+        ))}
       </div>
-    </div>
-  );
-}
-
-function ResourceBlock({ r }: { r: ProMoveResource }) {
-  const Icon = r.type === "audio" ? Volume2 : r.type === "script" ? FileText : Link2;
-  const header = r.title || (r.type === "script" ? "Script" : r.type === "audio" ? "Audio" : "Resource");
-  return (
-    <div>
-      <div className="text-sm font-medium mb-2 flex items-center gap-2">
-        <Icon className="h-4 w-4 text-muted-foreground" /> {header}
-      </div>
-      {r.type === "audio" && r.url && <audio controls src={r.url} className="w-full" />}
-      {r.contentMd && (
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <ReactMarkdown>{r.contentMd}</ReactMarkdown>
-        </div>
-      )}
-      {r.url && r.type !== "audio" && (
-        <a href={r.url} target="_blank" rel="noreferrer" className="text-sm text-primary underline">Open resource</a>
-      )}
     </div>
   );
 }

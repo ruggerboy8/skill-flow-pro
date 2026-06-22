@@ -18,6 +18,11 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
+import { gatherStaffRecord } from "@/lib/hrExport";
+import { buildRecordPdf, recordFilename } from "@/lib/hrExportPdf";
+
+const HR_EXPORT_EMAIL = "falvarez@alcandentalcooperative.com";
 
 interface User {
   staff_id: string;
@@ -77,6 +82,9 @@ export function AdminUsersTab() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [sendToHr, setSendToHr] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const usersPerPage = 25;
@@ -222,37 +230,81 @@ export function AdminUsersTab() {
 
   const handleDeleteUser = (user: User) => {
     setUserToDelete(user);
+    setSendToHr(true);
     setDeleteDialogOpen(true);
+  };
+
+  const gatherDoc = async (user: User) => {
+    const rec = await gatherStaffRecord({
+      staffId: user.staff_id,
+      name: user.name,
+      email: user.email,
+      role: user.role_name,
+      location: user.location_name,
+    });
+    return { rec, doc: buildRecordPdf(rec) };
+  };
+
+  const handlePreviewRecord = async () => {
+    if (!userToDelete) return;
+    // Open a blank tab synchronously (within the click gesture) so popup blockers allow it,
+    // then point it at the generated PDF. A new tab renders reliably; an inline iframe of a
+    // blob PDF can show as a black box.
+    const win = window.open("", "_blank");
+    setPreviewing(true);
+    try {
+      const { doc } = await gatherDoc(userToDelete);
+      const url = URL.createObjectURL(doc.output("blob"));
+      if (win) win.location.href = url;
+      else window.open(url, "_blank");
+    } catch (error) {
+      if (win) win.close();
+      console.error("Error building record preview:", error);
+      toast({ title: "Error", description: "Could not build the record preview", variant: "destructive" });
+    } finally {
+      setPreviewing(false);
+    }
   };
 
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
-
+    setDeleting(true);
     try {
-      const { error } = await supabase.functions.invoke('admin-users', {
-        body: { 
-          action: 'delete_user',
-          user_id: userToDelete.user_id 
-        },
-      });
+      // Send the record to HR first (while the data still exists), then delete.
+      if (sendToHr) {
+        const { rec, doc } = await gatherDoc(userToDelete);
+        const dataUri = doc.output("datauristring");
+        const pdfBase64 = dataUri.substring(dataUri.indexOf(",") + 1);
+        const { data, error: sendErr } = await supabase.functions.invoke('send-hr-export', {
+          body: { pdfBase64, filename: recordFilename(rec), staffName: rec.name },
+        });
+        if (sendErr || (data as any)?.error) {
+          throw new Error(sendErr?.message || (data as any)?.error || 'Failed to send record to HR');
+        }
+      }
 
+      const { error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'delete_user', user_id: userToDelete.user_id },
+      });
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "User deleted successfully",
+        description: sendToHr ? `Record sent to HR and ${userToDelete.name} deleted.` : "User deleted successfully",
       });
 
       setDeleteDialogOpen(false);
       setUserToDelete(null);
       loadUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting user:", error);
       toast({
         title: "Error",
-        description: "Failed to delete user",
+        description: error.message || "Failed to delete user",
         variant: "destructive",
       });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -608,7 +660,7 @@ const handleResendInvite = async (user: User) => {
         organizations={groups}
       />
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(o) => { if (!deleting) setDeleteDialogOpen(o); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete User</AlertDialogTitle>
@@ -621,13 +673,27 @@ const handleResendInvite = async (user: User) => {
               </ul>
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          <div className="rounded-md border p-3 space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <Checkbox checked={sendToHr} onCheckedChange={(c) => setSendToHr(c === true)} className="mt-0.5" />
+              <span className="text-sm">
+                Send {userToDelete?.name}'s record to HR (<span className="font-medium">{HR_EXPORT_EMAIL}</span>) before deletion.
+              </span>
+            </label>
+            <Button variant="outline" size="sm" onClick={handlePreviewRecord} disabled={previewing}>
+              {previewing ? "Building preview…" : "Preview record (PDF)"}
+            </Button>
+          </div>
+
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDeleteUser}
+              onClick={(e) => { e.preventDefault(); confirmDeleteUser(); }}
+              disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete User
+              {deleting ? (sendToHr ? "Sending & deleting…" : "Deleting…") : (sendToHr ? "Send to HR & delete" : "Delete user")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -11,21 +11,37 @@ deleted. Produce it in **two forms**:
 - **Raw data** (machine-readable: JSON and/or CSV) — complete record.
 - **Polished summary** (human-readable: PDF/HTML) — so HR staff can skim it easily.
 
-## What to include (current understanding)
+## What to include  *(resolved 2026-06-22)*
 
-A single person's full development record:
-- **Evaluations** — `evaluations` + `evaluation_items` (scores, notes, summary feedback), and
-  any **feedback provided to them** (released eval content, coach notes), including evaluation
-  **transcripts** (not audio).
-- **Pro Move submissions** — their `weekly_scores` (confidence + performance over time).
+A single person's development record. **Default to over-reporting; pare back later.** Where a
+section has no data, **say so explicitly** in the report (many people won't have all of this).
+
+- **Evaluations** — `evaluations` + `evaluation_items`: the feedback they received, coach notes,
+  and the **transcripts** (not audio).
+- **Pro Move participation** — from `weekly_scores`, a **participation summary** (how consistently
+  they engaged: weeks submitted, on-time vs late, completion over time). **Not** a dump of every
+  confidence score.
+- **Self-reported performance vs evaluation** — surface their **self-reported performance scores**
+  alongside the matching **coach evaluation scores**, so HR can see self-assessment next to
+  evaluated performance where both exist.
 - **Profile basics** — name, role, location, hire date (and termination date).
-- *(Open Q: doctor/coach baselines, reflections, quarter-focus selections — include?)*
 
-## Output
+## Output  *(resolved)*
 
-- **Raw bundle:** JSON (and/or CSV per table) containing all of the above.
-- **Polished report:** a readable PDF/HTML — header (who/role/location/dates), an evaluation
-  summary, a Pro Move performance overview, and the feedback they received.
+- **A single PDF.** HR is non-technical and won't work with HTML/JSON or manipulate the data —
+  it's for documentation. So the deliverable is **one readable PDF** (no raw JSON/CSV alongside).
+- Structure: header (who / role / location / dates), an evaluations section (feedback +
+  transcripts), a participation summary, a self-vs-evaluation comparison, each with a clear
+  "no data on record" note when empty.
+
+## Build approach  *(planned)*
+
+- **PDF generated client-side** (no PDF tooling exists yet; add a lightweight lib such as
+  `pdfmake`). The "Offboard / Export" action gathers the record via Supabase queries and renders
+  the PDF for **download**.
+- **Send to HR** posts the generated PDF to a new edge function that emails it as an attachment
+  via **Resend** (already used by `coach-remind` / `notify-eval-release`) to a configured HR
+  address. Deletion stays a separate, explicit step (existing `admin-users` delete path).
 
 ## Delivery  *(resolved)*
 
@@ -49,16 +65,16 @@ A single person's full development record:
 
 ## Resolved (2026-06-22)
 
-- **Audio/transcripts:** include **transcripts**, not audio.
-- **Delivery:** downloadable **and** sent to HR directly from the platform (admin action).
+- **Scope:** evals + feedback + transcripts; pro-move **participation** summary (not all
+  confidence scores); self-reported performance vs evaluation; acknowledge missing sections;
+  default to over-reporting.
+- **Format:** a single **PDF** (HR is non-technical; no HTML/JSON).
+- **Delivery:** download **and** send-to-HR from the platform (admin action) via Resend.
+- **Recipient:** one fixed HR email for v1 (configurable; per-org later).
 - **Deletion:** decoupled from export (separate guarded steps).
 - **PII:** owner sees no special sensitivity for this internal use.
 
-## Still open (revisit when we build this — it's feature #2)
+## Still open
 
-1. **Scope of "everything":** beyond evaluations + feedback + Pro Move submissions — include
-   baselines, reflections, quarter-focus? Where's the line?
-2. **Polished format:** PDF or HTML? Any fields/branding HR expects?
-3. **Tenancy:** Alcan-only for now, or per-org HR contact?
-4. **Email mechanism:** which sending service (the project's existing email path, if any)?
-5. **Retention:** any required window/format from HR to match?
+1. **HR email address** — the actual recipient (John to provide; wire as a config value meanwhile).
+2. **Retention** — any required window/format from HR to match (none assumed for v1).

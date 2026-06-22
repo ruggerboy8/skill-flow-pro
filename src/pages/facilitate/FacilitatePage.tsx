@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -156,30 +156,17 @@ export default function FacilitatePage() {
                   </p>
                 </div>
               ) : (
-                <>
-                  {/* Wide + centered by default; shrinks to the paired size when material opens */}
-                  <div className="flex gap-8 justify-center items-stretch">
-                    <ProMoveCard pm={proMoves[safeIndex]} index={safeIndex} total={proMoves.length}
-                      showMaterial={showMaterial} setShowMaterial={setShowMaterial} />
-                    {showMaterial && proMoves[safeIndex].hasResource && (
-                      <MaterialCard pm={proMoves[safeIndex]} />
-                    )}
+                <div className="flex gap-6 justify-center items-center">
+                  <div className="flex gap-2 shrink-0">
+                    <CircleArrow dir="prev" onClick={() => moveTo((safeIndex - 1 + proMoves.length) % proMoves.length)} />
+                    <CircleArrow dir="next" onClick={() => moveTo((safeIndex + 1) % proMoves.length)} />
                   </div>
-                  <div className="flex items-center gap-3 mt-8">
-                    <Button variant="outline" size="lg" onClick={() => moveTo((safeIndex - 1 + proMoves.length) % proMoves.length)}>
-                      <ChevronLeft className="h-4 w-4 mr-1" /> Prev
-                    </Button>
-                    <Button variant="outline" size="lg" onClick={() => moveTo((safeIndex + 1) % proMoves.length)}>
-                      Next <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                    <div className="flex gap-1.5 ml-3 items-center">
-                      {proMoves.map((_, i) => (
-                        <span key={i} className="h-2 rounded-full transition-all"
-                          style={{ width: i === safeIndex ? 28 : 8, background: i === safeIndex ? v("--primary") : v("--border") }} />
-                      ))}
-                    </div>
-                  </div>
-                </>
+                  <ProMoveCard pm={proMoves[safeIndex]} index={safeIndex} total={proMoves.length}
+                    showMaterial={showMaterial} setShowMaterial={setShowMaterial} />
+                  {showMaterial && proMoves[safeIndex].hasResource && (
+                    <MaterialCard pm={proMoves[safeIndex]} />
+                  )}
+                </div>
               )
             )}
 
@@ -211,6 +198,46 @@ export default function FacilitatePage() {
   );
 }
 
+// Sizes the statement as large as possible while still fitting its box (no scroll).
+function FitText({ text, min = 28, max = 60 }: { text: string; min?: number; max?: number }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const [size, setSize] = useState(max);
+  useLayoutEffect(() => {
+    const box = boxRef.current, span = spanRef.current;
+    if (!box || !span) return;
+    const fit = () => {
+      let lo = min, hi = max, best = min;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        span.style.fontSize = mid + "px";
+        if (span.scrollHeight <= box.clientHeight) { best = mid; lo = mid + 1; } else hi = mid - 1;
+      }
+      span.style.fontSize = best + "px";
+      setSize(best);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [text, min, max]);
+  return (
+    <div ref={boxRef} className="w-full h-full flex items-center overflow-hidden">
+      <span ref={spanRef} className="block w-full font-medium tracking-tight"
+        style={{ fontSize: size, lineHeight: 1.12 }}>{text}</span>
+    </div>
+  );
+}
+
+function CircleArrow({ dir, onClick }: { dir: "prev" | "next"; onClick: () => void }) {
+  return (
+    <button onClick={onClick} aria-label={dir === "prev" ? "Previous pro move" : "Next pro move"}
+      className="h-11 w-11 rounded-full flex items-center justify-center bg-card border border-border shadow-sm text-foreground hover:bg-muted transition-colors">
+      {dir === "prev" ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+    </button>
+  );
+}
+
 function ProMoveCard({ pm, index, total, showMaterial, setShowMaterial }: {
   pm: WeekProMove; index: number; total: number;
   showMaterial: boolean; setShowMaterial: (b: boolean) => void;
@@ -227,8 +254,8 @@ function ProMoveCard({ pm, index, total, showMaterial, setShowMaterial }: {
         <span className="rounded-full px-3.5 py-1 text-sm font-medium" style={{ background: pastel, color: onPastel }}>{pm.domain}</span>
         <span className="text-sm text-muted-foreground">{index + 1} of {total}</span>
       </div>
-      <div className="flex-1 flex items-center overflow-y-auto">
-        <p className="text-4xl font-medium leading-[1.15] tracking-tight">{pm.statement}</p>
+      <div className="flex-1 min-h-0">
+        <FitText text={pm.statement} />
       </div>
       {pm.hasResource && (
         <button onClick={() => setShowMaterial(!showMaterial)}

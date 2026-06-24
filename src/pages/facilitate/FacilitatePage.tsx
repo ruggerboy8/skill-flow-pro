@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useLayoutEffect } from "react";
+import { useState, useMemo, useRef, useLayoutEffect, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -15,6 +15,20 @@ import {
   journeyStages, icebreakers,
 } from "./facilitatorData";
 import { useFacilitatorWeek, WeekProMove, ProMoveResource } from "./useFacilitatorWeek";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useRoleDisplayNames } from "@/hooks/useRoleDisplayNames";
+
+// Map archetype_code → legacy Role key used by the seeded journey content.
+const ARCHETYPE_TO_LEGACY: Record<string, Role> = {
+  front_desk: "DFI",
+  dental_assistant: "RDA",
+  lead_dental_assistant: "RDA",
+  practice_manager: "OM",
+};
+
+interface OrgRole { role_id: number; role_name: string; archetype_code: string | null; }
 
 type StepId = "question" | "promoves" | "confidence" | "glows" | "grows" | "performance";
 
@@ -42,8 +56,10 @@ const v = (cssVar: string) => `hsl(var(${cssVar}))`;
 
 export default function FacilitatePage() {
   const navigate = useNavigate();
+  const { practiceType } = useUserRole();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const [meeting, setMeeting] = useState<MeetingType>("in");
-  const [role, setRole] = useState<Role>("RDA");
+  const [roleId, setRoleId] = useState<number | null>(null);
   const [step, setStep] = useState<StepId>("question");
   const [qIndex, setQIndex] = useState(0);
   const [custom, setCustom] = useState("");
@@ -53,8 +69,33 @@ export default function FacilitatePage() {
   const [activeStage, setActiveStage] = useState<number | null>(null);
   const [showMaterial, setShowMaterial] = useState(false);
 
+  // Load the active roles available for this org's practice type.
+  const { data: orgRoles = [] } = useQuery<OrgRole[]>({
+    queryKey: ["facilitator-roles", practiceType],
+    enabled: !!practiceType,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("roles")
+        .select("role_id, role_name, archetype_code, practice_type, active")
+        .eq("practice_type", practiceType!)
+        .eq("active", true)
+        .order("role_id");
+      // Exclude doctors — facilitator flow targets staff roles.
+      return (data ?? []).filter((r: any) => r.archetype_code !== "doctor") as OrgRole[];
+    },
+  });
+
+  // Default-select the first available role once roles arrive.
+  useEffect(() => {
+    if (roleId == null && orgRoles.length > 0) setRoleId(orgRoles[0].role_id);
+  }, [orgRoles, roleId]);
+
+  const activeRole = orgRoles.find(r => r.role_id === roleId);
+  const legacyRoleKey: Role = (activeRole && ARCHETYPE_TO_LEGACY[activeRole.archetype_code ?? ""]) || "RDA";
+  const roleDisplayName = activeRole ? resolveRole(activeRole.role_id, activeRole.role_name) : "";
+
   const steps = STEPS[meeting];
-  const { data: proMoves = [], isLoading: pmLoading } = useFacilitatorWeek(role);
+  const { data: proMoves = [], isLoading: pmLoading } = useFacilitatorWeek(roleId);
   const safeIndex = proMoves.length ? Math.min(pmIndex, proMoves.length - 1) : 0;
   const question = custom || icebreakers[qIndex];
 
@@ -62,7 +103,7 @@ export default function FacilitatePage() {
   const changeMeeting = (m: MeetingType) => {
     setMeeting(m); setStep(STEPS[m][0].id); setActiveStage(null); setShowJourney(false); setShowMaterial(false);
   };
-  const changeRole = (r: Role) => { setRole(r); setPmIndex(0); setShowMaterial(false); };
+  const changeRole = (id: number) => { setRoleId(id); setPmIndex(0); setShowMaterial(false); };
   const moveTo = (i: number) => { setShowMaterial(false); setPmIndex(i); };
 
   return (
@@ -86,15 +127,24 @@ export default function FacilitatePage() {
             </Select>
             <span className="h-4 w-px bg-border" />
             <span className="text-xs text-muted-foreground">Role</span>
-            <Select value={role} onValueChange={(val) => changeRole(val as Role)}>
-              <SelectTrigger className="h-8 w-36 border-0 bg-transparent shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
+            <Select
+              value={roleId != null ? String(roleId) : ""}
+              onValueChange={(val) => changeRole(Number(val))}
+              disabled={orgRoles.length === 0}
+            >
+              <SelectTrigger className="h-8 w-44 border-0 bg-transparent shadow-none focus:ring-0">
+                <SelectValue placeholder={orgRoles.length === 0 ? "No roles" : "Select role"} />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="RDA">RDA</SelectItem>
-                <SelectItem value="DFI">DFI</SelectItem>
-                <SelectItem value="OM">Office Manager</SelectItem>
+                {orgRoles.map(r => (
+                  <SelectItem key={r.role_id} value={String(r.role_id)}>
+                    {resolveRole(r.role_id, r.role_name)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
+
           <Button variant="ghost" size="icon" className="ml-1" aria-label="Exit session" onClick={() => navigate("/")}>
             <X className="h-4 w-4" />
           </Button>
@@ -152,7 +202,7 @@ export default function FacilitatePage() {
                 <div className="max-w-2xl">
                   <p className="text-4xl font-semibold tracking-tight mb-3">No pro moves locked yet</p>
                   <p className="text-lg text-muted-foreground">
-                    There is no locked plan for {roleLabels[role]} this week at your location. Lock it in the planner, then refresh.
+                    There is no locked plan for {roleDisplayName || "this role"} this week at your location. Lock it in the planner, then refresh.
                   </p>
                 </div>
               ) : (
@@ -179,7 +229,7 @@ export default function FacilitatePage() {
                 icon={PartyPopper} iconColor={v("--score-4")}
                 question="What glowed this week?"
                 showJourney={showJourney} setShowJourney={setShowJourney}
-                role={role} activeStage={activeStage} setActiveStage={setActiveStage}
+                role={legacyRoleKey} activeStage={activeStage} setActiveStage={setActiveStage}
               />
             )}
 
@@ -188,7 +238,7 @@ export default function FacilitatePage() {
                 icon={Sprout} iconColor={v("--score-2")}
                 question="What can we grow next week?"
                 showJourney={showJourney} setShowJourney={setShowJourney}
-                role={role} activeStage={activeStage} setActiveStage={setActiveStage}
+                role={legacyRoleKey} activeStage={activeStage} setActiveStage={setActiveStage}
               />
             )}
           </div>
@@ -354,7 +404,7 @@ function Reflection({ icon: Icon, iconColor, question, showJourney, setShowJourn
         <p className="text-6xl font-semibold leading-[1.05] tracking-tight max-w-4xl">{question}</p>
       </div>
 
-      {showJourney && <JourneyExplorer role={role} active={activeStage} setActive={setActiveStage} />}
+      {showJourney && <JourneyExplorer role={legacyRoleKey} active={activeStage} setActive={setActiveStage} />}
 
       {/* Ariana's "supply cabinet": understated, off to the side */}
       <div className="mt-12">

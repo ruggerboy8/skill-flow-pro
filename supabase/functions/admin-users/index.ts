@@ -47,7 +47,7 @@ serve(async (req: Request) => {
 
   const { data: me, error: meErr } = await caller
     .from("staff")
-    .select("is_super_admin, is_org_admin, is_clinical_director, user_id, name")
+    .select("id, is_super_admin, is_org_admin, is_clinical_director, user_id, name")
     .eq("user_id", authUser.user.id)
     .maybeSingle();
 
@@ -62,12 +62,25 @@ serve(async (req: Request) => {
     console.log("No staff record found for user:", authUser.user.id);
     return json({ error: "No staff record found for this user" }, 403);
   }
-  
-  // Allow access for super admin OR org admin
-  if (!me.is_super_admin && !me.is_org_admin) {
+
+  // Look up capability toggles (new permission system) — admins-by-capability are allowed
+  const { data: meCaps } = await admin
+    .from("user_capabilities")
+    .select("is_platform_admin, is_org_admin, can_manage_users, can_manage_locations, can_invite_users, can_view_submissions, can_manage_library, can_review_evals")
+    .eq("staff_id", me.id)
+    .maybeSingle();
+
+  const hasAdminCapability =
+    !!(meCaps?.is_platform_admin || meCaps?.is_org_admin || meCaps?.can_manage_users ||
+       meCaps?.can_manage_locations || meCaps?.can_invite_users || meCaps?.can_view_submissions ||
+       meCaps?.can_manage_library || meCaps?.can_review_evals);
+
+  // Allow access for super admin OR org admin OR capability-based admins
+  if (!me.is_super_admin && !me.is_org_admin && !hasAdminCapability) {
     console.log("User is not an admin:", me);
     return json({ error: "Forbidden: Admin access required" }, 403);
   }
+
 
   const payload = await safeJson(req);
   const action = payload?.action as string | undefined;

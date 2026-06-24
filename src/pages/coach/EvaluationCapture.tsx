@@ -21,6 +21,7 @@ import {
   BookOpen,
   Lightbulb,
   PenLine,
+  HelpCircle,
 } from "lucide-react";
 import {
   loadCaptureData,
@@ -34,6 +35,7 @@ import { GLOW_STEMS, GROW_STEMS } from "@/lib/evalCaptureFraming";
 import { VoiceCaptureButton } from "@/components/coach/VoiceCaptureButton";
 import { getDomainColorRaw, getDomainColorRich, getDomainColorRichRaw } from "@/lib/domainColors";
 import { submitEvaluation } from "@/lib/evaluations";
+import { CaptureTour, TOUR_DISMISSED_KEY } from "@/components/coach/CaptureTour";
 import {
   Dialog,
   DialogContent,
@@ -51,8 +53,8 @@ const INTRO_KEY = "evalCaptureIntroDismissed";
  * /coach/:staffId/eval/:evalId/capture, alongside the classic EvaluationHub
  * which is unchanged.
  *
- * Layout is bifurcated by function: a left REFERENCE pane (the rubric — what to
- * assess, what good looks like) and a right CAPTURE pane (input — feedback +
+ * Layout is bifurcated by function: a left REFERENCE pane (the rubric: what to
+ * assess, what good looks like) and a right CAPTURE pane (input: feedback and
  * scores). This separation is deliberate; the two surfaces have opposite needs.
  * Visual/delight pass is a follow-up (design-ui-designer).
  */
@@ -78,7 +80,18 @@ export default function EvaluationCapture() {
   });
   const [reviewOpen, setReviewOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
+
+  // First-run guided tour: auto-open once per browser unless dismissed. The
+  // "Show tutorial" header button always re-opens it (ignoring the flag).
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(TOUR_DISMISSED_KEY) !== "1") setTourOpen(true);
+    } catch {
+      setTourOpen(true);
+    }
+  }, []);
 
   // Competencies that already have notes start expanded.
   function competenciesWithNotes(result: CaptureData | null): number[] {
@@ -397,14 +410,26 @@ export default function EvaluationCapture() {
           >
             <ArrowLeft className="h-4 w-4 mr-2" /> Classic editor
           </Button>
-          <Button size="sm" onClick={() => setReviewOpen(true)}>
-            Review &amp; submit
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => setTourOpen(true)}
+            aria-label="Show tutorial"
+          >
+            <HelpCircle className="h-4 w-4 mr-2" /> Show tutorial
           </Button>
+          <span id="tour-submit" className="rounded-full">
+            <Button size="sm" onClick={() => setReviewOpen(true)}>
+              Review &amp; submit
+            </Button>
+          </span>
         </div>
       </div>
 
-      {/* Signposting */}
-      {showIntro && (
+      {/* Signposting: a lighter persistent hint. Hidden while the full tour is
+          open so the two never stack on first run. */}
+      {showIntro && !tourOpen && (
         <Card className="border-none shadow-sm" style={{ backgroundColor: tint }}>
           <CardContent className="py-4 flex items-start gap-3.5">
             <span
@@ -492,7 +517,7 @@ export default function EvaluationCapture() {
       {/* Two-pane: REFERENCE (rubric) | CAPTURE (input) */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* REFERENCE pane */}
-        <aside className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto space-y-3 pr-1">
+        <aside id="tour-rubric" className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto space-y-3 pr-1">
           <div className="flex items-center gap-2 px-1 pt-0.5">
             <BookOpen className="h-4 w-4" style={{ color: richColor }} />
             <p className="text-2xs font-semibold uppercase tracking-[0.12em]" style={{ color: richColor }}>
@@ -557,7 +582,7 @@ export default function EvaluationCapture() {
         {/* CAPTURE pane */}
         <div ref={captureRef} className="lg:col-span-3 space-y-5">
           {/* Input */}
-          <Card className="overflow-hidden border-none shadow-md" style={{ backgroundColor: tint }}>
+          <Card id="tour-feedback" className="overflow-hidden border-none shadow-md" style={{ backgroundColor: tint }}>
             <CardContent className="py-5 space-y-5">
               <div className="flex items-start gap-3">
                 <span
@@ -619,7 +644,7 @@ export default function EvaluationCapture() {
           </Card>
 
           {/* Scores + seeded notes (condensed) */}
-          <div className="space-y-3">
+          <div id="tour-scores" className="space-y-3">
             <div className="flex items-center gap-2 px-1">
               <PenLine className="h-4 w-4 text-muted-foreground" />
               <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -831,6 +856,8 @@ export default function EvaluationCapture() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CaptureTour open={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 }

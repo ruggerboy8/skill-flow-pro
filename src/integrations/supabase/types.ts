@@ -1063,6 +1063,8 @@ export type Database = {
           domain_name: string | null
           evaluation_id: string
           interview_prompt_snapshot: string | null
+          observer_glow: string | null
+          observer_grow: string | null
           observer_is_na: boolean | null
           observer_note: string | null
           observer_score: number | null
@@ -1080,6 +1082,8 @@ export type Database = {
           domain_name?: string | null
           evaluation_id: string
           interview_prompt_snapshot?: string | null
+          observer_glow?: string | null
+          observer_grow?: string | null
           observer_is_na?: boolean | null
           observer_note?: string | null
           observer_score?: number | null
@@ -1097,6 +1101,8 @@ export type Database = {
           domain_name?: string | null
           evaluation_id?: string
           interview_prompt_snapshot?: string | null
+          observer_glow?: string | null
+          observer_grow?: string | null
           observer_is_na?: boolean | null
           observer_note?: string | null
           observer_score?: number | null

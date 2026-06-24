@@ -421,7 +421,7 @@ export default function EvaluationCapture() {
           >
             <HelpCircle className="h-4 w-4 mr-2" /> Show tutorial
           </Button>
-          <span id="tour-submit" className="rounded-full">
+          <span id="tour-submit" className="inline-flex rounded-full">
             <Button size="sm" onClick={() => setReviewOpen(true)}>
               Review &amp; submit
             </Button>

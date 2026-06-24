@@ -95,19 +95,10 @@ export default function EvaluationCapture() {
     }
   }, []);
 
-  // Competencies that already have notes start expanded.
-  function competenciesWithNotes(result: CaptureData | null): number[] {
-    if (!result) return [];
-    return result.domains.flatMap((d) =>
-      d.competencies.filter((c) => c.glow || c.grow).map((c) => c.competencyId),
-    );
-  }
-
   async function reload() {
     if (!evalId) return null;
     const result = await loadCaptureData(evalId);
     setData(result);
-    setOpenIds((prev) => new Set([...prev, ...competenciesWithNotes(result)]));
     return result;
   }
 
@@ -118,10 +109,7 @@ export default function EvaluationCapture() {
       setLoading(true);
       try {
         const result = await loadCaptureData(evalId);
-        if (!cancelled) {
-          setData(result);
-          setOpenIds(new Set(competenciesWithNotes(result)));
-        }
+        if (!cancelled) setData(result);
       } catch (e) {
         if (!cancelled) {
           toast({
@@ -358,29 +346,7 @@ export default function EvaluationCapture() {
   const atLast = activeIdx === data.domains.length - 1;
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 xl:px-20 space-y-6">
-      {/* Process arrows: vertically centered in the viewport, hugging the outer edges of the content module */}
-      <div className="hidden xl:block fixed inset-x-0 top-1/2 z-20 pointer-events-none">
-        <div className="max-w-7xl mx-auto px-1 relative">
-          <button
-            aria-label="Previous domain"
-            onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
-            disabled={atFirst}
-            className="pointer-events-auto absolute left-0 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button
-            aria-label="Next domain"
-            onClick={() => setActiveIdx((i) => Math.min(data.domains.length - 1, i + 1))}
-            disabled={atLast}
-            className="pointer-events-auto absolute right-0 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1.5">
@@ -516,8 +482,19 @@ export default function EvaluationCapture() {
         })}
       </div>
 
-      {/* Two-pane: REFERENCE (rubric) | CAPTURE (input) */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+      {/* Two-pane with in-flow step arrows that track the content width (so they
+          reposition when the app nav bar opens/closes) and stay vertically centered. */}
+      <div className="flex items-start gap-2 xl:gap-3">
+        <button
+          aria-label="Previous domain"
+          onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
+          disabled={atFirst}
+          className="hidden xl:flex sticky top-[calc(50vh-1.375rem)] h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+
+        <div className="min-w-0 flex-1 grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* REFERENCE pane */}
         <aside id="tour-rubric" className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto space-y-3 pr-1">
           <div className="flex items-center gap-2 px-1 pt-0.5">
@@ -749,6 +726,13 @@ export default function EvaluationCapture() {
                         className="text-2xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
                       >
                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "" : "-rotate-90"}`} /> Notes
+                        {!open && (comp.glow?.trim() || comp.grow?.trim()) && (
+                          <span
+                            className="ml-0.5 h-1.5 w-1.5 rounded-full"
+                            style={{ background: richColor }}
+                            aria-label="has notes"
+                          />
+                        )}
                       </button>
                       <button
                         onClick={() => handleNA(activeDomain.domainId, comp)}
@@ -769,6 +753,16 @@ export default function EvaluationCapture() {
             })}
           </div>
         </div>
+        </div>
+
+        <button
+          aria-label="Next domain"
+          onClick={() => setActiveIdx((i) => Math.min(data.domains.length - 1, i + 1))}
+          disabled={atLast}
+          className="hidden xl:flex sticky top-[calc(50vh-1.375rem)] h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Review & submit */}

@@ -229,7 +229,7 @@ export default function FacilitatePage() {
                 icon={PartyPopper} iconColor={v("--score-4")}
                 question="What glowed this week?"
                 showJourney={showJourney} setShowJourney={setShowJourney}
-                role={role} activeStage={activeStage} setActiveStage={setActiveStage}
+                role={legacyRoleKey} activeStage={activeStage} setActiveStage={setActiveStage}
               />
             )}
 
@@ -238,7 +238,7 @@ export default function FacilitatePage() {
                 icon={Sprout} iconColor={v("--score-2")}
                 question="What can we grow next week?"
                 showJourney={showJourney} setShowJourney={setShowJourney}
-                role={role} activeStage={activeStage} setActiveStage={setActiveStage}
+                role={legacyRoleKey} activeStage={activeStage} setActiveStage={setActiveStage}
               />
             )}
           </div>
@@ -404,7 +404,7 @@ function Reflection({ icon: Icon, iconColor, question, showJourney, setShowJourn
         <p className="text-6xl font-semibold leading-[1.05] tracking-tight max-w-4xl">{question}</p>
       </div>
 
-      {showJourney && <JourneyExplorer role={role} active={activeStage} setActive={setActiveStage} />}
+      {showJourney && <JourneyExplorer role={legacyRoleKey} active={activeStage} setActive={setActiveStage} />}
 
       {/* Ariana's "supply cabinet": understated, off to the side */}
       <div className="mt-12">

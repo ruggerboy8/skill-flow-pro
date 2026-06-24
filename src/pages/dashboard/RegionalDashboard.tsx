@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
-import { useUserRole } from '@/hooks/useUserRole';
 import { useLocationExcuses } from '@/hooks/useLocationExcuses';
 import { LocationHealthCard, LocationStats } from '@/components/dashboard/LocationHealthCard';
 import { ExcuseSubmissionsDialog } from '@/components/dashboard/ExcuseSubmissionsDialog';
@@ -29,7 +28,6 @@ interface LocationConfig {
 }
 
 export default function RegionalDashboard() {
-  const { managedLocationIds, managedOrgIds, isSuperAdmin } = useUserRole();
   const tz = useLocationTimezone();
   const [now, setNow] = useState(nowUtc());
   const [excuseDialogOpen, setExcuseDialogOpen] = useState(false);
@@ -106,12 +104,6 @@ export default function RegionalDashboard() {
     const byLocation = new Map<string, StaffWeekSummary[]>();
     
     summaries.forEach(s => {
-      if (!isSuperAdmin) {
-        const hasOrgAccess = managedOrgIds.includes(s.group_id);
-        const hasLocationAccess = managedLocationIds.includes(s.location_id);
-        if (!hasOrgAccess && !hasLocationAccess) return;
-      }
-      
       if (!byLocation.has(s.location_id)) {
         byLocation.set(s.location_id, []);
       }
@@ -186,7 +178,7 @@ export default function RegionalDashboard() {
       totals: { totalStaff, totalMissingConf, totalMissingPerf, totalPendingConf, avgRate, locationCount: stats.length,
         totalConfSubmitted, totalConfExpected, totalPerfSubmitted, totalPerfExpected, anyLocationPastDeadline }
     };
-  }, [summaries, managedLocationIds, managedOrgIds, isSuperAdmin, locationGatesMap]);
+  }, [summaries, locationGatesMap]);
 
   // Compute signals — only fire when a deadline has actually passed
   const signals = useMemo((): Signal[] => {

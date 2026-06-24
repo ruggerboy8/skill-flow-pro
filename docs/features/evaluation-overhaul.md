@@ -213,10 +213,21 @@ Phase 1. The release/UI work in Phase 3 can run in parallel since it does not to
 - Pro Move teaching depth: **titles only**, description / "why this matters" on hover, no
   click-through to learning materials.
 
+**Companion docs (Phase 1 progress):**
+- Transcription/recorder decision: [`evaluation-transcription-spike.md`](evaluation-transcription-spike.md)
+  — recommends simplify-don't-re-platform (single Whisper, short clips, delete chunking/pause).
+- Sentence-stem draft: [`evaluation-capture-stems.md`](evaluation-capture-stems.md) — grounded
+  working set, **owner to edit wording.** Key refinement: each stem is labeled Glow or Grow, so the
+  AI slots by competency without having to infer praise vs critique.
+
 **Still open, to settle during build:**
-1. **Prompt wording** for the per-domain sentence stems (owner-authored, during §2.1).
-2. **Transcription approach** — output of the §2.2 spike (single-take clips vs streaming provider).
+1. **Prompt wording** — draft exists ([stems doc](evaluation-capture-stems.md)); owner to finalize.
+2. **Transcription approach** — spike done ([spike doc](evaluation-transcription-spike.md));
+   recommendation is short single-take clips on Whisper, streaming deferred.
 3. **Post-record Pro Move flagging** — prototype and decide if it earns its place (§2.3).
+4. **Glow/Grow storage** — recommend additive `observer_glow` / `observer_grow` columns on
+   `evaluation_items`, keeping `observer_note` populated for backward compat until Phase 2 migrates
+   the staff review. (Gates Workstream A.)
 
 ---
 

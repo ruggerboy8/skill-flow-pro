@@ -36,6 +36,7 @@ import PlatformPage from "@/pages/PlatformPage";
 import EvalResultsV2 from "@/pages/admin/EvalResultsV2";
 import EvaluationViewer from "@/pages/EvaluationViewer";
 import EvaluationReview from "@/pages/EvaluationReview";
+import EvaluationReviewV2 from "@/pages/EvaluationReviewV2";
 import AdminBuilder from "@/pages/AdminBuilder";
 import PlannerPage from "@/pages/planner/PlannerPage";
 import NotFound from "@/pages/NotFound";
@@ -171,6 +172,7 @@ function AppRoutes() {
         <Route path="admin/eval-results-v2" element={<Navigate to="/admin/evaluations" replace />} />
         <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
         <Route path="evaluation/:evalId/review" element={<EvaluationReview />} />
+        <Route path="evaluation/:evalId/review-v2" element={<EvaluationReviewV2 />} />
         <Route path="builder" element={<AdminBuilder />} />
         {/* Legacy builder routes redirect to planner */}
         <Route path="builder/:roleId" element={<Navigate to="/builder" replace />} />

@@ -27,18 +27,43 @@ export interface DomainSummary {
   count_scored: number;
 }
 
+/** A single competency within the per-domain walkthrough (v4+). */
+export interface ReviewDomainItem {
+  competency_id: number;
+  competency_name: string;
+  domain_name: string;
+  observer_score: number | null;
+  observer_is_na: boolean;
+  observer_glow: string | null;
+  observer_grow: string | null;
+  observer_note: string | null;
+  self_score: number | null;
+  gap: number | null;
+  /** Client-enriched tagline (not from RPC) */
+  tagline?: string | null;
+}
+
+/** Per-domain full breakdown for the staff walkthrough (v4+). */
+export interface ReviewDomainBreakdown {
+  domain_name: string;
+  observer_avg: number | null;
+  items: ReviewDomainItem[];
+}
+
 export interface ReviewPayload {
   version: number;
   computed_at: string;
   sparse: boolean;
   domain_summaries: DomainSummary[];
+  /** Present on v4+ payloads; empty for older v2/v3. */
+  domain_breakdown: ReviewDomainBreakdown[];
   top_candidates: ReviewPayloadItem[];
   bottom_candidates: ReviewPayloadItem[];
   top_used_fallback: boolean;
 }
 
 /** Current payload version this client expects */
-export const CURRENT_PAYLOAD_VERSION = 3;
+export const CURRENT_PAYLOAD_VERSION = 4;
 
 /**
  * Parse and validate a review payload from the stored JSONB.
@@ -58,6 +83,7 @@ export function parseReviewPayload(raw: unknown): ReviewPayload | null {
     computed_at: (p.computed_at as string) ?? '',
     sparse: (p.sparse as boolean) ?? false,
     domain_summaries: (p.domain_summaries as DomainSummary[]) ?? [],
+    domain_breakdown: (p.domain_breakdown as ReviewDomainBreakdown[]) ?? [],
     top_candidates: (p.top_candidates as ReviewPayloadItem[]) ?? [],
     bottom_candidates: (p.bottom_candidates as ReviewPayloadItem[]) ?? [],
     top_used_fallback: (p.top_used_fallback as boolean) ?? false,

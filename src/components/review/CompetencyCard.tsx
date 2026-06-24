@@ -11,9 +11,11 @@ interface CompetencyCardProps {
   disabled?: boolean;
   /** Hide the selection affordance entirely (read-only display) */
   readOnly?: boolean;
+  /** De-emphasize: hide the coach-vs-self gap number (staff-facing V2). */
+  hideGap?: boolean;
 }
 
-export function CompetencyCard({ item, selected, onSelect, disabled, readOnly }: CompetencyCardProps) {
+export function CompetencyCard({ item, selected, onSelect, disabled, readOnly, hideGap }: CompetencyCardProps) {
   const [noteOpen, setNoteOpen] = useState(false);
   const glow = item.observer_glow?.trim();
   const grow = item.observer_grow?.trim();
@@ -56,7 +58,7 @@ export function CompetencyCard({ item, selected, onSelect, disabled, readOnly }:
         ) : (
           <span className="italic">Self: Not enough data</span>
         )}
-        {item.gap != null && item.self_score != null && (
+        {!hideGap && item.gap != null && item.self_score != null && (
           <span className="text-muted-foreground">Gap: {item.gap > 0 ? '+' : ''}{item.gap}</span>
         )}
       </div>

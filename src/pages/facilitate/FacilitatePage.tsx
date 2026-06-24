@@ -127,15 +127,24 @@ export default function FacilitatePage() {
             </Select>
             <span className="h-4 w-px bg-border" />
             <span className="text-xs text-muted-foreground">Role</span>
-            <Select value={role} onValueChange={(val) => changeRole(val as Role)}>
-              <SelectTrigger className="h-8 w-36 border-0 bg-transparent shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
+            <Select
+              value={roleId != null ? String(roleId) : ""}
+              onValueChange={(val) => changeRole(Number(val))}
+              disabled={orgRoles.length === 0}
+            >
+              <SelectTrigger className="h-8 w-44 border-0 bg-transparent shadow-none focus:ring-0">
+                <SelectValue placeholder={orgRoles.length === 0 ? "No roles" : "Select role"} />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="RDA">RDA</SelectItem>
-                <SelectItem value="DFI">DFI</SelectItem>
-                <SelectItem value="OM">Office Manager</SelectItem>
+                {orgRoles.map(r => (
+                  <SelectItem key={r.role_id} value={String(r.role_id)}>
+                    {resolveRole(r.role_id, r.role_name)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
+
           <Button variant="ghost" size="icon" className="ml-1" aria-label="Exit session" onClick={() => navigate("/")}>
             <X className="h-4 w-4" />
           </Button>

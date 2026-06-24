@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useLayoutEffect } from "react";
+import { useState, useMemo, useRef, useLayoutEffect, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -15,6 +15,20 @@ import {
   journeyStages, icebreakers,
 } from "./facilitatorData";
 import { useFacilitatorWeek, WeekProMove, ProMoveResource } from "./useFacilitatorWeek";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useRoleDisplayNames } from "@/hooks/useRoleDisplayNames";
+
+// Map archetype_code → legacy Role key used by the seeded journey content.
+const ARCHETYPE_TO_LEGACY: Record<string, Role> = {
+  front_desk: "DFI",
+  dental_assistant: "RDA",
+  lead_dental_assistant: "RDA",
+  practice_manager: "OM",
+};
+
+interface OrgRole { role_id: number; role_name: string; archetype_code: string | null; }
 
 type StepId = "question" | "promoves" | "confidence" | "glows" | "grows" | "performance";
 

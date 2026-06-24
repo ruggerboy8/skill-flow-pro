@@ -60,6 +60,9 @@ verify_jwt = true
 [functions.map-observation-notes]
 verify_jwt = true
 
+[functions.slot-domain-feedback]
+verify_jwt = true
+
 [functions.format-agenda]
 verify_jwt = true
 

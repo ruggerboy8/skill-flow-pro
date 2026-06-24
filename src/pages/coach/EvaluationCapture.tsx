@@ -22,6 +22,8 @@ import {
   Lightbulb,
   PenLine,
   HelpCircle,
+  CircleDashed,
+  MessageSquare,
 } from "lucide-react";
 import {
   loadCaptureData,
@@ -786,7 +788,7 @@ export default function EvaluationCapture() {
               {unscored.length === 0 ? (
                 <Check className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-complete))" }} />
               ) : (
-                <AlertTriangle className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <CircleDashed className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-missing))" }} />
               )}
               <span>
                 {unscored.length === 0
@@ -798,7 +800,7 @@ export default function EvaluationCapture() {
               {lowMissingNote.length === 0 ? (
                 <Check className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-complete))" }} />
               ) : (
-                <AlertTriangle className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <MessageSquare className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-missing))" }} />
               )}
               <span>
                 {lowMissingNote.length === 0
@@ -816,30 +818,56 @@ export default function EvaluationCapture() {
                   {d.domainName}
                 </p>
                 <div className="space-y-1">
-                  {d.competencies.map((c) => (
-                    <div
-                      key={c.competencyId}
-                      className="flex items-start justify-between gap-3 border-b border-border/50 pb-1 text-sm"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-medium leading-snug">{c.name}</div>
-                        {(c.glow || c.grow) && (
-                          <div className="text-2xs text-muted-foreground line-clamp-2">
-                            {[c.glow, c.grow].filter(Boolean).join(" · ")}
-                          </div>
-                        )}
+                  {d.competencies.map((c) => {
+                    const needsScore = c.observerScore == null && !c.observerIsNA;
+                    const needsNote =
+                      c.observerScore != null && c.observerScore <= 2 && !c.glow?.trim() && !c.grow?.trim();
+                    return (
+                      <div
+                        key={c.competencyId}
+                        className="flex items-start justify-between gap-3 border-b border-border/50 pb-1 text-sm"
+                      >
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="font-medium leading-snug">{c.name}</div>
+                          {c.glow?.trim() && (
+                            <div className="flex items-start gap-1.5 text-2xs text-muted-foreground">
+                              <Sun className="mt-0.5 h-3 w-3 shrink-0" style={{ color: "hsl(var(--score-4))" }} />
+                              <span className="line-clamp-2">{c.glow}</span>
+                            </div>
+                          )}
+                          {c.grow?.trim() && (
+                            <div className="flex items-start gap-1.5 text-2xs text-muted-foreground">
+                              <Sprout className="mt-0.5 h-3 w-3 shrink-0" style={{ color: "hsl(var(--score-2))" }} />
+                              <span className="line-clamp-2">{c.grow}</span>
+                            </div>
+                          )}
+                        </div>
+                        <span className="shrink-0 inline-flex items-center gap-1.5 text-2xs font-medium">
+                          {needsScore ? (
+                            <span
+                              className="inline-flex items-center gap-1"
+                              style={{ color: "hsl(var(--status-missing))" }}
+                            >
+                              <CircleDashed className="h-3.5 w-3.5" /> Needs score
+                            </span>
+                          ) : c.observerIsNA ? (
+                            <span className="text-muted-foreground">N/A</span>
+                          ) : (
+                            <>
+                              Score {c.observerScore}
+                              {needsNote && (
+                                <MessageSquare
+                                  className="h-3.5 w-3.5"
+                                  style={{ color: "hsl(var(--status-missing))" }}
+                                  aria-label="needs a note"
+                                />
+                              )}
+                            </>
+                          )}
+                        </span>
                       </div>
-                      <span className="shrink-0 text-2xs font-medium">
-                        {c.observerIsNA ? (
-                          "N/A"
-                        ) : c.observerScore != null ? (
-                          `Score ${c.observerScore}`
-                        ) : (
-                          <span className="text-muted-foreground">not scored</span>
-                        )}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}

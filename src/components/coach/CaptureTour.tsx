@@ -182,18 +182,32 @@ export function CaptureTour({ open, onClose }: { open: boolean; onClose: () => v
       }
     : null;
 
-  // Position the step card: below the spotlight if there's room, otherwise
-  // above it; centered when there's no target (intro/last fallback).
+  // Position the step card. For a tall target (or one that overruns the
+  // viewport), center the card so it can never get lost off-screen. For a
+  // normal target, sit below it (or above), aligned horizontally to the target
+  // and clamped to the viewport.
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const cardWidth = Math.min(352, vw - 32);
   let cardStyle: React.CSSProperties;
-  if (hole) {
-    const belowTop = hole.top + hole.height + CARD_GAP;
-    const spaceBelow = window.innerHeight - belowTop;
-    const placeBelow = spaceBelow > 220;
-    cardStyle = placeBelow
-      ? { top: belowTop, left: "50%", transform: "translateX(-50%)" }
-      : { bottom: window.innerHeight - hole.top + CARD_GAP, left: "50%", transform: "translateX(-50%)" };
-  } else {
+  if (!hole) {
     cardStyle = { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
+  } else {
+    const targetTall = hole.height > vh * 0.6 || hole.top < 8 || hole.top + hole.height > vh - 8;
+    if (targetTall) {
+      cardStyle = { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
+    } else {
+      const centerX = hole.left + hole.width / 2;
+      const left = Math.min(Math.max(centerX - cardWidth / 2, 16), vw - cardWidth - 16);
+      const belowTop = hole.top + hole.height + CARD_GAP;
+      if (vh - belowTop > 240) {
+        cardStyle = { top: belowTop, left, transform: "none" };
+      } else if (hole.top > 240) {
+        cardStyle = { bottom: vh - hole.top + CARD_GAP, left, transform: "none" };
+      } else {
+        cardStyle = { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
+      }
+    }
   }
 
   return (

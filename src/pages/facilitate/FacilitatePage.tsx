@@ -56,8 +56,10 @@ const v = (cssVar: string) => `hsl(var(${cssVar}))`;
 
 export default function FacilitatePage() {
   const navigate = useNavigate();
+  const { practiceType } = useUserRole();
+  const { resolve: resolveRole } = useRoleDisplayNames();
   const [meeting, setMeeting] = useState<MeetingType>("in");
-  const [role, setRole] = useState<Role>("RDA");
+  const [roleId, setRoleId] = useState<number | null>(null);
   const [step, setStep] = useState<StepId>("question");
   const [qIndex, setQIndex] = useState(0);
   const [custom, setCustom] = useState("");
@@ -67,8 +69,33 @@ export default function FacilitatePage() {
   const [activeStage, setActiveStage] = useState<number | null>(null);
   const [showMaterial, setShowMaterial] = useState(false);
 
+  // Load the active roles available for this org's practice type.
+  const { data: orgRoles = [] } = useQuery<OrgRole[]>({
+    queryKey: ["facilitator-roles", practiceType],
+    enabled: !!practiceType,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("roles")
+        .select("role_id, role_name, archetype_code, practice_type, active")
+        .eq("practice_type", practiceType!)
+        .eq("active", true)
+        .order("role_id");
+      // Exclude doctors — facilitator flow targets staff roles.
+      return (data ?? []).filter((r: any) => r.archetype_code !== "doctor") as OrgRole[];
+    },
+  });
+
+  // Default-select the first available role once roles arrive.
+  useEffect(() => {
+    if (roleId == null && orgRoles.length > 0) setRoleId(orgRoles[0].role_id);
+  }, [orgRoles, roleId]);
+
+  const activeRole = orgRoles.find(r => r.role_id === roleId);
+  const legacyRoleKey: Role = (activeRole && ARCHETYPE_TO_LEGACY[activeRole.archetype_code ?? ""]) || "RDA";
+  const roleDisplayName = activeRole ? resolveRole(activeRole.role_id, activeRole.role_name) : "";
+
   const steps = STEPS[meeting];
-  const { data: proMoves = [], isLoading: pmLoading } = useFacilitatorWeek(role);
+  const { data: proMoves = [], isLoading: pmLoading } = useFacilitatorWeek(roleId);
   const safeIndex = proMoves.length ? Math.min(pmIndex, proMoves.length - 1) : 0;
   const question = custom || icebreakers[qIndex];
 
@@ -76,7 +103,7 @@ export default function FacilitatePage() {
   const changeMeeting = (m: MeetingType) => {
     setMeeting(m); setStep(STEPS[m][0].id); setActiveStage(null); setShowJourney(false); setShowMaterial(false);
   };
-  const changeRole = (r: Role) => { setRole(r); setPmIndex(0); setShowMaterial(false); };
+  const changeRole = (id: number) => { setRoleId(id); setPmIndex(0); setShowMaterial(false); };
   const moveTo = (i: number) => { setShowMaterial(false); setPmIndex(i); };
 
   return (

@@ -1,0 +1,147 @@
+/**
+ * Data layer for the rebuilt per-domain evaluation capture flow.
+ *
+ * Reuses the existing getEvaluation loader (so the eval + items come from the
+ * same place the classic EvaluationHub uses) and layers on the Pro Moves per
+ * competency plus the per-(role, domain) framing summary. All writes are to the
+ * existing evaluation_items row, including the additive observer_glow /
+ * observer_grow columns. Nothing here touches the classic flow.
+ */
+import { supabase } from "@/integrations/supabase/client";
+import { getEvaluation } from "@/lib/evaluations";
+import { getDomainSummary } from "@/lib/evalCaptureFraming";
+
+export interface CaptureCompetency {
+  competencyId: number;
+  name: string;
+  tagline?: string | null;
+  description?: string | null;
+  proMoves: string[];
+  observerScore: number | null;
+  observerIsNA: boolean;
+  glow: string | null;
+  grow: string | null;
+}
+
+export interface CaptureDomain {
+  domainId: number;
+  domainName: string;
+  summary: string | null;
+  competencies: CaptureCompetency[];
+}
+
+export interface CaptureData {
+  evalId: string;
+  staffId: string;
+  roleId: number;
+  staffStatus: string;
+  domains: CaptureDomain[];
+}
+
+const DOMAIN_ORDER = [1, 2, 3, 4]; // Clinical, Clerical, Cultural, Case Acceptance
+
+export async function loadCaptureData(evalId: string): Promise<CaptureData | null> {
+  const evaluation = await getEvaluation(evalId);
+  if (!evaluation) return null;
+
+  const items = evaluation.items || [];
+  const competencyIds = items.map((i) => i.competency_id);
+
+  // Fetch Pro Moves for these competencies (the readable prompting resource).
+  const proMovesByCompetency = new Map<number, string[]>();
+  if (competencyIds.length > 0) {
+    const { data: proMoves } = await supabase
+      .from("pro_moves")
+      .select("competency_id, action_statement")
+      .in("competency_id", competencyIds);
+    for (const pm of proMoves || []) {
+      if (pm.competency_id == null) continue;
+      const list = proMovesByCompetency.get(pm.competency_id) || [];
+      if (pm.action_statement) list.push(pm.action_statement);
+      proMovesByCompetency.set(pm.competency_id, list);
+    }
+  }
+
+  const roleId = (evaluation as { role_id: number }).role_id;
+
+  // Group items by domain.
+  const byDomain = new Map<number, CaptureDomain>();
+  for (const item of items) {
+    const domainId = (item as { domain_id: number | null }).domain_id ?? 0;
+    const domainName = (item as { domain_name?: string | null }).domain_name || "Other";
+    if (!byDomain.has(domainId)) {
+      byDomain.set(domainId, {
+        domainId,
+        domainName,
+        summary: getDomainSummary(roleId, domainId),
+        competencies: [],
+      });
+    }
+    byDomain.get(domainId)!.competencies.push({
+      competencyId: item.competency_id,
+      name: item.competency_name_snapshot || `Competency ${item.competency_id}`,
+      tagline: (item as { tagline?: string | null }).tagline ?? null,
+      description: (item as { competency_description?: string | null }).competency_description ?? null,
+      proMoves: proMovesByCompetency.get(item.competency_id) || [],
+      observerScore: item.observer_score ?? null,
+      observerIsNA: Boolean((item as { observer_is_na?: boolean }).observer_is_na),
+      glow: (item as { observer_glow?: string | null }).observer_glow ?? null,
+      grow: (item as { observer_grow?: string | null }).observer_grow ?? null,
+    });
+  }
+
+  const domains = Array.from(byDomain.values()).sort(
+    (a, b) => DOMAIN_ORDER.indexOf(a.domainId) - DOMAIN_ORDER.indexOf(b.domainId),
+  );
+
+  return {
+    evalId,
+    staffId: (evaluation as { staff_id: string }).staff_id,
+    roleId,
+    staffStatus: (evaluation as { status: string }).status,
+    domains,
+  };
+}
+
+export interface CaptureItemPatch {
+  observer_score?: number | null;
+  observer_is_na?: boolean;
+  observer_glow?: string | null;
+  observer_grow?: string | null;
+}
+
+/** Patch a single evaluation_items row (score, N/A, glow, grow). */
+export async function saveCaptureItem(
+  evalId: string,
+  competencyId: number,
+  patch: CaptureItemPatch,
+): Promise<void> {
+  const { error } = await supabase
+    .from("evaluation_items")
+    // Cast: observer_glow/observer_grow are newly added and not yet in generated types.
+    .update(patch as never)
+    .eq("evaluation_id", evalId)
+    .eq("competency_id", competencyId);
+  if (error) throw new Error(error.message);
+}
+
+export interface SlottedItem {
+  competency_id: number;
+  glow: string | null;
+  grow: string | null;
+}
+
+/** Call the slot-domain-feedback edge function for one domain. */
+export async function slotDomainFeedback(params: {
+  domain: string;
+  competencies: { id: number; name: string; proMoves: string[] }[];
+  glowText: string;
+  growText: string;
+}): Promise<SlottedItem[]> {
+  const { data, error } = await supabase.functions.invoke("slot-domain-feedback", {
+    body: params,
+  });
+  if (error) throw new Error(error.message);
+  if (data?.error) throw new Error(data.error);
+  return (data?.items || []) as SlottedItem[];
+}

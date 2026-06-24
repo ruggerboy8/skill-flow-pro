@@ -30,6 +30,7 @@ import CoachLayoutV2 from "@/pages/coach/CoachLayoutV2";
 import CoachDashboardV2 from "@/pages/coach/CoachDashboardV2";
 import StaffDetailV2 from "@/pages/coach/StaffDetailV2";
 import { EvaluationHub } from "@/pages/coach/EvaluationHub";
+import EvaluationCapture from "@/pages/coach/EvaluationCapture";
 import AdminPage from "@/pages/AdminPage";
 import PlatformPage from "@/pages/PlatformPage";
 import EvalResultsV2 from "@/pages/admin/EvalResultsV2";
@@ -131,6 +132,7 @@ function AppRoutes() {
           <Route index element={<CoachDashboardV2 />} />
           <Route path=":staffId" element={<StaffDetailV2 />} />
           <Route path=":staffId/eval/:evalId" element={<EvaluationHub />} />
+          <Route path=":staffId/eval/:evalId/capture" element={<EvaluationCapture />} />
         </Route>
 
         {/* Dashboard Routes */}

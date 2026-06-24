@@ -11,12 +11,34 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
 
   try {
-    const { text } = await req.json();
+    const { text, context } = await req.json();
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return new Response(
         JSON.stringify({ error: "No text provided" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Optional focus context so the polish stays specific and does not reinterpret
+    // domain/competency names (e.g. "Cultural" is a performance domain, not patient
+    // cultural backgrounds).
+    let contextBlock = "";
+    if (context && typeof context === "object") {
+      const focusAreas = Array.isArray(context.focusAreas) ? context.focusAreas : [];
+      const proMoves = Array.isArray(context.proMoves) ? context.proMoves : [];
+      const lines: string[] = [];
+      for (const f of focusAreas) {
+        if (f && f.competency) {
+          lines.push(`- ${f.competency}${f.domain ? ` (${f.domain} domain)` : ""}${f.about ? `: ${f.about}` : ""}`);
+        }
+      }
+      for (const pm of proMoves) {
+        if (typeof pm === "string" && pm.trim()) lines.push(`- Pro Move: ${pm}`);
+      }
+      if (lines.length) {
+        contextBlock =
+          `\n\nThe person chose these focus areas this quarter. Keep the note grounded in these exact areas and preserve any names they reference:\n${lines.join("\n")}`;
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -35,9 +57,10 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: `You are a writing assistant helping a dental assistant write a short personal note to themselves about what they want to focus on this quarter at work. 
-Polish the text so it's clear, concise, and well-written. Keep the same meaning and first-person voice. Keep it under 500 characters. 
-Return ONLY the polished text, nothing else — no quotes, no explanation.`,
+              content: `You are a writing assistant helping a dental-practice team member write a short personal note to themselves about what they want to focus on this quarter at work.
+Polish the text so it's clear, concise, and well-written. Keep the same meaning and first-person voice. Keep it under 500 characters.
+This is workplace performance coaching with four performance DOMAINS: Clinical, Clerical, Cultural, and Case Acceptance. These are categories of job performance, not patient demographics, cultural backgrounds, or clinical procedures. Treat any domain or competency name the person uses as the proper name of a focus area and preserve it exactly; never reinterpret it (for example, "Cultural" means the Cultural performance domain, not patients' cultural backgrounds). Preserve the person's specific intent and any competencies or Pro Moves they named; do not invent new focus areas.${contextBlock}
+Return ONLY the polished text, nothing else, no quotes, no explanation.`,
             },
             { role: "user", content: text },
           ],

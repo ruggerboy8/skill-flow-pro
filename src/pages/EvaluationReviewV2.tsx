@@ -183,6 +183,7 @@ export default function EvaluationReviewV2() {
       queryClient.invalidateQueries({ queryKey: ['eval-review-v2'] });
       queryClient.invalidateQueries({ queryKey: ['staff-quarter-focus'] });
       queryClient.invalidateQueries({ queryKey: ['current-focus-card'] });
+      queryClient.invalidateQueries({ queryKey: ['eval-ready-card'] });
       setStep(RECAP_STEP); // closing recap instead of bouncing to Home
     } catch (err: any) {
       toast.error(err.message || 'Failed to save');
@@ -534,7 +535,13 @@ export default function EvaluationReviewV2() {
                 onClick={async () => {
                   setPolishing(true);
                   try {
-                    const { data, error } = await supabase.functions.invoke('polish-note', { body: { text: learnerNote } });
+                    const focusAreas = [
+                      ...payload.top_candidates.filter(c => c.competency_id === keepCrushingId),
+                      ...payload.bottom_candidates.filter(c => improveIds.has(c.competency_id)),
+                    ].map(c => ({ competency: c.competency_name, domain: c.domain_name, about: c.tagline ?? undefined }));
+                    const { data, error } = await supabase.functions.invoke('polish-note', {
+                      body: { text: learnerNote, context: { focusAreas, proMoves: chosenMoves } },
+                    });
                     if (error) throw error;
                     if (data?.polished) { setLearnerNote(data.polished.slice(0, 500)); toast.success('Note polished!'); }
                   } catch (err: any) { toast.error(err.message || 'Failed to polish note'); }

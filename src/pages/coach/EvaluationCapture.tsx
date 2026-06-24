@@ -15,6 +15,7 @@ import {
   type CaptureCompetency,
 } from "@/lib/evalCaptureData";
 import { GLOW_STEMS, GROW_STEMS } from "@/lib/evalCaptureFraming";
+import { VoiceCaptureButton } from "@/components/coach/VoiceCaptureButton";
 
 const SCORES = [1, 2, 3, 4];
 
@@ -172,6 +173,15 @@ export default function EvaluationCapture() {
   const activeDomain = data.domains[activeIdx];
   const draft = domainText[activeDomain.domainId] || { glow: "", grow: "" };
 
+  function appendDraft(field: "glow" | "grow", text: string) {
+    setDomainText((p) => {
+      const cur = p[activeDomain.domainId] || { glow: "", grow: "" };
+      const existing = cur[field];
+      const next = existing ? `${existing} ${text}` : text;
+      return { ...p, [activeDomain.domainId]: { ...cur, [field]: next } };
+    });
+  }
+
   function domainProgress(domainId: number) {
     const d = data!.domains.find((x) => x.domainId === domainId)!;
     const rated = d.competencies.filter((c) => c.observerScore != null || c.observerIsNA).length;
@@ -239,7 +249,10 @@ export default function EvaluationCapture() {
       <Card>
         <CardContent className="pt-4 space-y-4">
           <div>
-            <label className="text-sm font-medium">What's going well (Glow)</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">What's going well (Glow)</label>
+              <VoiceCaptureButton onTranscript={(t) => appendDraft("glow", t)} />
+            </div>
             <Textarea
               className="mt-1"
               rows={3}
@@ -254,7 +267,10 @@ export default function EvaluationCapture() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Where they can grow (Grow)</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Where they can grow (Grow)</label>
+              <VoiceCaptureButton onTranscript={(t) => appendDraft("grow", t)} />
+            </div>
             <Textarea
               className="mt-1"
               rows={3}

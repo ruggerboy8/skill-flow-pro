@@ -3,10 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useStaffProfile } from "@/hooks/useStaffProfile";
 import { getLocationWeekContext, assembleWeek } from "@/lib/locationState";
-import { Role } from "./facilitatorData";
-
-// DFI / RDA / OM -> role_id (matches the planner routes in App.tsx)
-const ROLE_ID: Record<Role, number> = { DFI: 1, RDA: 2, OM: 3 };
 
 export interface ProMoveResource {
   type: string;
@@ -25,23 +21,22 @@ export interface WeekProMove {
   hasResource: boolean;
 }
 
-// Returns this week's locked pro moves for a role at the facilitator's location,
-// reusing the same assembleWeek logic the participant ThisWeekPanel uses.
-export function useFacilitatorWeek(role: Role) {
+// Returns this week's locked pro moves for a given role at the facilitator's
+// location, reusing the same assembleWeek logic the participant ThisWeekPanel uses.
+export function useFacilitatorWeek(roleId: number | null) {
   const { user } = useAuth();
   const { data: staff } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const locationId = staff?.primary_location_id ?? null;
-  const roleId = ROLE_ID[role];
 
   return useQuery<WeekProMove[]>({
     queryKey: ["facilitator-week", locationId, roleId],
-    enabled: !!user && !!locationId,
+    enabled: !!user && !!locationId && !!roleId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const ctx = await getLocationWeekContext(locationId!);
       const rows = await assembleWeek({
         userId: user!.id,
-        roleId,
+        roleId: roleId!,
         locationId: locationId!,
         cycleNumber: ctx.cycleNumber,
         weekInCycle: ctx.weekInCycle,
@@ -62,11 +57,11 @@ export function useFacilitatorWeek(role: Role) {
           .order("display_order");
         (res ?? []).forEach((r: any) => {
           // Audio urls are storage paths in the public 'pro-move-audio' bucket; resolve
-        // them to playable public URLs (mirrors ProMoveDrawer).
-        const url = r.type === "audio" && r.url
-          ? supabase.storage.from("pro-move-audio").getPublicUrl(r.url).data.publicUrl
-          : r.url;
-        (byAction[r.action_id] ??= []).push({
+          // them to playable public URLs (mirrors ProMoveDrawer).
+          const url = r.type === "audio" && r.url
+            ? supabase.storage.from("pro-move-audio").getPublicUrl(r.url).data.publicUrl
+            : r.url;
+          (byAction[r.action_id] ??= []).push({
             type: r.type, title: r.title, url,
             contentMd: r.content_md, durationMs: r.duration_ms,
           });

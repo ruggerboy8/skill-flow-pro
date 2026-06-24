@@ -82,7 +82,7 @@ How to choose the competency (read carefully):
 - The competencies in a domain overlap and their Example behaviors often mention related ideas. A behavior listed under one competency does not mean every comment touching that word belongs there. For instance, a comment about a person's own knowledge of clinical procedures is about clinical KNOWLEDGE, not about scheduling or patient flow, even if a flow-related behavior happens to mention procedures.
 - For each note, first reason briefly about which definition fits best, then assign the competency_id, then set confidence. If no competency is a clear fit, set confidence to "low" rather than forcing it into a weak match.
 
-Write every note in warm, second-person coaching voice, addressed to the team member ("You consistently...", "I noticed how you...", "The next level is to..."):
+Write every note in a warm, natural second-person coaching voice, addressed to the team member ("You consistently...", "I noticed how you...", "The next level is to..."). Sound like a supportive manager talking to a teammate they respect: relaxed and human, not stiff or corporate, but not gushing or jokey either. Plain, encouraging language.
 - GLOW notes name a specific behavior AND its impact.
 - GROW notes are forward-looking and specific: an opportunity and a concrete next step, never a verdict.
 - Fix grammar, remove filler and false starts, expand shorthand into clear, natural sentences.

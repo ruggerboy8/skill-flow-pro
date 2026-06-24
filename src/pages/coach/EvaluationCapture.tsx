@@ -11,6 +11,8 @@ import {
   Sparkles,
   Loader2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Check,
   AlertTriangle,
   X,
@@ -67,10 +69,19 @@ export default function EvaluationCapture() {
   });
   const captureRef = useRef<HTMLDivElement>(null);
 
+  // Competencies that already have notes start expanded.
+  function competenciesWithNotes(result: CaptureData | null): number[] {
+    if (!result) return [];
+    return result.domains.flatMap((d) =>
+      d.competencies.filter((c) => c.glow || c.grow).map((c) => c.competencyId),
+    );
+  }
+
   async function reload() {
     if (!evalId) return null;
     const result = await loadCaptureData(evalId);
     setData(result);
+    setOpenIds((prev) => new Set([...prev, ...competenciesWithNotes(result)]));
     return result;
   }
 
@@ -81,7 +92,10 @@ export default function EvaluationCapture() {
       setLoading(true);
       try {
         const result = await loadCaptureData(evalId);
-        if (!cancelled) setData(result);
+        if (!cancelled) {
+          setData(result);
+          setOpenIds(new Set(competenciesWithNotes(result)));
+        }
       } catch (e) {
         if (!cancelled) {
           toast({
@@ -225,7 +239,7 @@ export default function EvaluationCapture() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
         <Skeleton className="h-9 w-72 rounded-lg" />
         <Skeleton className="h-10 w-full rounded-xl" />
         <div className="flex flex-wrap gap-2">
@@ -282,8 +296,29 @@ export default function EvaluationCapture() {
     return { rated, total: d.competencies.length };
   }
 
+  const atFirst = activeIdx === 0;
+  const atLast = activeIdx === data.domains.length - 1;
+
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 xl:px-20 space-y-6">
+      {/* Process arrows: step through domains, sitting outside the content */}
+      <button
+        aria-label="Previous domain"
+        onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
+        disabled={atFirst}
+        className="hidden xl:flex fixed left-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+      <button
+        aria-label="Next domain"
+        onClick={() => setActiveIdx((i) => Math.min(data.domains.length - 1, i + 1))}
+        disabled={atLast}
+        className="hidden xl:flex fixed right-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
+      >
+        <ChevronRight className="h-6 w-6" />
+      </button>
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1.5">
@@ -354,7 +389,7 @@ export default function EvaluationCapture() {
       )}
 
       {/* Domain stepper with color pills */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         {data.domains.map((d, i) => {
           const { rated, total } = domainProgress(d.domainId);
           const complete = rated === total && total > 0;
@@ -407,8 +442,8 @@ export default function EvaluationCapture() {
         {/* REFERENCE pane */}
         <aside className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto space-y-3 pr-1">
           <div className="flex items-center gap-2 px-1 pt-0.5">
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-            <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <BookOpen className="h-4 w-4" style={{ color: richColor }} />
+            <p className="text-2xs font-semibold uppercase tracking-[0.12em]" style={{ color: richColor }}>
               Rubric &middot; {activeDomain.domainName}
             </p>
           </div>
@@ -426,7 +461,11 @@ export default function EvaluationCapture() {
           </Card>
 
           {activeDomain.competencies.map((comp) => (
-            <Card key={comp.competencyId} className="shadow-sm transition-shadow hover:shadow-md">
+            <Card
+              key={comp.competencyId}
+              className="shadow-sm transition-shadow hover:shadow-md"
+              style={{ borderLeftColor: richColor, borderLeftWidth: 3, backgroundColor: `hsl(${richRaw} / 0.06)` }}
+            >
               <CardContent className="py-3.5 space-y-2">
                 <div className="flex items-start gap-2.5">
                   <span
@@ -443,15 +482,15 @@ export default function EvaluationCapture() {
                 </div>
                 {comp.proMoves.length > 0 && (
                   <details className="group ml-[1.125rem]">
-                    <summary className="flex cursor-pointer list-none items-center gap-1.5 text-2xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
-                      What great looks like
+                      Pro Moves
                       <span className="opacity-60">({comp.proMoves.length})</span>
                     </summary>
                     <ul className="mt-2 space-y-1.5">
                       {comp.proMoves.map((pm, i) => (
-                        <li key={i} className="flex items-start gap-2 text-xs leading-snug text-muted-foreground">
-                          <Check className="mt-0.5 h-3 w-3 shrink-0" style={{ color: richColor }} />
+                        <li key={i} className="flex items-start gap-2 text-sm leading-snug text-muted-foreground">
+                          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: richColor }} />
                           <span>{pm}</span>
                         </li>
                       ))}
@@ -536,7 +575,7 @@ export default function EvaluationCapture() {
               </p>
             </div>
             {activeDomain.competencies.map((comp) => {
-              const open = openIds.has(comp.competencyId) || Boolean(comp.glow) || Boolean(comp.grow);
+              const open = openIds.has(comp.competencyId);
               const highlight = recentlySlotted.has(comp.competencyId);
               const low = lowConfidence.has(comp.competencyId);
               return (
@@ -622,16 +661,13 @@ export default function EvaluationCapture() {
                     )}
 
                     <div className="flex items-center justify-between">
-                      {!open ? (
-                        <button
-                          onClick={() => toggleOpen(comp.competencyId)}
-                          className="text-2xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
-                        >
-                          <ChevronDown className="h-3.5 w-3.5" /> Add a note
-                        </button>
-                      ) : (
-                        <span />
-                      )}
+                      <button
+                        onClick={() => toggleOpen(comp.competencyId)}
+                        aria-expanded={open}
+                        className="text-2xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
+                      >
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "" : "-rotate-90"}`} /> Notes
+                      </button>
                       <button
                         onClick={() => handleNA(activeDomain.domainId, comp)}
                         aria-pressed={comp.observerIsNA}

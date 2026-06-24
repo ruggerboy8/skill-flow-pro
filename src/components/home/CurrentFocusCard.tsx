@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { quarterNum } from '@/lib/reviewPayload';
+import { reviewPath } from '@/lib/reviewRoute';
 
 /**
  * Home card showing the staff member's currently selected quarterly focus ProMoves.
@@ -89,8 +90,8 @@ export function CurrentFocusCard() {
             <Target className="w-4 h-4 text-primary" />
             My Quarterly Focus
           </CardTitle>
-          <Link 
-            to={`/evaluation/${data.evalId}/review`}
+          <Link
+            to={reviewPath(data.evalId)}
             className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
           >
             View Evaluation <ExternalLink className="w-3 h-3" />

@@ -7,6 +7,7 @@ import { ClipboardCheck, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { quarterNum } from '@/lib/reviewPayload';
+import { reviewPath } from '@/lib/reviewRoute';
 
 /**
  * Home notification card for unreviewd evaluations.
@@ -81,7 +82,7 @@ export function EvalReadyCard() {
               </p>
             )}
           </div>
-          <Button size="sm" onClick={() => navigate(`/evaluation/${data.evalId}/review`)}>
+          <Button size="sm" onClick={() => navigate(reviewPath(data.evalId))}>
             Start Review <ArrowRight className="w-3.5 h-3.5 ml-1" />
           </Button>
         </CardContent>
@@ -97,7 +98,7 @@ export function EvalReadyCard() {
         <p className="text-sm text-muted-foreground flex-1">
           You have an evaluation review in progress
         </p>
-        <Button variant="outline" size="sm" onClick={() => navigate(`/evaluation/${data.evalId}/review`)}>
+        <Button variant="outline" size="sm" onClick={() => navigate(reviewPath(data.evalId))}>
           Continue Review
         </Button>
       </CardContent>

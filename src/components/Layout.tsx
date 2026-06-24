@@ -79,13 +79,30 @@ export default function Layout() {
   // Can access admin = super admin OR org admin
   const canAccessAdmin = isSuperAdmin || isOrgAdmin;
 
-  // Can access builder = admins, OR staff with explicit can_manage_assignments capability
+  // Capability-based access (new permission system). Read directly from
+  // user_capabilities so non-admin staff with explicit toggles get the right tabs.
+  const caps = (staffProfile?.user_capabilities as any) ?? null;
+  const canViewSubmissions = caps?.can_view_submissions ?? false;
+  const canSubmitEvals = caps?.can_submit_evals ?? false;
+  const canReviewEvals = caps?.can_review_evals ?? false;
+  const canManageUsers = caps?.can_manage_users ?? false;
+  const canManageLocations = caps?.can_manage_locations ?? false;
+  const canInviteUsers = caps?.can_invite_users ?? false;
+  const canManageLibrary = caps?.can_manage_library ?? false;
   const canManageAssignments =
-    canAccessAdmin ||
-    ((staffProfile?.user_capabilities as any)?.can_manage_assignments ?? false);
-  
+    canAccessAdmin || (caps?.can_manage_assignments ?? false);
+
+  // Tab visibility derived from BOTH legacy role flags and capability toggles
+  const showCoachTabs = isCoach || isOrgAdmin || isLead || canViewSubmissions || canSubmitEvals;
+  const showAdminTab = canAccessAdmin || canManageUsers || canManageLocations || canInviteUsers || canManageLibrary;
+  const showEvaluationsTab = canAccessAdmin || canReviewEvals;
+
   // Office managers who are NOT coaches should see "My Location" link
   const showLocationDashboard = isOfficeManager && !isCoach && !isOrgAdmin;
+
+  // "My Role" is the participant area — only useful if the staff has an actual role
+  // assigned (role_id). Non-participant staff (admins, coaches w/o a role) shouldn't see it.
+  const hasAssignedRole = (staffProfile?.role_id ?? null) !== null;
 
   // A "pure" doctor has no admin/coach role — they get the doctor-only nav.
   // Doctors who are also admins/coaches keep their admin nav AND get a Doctor link.
@@ -111,14 +128,14 @@ export default function Layout() {
     { name: 'Platform', href: '/platform', icon: Globe },
   ] : [
     // Standard navigation
-    // Org admins see Command Center instead of Home
-    ...(isOrgAdmin ? [
+    // Org admins (and any staff with admin-style capabilities) see Command Center instead of Home
+    ...(isOrgAdmin || showAdminTab ? [
       { name: 'Command Center', href: '/dashboard', icon: Building2 },
     ] : [
       { name: 'Home', href: '/', icon: Home },
     ]),
-    // My Role hidden for regional admins (org admins) - they use coach/admin tools
-    ...(!isOrgAdmin ? [
+    // My Role only for participants with an assigned role (hidden for org admins and role-less staff)
+    ...(!isOrgAdmin && hasAssignedRole ? [
       { name: 'My Role', href: '/my-role', icon: BookOpen },
     ] : []),
     // My Location for Office Managers (view-only access to their location)
@@ -133,17 +150,18 @@ export default function Layout() {
     ...(isDoctor ? [
       { name: 'Doctor', href: '/doctor', icon: Stethoscope },
     ] : []),
-    // Backfill nav removed - keeping function for individual score backfill only
-    ...(isCoach || isOrgAdmin || isLead ? [
+    ...(showCoachTabs ? [
       { name: 'Coach', href: '/coach', icon: Users },
       { name: 'Facilitate', href: '/facilitate', icon: Presentation },
     ] : []),
     ...(canManageAssignments ? [
       { name: 'Builder', href: '/builder', icon: SettingsIcon },
     ] : []),
-    ...(canAccessAdmin ? [
+    ...(showAdminTab ? [
       { name: 'Admin', href: '/admin', icon: Shield },
-      { name: 'Evaluations', href: '/admin/evaluations', icon: TrendingUp }
+    ] : []),
+    ...(showEvaluationsTab ? [
+      { name: 'Evaluations', href: '/admin/evaluations', icon: TrendingUp },
     ] : []),
   ];
 

@@ -39,12 +39,13 @@ That reframes EX1 from "remove cognitive load" to "scaffold *and* educate at the
 |---|---|---|
 | Storage unit | **Option A: competency stays the storage unit; Pro Move is the lens.** | No schema change to storage grain. |
 | Capture model | **Per-domain guided process** (see §2.1). Walk the evaluator through one domain at a time. | Replaces the flat competency grid and the tap-tagging interaction entirely. |
-| Scoring | **Manual 1–4 per competency, clicked by the evaluator.** Owner wants the deliberate act of choosing each number. | No AI score suggestion. Partial scoring (≈12 of 16) is expected and fine; see §3.1. |
+| Scoring | **Manual 1–4 per competency, clicked by the evaluator.** Owner wants the deliberate act of choosing each number. **Default to rating;** "didn't see it" is an explicit per-competency N/A. No domain is skipped. | No AI score suggestion. See §2.1 and §3.1. |
 | Release policy | **Admin-only separate release.** Submit stays gated. | Tighten RPC auth to org-admin/super-admin (analysis finding #5); kill auto-release ambiguity (#4). |
 | Baseline | **Remove coach `type='Baseline'` from the software.** First eval is colloquially "the baseline" but not a tracked type. **Doctor baseline stays.** | Drop the Baseline branch in eval creation/UI; deletes the duplicate-Baseline uniqueness gap (#6) by removing the case. |
 | Permissions | **Align release/eval auth onto `user_capabilities`** (backlog B2), preserving everyone who legitimately holds it today. | Migrate off the legacy `is_coach/is_org_admin` flags for these paths. |
 | Capture input | **Voice and text equally weighted.** Text gets a "Polish / Magic" button that coachifies the language. | Both paths first-class; the polish step replaces the implicit "format-transcript" cleanup for typed input. |
 | Transcription | **Reconsider the whole approach.** The current Whisper + ElevenLabs fallback feels janky. Explore better browser-side options. | Research spike in §2.2 before committing. |
+| Migration posture | **Keep existing features working alongside new ones until tested; migrate over conservatively.** | Build new functions/columns alongside live ones; never break a live path. Governs all phases. |
 
 ---
 
@@ -57,22 +58,25 @@ The capture experience, rebuilt. This is where the felt pain lives and where the
 Instead of one flat grid of 126 competency rows, the evaluator moves through the **four domains**
 one at a time (Clinical, Clerical, Cultural, Case Acceptance). For each domain:
 
-1. **Show the domain's scope.** Display that domain's competencies, with the underlying Pro Moves
-   shown as **titles only** (no click-through to learning materials). On hover, reveal the Pro
-   Move's description / "why this is important" language. This is the teaching step: it grounds an
-   evaluator who knows the person but not the framework, without burying them in detail.
-2. **Prompt with domain-specific sentence stems / open-ended questions.** The stems pull out what
-   is going well and what they want improved *within that domain* ("In the operatory, what did you
-   see them do well clinically?", "Where did their clinical technique fall short of what you'd
-   want?"). Exact wording is owner-authored during build (§5 open item).
+1. **Show the domain's scope, framed per role.** Lead with a short **you-voice summary** of what
+   this domain means for this person's role (synthesized from that role's Pro Moves), then show the
+   domain's competencies with their **Pro Moves as the primary prompting resource** — readable and
+   scannable beside the capture area, grouped by competency and expandable, but presented so they do
+   not overwhelm. This is the teaching step. See [`evaluation-capture-stems.md`](evaluation-capture-stems.md).
+2. **Prompt with domain *summaries*, in "you," not questions.** The framing is a second-person
+   summary addressed to the staff member ("In Clerical, you run the front-desk machinery…"), with
+   the Pro Moves doing the concrete prompting. Glow and Grow are labeled capture areas with you-voice
+   starter stems ("You did a great job…", "You could grow by…"). Owner finalizes wording.
 3. **Capture by voice or text.** Voice records a short, single-take clip for that domain; text is
    typed directly and gets a Polish / Magic button that formalizes and coachifies the wording.
-4. **AI slots the response under the right competencies in that domain** and returns, at minimum,
-   **recommended Glow and Grow language** the evaluator can accept or edit. Slotting into the
-   correct competency is what makes clean delivery to staff possible.
-5. **The evaluator clicks the 1–4 score for each competency** they want to score, **inline within
-   the domain** (scoring placement is per-domain, owner decision). The deliberate act of choosing
-   the number stays.
+4. **AI slots the response under the right competencies in that domain.** Because each response is
+   Glow- or Grow-labeled, the AI slots by competency without inferring praise vs critique. Slotting
+   into the correct competency is what makes clean delivery to staff possible.
+5. **The evaluator clicks the 1–4 score for each competency**, **inline within the domain** (scoring
+   placement is per-domain). The deliberate act of choosing the number stays. **No domain is skipped:**
+   every domain gets a response, and "didn't see it" is registered per competency as an explicit
+   **N/A / "Did not observe"** rating, not by skipping the domain. **Default to rating** more often
+   than not; make N/A the deliberate exception.
 
 Candidate happy-path flow for a single domain:
 
@@ -138,12 +142,15 @@ completeness, cohesion, and an evaluator-facing pre-submit review, not a rebuild
 
 The "sparse below 4 scored competencies" rule is the wrong worry. Owner's reality:
 
-- Of ~16 competencies per position, **at least ~12 get scored**, and that is fine.
-- The unscored ones are typically the **contextual / not-always-observed** competencies (conflict
-  resolution, complaint handling). Not scoring them is correct behavior, not a gap.
+- Of ~16 competencies per position, **most get scored** (default is to rate), and the few that are
+  not should be **explicitly marked N/A / "Did not observe"** at the competency level, not left
+  blank. The unscored ones are typically the **contextual / not-always-observed** competencies.
+- **Every domain still gets a response** (no domain skipping; see §2.1). "Did not observe" is a
+  per-competency choice, never a per-domain one.
 
-So: **drop the hard count-of-4 sparse gate.** Do not treat unscored contextual competencies as a
-defect.
+So: **drop the hard count-of-4 sparse gate**, and treat an explicit N/A as intentional coverage, not
+a defect. A review is "complete" when every domain has a response and competencies are either scored
+or deliberately marked N/A.
 
 ### 3.2 Glow / Grow as a per-domain preference
 

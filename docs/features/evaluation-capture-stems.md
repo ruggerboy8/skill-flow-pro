@@ -1,108 +1,117 @@
-# Per-Domain Capture Stems — Draft Working Set
+# Per-Domain Capture Framing & Stems — Draft Working Set
 
-*Date: 2026-06-24. Feeds [`evaluation-overhaul.md`](evaluation-overhaul.md) §2.1 (open item #1).*
-*Owner to edit the wording. This is a starting draft grounded in the live competency/Pro Move
-content, not final copy.*
-
-> **Design principle behind these:** each stem is explicitly labeled **Glow** (going well) or
-> **Grow** (room to improve). That label travels with the evaluator's response into
-> `map-observation-notes`, so the AI never has to *infer* whether a comment was praise or critique.
-> It only has to slot the comment under the right competency. This is what makes the slotting
-> reliable and what seeds the staff review's Highlights / Grow sections directly.
->
-> The four domains are **behavioral**, not clinical-technique. The content is front-desk and
-> guardian-facing (greeting, check-in, scheduling, objection handling). Stems prompt for **observable
-> behavior the evaluator actually saw**, which is exactly what an evaluator who knows the person but
-> not the framework can speak to.
+*Date: 2026-06-24. Feeds [`evaluation-overhaul.md`](evaluation-overhaul.md) §2.1.*
+*Owner to edit wording. Grounded in live Pro Move content for Front Desk (role_id 1) as the worked
+example; other roles follow the same synthesis method.*
 
 ---
 
-## How the stems are used in the flow
+## Design principles (owner-set, 2026-06-24)
 
-1. The evaluator is on one domain (e.g. Clinical). The domain's competencies and Pro Move titles are
-   visible beside the prompts (titles only, description on hover).
-2. They answer the **Glow** prompt, then the **Grow** prompt, by voice or text. Optional starter
-   stems sit in the input as ghost text to get them unstuck.
-3. The response is slotted under the right competencies, and the Glow/Grow label is preserved.
-4. They set the 1–4 scores for that domain's competencies, then move on (or jump to another domain).
-
-Domain framings below are deliberately plain-language so they orient an evaluator without competency
-fluency.
-
----
-
-## Clinical
-
-*Plain-language framing shown to the evaluator:* "How this person keeps patients moving smoothly and
-keeps the clinical team in the loop. Think flow, communication with the back, and adapting when the
-day changes." *(Real competencies here include Patient Flow Coordination, Clinical Team
-Communication, Daily Schedule Adaptability.)*
-
-- **Glow prompt:** "Where did you see this person keep the day running smoothly or keep the clinical
-  team well-informed? Give a specific moment if you can."
-  - Starter stems: "One thing they did really well was…" / "I noticed they were great at…"
-- **Grow prompt:** "Where did flow or communication with the back break down, or where could they be
-  more proactive?"
-  - Starter stems: "I'd love to see them…" / "Next time, it would help if they…"
-
-## Clerical
-
-*Framing:* "How this person handles the front-desk machinery: records and paperwork, balancing
-phones and in-person guests, and getting ahead of the schedule." *(Patient Record Maintenance,
-Communication Balancing, Strategic Scheduling.)*
-
-- **Glow prompt:** "Where were they on top of the details, accurate records, paperwork ready,
-  schedule worked ahead, or smooth at juggling the desk and a guest at once?"
-  - Starter stems: "They really stayed on top of…" / "I was impressed by how they…"
-- **Grow prompt:** "Where did details slip, or where did they get stuck juggling competing demands at
-  the desk?"
-  - Starter stems: "It would help if they…" / "I'd like to see them tighten up…"
-
-## Cultural
-
-*Framing:* "How this person makes patients and guardians feel: the welcome, the warmth, building
-trust, and handling policy conversations with both kindness and firmness." *(Welcoming Presence,
-Trust Building Interactions, Empathetic Practice Policy Education.)*
-
-- **Glow prompt:** "When did you see them make a patient or guardian feel genuinely welcome or build
-  real trust? What did that look like?"
-  - Starter stems: "They have a real gift for…" / "A guardian clearly felt…"
-- **Grow prompt:** "Where could the warmth, the read on a family, or a hard policy conversation have
-  gone better?"
-  - Starter stems: "I'd love to help them with…" / "They could lean further into…"
-
-## Case Acceptance
-
-*Framing:* "How this person helps families say yes to care: explaining treatment clearly,
-establishing the doctor's credibility, and handling objections without pressure." *(Treatment
-Communication, Establishing Credibility, Effective Objection Handling.)*
-
-- **Glow prompt:** "Where did they communicate treatment well, build the doctor up, or turn a
-  hesitation into a yes? Give the moment if you can."
-  - Starter stems: "They did a great job explaining…" / "When a parent pushed back, they…"
-- **Grow prompt:** "Where did a treatment conversation fall flat, or an objection go unaddressed?"
-  - Starter stems: "I'd like to see them get more comfortable with…" / "Next time, they could…"
+1. **Everything is in "you," addressed to the staff member.** The evaluator is writing feedback that
+   the staff member will read, so framings and stems are second person: "You greet every family…",
+   "You could grow by…".
+2. **Prompts are domain *summaries*, not questions.** Instead of asking "Where did you see them
+   welcome patients?", we show a short summary of what the domain means for this person's role, and
+   let the evaluator respond to it.
+3. **The Pro Moves themselves are the primary prompting resource.** They are concrete, observable,
+   and already define "good." They must be **accessible and readable** beside the capture area, but
+   presented so they **do not overwhelm** (grouped by competency, scannable, expandable).
+4. **No skipping a domain.** The evaluator always enters something for every domain. Granular "didn't
+   see it" lives at the **competency** level via an N/A / "Did not observe" rating, not by skipping
+   the domain. **Default to rating more often than not.**
+5. **Framing is per role.** Each (role, domain) summary is synthesized from *that role's* Pro Moves in
+   *that domain*. The four domains mean different things for a Front Desk teammate than for a Dental
+   Assistant.
 
 ---
 
-## Notes for the owner to weigh in on
+## How the per-(role, domain) summary is produced
 
-1. **Tone:** drafted in the warm, conversational Alcan voice. Adjust as needed.
-2. **One Glow + one Grow per domain** is the default. We could add a second optional probe per domain
-   ("anything else?") but two prompts keeps it light.
-3. **Role-specific framing:** the framings above are written for the front-desk/guardian-facing
-   content the live data shows. If a role (e.g. an assistant or hygienist) has materially different
-   competencies under the same domain, the framing line may need a per-role variant. Flag if so.
-4. **Optional skip:** an evaluator who genuinely did not observe a domain should be able to skip it
-   cleanly (ties to the Phase 2 decision that not every domain needs a Glow and a Grow).
+Synthesize a short you-voice summary from the role's Pro Moves in the domain. Generate once per
+(role, domain), curate, and **store as config** (do not regenerate per evaluation). The Front Desk
+examples below were synthesized by hand from the live Pro Moves as a model for the rest.
+
+---
+
+## Worked example — Front Desk (role_id 1)
+
+Each domain shows: the **you-voice summary** (the prompt), the **competencies** it spans (the readable
+Pro Moves sit under each in the UI), and **you-voice starter stems** for the Glow and Grow capture
+areas.
+
+### Clinical
+> **Summary (prompt):** "In Clinical, you are the front desk's bridge to the clinical team. You keep
+> patients moving, alerting the back the moment someone is ready and flagging anyone waiting more than
+> ten minutes; you hand off clean information; you adapt the schedule when emergencies or delays hit;
+> and you know common procedures well enough to speak to them with confidence."
+
+Competencies: Patient Flow Coordination · Clinical Team Communication · Daily Schedule Adaptability ·
+Fundamental Dental Knowledge.
+
+### Clerical
+> **Summary (prompt):** "In Clerical, you run the front-desk machinery. You balance phones, texts, and
+> the guest in front of you without dropping any of them; you keep records and paperwork accurate
+> before check-in; you work the schedule days ahead to confirm visits and fill open slots; and you
+> keep the front area clean, stocked, and welcoming."
+
+Competencies: Communication Balancing · Patient Record Maintenance · Strategic Scheduling ·
+Welcoming Environment.
+
+### Cultural
+> **Summary (prompt):** "In Cultural, you set how families feel. You greet every patient and guardian
+> warmly and by their preferred name, build trust by asking about their goals, deliver hard policy and
+> balance conversations with both kindness and firmness, and stay calm and accountable when you
+> receive critical feedback."
+
+Competencies: Welcoming Presence · Trust Building Interactions · Empathetic Practice Policy
+Education · Handling Critical Feedback.
+
+### Case Acceptance
+> **Summary (prompt):** "In Case Acceptance, you help families say yes to care. You explain treatment
+> and finances clearly, using estimated benefits and patient portion rather than covered or not; you
+> build the doctor's and the practice's credibility; you handle objections about cost or x-rays with
+> confidence instead of pressure; and you smooth the path through portal and paperwork."
+
+Competencies: Treatment Communication · Establishing Credibility · Effective Objection Handling ·
+Facilitating Smooth Processes.
+
+### Starter stems (you-voice, all domains)
+- **Glow capture:** "You did a great job…" / "You consistently…" / "I noticed how well you…"
+- **Grow capture:** "You could grow by…" / "I'd love to see you…" / "Next quarter, focus on…"
+
+---
+
+## Capture rules
+
+- **Every domain gets a response.** The Glow and Grow areas are the input; the domain summary plus the
+  Pro Moves prompt them.
+- **N/A is per competency**, labeled "Did not observe." It is the only way to register "I didn't see
+  this," and it lives on the individual competency rating, never on a whole domain.
+- **Default to rating.** The UI should make rating the easy, expected path and N/A the deliberate
+  exception, not the reverse.
+- **Pro Moves are readable but contained:** grouped under their competency, scannable, expandable for
+  the full statement, so they teach without burying the evaluator.
+
+---
+
+## Still for the owner
+
+1. **Wording pass** on the four Front Desk summaries and the starter stems.
+2. **Remaining roles:** synthesize Dental Assistant, Office Manager (and Lead Dental Assistant) the
+   same way. Doctor is the separate doctor track. Empty placeholder roles (Hygienist, Treatment
+   Coordinator) wait until they have Pro Moves.
+3. **Generation vs hand-curation:** are you comfortable with an AI first-pass synthesis of each
+   (role, domain) summary that you then edit, or do you want to author them directly?
 
 ---
 
 ## What this unblocks
 
-- **Workstream A** (`map-observation-notes` rework): the function's input contract is now clear. It
-  receives, per domain, the staff role's competencies for that domain plus the evaluator's
-  **Glow-labeled** and **Grow-labeled** responses, and returns per-competency `glow` / `grow` text.
-  No timeline, no glow-vs-grow inference.
-- **Workstream B** (capture UI): the per-domain screen content is specified (framing + two labeled
-  prompts + starter stems + competency/Pro Move sidebar).
+- **Workstream A** (`slot-domain-feedback`, the new function built alongside the live
+  `map-observation-notes`): per domain it receives the role's competencies, the readable Pro Moves,
+  and the evaluator's Glow-labeled and Grow-labeled you-voice text, and returns per-competency
+  Glow/Grow slotting. No glow-vs-grow inference, no timeline.
+- **Workstream B** (capture UI): per-domain screen content is specified — you-voice summary, Pro
+  Moves under each competency, two labeled capture areas with starter stems, per-competency rating
+  with an explicit "Did not observe," and no domain-level skip.

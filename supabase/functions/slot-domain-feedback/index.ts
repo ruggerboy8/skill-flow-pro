@@ -23,6 +23,7 @@ const MAX_NOTE_CHARS = 600;
 interface CompetencyInput {
   id: number;
   name: string;
+  description?: string | null;
   proMoves?: string[];
 }
 
@@ -60,10 +61,11 @@ serve(async (req) => {
     // model can match observations to the right competency.
     const competencyList = competencies
       .map((c) => {
+        const covers = c.description?.trim() ? `\n  What it covers: ${c.description.trim()}` : "";
         const moves = (c.proMoves ?? [])
           .map((m) => `    * ${m}`)
           .join("\n");
-        return `- ID ${c.id}: "${c.name}"${moves ? `\n${moves}` : ""}`;
+        return `- ID ${c.id}: "${c.name}"${covers}${moves ? `\n  Example behaviors:\n${moves}` : ""}`;
       })
       .join("\n");
 
@@ -73,7 +75,12 @@ The evaluator gave two separate pieces of feedback about one team member:
 - GLOW: what the person is doing well (reinforcing feedback).
 - GROW: what they could improve (growth feedback).
 
-Your job is to split each into per-competency coaching notes and slot them under the right competency, using the competency names and their Pro Moves to decide where each observation belongs.
+Your job is to split each into per-competency coaching notes and slot them under the right competency.
+
+How to choose the competency (read carefully):
+- Match each observation to the competency whose "What it covers" definition best fits the SUBSTANCE of the feedback. Do NOT match on shared keywords alone.
+- The competencies in a domain overlap and their Example behaviors often mention related ideas. A behavior listed under one competency does not mean every comment touching that word belongs there. For instance, a comment about a person's own knowledge of clinical procedures is about clinical KNOWLEDGE, not about scheduling or patient flow, even if a flow-related behavior happens to mention procedures.
+- For each note, first reason briefly about which definition fits best, then assign the competency_id, then set confidence. If no competency is a clear fit, set confidence to "low" rather than forcing it into a weak match.
 
 Write every note in warm, second-person coaching voice, addressed to the team member ("You consistently...", "I noticed how you...", "The next level is to..."):
 - GLOW notes name a specific behavior AND its impact.
@@ -97,7 +104,7 @@ ${competencyList}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
@@ -117,11 +124,13 @@ ${competencyList}`;
                     items: {
                       type: "object",
                       properties: {
+                        reasoning: { type: "string", description: "Brief: which competency definition best fits this observation and why. Fill this first." },
                         competency_id: { type: "number", description: "The competency ID this note belongs to" },
+                        confidence: { type: "string", enum: ["high", "low"], description: "low if no competency is a clear fit" },
                         glow: { type: "string", description: "Reinforcing coaching note, you-voice, or omit if none" },
                         grow: { type: "string", description: "Growth coaching note, you-voice, or omit if none" },
                       },
-                      required: ["competency_id"],
+                      required: ["reasoning", "competency_id", "confidence"],
                       additionalProperties: false,
                     },
                   },
@@ -164,10 +173,10 @@ ${competencyList}`;
         seen.add(it.competency_id);
         return true;
       })
-      .map((it: { competency_id: number; glow?: string; grow?: string }) => {
+      .map((it: { competency_id: number; glow?: string; grow?: string; confidence?: string }) => {
         const glow = it.glow?.trim() ? it.glow.trim().slice(0, MAX_NOTE_CHARS) : null;
         const grow = it.grow?.trim() ? it.grow.trim().slice(0, MAX_NOTE_CHARS) : null;
-        return { competency_id: it.competency_id, glow, grow };
+        return { competency_id: it.competency_id, glow, grow, confidence: it.confidence === "low" ? "low" : "high" };
       })
       .filter((it: { glow: string | null; grow: string | null }) => it.glow || it.grow);
 

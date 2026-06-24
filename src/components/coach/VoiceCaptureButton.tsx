@@ -65,8 +65,19 @@ export function VoiceCaptureButton({ onTranscript, disabled }: VoiceCaptureButto
     );
   }
 
+  async function handleStart() {
+    const ok = await controls.startRecording();
+    if (!ok) {
+      toast({
+        title: "Microphone unavailable",
+        description: "We couldn't access your mic. Check the browser's permission for this site, or type instead.",
+        variant: "destructive",
+      });
+    }
+  }
+
   return (
-    <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => controls.startRecording()}>
+    <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={handleStart}>
       <Mic className="h-4 w-4 mr-1" /> Record
     </Button>
   );

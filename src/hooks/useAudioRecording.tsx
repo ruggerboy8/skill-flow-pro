@@ -23,7 +23,7 @@ export interface AudioRecordingState {
 }
 
 export interface AudioRecordingControls {
-  startRecording: () => Promise<void>;
+  startRecording: () => Promise<boolean>;
   stopRecording: () => void;
   stopAndGetBlob: () => Promise<Blob | null>;
   togglePause: () => void;
@@ -206,8 +206,12 @@ export function useAudioRecording(options: UseAudioRecordingOptions = {}) {
       timerRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
+      return true;
     } catch (error) {
+      // Most commonly a denied/unavailable microphone. Return false so callers
+      // can surface it; existing callers that ignore the result are unaffected.
       console.error('Failed to start recording:', error);
+      return false;
     }
   }, [enableSegmentation, finalizeCurrentSegment]);
 

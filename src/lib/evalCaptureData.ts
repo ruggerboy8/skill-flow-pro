@@ -108,6 +108,15 @@ export interface CaptureItemPatch {
   observer_is_na?: boolean;
   observer_glow?: string | null;
   observer_grow?: string | null;
+  // Kept in sync with glow/grow for backward compatibility: the classic
+  // EvaluationHub and the insights pipeline still read observer_note.
+  observer_note?: string | null;
+}
+
+/** Compose the legacy combined observer_note from Glow/Grow so classic readers stay populated. */
+export function buildObserverNote(glow: string | null, grow: string | null): string | null {
+  const parts = [glow?.trim(), grow?.trim()].filter(Boolean);
+  return parts.length ? parts.join("\n\n") : null;
 }
 
 /** Patch a single evaluation_items row (score, N/A, glow, grow). */
@@ -129,12 +138,13 @@ export interface SlottedItem {
   competency_id: number;
   glow: string | null;
   grow: string | null;
+  confidence?: "high" | "low";
 }
 
 /** Call the slot-domain-feedback edge function for one domain. */
 export async function slotDomainFeedback(params: {
   domain: string;
-  competencies: { id: number; name: string; proMoves: string[] }[];
+  competencies: { id: number; name: string; description?: string | null; proMoves: string[] }[];
   glowText: string;
   growText: string;
 }): Promise<SlottedItem[]> {

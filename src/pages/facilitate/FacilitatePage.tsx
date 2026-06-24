@@ -202,7 +202,7 @@ export default function FacilitatePage() {
                 <div className="max-w-2xl">
                   <p className="text-4xl font-semibold tracking-tight mb-3">No pro moves locked yet</p>
                   <p className="text-lg text-muted-foreground">
-                    There is no locked plan for {roleLabels[role]} this week at your location. Lock it in the planner, then refresh.
+                    There is no locked plan for {roleDisplayName || "this role"} this week at your location. Lock it in the planner, then refresh.
                   </p>
                 </div>
               ) : (

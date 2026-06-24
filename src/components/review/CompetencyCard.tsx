@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sun, Sprout } from 'lucide-react';
 import type { ReviewPayloadItem } from '@/lib/reviewPayload';
 import { cn } from '@/lib/utils';
 
@@ -15,7 +15,10 @@ interface CompetencyCardProps {
 
 export function CompetencyCard({ item, selected, onSelect, disabled, readOnly }: CompetencyCardProps) {
   const [noteOpen, setNoteOpen] = useState(false);
-  const hasCoachNote = !!item.observer_note?.trim();
+  const glow = item.observer_glow?.trim();
+  const grow = item.observer_grow?.trim();
+  const legacyNote = item.observer_note?.trim();
+  const hasCoachNote = !!(glow || grow || legacyNote);
   const hasSelfNote = !!item.self_note?.trim();
 
   return (
@@ -70,9 +73,25 @@ export function CompetencyCard({ item, selected, onSelect, disabled, readOnly }:
             {noteOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
           {noteOpen && (
-            <p className="text-xs text-muted-foreground mt-1 pl-1 border-l-2 border-muted leading-relaxed">
-              {item.observer_note}
-            </p>
+            <div className="mt-1.5 space-y-1.5">
+              {glow && (
+                <div className="flex items-start gap-1.5">
+                  <Sun className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: 'hsl(var(--score-4))' }} />
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.observer_glow}</p>
+                </div>
+              )}
+              {grow && (
+                <div className="flex items-start gap-1.5">
+                  <Sprout className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: 'hsl(var(--score-2))' }} />
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.observer_grow}</p>
+                </div>
+              )}
+              {!glow && !grow && legacyNote && (
+                <p className="text-xs text-muted-foreground pl-1 border-l-2 border-muted leading-relaxed">
+                  {item.observer_note}
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}

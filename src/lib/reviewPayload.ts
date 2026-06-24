@@ -12,6 +12,9 @@ export interface ReviewPayloadItem {
   self_score: number | null;
   gap: number | null;
   observer_note: string | null;
+  /** Per-competency reinforcing / growth coaching text (v3+; null for legacy v2 payloads). */
+  observer_glow: string | null;
+  observer_grow: string | null;
   self_note: string | null;
   /** Client-enriched tagline (not from RPC) */
   tagline?: string | null;
@@ -35,11 +38,13 @@ export interface ReviewPayload {
 }
 
 /** Current payload version this client expects */
-export const CURRENT_PAYLOAD_VERSION = 2;
+export const CURRENT_PAYLOAD_VERSION = 3;
 
 /**
- * Parse and validate a V2 review payload from the stored JSONB.
- * Returns null if the payload is missing, malformed, or not V2.
+ * Parse and validate a review payload from the stored JSONB.
+ * Accepts v2 and v3 (v3 adds observer_glow/observer_grow per item; on a v2
+ * payload those are simply absent and the UI falls back to observer_note).
+ * Returns null if the payload is missing or malformed.
  */
 export function parseReviewPayload(raw: unknown): ReviewPayload | null {
   if (!raw || typeof raw !== 'object') return null;

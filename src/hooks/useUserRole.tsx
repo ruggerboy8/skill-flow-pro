@@ -128,7 +128,18 @@ export function useUserRole() {
   const showLocationDashboard = isOfficeManager && !isCoach && !isRegional;
 
   // ─── Admin / clinical access ──────────────────────────────────────────────
-  const canAccessAdmin = isSuperAdmin || isOrgAdmin;
+  // Capability-based admins (e.g. users with can_manage_users but no is_org_admin flag)
+  // must also be able to land on /admin. Otherwise AdminPage redirects them to "/".
+  const canAccessAdmin =
+    isSuperAdmin ||
+    isOrgAdmin ||
+    canManageUsers ||
+    canManageLocations ||
+    canManageAssignments ||
+    canInviteUsers ||
+    canViewSubmissions ||
+    canReviewEvals ||
+    canManageLibrary;
   const canAccessClinical = isClinicalDirector || isSuperAdmin;
 
   // ─── Home route ───────────────────────────────────────────────────────────

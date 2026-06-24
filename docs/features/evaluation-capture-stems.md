@@ -40,11 +40,14 @@ examples below were synthesized by hand from the live Pro Moves as a model for t
 
 ---
 
-## Worked example — Front Desk (role_id 1)
+## Per-role domain summaries
 
-Each domain shows: the **third-person summary** (the prompt to the evaluator), the **competencies**
-it spans (the readable Pro Moves sit under each in the UI), and **you-voice starter stems** for the
-Glow and Grow capture areas.
+Each domain block shows the **third-person summary** (the prompt to the evaluator) and the
+**competencies** it spans (the readable Pro Moves sit under each in the UI). The you-voice starter
+stems are shared across all roles and listed once at the end. Active staff roles are Front Desk,
+Dental Assistant, and Office Manager; Doctor is the separate doctor track.
+
+## Front Desk (role_id 1)
 
 ### Clinical
 > **Summary (prompt):** "In Clinical, they are the front desk's bridge to the clinical team. They
@@ -82,7 +85,88 @@ Education · Handling Critical Feedback.
 Competencies: Treatment Communication · Establishing Credibility · Effective Objection Handling ·
 Facilitating Smooth Processes.
 
-### Starter stems (you-voice, coaching-grade, all domains)
+## Dental Assistant (role_id 2)
+
+### Clinical
+> **Summary (prompt):** "In Clinical, they are the doctor's hands chairside. They chart accurately as
+> the doctor calls findings, anticipate the next instrument before it is asked for, run tell-show-do
+> and watch closely for a patient's comfort and anxiety, present the patient cleanly when the doctor
+> enters, and keep the room sterile and reset between patients."
+
+Competencies: Accurate Charting · Mastery of Dental Procedures · Patient Comfort and Communication
+During Procedures · Sterilization and Procedure Preparation.
+
+### Clerical
+> **Summary (prompt):** "In Clerical, they keep the chair on schedule and the record clean. They
+> confirm consent forms and the authorized adult before starting, move patient status in real time,
+> resequence chairs and flag the Lead RDA when running behind, verify medical history, draft clinical
+> notes before the patient leaves, schedule recare while the patient is in-chair, and stay on top of
+> Uptime tasks and disposables."
+
+Competencies: Clerical Procedure Requirements · Coordinating Patient Flow · Office Task Management ·
+Patient Record Management.
+
+### Cultural
+> **Summary (prompt):** "In Cultural, they make the chair feel safe. They greet the patient by name
+> with eye contact, read the parent's and patient's mood, offer comfort like a blanket or headset,
+> give the patient a hand-raise to pause, ask a curious open-ended question, reinforce attendance
+> kindly, and stay calm and resolution-focused when a parent is frustrated."
+
+Competencies: Trust Building Interactions · Demonstrating Emotional Intelligence · Empathetic
+Practice Policy Education · Handling Constructive Feedback.
+
+### Case Acceptance
+> **Summary (prompt):** "In Case Acceptance, they help families understand and accept care. After the
+> doctor leaves the chair they check for comprehension and ask how the plan sounds, identify the real
+> concern behind a hesitation (comfort, time, or cost), link treatment to the parent's goals for
+> their child, preview the doctor and OVERJET to build credibility, use estimated-benefits language,
+> and make sure the next visit is scheduled at the right interval."
+
+Competencies: Clear Treatment Communication · Effective Objection Handling · Empowering Informed
+Decisions · Establishing Credibility.
+
+## Office Manager (role_id 3)
+
+### Clinical
+> **Summary (prompt):** "In Clinical, their role is oversight, not chairside. Each week they review
+> clinical-equipment Uptime tasks with the Lead RDA, observe the RDA-to-doctor hand-off and document
+> an opportunity to coach, and verify Pro Move meeting attendance, following up with anyone who
+> missed."
+
+Competencies: Compliance and Safety · Patient Care Standards · Team Training Oversight.
+
+### Clerical
+> **Summary (prompt):** "In Clerical, they run the operational engine. They review last week's KPIs
+> every Monday and send the Regional Manager an action plan, work uncollected balances and claim
+> flags daily, reconcile the production report, dig into the root cause of recurring flags and coach
+> the fix at huddle, and make sure phones are answered in three rings and every visit inside 48 hours
+> is confirmed."
+
+Competencies: Operational Efficiency · Revenue Cycle Management · Root Cause Analysis · Schedule and
+Flow.
+
+### Cultural
+> **Summary (prompt):** "In Cultural, they set the tone for the office. They walk the floor twice a
+> day with specific encouragement, stay aware of the room's mood and reset it or address tension
+> directly, personally follow up on any escalated parent concern by the end of the next day, and make
+> sure the week's social content reaches marketing."
+
+Competencies: Leading and Coaching · Emotional Intelligence · Trust Building · Community and
+Marketing.
+
+### Case Acceptance
+> **Summary (prompt):** "In Case Acceptance, they own the financial conversation and model the
+> standard. They use estimated-benefits and family-contribution language, respond to financial
+> concerns with clear options like staging treatment or CareCredit, personally complete a full
+> over-the-top check-in with at least one family a day so the team sees the bar, and submit
+> preauthorization within 48 hours while reviewing approvals daily."
+
+Competencies: Case Communication · Financial Coordination · Patient Experience · Treatment Plan
+Follow-Up.
+
+---
+
+## Starter stems (you-voice, coaching-grade, all roles and domains)
 *Glow names a behavior and its impact; Grow points forward to a specific next step.*
 
 - **Glow capture:**

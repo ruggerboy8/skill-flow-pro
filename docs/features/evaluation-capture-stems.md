@@ -8,9 +8,15 @@ example; other roles follow the same synthesis method.*
 
 ## Design principles (owner-set, 2026-06-24)
 
-1. **Everything is in "you," addressed to the staff member.** The evaluator is writing feedback that
-   the staff member will read, so framings and stems are second person: "You greet every family…",
-   "You could grow by…".
+1. **Two voices, split by purpose.**
+   - **Domain summaries are third person** ("they" / "this team member"). They prompt the *evaluator*
+     to recall what they observed: "In Cultural, they set how families feel…".
+   - **Stems are second person** ("you"). They are the evaluator's actual words to the staff member,
+     who will read them: "You consistently…", "One opportunity for you is…".
+   - The summary sets the frame and jogs memory; the stems help write the feedback.
+1b. **Stems should sound like effective coaching.** Glow stems name a specific behavior *and its
+   impact* (situation–behavior–impact). Grow stems are forward-looking, specific, and supportive —
+   an opportunity and a next step, not a verdict.
 2. **Prompts are domain *summaries*, not questions.** Instead of asking "Where did you see them
    welcome patients?", we show a short summary of what the domain means for this person's role, and
    let the evaluator respond to it.
@@ -36,49 +42,58 @@ examples below were synthesized by hand from the live Pro Moves as a model for t
 
 ## Worked example — Front Desk (role_id 1)
 
-Each domain shows: the **you-voice summary** (the prompt), the **competencies** it spans (the readable
-Pro Moves sit under each in the UI), and **you-voice starter stems** for the Glow and Grow capture
-areas.
+Each domain shows: the **third-person summary** (the prompt to the evaluator), the **competencies**
+it spans (the readable Pro Moves sit under each in the UI), and **you-voice starter stems** for the
+Glow and Grow capture areas.
 
 ### Clinical
-> **Summary (prompt):** "In Clinical, you are the front desk's bridge to the clinical team. You keep
-> patients moving, alerting the back the moment someone is ready and flagging anyone waiting more than
-> ten minutes; you hand off clean information; you adapt the schedule when emergencies or delays hit;
-> and you know common procedures well enough to speak to them with confidence."
+> **Summary (prompt):** "In Clinical, they are the front desk's bridge to the clinical team. They
+> keep patients moving, alerting the back the moment someone is ready and flagging anyone waiting more
+> than ten minutes; they hand off clean information; they adapt the schedule when emergencies or
+> delays hit; and they know common procedures well enough to speak to them with confidence."
 
 Competencies: Patient Flow Coordination · Clinical Team Communication · Daily Schedule Adaptability ·
 Fundamental Dental Knowledge.
 
 ### Clerical
-> **Summary (prompt):** "In Clerical, you run the front-desk machinery. You balance phones, texts, and
-> the guest in front of you without dropping any of them; you keep records and paperwork accurate
-> before check-in; you work the schedule days ahead to confirm visits and fill open slots; and you
-> keep the front area clean, stocked, and welcoming."
+> **Summary (prompt):** "In Clerical, they run the front-desk machinery. They balance phones, texts,
+> and the guest in front of them without dropping any of them; they keep records and paperwork
+> accurate before check-in; they work the schedule days ahead to confirm visits and fill open slots;
+> and they keep the front area clean, stocked, and welcoming."
 
 Competencies: Communication Balancing · Patient Record Maintenance · Strategic Scheduling ·
 Welcoming Environment.
 
 ### Cultural
-> **Summary (prompt):** "In Cultural, you set how families feel. You greet every patient and guardian
-> warmly and by their preferred name, build trust by asking about their goals, deliver hard policy and
-> balance conversations with both kindness and firmness, and stay calm and accountable when you
-> receive critical feedback."
+> **Summary (prompt):** "In Cultural, they set how families feel. They greet every patient and
+> guardian warmly and by their preferred name, build trust by asking about their goals, deliver hard
+> policy and balance conversations with both kindness and firmness, and stay calm and accountable
+> when they receive critical feedback."
 
 Competencies: Welcoming Presence · Trust Building Interactions · Empathetic Practice Policy
 Education · Handling Critical Feedback.
 
 ### Case Acceptance
-> **Summary (prompt):** "In Case Acceptance, you help families say yes to care. You explain treatment
-> and finances clearly, using estimated benefits and patient portion rather than covered or not; you
-> build the doctor's and the practice's credibility; you handle objections about cost or x-rays with
-> confidence instead of pressure; and you smooth the path through portal and paperwork."
+> **Summary (prompt):** "In Case Acceptance, they help families say yes to care. They explain
+> treatment and finances clearly, using estimated benefits and patient portion rather than covered or
+> not; they build the doctor's and the practice's credibility; they handle objections about cost or
+> x-rays with confidence instead of pressure; and they smooth the path through portal and paperwork."
 
 Competencies: Treatment Communication · Establishing Credibility · Effective Objection Handling ·
 Facilitating Smooth Processes.
 
-### Starter stems (you-voice, all domains)
-- **Glow capture:** "You did a great job…" / "You consistently…" / "I noticed how well you…"
-- **Grow capture:** "You could grow by…" / "I'd love to see you…" / "Next quarter, focus on…"
+### Starter stems (you-voice, coaching-grade, all domains)
+*Glow names a behavior and its impact; Grow points forward to a specific next step.*
+
+- **Glow capture:**
+  - "You consistently [behavior], and it shows in [impact]…"
+  - "One of your real strengths is the way you…"
+  - "I noticed how you [specific moment] — families clearly felt…"
+- **Grow capture:**
+  - "You're already strong at …; the next level is to…"
+  - "One opportunity this quarter: when …, try…"
+  - "I'd love to see you …, especially when…"
+  - "A small shift that would make a big difference: …"
 
 ---
 

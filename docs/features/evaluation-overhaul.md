@@ -58,15 +58,17 @@ The capture experience, rebuilt. This is where the felt pain lives and where the
 Instead of one flat grid of 126 competency rows, the evaluator moves through the **four domains**
 one at a time (Clinical, Clerical, Cultural, Case Acceptance). For each domain:
 
-1. **Show the domain's scope, framed per role.** Lead with a short **you-voice summary** of what
-   this domain means for this person's role (synthesized from that role's Pro Moves), then show the
-   domain's competencies with their **Pro Moves as the primary prompting resource** — readable and
-   scannable beside the capture area, grouped by competency and expandable, but presented so they do
-   not overwhelm. This is the teaching step. See [`evaluation-capture-stems.md`](evaluation-capture-stems.md).
-2. **Prompt with domain *summaries*, in "you," not questions.** The framing is a second-person
-   summary addressed to the staff member ("In Clerical, you run the front-desk machinery…"), with
-   the Pro Moves doing the concrete prompting. Glow and Grow are labeled capture areas with you-voice
-   starter stems ("You did a great job…", "You could grow by…"). Owner finalizes wording.
+1. **Show the domain's scope, framed per role.** Lead with a short **third-person summary** of what
+   this domain means for this person's role ("In Clerical, they run the front-desk machinery…",
+   synthesized from that role's Pro Moves), then show the domain's competencies with their **Pro
+   Moves as the primary prompting resource** — readable and scannable beside the capture area, grouped
+   by competency and expandable, but presented so they do not overwhelm. This is the teaching step.
+   See [`evaluation-capture-stems.md`](evaluation-capture-stems.md).
+2. **Prompt with domain *summaries*, not questions.** The summary is third person (it prompts the
+   evaluator to recall what they saw); the Pro Moves do the concrete prompting. Glow and Grow are
+   labeled capture areas where the evaluator writes in **"you"** to the staff member, helped by
+   **coaching-grade starter stems** (Glow names a behavior and its impact; Grow points forward to a
+   specific next step). Owner finalizes wording.
 3. **Capture by voice or text.** Voice records a short, single-take clip for that domain; text is
    typed directly and gets a Polish / Magic button that formalizes and coachifies the wording.
 4. **AI slots the response under the right competencies in that domain.** Because each response is

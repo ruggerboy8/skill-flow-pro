@@ -33,6 +33,15 @@ import {
 import { GLOW_STEMS, GROW_STEMS } from "@/lib/evalCaptureFraming";
 import { VoiceCaptureButton } from "@/components/coach/VoiceCaptureButton";
 import { getDomainColorRaw, getDomainColorRich, getDomainColorRichRaw } from "@/lib/domainColors";
+import { submitEvaluation } from "@/lib/evaluations";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const SCORES = [1, 2, 3, 4];
 const INTRO_KEY = "evalCaptureIntroDismissed";
@@ -67,6 +76,8 @@ export default function EvaluationCapture() {
       return true;
     }
   });
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
 
   // Competencies that already have notes start expanded.
@@ -281,6 +292,38 @@ export default function EvaluationCapture() {
   const totalCompetencies = data.domains.reduce((acc, d) => acc + d.competencies.length, 0);
   const allDone = totalCompetencies > 0 && totalRated === totalCompetencies;
 
+  // Submission readiness: every competency scored or marked N/A, and any low
+  // score (1-2) carries a note. Mirrors the classic isEvaluationComplete gate.
+  const unscored = data.domains.flatMap((d) =>
+    d.competencies.filter((c) => c.observerScore == null && !c.observerIsNA),
+  );
+  const lowMissingNote = data.domains.flatMap((d) =>
+    d.competencies.filter(
+      (c) => c.observerScore != null && c.observerScore <= 2 && !c.glow?.trim() && !c.grow?.trim(),
+    ),
+  );
+  const canSubmit = unscored.length === 0 && lowMissingNote.length === 0;
+
+  async function handleSubmit() {
+    if (!evalId) return;
+    setSubmitting(true);
+    try {
+      await submitEvaluation(evalId);
+      toast({
+        title: "Evaluation submitted",
+        description: "Sent to your central office to review and release.",
+      });
+      navigate(`/coach/${staffId}`);
+    } catch (e) {
+      toast({
+        title: "Submit failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+    }
+  }
+
   function appendDraft(field: "glow" | "grow", text: string) {
     setDomainText((p) => {
       const cur = p[activeDomain.domainId] || { glow: "", grow: "" };
@@ -301,23 +344,27 @@ export default function EvaluationCapture() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 xl:px-20 space-y-6">
-      {/* Process arrows: step through domains, sitting outside the content */}
-      <button
-        aria-label="Previous domain"
-        onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
-        disabled={atFirst}
-        className="hidden xl:flex fixed left-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
-      >
-        <ChevronLeft className="h-6 w-6" />
-      </button>
-      <button
-        aria-label="Next domain"
-        onClick={() => setActiveIdx((i) => Math.min(data.domains.length - 1, i + 1))}
-        disabled={atLast}
-        className="hidden xl:flex fixed right-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
-      >
-        <ChevronRight className="h-6 w-6" />
-      </button>
+      {/* Process arrows: vertically centered in the viewport, hugging the outer edges of the content module */}
+      <div className="hidden xl:block fixed inset-x-0 top-1/2 z-20 pointer-events-none">
+        <div className="max-w-7xl mx-auto px-1 relative">
+          <button
+            aria-label="Previous domain"
+            onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
+            disabled={atFirst}
+            className="pointer-events-auto absolute left-0 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            aria-label="Next domain"
+            onClick={() => setActiveIdx((i) => Math.min(data.domains.length - 1, i + 1))}
+            disabled={atLast}
+            className="pointer-events-auto absolute right-0 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full border bg-card shadow-md hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -341,14 +388,19 @@ export default function EvaluationCapture() {
             )}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground"
-          onClick={() => navigate(`/coach/${staffId}/eval/${evalId}`)}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" /> Classic editor
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => navigate(`/coach/${staffId}/eval/${evalId}`)}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" /> Classic editor
+          </Button>
+          <Button size="sm" onClick={() => setReviewOpen(true)}>
+            Review &amp; submit
+          </Button>
+        </div>
       </div>
 
       {/* Signposting */}
@@ -620,10 +672,7 @@ export default function EvaluationCapture() {
                                       color: "white",
                                       boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.12)",
                                     }
-                                  : {
-                                      color: `hsl(var(--score-${s}))`,
-                                      backgroundColor: `hsl(var(--score-${s}-bg))`,
-                                    }
+                                  : { color: "hsl(var(--muted-foreground))" }
                               }
                             >
                               {s}
@@ -633,32 +682,38 @@ export default function EvaluationCapture() {
                       </div>
                     </div>
 
-                    {open && (
-                      <div className="space-y-2 pt-0.5">
-                        <div className="flex items-start gap-2">
-                          <Sun className="mt-2.5 h-4 w-4 shrink-0" style={{ color: "hsl(var(--score-4))" }} />
-                          <Textarea
-                            className="bg-background"
-                            rows={2}
-                            placeholder="Glow (sorted from your notes, or write directly)"
-                            value={comp.glow ?? ""}
-                            onChange={(e) => handleNoteChange(activeDomain.domainId, comp, "glow", e.target.value)}
-                            onBlur={() => handleNoteBlur(comp)}
-                          />
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <Sprout className="mt-2.5 h-4 w-4 shrink-0" style={{ color: "hsl(var(--score-2))" }} />
-                          <Textarea
-                            className="bg-background"
-                            rows={2}
-                            placeholder="Grow (sorted from your notes, or write directly)"
-                            value={comp.grow ?? ""}
-                            onChange={(e) => handleNoteChange(activeDomain.domainId, comp, "grow", e.target.value)}
-                            onBlur={() => handleNoteBlur(comp)}
-                          />
+                    <div
+                      className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+                        open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                      }`}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="space-y-2 pt-0.5">
+                          <div className="flex items-start gap-2">
+                            <Sun className="mt-2.5 h-4 w-4 shrink-0" style={{ color: "hsl(var(--score-4))" }} />
+                            <Textarea
+                              className="bg-background"
+                              rows={2}
+                              placeholder="Glow (sorted from your notes, or write directly)"
+                              value={comp.glow ?? ""}
+                              onChange={(e) => handleNoteChange(activeDomain.domainId, comp, "glow", e.target.value)}
+                              onBlur={() => handleNoteBlur(comp)}
+                            />
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <Sprout className="mt-2.5 h-4 w-4 shrink-0" style={{ color: "hsl(var(--score-2))" }} />
+                            <Textarea
+                              className="bg-background"
+                              rows={2}
+                              placeholder="Grow (sorted from your notes, or write directly)"
+                              value={comp.grow ?? ""}
+                              onChange={(e) => handleNoteChange(activeDomain.domainId, comp, "grow", e.target.value)}
+                              onBlur={() => handleNoteBlur(comp)}
+                            />
+                          </div>
                         </div>
                       </div>
-                    )}
+                    </div>
 
                     <div className="flex items-center justify-between">
                       <button
@@ -688,6 +743,94 @@ export default function EvaluationCapture() {
           </div>
         </div>
       </div>
+
+      {/* Review & submit */}
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Review &amp; submit</DialogTitle>
+            <DialogDescription>
+              Submitting sends this to your central office to review and release. The team member does not
+              see it until it is released.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Completeness checklist */}
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              {unscored.length === 0 ? (
+                <Check className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-complete))" }} />
+              ) : (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-muted-foreground" />
+              )}
+              <span>
+                {unscored.length === 0
+                  ? "Every competency is scored or marked Did not observe"
+                  : `${unscored.length} competenc${unscored.length === 1 ? "y" : "ies"} still need a score`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {lowMissingNote.length === 0 ? (
+                <Check className="h-4 w-4 shrink-0" style={{ color: "hsl(var(--status-complete))" }} />
+              ) : (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-muted-foreground" />
+              )}
+              <span>
+                {lowMissingNote.length === 0
+                  ? "Low scores include a note"
+                  : `${lowMissingNote.length} low score${lowMissingNote.length === 1 ? "" : "s"} need a note`}
+              </span>
+            </div>
+          </div>
+
+          {/* Per-domain summary */}
+          <div className="space-y-4">
+            {data.domains.map((d) => (
+              <div key={d.domainId} className="space-y-1.5">
+                <p className="text-sm font-semibold" style={{ color: getDomainColorRich(d.domainName) }}>
+                  {d.domainName}
+                </p>
+                <div className="space-y-1">
+                  {d.competencies.map((c) => (
+                    <div
+                      key={c.competencyId}
+                      className="flex items-start justify-between gap-3 border-b border-border/50 pb-1 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium leading-snug">{c.name}</div>
+                        {(c.glow || c.grow) && (
+                          <div className="text-2xs text-muted-foreground line-clamp-2">
+                            {[c.glow, c.grow].filter(Boolean).join(" · ")}
+                          </div>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-2xs font-medium">
+                        {c.observerIsNA ? (
+                          "N/A"
+                        ) : c.observerScore != null ? (
+                          `Score ${c.observerScore}`
+                        ) : (
+                          <span className="text-muted-foreground">not scored</span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReviewOpen(false)}>
+              Keep editing
+            </Button>
+            <Button onClick={handleSubmit} disabled={!canSubmit || submitting}>
+              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Submit evaluation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

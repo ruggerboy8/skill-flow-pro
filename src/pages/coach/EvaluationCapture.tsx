@@ -6,7 +6,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Sparkles, Loader2, ChevronDown, Check, AlertTriangle, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Sparkles,
+  Loader2,
+  ChevronDown,
+  Check,
+  AlertTriangle,
+  X,
+  Sun,
+  Sprout,
+  BookOpen,
+  Lightbulb,
+  PenLine,
+} from "lucide-react";
 import {
   loadCaptureData,
   saveCaptureItem,
@@ -17,7 +30,7 @@ import {
 } from "@/lib/evalCaptureData";
 import { GLOW_STEMS, GROW_STEMS } from "@/lib/evalCaptureFraming";
 import { VoiceCaptureButton } from "@/components/coach/VoiceCaptureButton";
-import { getDomainColorRaw, getDomainColorRich } from "@/lib/domainColors";
+import { getDomainColorRaw, getDomainColorRich, getDomainColorRichRaw } from "@/lib/domainColors";
 
 const SCORES = [1, 2, 3, 4];
 const INTRO_KEY = "evalCaptureIntroDismissed";
@@ -212,10 +225,19 @@ export default function EvaluationCapture() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto p-6 space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
+        <Skeleton className="h-9 w-72 rounded-lg" />
+        <Skeleton className="h-10 w-full rounded-xl" />
+        <div className="flex flex-wrap gap-2">
+          <Skeleton className="h-9 w-28 rounded-full" />
+          <Skeleton className="h-9 w-28 rounded-full" />
+          <Skeleton className="h-9 w-28 rounded-full" />
+          <Skeleton className="h-9 w-32 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <Skeleton className="lg:col-span-2 h-72 w-full rounded-xl" />
+          <Skeleton className="lg:col-span-3 h-72 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -234,7 +256,16 @@ export default function EvaluationCapture() {
   const activeDomain = data.domains[activeIdx];
   const draft = domainText[activeDomain.domainId] || { glow: "", grow: "" };
   const richColor = getDomainColorRich(activeDomain.domainName);
-  const tint = `hsl(${getDomainColorRaw(activeDomain.domainName)} / 0.18)`;
+  const richRaw = getDomainColorRaw(activeDomain.domainName);
+  const tint = `hsl(${richRaw} / 0.18)`;
+
+  // Overall progress across every competency in every domain (for the header).
+  const totalRated = data.domains.reduce(
+    (acc, d) => acc + d.competencies.filter((c) => c.observerScore != null || c.observerIsNA).length,
+    0,
+  );
+  const totalCompetencies = data.domains.reduce((acc, d) => acc + d.competencies.length, 0);
+  const allDone = totalCompetencies > 0 && totalRated === totalCompetencies;
 
   function appendDraft(field: "glow" | "grow", text: string) {
     setDomainText((p) => {
@@ -252,33 +283,60 @@ export default function EvaluationCapture() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold">Evaluation capture</h1>
-          <Badge variant="secondary">Beta</Badge>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-semibold tracking-tight">Evaluation capture</h1>
+            <Badge variant="secondary" className="rounded-full">Beta</Badge>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span
+              className="inline-flex h-1.5 w-1.5 rounded-full"
+              style={{ background: allDone ? "hsl(var(--status-complete))" : richColor }}
+              aria-hidden
+            />
+            {allDone ? (
+              <span className="text-foreground font-medium">All competencies scored</span>
+            ) : (
+              <span>
+                {totalRated} of {totalCompetencies} competencies scored
+              </span>
+            )}
+          </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/coach/${staffId}/eval/${evalId}`)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => navigate(`/coach/${staffId}/eval/${evalId}`)}
+        >
           <ArrowLeft className="h-4 w-4 mr-2" /> Classic editor
         </Button>
       </div>
 
       {/* Signposting */}
       {showIntro && (
-        <Card className="bg-muted/40">
-          <CardContent className="pt-4 pb-4 flex items-start justify-between gap-3">
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">How this works</p>
-              <p>
+        <Card className="border-none shadow-sm" style={{ backgroundColor: tint }}>
+          <CardContent className="py-4 flex items-start gap-3.5">
+            <span
+              className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/70"
+              aria-hidden
+            >
+              <Lightbulb className="h-5 w-5" style={{ color: richColor }} />
+            </span>
+            <div className="flex-1 text-sm text-muted-foreground space-y-1">
+              <p className="font-semibold text-foreground">How this works</p>
+              <p className="leading-relaxed">
                 Give this team member feedback across their four domains. The left side is your rubric: what each
                 domain and competency covers. The right side is where you speak or type your feedback and set scores.
-                We'll polish what you say and file it under the right competencies. Work the domains in any order, but
-                address all four.
+                We'll polish what you say and file it under the right competencies. Work the domains in any order, and
+                cover all four.
               </p>
             </div>
             <button
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground transition-colors rounded-md p-1 -m-1"
               aria-label="Dismiss"
               onClick={() => {
                 setShowIntro(false);
@@ -301,28 +359,43 @@ export default function EvaluationCapture() {
           const { rated, total } = domainProgress(d.domainId);
           const complete = rated === total && total > 0;
           const active = i === activeIdx;
+          const raw = getDomainColorRaw(d.domainName);
           return (
             <button
               key={d.domainId}
               onClick={() => setActiveIdx(i)}
-              className="px-3 py-1.5 rounded-full text-sm border transition-colors"
+              aria-pressed={active}
+              className="group inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-sm border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
               style={
                 active
                   ? {
-                      backgroundColor: `hsl(${getDomainColorRaw(d.domainName)} / 0.3)`,
+                      backgroundColor: `hsl(${raw} / 0.45)`,
                       borderColor: getDomainColorRich(d.domainName),
                       color: "hsl(var(--foreground))",
-                      fontWeight: 500,
+                      fontWeight: 600,
+                      boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
                     }
-                  : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+                  : {
+                      backgroundColor: "hsl(var(--card))",
+                      borderColor: "hsl(var(--border))",
+                      color: "hsl(var(--muted-foreground))",
+                    }
               }
             >
-              <span className="inline-flex items-center gap-1.5">
-                {complete && <Check className="h-3.5 w-3.5" />}
-                {d.domainName}
-                <span className="text-2xs opacity-70">
-                  {rated}/{total}
-                </span>
+              <span
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
+                style={
+                  complete
+                    ? { background: "hsl(var(--status-complete))", color: "white" }
+                    : { background: `hsl(${getDomainColorRichRaw(d.domainName)})`, opacity: active ? 1 : 0.55 }
+                }
+                aria-hidden
+              >
+                {complete && <Check className="h-3 w-3" />}
+              </span>
+              {d.domainName}
+              <span className="text-2xs tabular-nums opacity-70">
+                {rated}/{total}
               </span>
             </button>
           );
@@ -330,13 +403,22 @@ export default function EvaluationCapture() {
       </div>
 
       {/* Two-pane: REFERENCE (rubric) | CAPTURE (input) */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* REFERENCE pane */}
-        <div className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto space-y-3 pr-1">
-          <Card style={{ borderLeftColor: richColor, borderLeftWidth: 4 }}>
-            <CardContent className="pt-4 space-y-1">
-              <p className="text-2xs uppercase tracking-wide text-muted-foreground">Your rubric</p>
-              <p className="text-sm text-muted-foreground">
+        <aside className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto space-y-3 pr-1">
+          <div className="flex items-center gap-2 px-1 pt-0.5">
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+            <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Rubric &middot; {activeDomain.domainName}
+            </p>
+          </div>
+
+          <Card
+            className="overflow-hidden border-none shadow-sm"
+            style={{ backgroundColor: `hsl(${richRaw} / 0.4)` }}
+          >
+            <CardContent className="py-4">
+              <p className="text-sm leading-relaxed text-foreground/80">
                 {activeDomain.summary ||
                   `Consider what you observed in ${activeDomain.domainName}. Use the competencies below as a guide.`}
               </p>
@@ -344,18 +426,34 @@ export default function EvaluationCapture() {
           </Card>
 
           {activeDomain.competencies.map((comp) => (
-            <Card key={comp.competencyId}>
-              <CardContent className="pt-3 pb-3 space-y-1">
-                <div className="font-medium text-sm">{comp.name}</div>
-                {comp.tagline && <div className="text-2xs text-muted-foreground">{comp.tagline}</div>}
+            <Card key={comp.competencyId} className="shadow-sm transition-shadow hover:shadow-md">
+              <CardContent className="py-3.5 space-y-2">
+                <div className="flex items-start gap-2.5">
+                  <span
+                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: richColor }}
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold leading-snug">{comp.name}</div>
+                    {comp.tagline && (
+                      <div className="text-xs text-muted-foreground leading-snug mt-0.5">{comp.tagline}</div>
+                    )}
+                  </div>
+                </div>
                 {comp.proMoves.length > 0 && (
-                  <details className="text-sm mt-1">
-                    <summary className="cursor-pointer text-2xs text-muted-foreground">
-                      What great looks like ({comp.proMoves.length})
+                  <details className="group ml-[1.125rem]">
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 text-2xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+                      <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                      What great looks like
+                      <span className="opacity-60">({comp.proMoves.length})</span>
                     </summary>
-                    <ul className="mt-1 ml-4 list-disc space-y-1 text-2xs text-muted-foreground">
+                    <ul className="mt-2 space-y-1.5">
                       {comp.proMoves.map((pm, i) => (
-                        <li key={i}>{pm}</li>
+                        <li key={i} className="flex items-start gap-2 text-xs leading-snug text-muted-foreground">
+                          <Check className="mt-0.5 h-3 w-3 shrink-0" style={{ color: richColor }} />
+                          <span>{pm}</span>
+                        </li>
                       ))}
                     </ul>
                   </details>
@@ -363,79 +461,66 @@ export default function EvaluationCapture() {
               </CardContent>
             </Card>
           ))}
-        </div>
+        </aside>
 
         {/* CAPTURE pane */}
-        <div ref={captureRef} className="lg:col-span-3 space-y-4">
+        <div ref={captureRef} className="lg:col-span-3 space-y-5">
           {/* Input */}
-          <Card style={{ backgroundColor: tint }}>
-            <CardContent className="pt-4 space-y-4">
-              <div>
-                <p className="text-sm font-medium">Your feedback on {activeDomain.domainName}</p>
-                <p className="text-2xs text-muted-foreground">
-                  Speak or type it naturally. We'll polish it and file it under the right competencies below.
-                </p>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">What's going well (Glow)</label>
-                  <VoiceCaptureButton onTranscript={(t) => appendDraft("glow", t)} />
-                </div>
-                <Textarea
-                  className="mt-1 bg-background"
-                  rows={3}
-                  placeholder="Speak or type, or tap a starter below"
-                  value={draft.glow}
-                  onChange={(e) =>
-                    setDomainText((p) => ({ ...p, [activeDomain.domainId]: { ...draft, glow: e.target.value } }))
-                  }
-                />
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {GLOW_STEMS.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => appendDraft("glow", s)}
-                      className="text-2xs px-2 py-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors text-left"
-                    >
-                      {s}
-                    </button>
-                  ))}
+          <Card className="overflow-hidden border-none shadow-md" style={{ backgroundColor: tint }}>
+            <CardContent className="py-5 space-y-5">
+              <div className="flex items-start gap-3">
+                <span
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/70"
+                  aria-hidden
+                >
+                  <Sparkles className="h-5 w-5" style={{ color: richColor }} />
+                </span>
+                <div>
+                  <p className="text-base font-semibold leading-tight">Your feedback on {activeDomain.domainName}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Speak or type it naturally. We'll polish it and file it under the right competencies below.
+                  </p>
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Where they can grow (Grow)</label>
-                  <VoiceCaptureButton onTranscript={(t) => appendDraft("grow", t)} />
-                </div>
-                <Textarea
-                  className="mt-1 bg-background"
-                  rows={3}
-                  placeholder="Speak or type, or tap a starter below"
-                  value={draft.grow}
-                  onChange={(e) =>
-                    setDomainText((p) => ({ ...p, [activeDomain.domainId]: { ...draft, grow: e.target.value } }))
-                  }
-                />
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {GROW_STEMS.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => appendDraft("grow", s)}
-                      className="text-2xs px-2 py-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors text-left"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <FeedbackField
+                icon={Sun}
+                accent="--score-4"
+                label="What's going well"
+                tag="Glow"
+                value={draft.glow}
+                stems={GLOW_STEMS}
+                onChange={(v) =>
+                  setDomainText((p) => ({ ...p, [activeDomain.domainId]: { ...draft, glow: v } }))
+                }
+                onTranscript={(t) => appendDraft("glow", t)}
+                onStem={(s) => appendDraft("glow", s)}
+              />
 
-              <Button onClick={() => handleSlot(activeDomain.domainId)} disabled={slottingDomain != null}>
+              <FeedbackField
+                icon={Sprout}
+                accent="--score-2"
+                label="Where they can grow"
+                tag="Grow"
+                value={draft.grow}
+                stems={GROW_STEMS}
+                onChange={(v) =>
+                  setDomainText((p) => ({ ...p, [activeDomain.domainId]: { ...draft, grow: v } }))
+                }
+                onTranscript={(t) => appendDraft("grow", t)}
+                onStem={(s) => appendDraft("grow", s)}
+              />
+
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => handleSlot(activeDomain.domainId)}
+                disabled={slottingDomain != null}
+              >
                 {slottingDomain === activeDomain.domainId ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                 ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
+                  <Sparkles className="h-5 w-5 mr-2" />
                 )}
                 Polish &amp; sort into competencies
               </Button>
@@ -443,8 +528,13 @@ export default function EvaluationCapture() {
           </Card>
 
           {/* Scores + seeded notes (condensed) */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground px-1">Score each competency</p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <PenLine className="h-4 w-4 text-muted-foreground" />
+              <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Score each competency
+              </p>
+            </div>
             {activeDomain.competencies.map((comp) => {
               const open = openIds.has(comp.competencyId) || Boolean(comp.glow) || Boolean(comp.grow);
               const highlight = recentlySlotted.has(comp.competencyId);
@@ -452,34 +542,49 @@ export default function EvaluationCapture() {
               return (
                 <Card
                   key={comp.competencyId}
-                  style={highlight ? { borderColor: richColor, boxShadow: `0 0 0 1px ${richColor}` } : undefined}
+                  className="shadow-sm transition-all"
+                  style={
+                    highlight
+                      ? { borderColor: richColor, boxShadow: `0 0 0 2px hsl(${richRaw} / 0.5)` }
+                      : comp.observerIsNA
+                        ? { opacity: 0.7 }
+                        : undefined
+                  }
                 >
-                  <CardContent className="pt-3 pb-3 space-y-2">
+                  <CardContent className="py-3.5 space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-medium">
+                      <span className="text-sm font-semibold leading-snug">
                         {comp.name}
                         {low && (
-                          <span className="ml-2 inline-flex items-center gap-1 text-2xs text-muted-foreground">
+                          <span className="ml-2 inline-flex items-center gap-1 text-2xs font-medium text-muted-foreground">
                             <AlertTriangle className="h-3 w-3" /> check placement
                           </span>
                         )}
                       </span>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div
+                        className="flex items-center gap-1 shrink-0 rounded-lg bg-muted/60 p-1"
+                        role="group"
+                        aria-label={`Score for ${comp.name}`}
+                      >
                         {SCORES.map((s) => {
                           const selected = comp.observerScore === s;
                           return (
                             <button
                               key={s}
                               onClick={() => handleScore(activeDomain.domainId, comp, s)}
-                              className="h-8 w-8 rounded-md border text-sm font-medium transition-colors"
+                              aria-pressed={selected}
+                              className="h-8 w-8 rounded-md text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               style={
                                 selected
                                   ? {
                                       backgroundColor: `hsl(var(--score-${s}))`,
-                                      borderColor: `hsl(var(--score-${s}))`,
                                       color: "white",
+                                      boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.12)",
                                     }
-                                  : { borderColor: "hsl(var(--border))" }
+                                  : {
+                                      color: `hsl(var(--score-${s}))`,
+                                      backgroundColor: `hsl(var(--score-${s}-bg))`,
+                                    }
                               }
                             >
                               {s}
@@ -490,21 +595,29 @@ export default function EvaluationCapture() {
                     </div>
 
                     {open && (
-                      <div className="space-y-2">
-                        <Textarea
-                          rows={2}
-                          placeholder="Glow (sorted from your notes, or write directly)"
-                          value={comp.glow ?? ""}
-                          onChange={(e) => handleNoteChange(activeDomain.domainId, comp, "glow", e.target.value)}
-                          onBlur={() => handleNoteBlur(comp)}
-                        />
-                        <Textarea
-                          rows={2}
-                          placeholder="Grow (sorted from your notes, or write directly)"
-                          value={comp.grow ?? ""}
-                          onChange={(e) => handleNoteChange(activeDomain.domainId, comp, "grow", e.target.value)}
-                          onBlur={() => handleNoteBlur(comp)}
-                        />
+                      <div className="space-y-2 pt-0.5">
+                        <div className="flex items-start gap-2">
+                          <Sun className="mt-2.5 h-4 w-4 shrink-0" style={{ color: "hsl(var(--score-4))" }} />
+                          <Textarea
+                            className="bg-background"
+                            rows={2}
+                            placeholder="Glow (sorted from your notes, or write directly)"
+                            value={comp.glow ?? ""}
+                            onChange={(e) => handleNoteChange(activeDomain.domainId, comp, "glow", e.target.value)}
+                            onBlur={() => handleNoteBlur(comp)}
+                          />
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Sprout className="mt-2.5 h-4 w-4 shrink-0" style={{ color: "hsl(var(--score-2))" }} />
+                          <Textarea
+                            className="bg-background"
+                            rows={2}
+                            placeholder="Grow (sorted from your notes, or write directly)"
+                            value={comp.grow ?? ""}
+                            onChange={(e) => handleNoteChange(activeDomain.domainId, comp, "grow", e.target.value)}
+                            onBlur={() => handleNoteBlur(comp)}
+                          />
+                        </div>
                       </div>
                     )}
 
@@ -512,20 +625,24 @@ export default function EvaluationCapture() {
                       {!open ? (
                         <button
                           onClick={() => toggleOpen(comp.competencyId)}
-                          className="text-2xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                          className="text-2xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
                         >
-                          <ChevronDown className="h-3 w-3" /> Add a note
+                          <ChevronDown className="h-3.5 w-3.5" /> Add a note
                         </button>
                       ) : (
                         <span />
                       )}
                       <button
                         onClick={() => handleNA(activeDomain.domainId, comp)}
-                        className={`text-2xs underline-offset-2 hover:underline ${
-                          comp.observerIsNA ? "text-foreground font-medium" : "text-muted-foreground"
+                        aria-pressed={comp.observerIsNA}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-2xs font-medium transition-colors ${
+                          comp.observerIsNA
+                            ? "border-foreground/20 bg-muted text-foreground"
+                            : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                         }`}
                       >
-                        {comp.observerIsNA ? "✓ Did not observe" : "Did not observe"}
+                        {comp.observerIsNA && <Check className="h-3 w-3" />}
+                        Did not observe
                       </button>
                     </div>
                   </CardContent>
@@ -534,6 +651,74 @@ export default function EvaluationCapture() {
             })}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Presentational Glow/Grow input block. Pure markup; all state lives in the
+ * parent and is threaded through callbacks, so behavior is unchanged.
+ */
+function FeedbackField({
+  icon: Icon,
+  accent,
+  label,
+  tag,
+  value,
+  stems,
+  onChange,
+  onTranscript,
+  onStem,
+}: {
+  icon: React.ElementType;
+  accent: string;
+  label: string;
+  tag: string;
+  value: string;
+  stems: string[];
+  onChange: (value: string) => void;
+  onTranscript: (text: string) => void;
+  onStem: (stem: string) => void;
+}) {
+  return (
+    <div className="rounded-xl bg-background/70 p-3.5 space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-2">
+          <span
+            className="inline-flex h-6 w-6 items-center justify-center rounded-lg"
+            style={{ backgroundColor: `hsl(var(${accent}-bg))` }}
+            aria-hidden
+          >
+            <Icon className="h-4 w-4" style={{ color: `hsl(var(${accent}))` }} />
+          </span>
+          <span className="text-sm font-semibold">{label}</span>
+          <span
+            className="rounded-full px-2 py-0.5 text-2xs font-medium"
+            style={{ backgroundColor: `hsl(var(${accent}-bg))`, color: `hsl(var(${accent}))` }}
+          >
+            {tag}
+          </span>
+        </span>
+        <VoiceCaptureButton onTranscript={onTranscript} />
+      </div>
+      <Textarea
+        className="bg-background"
+        rows={3}
+        placeholder="Speak or type, or tap a starter below"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <div className="flex flex-wrap gap-1.5">
+        {stems.map((s) => (
+          <button
+            key={s}
+            onClick={() => onStem(s)}
+            className="text-2xs px-2.5 py-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:shadow-sm transition-all text-left"
+          >
+            {s}
+          </button>
+        ))}
       </div>
     </div>
   );

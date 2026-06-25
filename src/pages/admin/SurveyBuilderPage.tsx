@@ -20,6 +20,7 @@ import { getAlcanActiveLocationIds } from '@/lib/alcanScope';
 import { useSurvey, useSurveyMutations, type DraftQuestion } from '@/hooks/useSurveys';
 import { QuestionEditor } from '@/components/admin/surveys/QuestionEditor';
 import { TargetingPicker } from '@/components/admin/surveys/TargetingPicker';
+import { supabase } from '@/integrations/supabase/client';
 
 function isoToLocalInput(iso: string | null): string {
   if (!iso) return '';

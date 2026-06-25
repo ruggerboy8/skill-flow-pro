@@ -37,26 +37,20 @@ const STEPS: TourStep[] = [
   {
     targetId: "tour-rubric",
     icon: BookOpen,
-    title: "Your rubric lives here",
-    body: "The left side is your reference: what each domain and competency covers, and the Pro Moves to look for. Lean on it as you recall what you saw.",
+    title: "Pick a domain, then a competency",
+    body: "The left side is your map. Choose a domain up top, then click a competency. Its Pro Moves show here as a reminder of what good looks like, and the little markers track your progress.",
   },
   {
     targetId: "tour-feedback",
-    icon: Sparkles,
-    title: "Say it naturally here",
-    body: "Speak or type your feedback in Glow and Grow. Tap a starter if you'd like a nudge, then let us polish it and file it under the right competencies.",
-  },
-  {
-    targetId: "tour-scores",
     icon: PenLine,
-    title: "Score each competency",
-    body: "Set a 1 to 4 score for every competency, or mark Did not observe. Notes sort in here automatically, and you can edit them directly.",
+    title: "Score it, then say what you saw",
+    body: "Set the 1 to 4 score, then talk or type about that one competency, the good and the not-yet. Hit Polish and we'll split it into a glow and a grow you can tweak.",
   },
   {
     targetId: "tour-submit",
     icon: Send,
     title: "Review and submit",
-    body: "When all four domains are covered, open Review and submit. We'll flag anything missing before it goes to your central office.",
+    body: "Work through the competencies in any order until each has a score. When you're done, open Review and submit and we'll flag anything missing.",
   },
 ];
 

@@ -141,6 +141,19 @@ export interface SlottedItem {
   confidence?: "high" | "low";
 }
 
+/** Split one competency's free-form feedback into a Glow and a Grow. */
+export async function separateFeedback(params: {
+  competency: { name: string; description?: string | null; proMoves: string[] };
+  text: string;
+  existingGlow?: string | null;
+  existingGrow?: string | null;
+}): Promise<{ glow: string | null; grow: string | null }> {
+  const { data, error } = await supabase.functions.invoke("separate-feedback", { body: params });
+  if (error) throw new Error(error.message);
+  if (data?.error) throw new Error(data.error);
+  return { glow: data?.glow ?? null, grow: data?.grow ?? null };
+}
+
 /** Call the slot-domain-feedback edge function for one domain. */
 export async function slotDomainFeedback(params: {
   domain: string;

@@ -64,7 +64,7 @@ export function PlatformOrgsTab() {
       const [{ data: orgsData, error }, { data: groupCounts }] = await Promise.all([
         supabase
           .from('organizations')
-          .select('id, name, slug, practice_type, created_at')
+          .select('id, name, slug, practice_type, created_at, brand_color, logo_url, app_display_name')
           .order('name'),
         supabase
           .from('practice_groups')

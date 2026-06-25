@@ -128,10 +128,11 @@ export function AdminGlobalSettingsTab() {
         const { error: uploadErr } = await supabase.storage
           .from('org-assets')
           .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
-        if (!uploadErr) {
-          const { data: urlData } = supabase.storage.from('org-assets').getPublicUrl(path);
-          logoUrl = urlData.publicUrl;
+        if (uploadErr) {
+          throw new Error(`Logo upload failed: ${uploadErr.message}`);
         }
+        const { data: urlData } = supabase.storage.from('org-assets').getPublicUrl(path);
+        logoUrl = urlData.publicUrl;
       }
 
       const payload: Record<string, any> = {

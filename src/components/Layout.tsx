@@ -17,6 +17,7 @@ import { hexToHsl } from '@/lib/colorUtils';
 import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList, Presentation } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PendingSurveysCard } from '@/components/home/PendingSurveysCard';
+import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -34,13 +35,13 @@ export default function Layout() {
     if (!organizationId) return;
     supabase
       .from('organizations')
-      .select('name')
+      .select('name, app_display_name, logo_url, brand_color')
       .eq('id', organizationId)
       .maybeSingle()
       .then(({ data }: any) => {
         if (!data) return;
-        setOrgName(data.name ?? null);
-        // logo_url and brand_color may not exist yet (pending migration)
+        // Prefer the friendly display name, fall back to the legal org name.
+        setOrgName(data.app_display_name ?? data.name ?? null);
         if (data.logo_url) setOrgLogoUrl(data.logo_url);
         if (data.brand_color) {
           const hsl = hexToHsl(data.brand_color);
@@ -211,13 +212,20 @@ export default function Layout() {
             <header className="h-16 flex items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 sticky top-0 z-10">
               <SidebarTrigger />
               
-              {/* Org logo — falls back to default if org hasn't uploaded one */}
+              {/* Org logo — custom logo, else Alcan's mark for Alcan, else a
+                  neutral text wordmark so other orgs never see Alcan branding. */}
               <div className="absolute left-1/2 -translate-x-1/2">
-                <img
-                  src={orgLogoUrl ?? alcanLogo}
-                  alt={orgName ?? 'Pro-Moves'}
-                  className="h-6 object-contain dark:invert"
-                />
+                {orgLogoUrl ? (
+                  <img
+                    src={orgLogoUrl}
+                    alt={orgName ?? 'ProMoves'}
+                    className="h-6 object-contain dark:invert"
+                  />
+                ) : organizationId === ALCAN_ORG_ID ? (
+                  <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert" />
+                ) : (
+                  <span className="text-sm font-semibold text-foreground">{orgName ?? 'ProMoves'}</span>
+                )}
               </div>
               
               <div className="flex-1" />

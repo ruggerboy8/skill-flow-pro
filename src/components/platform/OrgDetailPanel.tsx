@@ -226,7 +226,7 @@ export function OrgDetailPanel({ org, onClose, onRefresh }: OrgDetailPanelProps)
           name: editName.trim(),
           practice_type: editPracticeType,
           ...(editTimezone && { timezone: editTimezone }),
-          ...(editBrandColor !== '#1a4a7a' && { brand_color: editBrandColor }),
+          brand_color: editBrandColor,
           ...(newLogoUrl !== org.logo_url && { logo_url: newLogoUrl }),
         } as any)
         .eq('id', org.id);

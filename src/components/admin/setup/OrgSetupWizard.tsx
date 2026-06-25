@@ -153,7 +153,7 @@ export function OrgSetupWizard({
       // Org practice_type + branding fields
       const { data: orgData } = await (supabase
         .from('organizations')
-        .select('practice_type, name, slug, app_display_name, email_sign_off, reply_to_email') as any)
+        .select('practice_type, name, slug, app_display_name, email_sign_off, reply_to_email, logo_url, brand_color') as any)
         .eq('id', organizationId)
         .single();
 

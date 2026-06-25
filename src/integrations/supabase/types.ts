@@ -2479,6 +2479,251 @@ export type Database = {
         }
         Relationships: []
       }
+      survey_answers: {
+        Row: {
+          id: string
+          question_id: string
+          response_id: string
+          value: Json | null
+        }
+        Insert: {
+          id?: string
+          question_id: string
+          response_id: string
+          value?: Json | null
+        }
+        Update: {
+          id?: string
+          question_id?: string
+          response_id?: string
+          value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "survey_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "survey_answers_response_id_fkey"
+            columns: ["response_id"]
+            isOneToOne: false
+            referencedRelation: "survey_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_assignments: {
+        Row: {
+          assigned_at: string
+          completed_at: string | null
+          id: string
+          staff_id: string
+          status: string
+          survey_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          completed_at?: string | null
+          id?: string
+          staff_id: string
+          status?: string
+          survey_id: string
+        }
+        Update: {
+          assigned_at?: string
+          completed_at?: string | null
+          id?: string
+          staff_id?: string
+          status?: string
+          survey_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_assignments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "survey_assignments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "survey_assignments_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_questions: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          position: number
+          prompt: string
+          required: boolean
+          survey_id: string
+          type: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          position?: number
+          prompt: string
+          required?: boolean
+          survey_id: string
+          type: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          position?: number
+          prompt?: string
+          required?: boolean
+          survey_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_questions_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_responses: {
+        Row: {
+          id: string
+          staff_id: string | null
+          submitted_at: string
+          survey_id: string
+        }
+        Insert: {
+          id?: string
+          staff_id?: string | null
+          submitted_at?: string
+          survey_id: string
+        }
+        Update: {
+          id?: string
+          staff_id?: string | null
+          submitted_at?: string
+          survey_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_responses_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "survey_responses_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "survey_responses_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      surveys: {
+        Row: {
+          closed_at: string | null
+          closes_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_anonymous: boolean
+          opens_at: string | null
+          organization_id: string
+          published_at: string | null
+          status: string
+          target_location_ids: string[]
+          target_role_ids: number[]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closes_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_anonymous?: boolean
+          opens_at?: string | null
+          organization_id: string
+          published_at?: string | null
+          status?: string
+          target_location_ids?: string[]
+          target_role_ids?: number[]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closes_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_anonymous?: boolean
+          opens_at?: string | null
+          organization_id?: string
+          published_at?: string | null
+          status?: string
+          target_location_ids?: string[]
+          target_role_ids?: number[]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "surveys_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "surveys_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "surveys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_backlog: {
         Row: {
           added_week_id: string
@@ -3984,6 +4229,7 @@ export type Database = {
           source: string
         }[]
       }
+      publish_survey: { Args: { p_survey_id: string }; Returns: undefined }
       recover_orphaned_scores: { Args: never; Returns: Json }
       release_single_evaluation: {
         Args: { p_eval_id: string; p_released_by: string; p_visible: boolean }
@@ -4088,6 +4334,10 @@ export type Database = {
               score: number
             }[]
           }
+      submit_survey: {
+        Args: { p_answers: Json; p_survey_id: string }
+        Returns: string
+      }
     }
     Enums: {
       plan_status: "locked" | "draft"

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { CalendarCheck, Users, BarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ProMovesLogo } from '@/components/ProMovesLogo';
 
 const valueProps = [
   {
@@ -28,9 +29,7 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
-          <span className="text-xl font-semibold text-brand-600 tracking-tight">
-            ProMoves
-          </span>
+          <ProMovesLogo className="text-xl" />
           <Button
             variant="outline"
             size="sm"

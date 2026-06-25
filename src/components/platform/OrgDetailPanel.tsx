@@ -225,13 +225,28 @@ export function OrgDetailPanel({ org, onClose, onRefresh }: OrgDetailPanelProps)
         .update({
           name: editName.trim(),
           practice_type: editPracticeType,
-          ...(editTimezone && { timezone: editTimezone }),
           brand_color: editBrandColor,
           ...(newLogoUrl !== org.logo_url && { logo_url: newLogoUrl }),
         } as any)
         .eq('id', org.id);
 
       if (error) throw error;
+
+      // Timezone lives on locations (organizations has no timezone column).
+      // Apply the chosen default to all of this org's locations.
+      if (editTimezone) {
+        const { data: groups } = await supabase
+          .from('practice_groups')
+          .select('id')
+          .eq('organization_id', org.id);
+        const groupIds = (groups ?? []).map((g) => g.id);
+        if (groupIds.length) {
+          await supabase
+            .from('locations')
+            .update({ timezone: editTimezone } as any)
+            .in('group_id', groupIds);
+        }
+      }
 
       toast({ title: 'Saved', description: 'Organization settings updated.' });
       setLogoFile(null);

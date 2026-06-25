@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Check, Loader2 } from 'lucide-react';
-import alcanLogo from '@/assets/alcan-logo-full.jpg'; // TODO: Replace with org-specific logo once logo upload is implemented
+import { ProMovesLogo } from '@/components/ProMovesLogo';
+import { useOrgBranding } from '@/hooks/useOrgBranding';
 
 interface StaffInfo {
   name: string;
@@ -23,6 +24,7 @@ export default function SetupPassword() {
   const [loadingInfo, setLoadingInfo] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { branding } = useOrgBranding({ applyPrimary: true });
 
   // Fetch staff info for personalization
   useEffect(() => {
@@ -137,13 +139,17 @@ export default function SetupPassword() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-muted/30">
       <Card className="w-full max-w-md border-0 shadow-xl bg-card/95 backdrop-blur">
         <CardContent className="pt-8 pb-8 space-y-6">
-          {/* Logo */}
+          {/* Logo — org's own if uploaded, else the generic ProMoves wordmark */}
           <div className="flex justify-center">
-            <img 
-              src={alcanLogo} 
-              alt="Pro-Moves" 
-              className="h-16 w-auto object-contain"
-            />
+            {branding?.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.displayName ?? branding.name ?? 'Organization logo'}
+                className="h-16 w-auto object-contain"
+              />
+            ) : (
+              <ProMovesLogo className="text-3xl" />
+            )}
           </div>
 
           {/* Personalized Greeting */}

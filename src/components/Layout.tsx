@@ -17,6 +17,7 @@ import { hexToHsl } from '@/lib/colorUtils';
 import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList, Presentation } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PendingSurveysCard } from '@/components/home/PendingSurveysCard';
+import { ProMovesLogo } from '@/components/ProMovesLogo';
 import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
 // Server-side backfill detection via RPC
 
@@ -223,8 +224,10 @@ export default function Layout() {
                   />
                 ) : organizationId === ALCAN_ORG_ID ? (
                   <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert" />
+                ) : orgName ? (
+                  <span className="text-sm font-semibold text-foreground">{orgName}</span>
                 ) : (
-                  <span className="text-sm font-semibold text-foreground">{orgName ?? 'ProMoves'}</span>
+                  <ProMovesLogo className="text-base" />
                 )}
               </div>
               

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { ProMovesLogo } from '@/components/ProMovesLogo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -47,7 +48,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">ProMoves</CardTitle>
+          <CardTitle className="text-2xl"><ProMovesLogo /></CardTitle>
           <CardDescription>
             Sign in to your account
           </CardDescription>

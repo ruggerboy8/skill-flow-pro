@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { BookOpen, TrendingUp, Trophy } from 'lucide-react';
-import alcanLogo from '@/assets/alcan-logo-full.jpg'; // TODO: Replace with org-specific logo once logo upload is implemented
+import { ProMovesLogo } from '@/components/ProMovesLogo';
+import { useOrgBranding } from '@/hooks/useOrgBranding';
 
 interface StaffInfo {
   name: string;
@@ -16,6 +17,7 @@ export default function Welcome() {
   const navigate = useNavigate();
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const { branding } = useOrgBranding({ applyPrimary: true });
 
   useEffect(() => {
     const fetchStaffInfo = async () => {
@@ -77,13 +79,17 @@ export default function Welcome() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-muted/30">
       <Card className="w-full max-w-lg border-0 shadow-xl bg-card/95 backdrop-blur animate-in fade-in slide-in-from-bottom-4 duration-500">
         <CardContent className="pt-8 pb-8 space-y-6">
-          {/* Logo */}
+          {/* Logo — org's own if uploaded, else the generic ProMoves wordmark */}
           <div className="flex justify-center">
-            <img 
-              src={alcanLogo} 
-              alt="Pro-Moves" 
-              className="h-14 w-auto object-contain"
-            />
+            {branding?.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.displayName ?? branding.name ?? 'Organization logo'}
+                className="h-14 w-auto object-contain"
+              />
+            ) : (
+              <ProMovesLogo className="text-3xl" />
+            )}
           </div>
 
           {/* Celebration Header */}

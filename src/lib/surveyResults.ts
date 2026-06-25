@@ -128,10 +128,12 @@ export function buildResponseCsvRows(params: {
 
   return responses.map((r) => {
     const row: Record<string, string> = {};
+    // Identity and precise timing are omitted for anonymous surveys so the CSV
+    // can't be used to re-identify responders.
     if (!isAnonymous) {
       row['Respondent'] = r.staff_id ? staffNames.get(r.staff_id) ?? '(unknown)' : '';
+      row['Submitted'] = new Date(r.submitted_at).toLocaleString();
     }
-    row['Submitted'] = new Date(r.submitted_at).toLocaleString();
     const amap = byResponse.get(r.id);
     questions.forEach((q, i) => {
       row[header(q, i)] = amap ? answerToCell(amap.get(q.id) ?? null) : '';

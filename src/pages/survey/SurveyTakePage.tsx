@@ -31,6 +31,7 @@ export default function SurveyTakePage() {
   const { data, isLoading } = useSurveyForTaking(id);
   const submit = useSubmitSurvey();
   const [answers, setAnswers] = useState<AnswerMap>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   if (isLoading) {
     return <div className="mx-auto max-w-2xl p-6"><Skeleton className="h-96 w-full" /></div>;
@@ -73,8 +74,12 @@ export default function SurveyTakePage() {
   );
 
   const handleSubmit = async () => {
+    setSubmitAttempted(true);
     if (firstMissingRequired) {
-      toast.error('Please answer all required questions.');
+      toast.error('Please answer the highlighted questions.');
+      const el = document.getElementById(`q-${firstMissingRequired.id}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (el?.querySelector('input, textarea, button') as HTMLElement | null)?.focus();
       return;
     }
     const payload: SurveyAnswerInput[] = questions
@@ -92,7 +97,7 @@ export default function SurveyTakePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 md:p-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+        <Button variant="ghost" size="icon" aria-label="Back to home" onClick={() => navigate('/')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-xl font-semibold">{survey.title}</h1>
@@ -101,17 +106,20 @@ export default function SurveyTakePage() {
       {survey.description && <p className="text-sm text-muted-foreground">{survey.description}</p>}
 
       {survey.is_anonymous && (
-        <div className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-2xs text-muted-foreground">
-          <EyeOff className="h-3 w-3" /> Your answers are anonymous.
+        <div className="flex items-start gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-2xs text-muted-foreground">
+          <EyeOff className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>
+            Anonymous. Your answers aren't linked to your name. We can see that you responded, but not what you said.
+          </span>
         </div>
       )}
 
       <div className="space-y-4">
         {questions.map((q, i) => {
           const val = answers[q.id];
-          const missing = q.required && !isAnswered(q, val);
+          const missing = submitAttempted && q.required && !isAnswered(q, val);
           return (
-            <Card key={q.id}>
+            <Card key={q.id} id={`q-${q.id}`}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium">
                   <span className="text-muted-foreground">Q{i + 1}. </span>
@@ -163,7 +171,11 @@ export default function SurveyTakePage() {
 
                 {q.type === 'rating' && <RatingControl q={q} value={val} onChange={(v) => setAnswer(q.id, v)} />}
 
-                {missing && <p className="mt-2 text-2xs text-destructive">This question is required.</p>}
+                {missing && (
+                  <p className="mt-2 text-2xs text-destructive" role="alert">
+                    This question is required.
+                  </p>
+                )}
               </CardContent>
             </Card>
           );
@@ -194,18 +206,27 @@ function RatingControl({
   const scale: number[] = [];
   for (let n = min; n <= max; n++) scale.push(n);
 
+  const labelFor = (n: number) => {
+    if (n === min && q.config.minLabel) return `${n}, ${q.config.minLabel}`;
+    if (n === max && q.config.maxLabel) return `${n}, ${q.config.maxLabel}`;
+    return String(n);
+  };
+
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5">
+      <div role="radiogroup" aria-label={q.prompt} className="flex flex-wrap gap-1.5">
         {scale.map((n) => (
           <button
             key={n}
             type="button"
+            role="radio"
+            aria-checked={value === n}
+            aria-label={labelFor(n)}
             onClick={() => onChange(n)}
             className={cn(
               'h-9 w-9 rounded-md border text-sm font-medium tabular-nums transition-colors',
               value === n
-                ? 'border-primary bg-primary text-primary-foreground'
+                ? 'border-primary bg-primary text-primary-foreground ring-2 ring-primary ring-offset-1'
                 : 'border-input hover:bg-muted',
             )}
           >

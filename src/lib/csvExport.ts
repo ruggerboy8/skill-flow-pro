@@ -1,4 +1,20 @@
 // Utility for CSV export functionality
+
+// Escape a single CSV cell: quote when it contains a delimiter/quote/newline,
+// double up embedded quotes, and neutralize spreadsheet formula-injection on
+// non-numeric strings (so "-5" stays a number but "=cmd()" is defanged).
+function escapeCsvCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  let s = String(value);
+  if (/^[=+\-@\t\r]/.test(s) && Number.isNaN(Number(s))) {
+    s = `'${s}`;
+  }
+  if (/[",\n\r]/.test(s)) {
+    s = `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
 export function downloadCSV(data: any[], filename: string) {
   if (!data || data.length === 0) {
     return;
@@ -6,16 +22,9 @@ export function downloadCSV(data: any[], filename: string) {
 
   const headers = Object.keys(data[0]);
   const csvContent = [
-    headers.join(','),
-    ...data.map(row => 
-      headers.map(header => {
-        const value = row[header];
-        if (value === null || value === undefined) return '';
-        if (typeof value === 'string' && value.includes(',')) {
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        return value;
-      }).join(',')
+    headers.map(escapeCsvCell).join(','),
+    ...data.map(row =>
+      headers.map(header => escapeCsvCell(row[header])).join(',')
     )
   ].join('\n');
 

@@ -227,7 +227,7 @@ export function useSurveyMutations() {
             type: q.type,
             prompt: q.prompt,
             required: q.required,
-            config: q.config,
+            config: { ...q.config },
           })),
         );
         if (insErr) throw insErr;

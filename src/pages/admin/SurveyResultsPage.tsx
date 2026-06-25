@@ -84,7 +84,7 @@ export default function SurveyResultsPage() {
     <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/admin?tab=surveys')}>
+        <Button variant="ghost" size="icon" aria-label="Back to surveys" onClick={() => navigate('/admin?tab=surveys')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="min-w-0 flex-1">
@@ -111,7 +111,7 @@ export default function SurveyResultsPage() {
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" onClick={handleExport}>
           <Download className="h-4 w-4 mr-2" /> Download CSV
         </Button>
@@ -128,19 +128,30 @@ export default function SurveyResultsPage() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Close this survey?</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {state === 'Scheduled' ? 'Cancel this scheduled survey?' : 'Close this survey?'}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Staff will no longer be able to respond. This can't be undone (you can duplicate it to re-run).
+                  {state === 'Scheduled'
+                    ? "It won't open, and staff won't be asked to respond. This can't be undone (you can duplicate it to re-run)."
+                    : "Staff will no longer be able to respond. This can't be undone (you can duplicate it to re-run)."}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClose}>Close survey</AlertDialogAction>
+                <AlertDialogAction onClick={handleClose}>
+                  {state === 'Scheduled' ? 'Cancel survey' : 'Close survey'}
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         ) : null}
       </div>
+      {survey.is_anonymous && (
+        <p className="-mt-3 text-2xs text-muted-foreground">
+          CSV omits names and timestamps for anonymous surveys.
+        </p>
+      )}
 
       {/* Completion */}
       <Card>
@@ -164,8 +175,8 @@ export default function SurveyResultsPage() {
           <ShieldAlert className="h-4 w-4" />
           <AlertDescription>
             This survey is anonymous and has only {responseCount} response
-            {responseCount === 1 ? '' : 's'}. Per-question results are hidden until at least{' '}
-            {SURVEY_MIN_ANON_N} people respond, to protect anonymity.
+            {responseCount === 1 ? '' : 's'} ({responseCount} of {SURVEY_MIN_ANON_N} needed).
+            Per-question results stay hidden until at least {SURVEY_MIN_ANON_N} people respond, to protect anonymity.
           </AlertDescription>
         </Alert>
       )}

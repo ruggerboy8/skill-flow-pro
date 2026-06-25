@@ -1,4 +1,4 @@
-import { Trash2, GripVertical, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -28,15 +28,17 @@ interface Props {
 
 export function QuestionEditor({ question, index, total, onChange, onRemove, onMove }: Props) {
   const setType = (type: SurveyQuestionType) => {
-    // Reset config to sensible defaults per type.
+    // Preserve any already-entered config (choices, rating bounds) so switching
+    // type and back doesn't silently discard the user's work. Just ensure the
+    // keys the new type needs have sensible defaults.
+    const cfg = { ...question.config };
     if (type === 'rating') {
-      onChange({ ...question, type, config: { min: 0, max: 10, minLabel: '', maxLabel: '' } });
+      if (cfg.min == null) cfg.min = 0;
+      if (cfg.max == null) cfg.max = 10;
     } else if (type === 'single_choice' || type === 'multi_choice') {
-      const choices = question.config.choices?.length ? question.config.choices : ['', ''];
-      onChange({ ...question, type, config: { choices } });
-    } else {
-      onChange({ ...question, type, config: {} });
+      if (!cfg.choices?.length) cfg.choices = ['', ''];
     }
+    onChange({ ...question, type, config: cfg });
   };
 
   const choices = question.config.choices ?? [];
@@ -59,7 +61,6 @@ export function QuestionEditor({ question, index, total, onChange, onRemove, onM
     <Card>
       <CardContent className="space-y-3 p-4">
         <div className="flex items-start gap-2">
-          <GripVertical className="mt-2.5 h-4 w-4 shrink-0 text-muted-foreground/50" />
           <div className="flex-1 space-y-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-muted-foreground">Q{index + 1}</span>
@@ -69,6 +70,7 @@ export function QuestionEditor({ question, index, total, onChange, onRemove, onM
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
+                  aria-label="Move question up"
                   disabled={index === 0}
                   onClick={() => onMove(-1)}
                 >
@@ -79,6 +81,7 @@ export function QuestionEditor({ question, index, total, onChange, onRemove, onM
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
+                  aria-label="Move question down"
                   disabled={index === total - 1}
                   onClick={() => onMove(1)}
                 >
@@ -89,6 +92,7 @@ export function QuestionEditor({ question, index, total, onChange, onRemove, onM
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-destructive"
+                  aria-label="Remove question"
                   onClick={onRemove}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -159,55 +163,92 @@ export function QuestionEditor({ question, index, total, onChange, onRemove, onM
             )}
 
             {/* Rating config */}
-            {question.type === 'rating' && (
-              <div className="grid grid-cols-2 gap-3 rounded-md border border-dashed p-3 sm:grid-cols-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Min</Label>
-                  <Input
-                    type="number"
-                    value={question.config.min ?? 0}
-                    onChange={(e) =>
-                      onChange({ ...question, config: { ...question.config, min: Number(e.target.value) } })
-                    }
-                  />
+            {question.type === 'rating' && (() => {
+              const min = question.config.min ?? 0;
+              const max = question.config.max ?? 10;
+              const rangeInvalid = max <= min;
+              const isNps = min === 0 && max === 10;
+              const wide = !rangeInvalid && max - min > 10;
+              return (
+                <div className="grid grid-cols-2 gap-3 rounded-md border border-dashed p-3 sm:grid-cols-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Min</Label>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      aria-invalid={rangeInvalid}
+                      value={min}
+                      onChange={(e) =>
+                        onChange({ ...question, config: { ...question.config, min: Number(e.target.value) } })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Max</Label>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      aria-invalid={rangeInvalid}
+                      value={max}
+                      onChange={(e) =>
+                        onChange({ ...question, config: { ...question.config, max: Number(e.target.value) } })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Low label</Label>
+                    <Input
+                      placeholder="e.g. Not likely"
+                      value={question.config.minLabel ?? ''}
+                      onChange={(e) =>
+                        onChange({ ...question, config: { ...question.config, minLabel: e.target.value } })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">High label</Label>
+                    <Input
+                      placeholder="e.g. Very likely"
+                      value={question.config.maxLabel ?? ''}
+                      onChange={(e) =>
+                        onChange({ ...question, config: { ...question.config, maxLabel: e.target.value } })
+                      }
+                    />
+                  </div>
+
+                  {rangeInvalid && (
+                    <p className="col-span-full text-2xs text-destructive">
+                      Max must be greater than min.
+                    </p>
+                  )}
+                  {wide && (
+                    <p className="col-span-full text-2xs text-muted-foreground">
+                      That's a lot of options to tap on a phone. Consider a 0 to 10 scale or smaller.
+                    </p>
+                  )}
+
+                  <div className="col-span-full flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-2xs text-muted-foreground">
+                      {isNps
+                        ? 'A 0 to 10 scale. Results will also report an NPS score.'
+                        : 'Tip: set the range to 0 to 10 to also report an NPS score.'}
+                    </p>
+                    {!isNps && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          onChange({ ...question, config: { ...question.config, min: 0, max: 10 } })
+                        }
+                      >
+                        Use 0–10 (NPS)
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Max</Label>
-                  <Input
-                    type="number"
-                    value={question.config.max ?? 10}
-                    onChange={(e) =>
-                      onChange({ ...question, config: { ...question.config, max: Number(e.target.value) } })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Low label</Label>
-                  <Input
-                    placeholder="e.g. Not likely"
-                    value={question.config.minLabel ?? ''}
-                    onChange={(e) =>
-                      onChange({ ...question, config: { ...question.config, minLabel: e.target.value } })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">High label</Label>
-                  <Input
-                    placeholder="e.g. Very likely"
-                    value={question.config.maxLabel ?? ''}
-                    onChange={(e) =>
-                      onChange({ ...question, config: { ...question.config, maxLabel: e.target.value } })
-                    }
-                  />
-                </div>
-                {question.config.min === 0 && question.config.max === 10 && (
-                  <p className="col-span-full text-2xs text-muted-foreground">
-                    0–10 scale — results will also report an NPS score.
-                  </p>
-                )}
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       </CardContent>

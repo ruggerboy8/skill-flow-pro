@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Send, Save, Loader2, EyeOff } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +15,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { useAskAlcanAccess, ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
+import { useAskAlcanAccess } from '@/lib/askAlcanAccess';
+import { getAlcanActiveLocationIds } from '@/lib/alcanScope';
 import { useSurvey, useSurveyMutations, type DraftQuestion } from '@/hooks/useSurveys';
 import { QuestionEditor } from '@/components/admin/surveys/QuestionEditor';
 import { TargetingPicker } from '@/components/admin/surveys/TargetingPicker';
@@ -90,14 +90,7 @@ export default function SurveyBuilderPage() {
   const { data: recipientEstimate } = useQuery({
     queryKey: ['survey-recipient-estimate', [...locationIds].sort().join(','), [...roleIds].sort().join(',')],
     queryFn: async (): Promise<number> => {
-      const { data: groups } = await supabase
-        .from('practice_groups')
-        .select('id')
-        .eq('organization_id', ALCAN_ORG_ID);
-      const groupIds = (groups ?? []).map((g) => g.id);
-      if (!groupIds.length) return 0;
-      const { data: locs } = await supabase.from('locations').select('id').in('group_id', groupIds);
-      const allLocIds = (locs ?? []).map((l) => l.id);
+      const allLocIds = await getAlcanActiveLocationIds();
       const scopeLocIds = locationIds.length ? locationIds : allLocIds;
       if (!scopeLocIds.length) return 0;
       let q = supabase
@@ -211,7 +204,7 @@ export default function SurveyBuilderPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/admin?tab=surveys')}>
+        <Button variant="ghost" size="icon" aria-label="Back to surveys" onClick={() => navigate('/admin?tab=surveys')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-xl font-semibold">{isEdit ? 'Edit survey' : 'New survey'}</h1>
@@ -284,6 +277,11 @@ export default function SurveyBuilderPage() {
           <p className="text-sm text-muted-foreground">
             Estimated recipients: <span className="font-semibold text-foreground">{recipientEstimate ?? '…'}</span>
           </p>
+          {recipientEstimate === 0 && (
+            <p className="text-2xs text-destructive">
+              No active staff match this targeting. Adjust the filters before publishing.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -314,7 +312,7 @@ export default function SurveyBuilderPage() {
         </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button disabled={busy}>
+            <Button disabled={busy || recipientEstimate === 0}>
               <Send className="h-4 w-4 mr-2" /> Publish
             </Button>
           </AlertDialogTrigger>
@@ -322,7 +320,8 @@ export default function SurveyBuilderPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Publish this survey?</AlertDialogTitle>
               <AlertDialogDescription>
-                It will be assigned to about {recipientEstimate ?? 0} staff and questions will lock.
+                It will be assigned to about{' '}
+                {recipientEstimate === undefined ? 'a number of' : recipientEstimate} staff and questions will lock.
                 You can close it early or duplicate it later, but you can't edit the questions once it's live.
               </AlertDialogDescription>
             </AlertDialogHeader>

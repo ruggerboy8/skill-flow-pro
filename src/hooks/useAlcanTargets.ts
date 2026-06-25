@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
+import { getAlcanGroupIds, getAlcanActiveLocationIds } from '@/lib/alcanScope';
 
 export interface TargetLocation {
   id: string;
@@ -17,11 +17,7 @@ export function useAlcanTargets() {
     queryKey: ['alcan-targets', 'locations'],
     staleTime: 1000 * 60 * 10,
     queryFn: async (): Promise<TargetLocation[]> => {
-      const { data: groups } = await supabase
-        .from('practice_groups')
-        .select('id')
-        .eq('organization_id', ALCAN_ORG_ID);
-      const groupIds = (groups ?? []).map((g) => g.id);
+      const groupIds = await getAlcanGroupIds();
       if (!groupIds.length) return [];
       const { data, error } = await supabase
         .from('locations')
@@ -39,17 +35,7 @@ export function useAlcanTargets() {
     staleTime: 1000 * 60 * 10,
     queryFn: async (): Promise<TargetRole[]> => {
       // Roles actually held by active Alcan staff (keeps the picker tidy).
-      const { data: groups } = await supabase
-        .from('practice_groups')
-        .select('id')
-        .eq('organization_id', ALCAN_ORG_ID);
-      const groupIds = (groups ?? []).map((g) => g.id);
-      if (!groupIds.length) return [];
-      const { data: locs } = await supabase
-        .from('locations')
-        .select('id')
-        .in('group_id', groupIds);
-      const locIds = (locs ?? []).map((l) => l.id);
+      const locIds = await getAlcanActiveLocationIds();
       if (!locIds.length) return [];
       const { data: staff } = await supabase
         .from('staff')

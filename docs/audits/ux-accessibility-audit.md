@@ -12,6 +12,17 @@ not run. No app was launched; no live screen reader, contrast tooling, or keyboa
 performed. This audit *replaces* the prior stale audit (which ran against the March-6 branch,
 ~1,529 commits behind `main`).
 
+> **Update 2026-06-25 — most SAFE quick wins addressed.** Fixed on `main`: A1 (NumberScale
+> `metric` prop), A2 (Lead card `onKeyDown`), A3 (ProMoveRow keyboard), A4 (header icon
+> `aria-label`s), N1 (the broken `:week` redirects), B1 (neutral wordmark fallback so non-Alcan
+> orgs stop seeing Alcan's logo — *header only; `Welcome`/`SetupPassword` still hardcode the Alcan
+> image, see below*), B3 (deleted `Index.backup.tsx` + legacy `Confidence`/`Performance`), C1
+> (Skeleton loading + recovery action in both wizards), A5 (domain spine now uses rich color, not
+> white-on-pastel — still wants a live contrast measurement), and the C2 console noise (masquerade
+> PII block removed; ConfidenceWizard logs gated to dev). **Still open:** `Welcome.tsx`/
+> `SetupPassword.tsx` org-logo fallback, the broader `cursor-pointer`-on-`div` sweep (A3 tail), and
+> everything under "Needs live walkthrough."
+
 > **What a code-reading audit can and cannot do.** It reliably catches *structural* a11y problems —
 > clickable `div`s without keyboard handlers, missing roles, color-only signaling, wrong `aria-label`
 > logic, broken redirects. It **cannot** measure real contrast ratios, focus-trap behavior, or

@@ -12,9 +12,21 @@ export function ProMoveRow({ move, onClick }: ProMoveRowProps) {
   const hasHistory = !!move.lastPracticed;
 
   return (
-    <div 
+    <div
       onClick={onClick}
-      className="group flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3 rounded-lg border border-transparent hover:bg-muted/50 hover:border-border/50 transition-all cursor-pointer"
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      className="group flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3 rounded-lg border border-transparent hover:bg-muted/50 hover:border-border/50 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {/* Content */}
       <div className="flex-1 space-y-1.5">

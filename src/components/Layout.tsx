@@ -234,12 +234,12 @@ export default function Layout() {
                 {/* Sim console trigger - only for admins with dev tools enabled */}
                 {(user?.email === 'johno@reallygoodconsulting.org' || user?.email === 'ryanjoberly@gmail.com') && 
                  import.meta.env.VITE_ENABLE_SIMTOOLS === 'true' && (
-                  <Button variant="ghost" size="icon" onClick={() => setIsSimConsoleOpen(true)}>
+                  <Button variant="ghost" size="icon" aria-label="Open simulation console" onClick={() => setIsSimConsoleOpen(true)}>
                     <SettingsIcon className="w-4 h-4" />
                   </Button>
                 )}
-                
-                <NavLink to="/profile">
+
+                <NavLink to="/profile" aria-label="Profile">
                   <Button variant="outline" size="icon">
                     <User className="w-4 h-4" />
                   </Button>

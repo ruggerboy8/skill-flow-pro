@@ -6,9 +6,11 @@ interface NumberScaleProps {
   onChange: (value: number) => void;
   disabled?: boolean;
   hideTips?: boolean;
+  /** Which wizard this control is rendering in — used for the screen-reader label. */
+  metric?: 'confidence' | 'performance';
 }
 
-export default function NumberScale({ value, onChange, disabled, hideTips }: NumberScaleProps) {
+export default function NumberScale({ value, onChange, disabled, hideTips, metric = 'performance' }: NumberScaleProps) {
   const [persistentTooltip, setPersistentTooltip] = useState<number | null>(null);
 
   // Reset tooltip when value becomes null or undefined
@@ -48,7 +50,7 @@ export default function NumberScale({ value, onChange, disabled, hideTips }: Num
             variant="outline"
             onClick={() => handleClick(score)}
             disabled={disabled}
-            aria-label={`${score === 4 ? 'Confidence' : 'Performance'} ${score} – ${tooltipText[score as keyof typeof tooltipText]}`}
+            aria-label={`${metric === 'confidence' ? 'Confidence' : 'Performance'} ${score} – ${tooltipText[score as keyof typeof tooltipText]}`}
             className={`h-12 w-full text-lg font-semibold transition-all ${
               value !== score ? 'hover:bg-slate-50 border-slate-200 text-slate-600' : ''
             }`}

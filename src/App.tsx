@@ -1,5 +1,5 @@
 // src/App.tsx
-import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
@@ -19,9 +19,7 @@ import Index from "@/pages/Index";
 import Welcome from "@/pages/Welcome";
 import Profile from "@/pages/Profile";
 
-import Confidence from "@/pages/Confidence";
 import ConfidenceWizard from "@/pages/ConfidenceWizard";
-import Performance from "@/pages/Performance";
 import PerformanceWizard from "@/pages/PerformanceWizard";
 import Review from "@/pages/Review";
 
@@ -75,6 +73,14 @@ import DoctorMyTeam from "@/pages/doctor/DoctorMyTeam";
 import DoctorTeamRoleDetail from "@/pages/doctor/DoctorTeamRoleDetail";
 import DoctorTeamDomainDetail from "@/pages/doctor/DoctorTeamDomainDetail";
 
+// Interpolates the :week param when redirecting legacy /confidence/:week and
+// /performance/:week links to their step-1 wizard route. (A plain <Navigate to>
+// would send users to a URL with a literal ":week" in it.)
+function RedirectToStepOne({ base }: { base: 'confidence' | 'performance' }) {
+  const { week } = useParams();
+  return <Navigate to={`/${base}/${week}/step/1`} replace />;
+}
+
 // App routes with pre-routing checks for public pages
 function AppRoutes() {
   const { user, loading, needsPasswordSetup } = useAuth();
@@ -125,9 +131,9 @@ function AppRoutes() {
         <Route path="reset-password" element={<ResetPassword />} />
         
         {/* Redirect legacy pages to wizard versions */}
-        <Route path="confidence/:week" element={<Navigate to="/confidence/:week/step/1" replace />} />
+        <Route path="confidence/:week" element={<RedirectToStepOne base="confidence" />} />
         <Route path="confidence/:week/step/:n" element={<ConfidenceWizard />} />
-        <Route path="performance/:week" element={<Navigate to="/performance/:week/step/1" replace />} />
+        <Route path="performance/:week" element={<RedirectToStepOne base="performance" />} />
         <Route path="performance/:week/step/:n" element={<PerformanceWizard />} />
         <Route path="review/:cycle/:week" element={<Review />} />
 

@@ -53,6 +53,13 @@ interface WeeklyFocus {
   week_label?: string;
 }
 
+// Dev-only logging. Keeps the verbose wizard/repair tracing for local debugging
+// but stays silent in production (it was leaking scores, payloads, and staff
+// identifiers to the browser console for real participants).
+const debug: (...args: unknown[]) => void = import.meta.env.DEV
+  ? console.log.bind(console)
+  : () => {};
+
 export default function ConfidenceWizard() {
   const { n } = useParams();
   const [staff, setStaff] = useState<Staff | null>(null);
@@ -98,7 +105,7 @@ export default function ConfidenceWizard() {
       if (storedScores) {
         try {
           const parsed = JSON.parse(storedScores);
-          console.log('Restoring scores from sessionStorage:', parsed);
+          debug('Restoring scores from sessionStorage:', parsed);
           setScores(parsed);
         } catch (e) {
           console.error('Failed to parse stored scores:', e);
@@ -110,7 +117,7 @@ export default function ConfidenceWizard() {
       if (storedSelections) {
         try {
           const parsed = JSON.parse(storedSelections);
-          console.log('Restoring selections from sessionStorage:', parsed);
+          debug('Restoring selections from sessionStorage:', parsed);
           setSelectedActions(parsed);
         } catch (e) {
           console.error('Failed to parse stored selections:', e);
@@ -125,7 +132,7 @@ export default function ConfidenceWizard() {
   const returnTo = qs.get("returnTo");
   
   // Immediate debug logging
-  console.log('ConfidenceWizard - Raw URL params:', { 
+  debug('ConfidenceWizard - Raw URL params:', { 
     isRepair, 
     repairCycle: `"${repairCycle}"`, 
     repairWeek: `"${repairWeek}"`, 
@@ -142,7 +149,7 @@ export default function ConfidenceWizard() {
     } else {
       targetCycle = parseInt(repairCycle, 10);
       targetWeek = parseInt(repairWeek, 10);
-      console.log('ConfidenceWizard - Parsed repair params:', { 
+      debug('ConfidenceWizard - Parsed repair params:', { 
         targetCycle, 
         targetWeek, 
         targetCycleIsNaN: isNaN(targetCycle), 
@@ -259,7 +266,7 @@ export default function ConfidenceWizard() {
         return;
       }
 
-      console.log('Loading repair data for weekOf:', weekOf);
+      debug('Loading repair data for weekOf:', weekOf);
       
       // Try to use cycle/week if available, otherwise use weekOf to determine source
       // Also check if location has onboarding disabled (skip onboarding mode)
@@ -301,7 +308,7 @@ export default function ConfidenceWizard() {
             .eq('status', 'locked')
             .order('display_order');
 
-          console.log('Repair query result (assignments):', { assignData, assignError });
+          debug('Repair query result (assignments):', { assignData, assignError });
 
           assignments = (assignData || []).map((item: any) => {
             let domainName = 'Unknown';
@@ -350,7 +357,7 @@ export default function ConfidenceWizard() {
             .eq('status', 'locked')
             .order('display_order');
 
-          console.log('Repair query result (plan):', { planData, planError });
+          debug('Repair query result (plan):', { planData, planError });
 
           assignments = (planData || []).map((item: any) => {
             let domainName = 'Unknown';
@@ -376,7 +383,7 @@ export default function ConfidenceWizard() {
         weekInCycle = targetWeek;
       } else {
         // No cycle/week - try weekly_assignments first (location-specific onboarding, then global), then weekly_plan
-        console.log('No cycle/week params, querying by weekOf - trying weekly_assignments first');
+        debug('No cycle/week params, querying by weekOf - trying weekly_assignments first');
         
         // First try location-specific onboarding assignments
         const { data: onboardingData, error: onboardingError } = await supabase
@@ -410,7 +417,7 @@ export default function ConfidenceWizard() {
           .is('superseded_at', null)
           .order('display_order');
 
-        console.log('Repair query result (onboarding assignments):', { onboardingData, onboardingError });
+        debug('Repair query result (onboarding assignments):', { onboardingData, onboardingError });
 
         // If no location-specific onboarding, try global assignments
         let assignData = onboardingData;
@@ -427,7 +434,7 @@ export default function ConfidenceWizard() {
                 return pg?.organization_id ?? null;
               })()
             : null;
-          console.log('No onboarding assignments, trying org-scoped assignments, orgId:', repairOrgId);
+          debug('No onboarding assignments, trying org-scoped assignments, orgId:', repairOrgId);
           let orgQuery = supabase
             .from('weekly_assignments')
             .select(`
@@ -463,7 +470,7 @@ export default function ConfidenceWizard() {
 
           const { data: globalData, error: globalError } = await orgQuery;
 
-          console.log('Repair query result (org-scoped assignments):', { globalData, globalError });
+          debug('Repair query result (org-scoped assignments):', { globalData, globalError });
           assignData = globalData;
         }
 
@@ -490,7 +497,7 @@ export default function ConfidenceWizard() {
           });
         } else {
           // Fall back to weekly_plan (for ongoing phase users)
-          console.log('No weekly_assignments found, trying weekly_plan');
+          debug('No weekly_assignments found, trying weekly_plan');
           
           const { data: planData, error: planError } = await supabase
             .from('weekly_plan')
@@ -518,7 +525,7 @@ export default function ConfidenceWizard() {
             .eq('status', 'locked')
             .order('display_order');
 
-          console.log('Repair query result (plan by weekOf):', { planData, planError });
+          debug('Repair query result (plan by weekOf):', { planData, planError });
 
           if (!planData || planData.length === 0) {
             console.error('No assignments found for weekOf:', weekOf);
@@ -557,7 +564,7 @@ export default function ConfidenceWizard() {
         weekInCycle = 0;
       }
 
-      console.log('repair mode assignments', assignments);
+      debug('repair mode assignments', assignments);
     } else {
       // Normal current week logic
       const result = await assembleCurrentWeek(
@@ -572,10 +579,10 @@ export default function ConfidenceWizard() {
       assignments = result.assignments;
       cycleNumber = result.cycleNumber;
       weekInCycle = result.weekInCycle;
-      console.log('current assignments', assignments);
+      debug('current assignments', assignments);
     }
     
-    console.log('cycle info:', { cycleNumber, weekInCycle });
+    debug('cycle info:', { cycleNumber, weekInCycle });
 
     if (!assignments || assignments.length === 0) {
       toast({
@@ -821,9 +828,9 @@ export default function ConfidenceWizard() {
     setSubmitPhase('saving');
 
     // Debug logging to track self-select state
-    console.log('Submit debug - selectedActions:', selectedActions);
-    console.log('Submit debug - selfSelectById:', selfSelectById);
-    console.log('Submit debug - weeklyFocus:', weeklyFocus.map(f => ({ id: f.id, action_statement: f.action_statement })));
+    debug('Submit debug - selectedActions:', selectedActions);
+    debug('Submit debug - selfSelectById:', selfSelectById);
+    debug('Submit debug - weeklyFocus:', weeklyFocus.map(f => ({ id: f.id, action_statement: f.action_statement })));
 
     // Get location timezone for proper deadline calculation
     let timezone = 'America/Chicago'; // default fallback
@@ -849,7 +856,7 @@ export default function ConfidenceWizard() {
 
     const scoreInserts = weeklyFocus.map(focus => {
       const scoreValue = scores[focus.id];
-      console.log(`Processing focus ${focus.id}: score = ${scoreValue}, scores object:`, scores);
+      debug(`Processing focus ${focus.id}: score = ${scoreValue}, scores object:`, scores);
       
       if (!scoreValue) {
         console.error(`No score found for focus ${focus.id}`);
@@ -865,14 +872,14 @@ export default function ConfidenceWizard() {
         confidence_late: isAuthorizedBackfill ? false : isLate,
       };
       
-      console.log(`Created base object for focus ${focus.id}:`, base, `isAuthorizedBackfill: ${isAuthorizedBackfill}`);
+      debug(`Created base object for focus ${focus.id}:`, base, `isAuthorizedBackfill: ${isAuthorizedBackfill}`);
       
       // For self-select slots: set selected_action_id
       if (selfSelectById[focus.id] && selectedActions[focus.id] && selectedActions[focus.id] !== "") {
         const actionId = parseInt(selectedActions[focus.id]!, 10);
         if (!isNaN(actionId)) {
           base.selected_action_id = actionId;
-          console.log(`Setting selected_action_id for focus ${focus.id}: ${actionId}`);
+          debug(`Setting selected_action_id for focus ${focus.id}: ${actionId}`);
         } else {
           console.error(`Invalid action_id for focus ${focus.id}: ${selectedActions[focus.id]}`);
         }
@@ -946,7 +953,7 @@ export default function ConfidenceWizard() {
       selfSelectInserts
     };
 
-    console.log('Submitting data:', { 
+    debug('Submitting data:', { 
       submissionData, 
       finalScoreInserts, 
       selfSelectInserts,
@@ -957,8 +964,8 @@ export default function ConfidenceWizard() {
 
     const success = await submitWithRetry('confidence', submissionData);
     
-    console.log('Submission result:', success);
-    console.log('Navigation params:', { isRepair, returnTo });
+    debug('Submission result:', success);
+    debug('Navigation params:', { isRepair, returnTo });
     
     if (success) {
       // Show checkmark phase
@@ -991,7 +998,7 @@ export default function ConfidenceWizard() {
       }, isRepair ? 800 : 1800);
     } else {
       // Don't show error toast - useReliableSubmission handles retries in background
-      console.log('Immediate submission failed, retries queued in background');
+      debug('Immediate submission failed, retries queued in background');
       
       // Clear sessionStorage
       if (scoresStorageKey) {
@@ -1036,7 +1043,7 @@ export default function ConfidenceWizard() {
   };
   
   const handleSelectionChange = (focusId: string, value: string) => {
-    console.log(`Selection changed for focus ${focusId}: ${value}`);
+    debug(`Selection changed for focus ${focusId}: ${value}`);
     const newSelections = {
       ...selectedActions,
       [focusId]: value
@@ -1193,6 +1200,7 @@ export default function ConfidenceWizard() {
             <NumberScale
               value={scores[currentFocus.id] || null}
               onChange={handleScoreChange}
+              metric="confidence"
             />
           </div>
         </motion.div>

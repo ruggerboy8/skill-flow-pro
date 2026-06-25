@@ -1130,6 +1130,7 @@ export default function PerformanceWizard() {
             <NumberScale
               value={performanceScores[currentFocus.id] || null}
               onChange={handleScoreChange}
+              metric="performance"
             />
           </div>
         </motion.div>

@@ -7,7 +7,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NumberScale from '@/components/NumberScale';
-import { getDomainColor } from '@/lib/domainColors';
+import { Skeleton } from '@/components/ui/skeleton';
+import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getAnchors } from '@/lib/centralTime';
 import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { format } from 'date-fns';
@@ -1058,16 +1059,24 @@ export default function ConfidenceWizard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">Loading...</div>
+      <div className="min-h-screen bg-background p-4">
+        <div className="max-w-2xl mx-auto space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-40 w-full rounded-2xl" />
+          <Skeleton className="h-12 w-full" />
+        </div>
       </div>
     );
   }
 
   if (!currentFocus) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">Focus item not found</div>
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="text-center space-y-3">
+          <h2 className="text-lg font-semibold">We couldn't load this Pro Move</h2>
+          <p className="text-sm text-muted-foreground">It may have moved or already been submitted.</p>
+          <Button onClick={() => navigate('/')}>Back to home</Button>
+        </div>
       </div>
     );
   }
@@ -1139,9 +1148,13 @@ export default function ConfidenceWizard() {
                 className="w-8 shrink-0 flex items-center justify-center"
                 style={{ backgroundColor: getDomainColor(currentFocus.domain_name) }}
               >
-                <span 
-                  className="text-2xs font-bold tracking-wider uppercase text-white drop-shadow-sm whitespace-nowrap"
-                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                <span
+                  className="text-2xs font-bold tracking-wider uppercase whitespace-nowrap"
+                  style={{
+                    writingMode: 'vertical-rl',
+                    transform: 'rotate(180deg)',
+                    color: `hsl(${getDomainColorRichRaw(currentFocus.domain_name)})`,
+                  }}
                 >
                   {currentFocus.domain_name}
                 </span>

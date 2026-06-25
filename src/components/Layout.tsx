@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { hexToHsl } from '@/lib/colorUtils';
 import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList, Presentation } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PendingSurveysCard } from '@/components/home/PendingSurveysCard';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
@@ -241,6 +242,9 @@ export default function Layout() {
             <SimConsole isOpen={isSimConsoleOpen} onClose={() => setIsSimConsoleOpen(false)} />
             
             <main className="flex-1 p-6 overflow-auto w-full min-w-0">
+              <div className="mb-4 empty:mb-0">
+                <PendingSurveysCard />
+              </div>
               <Outlet />
             </main>
           </div>

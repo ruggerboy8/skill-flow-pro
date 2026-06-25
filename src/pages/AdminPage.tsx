@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Shield, Users, MapPin, Building, Settings, Building2, Wand2, X, Plug } from "lucide-react";
+import { Shield, Users, MapPin, Building, Settings, Building2, Wand2, X, Plug, ClipboardList } from "lucide-react";
 import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
+import { AdminSurveysTab } from "@/components/admin/surveys/AdminSurveysTab";
+import { useAskAlcanAccess } from "@/lib/askAlcanAccess";
 import { AdminLocationsTab } from "@/components/admin/AdminLocationsTab";
 import { AdminOrganizationsTab } from "@/components/admin/AdminOrganizationsTab";
 import { AdminGlobalSettingsTab } from "@/components/admin/AdminGlobalSettingsTab";
@@ -16,6 +18,7 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isSuperAdmin, isOrgAdmin, canAccessAdmin, isLoading, organizationId } = useUserRole();
+  const { canAccess: canAccessAskAlcan } = useAskAlcanAccess();
 
   // Redirect legacy ?tab=pro-moves deep links to Builder, where the library now lives.
   useEffect(() => {
@@ -57,9 +60,12 @@ export default function AdminPage() {
     { value: "users", label: "Users", icon: Users, content: <AdminUsersTab /> },
     { value: "locations", label: "Locations", icon: MapPin, content: <AdminLocationsTab /> },
     { value: "organizations", label: "Groups", icon: Building, content: <AdminOrganizationsTab /> },
+    ...(canAccessAskAlcan
+      ? [{ value: "surveys", label: "Ask Alcan", icon: ClipboardList, content: <AdminSurveysTab /> }]
+      : []),
     { value: "integrations", label: "Integrations", icon: Plug, content: <AdminIntegrationsTab /> },
     { value: "settings", label: "Settings", icon: Settings, content: <AdminGlobalSettingsTab /> },
-  ], []);
+  ], [canAccessAskAlcan]);
 
   return (
     <>

@@ -34,6 +34,9 @@ import EvaluationCapture from "@/pages/coach/EvaluationCapture";
 import AdminPage from "@/pages/AdminPage";
 import PlatformPage from "@/pages/PlatformPage";
 import EvalResultsV2 from "@/pages/admin/EvalResultsV2";
+import SurveyBuilderPage from "@/pages/admin/SurveyBuilderPage";
+import SurveyResultsPage from "@/pages/admin/SurveyResultsPage";
+import SurveyTakePage from "@/pages/survey/SurveyTakePage";
 import EvaluationViewer from "@/pages/EvaluationViewer";
 import EvaluationReview from "@/pages/EvaluationReview";
 import EvaluationReviewV2 from "@/pages/EvaluationReviewV2";
@@ -170,6 +173,12 @@ function AppRoutes() {
         {/* Legacy redirects for old eval results paths */}
         <Route path="admin/eval-results" element={<Navigate to="/admin/evaluations" replace />} />
         <Route path="admin/eval-results-v2" element={<Navigate to="/admin/evaluations" replace />} />
+        {/* Ask Alcan — surveys */}
+        <Route path="admin/surveys/new" element={<SurveyBuilderPage />} />
+        <Route path="admin/surveys/:id/edit" element={<SurveyBuilderPage />} />
+        <Route path="admin/surveys/:id" element={<SurveyResultsPage />} />
+        <Route path="survey/:id" element={<SurveyTakePage />} />
+
         <Route path="evaluation/:evalId" element={<EvaluationViewer />} />
         <Route path="evaluation/:evalId/review" element={<EvaluationReview />} />
         <Route path="evaluation/:evalId/review-v2" element={<EvaluationReviewV2 />} />

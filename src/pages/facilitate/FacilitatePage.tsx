@@ -404,7 +404,7 @@ function Reflection({ icon: Icon, iconColor, question, showJourney, setShowJourn
         <p className="text-6xl font-semibold leading-[1.05] tracking-tight max-w-4xl">{question}</p>
       </div>
 
-      {showJourney && <JourneyExplorer role={legacyRoleKey} active={activeStage} setActive={setActiveStage} />}
+      {showJourney && <JourneyExplorer role={role} active={activeStage} setActive={setActiveStage} />}
 
       {/* Ariana's "supply cabinet": understated, off to the side */}
       <div className="mt-12">

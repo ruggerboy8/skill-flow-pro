@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Sparkles, Loader2, Check, X, Sun, Sprout, BookOpen, Lightbulb,
-  HelpCircle, CircleDashed, MessageSquare,
+  HelpCircle, CircleDashed, MessageSquare, ChevronDown,
 } from "lucide-react";
 import {
   loadCaptureData,
@@ -55,6 +55,7 @@ export default function EvaluationCapture() {
   const [loading, setLoading] = useState(true);
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [openProMoves, setOpenProMoves] = useState<Set<number>>(new Set());
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [polishingId, setPolishingId] = useState<number | null>(null);
   const [showIntro, setShowIntro] = useState(() => {
@@ -148,6 +149,18 @@ export default function EvaluationCapture() {
       toast({ title: "Nothing to polish yet", description: "Talk or type your feedback first." });
       return;
     }
+    // Gather the openings already used on OTHER competencies so the model can
+    // deliberately vary phrasing across the evaluation (no two notes alike).
+    const avoid: string[] = [];
+    for (const d of data?.domains ?? []) {
+      for (const c of d.competencies) {
+        if (c.competencyId === comp.competencyId) continue;
+        for (const note of [c.glow, c.grow]) {
+          const t = note?.trim();
+          if (t) avoid.push(t.split(/\s+/).slice(0, 10).join(" "));
+        }
+      }
+    }
     setPolishingId(comp.competencyId);
     try {
       const { glow, grow } = await separateFeedback({
@@ -155,6 +168,7 @@ export default function EvaluationCapture() {
         text: raw,
         existingGlow: comp.glow,
         existingGrow: comp.grow,
+        avoid: Array.from(new Set(avoid)).slice(0, 24),
       });
       patchCompetency(domainId, comp.competencyId, { glow, grow });
       await persist(comp.competencyId, { observer_glow: glow, observer_grow: grow, observer_note: buildObserverNote(glow, grow) });
@@ -352,16 +366,35 @@ export default function EvaluationCapture() {
                       </span>
                     )}
                   </div>
-                  {/* Pro Moves shown as reference for the selected competency */}
-                  {isSel && comp.proMoves.length > 0 && (
-                    <ul className="ml-[1.625rem] space-y-1.5 pt-0.5">
-                      {comp.proMoves.map((pm, i) => (
-                        <li key={i} className="flex items-start gap-2 text-xs leading-snug text-muted-foreground">
-                          <Check className="mt-0.5 h-3 w-3 shrink-0" style={{ color: richColor }} />
-                          <span>{pm}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  {/* Pro Moves: collapsed by default, click in and out to keep the list clean */}
+                  {comp.proMoves.length > 0 && (
+                    <div className="ml-[1.625rem]">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenProMoves((prev) => {
+                            const next = new Set(prev);
+                            next.has(comp.competencyId) ? next.delete(comp.competencyId) : next.add(comp.competencyId);
+                            return next;
+                          });
+                        }}
+                        aria-expanded={openProMoves.has(comp.competencyId)}
+                        className="inline-flex items-center gap-1 text-2xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${openProMoves.has(comp.competencyId) ? "" : "-rotate-90"}`} />
+                        Pro Moves <span className="opacity-60">({comp.proMoves.length})</span>
+                      </button>
+                      {openProMoves.has(comp.competencyId) && (
+                        <ul className="mt-1.5 space-y-1.5">
+                          {comp.proMoves.map((pm, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs leading-snug text-muted-foreground">
+                              <Check className="mt-0.5 h-3 w-3 shrink-0" style={{ color: richColor }} />
+                              <span>{pm}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>

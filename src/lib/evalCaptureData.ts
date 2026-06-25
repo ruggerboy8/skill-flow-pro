@@ -147,6 +147,8 @@ export async function separateFeedback(params: {
   text: string;
   existingGlow?: string | null;
   existingGrow?: string | null;
+  /** Openings already used on other competencies, so the model varies phrasing. */
+  avoid?: string[];
 }): Promise<{ glow: string | null; grow: string | null }> {
   const { data, error } = await supabase.functions.invoke("separate-feedback", { body: params });
   if (error) throw new Error(error.message);

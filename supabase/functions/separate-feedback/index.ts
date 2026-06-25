@@ -20,11 +20,12 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { competency, text, existingGlow, existingGrow } = await req.json() as {
+    const { competency, text, existingGlow, existingGrow, avoid } = await req.json() as {
       competency?: { name?: string; description?: string | null; proMoves?: string[] };
       text?: string;
       existingGlow?: string | null;
       existingGrow?: string | null;
+      avoid?: string[];
     };
 
     if (!text || !text.trim()) {
@@ -47,19 +48,29 @@ serve(async (req) => {
         ? `\n\nThe competency already has these notes; integrate the new feedback into them and return the complete, updated versions:\nGLOW: ${existingGlow?.trim() || "(none)"}\nGROW: ${existingGrow?.trim() || "(none)"}`
         : "";
 
+    const avoidBlock =
+      Array.isArray(avoid) && avoid.length
+        ? `\n\nOther notes in this same evaluation already open with these phrasings. Deliberately open and structure yours DIFFERENTLY so no two notes read alike:\n${avoid.map((a) => `  - "${a}..."`).join("\n")}`
+        : "";
+
     const systemPrompt = `You are a coaching-notes assistant for a dental-practice performance evaluation. The evaluator just gave spoken or typed feedback about ONE competency: "${compName}".${covers}${moves}
 
 Split their feedback into exactly two coaching notes for this competency:
 - GLOW: what the person is doing well. Name a specific behavior and its impact.
 - GROW: what they could improve. Forward-looking and specific: an opportunity and a concrete next step, never a verdict.
 
-Write both in a warm, natural, second-person coaching voice addressed to the team member ("You consistently...", "I noticed how you...", "The next level is to..."). Sound like a supportive manager talking to a teammate they respect: relaxed and human, not stiff or corporate, and not gushing. Fix grammar, remove filler and false starts, expand shorthand into clear sentences. Preserve the evaluator's specific examples; do not fabricate anything not in the feedback. Keep each note to 2-4 sentences, max ${MAX_NOTE_CHARS} characters. If the feedback genuinely contains no growth (or no glow) content, return an empty string for that field rather than inventing one.${existing}`;
+Write both in a warm, natural, second-person coaching voice (address the team member as "you"). Sound like a real supportive manager talking to a teammate they respect: relaxed and human, not stiff or corporate, and not gushing.
+
+VARY YOUR WRITING. This is critical: across an evaluation a coach writes many of these, and they must NOT all sound the same. Do not fall back on formulaic openings. In particular, never start a Grow with stock phrases like "The next level is to", "One opportunity", "Consider", or "Try to". Open differently each time, vary sentence length and structure, and let the specific observation drive the wording. Write the way a thoughtful person actually talks, never from a template.
+
+Fix grammar, remove filler and false starts, expand shorthand into clear sentences. Preserve the evaluator's specific examples; do not fabricate anything not in the feedback. Keep each note to 2-4 sentences, max ${MAX_NOTE_CHARS} characters. If the feedback genuinely contains no growth (or no glow) content, return an empty string for that field rather than inventing one.${avoidBlock}${existing}`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "gpt-4o",
+        temperature: 0.9,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: text },

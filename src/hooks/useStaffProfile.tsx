@@ -45,6 +45,10 @@ export interface StaffProfile {
   baseline_released_at: string | null;
   baseline_released_by: string | null;
   scheduling_link: string | null;
+  roles: {
+    archetype_code: string | null;
+    role_name: string | null;
+  } | null;
   locations: {
     group_id: string;
     program_start_date: string;

@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Sparkles, Trophy, TrendingUp } from 'lucide-react';
 import { useDomainDetail, type ProMoveDetail } from '@/hooks/useDomainDetail';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
-import { ROLE_CONTENT, getRoleType, type RoleType } from '@/lib/content/roleDefinitions';
+import { ROLE_CONTENT, getRoleTypeFromArchetype, type RoleType } from '@/lib/content/roleDefinitions';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import CompetencyAccordion from '@/components/my-role/CompetencyAccordion';
 import { ProMoveDrawer } from '@/components/my-role/ProMoveDrawer';

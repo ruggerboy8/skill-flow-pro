@@ -5,7 +5,7 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
-import { ROLE_CONTENT, DOMAIN_ORDER, getRoleType, type RoleType } from '@/lib/content/roleDefinitions';
+import { ROLE_CONTENT, DOMAIN_ORDER, getRoleTypeFromArchetype, type RoleType } from '@/lib/content/roleDefinitions';
 import { ChevronRight, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

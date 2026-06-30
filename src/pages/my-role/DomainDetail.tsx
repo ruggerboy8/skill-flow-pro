@@ -33,7 +33,8 @@ export default function DomainDetail() {
   
   const { data, isLoading, error } = useDomainDetail(domainSlug);
 
-  const roleType: RoleType = getRoleType(staffProfile?.role_id);
+  const archetype = (staffProfile as any)?.roles?.archetype_code ?? null;
+  const roleType: RoleType = getRoleTypeFromArchetype(archetype, staffProfile?.role_id);
   const domainContent = data?.domainName ? ROLE_CONTENT[roleType]?.[data.domainName] : null;
   const richColor = data?.domainName ? getDomainColorRichRaw(data.domainName) : '0 0% 50%';
   

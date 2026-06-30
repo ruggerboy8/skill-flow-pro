@@ -62,11 +62,33 @@ export const ROLE_CONTENT: Record<RoleType, Record<string, DomainContent>> = {
   }
 };
 
-// Helper to convert role_id to RoleType
+// Helper to convert role_id to RoleType (legacy Alcan mapping)
 export function getRoleType(roleId: number | null | undefined): RoleType {
   if (roleId === 1) return 'DFI';
   if (roleId === 2) return 'RDA';
   return 'OM'; // Default to OM for role_id=3 or others
+}
+
+/**
+ * Resolve RoleType from a role's archetype_code. This is the multi-tenant-safe
+ * way — any role mapped to e.g. `dental_assistant` archetype gets the RDA
+ * competency blueprint regardless of the underlying role_id.
+ */
+export function getRoleTypeFromArchetype(
+  archetype: string | null | undefined,
+  fallbackRoleId?: number | null
+): RoleType {
+  switch (archetype) {
+    case 'front_desk':
+      return 'DFI';
+    case 'dental_assistant':
+    case 'lead_dental_assistant':
+      return 'RDA';
+    case 'practice_manager':
+      return 'OM';
+    default:
+      return getRoleType(fallbackRoleId);
+  }
 }
 
 // Ordered list of domains for consistent display

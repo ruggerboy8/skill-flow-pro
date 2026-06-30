@@ -45,6 +45,10 @@ export interface StaffProfile {
   baseline_released_at: string | null;
   baseline_released_by: string | null;
   scheduling_link: string | null;
+  roles: {
+    archetype_code: string | null;
+    role_name: string | null;
+  } | null;
   locations: {
     group_id: string;
     program_start_date: string;
@@ -115,6 +119,10 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
            baseline_released_at,
            baseline_released_by,
            scheduling_link,
+          roles!staff_role_id_fkey (
+            archetype_code,
+            role_name
+          ),
           locations (
             group_id,
             program_start_date,

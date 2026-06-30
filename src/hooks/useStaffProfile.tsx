@@ -119,6 +119,10 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
            baseline_released_at,
            baseline_released_by,
            scheduling_link,
+          roles!staff_role_id_fkey (
+            archetype_code,
+            role_name
+          ),
           locations (
             group_id,
             program_start_date,

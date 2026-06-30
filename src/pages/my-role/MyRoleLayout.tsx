@@ -32,12 +32,15 @@ export default function MyRoleLayout() {
     return null;
   }
 
-  // Determine role subtitle
-  const roleSubtitle = 
-    staffProfile?.is_lead && staffProfile?.role_id === 2 ? 'Lead RDA Competency Blueprint' :
-    staffProfile?.role_id === 1 ? 'DFI Competency Blueprint' :
-    staffProfile?.role_id === 2 ? 'RDA Competency Blueprint' :
-    'Office Manager Competency Blueprint';
+  // Determine role subtitle from archetype (multi-tenant safe).
+  const archetype = (staffProfile as any)?.roles?.archetype_code as string | null | undefined;
+  const roleLabel = (staffProfile as any)?.roles?.role_name as string | null | undefined;
+  const roleSubtitle =
+    staffProfile?.is_lead && archetype === 'dental_assistant'
+      ? 'Lead Dental Assistant Competency Blueprint'
+      : roleLabel
+        ? `${roleLabel} Competency Blueprint`
+        : 'Competency Blueprint';
 
   return (
     <div className="space-y-4 md:space-y-6">

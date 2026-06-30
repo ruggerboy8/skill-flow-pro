@@ -24,8 +24,9 @@ export default function RoleRadar() {
   const [loading, setLoading] = useState(true);
   const [domainScores, setDomainScores] = useState<Map<string, number>>(new Map());
 
-  // Determine role type from role_id (1=DFI, 2=RDA, 3=OM)
-  const roleType: RoleType = getRoleType(staffProfile?.role_id);
+  // Resolve role type from the role's archetype (multi-tenant safe).
+  const archetype = (staffProfile as any)?.roles?.archetype_code ?? null;
+  const roleType: RoleType = getRoleTypeFromArchetype(archetype, staffProfile?.role_id);
   const roleContent = ROLE_CONTENT[roleType];
 
   useEffect(() => {

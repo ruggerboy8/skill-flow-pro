@@ -226,35 +226,27 @@ export default function DoctorProMoveLibrary() {
   });
 
   const handleAddProMove = () => {
-    setEditingProMove(null);
+    setEditingActionId('');
     setShowAddForm(true);
   };
 
   const handleEditProMove = (proMove: ProMove) => {
-    setEditingProMove({
-      action_id: proMove.action_id,
-      action_statement: proMove.action_statement,
-      description: proMove.description,
-      active: proMove.active,
-      competency_id: proMove.competency_id,
-      conditionally_applicable: proMove.conditionally_applicable,
-      role_id: DOCTOR_ROLE_ID,
-    });
-    setShowAddForm(true);
+    setEditingActionId(String(proMove.action_id));
+    setShowAddForm(false);
   };
 
   const handleFormClose = () => {
     setShowAddForm(false);
-    setEditingProMove(null);
+    setEditingActionId('');
     setRefreshKey(prev => prev + 1);
   };
 
   const handleOpenMaterials = (actionId: number) => {
-    setSelectedProMoveId(actionId);
+    setSelectedProMoveIdRaw(String(actionId));
   };
 
   const handleMaterialsClose = () => {
-    setSelectedProMoveId(null);
+    setSelectedProMoveIdRaw('');
     setRefreshKey(prev => prev + 1);
   };
 

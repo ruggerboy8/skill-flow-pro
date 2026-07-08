@@ -1,76 +1,79 @@
 
-## Current state (verified just now)
+## What Alex is experiencing
 
-- **Maria Castillo** — `id 2000d667…`, Alcan Pediatric Dental, location `f9d29710…`
-- `role_id = 3` (Office Manager), `is_office_manager = true`, `is_participant = true`
-- `participation_start_at = 2026-03-09`
-- 1 coach scope: `location` → her own location
-- 21 historical `weekly_scores` rows (OM history)
-- No `user_capabilities` row, no `staff_quarter_focus`, no evaluations, no backlog
+When she's mid-flow in the Clinical portal (editing a Pro Move, composing an agenda, viewing a doctor's thread) and briefly flips to her email tab to copy something, coming back "resets" the page — collapsed sections re-collapse, filters snap back to All, the doctor she was on stays but the sub-panel she'd expanded closes, and any half-open edit form is gone.
 
-## Consequences considered
+Root cause: all of that UI state lives in local `useState` inside the page/component and nothing writes it to the URL or sessionStorage. As soon as anything remounts the tree (auth re-check on window focus, React Query refetches, a Sheet closing, a navigation back-and-forth), the defaults win. On top of that, back/forward navigation between Clinical → DoctorDetail → Clinical currently loses all filters and scroll position.
 
-1. **Timing is clean.** Today is Monday 2026-06-29 — the new week just started.
-   - Week of 6/22 (last week): she has OM assignments; her submissions there stay intact.
-   - Week of 6/29 onward: org-scoped FD assignments (`role_id = 1`) are already **locked** for 6/29, 7/6, 7/13, 7/20, 7/27, 8/3, 8/10. She'll pick those up automatically once her `role_id` flips.
-   - OM (`role_id = 3`) assignments are only locked through 6/22 — OM was already winding down at the org level, so we're not orphaning a future OM plan.
+## Goal
 
-2. **Historical OM scores are preserved.** `weekly_scores` rows reference the assignment, not the staff role flag, so her 21 prior submissions remain attributable and visible in her history.
+Make the Clinical section (and its neighbors) "sticky": whatever you had selected, expanded, or opened stays that way when you tab away and come back, refresh, or navigate back from a detail page.
 
-3. **Coach scope.** She has a location-scoped coach scope. DFI is an individual contributor role; per our prior call we'll drop it (cleaner). If she should still help coach peers, say the word and we'll keep it.
+## Scope (Clinical + directly connected surfaces)
 
-4. **OM flag.** Clear `is_office_manager = false` so OM-only surfaces (e.g. manager dashboards, reminder routing) stop treating her as the OM.
+Pages/components whose state resets today and will become persistent:
 
-5. **Role display.** Avenue Dental uses the pediatric role aliases; role 1 will render as **"Front Desk / DFI"** via `organization_role_names` — no UI change needed.
+1. **`src/pages/clinical/DoctorManagement.tsx`** — status filter (`all | invited | active | inactive`).
+2. **`src/pages/clinical/DoctorProMoveLibrary.tsx`** — `selectedDomain`, `selectedCompetency`, `searchTerm`, `showActiveOnly`, `editingProMove` (open edit sheet), `showAddForm`, `selectedProMoveId`.
+3. **`src/pages/clinical/DoctorDetail.tsx`** — `assessmentsOpen`, `expandedAssessment` (which results sheet is open), `showCoachWizard`.
+4. **`src/components/clinical/DoctorDetailThread.tsx`** — `expandedId` (which coaching session card is expanded), `prepSessionId`, `inviteSessionId`, `captureSessionId` (which composer/drawer is active).
+5. **Scroll position** — restore vertical scroll on DoctorManagement and DoctorProMoveLibrary when navigating back from a detail page.
 
-6. **Capabilities.** No `user_capabilities` row exists, so nothing to migrate there.
+Out of scope: no business-logic changes, no query changes, no DB changes. Same components, same features — just remembered state.
 
-7. **Audit trail.** Write a `staff_audit` entry documenting the change, actor, effective date, and reason ("Role correction — moving from OM to DFI, effective 2026-06-29").
+## Approach
 
-## One open question
+### 1. New utility: `useUrlState`
 
-**`participation_start_at`** — currently `2026-03-09`. Two options:
+Add `src/hooks/useUrlState.ts` — a thin wrapper over `react-router-dom`'s `useSearchParams` that behaves like `useState` but writes the value to a URL query param (with `replace: true` so it doesn't pollute browser history). Signature:
 
-- **A. Leave as 2026-03-09 (recommended).** Her DFI history page shows her full participation timeline; old OM scores still appear in her past weeks (they happened, after all). Cleaner for longitudinal reporting.
-- **B. Reset to 2026-06-29.** Treats DFI as a fresh participation start; older OM weeks drop out of accountability calculations. Useful only if leadership wants a clean slate for her DFI metrics.
-
-I'll go with **A** unless you say otherwise.
-
-## The change (single migration / data update)
-
-```sql
-UPDATE staff
-   SET role_id = 1,
-       is_office_manager = false,
-       updated_at = now()
- WHERE id = '2000d667-d0ea-4234-a771-cc1aa14e15cd';
-
-DELETE FROM coach_scopes
- WHERE staff_id = '2000d667-d0ea-4234-a771-cc1aa14e15cd';
-
-INSERT INTO staff_audit (staff_id, action, actor_id, details, created_at)
-VALUES (
-  '2000d667-d0ea-4234-a771-cc1aa14e15cd',
-  'role_change',
-  <your staff id>,
-  jsonb_build_object(
-    'from_role_id', 3,
-    'to_role_id', 1,
-    'cleared_is_office_manager', true,
-    'dropped_coach_scope', 'location:f9d29710-36ec-4ab2-89c5-f8808e3f8862',
-    'effective_date', '2026-06-29',
-    'reason', 'Role correction — OM → DFI'
-  ),
-  now()
-);
+```ts
+useUrlState<T extends string>(key: string, defaultValue: T): [T, (v: T) => void]
+useUrlState<T>(key: string, defaultValue: T, opts: { serialize, parse }): [T, (v: T) => void]
 ```
 
-(Exact `staff_audit` column shape will be matched to the live schema before running.)
+Why URL over sessionStorage as the primary store:
+- Survives tab-away/return (the URL is still there).
+- Survives back/forward — the browser restores the exact query string.
+- Shareable/deep-linkable (Alex can send a coworker the URL of a filtered library view).
+- No stale-state risk across different doctors — each `staffId` route has its own URL.
 
-## What happens next, from Maria's perspective
+### 2. New utility: `useSessionState`
 
-- Logs in today → sees the **Front Desk / DFI** Pro Moves for the week of 6/29 (already locked at org level).
-- Her past OM submissions remain on her history.
-- OM-only surfaces no longer treat her as the OM for the location.
+Add `src/hooks/useSessionState.ts` for state that shouldn't live in the URL (large blobs, non-shareable UI toggles like `assessmentsOpen`). Backed by `sessionStorage` with a namespaced key so it's per-tab and clears on tab close. Same `useState`-shaped API.
 
-Confirm option A vs B on `participation_start_at` (or just 👍 to proceed with A) and I'll run it.
+### 3. Scroll restoration
+
+Add `src/components/ScrollRestoration.tsx`: on route change, records `window.scrollY` for the outgoing path in `sessionStorage`; on mount for a path with a saved value, restores it after the first paint. Mount it once inside the Clinical layout so it only affects that section (avoids surprising behavior elsewhere).
+
+### 4. Wire the pages
+
+- **DoctorManagement**: `filter` → `useUrlState('status', 'all')`.
+- **DoctorProMoveLibrary**: convert `selectedDomain`, `selectedCompetency`, `searchTerm`, `showActiveOnly` to `useUrlState` (`domain`, `competency`, `q`, `activeOnly`). Convert `editingProMove` / `showAddForm` / `selectedProMoveId` to `useUrlState('edit', ...)` / `?new=1` / `?view=<id>` — the drawer reopens after tab-return or refresh. `editingProMove`'s full object is re-fetched from `proMoves` by ID rather than serialized.
+- **DoctorDetail**: `assessmentsOpen` → `useSessionState` (per-doctor key). `expandedAssessment` → `useUrlState('sheet', null)`. `showCoachWizard` → `useUrlState('wizard', '0')`.
+- **DoctorDetailThread**: `expandedId` → `useUrlState('session', null)`. `prepSessionId` / `inviteSessionId` / `captureSessionId` → `useUrlState('action', null)` + `?actionSession=<id>` (single active composer at a time; already the case in the UI).
+- **Clinical layout**: mount `<ScrollRestoration scopeKey="clinical" />`.
+
+### 5. Safety net: prevent unnecessary remounts on window refocus
+
+Audit `useAuth`'s `onAuthStateChange`. It already skips `TOKEN_REFRESHED`; also short-circuit `SIGNED_IN` when `session.user.id` matches the currently loaded user so returning to the tab does not re-run `checkUserStatus` and cascade a re-render that closes non-persisted UI in other parts of the app. This is a small hardening step so persistence isn't fighting an unnecessary reset.
+
+## Technical details
+
+- Query param encoding: booleans as `'1'`/`'0'`, `null` as absent key, strings as-is (URL-encoded by `URLSearchParams`).
+- All URL writes use `setSearchParams(next, { replace: true })` so the browser back button still takes Alex back to the previous page, not through each filter change.
+- `useUrlState` reads once per render from `useSearchParams()`, so multiple hooks on the same page stay in sync automatically.
+- Session-storage keys are namespaced: `clinical:<path>:<key>` to avoid collisions.
+- Scroll restoration uses `requestAnimationFrame` after data has loaded (guarded by a `data-ready` sentinel on the list container) so we don't scroll before the list has rendered.
+
+## Files touched
+
+- Add: `src/hooks/useUrlState.ts`, `src/hooks/useSessionState.ts`, `src/components/ScrollRestoration.tsx`
+- Edit: `src/pages/clinical/ClinicalLayout.tsx`, `src/pages/clinical/DoctorManagement.tsx`, `src/pages/clinical/DoctorProMoveLibrary.tsx`, `src/pages/clinical/DoctorDetail.tsx`, `src/components/clinical/DoctorDetailThread.tsx`, `src/hooks/useAuth.tsx` (SIGNED_IN dedupe only)
+
+## Verification
+
+- Open a doctor → expand a coaching session → switch to another browser tab → return → session is still expanded.
+- Filter the doctor Pro Move library by domain + search "prep" → open a Pro Move to edit → refresh the page → same filters, same edit sheet open.
+- From DoctorManagement filtered to "Invited", click a doctor, hit back → filter still Invited, scroll position restored.
+- URLs remain shareable: pasting a filtered library URL into a new tab lands on the same view.

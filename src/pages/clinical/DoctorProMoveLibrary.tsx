@@ -298,7 +298,8 @@ export default function DoctorProMoveLibrary() {
     }
   };
 
-  const selectedProMove = proMoves.find(pm => pm.action_id === selectedProMoveId);
+  const selectedProMove = proMoves.find(pm => pm.action_id === selectedProMoveIdNum);
+  const isFormOpen = showAddForm || !!editingProMove;
 
   const MaterialIcon = ({ has, icon: Icon, label }: { has: boolean; icon: React.ElementType; label: string }) => (
     <TooltipProvider delayDuration={0}>
@@ -515,7 +516,7 @@ export default function DoctorProMoveLibrary() {
       </div>
 
       {/* Modals */}
-      {showAddForm && (
+      {isFormOpen && (
         <DoctorProMoveForm
           proMove={editingProMove}
           onClose={handleFormClose}
@@ -523,9 +524,9 @@ export default function DoctorProMoveLibrary() {
         />
       )}
 
-      {selectedProMoveId && selectedProMove && (
+      {selectedProMoveIdNum && selectedProMove && (
         <DoctorMaterialsDrawer
-          actionId={selectedProMoveId}
+          actionId={selectedProMoveIdNum}
           proMoveStatement={selectedProMove.action_statement}
           open={true}
           onOpenChange={(open) => !open && handleMaterialsClose()}

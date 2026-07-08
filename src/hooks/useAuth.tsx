@@ -64,12 +64,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    // Track last-loaded user id so we can dedupe SIGNED_IN events that fire
+    // on window refocus for an already-authenticated user.
+    let lastLoadedUserId: string | null = null;
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         // Skip TOKEN_REFRESHED events — these fire on tab return and cause
         // unnecessary re-renders that close modals and reset scroll position
         if (event === 'TOKEN_REFRESHED') return;
+
+        // Skip SIGNED_IN for the same user (e.g. tab refocus re-emitting the
+        // event) — the role fetch would trigger a cascade of re-renders that
+        // close drawers and reset unpersisted UI state elsewhere.
+        if (event === 'SIGNED_IN' && session?.user?.id && session.user.id === lastLoadedUserId) {
+          return;
+        }
 
         setSession(session);
         setUser(session?.user ?? null);

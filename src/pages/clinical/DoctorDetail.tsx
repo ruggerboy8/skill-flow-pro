@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { useUrlState } from '@/hooks/useUrlState';
+import { useSessionState } from '@/hooks/useSessionState';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,9 +35,19 @@ function toCardStatus(status: string | null | undefined, exists: boolean): Asses
 export default function DoctorDetail() {
   const { staffId } = useParams<{ staffId: string }>();
   const { data: myStaff } = useStaffProfile();
-  const [showCoachWizard, setShowCoachWizard] = useState(false);
-  const [expandedAssessment, setExpandedAssessment] = useState<ExpandedAssessmentKey>(null);
-  const [assessmentsOpen, setAssessmentsOpen] = useState<boolean | null>(true);
+  const [showCoachWizard, setShowCoachWizard] = useUrlState<boolean>('wizard', false);
+  const [expandedAssessment, setExpandedAssessment] = useUrlState<ExpandedAssessmentKey>(
+    'sheet',
+    null,
+    {
+      serialize: (v) => (v === 'doctor_baseline' || v === 'coach_baseline' ? v : null),
+      parse: (raw) => (raw === 'doctor_baseline' || raw === 'coach_baseline' ? raw : null),
+    }
+  );
+  const [assessmentsOpen, setAssessmentsOpen] = useSessionState<boolean | null>(
+    `clinical:doctor:${staffId ?? 'unknown'}:assessmentsOpen`,
+    true
+  );
 
   const { data: doctor, isLoading: doctorLoading } = useQuery({
     queryKey: ['doctor-detail', staffId],

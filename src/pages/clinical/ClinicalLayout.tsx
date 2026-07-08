@@ -1,6 +1,7 @@
 import { Outlet, Navigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollRestoration } from '@/components/ScrollRestoration';
 
 export default function ClinicalLayout() {
   const { canAccessClinical, isLoading } = useUserRole();
@@ -21,6 +22,7 @@ export default function ClinicalLayout() {
 
   return (
     <div className="space-y-6">
+      <ScrollRestoration scopeKey="clinical" />
       <Outlet />
     </div>
   );

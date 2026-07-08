@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useUrlState } from '@/hooks/useUrlState';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -50,16 +51,35 @@ export default function DoctorProMoveLibrary() {
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [proMoves, setProMoves] = useState<ProMove[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDomain, setSelectedDomain] = useState<string>('all');
-  const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showActiveOnly, setShowActiveOnly] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingProMove, setEditingProMove] = useState<any>(null);
-  const [selectedProMoveId, setSelectedProMoveId] = useState<number | null>(null);
+  const [selectedDomain, setSelectedDomain] = useUrlState<string>('domain', 'all');
+  const [selectedCompetency, setSelectedCompetency] = useUrlState<string>('competency', 'all');
+  const [searchTerm, setSearchTerm] = useUrlState<string>('q', '');
+  const [showActiveOnly, setShowActiveOnly] = useUrlState<boolean>('activeOnly', true);
+  // URL-backed drawer state so tab-away/refresh reopens the same panel.
+  const [editingActionId, setEditingActionId] = useUrlState<string>('edit', '');
+  const [showAddForm, setShowAddForm] = useUrlState<boolean>('new', false);
+  const [selectedProMoveId, setSelectedProMoveIdRaw] = useUrlState<string>('materials', '');
   const [refreshKey, setRefreshKey] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<ProMove | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Resolve editingProMove from URL id + loaded proMoves list.
+  const editingProMove = editingActionId
+    ? (() => {
+        const pm = proMoves.find((p) => String(p.action_id) === editingActionId);
+        if (!pm) return null;
+        return {
+          action_id: pm.action_id,
+          action_statement: pm.action_statement,
+          description: pm.description,
+          active: pm.active,
+          competency_id: pm.competency_id,
+          conditionally_applicable: pm.conditionally_applicable,
+          role_id: DOCTOR_ROLE_ID,
+        };
+      })()
+    : null;
+  const selectedProMoveIdNum = selectedProMoveId ? Number(selectedProMoveId) : null;
 
   // Get unique domains from competencies
   const domains = [...new Set(competencies.map(c => c.domain_name).filter(Boolean))];
@@ -206,35 +226,27 @@ export default function DoctorProMoveLibrary() {
   });
 
   const handleAddProMove = () => {
-    setEditingProMove(null);
+    setEditingActionId('');
     setShowAddForm(true);
   };
 
   const handleEditProMove = (proMove: ProMove) => {
-    setEditingProMove({
-      action_id: proMove.action_id,
-      action_statement: proMove.action_statement,
-      description: proMove.description,
-      active: proMove.active,
-      competency_id: proMove.competency_id,
-      conditionally_applicable: proMove.conditionally_applicable,
-      role_id: DOCTOR_ROLE_ID,
-    });
-    setShowAddForm(true);
+    setEditingActionId(String(proMove.action_id));
+    setShowAddForm(false);
   };
 
   const handleFormClose = () => {
     setShowAddForm(false);
-    setEditingProMove(null);
+    setEditingActionId('');
     setRefreshKey(prev => prev + 1);
   };
 
   const handleOpenMaterials = (actionId: number) => {
-    setSelectedProMoveId(actionId);
+    setSelectedProMoveIdRaw(String(actionId));
   };
 
   const handleMaterialsClose = () => {
-    setSelectedProMoveId(null);
+    setSelectedProMoveIdRaw('');
     setRefreshKey(prev => prev + 1);
   };
 
@@ -286,7 +298,8 @@ export default function DoctorProMoveLibrary() {
     }
   };
 
-  const selectedProMove = proMoves.find(pm => pm.action_id === selectedProMoveId);
+  const selectedProMove = proMoves.find(pm => pm.action_id === selectedProMoveIdNum);
+  const isFormOpen = showAddForm || !!editingProMove;
 
   const MaterialIcon = ({ has, icon: Icon, label }: { has: boolean; icon: React.ElementType; label: string }) => (
     <TooltipProvider delayDuration={0}>
@@ -503,7 +516,7 @@ export default function DoctorProMoveLibrary() {
       </div>
 
       {/* Modals */}
-      {showAddForm && (
+      {isFormOpen && (
         <DoctorProMoveForm
           proMove={editingProMove}
           onClose={handleFormClose}
@@ -511,9 +524,9 @@ export default function DoctorProMoveLibrary() {
         />
       )}
 
-      {selectedProMoveId && selectedProMove && (
+      {selectedProMoveIdNum && selectedProMove && (
         <DoctorMaterialsDrawer
-          actionId={selectedProMoveId}
+          actionId={selectedProMoveIdNum}
           proMoveStatement={selectedProMove.action_statement}
           open={true}
           onOpenChange={(open) => !open && handleMaterialsClose()}

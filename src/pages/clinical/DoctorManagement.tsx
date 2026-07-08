@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useUrlState } from '@/hooks/useUrlState';
 import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,7 +31,7 @@ type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
 export default function DoctorManagement() {
   const { toast } = useToast();
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [filter, setFilter] = useState<FilterValue>('all');
+  const [filter, setFilter] = useUrlState<FilterValue>('status', 'all');
   const navigate = useNavigate();
 
   const { data: doctors, isLoading, refetch } = useQuery({

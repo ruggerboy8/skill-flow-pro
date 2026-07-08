@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useUrlState } from '@/hooks/useUrlState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -73,10 +74,11 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
   const { isSuperAdmin } = useUserRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [captureSessionId, setCaptureSessionId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [prepSessionId, setPrepSessionId] = useState<string | null>(null);
-  const [inviteSessionId, setInviteSessionId] = useState<string | null>(null);
+  // URL-backed so tab-away/return keeps the same session card expanded / composer open.
+  const [captureSessionId, setCaptureSessionId] = useUrlState<string | null>('capture', null);
+  const [expandedId, setExpandedId] = useUrlState<string | null>('session', null);
+  const [prepSessionId, setPrepSessionId] = useUrlState<string | null>('prep', null);
+  const [inviteSessionId, setInviteSessionId] = useUrlState<string | null>('invite', null);
 
   // Fetch clinical directors for reassign dropdown (super admin only)
   const { data: clinicalDirectors } = useQuery({

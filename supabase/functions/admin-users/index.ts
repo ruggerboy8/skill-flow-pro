@@ -1178,13 +1178,26 @@ serve(async (req: Request) => {
           return json({ error: "Failed to create user - no user ID returned" }, 500);
         }
 
-        // 2) Create staff row with is_doctor = true
+        // 2) Resolve organization_id from the selected practice group so the
+        // doctor is scoped to the correct org even when roaming (no location).
+        let doctorOrgId: string | null = null;
+        {
+          const { data: pgRow } = await admin
+            .from('practice_groups')
+            .select('organization_id')
+            .eq('id', resolvedGroupId)
+            .maybeSingle();
+          doctorOrgId = pgRow?.organization_id ?? null;
+        }
+
+        // 3) Create staff row with is_doctor = true
         // If release_baseline is truthy, set baseline_released_at now
         const staffInsert: Record<string, any> = { 
           name, 
           email, 
           role_id: 4,  // Doctor role
           primary_location_id: location_id || null,  // null = roaming
+          organization_id: doctorOrgId,
           is_participant: false,
           is_doctor: true,
           user_id: invite.user.id,

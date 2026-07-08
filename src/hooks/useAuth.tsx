@@ -95,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setNeedsPasswordSetup(false);
             // Check user roles (only fetch if we haven't already or on sign-in)
             if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+              lastLoadedUserId = session.user.id;
               checkUserStatus(session.user.id);
               // Fire-and-forget: auto-excuse any weeks missed before first login.
               // Edge function is idempotent (guarded by staff.first_login_at).
@@ -104,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else if (event === 'SIGNED_OUT') {
+          lastLoadedUserId = null;
           setNeedsPasswordSetup(false);
           setIsCoach(false);
           setIsSuperAdmin(false);

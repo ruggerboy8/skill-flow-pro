@@ -131,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setNeedsPasswordSetup(false);
           // Check user roles
+          lastLoadedUserId = session.user.id;
           checkUserStatus(session.user.id);
         }
       } else {

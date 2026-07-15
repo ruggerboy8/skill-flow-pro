@@ -166,9 +166,15 @@ export function FilterBar({ filters, onFiltersChange, hidePeriodSelector = false
         .eq('active', true)
         .order('name');
 
-      // Non-super-admins only see groups within their own organization
-      if (!isSuperAdmin && callerOrgId) {
+      // Always scope to the caller's current organization. For super admins this is
+      // their home org unless they're masquerading — in which case callerOrgId
+      // reflects the impersonated org. This prevents cross-tenant bleed in the picker.
+      if (callerOrgId) {
         query = query.eq('organization_id', callerOrgId);
+      } else if (!isSuperAdmin) {
+        // No org resolvable and not a super admin — return nothing rather than everything.
+        setOrganizations([]);
+        return;
       }
 
       const { data, error } = await query;

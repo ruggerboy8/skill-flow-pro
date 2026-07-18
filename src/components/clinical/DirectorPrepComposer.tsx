@@ -151,30 +151,29 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!sessionId,
   });
 
-  // Capture the snapshot timestamp for optimistic concurrency, and write a
-  // presence heartbeat so other directors see "X opened this N min ago".
+  // Capture the last-edited snapshot for optimistic concurrency, and write a
+  // presence heartbeat so other directors see "X opened this N min ago". The
+  // heartbeat touches `last_opened_*` (and updated_at via trigger), but does
+  // NOT touch `last_edited_at`, so we can capture the snapshot once and it
+  // stays valid across heartbeats, invite sends, and other benign writes.
   useEffect(() => {
     if (!session || !myStaffForOwnership?.id) return;
-    if (loadedUpdatedAt === null) {
-      setLoadedUpdatedAt((session as any).updated_at ?? null);
+    if (!lastEditedLoaded) {
+      setLoadedLastEditedAt((session as any).last_edited_at ?? null);
+      setLastEditedLoaded(true);
     }
     (async () => {
-      // Write presence heartbeat and re-sync the concurrency snapshot to the
-      // post-heartbeat updated_at. Without this, the heartbeat's own bump to
-      // updated_at makes the next save look like a conflict from another user.
-      const { data: hb } = await (supabase as any)
+      await (supabase as any)
         .from('coaching_sessions')
         .update({
           last_opened_by_staff_id: myStaffForOwnership.id,
           last_opened_at: new Date().toISOString(),
         })
-        .eq('id', session.id)
-        .select('updated_at')
-        .maybeSingle();
-      if (hb?.updated_at) setLoadedUpdatedAt(hb.updated_at);
+        .eq('id', session.id);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, myStaffForOwnership?.id]);
+
 
 
   // Fetch doctor's baseline items as the ProMove pool

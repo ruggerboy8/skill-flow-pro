@@ -491,14 +491,16 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         .from('coaching_sessions')
         .update(draftPayload)
         .eq('id', sessionId);
-      if (loadedUpdatedAt) draftQuery = draftQuery.eq('updated_at', loadedUpdatedAt);
-      const { data: updated, error: draftErr } = await draftQuery.select('id, updated_at');
+      draftQuery = loadedLastEditedAt
+        ? draftQuery.eq('last_edited_at', loadedLastEditedAt)
+        : draftQuery.is('last_edited_at', null);
+      const { data: updated, error: draftErr } = await draftQuery.select('id, last_edited_at');
       if (draftErr) throw draftErr;
       if (!updated || updated.length === 0) {
         setStaleConflict(true);
         throw new Error('Someone else saved changes to this session while you were editing. Reload to see their version before saving again.');
       }
-      setLoadedUpdatedAt(updated[0].updated_at);
+      setLoadedLastEditedAt(updated[0].last_edited_at);
     },
     onSuccess: () => {
       toast({ title: 'Draft saved' });

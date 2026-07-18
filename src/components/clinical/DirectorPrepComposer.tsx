@@ -73,8 +73,14 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
 
   // Ownership is informational; any clinical director may edit, but we surface
   // who owns and who last touched it, and apply optimistic concurrency on save.
+  // We guard on `last_edited_at` rather than `updated_at` because only prep
+  // saves update that field — heartbeats, invite sends (`meeting_link`),
+  // meeting-outcome status changes, and doctor confirmations all bump
+  // `updated_at` but leave `last_edited_at` untouched, so guarding on it
+  // avoids false-positive "someone else saved" conflicts.
   const { data: myStaffForOwnership } = useStaffProfile();
-  const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null);
+  const [loadedLastEditedAt, setLoadedLastEditedAt] = useState<string | null>(null);
+  const [lastEditedLoaded, setLastEditedLoaded] = useState(false);
   const [staleConflict, setStaleConflict] = useState(false);
 
   // Auto-create session when sessionId is 'new'
@@ -145,30 +151,29 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!sessionId,
   });
 
-  // Capture the snapshot timestamp for optimistic concurrency, and write a
-  // presence heartbeat so other directors see "X opened this N min ago".
+  // Capture the last-edited snapshot for optimistic concurrency, and write a
+  // presence heartbeat so other directors see "X opened this N min ago". The
+  // heartbeat touches `last_opened_*` (and updated_at via trigger), but does
+  // NOT touch `last_edited_at`, so we can capture the snapshot once and it
+  // stays valid across heartbeats, invite sends, and other benign writes.
   useEffect(() => {
     if (!session || !myStaffForOwnership?.id) return;
-    if (loadedUpdatedAt === null) {
-      setLoadedUpdatedAt((session as any).updated_at ?? null);
+    if (!lastEditedLoaded) {
+      setLoadedLastEditedAt((session as any).last_edited_at ?? null);
+      setLastEditedLoaded(true);
     }
     (async () => {
-      // Write presence heartbeat and re-sync the concurrency snapshot to the
-      // post-heartbeat updated_at. Without this, the heartbeat's own bump to
-      // updated_at makes the next save look like a conflict from another user.
-      const { data: hb } = await (supabase as any)
+      await (supabase as any)
         .from('coaching_sessions')
         .update({
           last_opened_by_staff_id: myStaffForOwnership.id,
           last_opened_at: new Date().toISOString(),
         })
-        .eq('id', session.id)
-        .select('updated_at')
-        .maybeSingle();
-      if (hb?.updated_at) setLoadedUpdatedAt(hb.updated_at);
+        .eq('id', session.id);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, myStaffForOwnership?.id]);
+
 
 
   // Fetch doctor's baseline items as the ProMove pool
@@ -421,14 +426,16 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         .from('coaching_sessions')
         .update(updatePayload)
         .eq('id', sessionId);
-      if (loadedUpdatedAt) updateQuery = updateQuery.eq('updated_at', loadedUpdatedAt);
-      const { data: updated, error: sessErr } = await updateQuery.select('id, updated_at');
+      updateQuery = loadedLastEditedAt
+        ? updateQuery.eq('last_edited_at', loadedLastEditedAt)
+        : updateQuery.is('last_edited_at', null);
+      const { data: updated, error: sessErr } = await updateQuery.select('id, last_edited_at');
       if (sessErr) throw sessErr;
       if (!updated || updated.length === 0) {
         setStaleConflict(true);
         throw new Error('Someone else saved changes to this session while you were editing. Reload to see their version before saving again.');
       }
-      setLoadedUpdatedAt(updated[0].updated_at);
+      setLoadedLastEditedAt(updated[0].last_edited_at);
 
       // Save prior action statuses if any exist
       if (priorExperiments && priorExperiments.length > 0 && Object.keys(priorActionStatuses).length > 0) {
@@ -484,14 +491,16 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         .from('coaching_sessions')
         .update(draftPayload)
         .eq('id', sessionId);
-      if (loadedUpdatedAt) draftQuery = draftQuery.eq('updated_at', loadedUpdatedAt);
-      const { data: updated, error: draftErr } = await draftQuery.select('id, updated_at');
+      draftQuery = loadedLastEditedAt
+        ? draftQuery.eq('last_edited_at', loadedLastEditedAt)
+        : draftQuery.is('last_edited_at', null);
+      const { data: updated, error: draftErr } = await draftQuery.select('id, last_edited_at');
       if (draftErr) throw draftErr;
       if (!updated || updated.length === 0) {
         setStaleConflict(true);
         throw new Error('Someone else saved changes to this session while you were editing. Reload to see their version before saving again.');
       }
-      setLoadedUpdatedAt(updated[0].updated_at);
+      setLoadedLastEditedAt(updated[0].last_edited_at);
     },
     onSuccess: () => {
       toast({ title: 'Draft saved' });

@@ -153,16 +153,23 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
       setLoadedUpdatedAt((session as any).updated_at ?? null);
     }
     (async () => {
-      await (supabase as any)
+      // Write presence heartbeat and re-sync the concurrency snapshot to the
+      // post-heartbeat updated_at. Without this, the heartbeat's own bump to
+      // updated_at makes the next save look like a conflict from another user.
+      const { data: hb } = await (supabase as any)
         .from('coaching_sessions')
         .update({
           last_opened_by_staff_id: myStaffForOwnership.id,
           last_opened_at: new Date().toISOString(),
         })
-        .eq('id', session.id);
+        .eq('id', session.id)
+        .select('updated_at')
+        .maybeSingle();
+      if (hb?.updated_at) setLoadedUpdatedAt(hb.updated_at);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, myStaffForOwnership?.id]);
+
 
   // Fetch doctor's baseline items as the ProMove pool
   const { data: baselineItems } = useQuery({

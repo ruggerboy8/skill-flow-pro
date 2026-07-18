@@ -73,8 +73,14 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
 
   // Ownership is informational; any clinical director may edit, but we surface
   // who owns and who last touched it, and apply optimistic concurrency on save.
+  // We guard on `last_edited_at` rather than `updated_at` because only prep
+  // saves update that field — heartbeats, invite sends (`meeting_link`),
+  // meeting-outcome status changes, and doctor confirmations all bump
+  // `updated_at` but leave `last_edited_at` untouched, so guarding on it
+  // avoids false-positive "someone else saved" conflicts.
   const { data: myStaffForOwnership } = useStaffProfile();
-  const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null);
+  const [loadedLastEditedAt, setLoadedLastEditedAt] = useState<string | null>(null);
+  const [lastEditedLoaded, setLastEditedLoaded] = useState(false);
   const [staleConflict, setStaleConflict] = useState(false);
 
   // Auto-create session when sessionId is 'new'

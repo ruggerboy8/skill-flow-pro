@@ -426,14 +426,16 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         .from('coaching_sessions')
         .update(updatePayload)
         .eq('id', sessionId);
-      if (loadedUpdatedAt) updateQuery = updateQuery.eq('updated_at', loadedUpdatedAt);
-      const { data: updated, error: sessErr } = await updateQuery.select('id, updated_at');
+      updateQuery = loadedLastEditedAt
+        ? updateQuery.eq('last_edited_at', loadedLastEditedAt)
+        : updateQuery.is('last_edited_at', null);
+      const { data: updated, error: sessErr } = await updateQuery.select('id, last_edited_at');
       if (sessErr) throw sessErr;
       if (!updated || updated.length === 0) {
         setStaleConflict(true);
         throw new Error('Someone else saved changes to this session while you were editing. Reload to see their version before saving again.');
       }
-      setLoadedUpdatedAt(updated[0].updated_at);
+      setLoadedLastEditedAt(updated[0].last_edited_at);
 
       // Save prior action statuses if any exist
       if (priorExperiments && priorExperiments.length > 0 && Object.keys(priorActionStatuses).length > 0) {

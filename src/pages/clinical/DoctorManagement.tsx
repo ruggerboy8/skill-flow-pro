@@ -31,12 +31,15 @@ type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
 
 export default function DoctorManagement() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useUrlState<FilterValue>('status', 'all');
   const navigate = useNavigate();
 
   const { data: doctors, isLoading, refetch } = useQuery({
     queryKey: ['doctors-management'],
+    refetchOnMount: 'always',
+    staleTime: 0,
     queryFn: async (): Promise<DoctorRow[]> => {
       const { data: staffData, error: staffErr } = await supabase
         .from('staff')

@@ -1,11 +1,20 @@
 export type ExportGrain = 'individual' | 'location' | 'organization';
-export type TimeWindow = '3weeks' | '6weeks' | 'all';
+// The period is chosen once, on the Scope step, and governs BOTH participation
+// (which weeks of check-ins to score) and evaluation columns:
+//   'quarter' → use the selected quarter/baseline (eval columns available)
+//   'custom'  → an arbitrary date range (participation only; evals are
+//               quarter-tagged, so eval columns are disabled in this mode)
+export type PeriodMode = 'quarter' | 'custom';
 
 export interface ExportConfig {
   grain: ExportGrain;
   includeCompletionRate: boolean;
   includeOnTimeRate: boolean;
-  submissionWindow: TimeWindow;
+  periodMode: PeriodMode;
+  // Only used when periodMode === 'custom'. ISO date strings (YYYY-MM-DD),
+  // inclusive on both ends. customEnd null means "through today".
+  customStart: string | null;
+  customEnd: string | null;
   includeDomainAverages: boolean;
   includeCompetencyAverages: boolean;
   includeObserverAndSelf: boolean;
@@ -13,9 +22,13 @@ export interface ExportConfig {
 
 export const DEFAULT_EXPORT_CONFIG: ExportConfig = {
   grain: 'individual',
-  includeCompletionRate: false,
-  includeOnTimeRate: false,
-  submissionWindow: '6weeks',
+  // Participation metrics default ON — the primary use of the Reports export is
+  // pulling ProMoves completion / on-time data for staff conversations.
+  includeCompletionRate: true,
+  includeOnTimeRate: true,
+  periodMode: 'quarter',
+  customStart: null,
+  customEnd: null,
   includeDomainAverages: false,
   includeCompetencyAverages: false,
   includeObserverAndSelf: true,
@@ -39,6 +52,14 @@ export const COLUMN_NAMES = {
   staffCount: 'Staff Count',
   completionRate: 'Completion %',
   onTimeRate: 'On-Time %',
+  // Participation detail (individual grain). Counts are submission slots
+  // (each week has a check-in + a check-out), not weeks.
+  expected: 'Submissions Due',
+  completed: 'Submitted',
+  onTimeCount: 'On-Time',
+  lateCount: 'Late',
+  missingCount: 'Missing',
+  lastSubmission: 'Last Submission',
   competencyName: 'Competency',
   domainName: 'Domain',
   obsMean: 'Observer Mean',

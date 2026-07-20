@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Shield, Users, MapPin, Building, Settings, Building2, Wand2, X, Plug, ClipboardList } from "lucide-react";
+import { Shield, Users, MapPin, Building, Settings, Building2, Wand2, X, Plug, ClipboardList, FileSpreadsheet } from "lucide-react";
 import { AdminUsersTab } from "@/components/admin/AdminUsersTab";
+import { AdminReportsTab } from "@/components/admin/AdminReportsTab";
 import { AdminSurveysTab } from "@/components/admin/surveys/AdminSurveysTab";
 import { useAskAlcanAccess } from "@/lib/askAlcanAccess";
 import { AdminLocationsTab } from "@/components/admin/AdminLocationsTab";
@@ -17,7 +18,7 @@ import { TabbedPageShell, type TabDefinition } from "@/components/shared/TabbedP
 export default function AdminPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isSuperAdmin, isOrgAdmin, canAccessAdmin, isLoading, organizationId } = useUserRole();
+  const { isSuperAdmin, isOrgAdmin, canAccessAdmin, canViewSubmissions, isLoading, organizationId } = useUserRole();
   const { canAccess: canAccessAskAlcan } = useAskAlcanAccess();
 
   // Redirect legacy ?tab=pro-moves deep links to Builder, where the library now lives.
@@ -60,12 +61,15 @@ export default function AdminPage() {
     { value: "users", label: "Users", icon: Users, content: <AdminUsersTab /> },
     { value: "locations", label: "Locations", icon: MapPin, content: <AdminLocationsTab /> },
     { value: "organizations", label: "Groups", icon: Building, content: <AdminOrganizationsTab /> },
+    ...(canViewSubmissions
+      ? [{ value: "reports", label: "Reports", icon: FileSpreadsheet, content: <AdminReportsTab /> }]
+      : []),
     ...(canAccessAskAlcan
       ? [{ value: "surveys", label: "Ask Alcan", icon: ClipboardList, content: <AdminSurveysTab /> }]
       : []),
     { value: "integrations", label: "Integrations", icon: Plug, content: <AdminIntegrationsTab /> },
     { value: "settings", label: "Settings", icon: Settings, content: <AdminGlobalSettingsTab /> },
-  ], [canAccessAskAlcan]);
+  ], [canViewSubmissions, canAccessAskAlcan]);
 
   return (
     <>

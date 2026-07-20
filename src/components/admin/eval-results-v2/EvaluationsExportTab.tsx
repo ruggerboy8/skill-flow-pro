@@ -2,11 +2,13 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,7 +17,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StepBar } from '@/components/admin/StepBar';
 import { downloadCSV } from '@/lib/csvExport';
-import { calculateSubmissionStats, calculateCutoffDate } from '@/lib/submissionRateCalc';
+import { calculateSubmissionStats } from '@/lib/submissionRateCalc';
 import { getPeriodLabel } from '@/types/analytics';
 import { toast } from 'sonner';
 import {
@@ -27,9 +29,18 @@ import type { EvalDistributionRow } from '@/types/evalMetricsV2';
 import { EvalPeriodSelector } from '@/components/admin/eval-results-v2/EvalPeriodSelector';
 import { formatEvalPeriod } from '@/lib/evalPeriods';
 import {
-  type ExportConfig, type ExportGrain, type TimeWindow,
+  type ExportConfig, type ExportGrain, type PeriodMode,
   DEFAULT_EXPORT_CONFIG, EXPORT_FORMAT, MAX_EXPORT_ROWS, COLUMN_NAMES,
 } from '@/types/exportConfig';
+
+// Calendar-quarter date bounds (Q1 = Jan–Mar, … Q4 = Oct–Dec) for a given year.
+// Used to scope participation weeks when exporting "by quarter".
+function quarterDateBounds(quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4', year: number): { start: string; end: Date } {
+  const startMonth = { Q1: 0, Q2: 3, Q3: 6, Q4: 9 }[quarter];
+  const start = new Date(Date.UTC(year, startMonth, 1));
+  const end = new Date(Date.UTC(year, startMonth + 3, 0, 23, 59, 59)); // last day of the quarter
+  return { start: start.toISOString().slice(0, 10), end };
+}
 
 // ── Props ──────────────────────────────────────────────────────
 interface EvaluationsExportTabProps {
@@ -48,11 +59,30 @@ const GRAIN_OPTIONS: { value: ExportGrain; label: string; description: string; i
 interface OrgOption { id: string; name: string; }
 interface LocOption { id: string; name: string; group_id: string; }
 interface RoleOption { role_id: number; role_name: string; }
+interface StaffSubmission {
+  completionRate: number | null;
+  onTimeRate: number | null;
+  expected: number;
+  completed: number;
+  onTime: number;
+  late: number;
+  missing: number;
+  lastSubmission: string | null;
+}
 
 // ── Component ──────────────────────────────────────────────────
 export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsExportTabProps) {
   const { user } = useAuth();
+  const { isSuperAdmin, managedOrgIds, managedLocationIds } = useUserRole();
   const { resolve: resolveRole } = useRoleDisplayNames();
+
+  // Scope boundary: a non-super-admin with coach_scopes may only export within
+  // those scopes. RLS already limits reads to the user's organization, but a
+  // regional scoped to a *subset* of a multi-group org needs a tighter fence
+  // than the org. `managedOrgIds` holds scoped practice_group ids; when a user
+  // has no scopes (e.g. a plain org-admin) we fall back to the RLS org view.
+  const scopedGroupIds = isSuperAdmin ? null : (managedOrgIds.length > 0 ? managedOrgIds : null);
+  const scopedLocationIds = isSuperAdmin ? null : (managedLocationIds.length > 0 ? managedLocationIds : null);
   const [currentStep, setCurrentStep] = useState(0);
   const [config, setConfig] = useState<ExportConfig>(DEFAULT_EXPORT_CONFIG);
   const [isExporting, setIsExporting] = useState(false);
@@ -60,19 +90,34 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
 
-  const isBaseline = filters.evaluationPeriod.type === 'Baseline';
+  const isBaseline = config.periodMode === 'quarter' && filters.evaluationPeriod.type === 'Baseline';
   const hasAnyMetric = config.includeCompletionRate || config.includeOnTimeRate
     || config.includeDomainAverages || config.includeCompetencyAverages;
 
+  const isCustomPeriod = config.periodMode === 'custom';
+  // In custom mode a valid range is required (start present, start <= end;
+  // a blank end means "through today").
+  const customRangeInvalid =
+    isCustomPeriod && (
+      !config.customStart ||
+      (!!config.customEnd && config.customStart > config.customEnd)
+    );
+  const periodDisplay = isCustomPeriod
+    ? `${config.customStart ?? '—'} to ${config.customEnd ?? 'today'}`
+    : getPeriodLabel(filters.evaluationPeriod);
+
   // ── Fetch all active organizations ───────────────────────────
   const { data: allOrgs = [], isLoading: orgsLoading } = useQuery({
-    queryKey: ['export-all-orgs'],
+    queryKey: ['export-all-orgs', scopedGroupIds ? [...scopedGroupIds].sort().join(',') : 'all'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('practice_groups')
         .select('id, name')
         .eq('active', true)
         .order('name');
+      // Fence to the user's scoped groups (super-admins and unscoped users see the RLS org view).
+      if (scopedGroupIds) query = query.in('id', scopedGroupIds);
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as OrgOption[];
     },
@@ -89,15 +134,22 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
   // ── Fetch locations for selected orgs ──────────────────────
   const sortedSelectedOrgIdsForLoc = useMemo(() => [...selectedOrgIds].sort().join(','), [selectedOrgIds]);
   const { data: allLocations = [], isLoading: locsLoading } = useQuery({
-    queryKey: ['export-locations-for-orgs', sortedSelectedOrgIdsForLoc],
+    queryKey: [
+      'export-locations-for-orgs',
+      sortedSelectedOrgIdsForLoc,
+      scopedLocationIds ? [...scopedLocationIds].sort().join(',') : 'all',
+    ],
     queryFn: async () => {
       if (selectedOrgIds.length === 0) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('locations')
         .select('id, name, group_id')
         .in('group_id', selectedOrgIds)
         .eq('active', true)
         .order('name');
+      // Location-scoped users (coach_scopes of type 'location') only see those locations.
+      if (scopedLocationIds) query = query.in('id', scopedLocationIds);
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as LocOption[];
     },
@@ -110,25 +162,46 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
     setSelectedLocationIds(allLocations.map(l => l.id));
   }, [allLocations]);
 
-  // ── Fetch all roles ────────────────────────────────────────
+  // ── Fetch roles actually present among in-scope participants ──
+  // Not the global roles table: only roles held by active participants in the
+  // scoped locations. This drops roles with no ProMoves data (e.g. Doctor,
+  // non-participant roles) and keeps the picker to what's relevant for this org.
+  const scopedLocationIdsForRoles = useMemo(
+    () => allLocations.map(l => l.id).sort().join(','),
+    [allLocations]
+  );
   const { data: allRoles = [], isLoading: rolesLoading } = useQuery({
-    queryKey: ['export-all-roles'],
+    queryKey: ['export-roles-in-scope', scopedLocationIdsForRoles],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const locIds = allLocations.map(l => l.id);
+      if (locIds.length === 0) return [];
+      const { data: staffRows, error } = await supabase
+        .from('staff')
+        .select('role_id')
+        .in('primary_location_id', locIds)
+        .eq('is_participant', true)
+        .eq('is_paused', false)
+        .not('role_id', 'is', null);
+      if (error) throw error;
+      const roleIds = [...new Set((staffRows || []).map((s: any) => s.role_id as number))];
+      if (roleIds.length === 0) return [];
+      const { data: rolesData, error: rErr } = await supabase
         .from('roles')
         .select('role_id, role_name')
+        .in('role_id', roleIds)
         .order('role_name');
-      if (error) throw error;
-      return (data || []) as RoleOption[];
+      if (rErr) throw rErr;
+      return (rolesData || []) as RoleOption[];
     },
-    staleTime: 1000 * 60 * 10,
+    enabled: allLocations.length > 0,
+    staleTime: 1000 * 60 * 5,
   });
 
-  // Initialize selectedRoleIds to all roles once loaded
+  // Keep role selection in sync with the available roles (mirrors locations):
+  // reset to "all" whenever the scoped role set changes, so the "all selected"
+  // invariant the estimate/export rely on stays correct.
   useEffect(() => {
-    if (allRoles.length > 0 && selectedRoleIds.length === 0) {
-      setSelectedRoleIds(allRoles.map(r => r.role_id));
-    }
+    setSelectedRoleIds(allRoles.map(r => r.role_id));
   }, [allRoles]);
 
   const toggleOrg = (orgId: string) => {
@@ -230,8 +303,18 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
     } else {
       cols.push(COLUMN_NAMES.staffCount);
     }
-    if (config.includeCompletionRate) cols.push(COLUMN_NAMES.completionRate);
-    if (config.includeOnTimeRate) cols.push(COLUMN_NAMES.onTimeRate);
+    const individual = config.grain === 'individual';
+    if (config.includeCompletionRate) {
+      cols.push(COLUMN_NAMES.completionRate);
+      if (individual) cols.push(COLUMN_NAMES.expected, COLUMN_NAMES.completed, COLUMN_NAMES.missingCount);
+    }
+    if (config.includeOnTimeRate) {
+      cols.push(COLUMN_NAMES.onTimeRate);
+      if (individual) cols.push(COLUMN_NAMES.onTimeCount, COLUMN_NAMES.lateCount);
+    }
+    if (individual && (config.includeCompletionRate || config.includeOnTimeRate)) {
+      cols.push(COLUMN_NAMES.lastSubmission);
+    }
     if (config.includeDomainAverages) {
       cols.push(`{Domain} ${COLUMN_NAMES.obsMean}`);
       if (config.includeObserverAndSelf) cols.push(`{Domain} ${COLUMN_NAMES.selfMean}`);
@@ -251,10 +334,10 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
   // ── Navigation ───────────────────────────────────────────────
   const canNext = useCallback(() => {
     if (currentStep === 0) return true;
-    if (currentStep === 1) return selectedOrgIds.length > 0 && selectedLocationIds.length > 0;
+    if (currentStep === 1) return selectedOrgIds.length > 0 && selectedLocationIds.length > 0 && !customRangeInvalid;
     if (currentStep === 2) return hasAnyMetric;
     return false;
-  }, [currentStep, selectedOrgIds.length, selectedLocationIds.length, hasAnyMetric]);
+  }, [currentStep, selectedOrgIds.length, selectedLocationIds.length, hasAnyMetric, customRangeInvalid]);
 
   // ── Export handler (loops over selected orgs) ────────────────
   const handleExport = async () => {
@@ -264,7 +347,12 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
     try {
       // Get role names (shared across orgs)
       const { data: rolesData } = await supabase.from('roles').select('role_id, role_name');
-      const roleMap = new Map((rolesData || []).map(r => [r.role_id, r.role_name || '']));
+      // Scoped users (single org) get their org's role labels (RDA/DFI/OM);
+      // super-admins may export across orgs, so keep platform-generic names.
+      const roleMap = new Map((rolesData || []).map(r => [
+        r.role_id,
+        isSuperAdmin ? (r.role_name || '') : resolveRole(r.role_id, r.role_name || ''),
+      ]));
 
       // Get all org names
       const orgNameMap = new Map(allOrgs.map(o => [o.id, o.name]));
@@ -297,10 +385,24 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
         if (staff.length === 0) continue;
 
         // 2. Build submission metrics for this org
-        let submissionByStaff = new Map<string, { completionRate: number | null; onTimeRate: number | null }>();
+        let submissionByStaff = new Map<string, StaffSubmission>();
 
         if (config.includeCompletionRate || config.includeOnTimeRate) {
-          const cutoff = calculateCutoffDate(config.submissionWindow);
+          // Resolve the participation window from the chosen period. The start
+          // goes to the RPC as p_since; the end is applied client-side (and used
+          // as the "as of" date) so weeks after it don't count as missing.
+          // End is capped at today so an in-progress quarter isn't penalised.
+          let cutoff: string | null = null;
+          let endBound: Date | null = null;
+          const today = new Date();
+          if (config.periodMode === 'custom') {
+            cutoff = config.customStart || null;
+            endBound = config.customEnd ? new Date(`${config.customEnd}T23:59:59`) : null;
+          } else if (filters.evaluationPeriod.type === 'Quarterly' && filters.evaluationPeriod.quarter) {
+            const { start, end } = quarterDateBounds(filters.evaluationPeriod.quarter, filters.evaluationPeriod.year);
+            cutoff = start;
+            endBound = end > today ? today : end;
+          }
           const batchSize = 20;
           for (let i = 0; i < staff.length; i += batchSize) {
             const batch = staff.slice(i, i + batchSize);
@@ -308,15 +410,33 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
               const params: any = { p_staff_id: s.id };
               if (cutoff) params.p_since = cutoff;
               const { data } = await supabase.rpc('get_staff_submission_windows', params);
-              const stats = calculateSubmissionStats((data || []) as any);
+              const windows = ((data || []) as any[]).filter(
+                (w) => !endBound || new Date(w.week_of) <= endBound
+              );
+              const stats = calculateSubmissionStats(windows as any, endBound || undefined);
+              // Latest actual submission date within the period (conf or perf).
+              let lastSubmission: string | null = null;
+              for (const w of windows) {
+                if (w.status === 'submitted' && w.submitted_at) {
+                  const d = String(w.submitted_at).slice(0, 10);
+                  if (!lastSubmission || d > lastSubmission) lastSubmission = d;
+                }
+              }
               return {
                 staffId: s.id,
                 completionRate: stats.hasData ? stats.completionRate : null,
                 onTimeRate: stats.hasData ? stats.onTimeRate : null,
+                expected: stats.totalExpected,
+                completed: stats.completed,
+                onTime: stats.onTime,
+                late: stats.late,
+                missing: stats.missing,
+                lastSubmission,
               };
             }));
             for (const r of results) {
-              submissionByStaff.set(r.staffId, { completionRate: r.completionRate, onTimeRate: r.onTimeRate });
+              const { staffId, ...rest } = r;
+              submissionByStaff.set(staffId, rest);
             }
           }
         }
@@ -381,7 +501,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
       }
 
       // 6. Download assembled files
-      const periodLabel = getPeriodLabel(filters.evaluationPeriod).replace(/\s+/g, '_');
+      const periodLabel = periodDisplay.replace(/\s+/g, '_');
       const dateStr = new Date().toISOString().slice(0, 10);
       let downloadedFiles = 0;
 
@@ -419,7 +539,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
         const { data: myStaff } = await supabase.from('staff').select('id').eq('user_id', user.id).single();
         if (myStaff) {
           await supabase.from('admin_audit').insert([{
-            action: 'evaluations_export_downloaded',
+            action: 'reports_export_downloaded',
             changed_by: myStaff.id,
             staff_id: myStaff.id,
             scope_group_id: selectedOrgIds.length === 1 ? selectedOrgIds[0] : null,
@@ -485,17 +605,70 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
 
       {currentStep === 1 && (
         <div className="space-y-4">
-          {/* Evaluation Period Selector */}
+          {/* Period: a quarter, or a custom date range. Governs both
+              participation weeks and (quarter mode only) evaluation columns. */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Evaluation Period</CardTitle>
+              <CardTitle className="text-sm font-medium">Period</CardTitle>
             </CardHeader>
-            <CardContent className="pt-0">
-              <EvalPeriodSelector
-                value={filters.evaluationPeriod}
-                onChange={(period) => onFiltersChange({ ...filters, evaluationPeriod: period as any })}
-                className="w-full max-w-xs"
-              />
+            <CardContent className="pt-0 space-y-3">
+              <ToggleGroup
+                type="single"
+                value={config.periodMode}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  const mode = v as PeriodMode;
+                  setConfig(prev => mode === 'custom'
+                    // A custom range can't map to quarter-tagged evals, so drop
+                    // the eval columns when switching into custom mode.
+                    ? { ...prev, periodMode: mode, includeDomainAverages: false, includeCompetencyAverages: false }
+                    : { ...prev, periodMode: mode });
+                }}
+                className="justify-start"
+              >
+                <ToggleGroupItem value="quarter" size="sm">By quarter</ToggleGroupItem>
+                <ToggleGroupItem value="custom" size="sm">Custom range</ToggleGroupItem>
+              </ToggleGroup>
+
+              {config.periodMode === 'quarter' ? (
+                <EvalPeriodSelector
+                  value={filters.evaluationPeriod}
+                  onChange={(period) => onFiltersChange({ ...filters, evaluationPeriod: period as any })}
+                  className="w-full max-w-xs"
+                />
+              ) : (
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="customStart" className="text-2xs text-muted-foreground">From</Label>
+                    <Input
+                      id="customStart"
+                      type="date"
+                      className="max-w-[10rem]"
+                      value={config.customStart ?? ''}
+                      max={config.customEnd ?? undefined}
+                      onChange={(e) => setConfig(prev => ({ ...prev, customStart: e.target.value || null }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="customEnd" className="text-2xs text-muted-foreground">To (blank = today)</Label>
+                    <Input
+                      id="customEnd"
+                      type="date"
+                      className="max-w-[10rem]"
+                      value={config.customEnd ?? ''}
+                      min={config.customStart ?? undefined}
+                      onChange={(e) => setConfig(prev => ({ ...prev, customEnd: e.target.value || null }))}
+                    />
+                  </div>
+                  {customRangeInvalid && (
+                    <p className="w-full text-2xs text-destructive">
+                      {config.customStart
+                        ? 'Start date must be on or before the end date.'
+                        : 'Choose a start date for the custom period.'}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -644,29 +817,20 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                 />
                 <Label htmlFor="onTimeRate" className="cursor-pointer">On-Time %</Label>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Time window</Label>
-                <ToggleGroup
-                  type="single"
-                  value={config.submissionWindow}
-                  onValueChange={(v) => { if (v) setConfig(prev => ({ ...prev, submissionWindow: v as TimeWindow })); }}
-                  disabled={isBaseline}
-                  className="justify-start"
-                >
-                  <ToggleGroupItem value="3weeks" size="sm">3 wk</ToggleGroupItem>
-                  <ToggleGroupItem value="6weeks" size="sm">6 wk</ToggleGroupItem>
-                  <ToggleGroupItem value="all" size="sm">All</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
+              <p className="text-2xs text-muted-foreground">
+                Scored over {isCustomPeriod ? 'the custom date range' : 'the selected quarter'} (set on the Scope step).
+              </p>
             </CardContent>
           </Card>
 
-          {/* Eval Performance */}
-          <Card>
+          {/* Eval Performance — evaluations are quarter-tagged, so these are
+              only available in "by quarter" mode. */}
+          <Card className={isCustomPeriod ? 'opacity-50' : ''}>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <FileSpreadsheet className="h-4 w-4" />
                 Evaluation Performance
+                {isCustomPeriod && <Badge variant="outline" className="text-xs">Requires a quarter</Badge>}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -675,6 +839,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                   id="domainAvg"
                   checked={config.includeDomainAverages}
                   onCheckedChange={(v) => setConfig(prev => ({ ...prev, includeDomainAverages: !!v }))}
+                  disabled={isCustomPeriod}
                 />
                 <Label htmlFor="domainAvg" className="cursor-pointer">Domain averages</Label>
               </div>
@@ -683,6 +848,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                   id="compAvg"
                   checked={config.includeCompetencyAverages}
                   onCheckedChange={(v) => setConfig(prev => ({ ...prev, includeCompetencyAverages: !!v }))}
+                  disabled={isCustomPeriod}
                 />
                 <Label htmlFor="compAvg" className="cursor-pointer">Competency averages</Label>
               </div>
@@ -691,6 +857,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                   id="obsSelf"
                   checked={config.includeObserverAndSelf}
                   onCheckedChange={(v) => setConfig(prev => ({ ...prev, includeObserverAndSelf: !!v }))}
+                  disabled={isCustomPeriod}
                 />
                 <Label htmlFor="obsSelf" className="cursor-pointer">Include observer + self columns</Label>
               </div>
@@ -745,7 +912,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
                 </div>
                 <div>
                   <span className="text-muted-foreground">Period</span>
-                  <p className="font-medium">{getPeriodLabel(filters.evaluationPeriod)}</p>
+                  <p className="font-medium">{periodDisplay}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Est. Rows</span>
@@ -809,6 +976,7 @@ export function EvaluationsExportTab({ filters, onFiltersChange }: EvaluationsEx
               || selectedOrgIds.length === 0
               || (rowEstimate ?? 0) === 0
               || (rowEstimate ?? 0) > MAX_EXPORT_ROWS
+              || customRangeInvalid
             }
             onClick={handleExport}
           >
@@ -859,7 +1027,7 @@ function buildPrimaryRows(
   orgName: string,
   locationMap: Map<string, string>,
   roleMap: Map<number, string>,
-  submissionByStaff: Map<string, { completionRate: number | null; onTimeRate: number | null }>,
+  submissionByStaff: Map<string, StaffSubmission>,
   domainRows: EvalDistributionRow[],
 ): Record<string, string>[] {
   const domainNames = [...new Set(domainRows.map(r => r.domain_name))].sort();
@@ -884,13 +1052,20 @@ function buildPrimaryRows(
         [COLUMN_NAMES.role]: roleMap.get(s.role_id || 0) || '',
       };
 
+      const sub = submissionByStaff.get(s.id);
       if (config.includeCompletionRate) {
-        const sub = submissionByStaff.get(s.id);
         row[COLUMN_NAMES.completionRate] = fmt(sub?.completionRate ?? null, EXPORT_FORMAT.percentDecimals);
+        row[COLUMN_NAMES.expected] = fmt(sub?.expected ?? null, 0);
+        row[COLUMN_NAMES.completed] = fmt(sub?.completed ?? null, 0);
+        row[COLUMN_NAMES.missingCount] = fmt(sub?.missing ?? null, 0);
       }
       if (config.includeOnTimeRate) {
-        const sub = submissionByStaff.get(s.id);
         row[COLUMN_NAMES.onTimeRate] = fmt(sub?.onTimeRate ?? null, EXPORT_FORMAT.percentDecimals);
+        row[COLUMN_NAMES.onTimeCount] = fmt(sub?.onTime ?? null, 0);
+        row[COLUMN_NAMES.lateCount] = fmt(sub?.late ?? null, 0);
+      }
+      if (config.includeCompletionRate || config.includeOnTimeRate) {
+        row[COLUMN_NAMES.lastSubmission] = sub?.lastSubmission ?? EXPORT_FORMAT.nullToken;
       }
 
       if (config.includeDomainAverages) {

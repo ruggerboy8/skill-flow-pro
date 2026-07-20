@@ -67,7 +67,12 @@ N7, Phase 3). Read-only; note the `eval_review_v2` flag.
 
 ---
 
-## Phase 2 — Background consistency (meant to preserve current experience)
+## Phase 2 — Background consistency (meant to preserve current experience) — ✅ SHIPPED 2026-07-20
+
+**Done:** 2.1 (Layout single-sourced to `useUserRole`), 2.3 (`RequireAccess` guards on
+`/coach`, `/facilitate`, `/dashboard` + its child), 2.4 (naming comment). Verified by
+masquerading as every role — side menus populate correctly per persona. Deferred: 2.2
+(capabilities backfill) folds into Phase 3.
 
 Internal plumbing. The intent is zero visible change for correctly-configured users;
 the one real effect is that the **menu and the page guards stop disagreeing** (N1).

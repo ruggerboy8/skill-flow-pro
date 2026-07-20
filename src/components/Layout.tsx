@@ -9,7 +9,7 @@ import { useRoleRefresh } from '@/hooks/useRoleRefresh';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useRoutePersistence } from '@/hooks/useRoutePersistence';
-import { useSim } from '@/devtools/SimProvider';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,11 +22,34 @@ import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
-  const { user, signOut, isCoach: authIsCoach, isSuperAdmin: authIsSuperAdmin, isOrgAdmin: authIsOrgAdmin, isLead: authIsLead, roleLoading, refreshRoles } = useAuth();
-  const { overrides } = useSim();
+  const { user, signOut, roleLoading, refreshRoles } = useAuth();
+  const queryClient = useQueryClient();
   const [isSimConsoleOpen, setIsSimConsoleOpen] = useState(false);
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
-  const { organizationId } = useUserRole();
+  // Single source of truth for roles/permissions: useUserRole is capability-
+  // preferred (with a legacy-flag fallback) and masquerade-aware via
+  // useStaffProfile, so the sidebar always agrees with the page guards — including
+  // while masquerading. (Previously the menu read legacy flags from useAuth while
+  // the guards read useUserRole, so the two could disagree.)
+  const {
+    organizationId,
+    isLoading: roleInfoLoading,
+    isCoach,
+    isSuperAdmin,
+    isOrgAdmin,
+    isLead,
+    isOfficeManager,
+    isDoctor,
+    isClinicalDirector,
+    canViewSubmissions,
+    canSubmitEvals,
+    canReviewEvals,
+    canManageUsers,
+    canManageLocations,
+    canInviteUsers,
+    canManageLibrary,
+    canManageAssignments,
+  } = useUserRole();
 
   // Org branding
   const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
@@ -51,15 +74,6 @@ export default function Layout() {
       });
   }, [organizationId]);
   
-  // When masquerading, use the simulated user's roles; otherwise use auth roles
-  const isMasquerading = overrides.enabled && overrides.masqueradeStaffId;
-  const isCoach = isMasquerading ? (staffProfile?.is_coach || staffProfile?.is_super_admin || staffProfile?.is_org_admin || false) : authIsCoach;
-  const isSuperAdmin = isMasquerading ? (staffProfile?.is_super_admin || false) : authIsSuperAdmin;
-  const isOrgAdmin = isMasquerading ? (staffProfile?.is_org_admin || false) : authIsOrgAdmin;
-  const isLead = isMasquerading ? (staffProfile?.is_lead || false) : authIsLead;
-  const isOfficeManager = isMasquerading ? (staffProfile?.is_office_manager || false) : (staffProfile?.is_office_manager || false);
-  const isDoctor = staffProfile?.is_doctor || false;
-  const isClinicalDirector = staffProfile?.is_clinical_director || false;
   const location = useLocation();
   const { toast } = useToast();
   
@@ -72,6 +86,9 @@ export default function Layout() {
     pollInterval: 60000, // Check every 60 seconds
     onRoleChange: async () => {
       await refreshRoles();
+      // The sidebar is now driven by useUserRole (profile-backed), so refresh that
+      // source too, otherwise the menu wouldn't update until the 5-min cache expires.
+      queryClient.invalidateQueries({ queryKey: ['staff-profile'] });
       toast({
         title: "Permissions Updated",
         description: "Your role or permissions have been updated.",
@@ -79,23 +96,10 @@ export default function Layout() {
     }
   });
 
-  // Can access admin = super admin OR org admin
+  // Can access admin = super admin OR org admin (preserves the prior menu semantics).
   const canAccessAdmin = isSuperAdmin || isOrgAdmin;
 
-  // Capability-based access (new permission system). Read directly from
-  // user_capabilities so non-admin staff with explicit toggles get the right tabs.
-  const caps = (staffProfile?.user_capabilities as any) ?? null;
-  const canViewSubmissions = caps?.can_view_submissions ?? false;
-  const canSubmitEvals = caps?.can_submit_evals ?? false;
-  const canReviewEvals = caps?.can_review_evals ?? false;
-  const canManageUsers = caps?.can_manage_users ?? false;
-  const canManageLocations = caps?.can_manage_locations ?? false;
-  const canInviteUsers = caps?.can_invite_users ?? false;
-  const canManageLibrary = caps?.can_manage_library ?? false;
-  const canManageAssignments =
-    canAccessAdmin || (caps?.can_manage_assignments ?? false);
-
-  // Tab visibility derived from BOTH legacy role flags and capability toggles
+  // Tab visibility derived from role flags + capability toggles (all from useUserRole).
   const showCoachTabs = isCoach || isOrgAdmin || isLead || canViewSubmissions || canSubmitEvals;
   const showAdminTab = canAccessAdmin || canManageUsers || canManageLocations || canInviteUsers || canManageLibrary;
   const showEvaluationsTab = canAccessAdmin || canReviewEvals;
@@ -180,7 +184,7 @@ export default function Layout() {
   };
 
   // Show loading state until roles are loaded
-  if (roleLoading) {
+  if (roleLoading || roleInfoLoading) {
     return (
       <div className="flex min-h-screen">
         <div className="w-64 border-r p-4 space-y-4 hidden md:block">

@@ -40,6 +40,7 @@ import EvaluationReview from "@/pages/EvaluationReview";
 import EvaluationReviewV2 from "@/pages/EvaluationReviewV2";
 import AdminBuilder from "@/pages/AdminBuilder";
 import NotFound from "@/pages/NotFound";
+import { RequireAccess, allowCoachSurface, allowDashboard } from "@/components/RequireAccess";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
 import RegionalDashboard from "@/pages/dashboard/RegionalDashboard";
@@ -108,7 +109,7 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Full-screen facilitator presentation (no app chrome) */}
-      <Route path="/facilitate" element={<FacilitatePage />} />
+      <Route path="/facilitate" element={<RequireAccess allow={allowCoachSurface}><FacilitatePage /></RequireAccess>} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="welcome" element={<Welcome />} />
@@ -140,7 +141,7 @@ function AppRoutes() {
         <Route path="review/:cycle/:week" element={<Review />} />
 
         {/* Coach Routes */}
-        <Route path="coach" element={<CoachLayoutV2 />}>
+        <Route path="coach" element={<RequireAccess allow={allowCoachSurface}><CoachLayoutV2 /></RequireAccess>}>
           <Route index element={<CoachDashboardV2 />} />
           <Route path=":staffId" element={<StaffDetailV2 />} />
           <Route path=":staffId/eval/:evalId" element={<EvaluationHub />} />
@@ -148,8 +149,9 @@ function AppRoutes() {
         </Route>
 
         {/* Dashboard Routes */}
-        <Route path="dashboard" element={<RegionalDashboard />} />
-        <Route path="dashboard/location/:locationId" element={<LocationDetail />} />
+        {/* N5: one destination, three names — menu label "Command Center", route /dashboard, component RegionalDashboard. */}
+        <Route path="dashboard" element={<RequireAccess allow={allowDashboard}><RegionalDashboard /></RequireAccess>} />
+        <Route path="dashboard/location/:locationId" element={<RequireAccess allow={allowDashboard}><LocationDetail /></RequireAccess>} />
         <Route path="my-location" element={<MyLocationPage />} />
 
         {/* Clinical Director Routes */}

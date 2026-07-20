@@ -13,9 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
+import { normalizeDoctorName, drName } from '@/lib/doctorDisplayName';
 
 interface InviteDoctorDialogProps {
   open: boolean;
@@ -31,7 +31,6 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
   const [name, setName] = useState('');
   const [groupId, setGroupId] = useState('');
   const [locationId, setLocationId] = useState('__roaming__');
-  const [releaseBaseline, setReleaseBaseline] = useState(true);
 
   // Fetch practice groups
   const { data: practiceGroups } = useQuery({
@@ -66,14 +65,15 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
 
   const inviteMutation = useMutation({
     mutationFn: async () => {
+      const cleanName = normalizeDoctorName(name);
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'invite_doctor',
           email: email.trim(),
-          name: name.trim(),
+          name: cleanName,
           group_id: groupId,
           location_id: locationId === '__roaming__' ? null : locationId,
-          release_baseline: releaseBaseline,
+          release_baseline: true,
         },
       });
 
@@ -106,7 +106,6 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
     setName('');
     setGroupId('');
     setLocationId('__roaming__');
-    setReleaseBaseline(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -197,18 +196,15 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
             </p>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="release-baseline" className="text-sm font-medium">Release baseline immediately</Label>
-              <p className="text-xs text-muted-foreground">
-                Allow the doctor to start their self-assessment as soon as they accept the invite
-              </p>
-            </div>
-            <Switch
-              id="release-baseline"
-              checked={releaseBaseline}
-              onCheckedChange={setReleaseBaseline}
-            />
+          <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">
+            <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+            <p>
+              Sending this invitation opens{' '}
+              <span className="font-medium text-foreground">
+                {name.trim() ? drName(normalizeDoctorName(name)) : 'the doctor'}
+              </span>
+              's baseline self-assessment so they can begin right away.
+            </p>
           </div>
 
           <DialogFooter>

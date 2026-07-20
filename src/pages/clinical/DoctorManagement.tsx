@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,11 +7,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { UserPlus, Mail, MoreHorizontal, Users, ClipboardCheck, Clock, ArrowRight, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUrlState } from '@/hooks/useUrlState';
 import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { drName } from '@/lib/doctorDisplayName';
 
 import { getDoctorJourneyStatus, type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
@@ -30,12 +31,15 @@ type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
 
 export default function DoctorManagement() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useUrlState<FilterValue>('status', 'all');
   const navigate = useNavigate();
 
   const { data: doctors, isLoading, refetch } = useQuery({
     queryKey: ['doctors-management'],
+    refetchOnMount: 'always',
+    staleTime: 0,
     queryFn: async (): Promise<DoctorRow[]> => {
       const { data: staffData, error: staffErr } = await supabase
         .from('staff')
@@ -105,6 +109,24 @@ export default function DoctorManagement() {
       });
     },
   });
+
+  // Keep the doctor list fresh without a hard reload — invalidate on any staff change.
+  useEffect(() => {
+    const channel = supabase
+      .channel('doctors-management-staff')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staff', filter: 'is_doctor=eq.true' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['doctors-management'] });
+          queryClient.invalidateQueries({ queryKey: ['doctor-stats'] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Compute stats from doctors data
   const stats = doctors ? {
@@ -211,12 +233,21 @@ export default function DoctorManagement() {
             </div>
           ) : filteredDoctors?.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <p>No doctors found.</p>
-              {filter === 'all' && (
-                <Button className="mt-4" onClick={() => setInviteOpen(true)}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Invite Your First Doctor
-                </Button>
+              {(doctors?.length ?? 0) > 0 && filter !== 'all' ? (
+                <>
+                  <p>No doctors match this filter.</p>
+                  <Button className="mt-4" variant="outline" onClick={() => setFilter('all')}>
+                    Show all doctors
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p>No doctors found.</p>
+                  <Button className="mt-4" onClick={() => setInviteOpen(true)}>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Invite Your First Doctor
+                  </Button>
+                </>
               )}
             </div>
           ) : (
@@ -239,7 +270,7 @@ export default function DoctorManagement() {
                   >
                     <TableCell>
                       <div>
-                        <span className="font-medium">Dr. {doctor.name}</span>
+                        <span className="font-medium">{drName(doctor.name)}</span>
                         <p className="text-xs text-muted-foreground">{doctor.email}</p>
                       </div>
                     </TableCell>

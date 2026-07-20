@@ -13,6 +13,8 @@ import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { drName } from '@/lib/doctorDisplayName';
+import { useUserRole } from '@/hooks/useUserRole';
+import { buildOrganizationStaffScopeFilter } from '@/lib/clinicalDoctorScope';
 
 import { getDoctorJourneyStatus, type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
@@ -35,17 +37,26 @@ export default function DoctorManagement() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useUrlState<FilterValue>('status', 'all');
   const navigate = useNavigate();
+  const { organizationId, isSuperAdmin } = useUserRole();
 
   const { data: doctors, isLoading, refetch } = useQuery({
-    queryKey: ['doctors-management'],
+    queryKey: ['doctors-management', organizationId, isSuperAdmin],
     refetchOnMount: 'always',
     staleTime: 0,
     queryFn: async (): Promise<DoctorRow[]> => {
-      const { data: staffData, error: staffErr } = await supabase
+      let staffQuery = supabase
         .from('staff')
         .select(`id, user_id, name, email, created_at, baseline_released_at, locations (name)`)
         .eq('is_doctor', true)
         .order('name');
+
+      if (organizationId) {
+        staffQuery = staffQuery.or(await buildOrganizationStaffScopeFilter(organizationId));
+      } else if (!isSuperAdmin) {
+        return [];
+      }
+
+      const { data: staffData, error: staffErr } = await staffQuery;
       
       if (staffErr) throw staffErr;
       
@@ -108,6 +119,7 @@ export default function DoctorManagement() {
         };
       });
     },
+    enabled: !!organizationId || isSuperAdmin,
   });
 
   // Keep the doctor list fresh without a hard reload — invalidate on any staff change.
@@ -212,17 +224,31 @@ export default function DoctorManagement() {
       {/* Doctor List */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>All Doctors</CardTitle>
-          <Select value={filter} onValueChange={(v) => setFilter(v as FilterValue)}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Doctors</SelectItem>
-              <SelectItem value="needs_my_action">Needs My Action</SelectItem>
-              <SelectItem value="waiting_on_doctor">Waiting on Doctor</SelectItem>
-            </SelectContent>
-          </Select>
+          <div>
+            <CardTitle>All Doctors</CardTitle>
+            {filter !== 'all' && !isLoading && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Showing {filteredDoctors?.length ?? 0} of {doctors?.length ?? 0}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {filter !== 'all' && (
+              <Button variant="ghost" size="sm" onClick={() => setFilter('all')}>
+                Show all
+              </Button>
+            )}
+            <Select value={filter} onValueChange={(v) => setFilter(v as FilterValue)}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Doctors</SelectItem>
+                <SelectItem value="needs_my_action">Needs My Action</SelectItem>
+                <SelectItem value="waiting_on_doctor">Waiting on Doctor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (

@@ -233,12 +233,21 @@ export default function DoctorManagement() {
             </div>
           ) : filteredDoctors?.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <p>No doctors found.</p>
-              {filter === 'all' && (
-                <Button className="mt-4" onClick={() => setInviteOpen(true)}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Invite Your First Doctor
-                </Button>
+              {(doctors?.length ?? 0) > 0 && filter !== 'all' ? (
+                <>
+                  <p>No doctors match this filter.</p>
+                  <Button className="mt-4" variant="outline" onClick={() => setFilter('all')}>
+                    Show all doctors
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p>No doctors found.</p>
+                  <Button className="mt-4" onClick={() => setInviteOpen(true)}>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Invite Your First Doctor
+                  </Button>
+                </>
               )}
             </div>
           ) : (

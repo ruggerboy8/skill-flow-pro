@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from '@/hooks/use-toast';
 import {
   Plus, LayoutList, KanbanSquare, MapPin, Archive, Eye, Stethoscope, Users, Activity,
-  ArrowRight, X, Shield,
+  Shield, Upload, Loader2, Sparkles, Check,
 } from 'lucide-react';
 
 // Subtle stage colors (a not-yet-tokenized concept; fine to hardcode for now).
@@ -28,16 +28,18 @@ const SOURCE_ICON: Record<SourceType, any> = { visit: Eye, doctor: Stethoscope, 
 
 interface Loc { id: string; name: string; group: string }
 
-function useLocations() {
+function useLocations(orgId: string | null) {
   return useQuery({
-    queryKey: ['workspace-locations'],
+    queryKey: ['workspace-locations', orgId],
+    enabled: !!orgId,
     queryFn: async (): Promise<Loc[]> => {
-      const [locs, groups] = await Promise.all([
-        supabase.from('locations').select('id, name, group_id').eq('active', true).order('name'),
-        supabase.from('practice_groups').select('id, name'),
-      ]);
-      const gmap = new Map((groups.data ?? []).map((g: any) => [g.id, g.name]));
-      return (locs.data ?? []).map((l: any) => ({ id: l.id, name: l.name, group: gmap.get(l.group_id) ?? '' }));
+      // Scope to the caller's org (don't lean on RLS, which is permissive for super admins).
+      const { data: groups } = await supabase.from('practice_groups').select('id, name').eq('organization_id', orgId);
+      const groupIds = (groups ?? []).map((g: any) => g.id);
+      if (!groupIds.length) return [];
+      const { data: locs } = await supabase.from('locations').select('id, name, group_id').in('group_id', groupIds).eq('active', true).order('name');
+      const gmap = new Map((groups ?? []).map((g: any) => [g.id, g.name]));
+      return (locs ?? []).map((l: any) => ({ id: l.id, name: l.name, group: gmap.get(l.group_id) ?? '' }));
     },
   });
 }
@@ -79,13 +81,14 @@ function SourceBadges({ sources }: { sources: SourceType[] }) {
 
 export default function TrainingWorkspace() {
   const ws = useCoachingWorkspace();
-  const { data: locations = [] } = useLocations();
+  const { data: locations = [] } = useLocations(ws.orgId);
   const locMap = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
 
   const [mode, setMode] = useState<'list' | 'board' | 'loc'>('list');
   const [drawer, setDrawer] = useState<CoachingIssue | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
+  const [ingestOpen, setIngestOpen] = useState(false);
   const [retireFor, setRetireFor] = useState<CoachingIssue | null>(null);
 
   // keep the open drawer issue in sync with fresh data
@@ -105,8 +108,9 @@ export default function TrainingWorkspace() {
             <Shield className="h-3.5 w-3.5" /> Private to you. Collect what you see, work it through the loop, close it out.
           </p>
         </div>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => setHistOpen(true)}><Archive className="mr-2 h-4 w-4" />History ({ws.archived.length})</Button>
+          <Button variant="outline" size="sm" onClick={() => setIngestOpen(true)}><Upload className="mr-2 h-4 w-4" />Ingest transcript</Button>
           <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-2 h-4 w-4" />Add issue</Button>
         </div>
       </div>
@@ -144,6 +148,9 @@ export default function TrainingWorkspace() {
         onRetire={(id, outcome, note) => ws.retire.mutate({ id, outcome, note }, { onSuccess: () => { setRetireFor(null); setDrawer(null); toast({ title: 'Retired to history' }); } })} />
       <HistoryDialog open={histOpen} onOpenChange={setHistOpen} archived={ws.archived} locMap={locMap}
         onReopen={(id) => ws.reopen.mutate(id, { onSuccess: () => toast({ title: 'Reopened' }) })} />
+      <IngestDialog open={ingestOpen} onOpenChange={setIngestOpen} locations={locations}
+        onAdd={(input) => ws.createIssue.mutate(input)}
+        onDone={(n) => toast({ title: n === 1 ? 'Added 1 issue' : `Added ${n} issues` })} />
     </div>
   );
 }
@@ -207,21 +214,25 @@ function BoardView({ issues, locMap, onOpen, onMove }: { issues: CoachingIssue[]
 function ByLocationView({ issues, locations, onOpen }: { issues: CoachingIssue[]; locations: Loc[]; onOpen: (i: CoachingIssue) => void }) {
   const locMap = new Map(locations.map((l) => [l.id, l]));
   const globals = issues.filter((i) => i.is_global);
+  // Bucket by location id (unique), not by resolved name — names can collide or be
+  // unresolved (load race / inactive location), which duplicated rows and keys.
   const byLoc = new Map<string, CoachingIssue[]>();
-  issues.forEach((i) => { if (i.is_global) return; i.locationIds.forEach((id) => { const n = locMap.get(id)?.name ?? 'Unknown'; (byLoc.get(n) ?? byLoc.set(n, []).get(n)!).push(i); }); });
-  const groups: { name: string; meta: string; items: CoachingIssue[] }[] = [];
-  if (globals.length) groups.push({ name: 'Global / cross-location', meta: 'Applies everywhere', items: globals });
-  Array.from(byLoc.keys()).sort().forEach((n) => groups.push({ name: n, meta: locations.find((l) => l.name === n)?.group ?? '', items: byLoc.get(n)! }));
+  issues.forEach((i) => { if (i.is_global) return; i.locationIds.forEach((id) => { if (!byLoc.has(id)) byLoc.set(id, []); byLoc.get(id)!.push(i); }); });
+  const groups: { key: string; name: string; meta: string; items: CoachingIssue[] }[] = [];
+  if (globals.length) groups.push({ key: 'global', name: 'Global / cross-location', meta: 'Applies everywhere', items: globals });
+  Array.from(byLoc.keys())
+    .sort((a, b) => (locMap.get(a)?.name ?? '').localeCompare(locMap.get(b)?.name ?? ''))
+    .forEach((id) => groups.push({ key: id, name: locMap.get(id)?.name ?? 'Unknown location', meta: locMap.get(id)?.group ?? '', items: byLoc.get(id)! }));
   return (
     <div className="space-y-3">
       {groups.map((g) => (
-        <div key={g.name} className="overflow-hidden rounded-xl border">
+        <div key={g.key} className="overflow-hidden rounded-xl border">
           <div className="flex items-center gap-2.5 border-b bg-muted/40 px-4 py-2.5">
             <span className="text-sm font-bold">{g.name}</span><span className="text-xs text-muted-foreground">{g.meta}</span>
             <span className="ml-auto rounded-full border bg-background px-2 py-0.5 text-[11px] text-muted-foreground">{g.items.length}</span>
           </div>
           {g.items.map((i) => (
-            <button key={i.id + g.name} onClick={() => onOpen(i)} className="flex w-full items-center gap-2.5 border-b px-4 py-2.5 text-left last:border-0 hover:bg-muted/40">
+            <button key={i.id} onClick={() => onOpen(i)} className="flex w-full items-center gap-2.5 border-b px-4 py-2.5 text-left last:border-0 hover:bg-muted/40">
               <span className="flex-1 text-sm font-medium">{i.title}</span><StagePill stage={i.stage} />
             </button>
           ))}
@@ -396,6 +407,94 @@ function HistoryDialog({ open, onOpenChange, archived, locMap, onReopen }: { ope
             );
           })}
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface IngestCand { title: string; detail: string; selected: boolean; locationIds: Set<string>; isGlobal: boolean }
+
+function IngestDialog({ open, onOpenChange, locations, onAdd, onDone }: {
+  open: boolean; onOpenChange: (o: boolean) => void; locations: Loc[];
+  onAdd: (input: { title: string; detail?: string; isGlobal: boolean; locationIds: string[]; sources: SourceType[] }) => void;
+  onDone: (n: number) => void;
+}) {
+  const [transcript, setTranscript] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [cands, setCands] = useState<IngestCand[] | null>(null);
+  useEffect(() => { if (open) { setTranscript(''); setCands(null); setLoading(false); } }, [open]);
+  const bump = () => setCands((prev) => (prev ? [...prev] : prev));
+
+  const run = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('coaching-extract-issues', {
+        body: { transcript, locationNames: locations.map((l) => l.name) },
+      });
+      if (error) throw error;
+      const nameToId = new Map(locations.map((l) => [l.name.toLowerCase(), l.id]));
+      const cs: IngestCand[] = (((data as any)?.issues ?? []) as any[]).map((iss) => ({
+        title: iss.title, detail: iss.detail ?? '', selected: true,
+        locationIds: new Set<string>(((iss.suggested_locations ?? []) as string[]).map((n) => nameToId.get(n.toLowerCase())).filter(Boolean) as string[]),
+        isGlobal: false,
+      }));
+      setCands(cs);
+    } catch (e: any) {
+      toast({ title: "Couldn't read that transcript", description: e?.message ?? 'Try again.', variant: 'destructive' });
+    } finally { setLoading(false); }
+  };
+
+  const addSelected = () => {
+    const chosen = (cands ?? []).filter((c) => c.selected && c.title.trim());
+    chosen.forEach((c) => onAdd({ title: c.title.trim(), detail: c.detail || undefined, isGlobal: c.isGlobal, locationIds: c.isGlobal ? [] : Array.from(c.locationIds), sources: ['leads'] }));
+    onOpenChange(false);
+    if (chosen.length) onDone(chosen.length);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
+        <DialogHeader><DialogTitle>Ingest a transcript</DialogTitle></DialogHeader>
+        {!cands ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">Paste a lead-meeting or visit transcript. I'll pull out the trackable issues for you to keep or drop.</p>
+            <Textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={7} placeholder="Paste the transcript here…" />
+            <Button disabled={loading || transcript.trim().length < 20} onClick={run}>
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Reading…</> : <><Sparkles className="mr-2 h-4 w-4" />Find issues</>}
+            </Button>
+          </div>
+        ) : cands.length === 0 ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">No trackable issues found in that transcript.
+            <div className="mt-3"><Button variant="ghost" size="sm" onClick={() => setCands(null)}>Try another</Button></div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">Found {cands.length}. Keep the ones worth tracking and confirm their locations.</p>
+            {cands.map((c, ix) => (
+              <div key={ix} className={`rounded-lg border p-3 ${c.selected ? 'border-primary/40 bg-primary/5' : ''}`}>
+                <div className="flex items-start gap-2.5">
+                  <button onClick={() => { c.selected = !c.selected; bump(); }} className={`mt-0.5 grid h-[18px] w-[18px] flex-shrink-0 place-items-center rounded border ${c.selected ? 'border-primary bg-primary text-primary-foreground' : 'border-input'}`}>{c.selected && <Check className="h-3 w-3" />}</button>
+                  <div className="min-w-0 flex-1">
+                    <input value={c.title} onChange={(e) => { c.title = e.target.value; bump(); }} className="w-full bg-transparent text-sm font-semibold focus:outline-none" />
+                    {c.detail && <div className="text-xs text-muted-foreground">{c.detail}</div>}
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <button onClick={() => { c.isGlobal = !c.isGlobal; bump(); }} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${c.isGlobal ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>Global</button>
+                      {!c.isGlobal && locations.map((l) => (
+                        <button key={l.id} onClick={() => { c.locationIds.has(l.id) ? c.locationIds.delete(l.id) : c.locationIds.add(l.id); bump(); }} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${c.locationIds.has(l.id) ? 'border-transparent bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{l.name}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {cands && cands.length > 0 && (
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCands(null)}>Back</Button>
+            <Button disabled={!cands.some((c) => c.selected)} onClick={addSelected}>Add selected</Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

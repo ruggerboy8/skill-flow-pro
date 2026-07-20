@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { toast } from '@/hooks/use-toast';
 import type {
   CoachingIssue, CoachingIssueEvent, CoachingIssueRow, IssueStage, RetireOutcome, SourceType,
 } from '@/types/coachingWorkspace';
@@ -66,7 +67,13 @@ export function useCoachingWorkspace() {
     },
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: KEY });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: KEY });
+    qc.invalidateQueries({ queryKey: ['issue-events'] }); // keep the drawer timeline fresh
+  };
+  // Surface every mutation failure (previously all errors were swallowed silently).
+  const onError = (e: any) =>
+    toast({ title: "Couldn't save that", description: e?.message ?? 'Please try again.', variant: 'destructive' });
 
   const logEvent = async (issueId: string, kind: CoachingIssueEvent['kind'], body?: string) => {
     await sb.from('coaching_issue_events').insert({
@@ -75,31 +82,22 @@ export function useCoachingWorkspace() {
   };
 
   const createIssue = useMutation({
+    // Atomic: one RPC inserts the issue + locations + sources + the 'created' event
+    // in a single transaction, and derives created_by/org server-side. Replaces the
+    // former 4 separate client writes (which could partial-fail under a success toast).
     mutationFn: async (input: NewIssueInput) => {
-      const { data: issue, error } = await sb
-        .from('coaching_issues')
-        .insert({
-          created_by: staffId, organization_id: orgId,
-          title: input.title, detail: input.detail || null, is_global: input.isGlobal,
-        } as any)
-        .select('id')
-        .single();
+      const { data, error } = await sb.rpc('create_coaching_issue', {
+        p_title: input.title,
+        p_detail: input.detail ?? '',
+        p_is_global: input.isGlobal,
+        p_location_ids: input.isGlobal ? [] : input.locationIds,
+        p_sources: input.sources,
+      });
       if (error) throw error;
-      const id = (issue as any).id as string;
-      if (input.locationIds.length) {
-        await sb.from('coaching_issue_locations').insert(
-          input.locationIds.map((location_id) => ({ issue_id: id, location_id })) as any,
-        );
-      }
-      if (input.sources.length) {
-        await sb.from('coaching_issue_sources').insert(
-          input.sources.map((source_type) => ({ issue_id: id, source_type })) as any,
-        );
-      }
-      await logEvent(id, 'created', 'Added to workspace');
-      return id;
+      return data as string;
     },
     onSuccess: invalidate,
+    onError,
   });
 
   const setStage = useMutation({
@@ -110,6 +108,7 @@ export function useCoachingWorkspace() {
       await logEvent(id, 'stage_change', `Next step now: ${stage}`);
     },
     onSuccess: invalidate,
+    onError,
   });
 
   const addNote = useMutation({
@@ -117,6 +116,7 @@ export function useCoachingWorkspace() {
       await logEvent(id, 'note', body);
     },
     onSuccess: invalidate,
+    onError,
   });
 
   const setPrivateNote = useMutation({
@@ -126,6 +126,7 @@ export function useCoachingWorkspace() {
       if (error) throw error;
     },
     onSuccess: invalidate,
+    onError,
   });
 
   const retire = useMutation({
@@ -137,17 +138,19 @@ export function useCoachingWorkspace() {
       await logEvent(id, 'retired', note ? `Retired (${outcome}): ${note}` : `Retired (${outcome})`);
     },
     onSuccess: invalidate,
+    onError,
   });
 
   const reopen = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await sb.from('coaching_issues')
-        .update({ status: 'active', stage: 'identified', retired_outcome: null, retired_at: null } as any)
+        .update({ status: 'active', stage: 'identified', retired_outcome: null, retired_note: null, retired_at: null } as any)
         .eq('id', id);
       if (error) throw error;
       await logEvent(id, 'reopened', 'Reopened — hitting it again');
     },
     onSuccess: invalidate,
+    onError,
   });
 
   return {
@@ -155,6 +158,7 @@ export function useCoachingWorkspace() {
     archived: archiveQuery.data ?? [],
     isLoading: activeQuery.isLoading,
     staffId,
+    orgId,
     createIssue, setStage, addNote, setPrivateNote, retire, reopen,
   };
 }

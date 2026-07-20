@@ -6,6 +6,8 @@ import { Users, ClipboardCheck, Clock, UserPlus, Stethoscope, BookOpen } from 'l
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { InviteDoctorDialog } from '@/components/clinical/InviteDoctorDialog';
+import { useUserRole } from '@/hooks/useUserRole';
+import { buildOrganizationStaffScopeFilter } from '@/lib/clinicalDoctorScope';
 
 interface DoctorStats {
   total: number;
@@ -16,17 +18,26 @@ interface DoctorStats {
 
 export default function ClinicalHome() {
   const [inviteOpen, setInviteOpen] = useState(false);
+  const { organizationId, isSuperAdmin } = useUserRole();
 
   const { data: stats, isLoading } = useQuery({
-    queryKey: ['doctor-stats'],
+    queryKey: ['doctor-stats', organizationId, isSuperAdmin],
     refetchOnMount: 'always',
     staleTime: 0,
     queryFn: async (): Promise<DoctorStats> => {
       // Get all doctors
-      const { data: doctors, error: doctorsErr } = await supabase
+      let doctorsQuery = supabase
         .from('staff')
         .select('id')
         .eq('is_doctor', true);
+
+      if (organizationId) {
+        doctorsQuery = doctorsQuery.or(await buildOrganizationStaffScopeFilter(organizationId));
+      } else if (!isSuperAdmin) {
+        return { total: 0, completed: 0, inProgress: 0, invited: 0 };
+      }
+
+      const { data: doctors, error: doctorsErr } = await doctorsQuery;
       
       if (doctorsErr) throw doctorsErr;
       
@@ -63,6 +74,7 @@ export default function ClinicalHome() {
       
       return { total: doctorIds.length, completed, inProgress, invited };
     },
+    enabled: !!organizationId || isSuperAdmin,
   });
 
   return (

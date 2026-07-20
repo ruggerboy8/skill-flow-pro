@@ -64,6 +64,17 @@ export default function FacilitatePage() {
   const [qIndex, setQIndex] = useState(0);
   const [custom, setCustom] = useState("");
   const [showCustom, setShowCustom] = useState(false);
+  const [customDraft, setCustomDraft] = useState("");
+  // Shuffle the icebreakers once per session (Fisher–Yates) so the Question of the
+  // Day isn't presented in the same fixed order every time.
+  const [shuffledQuestions] = useState<string[]>(() => {
+    const arr = [...icebreakers];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  });
   const [pmIndex, setPmIndex] = useState(0);
   const [showJourney, setShowJourney] = useState(false);
   const [activeStage, setActiveStage] = useState<number | null>(null);
@@ -97,7 +108,7 @@ export default function FacilitatePage() {
   const steps = STEPS[meeting];
   const { data: proMoves = [], isLoading: pmLoading } = useFacilitatorWeek(roleId);
   const safeIndex = proMoves.length ? Math.min(pmIndex, proMoves.length - 1) : 0;
-  const question = custom || icebreakers[qIndex];
+  const question = custom || shuffledQuestions[qIndex % shuffledQuestions.length];
 
   const goStep = (id: StepId) => { setStep(id); setShowJourney(false); setShowMaterial(false); };
   const changeMeeting = (m: MeetingType) => {
@@ -179,20 +190,49 @@ export default function FacilitatePage() {
             className="mx-auto w-full max-w-7xl min-h-full flex flex-col justify-center px-16 py-12 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
             {step === "question" && (
-              <>
-                <p className="text-6xl lg:text-7xl font-semibold leading-[1.05] tracking-tight max-w-5xl">{question}</p>
-                <div className="flex gap-3 mt-12">
-                  <Button size="lg" onClick={() => { setCustom(""); setShowCustom(false); setQIndex((qIndex + 1) % icebreakers.length); }}>
-                    Next question <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                  <Button size="lg" variant="outline" onClick={() => setShowCustom(true)}>Write your own</Button>
-                </div>
-                {showCustom && (
-                  <input autoFocus value={custom} onChange={(e) => setCustom(e.target.value)}
+              showCustom ? (
+                // Editor only — no big question shown, so you never see the question
+                // twice (big + input) while typing. Commit with "Show it" or Enter.
+                <div className="w-full max-w-3xl">
+                  <p className="text-2xl font-semibold mb-4 text-muted-foreground">Write your own question</p>
+                  <input
+                    autoFocus
+                    value={customDraft}
+                    onChange={(e) => setCustomDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && customDraft.trim()) { setCustom(customDraft.trim()); setShowCustom(false); }
+                      if (e.key === "Escape") setShowCustom(false);
+                    }}
                     placeholder="Type a question…"
-                    className={`mt-6 w-full max-w-3xl h-14 px-5 text-xl ${glass}`} />
-                )}
-              </>
+                    className={`w-full h-14 px-5 text-xl ${glass}`}
+                  />
+                  <div className="flex gap-3 mt-6">
+                    <Button size="lg" disabled={!customDraft.trim()}
+                      onClick={() => { setCustom(customDraft.trim()); setShowCustom(false); }}>
+                      Show it <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                    <Button size="lg" variant="outline" onClick={() => setShowCustom(false)}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-6xl lg:text-7xl font-semibold leading-[1.05] tracking-tight max-w-5xl">{question}</p>
+                  <div className="flex gap-3 mt-12">
+                    {custom ? (
+                      <Button size="lg" variant="outline" onClick={() => setCustom("")}>
+                        <X className="h-4 w-4 mr-1" /> Delete
+                      </Button>
+                    ) : (
+                      <Button size="lg" onClick={() => setQIndex((qIndex + 1) % shuffledQuestions.length)}>
+                        Next question <ArrowRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    )}
+                    <Button size="lg" variant="outline" onClick={() => { setCustomDraft(""); setShowCustom(true); }}>
+                      {custom ? "Write another" : "Write your own"}
+                    </Button>
+                  </div>
+                </>
+              )
             )}
 
             {step === "promoves" && (

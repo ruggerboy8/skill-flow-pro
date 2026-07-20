@@ -38,9 +38,22 @@ still loads each persona's home.
 **Done 2026-07-20:** deleted `PracticeLog.deprecated.tsx`, `StatsScores.tsx`,
 `StatsLayout.tsx`, `planner/PlannerPage.tsx`; removed the `/planner/*` routes +
 import and the stale `ClinicalHome` comment from `App.tsx` (kept `components/planner/*`
-and `plannerUtils`); removed `home_route` from `useStaffProfile` + `types.ts` and
-dropped the `staff.home_route` column (verified no function/view/policy dependency).
+and `plannerUtils`); removed `home_route` from `useStaffProfile` + `types.ts`.
 `tsc --noEmit` and `npm run build` both green.
+
+**N10 REVERSED — the `staff.home_route` column is KEPT; do not drop it.** Dropping
+it caused two live outages: (1) every still-running frontend that still selected it
+→ "column staff.home_route does not exist" → app-wide "failed to load profile"; and
+(2) the **`admin-users` edge function writes `home_route` in every role preset**
+(`supabase/functions/admin-users/index.ts:640-713`, e.g. `home_route:'/clinical'`),
+so every permission edit 500'd against the missing column. A third, downstream
+symptom: with the profile query failing, `organizationId` was undefined and the
+Clinical tab's doctor list returned `[]` (looked like "clinical director can't see
+her doctors"). Restoring the column fixed all three. **`home_route` is load-bearing
+(written by the edge function), so my "unused" assessment was wrong — the column
+stays.** Broader lesson: MCP DDL hits live prod instantly while code deploys
+separately via Lovable, so schema *removals* must lag deployed code, and grep
+`supabase/functions/` (not just `src/`) before dropping anything.
 
 | # | Finding | Do | Files | Notes |
 |---|---|---|---|---|

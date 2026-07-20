@@ -44,6 +44,11 @@ export default function DoctorManagement() {
     refetchOnMount: 'always',
     staleTime: 0,
     queryFn: async (): Promise<DoctorRow[]> => {
+      // Diagnostic logging: if a clinical director can't see an expected doctor,
+      // they can copy this console output. Org resolution is the usual culprit —
+      // a null organizationId yields an empty list (see the guard below).
+      console.log('[ClinicalDoctors] resolving list — organizationId:', organizationId, '| isSuperAdmin:', isSuperAdmin);
+
       let staffQuery = supabase
         .from('staff')
         .select(`id, user_id, name, email, created_at, baseline_released_at, locations (name)`)
@@ -51,15 +56,26 @@ export default function DoctorManagement() {
         .order('name');
 
       if (organizationId) {
-        staffQuery = staffQuery.or(await buildOrganizationStaffScopeFilter(organizationId));
+        const scopeFilter = await buildOrganizationStaffScopeFilter(organizationId);
+        console.log('[ClinicalDoctors] staff scope filter:', scopeFilter);
+        staffQuery = staffQuery.or(scopeFilter);
       } else if (!isSuperAdmin) {
+        console.warn('[ClinicalDoctors] no organizationId and not a super admin → returning empty doctor list');
         return [];
       }
 
       const { data: staffData, error: staffErr } = await staffQuery;
-      
-      if (staffErr) throw staffErr;
-      
+
+      if (staffErr) {
+        console.error('[ClinicalDoctors] staff query failed:', staffErr);
+        throw staffErr;
+      }
+
+      console.log(
+        `[ClinicalDoctors] fetched ${staffData?.length ?? 0} doctor(s):`,
+        (staffData ?? []).map(d => ({ id: d.id, name: d.name })),
+      );
+
       const doctorIds = staffData?.map(d => d.id) || [];
       if (doctorIds.length === 0) return [];
       

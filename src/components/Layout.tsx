@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SimConsole } from '@/devtools/SimConsole';
 import { supabase } from '@/integrations/supabase/client';
 import { hexToHsl } from '@/lib/colorUtils';
-import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList, Presentation } from 'lucide-react';
+import { Home, User, Settings as SettingsIcon, Users, TrendingUp, Shield, BookOpen, Building2, Globe, Stethoscope, ClipboardList, Presentation, Compass } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PendingSurveysCard } from '@/components/home/PendingSurveysCard';
 import { ProMovesLogo } from '@/components/ProMovesLogo';
@@ -127,6 +127,7 @@ export default function Layout() {
     { name: 'Command Center', href: '/dashboard', icon: Building2 },
     { name: 'Coach', href: '/coach', icon: Users },
     { name: 'Facilitate', href: '/facilitate', icon: Presentation },
+    { name: 'Training', href: '/training', icon: Compass },
     { name: 'Clinical', href: '/clinical', icon: Stethoscope },
     ...(isDoctor ? [{ name: 'Doctor', href: '/doctor', icon: Stethoscope }] : []),
     { name: 'Builder', href: '/builder', icon: SettingsIcon },

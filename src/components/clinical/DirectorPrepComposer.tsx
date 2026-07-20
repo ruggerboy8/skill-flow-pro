@@ -333,8 +333,8 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const toggleAction = (actionId: number) => {
     setSelectedActions(prev => {
       if (prev.includes(actionId)) return prev.filter(id => id !== actionId);
-      if (prev.length >= 2) {
-        toast({ title: 'Maximum 2 discussion topics', description: 'Deselect one before adding another.', variant: 'destructive' });
+      if (prev.length >= 1) {
+        toast({ title: 'One discussion topic', description: 'Deselect it to choose a different one.', variant: 'destructive' });
         return prev;
       }
       return [...prev, actionId];
@@ -681,7 +681,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         <CardHeader>
           <CardTitle className="text-base">Discussion Topics</CardTitle>
           <CardDescription>
-            Select 1–2 Pro Moves to focus on during the meeting
+            Select 1 Pro Move to focus on during the meeting
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -846,11 +846,11 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
       {/* Selected for Discussion — "snatched" items */}
       <Card className={selectedActions.length > 0 ? 'border-primary/30 bg-primary/5' : 'border-dashed'}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Selected for Discussion ({selectedActions.length}/2)</CardTitle>
+          <CardTitle className="text-sm">Selected for Discussion ({selectedActions.length}/1)</CardTitle>
         </CardHeader>
         <CardContent>
           {selectedActions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Select 1–2 Pro Moves above to discuss at the meeting.</p>
+            <p className="text-sm text-muted-foreground">Select 1 Pro Move above to discuss at the meeting.</p>
           ) : (
             <div className="space-y-2">
               {selectedItemData.map(item => {

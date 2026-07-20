@@ -227,8 +227,8 @@ export default function DoctorReviewPrep() {
   const toggleAction = (actionId: number) => {
     setSelectedActions(prev => {
       if (prev.includes(actionId)) return prev.filter(id => id !== actionId);
-      if (prev.length >= 2) {
-        toast({ title: 'Maximum 2', description: 'Deselect one before adding another.', variant: 'destructive' });
+      if (prev.length >= 1) {
+        toast({ title: 'One Pro Move', description: 'Deselect it to choose a different one.', variant: 'destructive' });
         return prev;
       }
       return [...prev, actionId];
@@ -495,7 +495,7 @@ export default function DoctorReviewPrep() {
             <CardTitle className="text-base">Your Focus Areas</CardTitle>
           </div>
           <CardDescription>
-            <strong>Choose up to 2 Pro Moves</strong> that you'd like to focus on during the meeting.
+            <strong>Choose 1 Pro Move</strong> that you'd like to focus on during the meeting.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -594,11 +594,11 @@ export default function DoctorReviewPrep() {
       {/* Selected "Your Picks" — snatched out */}
       <Card className={selectedActions.length > 0 ? 'border-primary/30 bg-primary/5' : 'border-dashed'}>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Your Picks ({selectedActions.length}/2)</CardTitle>
+          <CardTitle className="text-sm">Your Picks ({selectedActions.length}/1)</CardTitle>
         </CardHeader>
         <CardContent>
           {selectedActions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Select 1–2 Pro Moves above to discuss at the meeting.</p>
+            <p className="text-sm text-muted-foreground">Select 1 Pro Move above to discuss at the meeting.</p>
           ) : (
             <div className="space-y-2">
               {selectedItemData.map(item => {

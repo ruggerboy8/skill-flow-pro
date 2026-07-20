@@ -28,7 +28,7 @@ Before the meeting, please complete your meeting prep on the Pro Moves site:
 
 In your prep, you'll:
   • Review the meeting agenda your coach has prepared
-  • Select 1–2 Pro Moves you'd like to focus on
+  • Select 1 Pro Move you'd like to focus on
   • Add any questions or topics you want to discuss
 
 Looking forward to connecting!

@@ -88,6 +88,20 @@ exhaustive; cross-referenced to audit findings and other backlog items where the
 | NF5 | **Staff-facing patient-journey summary** | A scrollable summary of what the patient journey should entail; adopt "patient journey" language more broadly. John has a prototype from another Claude session to show. | 🟡 |
 | NF6 | **User status management / HR integration** | Use the Deputy integration to detect new staff & their positions and provision more automatically. On termination: when a fired user is deleted, roll up all their relevant data and send it to HR for retention *before* deletion. (Ties to GDPR erasure/retention — roadmap S1.) **Scoped → [features/hr-offboarding-export.md](features/hr-offboarding-export.md).** | 🔵 |
 
+## G. Navigation, information architecture & usability
+
+*Added 2026-07-20. The app grew feature-by-feature and fast; navigation that made
+sense at each step no longer coheres as a whole. This is its own workstream, not a
+guilt item. See also the management-model gap register (`docs/management-model.md`)
+where this sits next to "Ariyana's fragmented coaching surface" — same root cause,
+different corner of the app.*
+
+| # | Item | Notes | Status |
+|---|---|---|---|
+| G1 | **Usability & navigability audit** | Commission a structured audit of routing, navigation entry points, and page/tab structure. Find orphaned routes, buried-but-important surfaces, duplicated/overlapping pages, and flows that don't match how people actually work. Concrete tell: the Pro Move library (with its CSV download) lives behind the **Platform Console**, non-obvious even to John. **Audit → [audits/usability-navigation-audit.md](audits/usability-navigation-audit.md); sequenced plan → [navigation-remediation-plan.md](navigation-remediation-plan.md).** | 🔵 |
+| G2 | **Simplify the permission structure** | The newer **granular capability model** (`user_capabilities` + `coach_scopes`) is the better mental model and should become the single source of truth over the old role-based `is_*` flags. Consolidate. (Same target as B2/B1; G-framing is the usability angle: fewer concepts, clearer access.) | 🟡 |
+| G3 | **Things that just don't make sense as designed** | Catch-all the audit populates: surfaces/controls whose current design is confusing or vestigial, to be triaged into fixes. | 🔵 |
+
 ---
 
 ## Change management for active users

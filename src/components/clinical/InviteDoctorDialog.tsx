@@ -65,14 +65,15 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
 
   const inviteMutation = useMutation({
     mutationFn: async () => {
+      const cleanName = normalizeDoctorName(name);
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: {
           action: 'invite_doctor',
           email: email.trim(),
-          name: name.trim(),
+          name: cleanName,
           group_id: groupId,
           location_id: locationId === '__roaming__' ? null : locationId,
-          release_baseline: releaseBaseline,
+          release_baseline: true,
         },
       });
 

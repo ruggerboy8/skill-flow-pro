@@ -1190,6 +1190,10 @@ serve(async (req: Request) => {
           doctorOrgId = pgRow?.organization_id ?? null;
         }
 
+        if (!doctorOrgId) {
+          return json({ error: "Cannot invite doctor: selected group is not linked to an organization. Please contact support." }, 400);
+        }
+
         // 3) Create staff row with is_doctor = true
         // If release_baseline is truthy, set baseline_released_at now
         const staffInsert: Record<string, any> = { 

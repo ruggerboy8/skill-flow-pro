@@ -19,6 +19,8 @@ export default function ClinicalHome() {
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['doctor-stats'],
+    refetchOnMount: 'always',
+    staleTime: 0,
     queryFn: async (): Promise<DoctorStats> => {
       // Get all doctors
       const { data: doctors, error: doctorsErr } = await supabase

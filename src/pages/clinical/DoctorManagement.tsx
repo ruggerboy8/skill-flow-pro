@@ -110,6 +110,24 @@ export default function DoctorManagement() {
     },
   });
 
+  // Keep the doctor list fresh without a hard reload — invalidate on any staff change.
+  useEffect(() => {
+    const channel = supabase
+      .channel('doctors-management-staff')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staff', filter: 'is_doctor=eq.true' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['doctors-management'] });
+          queryClient.invalidateQueries({ queryKey: ['doctor-stats'] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   // Compute stats from doctors data
   const stats = doctors ? {
     total: doctors.length,

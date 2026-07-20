@@ -187,13 +187,6 @@ export default function DoctorDetail() {
         </div>
       </div>
 
-      {/* Pre-session actions (release baseline) — only while still invited */}
-      <DoctorDetailOverview
-        doctor={doctor}
-        baseline={baseline}
-        sessions={sessions || []}
-        journeyStatus={journeyStatus}
-      />
 
       {/* Assessments — collapsible module with two columns:
           left = doctor self-assessments, right = clinical director reviews.

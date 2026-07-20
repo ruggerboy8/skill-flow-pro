@@ -2226,7 +2226,6 @@ export type Database = {
           email: string
           first_login_at: string | null
           hire_date: string
-          home_route: string | null
           id: string
           is_clinical_director: boolean | null
           is_coach: boolean
@@ -2261,7 +2260,6 @@ export type Database = {
           email: string
           first_login_at?: string | null
           hire_date?: string
-          home_route?: string | null
           id?: string
           is_clinical_director?: boolean | null
           is_coach?: boolean
@@ -2296,7 +2294,6 @@ export type Database = {
           email?: string
           first_login_at?: string | null
           hire_date?: string
-          home_route?: string | null
           id?: string
           is_clinical_director?: boolean | null
           is_coach?: boolean

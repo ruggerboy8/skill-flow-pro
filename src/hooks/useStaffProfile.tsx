@@ -40,7 +40,6 @@ export interface StaffProfile {
   is_paused: boolean;
   paused_at: string | null;
   pause_reason: string | null;
-  home_route: string | null;
   allow_backfill_until: string | null;
   baseline_released_at: string | null;
   baseline_released_by: string | null;
@@ -114,7 +113,6 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           is_paused,
           paused_at,
           pause_reason,
-          home_route,
            allow_backfill_until,
            baseline_released_at,
            baseline_released_by,

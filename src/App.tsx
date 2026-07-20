@@ -39,7 +39,6 @@ import EvaluationViewer from "@/pages/EvaluationViewer";
 import EvaluationReview from "@/pages/EvaluationReview";
 import EvaluationReviewV2 from "@/pages/EvaluationReviewV2";
 import AdminBuilder from "@/pages/AdminBuilder";
-import PlannerPage from "@/pages/planner/PlannerPage";
 import NotFound from "@/pages/NotFound";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
@@ -55,7 +54,6 @@ import DomainDetail from "@/pages/my-role/DomainDetail";
 
 // Clinical Director pages
 import ClinicalLayout from "@/pages/clinical/ClinicalLayout";
-// ClinicalHome collapsed into DoctorManagement (Phase 1 R2.1)
 import DoctorManagement from "@/pages/clinical/DoctorManagement";
 import DoctorProMoveLibrary from "@/pages/clinical/DoctorProMoveLibrary";
 import DoctorDetail from "@/pages/clinical/DoctorDetail";
@@ -193,14 +191,10 @@ function AppRoutes() {
         <Route path="evaluation/:evalId/review" element={<EvaluationReview />} />
         <Route path="evaluation/:evalId/review-v2" element={<EvaluationReviewV2 />} />
         <Route path="builder" element={<AdminBuilder />} />
-        {/* Legacy builder routes redirect to planner */}
+        {/* Legacy builder deep-links redirect to the current Builder */}
         <Route path="builder/:roleId" element={<Navigate to="/builder" replace />} />
         <Route path="builder/:roleId/:cycle" element={<Navigate to="/builder" replace />} />
         <Route path="builder/:roleId/:cycle/week/:week" element={<Navigate to="/builder" replace />} />
-        
-        <Route path="planner/dfi" element={<PlannerPage roleId={1} roleName="DFI" />} />
-        <Route path="planner/rda" element={<PlannerPage roleId={2} roleName="RDA" />} />
-        <Route path="planner/om" element={<PlannerPage roleId={3} roleName="Office Manager" />} />
 
         {/* legacy redirects */}
         <Route path="admin/organizations" element={<Navigate to="/admin?tab=organizations" replace />} />

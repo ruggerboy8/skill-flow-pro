@@ -12,7 +12,7 @@ import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
 import { drName } from '@/lib/doctorDisplayName';
 
-import { DoctorDetailOverview } from '@/components/clinical/DoctorDetailOverview';
+
 import { DoctorLocationEditor } from '@/components/clinical/DoctorLocationEditor';
 import { DoctorDetailBaseline } from '@/components/clinical/DoctorDetailBaseline';
 import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';

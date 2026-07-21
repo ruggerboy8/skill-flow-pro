@@ -96,24 +96,11 @@ export default function ThisWeekPanel() {
         now: effectiveNow,
       });
       
-      // Lead Dental Assistant dual-panel detection
-      // Lead DAs have is_lead=true but role_id is the regular DA role.
-      // We need to resolve the lead_dental_assistant role for their practice_type
-      // and fetch that role's assignments as the "Lead Pro Move" panel.
-      let resolvedLeadRoleId: number | null = null;
-      if (staff.is_lead && staff.role_id) {
-        const practiceType = staff.locations?.practice_groups?.organizations?.practice_type;
-        if (practiceType) {
-          const { data: leadRole } = await supabase
-            .from('roles')
-            .select('role_id')
-            .eq('archetype_code', 'lead_dental_assistant')
-            .eq('practice_type', practiceType)
-            .eq('active', true)
-            .maybeSingle();
-          if (leadRole) resolvedLeadRoleId = leadRole.role_id;
-        }
-      }
+      // Legacy "Lead Pro Move" dual-panel retired 2026-07-21. Leads now get
+      // Ariyana's weekly focus card on the home (LeadFocusHomeCard) instead of a
+      // second pro-move stream. Keep the parent panel empty so the old Lead Pro
+      // Move block + banner below never render. staff.is_lead itself is unchanged.
+      const resolvedLeadRoleId: number | null = null;
       setParentRoleId(resolvedLeadRoleId);
 
       // Load current week assignments and context based on user progress

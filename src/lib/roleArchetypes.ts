@@ -65,9 +65,12 @@ export const ARCHETYPES: Record<ArchetypeCode, ArchetypeBehavior> = {
   lead_dental_assistant: {
     label: 'Lead Dental Assistant',
     hasWeeklyCadence: true,
-    hasPlannerTab: true,
-    dualPanel: true,
-    parentArchetype: 'dental_assistant',
+    // Retired 2026-07-21: the lead "training" model (a builder tab + a second
+    // "Lead Pro Move" home panel) is replaced by Ariyana's weekly lead focus.
+    // Leads are wielded as location-level behavior-change agents, not trained via
+    // their own pro-move curriculum. staff.is_lead stays as the lead identity.
+    hasPlannerTab: false,
+    dualPanel: false,
   },
   treatment_coordinator: {
     label: 'Treatment Coordinator',

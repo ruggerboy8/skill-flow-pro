@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lead Focus + Scheduling — prototype v3</title>
+<style>
+  :root{
+    --bg:hsl(210 40% 98%); --card:#fff; --fg:hsl(222 84% 4.9%);
+    --muted:hsl(210 40% 96.1%); --muted-fg:hsl(215 16% 47%);
+    --border:hsl(214 32% 91%); --primary:hsl(215 25% 27%); --primary-fg:hsl(210 40% 98%);
+    --comm:#0E7C86;
+    --landed:#047857; --letgo:#6b7280; --recur:#b45309; --pending:#0E7C86;
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.04);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  h1,h2,h3{margin:0}
+  .muted{color:var(--muted-fg)}
+  .protobar{background:hsl(222 47% 11%);color:#fff;display:flex;align-items:center;gap:14px;padding:9px 18px;position:sticky;top:0;z-index:50}
+  .protobar .dot{width:8px;height:8px;border-radius:50%;background:#f59e0b}
+  .protobar b{font-size:13px;font-weight:600}
+  .protobar .tag{font-size:11px;color:#a9b6c9;border:1px solid #33415a;border-radius:999px;padding:2px 8px}
+  .roleswitch{margin-left:auto;display:flex;gap:4px;background:#1c2942;border-radius:10px;padding:3px}
+  .roleswitch button{background:transparent;border:0;color:#a9b6c9;font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:7px}
+  .roleswitch button.active{background:#fff;color:hsl(222 47% 11%)}
+  .frame{max-width:1120px;margin:0 auto;padding:22px 20px 80px}
+  .topline{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px}
+  .topline .who{font-weight:700}.topline .role{font-size:12px}
+  .tabs{display:inline-flex;gap:3px;background:var(--muted);border-radius:11px;padding:4px;margin-bottom:20px}
+  .tabs button{background:transparent;border:0;font-size:13px;font-weight:600;color:var(--muted-fg);padding:7px 15px;border-radius:8px;display:inline-flex;align-items:center;gap:7px}
+  .tabs button.active{background:#fff;color:var(--fg);box-shadow:var(--shadow)}
+  .tabs button:disabled{opacity:.55;cursor:default}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .pad{padding:18px}
+  .btn{border:1px solid var(--border);background:#fff;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:600;color:var(--fg);display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{background:var(--muted)}
+  .btn.primary{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+  .btn.primary:hover{filter:brightness(1.12)}
+  .btn.sm{padding:5px 10px;font-size:12px}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn.ghost{border-color:transparent;background:transparent}
+  .btn.ghost:hover{background:var(--muted)}
+  .btn.icon{padding:6px 9px}
+  .chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;background:var(--muted);color:var(--muted-fg);border:1px solid transparent}
+  .chip.global{background:hsl(215 25% 27% / .1);color:var(--primary)}
+  .chip.src{background:#fff;border-color:var(--border);color:var(--muted-fg);padding:2px 7px}
+  .out{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px}
+  .out.landed{background:hsl(160 84% 30% / .13);color:var(--landed)}
+  .out.let_go{background:hsl(215 14% 45% / .13);color:var(--letgo)}
+  .out.recurring{background:hsl(38 92% 45% / .15);color:var(--recur)}
+  .out.pending{background:hsl(184 80% 27% / .13);color:var(--pending)}
+  .label{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-fg)}
+  input.txt,textarea.txt,select.txt{width:100%;border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-family:inherit;font-size:13.5px;background:#fff;color:var(--fg)}
+  textarea.txt{resize:vertical}
+  .row{display:flex;align-items:center;gap:8px}
+  .wrap{display:flex;flex-wrap:wrap;gap:6px}
+  .divider{height:1px;background:var(--border);margin:16px 0}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:hsl(222 47% 11%);color:#fff;padding:11px 18px;border-radius:11px;font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transition:.25s;z-index:60;display:flex;align-items:center;gap:9px;max-width:90vw}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .aiflag{font-size:10.5px;font-weight:700;color:var(--comm);display:inline-flex;align-items:center;gap:4px}
+  /* view toggle + week nav (planner-style) */
+  .seg{display:inline-flex;background:var(--muted);border-radius:10px;padding:3px;gap:3px}
+  .seg button{background:transparent;border:0;font-size:12.5px;font-weight:600;color:var(--muted-fg);padding:6px 14px;border-radius:7px}
+  .seg button.active{background:#fff;color:var(--fg);box-shadow:var(--shadow)}
+  .weeknav{display:flex;align-items:center;gap:8px}
+  /* builder */
+  .builder{display:grid;grid-template-columns:1.35fr 1fr;gap:16px}
+  @media(max-width:860px){.builder{grid-template-columns:1fr}}
+  .slot{border:1.5px dashed var(--border);border-radius:12px;padding:14px;margin-bottom:12px;transition:.15s}
+  .slot.drop{border-color:var(--comm);background:hsl(184 80% 27% / .05)}
+  .slot.filled{border-style:solid;background:#fff}
+  .slotnum{width:22px;height:22px;border-radius:50%;background:var(--muted);color:var(--muted-fg);font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
+  .issue{border:1px solid var(--border);border-radius:11px;padding:11px 12px;margin-bottom:9px;background:#fff}
+  .issue[draggable=true]{cursor:grab}
+  .empty{border:1.5px dashed var(--border);border-radius:12px;padding:26px;text-align:center;color:var(--muted-fg);font-size:13px}
+  .fitem{display:flex;gap:11px;padding:9px 0;border-top:1px solid var(--border)}
+  .fitem:first-child{border-top:0}
+  .fnum{width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;font-weight:700;font-size:11.5px;display:grid;place-items:center;flex:none;margin-top:1px}
+  .liveflag{font-size:11.5px;font-weight:700;color:var(--comm);display:inline-flex;align-items:center;gap:5px}
+  /* history strip (HistoryStrip pattern) */
+  .strip{display:flex;align-items:flex-end;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .stripchip{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;border:1px solid var(--border);border-radius:10px;padding:8px 12px;min-width:74px;background:#fff;cursor:pointer}
+  .stripchip:hover{background:var(--muted)}
+  .stripchip.active{border-color:var(--comm);box-shadow:0 0 0 2px hsl(184 80% 27% / .12)}
+  .sd{width:9px;height:9px;border-radius:50%;flex:none}
+  /* accordion (shadcn/radix pattern) */
+  .acc{border-top:1px solid var(--border)}
+  .acc-item{border-bottom:1px solid var(--border)}
+  .acc-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:13px 4px;background:transparent;border:0;font-weight:600;font-size:13.5px;text-align:left;color:var(--fg)}
+  .acc-trigger:hover{text-decoration:underline}
+  .acc-chev{transition:transform .2s;flex:none;color:var(--muted-fg)}
+  .acc-chev.open{transform:rotate(180deg)}
+  .acc-body{padding:2px 4px 14px}
+  /* month rows (MonthView pattern) */
+  .monthrow{width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:#fff;cursor:pointer;transition:background .12s}
+  .monthrow:hover{background:var(--muted)}
+  .monthrow.notset{background:var(--muted);opacity:.75}
+  .monthrow.pastempty{opacity:.5}
+  .reqcard{border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:11px}
+  .monthhead{font-size:12px;font-weight:700;color:var(--muted-fg);padding:8px 4px 2px}
+  .badge{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px}
+  .badge.sent{background:hsl(38 92% 50% / .14);color:#b45309}
+  .badge.opened{background:hsl(215 90% 45% / .13);color:#1d4ed8}
+  .badge.booked{background:hsl(160 84% 30% / .14);color:#047857}
+  .hint{font-size:12px;color:var(--muted-fg);margin-top:6px}
+  .homehero{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .link{color:var(--comm);font-weight:600;text-decoration:none}
+  .flowline{font-size:12px;color:var(--muted-fg);background:hsl(210 40% 97%);border:1px dashed var(--border);border-radius:9px;padding:8px 11px;margin-top:10px}
+  .covered{font-size:12px;color:var(--recur);background:hsl(38 92% 45% / .08);border:1px solid hsl(38 92% 45% / .25);border-radius:8px;padding:7px 10px;margin-bottom:10px;display:flex;gap:7px;align-items:center}
+</style>
+</head>
+<body>
+<div class="protobar">
+  <span class="dot"></span>
+  <b>Coaching Workspace — lead focus + scheduling</b>
+  <span class="tag">prototype v3</span>
+  <div class="roleswitch">
+    <button id="rv-ariyana" class="active" onclick="switchRole('ariyana')">Ariyana · Director</button>
+    <button id="rv-lead" onclick="switchRole('lead')">Raul · Lead RDA</button>
+  </div>
+</div>
+
+<!-- ============ ARIYANA ============ -->
+<div id="view-ariyana" class="frame">
+  <div class="topline">
+    <div class="avatar" style="background:#0E7C86">A</div>
+    <div><div class="who">Ariyana</div><div class="role muted">Director of RDAs · 12 locations · 6 leads</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="active" data-atab="focus" onclick="atab('focus')">◎ Lead focus</button>
+    <button data-atab="sched" onclick="atab('sched')">◷ Scheduling</button>
+    <button disabled title="Built in Slice 1">▤ Workspace (built)</button>
+  </div>
+
+  <section id="a-focus">
+    <div style="margin-bottom:14px">
+      <h1 style="font-size:20px">Lead focus schedule</h1>
+      <p class="muted" style="margin:4px 0 0;font-size:13px">One or two behaviors you want the leads driving at their locations each week. Move across weeks like the builder; past weeks are your record.</p>
+    </div>
+    <div id="a-focus-body"></div>
+  </section>
+
+  <section id="a-sched" style="display:none">
+    <h1 style="font-size:20px;margin-bottom:4px">Scheduling a 1:1</h1>
+    <p class="muted" style="margin:0 0 18px;font-size:13px">Nudge a lead to book time with you. They pick the slot on your Google booking link, and Google handles the calendar and attendance.</p>
+    <div class="builder">
+      <div class="card pad">
+        <h3 style="font-size:14px;margin-bottom:12px">Send a nudge</h3>
+        <div class="label" style="margin-bottom:6px">Which lead</div>
+        <select id="reqLead" class="txt" style="margin-bottom:12px">
+          <option value="raul">Raul</option><option value="priya">Priya</option>
+          <option value="marcus">Marcus</option><option value="bianca">Bianca</option>
+          <option value="devon">Devon</option><option value="sofia">Sofia</option>
+        </select>
+        <div class="label" style="margin-bottom:6px">Why <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">— so it is not out of the blue</span></div>
+        <textarea id="reqNote" class="txt" rows="2" placeholder="e.g. Want to talk through the South Austin no-charge conversations before they harden into a habit."></textarea>
+        <button class="btn primary" style="margin-top:12px" onclick="sendNudge()">Send nudge →</button>
+        <div class="flowline">Shows on their Pro Moves home with your reason. They tap <b>Find a time</b> → your link <span class="link">calendar.app.google/ariyana-rda</span>. No inbox to manage here.</div>
+      </div>
+      <div class="card pad">
+        <h3 style="font-size:14px;margin-bottom:12px">Nudges you have sent</h3>
+        <div id="sentList"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ LEAD (RAUL) ============ -->
+<div id="view-lead" class="frame" style="display:none">
+  <div class="homehero">
+    <div class="avatar" style="background:#7c3aed;width:40px;height:40px;font-size:15px">R</div>
+    <div>
+      <div class="who" style="font-size:17px">Hi Raul 👋</div>
+      <div class="role muted">Lead RDA · Round Rock · your Pro Moves home</div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px;overflow:hidden">
+    <div class="pad" style="background:hsl(184 80% 27% / .06);border-bottom:1px solid var(--border)">
+      <div class="row" style="gap:9px">
+        <span class="out pending" style="font-size:11.5px">◎ This week at your location</span>
+        <span class="muted" style="font-size:12px" id="lead-focus-meta">from Ariyana</span>
+      </div>
+    </div>
+    <div class="pad" id="lead-focus-body"></div>
+  </div>
+  <div class="card pad" style="margin-bottom:16px">
+    <div id="lead-incoming"></div>
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <h3 style="font-size:14px">Need to talk something through?</h3>
+        <p class="muted" style="margin:3px 0 0;font-size:12.5px">Book time with Ariyana whenever you need it.</p>
+      </div>
+      <button class="btn" onclick="toast('Opening calendar.app.google/ariyana-rda …')">Book time with Ariyana →</button>
+    </div>
+  </div>
+  <div class="empty" style="text-align:left;padding:16px 18px">
+    <span class="muted" style="font-size:12.5px">↓ Below: Raul's normal Pro Moves. The card at top <b>replaces the old "Lead Pro Move" block</b> that used to sit here.</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- data ---------------- */
+const LEADS={raul:'Raul',priya:'Priya',marcus:'Marcus',bianca:'Bianca',devon:'Devon',sofia:'Sofia'};
+const ISSUES=[
+  {id:'i1',title:'Notes should start at height & weight',locs:['McKinney','Round Rock'],global:false,srcs:['👁 visit','👥 leads'],count:3,used:false},
+  {id:'i2',title:'Same-day treatment case acceptance slipping',locs:['South Austin'],global:false,srcs:['🩺 doctor','📈 signal'],count:2,used:false},
+  {id:'i3',title:'New-patient handoff feels rushed',locs:[],global:true,srcs:['👥 leads'],count:1,used:false},
+  {id:'i4',title:'X-ray retakes up',locs:['Cedar Park'],global:false,srcs:['👁 visit'],count:1,used:false},
+  {id:'i5',title:'No-charge conversations not happening',locs:['South Austin'],global:false,srcs:['🩺 doctor'],count:1,used:false},
+];
+const POLISH={
+  i1:'Every new-patient note starts at height and weight. Set the tone before anything clinical.',
+  i2:'When same-day treatment fits, walk the family through it with confidence instead of rebooking.',
+  i3:'Slow the new-patient handoff by ten seconds. A warm intro, not a pass-off.',
+  i4:'Get the X-ray right the first time: position, breathe, capture. Fewer retakes, calmer kids.',
+  i5:'Name the no-charge moment out loud so families hear the value they are getting.',
+};
+const OUT={landed:'Landed',let_go:'Let go',recurring:'Keeps coming back',pending:'In flight'};
+const OUTC={landed:'var(--landed)',let_go:'var(--letgo)',recurring:'var(--recur)',pending:'var(--pending)'};
+
+const weeks=[
+  {id:'w0616',label:'Week of Jun 16',short:'Jun 16',month:'June 2026',when:'past',items:[
+      {text:'Greet every family by name in the reception area.',src:null,outcome:'landed'}]},
+  {id:'w0623',label:'Week of Jun 23',short:'Jun 23',month:'June 2026',when:'past',items:[
+      {text:'Confirm next visit before the family leaves the chair.',src:null,outcome:'recurring'}]},
+  {id:'w0630',label:'Week of Jun 30',short:'Jun 30',month:'June 2026',when:'past',items:[
+      {text:'Name the no-charge moment out loud so families hear the value.',src:'i5',outcome:'let_go'}]},
+  {id:'w0707',label:'Week of Jul 7',short:'Jul 7',month:'July 2026',when:'past',items:[
+      {text:'Every new-patient note starts at height and weight.',src:'i1',outcome:'landed'}]},
+  {id:'w0714',label:'Week of Jul 14',short:'Jul 14',month:'July 2026',when:'past',items:[
+      {text:'Slow the new-patient handoff by ten seconds.',src:'i3',outcome:'landed'},
+      {text:'Get the X-ray right the first time.',src:'i4',outcome:'recurring'}]},
+  {id:'w0721',label:'Week of Jul 21',short:'Jul 21',month:'July 2026',when:'current',items:[],framing:'',published:false},
+  {id:'w0728',label:'Week of Jul 28',short:'Jul 28',month:'July 2026',when:'future',items:[],framing:'',published:false},
+];
+const JULY=['w0707','w0714','w0721','w0728']; // month view rows
+const curIdx=weeks.findIndex(w=>w.when==='current');
+let selIdx=curIdx, viewMode='week';
+let build={open:false,weekId:null,items:[],framing:'',keyCtr:1};
+let expanded=new Set();
+let role='ariyana', aTab='focus';
+let nudges=[
+  {lead:'raul',note:'Talk through the McKinney notes rollout at your location.',status:'sent'},
+  {lead:'priya',note:'Check in on the same-day case-acceptance dip at South Austin.',status:'opened'},
+  {lead:'marcus',note:'Quick debrief after the Cedar Park visit.',status:'booked'},
+];
+
+function isSet(w){return w.when==='past' || (w.published && w.items.length>0);}
+function toast(m){const t=document.getElementById('toast');t.innerHTML='✓&nbsp;&nbsp;'+m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);}
+function locChips(iss){return iss.global?'<span class="chip global">Global</span>':iss.locs.map(l=>'<span class="chip">'+l+'</span>').join('');}
+function esc(s){return (s||'').replace(/</g,'&lt;');}
+
+/* ---------------- role + tabs ---------------- */
+function switchRole(r){role=r;
+  document.getElementById('view-ariyana').style.display=r==='ariyana'?'block':'none';
+  document.getElementById('view-lead').style.display=r==='lead'?'block':'none';
+  document.getElementById('rv-ariyana').classList.toggle('active',r==='ariyana');
+  document.getElementById('rv-lead').classList.toggle('active',r==='lead');
+  render();
+}
+function atab(t){aTab=t;
+  document.querySelectorAll('[data-atab]').forEach(b=>b.classList.toggle('active',b.dataset.atab===t));
+  document.getElementById('a-focus').style.display=t==='focus'?'block':'none';
+  document.getElementById('a-sched').style.display=t==='sched'?'block':'none';
+  render();
+}
+
+/* ---------------- navigation ---------------- */
+function setViewMode(m){viewMode=m;render();}
+function navWeek(d){selIdx=Math.max(0,Math.min(weeks.length-1,selIdx+d));build.open=false;render();}
+function goToday(){selIdx=curIdx;render();}
+function selectWeek(id){selIdx=weeks.findIndex(w=>w.id===id);viewMode='week';build.open=false;render();}
+function toggleAcc(id){expanded.has(id)?expanded.delete(id):expanded.add(id);render();}
+
+/* ---------------- builder ---------------- */
+function openBuilder(id){const w=weeks.find(x=>x.id===id);if(!w||w.when==='past')return;
+  build.open=true;build.weekId=id;
+  build.items=w.items.map(it=>({key:'k'+(build.keyCtr++),raw:it.text,polished:'',usePolished:true,sourceId:it.src}));
+  ISSUES.forEach(i=>i.used=false);
+  build.items.forEach(it=>{if(it.sourceId){const s=ISSUES.find(x=>x.id===it.sourceId);if(s)s.used=true;}});
+  build.framing=w.framing||'';render();}
+function closeBuilder(){build.open=false;render();}
+function addFromIssue(id){if(build.items.length>=2)return;const iss=ISSUES.find(x=>x.id===id);if(!iss||iss.used)return;iss.used=true;
+  build.items.push({key:'k'+(build.keyCtr++),raw:iss.title,polished:POLISH[id]||'',usePolished:false,sourceId:id});render();}
+function addOwn(){if(build.items.length>=2){toast('Two is the cap');return;}
+  const el=document.getElementById('ownText');const v=el.value.trim();if(!v)return;
+  build.items.push({key:'k'+(build.keyCtr++),raw:v,polished:'',usePolished:false,sourceId:null});el.value='';render();}
+function removeItem(k){const it=build.items.find(i=>i.key===k);if(it&&it.sourceId){const s=ISSUES.find(x=>x.id===it.sourceId);if(s)s.used=false;}build.items=build.items.filter(i=>i.key!==k);render();}
+function polish(k){const it=build.items.find(i=>i.key===k);if(!it)return;
+  if(!it.polished){let s=it.raw.trim();s=s.charAt(0).toUpperCase()+s.slice(1);if(!/[.!?]$/.test(s))s+='.';it.polished='This week: '+s;}
+  it.usePolished=true;render();}
+function unpolish(k){const it=build.items.find(i=>i.key===k);if(it)it.usePolished=false;render();}
+function editItem(k,v){const it=build.items.find(i=>i.key===k);if(it){if(it.usePolished)it.polished=v;else it.raw=v;}}
+function scheduleWeek(){
+  if(!build.items.length){toast('Add at least one focus first');return;}
+  const w=weeks.find(x=>x.id===build.weekId);
+  w.items=build.items.map(it=>({text:(it.usePolished?it.polished:it.raw),src:it.sourceId,outcome:'pending'}));
+  w.framing=build.framing;w.published=true;build.open=false;
+  const moved=build.items.filter(i=>i.sourceId).length;
+  const live=w.when==='current';
+  toast('Scheduled for '+w.short+(live?' · live on 6 lead homes':' · planned ahead')+(moved?' · '+moved+' issue'+(moved>1?'s':'')+' → Communicated':''));
+  render();
+}
+
+/* ---------------- render ---------------- */
+function render(){
+  if(role==='lead'){renderLead();return;}
+  if(aTab==='sched'){renderSched();return;}
+  const host=document.getElementById('a-focus-body');
+  let h='';
+  // toolbar: view toggle + nav
+  h+='<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">';
+  h+='<div class="seg"><button class="'+(viewMode==='week'?'active':'')+'" onclick="setViewMode(\'week\')">Week</button>'
+    +'<button class="'+(viewMode==='month'?'active':'')+'" onclick="setViewMode(\'month\')">Month</button></div>';
+  if(viewMode==='week'){const w=weeks[selIdx];
+    h+='<div class="weeknav"><button class="btn ghost icon" onclick="navWeek(-1)" '+(selIdx===0?'disabled':'')+'>‹</button>'
+      +'<span style="font-weight:700;min-width:120px;text-align:center">'+w.label+'</span>'
+      +'<button class="btn ghost icon" onclick="navWeek(1)" '+(selIdx===weeks.length-1?'disabled':'')+'>›</button>'
+      +(selIdx!==curIdx?'<button class="btn ghost sm" onclick="goToday()">This week</button>':'')+'</div>';
+  } else { h+='<div class="weeknav"><button class="btn ghost icon" disabled>‹</button><span style="font-weight:700">July 2026</span><button class="btn ghost icon" disabled>›</button></div>'; }
+  h+='</div>';
+
+  h+= viewMode==='month' ? monthHTML() : weekBodyHTML(weeks[selIdx]);
+  h+=recordHTML();
+  host.innerHTML=h;
+}
+
+function weekBodyHTML(w){
+  if(build.open && build.weekId===w.id) return '<div class="card pad" style="margin-bottom:18px">'+builderHTML(w)+'</div>';
+  // past = read-only record; current/future = set or prompt
+  if(w.when==='past' || isSet(w)){
+    const live=w.when==='current';
+    return '<div class="card pad" style="margin-bottom:18px">'
+      +'<div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="label">'+(w.when==='past'?'What you covered':'Scheduled')+'</span>'
+      +(live?'<span class="liveflag">● live on 6 lead homes</span>':'')+'</div>'
+      +w.items.map((it,i)=>focusItemHTML(it,i,w.when==='past')).join('')
+      +(w.framing?'<p class="muted" style="margin:10px 0 0;font-size:13px;font-style:italic">“'+esc(w.framing)+'”</p>':'')
+      +(w.when!=='past'?'<button class="btn sm" style="margin-top:12px" onclick="openBuilder(\''+w.id+'\')">Edit</button>':'')
+      +'</div>';
+  }
+  const cta=w.when==='current'?'Set this week\'s focus →':'Plan this week →';
+  return '<div class="card pad" style="margin-bottom:18px"><div class="empty">Nothing set for '+w.short+' yet.'
+    +'<div style="margin-top:10px"><button class="btn primary" onclick="openBuilder(\''+w.id+'\')">'+cta+'</button></div></div></div>';
+}
+function focusItemHTML(it,i,withOutcome){
+  const src=it.src?ISSUES.find(x=>x.id===it.src):null;
+  return '<div class="fitem"><span class="fnum">'+(i+1)+'</span><div style="flex:1">'
+    +'<div style="font-size:14px;font-weight:600">'+esc(it.text)+'</div>'
+    +'<div class="wrap" style="margin-top:5px">'
+    +(src?'<span class="chip src">from: '+esc(src.title.slice(0,30))+(src.title.length>30?'…':'')+'</span>':'')
+    +(withOutcome?'<span class="out '+it.outcome+'">'+OUT[it.outcome]+'</span>':'')+'</div></div></div>';
+}
+
+function builderHTML(w){
+  const avail=ISSUES.filter(i=>!i.used);
+  const live=w.when==='current';
+  return '<div class="row" style="justify-content:space-between;margin-bottom:12px"><h3 style="font-size:14px">Set focus · '+w.label+'</h3>'
+    +'<button class="btn ghost sm" onclick="closeBuilder()">Cancel</button></div>'
+    +'<div class="builder"><div>'
+    +'<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="label">This week (1–2)</span>'
+    +(build.items.length>=2?'<span class="aiflag">Two is the cap</span>':'')+'</div>'
+    +[0,1].map(n=>{const it=build.items[n];
+      if(!it)return '<div class="slot" data-slot="'+n+'"><div class="row"><span class="slotnum">'+(n+1)+'</span><span class="muted" style="font-size:12.5px">Drop an issue here, or write your own.</span></div></div>';
+      const text=it.usePolished?it.polished:it.raw;const src=it.sourceId?ISSUES.find(x=>x.id===it.sourceId):null;
+      return '<div class="slot filled"><div class="row" style="align-items:flex-start;gap:10px"><span class="slotnum">'+(n+1)+'</span><div style="flex:1">'
+        +'<textarea class="txt" rows="2" style="font-weight:600" oninput="editItem(\''+it.key+'\',this.value)">'+esc(text)+'</textarea>'
+        +'<div class="row" style="justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:8px"><div class="wrap">'
+        +(src?'<span class="chip src">from: '+esc(src.title.slice(0,22))+(src.title.length>22?'…':'')+'</span>':'<span class="chip src">written by you</span>')
+        +(it.usePolished?'<span class="aiflag">✨ AI-polished</span>':'')+'</div><div class="row" style="gap:6px">'
+        +(it.usePolished?'<button class="btn ghost sm" onclick="unpolish(\''+it.key+'\')">undo</button>':'<button class="btn sm" onclick="polish(\''+it.key+'\')">✨ Polish</button>')
+        +'<button class="btn ghost sm" onclick="removeItem(\''+it.key+'\')">remove</button></div></div></div></div></div>';
+    }).join('')
+    +'<div class="divider"></div><div class="label" style="margin-bottom:7px">Framing note <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">— optional</span></div>'
+    +'<textarea class="txt" id="framing" rows="2" oninput="build.framing=this.value" placeholder="e.g. Two small things this week, both about starting strong with the family.">'+esc(build.framing)+'</textarea>'
+    +'<button class="btn primary" style="margin-top:14px" onclick="scheduleWeek()">Schedule this week →</button>'
+    +'<div class="flowline">'+(live?'Pushes to the 6 lead homes and moves':'Saves to this week and moves')+' the sourcing issues to <b style="color:var(--comm)">Communicated</b>.</div>'
+    +'</div><div class="card pad" style="align-self:start"><h3 style="font-size:14px;margin-bottom:4px">Pull from your issues</h3>'
+    +'<p class="muted" style="font-size:12px;margin:0 0 12px">Click <b>+ Focus</b> or drag one over.</p>'
+    +'<div class="row" style="gap:7px;margin-bottom:14px"><input class="txt" id="ownText" placeholder="Or write your own…" onkeydown="if(event.key===\'Enter\')addOwn()"><button class="btn sm" onclick="addOwn()">Add</button></div>'
+    +(avail.length?avail.map(iss=>'<div class="issue" draggable="true" ondragstart="event.dataTransfer.setData(\'text\',\''+iss.id+'\')">'
+        +'<div class="row" style="justify-content:space-between;gap:8px"><div style="font-weight:600;font-size:13.5px;flex:1">'+esc(iss.title)+'</div>'
+        +'<button class="btn sm primary" '+(build.items.length>=2?'disabled':'')+' onclick="addFromIssue(\''+iss.id+'\')">+ Focus</button></div>'
+        +'<div class="wrap" style="margin-top:8px">'+locChips(iss)+iss.srcs.map(s=>'<span class="chip src">'+s+'</span>').join('')
+        +(iss.count>=2?'<span class="chip global">×'+iss.count+' corroborated</span>':'')+'</div></div>').join('')
+      :'<div class="empty">Every open issue is in this week.</div>')
+    +'</div></div>';
+}
+
+/* month view (MonthView pattern) */
+function monthHTML(){
+  return '<div class="card pad" style="margin-bottom:18px">'+JULY.map(id=>{
+    const w=weeks.find(x=>x.id===id);const set=isSet(w);const pastEmpty=w.when==='past'&&!set;
+    return '<div class="monthrow '+(set?'':'notset')+(pastEmpty?' pastempty':'')+'" onclick="selectWeek(\''+id+'\')">'
+      +'<span style="font-weight:600;font-size:13.5px">'+w.label+(w.when==='current'?' <span class="chip" style="background:hsl(184 80% 27% /.12);color:var(--comm);border:0">this week</span>':'')+'</span>'
+      +(set?'<span class="liveflag">✓ '+(w.when==='past'?'covered':'scheduled')+'</span>':'<span class="muted" style="font-size:12.5px">◦ not set</span>')
+      +'</div>';
+  }).join('')+'</div>';
+}
+
+/* record accordion, grouped by month (shadcn accordion pattern) */
+function recordHTML(){
+  const past=weeks.filter(w=>w.when==='past').slice().reverse(); // newest first
+  const groups=[];
+  past.forEach(w=>{let g=groups.find(x=>x.month===w.month);if(!g){g={month:w.month,weeks:[]};groups.push(g);}g.weeks.push(w);});
+  return '<div style="margin-top:20px"><div class="row" style="justify-content:space-between;margin-bottom:4px">'
+    +'<span class="label">Record — what you have covered</span>'
+    +'<span class="muted" style="font-size:12px">outcomes fill in as you assess the issues</span></div>'
+    + groups.map(g=>'<div style="margin-top:8px"><div class="monthhead">'+g.month+'</div><div class="acc">'
+        + g.weeks.map(w=>{
+            const open=expanded.has(w.id);
+            const dots=w.items.map(it=>'<span class="sd" style="background:'+OUTC[it.outcome]+'"></span>').join('');
+            return '<div class="acc-item"><button class="acc-trigger" onclick="toggleAcc(\''+w.id+'\')">'
+              +'<span>'+w.label+'</span><span class="row" style="gap:10px"><span class="row" style="gap:4px">'+dots+'</span>'
+              +'<svg class="acc-chev'+(open?' open':'')+'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></button>'
+              +(open?'<div class="acc-body">'+w.items.map((it,i)=>focusItemHTML(it,i,true)).join('')+'</div>':'')
+              +'</div>';
+          }).join('')
+        +'</div></div>').join('')
+    +'</div>';
+}
+
+/* ---------------- scheduling ---------------- */
+function sendNudge(){const lead=document.getElementById('reqLead').value;const note=document.getElementById('reqNote').value.trim();
+  if(!note){toast('Add a reason so it is not out of the blue');return;}
+  nudges.push({lead,note,status:'pending'});document.getElementById('reqNote').value='';
+  toast('Nudge sent to '+LEADS[lead]+' · on their home now');render();}
+function renderSched(){
+  document.getElementById('sentList').innerHTML=(nudges.length?nudges.map(n=>
+    '<div class="reqcard"><div class="row" style="justify-content:space-between"><b style="font-size:13.5px">'+LEADS[n.lead]+'</b>'
+    +'<span class="badge '+n.status+'">'+n.status+'</span></div>'
+    +'<p class="muted" style="margin:6px 0 0;font-size:12.5px">“'+esc(n.note)+'”</p></div>').join('')
+    :'<p class="muted" style="font-size:12.5px">Nothing sent yet.</p>')
+    +'<p class="hint" style="margin-top:12px">“Opened” means the lead has seen it on their home. Booking happens on your Google link.</p>';
+}
+
+/* ---------------- lead home ---------------- */
+function renderLead(){
+  const c=weeks[curIdx];const body=document.getElementById('lead-focus-body');const meta=document.getElementById('lead-focus-meta');
+  if(!c.published){body.innerHTML='<p class="muted" style="margin:0;font-size:13px">Ariyana has not set this week yet. It shows up here the moment she schedules it.</p>';meta.textContent='from Ariyana';}
+  else{meta.textContent='from Ariyana · '+c.label;
+    body.innerHTML=c.items.map((it,i)=>'<div class="fitem"><span class="fnum">'+(i+1)+'</span><div style="font-size:14.5px;font-weight:600;align-self:center">'+esc(it.text)+'</div></div>').join('')
+      +(c.framing?'<p class="muted" style="margin:12px 0 0;font-size:13px;font-style:italic">“'+esc(c.framing)+'”</p>':'')
+      +'<p class="hint" style="margin-top:14px">Your record of the meeting. Carry it into your location this week.</p>';}
+  const inc=nudges.find(n=>n.lead==='raul');
+  if(inc && inc.status==='sent') inc.status='opened'; // seeing it on the home marks it opened for Ariyana
+  document.getElementById('lead-incoming').innerHTML=inc?'<div class="reqcard" style="border-color:var(--comm);background:hsl(184 80% 27% / .05);margin-bottom:14px">'
+      +'<div class="row" style="gap:8px"><span class="out pending">◷ Ariyana would like to meet</span>'
+      +'<span class="badge '+inc.status+'" style="margin-left:auto">'+(inc.status==='booked'?'booked':'new')+'</span></div>'
+      +'<p style="margin:9px 0 0;font-size:13.5px">“'+esc(inc.note)+'”</p>'
+      +(inc.status==='pending'?'<button class="btn primary sm" style="margin-top:11px" onclick="leadBook()">Find a time →</button>':'<p class="hint" style="margin-top:9px">✓ Booked. It is on both calendars.</p>')
+      +'</div>':'';
+}
+function leadBook(){const n=nudges.find(x=>x.lead==='raul');if(n)n.status='booked';toast('Opening calendar.app.google/ariyana-rda …');render();}
+
+/* ---------------- drag/drop ---------------- */
+document.addEventListener('dragover',e=>{const s=e.target.closest?.('.slot:not(.filled)');if(s){e.preventDefault();s.classList.add('drop');}});
+document.addEventListener('dragleave',e=>{const s=e.target.closest?.('.slot');if(s)s.classList.remove('drop');});
+document.addEventListener('drop',e=>{const s=e.target.closest?.('.slot:not(.filled)');if(s){e.preventDefault();s.classList.remove('drop');const id=e.dataTransfer.getData('text');if(id)addFromIssue(id);}});
+
+render();
+</script>
+</body>
+</html>

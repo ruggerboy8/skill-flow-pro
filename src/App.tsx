@@ -41,7 +41,7 @@ import EvaluationReviewV2 from "@/pages/EvaluationReviewV2";
 import AdminBuilder from "@/pages/AdminBuilder";
 import NotFound from "@/pages/NotFound";
 import { RequireAccess, allowCoachSurface, allowDashboard } from "@/components/RequireAccess";
-import TrainingWorkspace from "@/pages/training/TrainingWorkspace";
+import TrainingHome from "@/pages/training/TrainingHome";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
 import RegionalDashboard from "@/pages/dashboard/RegionalDashboard";
@@ -194,7 +194,7 @@ function AppRoutes() {
         <Route path="evaluation/:evalId/review" element={<EvaluationReview />} />
         <Route path="evaluation/:evalId/review-v2" element={<EvaluationReviewV2 />} />
         <Route path="builder" element={<AdminBuilder />} />
-        <Route path="training" element={<RequireAccess allow={(r) => r.isSuperAdmin}><TrainingWorkspace /></RequireAccess>} />
+        <Route path="training" element={<RequireAccess allow={(r) => r.isSuperAdmin}><TrainingHome /></RequireAccess>} />
         {/* Legacy builder deep-links redirect to the current Builder */}
         <Route path="builder/:roleId" element={<Navigate to="/builder" replace />} />
         <Route path="builder/:roleId/:cycle" element={<Navigate to="/builder" replace />} />

@@ -4,6 +4,8 @@ import ThisWeekPanel from '@/components/home/ThisWeekPanel';
 import { RecentWinBanner } from '@/components/home/RecentWinBanner';
 import { EvalReadyCard } from '@/components/home/EvalReadyCard';
 import { CurrentFocusCard } from '@/components/home/CurrentFocusCard';
+import { LeadFocusHomeCard } from '@/components/home/LeadFocusHomeCard';
+import { LeadMeetingRequestCard } from '@/components/home/LeadMeetingRequestCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import RegionalDashboard from '@/pages/dashboard/RegionalDashboard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -73,6 +75,15 @@ export default function Index() {
         <EvalReadyCard />
 
         <RecentWinBanner />
+
+        {/* Leads (staff.is_lead): Ariyana's weekly focus + scheduling, replacing the
+            retired "Lead Pro Move" dual-panel. */}
+        {staffProfile?.is_lead && (
+          <>
+            <LeadFocusHomeCard isLead={staffProfile.is_lead} />
+            <LeadMeetingRequestCard staffId={staffProfile.id} isLead={staffProfile.is_lead} />
+          </>
+        )}
 
         <ThisWeekPanel />
 

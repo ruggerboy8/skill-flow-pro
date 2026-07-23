@@ -410,6 +410,194 @@ export type Database = {
           },
         ]
       }
+      coaching_issue_events: {
+        Row: {
+          at: string
+          body: string | null
+          by_staff: string | null
+          id: string
+          issue_id: string
+          kind: string
+        }
+        Insert: {
+          at?: string
+          body?: string | null
+          by_staff?: string | null
+          id?: string
+          issue_id: string
+          kind: string
+        }
+        Update: {
+          at?: string
+          body?: string | null
+          by_staff?: string | null
+          id?: string
+          issue_id?: string
+          kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_issue_events_by_staff_fkey"
+            columns: ["by_staff"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_issue_events_by_staff_fkey"
+            columns: ["by_staff"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "coaching_issue_events_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_issue_locations: {
+        Row: {
+          id: string
+          issue_id: string
+          location_id: string
+        }
+        Insert: {
+          id?: string
+          issue_id: string
+          location_id: string
+        }
+        Update: {
+          id?: string
+          issue_id?: string
+          location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_issue_locations_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_issue_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_issue_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      coaching_issue_sources: {
+        Row: {
+          id: string
+          issue_id: string
+          source_type: string
+        }
+        Insert: {
+          id?: string
+          issue_id: string
+          source_type: string
+        }
+        Update: {
+          id?: string
+          issue_id?: string
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_issue_sources_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_issues: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          detail: string | null
+          id: string
+          is_global: boolean
+          organization_id: string | null
+          private_note: string | null
+          retired_at: string | null
+          retired_note: string | null
+          retired_outcome: string | null
+          stage: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          detail?: string | null
+          id?: string
+          is_global?: boolean
+          organization_id?: string | null
+          private_note?: string | null
+          retired_at?: string | null
+          retired_note?: string | null
+          retired_outcome?: string | null
+          stage?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          detail?: string | null
+          id?: string
+          is_global?: boolean
+          organization_id?: string | null
+          private_note?: string | null
+          retired_at?: string | null
+          retired_note?: string | null
+          retired_outcome?: string | null
+          stage?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_issues_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_issues_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "coaching_issues_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaching_meeting_records: {
         Row: {
           calibration_confirmed: boolean
@@ -1379,6 +1567,188 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_focus_items: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          organization_id: string | null
+          source_issue_id: string | null
+          text: string
+          week_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order: number
+          id?: string
+          organization_id?: string | null
+          source_issue_id?: string | null
+          text: string
+          week_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          organization_id?: string | null
+          source_issue_id?: string | null
+          text?: string
+          week_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_focus_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_focus_items_source_issue_id_fkey"
+            columns: ["source_issue_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_focus_items_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "lead_focus_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_focus_weeks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          framing: string | null
+          id: string
+          organization_id: string | null
+          published_at: string | null
+          status: string
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          framing?: string | null
+          id?: string
+          organization_id?: string | null
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          framing?: string | null
+          id?: string
+          organization_id?: string | null
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_focus_weeks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_focus_weeks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "lead_focus_weeks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_meeting_requests: {
+        Row: {
+          booked_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          lead_staff_id: string
+          note: string | null
+          opened_at: string | null
+          organization_id: string | null
+          status: string
+        }
+        Insert: {
+          booked_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_staff_id: string
+          note?: string | null
+          opened_at?: string | null
+          organization_id?: string | null
+          status?: string
+        }
+        Update: {
+          booked_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_staff_id?: string
+          note?: string | null
+          opened_at?: string | null
+          organization_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_meeting_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_meeting_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "lead_meeting_requests_lead_staff_id_fkey"
+            columns: ["lead_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_meeting_requests_lead_staff_id_fkey"
+            columns: ["lead_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "lead_meeting_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           active: boolean | null
@@ -2226,6 +2596,7 @@ export type Database = {
           email: string
           first_login_at: string | null
           hire_date: string
+          home_route: string | null
           id: string
           is_clinical_director: boolean | null
           is_coach: boolean
@@ -2260,6 +2631,7 @@ export type Database = {
           email: string
           first_login_at?: string | null
           hire_date?: string
+          home_route?: string | null
           id?: string
           is_clinical_director?: boolean | null
           is_coach?: boolean
@@ -2294,6 +2666,7 @@ export type Database = {
           email?: string
           first_login_at?: string | null
           hire_date?: string
+          home_route?: string | null
           id?: string
           is_clinical_director?: boolean | null
           is_coach?: boolean
@@ -3669,7 +4042,18 @@ export type Database = {
         Args: { p_eval_id: string }
         Returns: undefined
       }
+      create_coaching_issue: {
+        Args: {
+          p_detail: string
+          p_is_global: boolean
+          p_location_ids: string[]
+          p_sources: string[]
+          p_title: string
+        }
+        Returns: string
+      }
       current_user_org_id: { Args: never; Returns: string }
+      current_user_staff_id: { Args: never; Returns: string }
       delete_latest_week_data: { Args: { p_user_id: string }; Returns: Json }
       delete_week_data: {
         Args: {
@@ -4225,6 +4609,10 @@ export type Database = {
           role_id: number
           source: string
         }[]
+      }
+      publish_lead_focus_week: {
+        Args: { p_framing: string; p_items: Json; p_week_start: string }
+        Returns: string
       }
       publish_survey: { Args: { p_survey_id: string }; Returns: undefined }
       recover_orphaned_scores: { Args: never; Returns: Json }

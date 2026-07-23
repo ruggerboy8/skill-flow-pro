@@ -126,26 +126,41 @@ export function buildObserverNote(glow: string | null, grow: string | null): str
 /**
  * Patch a single evaluation_items row (score, N/A, glow, grow).
  *
- * Upsert on the (evaluation_id, competency_id) primary key rather than a bare
- * update: an update against a missing row silently affects zero rows and
- * returns no error, which is how a coach's scores could vanish into a hollow
- * eval. loadCaptureData seeds the rows first, so in practice this resolves to an
- * update-on-conflict; the upsert is the belt-and-suspenders guarantee that a
- * save never no-ops.
+ * A plain update (not an upsert): the row already carries NOT NULL columns like
+ * competency_name_snapshot, so an upsert's insert arm would fail the not-null
+ * check before ON CONFLICT could turn it into an update. An update only touches
+ * the columns in `patch`, so it is safe.
+ *
+ * The historical silent-data-loss bug was an update that hit ZERO rows (the eval
+ * had no items) and returned no error. We defend against that directly: verify a
+ * row was actually updated, and if not, seed the missing rows and retry once, so
+ * a save can never no-op into a hollow eval.
  */
 export async function saveCaptureItem(
   evalId: string,
   competencyId: number,
   patch: CaptureItemPatch,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("evaluation_items")
-    // Cast: observer_glow/observer_grow are newly added and not yet in generated types.
-    .upsert(
-      { evaluation_id: evalId, competency_id: competencyId, ...patch } as never,
-      { onConflict: "evaluation_id,competency_id" },
-    );
+  const update = () =>
+    supabase
+      .from("evaluation_items")
+      // Cast: observer_glow/observer_grow are newly added and not yet in generated types.
+      .update(patch as never)
+      .eq("evaluation_id", evalId)
+      .eq("competency_id", competencyId)
+      .select("competency_id");
+
+  const { data, error } = await update();
   if (error) throw new Error(error.message);
+  if (data && data.length > 0) return;
+
+  // No row was updated: the item rows are missing. Seed them, then retry once.
+  await ensureEvaluationItems(evalId);
+  const retry = await update();
+  if (retry.error) throw new Error(retry.error.message);
+  if (!retry.data || retry.data.length === 0) {
+    throw new Error("Could not save this score: the evaluation item could not be found.");
+  }
 }
 
 export interface SlottedItem {

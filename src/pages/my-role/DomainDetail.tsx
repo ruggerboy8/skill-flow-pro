@@ -99,12 +99,12 @@ export default function DomainDetail() {
             </div>
 
             {/* Score Badge */}
-            {!isLoading && (
+            {!isLoading && data && (
               <div className="flex flex-col items-start md:items-end gap-1.5 mt-2 md:mt-0">
                 <Badge className={cn('px-4 py-2 text-sm font-medium shrink-0', avgBadge.className)}>
                   <BadgeIcon className="w-4 h-4 mr-2" />
                   {avgBadge.label}
-                  {data?.averageScore !== null && (
+                  {typeof data.averageScore === 'number' && (
                     <span className="ml-2 font-bold">{data.averageScore}</span>
                   )}
                 </Badge>

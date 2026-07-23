@@ -224,6 +224,66 @@ export async function createDraftEvaluation({
 }
 
 /**
+ * Ensure an evaluation has its per-competency item rows. Idempotent: if the
+ * evaluation already has any items, this does nothing and returns the count.
+ * If it has none (a "hollow" eval left by the historical seed-failure bug, or a
+ * partial-failure during creation), it seeds one row per competency for the
+ * eval's role, mirroring createDraftEvaluation's seed.
+ *
+ * This makes the capture surface self-healing: opening a hollow eval repopulates
+ * its scorable rows so a coach can (re)enter scores instead of seeing a blank
+ * page, and new evals can never end up permanently item-less.
+ */
+export async function ensureEvaluationItems(evalId: string): Promise<number> {
+  const { count, error: countError } = await supabase
+    .from('evaluation_items')
+    .select('competency_id', { count: 'exact', head: true })
+    .eq('evaluation_id', evalId);
+  if (countError) throw new Error(`Failed to check evaluation items: ${countError.message}`);
+  if ((count ?? 0) > 0) return count ?? 0;
+
+  // No items yet. Look up the eval's role so we know which competencies to seed.
+  const { data: evaluation, error: evalError } = await supabase
+    .from('evaluations')
+    .select('id, role_id')
+    .eq('id', evalId)
+    .maybeSingle();
+  if (evalError) throw new Error(`Failed to load evaluation: ${evalError.message}`);
+  if (!evaluation) return 0; // eval doesn't exist; nothing to seed
+
+  const { data: competencies, error: competenciesError } = await supabase
+    .from('competencies')
+    .select(`
+      competency_id,
+      name,
+      domain_id,
+      domains!competencies_domain_id_fkey(domain_name)
+    `)
+    .eq('role_id', evaluation.role_id);
+  if (competenciesError) throw new Error(`Failed to fetch competencies: ${competenciesError.message}`);
+  if (!competencies || competencies.length === 0) return 0;
+
+  const itemsData = competencies.map(comp => ({
+    evaluation_id: evalId,
+    competency_id: comp.competency_id,
+    competency_name_snapshot: comp.name || `Competency ${comp.competency_id}`,
+    domain_id: comp.domain_id,
+    domain_name: (comp.domains as { domain_name: string } | null)?.domain_name || null,
+  }));
+
+  // ignoreDuplicates so a concurrent seed (two tabs, a retry) can't error.
+  const { error: insertError } = await supabase
+    .from('evaluation_items')
+    .upsert(itemsData, { onConflict: 'evaluation_id,competency_id', ignoreDuplicates: true });
+  if (insertError) throw new Error(`Failed to seed evaluation items: ${insertError.message}`);
+
+  // Aggregate weekly self-scores into the freshly seeded rows (no-op for Baseline).
+  await refreshEvalSelfScores(evalId);
+
+  return itemsData.length;
+}
+
+/**
  * Get all evaluations for a staff member, separated by status
  */
 export async function getEvaluationsForStaff(staffId: string) {
@@ -560,6 +620,19 @@ export async function submitEvaluation(evalId: string, _releasedByStaffId?: stri
   // spacing) without changing any wording. Failures here must not block submission.
   await formatEvaluatorNoteIfPresent(evalId);
 
+  // Guard: never let an evaluation with no scored items reach `submitted`. This
+  // is the gate that historically let "hollow" evals (zero items) get submitted
+  // and released to staff as a blank page.
+  const { count: scoredCount, error: scoredError } = await supabase
+    .from('evaluation_items')
+    .select('competency_id', { count: 'exact', head: true })
+    .eq('evaluation_id', evalId)
+    .not('observer_score', 'is', null);
+  if (scoredError) throw new Error(`Failed to validate evaluation: ${scoredError.message}`);
+  if ((scoredCount ?? 0) === 0) {
+    throw new Error('This evaluation has no scores recorded yet, so it cannot be submitted. Please score the competencies first.');
+  }
+
   const { error } = await supabase
     .from('evaluations')
     .update({ status: 'submitted' })
@@ -607,7 +680,10 @@ export function isEvaluationComplete(evaluation: EvaluationWithItems): {
   naCount: number;
   missingObserverNotes: number;
 } {
-  const observerComplete = evaluation.items.every(
+  // A zero-item eval must never count as "complete": `.every()` is vacuously true
+  // on an empty array, which historically let hollow evals be submitted.
+  const hasItems = evaluation.items.length > 0;
+  const observerComplete = hasItems && evaluation.items.every(
     item => item.observer_score !== null || item.observer_is_na === true
   );
   // Self-scores are now auto-aggregated from weekly performance submissions.

@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -28,6 +27,7 @@ import {
 
 const SCORES = [1, 2, 3, 4];
 const INTRO_KEY = "evalCaptureIntroDismissed";
+const draftsKey = (evalId: string) => `evalCaptureDrafts:${evalId}`;
 
 type CompState = "scored" | "na" | "in-progress" | "untouched";
 function competencyState(c: CaptureCompetency): CompState {
@@ -95,6 +95,35 @@ export default function EvaluationCapture() {
     })();
     return () => { cancelled = true; };
   }, [evalId, toast]);
+
+  // Crash resilience for the raw (pre-Polish) feedback textarea, which otherwise
+  // lives only in React state. Restore any saved drafts once when the eval opens,
+  // then mirror every keystroke to localStorage so a closed tab, refresh, or
+  // power loss never discards in-progress notes. Scores and glow/grow already
+  // persist to the database as they're entered; this covers the one surface that
+  // did not.
+  const draftsRestored = useRef(false);
+  useEffect(() => {
+    if (!evalId) return;
+    if (!draftsRestored.current) {
+      draftsRestored.current = true;
+      try {
+        const raw = localStorage.getItem(draftsKey(evalId));
+        if (raw) {
+          const parsed = JSON.parse(raw) as Record<number, string>;
+          if (parsed && typeof parsed === "object") {
+            setDrafts(parsed);
+            return; // skip the save pass below until the restored state lands
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    try {
+      const hasContent = Object.values(drafts).some((v) => v && v.trim());
+      if (hasContent) localStorage.setItem(draftsKey(evalId), JSON.stringify(drafts));
+      else localStorage.removeItem(draftsKey(evalId));
+    } catch { /* ignore */ }
+  }, [drafts, evalId]);
 
   function patchCompetency(domainId: number, competencyId: number, patch: Partial<CaptureCompetency>) {
     setData((prev) => {
@@ -256,7 +285,6 @@ export default function EvaluationCapture() {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-semibold tracking-tight">Evaluation capture</h1>
-            <Badge variant="secondary" className="rounded-full">Beta</Badge>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="inline-flex h-1.5 w-1.5 rounded-full" style={{ background: allDone ? "hsl(var(--status-complete))" : richColor }} aria-hidden />

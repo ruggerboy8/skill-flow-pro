@@ -8,7 +8,7 @@
  * observer_grow columns. Nothing here touches the classic flow.
  */
 import { supabase } from "@/integrations/supabase/client";
-import { getEvaluation } from "@/lib/evaluations";
+import { getEvaluation, ensureEvaluationItems } from "@/lib/evaluations";
 import { getDomainSummary } from "@/lib/evalCaptureFraming";
 
 export interface CaptureCompetency {
@@ -41,6 +41,10 @@ export interface CaptureData {
 const DOMAIN_ORDER = [1, 2, 3, 4]; // Clinical, Clerical, Cultural, Case Acceptance
 
 export async function loadCaptureData(evalId: string): Promise<CaptureData | null> {
+  // Self-heal before loading: guarantee the per-competency rows exist so a
+  // "hollow" eval (zero items) opens as a scorable page instead of a blank one.
+  await ensureEvaluationItems(evalId);
+
   const evaluation = await getEvaluation(evalId);
   if (!evaluation) return null;
 
@@ -119,7 +123,16 @@ export function buildObserverNote(glow: string | null, grow: string | null): str
   return parts.length ? parts.join("\n\n") : null;
 }
 
-/** Patch a single evaluation_items row (score, N/A, glow, grow). */
+/**
+ * Patch a single evaluation_items row (score, N/A, glow, grow).
+ *
+ * Upsert on the (evaluation_id, competency_id) primary key rather than a bare
+ * update: an update against a missing row silently affects zero rows and
+ * returns no error, which is how a coach's scores could vanish into a hollow
+ * eval. loadCaptureData seeds the rows first, so in practice this resolves to an
+ * update-on-conflict; the upsert is the belt-and-suspenders guarantee that a
+ * save never no-ops.
+ */
 export async function saveCaptureItem(
   evalId: string,
   competencyId: number,
@@ -128,9 +141,10 @@ export async function saveCaptureItem(
   const { error } = await supabase
     .from("evaluation_items")
     // Cast: observer_glow/observer_grow are newly added and not yet in generated types.
-    .update(patch as never)
-    .eq("evaluation_id", evalId)
-    .eq("competency_id", competencyId);
+    .upsert(
+      { evaluation_id: evalId, competency_id: competencyId, ...patch } as never,
+      { onConflict: "evaluation_id,competency_id" },
+    );
   if (error) throw new Error(error.message);
 }
 

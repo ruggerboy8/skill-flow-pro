@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Eye, FileEdit, Trash2, Mic, Sparkles } from 'lucide-react';
+import { CalendarIcon, Plus, Eye, FileEdit, Trash2, Mic } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -375,18 +375,10 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                     </AlertDialog>
                     <Button
                       size="sm"
-                      onClick={() => navigate(`/coach/${staffId}/eval/${evaluation.id}`)}
+                      onClick={() => navigate(`/coach/${staffId}/eval/${evaluation.id}/capture`)}
                     >
                       <FileEdit className="w-4 h-4 mr-1" />
                       Continue
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(`/coach/${staffId}/eval/${evaluation.id}/capture`)}
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" />
-                      New capture (beta)
                     </Button>
                   </div>
                 </div>
@@ -466,9 +458,9 @@ export function QuarterlyEvalsTab({ staffId, staffInfo, currentUserId }: Quarter
                       <Eye className="w-4 h-4 mr-1" />
                       View
                     </Button>
-                    <Button 
+                    <Button
                       size="sm"
-                      onClick={() => navigate(`/coach/${staffId}/eval/${evaluation.id}?mode=edit`)}
+                      onClick={() => navigate(`/coach/${staffId}/eval/${evaluation.id}/capture`)}
                     >
                       <FileEdit className="w-4 h-4 mr-1" />
                       Edit

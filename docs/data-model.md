@@ -92,8 +92,8 @@ indicate relative scale. For the **proposed/intended** multi-tenant design, see
 | `evaluations` | 106 | Coach evaluation headers. |
 | `evaluation_items` | 1,696 | Per-evaluation line items. |
 | `staging_prompts` | 32 | Prompt content used in the evaluation/AI flow *(purpose inferred from name — confirm in code before relying on it)*. |
-| `coach_baseline_assessments` | 4 | Coach baseline headers. **Alcan-specific** — used only when Alcan onboards a new *practice*, not for new hires. Candidate for removal (an org's first evaluation could serve as its baseline). |
-| `coach_baseline_items` | 107 | Coach baseline line items. (See note above.) |
+| `coach_baseline_assessments` | 3 | **Doctor-track**: the clinical director's *observed* baseline of a doctor (`doctor_staff_id` + `coach_staff_id`). Active and load-bearing (verified 2026-07-24); the counterpart to the doctor's self-baseline below. An earlier description of this as a practice-onboarding feature was wrong. |
+| `coach_baseline_items` | 159 | Coach baseline line items (53 per assessment). |
 | `coach_baseline_audit` | 219 | Change log for coach baselines. |
 | `doctor_baseline_assessments` | 5 | Doctor baseline headers. |
 | `doctor_baseline_items` | 265 | Doctor baseline line items. |

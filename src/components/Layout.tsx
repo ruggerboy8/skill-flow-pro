@@ -37,6 +37,7 @@ export default function Layout() {
     isCoach,
     isSuperAdmin,
     isOrgAdmin,
+    isRegional,
     isLead,
     isOfficeManager,
     isDoctor,
@@ -101,6 +102,10 @@ export default function Layout() {
 
   // Tab visibility derived from role flags + capability toggles (all from useUserRole).
   const showCoachTabs = isCoach || isOrgAdmin || isLead || canViewSubmissions || canSubmitEvals;
+  // Facilitate is for the people who run check-in/check-out meetings (directors /
+  // regionals / admins) — leads and OMs keep Coach but not Facilitate. Must match
+  // allowFacilitate in RequireAccess.tsx.
+  const showFacilitate = isOrgAdmin || isSuperAdmin || isRegional;
   const showAdminTab = canAccessAdmin || canManageUsers || canManageLocations || canInviteUsers || canManageLibrary;
   const showEvaluationsTab = canAccessAdmin || canReviewEvals;
 
@@ -160,6 +165,8 @@ export default function Layout() {
     ] : []),
     ...(showCoachTabs ? [
       { name: 'Coach', href: '/coach', icon: Users },
+    ] : []),
+    ...(showFacilitate ? [
       { name: 'Facilitate', href: '/facilitate', icon: Presentation },
     ] : []),
     ...(canManageAssignments ? [

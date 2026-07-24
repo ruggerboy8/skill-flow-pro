@@ -56,7 +56,10 @@ export default function StaffDetailV2() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { resolve: resolveRole } = useRoleDisplayNames();
-  const { isSuperAdmin, isOrgAdmin } = useUserRole();
+  const { isSuperAdmin, isOrgAdmin, isOfficeManager, canSubmitEvals, canReviewEvals } = useUserRole();
+  // Evaluations are visible to evaluators/admins (and OMs for their location) but
+  // NOT to leads — leads see history + overview only (owner decision, 2026-07-25).
+  const showEvalsTab = canSubmitEvals || canReviewEvals || isOrgAdmin || isSuperAdmin || isOfficeManager;
   const queryClient = useQueryClient();
   const selectedWeek = searchParams.get('week');
 
@@ -458,7 +461,7 @@ export default function StaffDetailV2() {
         <TabsList>
           <TabsTrigger value="history">History</TabsTrigger>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="evaluations">Quarterly Evaluations</TabsTrigger>
+          {showEvalsTab && <TabsTrigger value="evaluations">Quarterly Evaluations</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="history" className="space-y-4">
@@ -592,7 +595,7 @@ export default function StaffDetailV2() {
         </TabsContent>
 
         <TabsContent value="evaluations">
-          {user && (
+          {showEvalsTab && user && (
             <QuarterlyEvalsTab
               staffId={staffId!}
               staffInfo={{

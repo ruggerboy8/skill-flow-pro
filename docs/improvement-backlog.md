@@ -43,7 +43,7 @@ to mark a feature as org-scoped (feature flag per org, or capability, etc.).
 
 | # | Item | Notes | Status |
 |---|---|---|---|
-| C1 | **Coach baseline assessments** | Only used when Alcan onboards a new *practice*. Either gate to Alcan only, or drop entirely and treat an org's **first evaluation as its baseline**. **Doctor baseline is unaffected — it stays.** | 🟡 |
+| C1 | ~~**Coach baseline assessments**~~ **RESOLVED 2026-07-24: not a removal candidate.** `coach_baseline_assessments` turned out to be the doctor track's observed baseline (clinical director assesses a doctor), actively used by Dr. Alex and Dr. Casey. It stays. See [utilization-snapshot-2026-07-24.md](utilization-snapshot-2026-07-24.md) §5. | ✅ |
 | C2 | **General mechanism for Alcan-only / org-specific features** | Decide the pattern (per-org feature flags?) before we accumulate more one-offs. | 🟡 |
 
 ## D. Role display names (multi-tenant)

@@ -40,7 +40,7 @@ import EvaluationReview from "@/pages/EvaluationReview";
 import EvaluationReviewV2 from "@/pages/EvaluationReviewV2";
 import AdminBuilder from "@/pages/AdminBuilder";
 import NotFound from "@/pages/NotFound";
-import { RequireAccess, allowCoachSurface, allowDashboard } from "@/components/RequireAccess";
+import { RequireAccess, allowCoachSurface, allowDashboard, allowFacilitate, allowStaffEvals } from "@/components/RequireAccess";
 import TrainingHome from "@/pages/training/TrainingHome";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
@@ -110,7 +110,7 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Full-screen facilitator presentation (no app chrome) */}
-      <Route path="/facilitate" element={<RequireAccess allow={allowCoachSurface}><FacilitatePage /></RequireAccess>} />
+      <Route path="/facilitate" element={<RequireAccess allow={allowFacilitate}><FacilitatePage /></RequireAccess>} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="welcome" element={<Welcome />} />
@@ -145,8 +145,8 @@ function AppRoutes() {
         <Route path="coach" element={<RequireAccess allow={allowCoachSurface}><CoachLayoutV2 /></RequireAccess>}>
           <Route index element={<CoachDashboardV2 />} />
           <Route path=":staffId" element={<StaffDetailV2 />} />
-          <Route path=":staffId/eval/:evalId" element={<EvaluationHub />} />
-          <Route path=":staffId/eval/:evalId/capture" element={<EvaluationCapture />} />
+          <Route path=":staffId/eval/:evalId" element={<RequireAccess allow={allowStaffEvals}><EvaluationHub /></RequireAccess>} />
+          <Route path=":staffId/eval/:evalId/capture" element={<RequireAccess allow={allowStaffEvals}><EvaluationCapture /></RequireAccess>} />
         </Route>
 
         {/* Dashboard Routes */}

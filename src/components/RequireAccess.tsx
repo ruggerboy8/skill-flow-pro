@@ -36,9 +36,25 @@ export function RequireAccess({
   return allow(role) ? <>{children}</> : <Navigate to={redirectTo} replace />;
 }
 
-/** Coach / facilitate audience: coaches, leads, admins, or explicit eval capabilities. */
+/** Coach audience: coaches, leads, admins, or explicit eval capabilities. */
 export const allowCoachSurface = (r: RoleInfo) =>
   r.isCoach || r.isLead || r.isOrgAdmin || r.isSuperAdmin || r.canViewSubmissions || r.canSubmitEvals;
+
+/**
+ * Facilitate audience: the people who actually run check-in/check-out meetings —
+ * functional directors / regional managers / admins. Leads and OMs are coach-surface
+ * users but not facilitators (owner decision, 2026-07-25 persona walkthrough).
+ */
+export const allowFacilitate = (r: RoleInfo) =>
+  r.isSuperAdmin || r.isOrgAdmin || r.isRegional;
+
+/**
+ * Staff-evaluation audience: evaluators/admins (and OMs for their location).
+ * Leads see the coach surface but not evaluations (owner decision, 2026-07-25).
+ * Must match showEvalsTab in StaffDetailV2.tsx.
+ */
+export const allowStaffEvals = (r: RoleInfo) =>
+  r.canSubmitEvals || r.canReviewEvals || r.isOrgAdmin || r.isSuperAdmin || r.isOfficeManager;
 
 /** Regional dashboard ("Command Center") audience: admins, regional managers, coaches. */
 export const allowDashboard = (r: RoleInfo) =>

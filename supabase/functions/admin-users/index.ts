@@ -733,15 +733,8 @@ serve(async (req: Request) => {
           
           if (scoreErr) console.warn("Error deleting scores:", scoreErr);
           deletedScores = scoreCount ?? 0;
-          
-          // Delete all weekly_self_select entries
-          const { error: selectErr, count: selectCount } = await admin
-            .from("weekly_self_select")
-            .delete({ count: 'exact' })
-            .eq("user_id", user_id);
-          
-          if (selectErr) console.warn("Error deleting selections:", selectErr);
-          deletedSelections = selectCount ?? 0;
+          // (weekly_self_select cleanup removed 2026-07-25 — self-select was never
+          // adopted and the table is being retired; see roadmap 2.1/2.2.)
         }
         
         // Update staff record
@@ -789,16 +782,11 @@ serve(async (req: Request) => {
           }
         }
         
-        // Sync scope to staff table for RPC compatibility (get_coach_roster_summary uses staff.coach_scope_*)
-        if ((preset === "lead" || preset === "coach" || preset === "coach_participant" || preset === "regional_manager" || preset === "clinical_director") && 
-            coach_scope_type && coach_scope_ids && coach_scope_ids.length > 0) {
-          // Keep scope_type as 'org' or 'location' - must match staff_coach_scope_type_check constraint
-          updates.coach_scope_type = coach_scope_type;
-          // Store the first scope ID (primary scope for RPCs)
-          updates.coach_scope_id = coach_scope_ids[0];
-          console.log(`Syncing scope to staff table: type=${updates.coach_scope_type}, id=${updates.coach_scope_id}`);
-        }
-        
+        // NOTE (2026-07-25, roadmap 1.4): scope now lives ONLY in the coach_scopes
+        // table. The RPCs no longer read staff.coach_scope_type/coach_scope_id, so
+        // the singular columns are no longer written (they'll be dropped once the
+        // deployed frontend stops selecting them).
+
         const { data: updatedStaff, error: updateErr } = await admin
           .from("staff")
           .update(updates)
@@ -864,6 +852,12 @@ serve(async (req: Request) => {
           coach_participant: { is_participant: true,  can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
           regional_manager:  { is_participant: false, can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: true,  can_manage_users: true,  can_manage_locations: true,  can_manage_library: false, is_org_admin: true,  is_platform_admin: false },
           super_admin:       { is_participant: false, can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: true,  can_manage_users: true,  can_manage_locations: true,  can_manage_library: true,  is_org_admin: true,  is_platform_admin: true  },
+          // Added 2026-07-25 (roadmap 1.3): useUserRole is now caps-only, so every
+          // preset must maintain the caps row. Doctor = no permissions (the doctor
+          // surface is gated by staff.is_doctor, a role attribute, not a capability).
+          // Clinical director mirrors the legacy config (coach + org admin powers).
+          doctor:            { is_participant: false, can_view_submissions: false, can_submit_evals: false, can_review_evals: false, can_invite_users: false, can_manage_users: false, can_manage_locations: false, can_manage_library: false, is_org_admin: false, is_platform_admin: false },
+          clinical_director: { is_participant: false, can_view_submissions: true,  can_submit_evals: true,  can_review_evals: true,  can_invite_users: true,  can_manage_users: true,  can_manage_locations: true,  can_manage_library: false, is_org_admin: true,  is_platform_admin: false },
         };
 
         const capsPreset = CAPABILITY_PRESETS[preset];

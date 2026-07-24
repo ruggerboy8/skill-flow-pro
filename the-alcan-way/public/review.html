@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Asset review</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #2b3440;
+        color: #e6edf3;
+        padding: 16px;
+      }
+      h2 {
+        font-size: 14px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #8fb4d8;
+        margin: 22px 0 10px;
+      }
+      .grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      figure {
+        margin: 0;
+        width: 132px;
+        background:
+          repeating-conic-gradient(#3a4654 0% 25%, #313b47 0% 50%) 50% / 16px 16px;
+        border-radius: 8px;
+        padding: 6px;
+        box-sizing: border-box;
+      }
+      img {
+        width: 120px;
+        height: 120px;
+        object-fit: contain;
+        image-rendering: pixelated;
+        display: block;
+      }
+      figcaption {
+        font-size: 10px;
+        color: #b8c4d0;
+        text-align: center;
+        margin-top: 4px;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      const groups = {
+        Parent: ['parent/parent-idle', 'parent/parent-tense', 'parent/parent-walk', 'parent/parent-seated', 'parent/parent-seated-relaxed'],
+        Child: ['child/cj-idle', 'child/cj-scared', 'child/cj-walk', 'child/cj-seated', 'child/cj-reach', 'child/cj-wave'],
+        Receptionist: ['receptionist/recept-idle', 'receptionist/recept-seated', 'receptionist/recept-standup', 'receptionist/recept-offer', 'receptionist/recept-wave'],
+        Assistant: ['assistant/assistant-idle', 'assistant/assistant-crouch', 'assistant/assistant-mirror', 'assistant/assistant-present', 'assistant/assistant-blanket'],
+        Doctor: ['doctor/doctor-idle', 'doctor/doctor-greet', 'doctor/doctor-turn'],
+        Pieces: ['pieces/piece-desk','pieces/piece-bench','pieces/piece-chairs','pieces/piece-plant','pieces/piece-playrug','pieces/piece-coffee','pieces/piece-sign-alcan','pieces/piece-wallart-fish','pieces/piece-window','pieces/piece-schedscreen','pieces/piece-kiddrawings','pieces/piece-barndoor','pieces/piece-dentalchair','pieces/piece-examlight','pieces/piece-monitorarm','pieces/piece-tray','pieces/piece-cornerchair','pieces/piece-cabinets','pieces/piece-xray','pieces/piece-qr'],
+        Props: ['props/prop-cup','props/prop-mirror','props/prop-blanket','props/prop-tablet','props/prop-phone'],
+      }
+      const root = document.getElementById('root')
+      for (const [name, files] of Object.entries(groups)) {
+        const h = document.createElement('h2'); h.textContent = name; root.appendChild(h)
+        const g = document.createElement('div'); g.className = 'grid'
+        for (const f of files) {
+          const fig = document.createElement('figure')
+          const img = document.createElement('img'); img.src = '/assets/' + f + '.png'
+          const cap = document.createElement('figcaption'); cap.textContent = f.split('/')[1]
+          fig.appendChild(img); fig.appendChild(cap); g.appendChild(fig)
+        }
+        root.appendChild(g)
+      }
+    </script>
+  </body>
+</html>

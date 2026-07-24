@@ -2,7 +2,6 @@ import { addMinutes, subDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { getWeekAnchors } from '@/v2/time';
 import { getLocationWeekContext, assembleWeek as assembleLocationWeek } from '@/lib/locationState';
-import { addToBacklogV2 } from '@/lib/backlog';
 
 /**
  * Enforce weekly rollover at local Monday 12:01am.
@@ -66,14 +65,8 @@ export async function enforceWeeklyRolloverNow(args: {
 
   if (fullyPerformed) return; // nothing to rollover
 
-  // Add SITE moves from incomplete weeks to backlog (dedup handled by RPC)
-  const siteActionIds = (focusRows || [])
-    .filter(f => !f.self_select && f.action_id)     // site slots only
-    .map(f => f.action_id as number);
-
-  for (const actionId of siteActionIds) {
-    await addToBacklogV2(staffId, actionId, prevCycle, prevWeek); // RPC dedups
-  }
-
-  console.log(`[Rollover] Added ${siteActionIds.length} incomplete site moves to backlog for staff ${staffId}, cycle ${prevCycle}, week ${prevWeek}`);
+  // Backlog writes removed 2026-07-25 (roadmap 2.3): no missed-assignment
+  // workflow — Pro Moves are only meaningful in the group meeting, so missed
+  // weeks are simply missed. (Rollover itself is cycles-1-3 legacy and is
+  // slated for full retirement in roadmap 2.4.)
 }

@@ -39,8 +39,12 @@ export function useUserRole() {
   }
 
   // ─── Capability resolution ─────────────────────────────────────────────────
-  // When a user_capabilities row exists, prefer those values.
-  // Fall back to legacy boolean flags on the staff table.
+  // CAPS-ONLY since 2026-07-25 (roadmap 1.3): user_capabilities is the single
+  // source of truth for permissions. Every staff row has a caps row (backfilled
+  // 2026-07-24, and the admin-users edge function upserts one on create/edit).
+  // The legacy staff.is_* flags are no longer read here — only the staff-role
+  // attributes (office manager / doctor / clinical director / lead), which are
+  // "who someone is", not permissions.
   const caps = staff.user_capabilities;
   const hasCapabilitiesRow = caps !== null;
 
@@ -52,20 +56,9 @@ export function useUserRole() {
   const locationScopeCount = locationScopes.length;
 
   // ─── Elevated roles ────────────────────────────────────────────────────────
-  // is_platform_admin in the new table maps to is_super_admin in the old table
-  const isSuperAdmin = caps
-    ? (caps.is_platform_admin ?? false)
-    : (staff.is_super_admin ?? false);
-
-  // is_org_admin: prefer capabilities row
-  const isOrgAdmin = caps
-    ? (caps.is_org_admin ?? false)
-    : (staff.is_org_admin ?? false);
-
-  // is_participant: prefer capabilities row
-  const isParticipant = caps
-    ? (caps.is_participant ?? false)
-    : (staff.is_participant ?? false);
+  const isSuperAdmin = caps?.is_platform_admin ?? false;
+  const isOrgAdmin = caps?.is_org_admin ?? false;
+  const isParticipant = caps?.is_participant ?? false;
 
   // Office Manager, Doctor, Clinical Director flags live on staff only (not yet in user_capabilities)
   const isOfficeManager = staff.is_office_manager ?? false;
@@ -76,45 +69,21 @@ export function useUserRole() {
   const isLead = staff.is_lead ?? false;
 
   // ─── Coach / regional / coaching scope ────────────────────────────────────
-  // isCoach: has coach_scopes OR old is_coach flag OR can_view_submissions capability
-  const isCoach = scopes.length > 0 || staff.is_coach || (caps?.can_view_submissions ?? false);
+  // isCoach: has coach_scopes OR can_view_submissions capability
+  const isCoach = scopes.length > 0 || (caps?.can_view_submissions ?? false);
 
   // Regional = org admin OR has org scope OR manages 2+ locations
   const isRegional = isOrgAdmin || hasOrgScope || locationScopeCount >= 2;
 
-  // ─── Capability toggles (new system) ──────────────────────────────────────
-  // When caps row exists use its values; otherwise derive from legacy flags.
-  const canViewSubmissions = caps
-    ? (caps.can_view_submissions ?? false)
-    : (staff.is_coach || staff.is_org_admin || staff.is_super_admin || false);
-
-  const canSubmitEvals = caps
-    ? (caps.can_submit_evals ?? false)
-    : (staff.is_coach || staff.is_org_admin || staff.is_super_admin || false);
-
-  const canReviewEvals = caps
-    ? (caps.can_review_evals ?? false)
-    : (staff.is_org_admin || staff.is_super_admin || false);
-
-  const canInviteUsers = caps
-    ? (caps.can_invite_users ?? false)
-    : (staff.is_org_admin || staff.is_super_admin || false);
-
-  const canManageLibrary = caps
-    ? (caps.can_manage_library ?? false)
-    : (staff.is_super_admin || false);
-
-  const canManageLocations = caps
-    ? (caps.can_manage_locations ?? false)
-    : (staff.is_org_admin || staff.is_super_admin || false);
-
-  const canManageUsers = caps
-    ? (caps.can_manage_users ?? false)
-    : (staff.is_org_admin || staff.is_super_admin || false);
-
-  const canManageAssignments = caps
-    ? (caps.can_manage_assignments ?? false) || isOrgAdmin || isSuperAdmin
-    : (staff.is_org_admin || staff.is_super_admin || false);
+  // ─── Capability toggles ───────────────────────────────────────────────────
+  const canViewSubmissions = caps?.can_view_submissions ?? false;
+  const canSubmitEvals = caps?.can_submit_evals ?? false;
+  const canReviewEvals = caps?.can_review_evals ?? false;
+  const canInviteUsers = caps?.can_invite_users ?? false;
+  const canManageLibrary = caps?.can_manage_library ?? false;
+  const canManageLocations = caps?.can_manage_locations ?? false;
+  const canManageUsers = caps?.can_manage_users ?? false;
+  const canManageAssignments = (caps?.can_manage_assignments ?? false) || isOrgAdmin || isSuperAdmin;
 
   // ─── Managed scope lists ──────────────────────────────────────────────────
   const managedLocationIds = locationScopes.map(s => s.scope_id);

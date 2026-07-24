@@ -53,18 +53,18 @@ legacy-flags-only; UK admins are capabilities-only. Order matters.
 |---|---|---|
 | 1.1 | ✅ **DONE 2026-07-24.** Backfilled `user_capabilities` for all 39 missing staff (migration `20260724120000_backfill_user_capabilities.sql`, applied live). Verified: 105/105 staff covered, 0 mismatches vs. legacy-derived formulas; no RLS policy reads `user_capabilities`, so scope of effect is the frontend hook only. The 8 legacy-only leaders (Raul, Wes, Lauren, Dr. Alex, Kasey, 3 OMs) mirror correctly. | Behavior-preserving by construction |
 | 1.2 | ✅ **DONE 2026-07-25.** John walked every persona: all correct (participant, OM scoping, regional, Ariyana, UK org admin, platform admin). Two tightenings requested and implemented same day: (a) Facilitate limited to regionals/org admins/super admins — leads and OMs keep Coach but lose Facilitate (`allowFacilitate` guard + split menu entry); (b) leads no longer see staff evaluations — Quarterly Evaluations tab and eval deep-link routes now require evaluator/admin capability or OM (`allowStaffEvals`; OM access confirmed intentional — appropriate to the role, low expected use). Wrinkles logged: roaming staff (PRD §13), UK eval-tenant wiring check (Phase C below). **Pushed `29b115e7` + gate fix `f43246ab` 2026-07-25** (first spot check caught leads still seeing Facilitate: 5 lead RDAs carry **org-wide** `coach_scopes` rows → `isRegional` passed the gate; fixed by excluding participants). Awaiting Lovable pull + publish + re-check. **Open data question (1.6):** should leads hold org-wide scopes at all? Org scope means those 5 leads can browse every staff member org-wide in Coach; location scope would match the "location lead" model but shrinks their staff list — owner call. Jennifer Esquivel also has 3 duplicate org scope rows (hygiene). | Change note drafted 2026-07-25 |
-| 1.3 | **Flip `useUserRole` to caps-only; retire legacy `is_*` reads** (nav-plan 3.1) | Change note for admins |
-| 1.4 | **Retire duplicate scope columns** `staff.coach_scope_type/id` → `coach_scopes` table only; fix `EditUserDrawer` writer first (nav-plan 3.2) | |
-| 1.5 | **Name the archetypes.** Six real personas exist (snapshot §3). Admin UI should offer named presets (Participant, Lead, Evaluator/Regional, Clinical Director, Org Admin, Platform Admin) + scope, with toggles as advanced overrides. Model OM/Doctor/Clinical Director/Lead as "who they are" attributes, not capabilities (nav-plan 3.3). | This is the "simpler than it needs to be" fix |
+| 1.3 | ✅ **DONE 2026-07-25.** `useUserRole` is caps-only (legacy `is_*` fallbacks removed; zero behavior change since all 105 staff have mirrored caps rows and caps already won when present). `admin-users` edge function gained capability presets for `doctor` and `clinical_director` (previously left caps stale) and was **deployed to prod**. Legacy flags are still *written* by presets (harmless) until their own retirement slice. | Provably equivalent |
+| 1.4 | 🔵 **Mostly done 2026-07-25.** Verified no column-only scope data; both RPCs (`get_staff_weekly_scores`, `get_coach_roster_summary`) rewritten to read scope ONLY from `coach_scopes` (applied live); `admin-users` no longer writes `staff.coach_scope_type/id`; `useStaffProfile` no longer selects them. **Remaining:** admin-users get/update actions still select the columns — clean those, then the column drop joins the staged migration. | Column drop lags deploy |
+| 1.5 | **Name the archetypes — NEXT UP, needs owner input.** The drawer already works via presets (participant, lead, coach, coach_participant, regional_manager, super_admin, doctor, clinical_director) hitting admin-users. Remaining: align preset names/labels with the archetype model, and decide how **Office Manager** is set (today `is_office_manager` has no preset). Proposed archetype list to confirm with John: Participant / Lead / Office Manager / Evaluator / Regional-Director / Clinical Director / Doctor / Org Admin / Platform Admin. | Owner confirms preset list first |
 
 ## Track 2 — Database cleanup (after 1.1-1.2, alongside 1.3+)
 
 | # | Step | Notes |
 |---|---|---|
-| 2.1 | **Drop never-used tables:** `weekly_self_select`, `manager_priorities`, `resource_events`, `user_backlog` (v1). Remove frontend dead writers first (`backlog.ts:saveUserSelection`, self-select types). | Zero rows ever; still grep functions/ first |
-| 2.2 | **Retire the self-select code paths** end-to-end (types, `selfSelect` branches, `areSelectionsLocked`). | Product decision: never doing it |
-| 2.3 | **Retire `user_backlog_v2`** (decided 2026-07-24: no missed-assignment workflow). Remove the missed-week writer (`backlog.ts`), the RPC overload that reads it, then the table. **Gate:** first confirm during the sequencer review that recommendations don't depend on it. | Code first, table drop lags deploy |
-| 2.4 | **Retire `weekly_focus` + `weekly_plan` + cycle machinery** (backlog A1-A3): remove stale frontend fallbacks (wizards, facilitatorData, planner components, `sequencer-rank` references), collapse the cycle/week formula out of RPCs, archive both tables (export CSV, then drop or rename `_archive`). Update/delete `src/lib/unifiedAssignments.md`. | The big one; do last, in slices, behind the walkthrough gate |
+| 2.1 | ✅ **Code done 2026-07-25.** Deleted orphaned legacy modules (`siteState.ts`, `coachStatus.ts`, `progressTracking.ts`, `v2/weekAssembly.ts`, `v2/locationState.ts`, `backlog.ts`). Table drops staged in `supabase/staged/drop_retired_backlog_and_selfselect.sql` — **apply only after the Lovable publish that includes these removals.** | Drops lag deploy |
+| 2.2 | ✅ **Code done 2026-07-25.** Self-select helpers removed from `weekAssembly`; `weekly_self_select` cleanup removed from admin-users (deployed). | |
+| 2.3 | ✅ **Code done 2026-07-25.** Sequencer confirmed NOT to read `user_backlog_v2` (gate cleared). Backlog writers removed (`locationState`, `rollover`); roster RPC returns `backlog_count = 0`. Table + backlog RPCs + the legacy uuid overload of `get_staff_week_assignments` are in the staged drop file. | Drops lag deploy |
+| 2.4 | **Retire `weekly_focus` + `weekly_plan` + cycle machinery** (backlog A1-A3) — **sliced plan, 2026-07-25:** each slice ships alone, invisible to users, verified by build + participant/coach spot check before the next. **Slice A — rollover:** remove `enforceWeeklyRolloverNow` from `ThisWeekPanel`, delete `v2/rollover.ts` + the SequencerTestConsole dry-run + the `sequencer-rollover` edge function (cycles-1-3 only; dormant). **Slice B — plan/focus reads:** remove `weekly_plan`/`weekly_focus` fallback reads from wizards, `facilitatorData`, planner components, `sequencer-rank`; decide GlobalPlanManager's fate (superseded by Builder). **Slice C — cycle formula:** collapse cycle/week-in-cycle out of the remaining RPCs (`get_staff_week_assignments` text overload, `get_staff_statuses`) and retire `site_cycle_state`; delete stale `src/lib/unifiedAssignments.md`. **Slice D — archive + drop:** CSV-export then drop `weekly_focus`, `weekly_plan`, `site_cycle_state`; also drop `staff.coach_scope_type/id` (after 1.4 residue ships) and legacy `is_*` write retirement; regenerate `types.ts`. | Each slice lags its deploy |
 | 2.5 | **Keep and re-document `coach_baseline_*`** as the doctor-track observed baseline. Correct data-model.md §6 + backlog C1. | Was wrongly slated as removable |
 | 2.6 | **Deputy tidy:** reconcile `sync_enabled` vs `auto_sync_enabled`; enable or remove the dormant second connection. | Small |
 
@@ -91,12 +91,16 @@ legacy-flags-only; UK admins are capabilities-only. Order matters.
 5. **AI insights on the growing dataset** (NF2), after 1-4 give it somewhere to
    land.
 
-## Sequencing summary
+## Sequencing summary (updated 2026-07-25 evening)
 
-**Done:** 1.1 (backfill, live), 1.2 (walkthrough + tightenings, pushed `29b115e7`).
-**Now:** Lovable publish + John's spot check of the tightenings.
-**Next:** 1.3 (flip `useUserRole` to caps-only) once the spot check passes, then
-1.4-1.5 with 2.1-2.2 interleaved (each small, each behind the gate). PRD Phase C
-(space-by-space comparison) can start in parallel.
-**Then:** Phase C findings become the Track 3 work list; 2.3-2.4 when convenient.
-**Later:** 3.4-3.5, remaining Track 4 items per PRD priorities.
+**Done:** 1.1, 1.2 (+ tightenings), group-scope visibility for leads/OMs (live),
+remind-button + facilitate-dropdown gating (in repo), 1.3 flip (live edge +
+frontend in repo), 1.4 (all but admin-users get/update column reads), 2.1-2.3
+code (drops staged in `supabase/staged/`).
+**Now:** Lovable publish → John spot-checks (lead: group-only Coach list, no
+Facilitate, no remind buttons, no eval tab; OM: group list, no Facilitate, no
+remind; facilitate dropdown shows only in-use roles; regionals unchanged).
+**Then:** apply the staged drop file (after publish confirmed), 1.5 preset
+naming (owner confirms archetype list), 2.4 slices A→D one at a time.
+**In parallel:** PRD Phase C comparison; its findings become the Track 3 list.
+**Later:** 3.x per Phase C; Track 4 per PRD priorities.

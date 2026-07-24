@@ -2,7 +2,7 @@ import { getWeekAnchors } from '@/v2/time';
 import { getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchOrgProMoveMetaByIds } from '@/lib/proMoves';
-import { getOpenBacklogCountV2, populateBacklogV2ForMissedWeek } from './backlog';
+// (backlog helpers removed 2026-07-25 — no missed-assignment workflow; roadmap 2.3)
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -414,9 +414,8 @@ export async function computeWeekState(params: {
       ? (latestConf.at > latestPerf.at ? latestConf : latestPerf)
       : (latestConf ?? latestPerf);
 
-  // Get backlog count
-  const backlogResult = await getOpenBacklogCountV2(staffId);
-  const backlogCount = backlogResult.count;
+  // Backlog retired (2026-07-25): no missed-assignment workflow, count is always 0.
+  const backlogCount = 0;
 
   // Check for selection pending
   const selectionPending = false; // Simplified for now

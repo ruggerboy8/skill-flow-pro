@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { assembleWeek as locationAssembleWeek, getLocationWeekContext } from "./locationState";
-import { areSelectionsLocked, saveUserSelection } from "./backlog"; // (getOpenBacklogCountV2 not used here)
+// (self-select helpers removed 2026-07-25 — self-select was never adopted; roadmap 2.2)
  // NOTE: nowUtc/getAnchors imports removed: not used in site-centric assembly
 
 export interface WeekAssignment {
@@ -122,4 +122,3 @@ export async function assembleCurrentWeek(
 }
 
 // Re-export (unchanged)
-export { saveUserSelection, areSelectionsLocked } from "./backlog";

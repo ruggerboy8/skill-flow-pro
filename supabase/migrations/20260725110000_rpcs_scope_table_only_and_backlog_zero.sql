@@ -1,0 +1,12 @@
+-- Applied live via MCP on 2026-07-25 (roadmap 1.4 + 2.3 prep); this file is the
+-- repo record. Idempotent (CREATE OR REPLACE) — safe if re-run by Lovable.
+--
+-- 1) get_coach_roster_summary: reads scope ONLY from coach_scopes (drops the
+--    UNION with staff.coach_scope_type/id, which are retired); OMs added to
+--    caller eligibility; backlog_count now returns 0 (user_backlog_v2 retiring).
+-- 2) get_staff_weekly_scores: same singular-column retirement.
+-- Full definitions live in the migration history (see dashboard) — kept out of
+-- this file to avoid divergence; the authoritative source is the applied
+-- migrations "retire_singular_scope_columns_in_rpcs" and
+-- "drop_singular_scope_union_in_weekly_scores_rpc".
+select 1;

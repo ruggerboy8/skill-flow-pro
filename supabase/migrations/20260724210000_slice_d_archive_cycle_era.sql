@@ -1,7 +1,5 @@
--- ██ STAGED — 2.4 Slice D. DO NOT APPLY until the Lovable publish that includes
--- ██ slices A-C (commits 735c83c4, 703b0527, f1b538ab) is live. The deployed
--- ██ bundle's Builder MonthView still queries weekly_plan until then.
---
+-- APPLIED LIVE 2026-07-24 (roadmap 2.4 slice D). Idempotent: renames use IF
+-- EXISTS (skip once archived) and the drop loop matches nothing on re-run.
 -- Archive-in-place: RENAME (not drop) the cycle-era tables. Data is fully
 -- preserved and rollback is a rename back. The zzz_ prefix keeps them at the
 -- bottom of table lists and out of the way.

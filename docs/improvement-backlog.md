@@ -23,10 +23,10 @@ together and proceed carefully — some are still load-bearing in code.
 
 | # | Item | Notes | Status |
 |---|---|---|---|
-| A1 | **Cycle / week-in-cycle concept** | No longer meaningful to the product. Still wired into RPCs (`get_staff_week_assignments`, etc.) and the cycle/week formula. Retiring it is a careful, multi-surface job; may be left in place with a "legacy" label if removal is too risky. | 🟡 |
-| A2 | **`weekly_focus` table** | Deprecated assignment source (cycles 1–3). Current functionality uses `weekly_plan` / `weekly_assignments`. May still back some historical staff views — confirm before removing. | 🟡 |
-| A3 | **Rollover** (`src/v2/rollover.ts`, `sequencer-rollover`) | Only runs for cycles 1–3; pushes incomplete site moves to backlog. Dormant for current usage. Legacy of the self-select idea. | 🟡 |
-| A4 | **Self-select** (`weekly_self_select`, `weekly_focus.self_select`) | Product decision: staff will **not** self-select Pro Moves. Remove if it breaks nothing; else mark "considered, not adopted." | 🟡 |
+| A1 | **Cycle / week-in-cycle concept** | ✅ **RETIRED 2026-07-24** (roadmap 2.4 slices A-D). The cycle-referencing RPCs are dropped or rewritten; `weekly_scores.site_action_id` backfilled for all eras makes history self-describing. Residual cycle math in `locationState` week labels only. | ✅ |
+| A2 | **`weekly_focus` table** | ✅ **ARCHIVED 2026-07-24** as `zzz_archived_weekly_focus` (rename-in-place; `weekly_plan` and `site_cycle_state` likewise). All readers removed or rewritten first. | ✅ |
+| A3 | **Rollover** | ✅ **RETIRED 2026-07-24.** `v2/rollover.ts` deleted, ThisWeekPanel call removed, `sequencer-rollover` edge function deleted from prod. | ✅ |
+| A4 | **Self-select** | ✅ **REMOVED 2026-07-24.** Tables dropped (`weekly_self_select`, backlog v1+v2), code paths stripped. Decision recorded: staff never self-select. | ✅ |
 
 ## B. Model simplification
 

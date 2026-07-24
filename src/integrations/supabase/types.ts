@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       _eval_repair_targets: {
@@ -1860,58 +1885,6 @@ export type Database = {
           },
         ]
       }
-      manager_priorities: {
-        Row: {
-          action_id: number
-          coach_staff_id: string
-          created_at: string
-          id: number
-          role_id: number
-          updated_at: string
-          weight: number
-        }
-        Insert: {
-          action_id: number
-          coach_staff_id: string
-          created_at?: string
-          id?: number
-          role_id: number
-          updated_at?: string
-          weight?: number
-        }
-        Update: {
-          action_id?: number
-          coach_staff_id?: string
-          created_at?: string
-          id?: number
-          role_id?: number
-          updated_at?: string
-          weight?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "manager_priorities_action_id_fkey"
-            columns: ["action_id"]
-            isOneToOne: false
-            referencedRelation: "pro_moves"
-            referencedColumns: ["action_id"]
-          },
-          {
-            foreignKeyName: "manager_priorities_coach_staff_id_fkey"
-            columns: ["coach_staff_id"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "manager_priorities_coach_staff_id_fkey"
-            columns: ["coach_staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_evaluation_items_enriched"
-            referencedColumns: ["staff_id"]
-          },
-        ]
-      }
       organization_pro_move_content_overrides: {
         Row: {
           created_at: string
@@ -2466,48 +2439,6 @@ export type Database = {
         }
         Relationships: []
       }
-      resource_events: {
-        Row: {
-          action_id: number
-          created_at: string
-          event_type: string
-          id: number
-          resource_id: string
-          staff_id: string
-        }
-        Insert: {
-          action_id: number
-          created_at?: string
-          event_type: string
-          id?: number
-          resource_id: string
-          staff_id: string
-        }
-        Update: {
-          action_id?: number
-          created_at?: string
-          event_type?: string
-          id?: number
-          resource_id?: string
-          staff_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "resource_events_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "resource_events_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_evaluation_items_enriched"
-            referencedColumns: ["staff_id"]
-          },
-        ]
-      }
       roles: {
         Row: {
           active: boolean
@@ -2599,36 +2530,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      site_cycle_state: {
-        Row: {
-          created_at: string
-          cycle_length_weeks: number
-          cycle_start_date: string
-          id: string
-          site_id: string
-          timezone: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          cycle_length_weeks?: number
-          cycle_start_date: string
-          id?: string
-          site_id: string
-          timezone?: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          cycle_length_weeks?: number
-          cycle_start_date?: string
-          id?: string
-          site_id?: string
-          timezone?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       staff: {
         Row: {
@@ -3139,91 +3040,6 @@ export type Database = {
           },
         ]
       }
-      user_backlog: {
-        Row: {
-          added_week_id: string
-          created_at: string
-          id: string
-          pro_move_id: number
-          resolved_week_id: string | null
-          status: string
-          user_id: string
-        }
-        Insert: {
-          added_week_id: string
-          created_at?: string
-          id?: string
-          pro_move_id: number
-          resolved_week_id?: string | null
-          status?: string
-          user_id: string
-        }
-        Update: {
-          added_week_id?: string
-          created_at?: string
-          id?: string
-          pro_move_id?: number
-          resolved_week_id?: string | null
-          status?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_backlog_v2: {
-        Row: {
-          action_id: number
-          assigned_on: string
-          created_at: string
-          id: string
-          resolved_on: string | null
-          source_cycle: number | null
-          source_week: number | null
-          staff_id: string
-        }
-        Insert: {
-          action_id: number
-          assigned_on?: string
-          created_at?: string
-          id?: string
-          resolved_on?: string | null
-          source_cycle?: number | null
-          source_week?: number | null
-          staff_id: string
-        }
-        Update: {
-          action_id?: number
-          assigned_on?: string
-          created_at?: string
-          id?: string
-          resolved_on?: string | null
-          source_cycle?: number | null
-          source_week?: number | null
-          staff_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_backlog_v2_action_id_fkey"
-            columns: ["action_id"]
-            isOneToOne: false
-            referencedRelation: "pro_moves"
-            referencedColumns: ["action_id"]
-          },
-          {
-            foreignKeyName: "user_backlog_v2_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_backlog_v2_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_evaluation_items_enriched"
-            referencedColumns: ["staff_id"]
-          },
-        ]
-      }
       user_capabilities: {
         Row: {
           can_invite_users: boolean
@@ -3384,7 +3200,129 @@ export type Database = {
           },
         ]
       }
-      weekly_focus: {
+      weekly_scores: {
+        Row: {
+          assignment_id: string | null
+          confidence_date: string | null
+          confidence_late: boolean | null
+          confidence_score: number | null
+          confidence_source: Database["public"]["Enums"]["score_source"]
+          created_at: string | null
+          entered_by: string
+          id: string
+          performance_date: string | null
+          performance_late: boolean | null
+          performance_score: number | null
+          performance_source: Database["public"]["Enums"]["score_source"]
+          selected_action_id: number | null
+          site_action_id: number | null
+          staff_id: string | null
+          updated_at: string | null
+          week_of: string | null
+          weekly_focus_id: string | null
+        }
+        Insert: {
+          assignment_id?: string | null
+          confidence_date?: string | null
+          confidence_late?: boolean | null
+          confidence_score?: number | null
+          confidence_source?: Database["public"]["Enums"]["score_source"]
+          created_at?: string | null
+          entered_by?: string
+          id?: string
+          performance_date?: string | null
+          performance_late?: boolean | null
+          performance_score?: number | null
+          performance_source?: Database["public"]["Enums"]["score_source"]
+          selected_action_id?: number | null
+          site_action_id?: number | null
+          staff_id?: string | null
+          updated_at?: string | null
+          week_of?: string | null
+          weekly_focus_id?: string | null
+        }
+        Update: {
+          assignment_id?: string | null
+          confidence_date?: string | null
+          confidence_late?: boolean | null
+          confidence_score?: number | null
+          confidence_source?: Database["public"]["Enums"]["score_source"]
+          created_at?: string | null
+          entered_by?: string
+          id?: string
+          performance_date?: string | null
+          performance_late?: boolean | null
+          performance_score?: number | null
+          performance_source?: Database["public"]["Enums"]["score_source"]
+          selected_action_id?: number | null
+          site_action_id?: number | null
+          staff_id?: string | null
+          updated_at?: string | null
+          week_of?: string | null
+          weekly_focus_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_scores_selected_action_id_fkey"
+            columns: ["selected_action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_site_action_fk"
+            columns: ["site_action_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
+      zzz_archived_site_cycle_state: {
+        Row: {
+          created_at: string
+          cycle_length_weeks: number
+          cycle_start_date: string
+          id: string
+          site_id: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cycle_length_weeks?: number
+          cycle_start_date: string
+          id?: string
+          site_id: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cycle_length_weeks?: number
+          cycle_start_date?: string
+          id?: string
+          site_id?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      zzz_archived_weekly_focus: {
         Row: {
           action_id: number | null
           competency_id: number | null
@@ -3455,7 +3393,7 @@ export type Database = {
           },
         ]
       }
-      weekly_plan: {
+      zzz_archived_weekly_plan: {
         Row: {
           action_id: number | null
           competency_id: number | null
@@ -3553,131 +3491,6 @@ export type Database = {
             referencedColumns: ["role_id"]
           },
         ]
-      }
-      weekly_scores: {
-        Row: {
-          assignment_id: string | null
-          confidence_date: string | null
-          confidence_late: boolean | null
-          confidence_score: number | null
-          confidence_source: Database["public"]["Enums"]["score_source"]
-          created_at: string | null
-          entered_by: string
-          id: string
-          performance_date: string | null
-          performance_late: boolean | null
-          performance_score: number | null
-          performance_source: Database["public"]["Enums"]["score_source"]
-          selected_action_id: number | null
-          site_action_id: number | null
-          staff_id: string | null
-          updated_at: string | null
-          week_of: string | null
-          weekly_focus_id: string | null
-        }
-        Insert: {
-          assignment_id?: string | null
-          confidence_date?: string | null
-          confidence_late?: boolean | null
-          confidence_score?: number | null
-          confidence_source?: Database["public"]["Enums"]["score_source"]
-          created_at?: string | null
-          entered_by?: string
-          id?: string
-          performance_date?: string | null
-          performance_late?: boolean | null
-          performance_score?: number | null
-          performance_source?: Database["public"]["Enums"]["score_source"]
-          selected_action_id?: number | null
-          site_action_id?: number | null
-          staff_id?: string | null
-          updated_at?: string | null
-          week_of?: string | null
-          weekly_focus_id?: string | null
-        }
-        Update: {
-          assignment_id?: string | null
-          confidence_date?: string | null
-          confidence_late?: boolean | null
-          confidence_score?: number | null
-          confidence_source?: Database["public"]["Enums"]["score_source"]
-          created_at?: string | null
-          entered_by?: string
-          id?: string
-          performance_date?: string | null
-          performance_late?: boolean | null
-          performance_score?: number | null
-          performance_source?: Database["public"]["Enums"]["score_source"]
-          selected_action_id?: number | null
-          site_action_id?: number | null
-          staff_id?: string | null
-          updated_at?: string | null
-          week_of?: string | null
-          weekly_focus_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "weekly_scores_selected_action_id_fkey"
-            columns: ["selected_action_id"]
-            isOneToOne: false
-            referencedRelation: "pro_moves"
-            referencedColumns: ["action_id"]
-          },
-          {
-            foreignKeyName: "weekly_scores_site_action_fk"
-            columns: ["site_action_id"]
-            isOneToOne: false
-            referencedRelation: "pro_moves"
-            referencedColumns: ["action_id"]
-          },
-          {
-            foreignKeyName: "weekly_scores_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "weekly_scores_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "view_evaluation_items_enriched"
-            referencedColumns: ["staff_id"]
-          },
-        ]
-      }
-      weekly_self_select: {
-        Row: {
-          created_at: string
-          id: string
-          selected_pro_move_id: number
-          slot_index: number
-          source: string
-          updated_at: string
-          user_id: string
-          weekly_focus_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          selected_pro_move_id: number
-          slot_index: number
-          source?: string
-          updated_at?: string
-          user_id: string
-          weekly_focus_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          selected_pro_move_id?: number
-          slot_index?: number
-          source?: string
-          updated_at?: string
-          user_id?: string
-          weekly_focus_id?: string
-        }
-        Relationships: []
       }
     }
     Views: {
@@ -4006,29 +3819,12 @@ export type Database = {
       }
     }
     Functions: {
-      add_backlog_if_missing: {
-        Args: {
-          p_action_id: number
-          p_cycle: number
-          p_staff_id: string
-          p_week: number
-        }
-        Returns: undefined
-      }
       admin_fix_backfill_week_of: {
         Args: never
         Returns: {
           sample_staff: string
           updated_count: number
         }[]
-      }
-      backfill_historical_score_timestamps: {
-        Args: {
-          p_jitter_minutes?: number
-          p_only_backfill?: boolean
-          p_staff_id: string
-        }
-        Returns: number
       }
       bulk_release_evaluations: {
         Args: {
@@ -4099,20 +3895,6 @@ export type Database = {
       }
       current_user_org_id: { Args: never; Returns: string }
       current_user_staff_id: { Args: never; Returns: string }
-      delete_latest_week_data: { Args: { p_user_id: string }; Returns: Json }
-      delete_week_data: {
-        Args: {
-          p_cycle: number
-          p_role_id: number
-          p_staff_id: string
-          p_week: number
-        }
-        Returns: Json
-      }
-      delete_week_data_by_week: {
-        Args: { p_role_id: number; p_staff_id: string; p_week_of: string }
-        Returns: Json
-      }
       get_best_weekly_win: {
         Args: { p_staff_id: string }
         Returns: {
@@ -4161,21 +3943,7 @@ export type Database = {
           tz: string
         }[]
       }
-      get_consistency: {
-        Args: { p_staff_id: string; p_tz?: string; p_weeks?: number }
-        Returns: Json
-      }
       get_current_staff_id: { Args: never; Returns: string }
-      get_cycle_week_status: {
-        Args: { p_role_id: number; p_staff_id: string }
-        Returns: {
-          conf_count: number
-          cycle: number
-          perf_count: number
-          total: number
-          week_in_cycle: number
-        }[]
-      }
       get_eval_distribution_metrics: {
         Args: {
           p_location_ids?: string[]
@@ -4237,23 +4005,6 @@ export type Database = {
               type: string
             }[]
           }
-      get_focus_cycle_week: {
-        Args: { p_cycle: number; p_role_id: number; p_week: number }
-        Returns: {
-          action_statement: string
-          display_order: number
-          domain_name: string
-          id: string
-        }[]
-      }
-      get_last_progress_week: {
-        Args: { p_staff_id: string }
-        Returns: {
-          is_complete: boolean
-          last_cycle: number
-          last_week: number
-        }[]
-      }
       get_location_domain_staff_averages: {
         Args: {
           p_end: string
@@ -4496,23 +4247,6 @@ export type Database = {
           staff_id: string
         }[]
       }
-      get_staff_week_assignments:
-        | {
-            Args: {
-              p_role_id: number
-              p_staff_id: string
-              p_week_start: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_role_id: number
-              p_staff_id: string
-              p_week_start: string
-            }
-            Returns: Json
-          }
       get_staff_weekly_scores: {
         Args: { p_coach_user_id: string; p_week_of?: string }
         Returns: {
@@ -4575,42 +4309,6 @@ export type Database = {
         }[]
       }
       get_user_org_id: { Args: { p_user_id: string }; Returns: string }
-      get_week_detail_by_week: {
-        Args: {
-          p_role_id: number
-          p_source: string
-          p_staff_id: string
-          p_week_of: string
-        }
-        Returns: {
-          action_statement: string
-          confidence_score: number
-          domain_name: string
-          performance_score: number
-        }[]
-      }
-      get_week_in_cycle: {
-        Args: {
-          check_date?: string
-          cycle_length_weeks: number
-          cycle_start_date: string
-        }
-        Returns: number
-      }
-      get_weekly_review: {
-        Args: {
-          p_cycle: number
-          p_role_id: number
-          p_staff_id: string
-          p_week: number
-        }
-        Returns: {
-          action_statement: string
-          confidence_score: number
-          domain_name: string
-          performance_score: number
-        }[]
-      }
       is_admin: { Args: { check_user_id: string }; Returns: boolean }
       is_clinical_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_coach_or_admin: { Args: { _user_id: string }; Returns: boolean }
@@ -4637,10 +4335,6 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_superadmin: { Args: never; Returns: boolean }
       mark_eval_viewed: { Args: { p_eval_id: string }; Returns: undefined }
-      needs_backfill: {
-        Args: { p_role_id: number; p_staff_id: string }
-        Returns: Json
-      }
       org_id_of_location: { Args: { _location_id: string }; Returns: string }
       org_id_of_staff: { Args: { _staff_id: string }; Returns: string }
       org_visible_pro_moves: {
@@ -4660,45 +4354,13 @@ export type Database = {
         Returns: string
       }
       publish_survey: { Args: { p_survey_id: string }; Returns: undefined }
-      recover_orphaned_scores: { Args: never; Returns: Json }
       release_single_evaluation: {
         Args: { p_eval_id: string; p_released_by: string; p_visible: boolean }
-        Returns: undefined
-      }
-      replace_weekly_focus: {
-        Args: {
-          p_cycle: number
-          p_role_id: number
-          p_slots: Json
-          p_week_in_cycle: number
-        }
-        Returns: Json
-      }
-      resolve_backlog_item: {
-        Args: { p_action_id: number; p_staff_id: string }
         Returns: undefined
       }
       resolve_role_display_name: {
         Args: { p_org_id: string; p_role_id: number }
         Returns: string
-      }
-      retime_backfill_cycle:
-        | {
-            Args: { p_cycle: number; p_role_id: number; p_staff_id: string }
-            Returns: string
-          }
-        | {
-            Args: { p_cycle: number; p_role_id: number; p_staff_id: string }
-            Returns: undefined
-          }
-      rewrite_backfill_week: {
-        Args: {
-          p_cycle: number
-          p_role_id: number
-          p_staff_id: string
-          p_week: number
-        }
-        Returns: undefined
       }
       save_eval_acknowledgement_and_focus:
         | {
@@ -4714,40 +4376,6 @@ export type Database = {
             }
             Returns: undefined
           }
-      seq_confidence_history_18w: {
-        Args: {
-          p_effective_date: string
-          p_org_id: string
-          p_role_id: number
-          p_tz: string
-        }
-        Returns: {
-          avg01: number
-          n: number
-          pro_move_id: number
-          week_start: string
-        }[]
-      }
-      seq_domain_coverage_8w: {
-        Args: {
-          p_effective_date: string
-          p_org_id: string
-          p_role_id: number
-          p_tz: string
-        }
-        Returns: {
-          appearances: number
-          domain_id: number
-          weeks_counted: number
-        }[]
-      }
-      seq_last_selected_by_move: {
-        Args: { p_org_id: string; p_role_id: number; p_tz: string }
-        Returns: {
-          pro_move_id: number
-          week_start: string
-        }[]
-      }
       seq_latest_quarterly_evals:
         | {
             Args: { p_org_id: string; p_role_id: number }
@@ -4897,6 +4525,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       plan_status: ["locked", "draft"],

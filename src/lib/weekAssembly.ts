@@ -30,37 +30,8 @@ async function findUserActiveWeek(
   simOverrides?: any,
   now?: Date
 ): Promise<{ cycleNumber: number; weekInCycle: number }> {
-  // Explicit opt-in to progress mode (legacy / special sims)
-  if (simOverrides?.mode === "progress") {
-    const { data: locationData } = await supabase
-      .from("locations")
-      .select("cycle_length_weeks")
-      .eq("id", locationId)
-      .single();
-
-    if (!locationData) {
-      throw new Error(`Location not found for locationId: ${locationId}`);
-    }
-    const cycleLength = locationData.cycle_length_weeks;
-
-    const { data, error } = await supabase.rpc("get_last_progress_week", {
-      p_staff_id: staffId,
-    });
-    if (error) throw error;
-
-    let cycleNumber = data?.[0]?.last_cycle ?? 1;
-    let weekInCycle = data?.[0]?.last_week ?? 1;
-    const isComplete = !!data?.[0]?.is_complete;
-
-    if (isComplete) {
-      weekInCycle += 1;
-      if (weekInCycle > cycleLength) {
-        weekInCycle = 1;
-        cycleNumber += 1;
-      }
-    }
-    return { cycleNumber, weekInCycle };
-  }
+  // (Legacy "progress mode" sim branch removed 2026-07-24 — it called the
+  // retired get_last_progress_week RPC; site-centric is the only mode.)
 
   // Default: SITE-CENTRIC (location calendar)
   const context = await getLocationWeekContext(locationId, now ?? new Date());

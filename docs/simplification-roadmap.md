@@ -52,7 +52,7 @@ legacy-flags-only; UK admins are capabilities-only. Order matters.
 | # | Step | Notes |
 |---|---|---|
 | 1.1 | ✅ **DONE 2026-07-24.** Backfilled `user_capabilities` for all 39 missing staff (migration `20260724120000_backfill_user_capabilities.sql`, applied live). Verified: 105/105 staff covered, 0 mismatches vs. legacy-derived formulas; no RLS policy reads `user_capabilities`, so scope of effect is the frontend hook only. The 8 legacy-only leaders (Raul, Wes, Lauren, Dr. Alex, Kasey, 3 OMs) mirror correctly. | Behavior-preserving by construction |
-| 1.2 | ✅ **DONE 2026-07-25.** John walked every persona: all correct (participant, OM scoping, regional, Ariyana, UK org admin, platform admin). Two tightenings requested and implemented same day: (a) Facilitate limited to regionals/org admins/super admins — leads and OMs keep Coach but lose Facilitate (`allowFacilitate` guard + split menu entry); (b) leads no longer see staff evaluations — Quarterly Evaluations tab and eval deep-link routes now require evaluator/admin capability or OM (`allowStaffEvals`). Wrinkles logged: roaming staff (PRD §13), UK eval-tenant wiring check (Phase C below). | Ship with change note for leads/OMs |
+| 1.2 | ✅ **DONE 2026-07-25.** John walked every persona: all correct (participant, OM scoping, regional, Ariyana, UK org admin, platform admin). Two tightenings requested and implemented same day: (a) Facilitate limited to regionals/org admins/super admins — leads and OMs keep Coach but lose Facilitate (`allowFacilitate` guard + split menu entry); (b) leads no longer see staff evaluations — Quarterly Evaluations tab and eval deep-link routes now require evaluator/admin capability or OM (`allowStaffEvals`; OM access confirmed intentional — appropriate to the role, low expected use). Wrinkles logged: roaming staff (PRD §13), UK eval-tenant wiring check (Phase C below). **Pushed to main `29b115e7` 2026-07-25; awaiting Lovable publish + John's live spot check (leads/OMs menus), with the change note for leads/OMs.** | Change note drafted 2026-07-25 |
 | 1.3 | **Flip `useUserRole` to caps-only; retire legacy `is_*` reads** (nav-plan 3.1) | Change note for admins |
 | 1.4 | **Retire duplicate scope columns** `staff.coach_scope_type/id` → `coach_scopes` table only; fix `EditUserDrawer` writer first (nav-plan 3.2) | |
 | 1.5 | **Name the archetypes.** Six real personas exist (snapshot §3). Admin UI should offer named presets (Participant, Lead, Evaluator/Regional, Clinical Director, Org Admin, Platform Admin) + scope, with toggles as advanced overrides. Model OM/Doctor/Clinical Director/Lead as "who they are" attributes, not capabilities (nav-plan 3.3). | This is the "simpler than it needs to be" fix |
@@ -93,7 +93,10 @@ legacy-flags-only; UK admins are capabilities-only. Order matters.
 
 ## Sequencing summary
 
-**Now:** 1.1 → 1.2 (backfill + walkthrough).
-**Next:** 1.3-1.5 with 2.1-2.2 interleaved (each small, each behind the gate).
-**Then:** 3.1-3.3 (the visible payoff), 2.3-2.4 when convenient.
-**Later:** 3.4-3.5, Track 4 in order.
+**Done:** 1.1 (backfill, live), 1.2 (walkthrough + tightenings, pushed `29b115e7`).
+**Now:** Lovable publish + John's spot check of the tightenings.
+**Next:** 1.3 (flip `useUserRole` to caps-only) once the spot check passes, then
+1.4-1.5 with 2.1-2.2 interleaved (each small, each behind the gate). PRD Phase C
+(space-by-space comparison) can start in parallel.
+**Then:** Phase C findings become the Track 3 work list; 2.3-2.4 when convenient.
+**Later:** 3.4-3.5, remaining Track 4 items per PRD priorities.

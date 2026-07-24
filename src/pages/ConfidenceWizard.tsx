@@ -667,8 +667,8 @@ export default function ConfidenceWizard() {
     setCompetencyById(compMap);
     setCompetencyNameById(compNameMap);
 
-    // Fetch options for competencies
-    const allCompIds = [...Object.values(compMap), ...(focusMeta || []).map((m: any) => m.competency_id)];
+    // Fetch options for competencies (weekly_focus metadata retired 2026-07-25)
+    const allCompIds = [...Object.values(compMap)];
     const compIds = Array.from(new Set(allCompIds.filter((cid: any) => !!cid)));
     if (compIds.length) {
       const { data: opts } = await supabase

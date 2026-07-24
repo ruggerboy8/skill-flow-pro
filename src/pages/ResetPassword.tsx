@@ -17,21 +17,44 @@ export default function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [working, setWorking] = useState(false);
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
 
   const canVerify = useMemo(() => email && code.length >= 6, [email, code]);
   const canSave = useMemo(() => password.length >= 8 && password === confirm, [password, confirm]);
 
-  // On mount, check if we already have a valid session (from AuthCallback recovery flow)
+  // On mount, check if we already have a valid session (from AuthCallback
+  // recovery flow). CRITICAL: the session must belong to the account the reset
+  // was requested for. If the browser had a pre-existing session for a
+  // DIFFERENT account (e.g. an admin clicking a reset link they sent for
+  // someone else) and the link's token exchange failed, updateUser() would
+  // silently change the wrong account's password (happened 2026-07-24). In
+  // that case: drop the session and fall back to the OTP code flow, which
+  // establishes a session for the correct account via verifyOtp.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const targetEmail = params.get("email");
+      if (
+        session &&
+        targetEmail &&
+        session.user.email?.toLowerCase() !== targetEmail.toLowerCase()
+      ) {
+        await supabase.auth.signOut();
+        toast({
+          title: "Signed out for safety",
+          description: `This reset link is for ${targetEmail}, but the browser was signed in as ${session.user.email}. Enter the 6-digit code from the email to continue.`,
+        });
+        setStage("enter-code");
+        return;
+      }
       if (session) {
-        // User arrived via email link → session already set by AuthCallback
+        setSessionEmail(session.user.email ?? null);
         setStage("set-password");
       } else {
         // No session → user navigated here manually, show OTP form
         setStage("enter-code");
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleVerifyCode() {
@@ -44,6 +67,7 @@ export default function ResetPassword() {
       });
       if (error) throw error;
 
+      setSessionEmail(email);
       setStage("set-password");
       toast({ title: "Code verified", description: "Please choose a new password." });
     } catch (e: any) {
@@ -112,6 +136,11 @@ export default function ResetPassword() {
 
           {stage === "set-password" && (
             <>
+              {sessionEmail && (
+                <p className="text-sm text-muted-foreground">
+                  Setting a new password for <span className="font-medium text-foreground">{sessionEmail}</span>
+                </p>
+              )}
               <label className="text-sm">New password (min 8 chars)</label>
               <Input
                 type="password"

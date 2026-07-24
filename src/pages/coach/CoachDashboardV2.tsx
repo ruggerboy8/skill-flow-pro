@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useRoleDisplayNames } from '@/hooks/useRoleDisplayNames';
 import { useStaffWeeklyScores } from '@/hooks/useStaffWeeklyScores';
 import { useLocationExcuses } from '@/hooks/useLocationExcuses';
@@ -42,7 +43,12 @@ export default function CoachDashboardV2({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { isOrgAdmin, isSuperAdmin, isRegional, isParticipant } = useUserRole();
   const { resolve: resolveRole } = useRoleDisplayNames();
+
+  // Reminders are sent by directors/regionals/admins, not leads or OMs — same
+  // audience rule as the Facilitate surface (owner decision, 2026-07-25).
+  const canSendReminders = (isOrgAdmin || isSuperAdmin || isRegional) && !isParticipant;
 
   // Week selection - always normalize to Monday
   const [selectedWeek, setSelectedWeek] = useState<Date>(() => {
@@ -576,22 +582,26 @@ export default function CoachDashboardV2({
                 <RotateCw className="h-4 w-4 mr-1" />
                 Reload
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={missingConfCount === 0}
-                onClick={openConfidenceReminder}
-              >
-                Reminder: Confidence ({missingConfCount})
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={missingPerfCount === 0}
-                onClick={openPerformanceReminder}
-              >
-                Reminder: Performance ({missingPerfCount})
-              </Button>
+              {canSendReminders && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={missingConfCount === 0}
+                    onClick={openConfidenceReminder}
+                  >
+                    Reminder: Confidence ({missingConfCount})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={missingPerfCount === 0}
+                    onClick={openPerformanceReminder}
+                  >
+                    Reminder: Performance ({missingPerfCount})
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </CardHeader>

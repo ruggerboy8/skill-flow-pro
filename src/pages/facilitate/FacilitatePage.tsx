@@ -56,7 +56,7 @@ const v = (cssVar: string) => `hsl(var(${cssVar}))`;
 
 export default function FacilitatePage() {
   const navigate = useNavigate();
-  const { practiceType } = useUserRole();
+  const { practiceType, organizationId } = useUserRole();
   const { resolve: resolveRole } = useRoleDisplayNames();
   const [meeting, setMeeting] = useState<MeetingType>("in");
   const [roleId, setRoleId] = useState<number | null>(null);
@@ -80,19 +80,33 @@ export default function FacilitatePage() {
   const [activeStage, setActiveStage] = useState<number | null>(null);
   const [showMaterial, setShowMaterial] = useState(false);
 
-  // Load the active roles available for this org's practice type.
+  // Load the active roles available for this org's practice type — limited to
+  // roles the org actually has active participants in (e.g. Alcan has no
+  // hygienists or treatment coordinators, so those shouldn't be offered).
   const { data: orgRoles = [] } = useQuery<OrgRole[]>({
-    queryKey: ["facilitator-roles", practiceType],
-    enabled: !!practiceType,
+    queryKey: ["facilitator-roles", practiceType, organizationId],
+    enabled: !!practiceType && !!organizationId,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("roles")
-        .select("role_id, role_name, archetype_code, practice_type, active")
-        .eq("practice_type", practiceType!)
-        .eq("active", true)
-        .order("role_id");
+      const [{ data: roleRows }, { data: staffRows }] = await Promise.all([
+        supabase
+          .from("roles")
+          .select("role_id, role_name, archetype_code, practice_type, active")
+          .eq("practice_type", practiceType!)
+          .eq("active", true)
+          .order("role_id"),
+        supabase
+          .from("staff")
+          .select("role_id")
+          .eq("organization_id", organizationId!)
+          .eq("is_participant", true)
+          .not("is_paused", "is", true)
+          .not("role_id", "is", null),
+      ]);
+      const inUse = new Set((staffRows ?? []).map((s: any) => s.role_id));
       // Exclude doctors — facilitator flow targets staff roles.
-      return (data ?? []).filter((r: any) => r.archetype_code !== "doctor") as OrgRole[];
+      return (roleRows ?? []).filter(
+        (r: any) => r.archetype_code !== "doctor" && inUse.has(r.role_id)
+      ) as OrgRole[];
     },
   });
 

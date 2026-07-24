@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      _eval_repair_targets: {
+        Row: {
+          eval_id: string | null
+          role_id: number | null
+        }
+        Insert: {
+          eval_id?: string | null
+          role_id?: number | null
+        }
+        Update: {
+          eval_id?: string | null
+          role_id?: number | null
+        }
+        Relationships: []
+      }
       admin_audit: {
         Row: {
           action: string
@@ -1239,6 +1254,36 @@ export type Database = {
           color_hex?: string | null
           domain_id?: number
           domain_name?: string | null
+        }
+        Relationships: []
+      }
+      eval_payload_recovery_backup: {
+        Row: {
+          captured_at: string | null
+          eval_id: string
+          payload: Json | null
+          payload_sparse: boolean | null
+          program_year: number | null
+          quarter: string | null
+          staff_id: string | null
+        }
+        Insert: {
+          captured_at?: string | null
+          eval_id: string
+          payload?: Json | null
+          payload_sparse?: boolean | null
+          program_year?: number | null
+          quarter?: string | null
+          staff_id?: string | null
+        }
+        Update: {
+          captured_at?: string | null
+          eval_id?: string
+          payload?: Json | null
+          payload_sparse?: boolean | null
+          program_year?: number | null
+          quarter?: string | null
+          staff_id?: string | null
         }
         Relationships: []
       }

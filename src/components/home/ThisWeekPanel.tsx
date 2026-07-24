@@ -22,7 +22,6 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { GraduationCap, CalendarOff, ChevronRight, PauseCircle } from 'lucide-react';
 import ConfPerfDelta from '@/components/ConfPerfDelta';
 import { buildWeekBanner } from '@/v2/weekCta';
-import { enforceWeeklyRolloverNow } from '@/v2/rollover';
 import { LearnerLearnDrawer } from '@/components/learner/LearnerLearnDrawer';
 import { cn } from '@/lib/utils';
 
@@ -87,15 +86,9 @@ export default function ThisWeekPanel() {
       // Use simulated time if available
       const effectiveNow = overrides.enabled && overrides.nowISO ? new Date(overrides.nowISO) : now;
 
-      // Enforce weekly rollover (idempotent)
-      await enforceWeeklyRolloverNow({
-        userId: user.id,
-        staffId: staff.id,
-        roleId: staff.role_id!,
-        locationId: staff.primary_location_id!,
-        now: effectiveNow,
-      });
-      
+      // Weekly rollover retired 2026-07-25 (roadmap 2.4 slice A): it only acted
+      // for cycles 1-3 and fed the removed backlog. Missed weeks are simply missed.
+
       // Legacy "Lead Pro Move" dual-panel retired 2026-07-21. Leads now get
       // Ariyana's weekly focus card on the home (LeadFocusHomeCard) instead of a
       // second pro-move stream. Keep the parent panel empty so the old Lead Pro

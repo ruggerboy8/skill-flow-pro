@@ -100,7 +100,22 @@ code (drops staged in `supabase/staged/`).
 **Now:** Lovable publish → John spot-checks (lead: group-only Coach list, no
 Facilitate, no remind buttons, no eval tab; OM: group list, no Facilitate, no
 remind; facilitate dropdown shows only in-use roles; regionals unchanged).
-**Then:** apply the staged drop file (after publish confirmed), 1.5 preset
-naming (owner confirms archetype list), 2.4 slices A→D one at a time.
+**Done 2026-07-25 (later):** staged drops APPLIED after John's spot checks
+passed (self-select/backlog tables + RPCs gone). Incident during application:
+the uuid overload of `get_staff_week_assignments` was dropped on a wrong
+assumption and restored within minutes (see migration
+`20260725120000_drop_retired_backlog_and_selfselect.sql` for the full note).
+Two findings out of it: the text overload is a broken abandoned rewrite
+(errors on any call); and the uuid overload returns empty for org-scoped
+weeks (compares `weekly_assignments.org_id` = ORGANIZATION id against the
+caller's practice-group id) — pre-existing, low impact because its only
+consumer is the legacy `/review/:cycle/:week` page (`useWeeklyAssignmentStatus`
+has no importers). **2.4 slice B/C therefore grows:** retire both overloads,
+the hook, and the Review route instead of fixing them.
+**Next:** 1.5 preset implementation (archetype list approved by John
+2026-07-25: Participant / Lead / Office Manager / Evaluator / Regional-
+Director / Clinical Director / Doctor / Org Admin / Platform Admin — needs an
+Office Manager preset added to admin-users + drawer labels). Then 2.4 slices
+A→D one at a time (approved, "must not break current experience").
 **In parallel:** PRD Phase C comparison; its findings become the Track 3 list.
 **Later:** 3.x per Phase C; Track 4 per PRD priorities.

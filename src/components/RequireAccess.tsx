@@ -44,9 +44,12 @@ export const allowCoachSurface = (r: RoleInfo) =>
  * Facilitate audience: the people who actually run check-in/check-out meetings —
  * functional directors / regional managers / admins. Leads and OMs are coach-surface
  * users but not facilitators (owner decision, 2026-07-25 persona walkthrough).
+ * The !isParticipant condition is load-bearing: several lead RDAs carry org-wide
+ * coach_scopes rows, which makes them isRegional — but they are participants, and
+ * participants never facilitate.
  */
 export const allowFacilitate = (r: RoleInfo) =>
-  r.isSuperAdmin || r.isOrgAdmin || r.isRegional;
+  (r.isSuperAdmin || r.isOrgAdmin || r.isRegional) && !r.isParticipant;
 
 /**
  * Staff-evaluation audience: evaluators/admins (and OMs for their location).

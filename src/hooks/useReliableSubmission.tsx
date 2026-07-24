@@ -141,14 +141,13 @@ export function useReliableSubmission() {
     const enrichedUpdates = await Promise.all(updates.map(async (update) => {
       const focusId = update.weekly_focus_id;
       
-      // Validate focus ID format (supports plan:<id>, assign:<uuid>, or raw UUID)
-      const isPlanId = /^plan:[0-9]+$/.test(focusId);
+      // Validate focus ID format — assignments are the only live source
+      // (weekly_focus / weekly_plan retired 2026-07-25, roadmap 2.4 slice B).
       const isAssignId = /^assign:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(focusId);
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(focusId);
-      
-      if (!isPlanId && !isAssignId && !isUuid) {
+
+      if (!isAssignId) {
         console.error('[Submission] Invalid focus ID format:', focusId);
-        throw new Error(`Invalid weekly_focus_id format: ${focusId}. Expected 'plan:<id>', 'assign:<uuid>', or UUID.`);
+        throw new Error(`Invalid weekly_focus_id format: ${focusId}. Expected 'assign:<uuid>'. Please refresh the page.`);
       }
       
       // Reject deprecated synthetic format (plan-{action}-{order})
@@ -165,30 +164,13 @@ export function useReliableSubmission() {
       // Populate week_of if missing
       let weekOf = update.week_of;
       if (!weekOf) {
-        if (isPlanId) {
-          const planId = parseInt(focusId.replace('plan:', ''), 10);
-          const { data: planData } = await supabase
-            .from('weekly_plan')
-            .select('week_start_date')
-            .eq('id', planId)
-            .single();
-          weekOf = planData?.week_start_date || null;
-        } else if (isAssignId) {
-          const assignId = focusId.replace('assign:', '');
-          const { data: assignData } = await supabase
-            .from('weekly_assignments')
-            .select('week_start_date')
-            .eq('id', assignId)
-            .single();
-          weekOf = assignData?.week_start_date || null;
-        } else {
-          const { data: focusData } = await supabase
-            .from('weekly_focus')
-            .select('week_start_date')
-            .eq('id', focusId)
-            .single();
-          weekOf = focusData?.week_start_date || null;
-        }
+        const assignId = focusId.replace('assign:', '');
+        const { data: assignData } = await supabase
+          .from('weekly_assignments')
+          .select('week_start_date')
+          .eq('id', assignId)
+          .single();
+        weekOf = assignData?.week_start_date || null;
       }
       
       console.info('[Submission] Writing score with focus_id=%s conf=%s perf=%s week_of=%s', 
@@ -226,14 +208,7 @@ export function useReliableSubmission() {
     }
   };
 
-  const resolveBacklog = async (staffId: string, actionIds: number[]) => {
-    if (!actionIds?.length) return;
-    await Promise.allSettled(
-      actionIds.map(actionId =>
-        supabase.rpc('resolve_backlog_item', { p_staff_id: staffId, p_action_id: actionId })
-      )
-    );
-  };
+  // (Backlog resolution removed 2026-07-25 — backlog retired, roadmap 2.3.)
 
   // Legacy data types for backwards compatibility
   type LegacyConfidenceData = {
@@ -276,10 +251,6 @@ export function useReliableSubmission() {
         await writeWeeklyScores(item.data.updates);
       } else {
         await writeWeeklyScores(item.data.updates);
-        if (item.data.staffId && item.data.resolveBacklogActionIds?.length) {
-          console.log(`[Submission] Resolving backlog for ${item.data.resolveBacklogActionIds.length} actions`);
-          await resolveBacklog(item.data.staffId, item.data.resolveBacklogActionIds);
-        }
       }
       
       console.log(`[Submission] Successfully completed ${item.data.kind} submission for item ${item.id}`);

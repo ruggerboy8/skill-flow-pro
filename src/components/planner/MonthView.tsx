@@ -48,12 +48,13 @@ export function MonthView({ roleId, selectedMonthAnchor, onSelectWeek }: MonthVi
     
     const mondays = getMondaysInMonth(selectedMonthAnchor);
     
-    // Simple query: just check existence of weekly_plan rows
+    // Check existence of locked weekly_assignments rows (weekly_plan retired
+    // 2026-07-25 — this also fixes the markers, which the frozen table left blank)
     const { data, error } = await supabase
-      .from('weekly_plan')
+      .from('weekly_assignments')
       .select('week_start_date')
-      .is('org_id', null)
       .eq('role_id', roleId)
+      .eq('status', 'locked')
       .in('week_start_date', mondays);
     
     if (error) {

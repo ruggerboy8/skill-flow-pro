@@ -331,24 +331,36 @@ export default function ConfidenceWizard() {
             };
           });
         } else {
-          // Query weekly_plan for cycle 4+
-          const { data: planData, error: planError } = await supabase
-            .from('weekly_plan')
+          // weekly_plan retired (2026-07-25, roadmap 2.4 slice B): ongoing-phase
+          // repair reads org/global weekly_assignments, same as the current week.
+          const repairOrgId = staffData.organization_id ?? await (async () => {
+            const groupId = (staffData.locations as any)?.group_id;
+            if (!groupId) return null;
+            const { data: pg } = await supabase
+              .from('practice_groups')
+              .select('organization_id')
+              .eq('id', groupId)
+              .maybeSingle();
+            return pg?.organization_id ?? null;
+          })();
+
+          let planQuery = supabase
+            .from('weekly_assignments')
             .select(`
               id,
               display_order,
               competency_id,
               self_select,
               action_id,
-              pro_moves!weekly_plan_action_id_fkey ( 
+              pro_moves!weekly_assignments_action_id_fkey (
                 action_statement,
                 intervention_text,
-                competencies ( 
+                competencies (
                   name,
                   domains!competencies_domain_id_fkey ( domain_name )
                 )
               ),
-              competencies ( 
+              competencies (
                 name,
                 domains!competencies_domain_id_fkey ( domain_name )
               )
@@ -356,9 +368,17 @@ export default function ConfidenceWizard() {
             .eq('role_id', staffData.role_id)
             .eq('week_start_date', weekOf)
             .eq('status', 'locked')
+            .is('superseded_at', null)
+            .is('location_id', null)
             .order('display_order');
 
-          debug('Repair query result (plan):', { planData, planError });
+          planQuery = repairOrgId
+            ? planQuery.eq('org_id', repairOrgId)
+            : planQuery.is('org_id', null);
+
+          const { data: planData, error: planError } = await planQuery;
+
+          debug('Repair query result (org/global assignments):', { planData, planError });
 
           assignments = (planData || []).map((item: any) => {
             let domainName = 'Unknown';
@@ -369,7 +389,7 @@ export default function ConfidenceWizard() {
             }
 
             return {
-              weekly_focus_id: `plan:${item.id}`,
+              weekly_focus_id: `assign:${item.id}`,
               type: item.self_select ? 'self_select' : 'site',
               display_order: item.display_order,
               action_statement: item.pro_moves?.action_statement || '',
@@ -497,67 +517,16 @@ export default function ConfidenceWizard() {
             };
           });
         } else {
-          // Fall back to weekly_plan (for ongoing phase users)
-          debug('No weekly_assignments found, trying weekly_plan');
-          
-          const { data: planData, error: planError } = await supabase
-            .from('weekly_plan')
-            .select(`
-              id,
-              display_order,
-              competency_id,
-              self_select,
-              action_id,
-              pro_moves!weekly_plan_action_id_fkey ( 
-                action_statement,
-                intervention_text,
-                competencies ( 
-                  name,
-                  domains!competencies_domain_id_fkey ( domain_name )
-                )
-              ),
-              competencies ( 
-                name,
-                domains!competencies_domain_id_fkey ( domain_name )
-              )
-            `)
-            .eq('role_id', staffData.role_id)
-            .eq('week_start_date', weekOf)
-            .eq('status', 'locked')
-            .order('display_order');
-
-          debug('Repair query result (plan by weekOf):', { planData, planError });
-
-          if (!planData || planData.length === 0) {
-            console.error('No assignments found for weekOf:', weekOf);
-            toast({
-              title: 'Error',
-              description: 'No assignments found for this week. Please try again.',
-              variant: 'destructive'
-            });
-            setLoading(false);
-            return;
-          }
-
-          assignments = planData.map((item: any) => {
-            let domainName = 'Unknown';
-            if (item.pro_moves?.competencies?.domains?.domain_name) {
-              domainName = item.pro_moves.competencies.domains.domain_name;
-            } else if (item.competencies?.domains?.domain_name) {
-              domainName = item.competencies.domains.domain_name;
-            }
-
-            return {
-              weekly_focus_id: `plan:${item.id}`,
-              type: item.self_select ? 'self_select' : 'site',
-              display_order: item.display_order,
-              action_statement: item.pro_moves?.action_statement || '',
-              intervention_text: item.pro_moves?.intervention_text || null,
-              domain_name: domainName,
-              required: true,
-              locked: false
-            };
+          // weekly_plan retired (2026-07-25): org/global weekly_assignments are
+          // the only source. Nothing found means the week genuinely has no plan.
+          console.error('No assignments found for weekOf:', weekOf);
+          toast({
+            title: 'Error',
+            description: 'No assignments found for this week. Please try again.',
+            variant: 'destructive'
           });
+          setLoading(false);
+          return;
         }
         
         // Set cycle/week to unknown for display
@@ -610,18 +579,21 @@ export default function ConfidenceWizard() {
       thisMonday.setHours(0, 0, 0, 0);
       weekLabel = `Week of ${format(thisMonday, 'MMM d')}`;
     } else {
-      // For repair mode, try to get week_start_date from weekly_focus
-      const focusIds = assignments.map(a => a.weekly_focus_id);
-      if (focusIds.length > 0) {
-        const { data: focusWithDate } = await supabase
-          .from('weekly_focus')
+      // For repair mode, get week_start_date from weekly_assignments
+      const repairAssignIds = assignments
+        .map(a => a.weekly_focus_id)
+        .filter(id => id.startsWith('assign:'))
+        .map(id => id.replace('assign:', ''));
+      if (repairAssignIds.length > 0) {
+        const { data: assignWithDate } = await supabase
+          .from('weekly_assignments')
           .select('week_start_date')
-          .in('id', focusIds)
+          .in('id', repairAssignIds)
           .limit(1)
           .maybeSingle();
-        
-        if (focusWithDate?.week_start_date) {
-          const weekStart = new Date(focusWithDate.week_start_date);
+
+        if (assignWithDate?.week_start_date) {
+          const weekStart = new Date(assignWithDate.week_start_date);
           weekLabel = `Week of ${format(weekStart, 'MMM d')}`;
         }
       }
@@ -670,37 +642,20 @@ export default function ConfidenceWizard() {
     setSelectedActions(selectedByFocus);
 
     // Load self-select metadata and competency names
-    // Extract raw IDs (handle assign:, plan:, and raw UUID formats)
-    const rawFocusIds = focusIds.map(id => {
-      if (id.startsWith('assign:')) return id.replace('assign:', '');
-      if (id.startsWith('plan:')) return id.replace('plan:', '');
-      return id;
-    });
-    
-    // Try both weekly_focus and weekly_assignments for metadata
-    const { data: focusMeta } = await supabase
-      .from('weekly_focus')
-      .select('id, self_select, competency_id, competencies(name)')
-      .in('id', rawFocusIds);
-      
+    // (weekly_focus retired 2026-07-25 — assignments are the only source)
+    const rawFocusIds = focusIds
+      .filter(id => id.startsWith('assign:'))
+      .map(id => id.replace('assign:', ''));
+
     const { data: assignMeta } = await supabase
       .from('weekly_assignments')
       .select('id, self_select, competency_id')
       .in('id', rawFocusIds);
-    
+
     const selfSel: Record<string, boolean> = {};
     const compMap: Record<string, number | null> = {};
     const compNameMap: Record<string, string> = {};
-    
-    // Process weekly_focus metadata
-    (focusMeta || []).forEach((m: any) => {
-      selfSel[m.id] = !!m.self_select;
-      compMap[m.id] = (m.competency_id ?? null) as number | null;
-      if (m.competencies?.name) {
-        compNameMap[m.id] = m.competencies.name;
-      }
-    });
-    
+
     // Process weekly_assignments metadata
     (assignMeta || []).forEach((m: any) => {
       const prefixedId = `assign:${m.id}`;
@@ -898,31 +853,20 @@ export default function ConfidenceWizard() {
       return base;
     });
 
-    // Get weekly_focus/weekly_assignments data to set site_action_id for site slots
-    // Extract raw IDs again
-    const rawIds = weeklyFocus.map(f => {
-      if (f.id.startsWith('assign:')) return f.id.replace('assign:', '');
-      if (f.id.startsWith('plan:')) return f.id.replace('plan:', '');
-      return f.id;
-    });
-    
-    const { data: focusActionData } = await supabase
-      .from('weekly_focus')
-      .select('id, action_id, self_select')
-      .in('id', rawIds);
-      
+    // Get weekly_assignments data to set site_action_id for site slots
+    // (weekly_focus retired 2026-07-25 — assignments are the only source)
+    const rawIds = weeklyFocus
+      .map(f => f.id)
+      .filter(id => id.startsWith('assign:'))
+      .map(id => id.replace('assign:', ''));
+
     const { data: assignActionData } = await supabase
       .from('weekly_assignments')
       .select('id, action_id, self_select')
       .in('id', rawIds);
 
     const actionMap = new Map<string, { action_id: number | null, self_select: boolean }>();
-    
-    // Map weekly_focus data (raw IDs)
-    (focusActionData || []).forEach(wf => {
-      actionMap.set(wf.id, { action_id: wf.action_id, self_select: wf.self_select });
-    });
-    
+
     // Map weekly_assignments data (with prefix)
     (assignActionData || []).forEach(wa => {
       actionMap.set(`assign:${wa.id}`, { action_id: wa.action_id, self_select: wa.self_select });

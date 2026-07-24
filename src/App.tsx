@@ -21,7 +21,6 @@ import Profile from "@/pages/Profile";
 
 import ConfidenceWizard from "@/pages/ConfidenceWizard";
 import PerformanceWizard from "@/pages/PerformanceWizard";
-import Review from "@/pages/Review";
 
 // Coach Pages
 import CoachLayoutV2 from "@/pages/coach/CoachLayoutV2";
@@ -139,7 +138,6 @@ function AppRoutes() {
         <Route path="confidence/:week/step/:n" element={<ConfidenceWizard />} />
         <Route path="performance/:week" element={<RedirectToStepOne base="performance" />} />
         <Route path="performance/:week/step/:n" element={<PerformanceWizard />} />
-        <Route path="review/:cycle/:week" element={<Review />} />
 
         {/* Coach Routes */}
         <Route path="coach" element={<RequireAccess allow={allowCoachSurface}><CoachLayoutV2 /></RequireAccess>}>

@@ -368,55 +368,11 @@ export default function PerformanceWizard() {
                 locked: false
               };
             });
-          } else {
-            // Fall back to weekly_plan for legacy data
-            const { data: planData } = await supabase
-              .from('weekly_plan')
-              .select(`
-                id,
-                display_order,
-                competency_id,
-                self_select,
-                action_id,
-                pro_moves!weekly_plan_action_id_fkey ( 
-                  action_statement,
-                  competencies ( 
-                    name,
-                    domains!competencies_domain_id_fkey ( domain_name )
-                  )
-                ),
-                competencies ( 
-                  name,
-                  domains!competencies_domain_id_fkey ( domain_name )
-                )
-              `)
-              .eq('role_id', staffData.role_id)
-              .eq('week_start_date', weekOf)
-              .eq('status', 'locked')
-              .order('display_order');
-
-            console.log('Repair query result (plan fallback):', { planData });
-
-            weekAssignments = (planData || []).map((item: any) => {
-              let domainName = 'Unknown';
-              if (item.pro_moves?.competencies?.domains?.domain_name) {
-                domainName = item.pro_moves.competencies.domains.domain_name;
-              } else if (item.competencies?.domains?.domain_name) {
-                domainName = item.competencies.domains.domain_name;
-              }
-              return {
-                weekly_focus_id: `plan:${item.id}`,
-                type: item.self_select ? 'self_select' : 'site',
-                display_order: item.display_order,
-                action_statement: item.pro_moves?.action_statement || '',
-                domain_name: domainName,
-                required: true,
-                locked: false
-              };
-            });
           }
+          // (weekly_plan fallback removed 2026-07-25, roadmap 2.4 slice B —
+          // weekly_assignments is the only assignment source.)
         }
-        
+
         cycleNumber = targetCycle;
         weekInCycle = targetWeek;
       } else {
@@ -487,62 +443,16 @@ export default function PerformanceWizard() {
             };
           });
         } else {
-          // Fall back to weekly_plan for legacy data
-          const { data: planData } = await supabase
-            .from('weekly_plan')
-            .select(`
-              id,
-              display_order,
-              competency_id,
-              self_select,
-              action_id,
-              pro_moves!weekly_plan_action_id_fkey ( 
-                action_statement,
-                competencies ( 
-                  name,
-                  domains!competencies_domain_id_fkey ( domain_name )
-                )
-              ),
-              competencies ( 
-                name,
-                domains!competencies_domain_id_fkey ( domain_name )
-              )
-            `)
-            .eq('role_id', staffData.role_id)
-            .eq('week_start_date', weekOf)
-            .eq('status', 'locked')
-            .order('display_order');
-
-          console.log('Repair query result (plan by weekOf):', { planData });
-
-          if (!planData || planData.length === 0) {
-            console.error('No assignments found for weekOf:', weekOf);
-            toast({
-              title: 'Error',
-              description: 'No assignments found for this week. Please try again.',
-              variant: 'destructive'
-            });
-            setLoading(false);
-            return;
-          }
-
-          weekAssignments = planData.map((item: any) => {
-            let domainName = 'Unknown';
-            if (item.pro_moves?.competencies?.domains?.domain_name) {
-              domainName = item.pro_moves.competencies.domains.domain_name;
-            } else if (item.competencies?.domains?.domain_name) {
-              domainName = item.competencies.domains.domain_name;
-            }
-            return {
-              weekly_focus_id: `plan:${item.id}`,
-              type: item.self_select ? 'self_select' : 'site',
-              display_order: item.display_order,
-              action_statement: item.pro_moves?.action_statement || '',
-              domain_name: domainName,
-              required: true,
-              locked: false
-            };
+          // weekly_plan retired (2026-07-25): org/global weekly_assignments are
+          // the only source. Nothing found means the week genuinely has no plan.
+          console.error('No assignments found for weekOf:', weekOf);
+          toast({
+            title: 'Error',
+            description: 'No assignments found for this week. Please try again.',
+            variant: 'destructive'
           });
+          setLoading(false);
+          return;
         }
         
         // Set cycle/week to unknown for display
@@ -707,18 +617,21 @@ export default function PerformanceWizard() {
       thisMonday.setHours(0, 0, 0, 0);
       weekLabel = `Week of ${format(thisMonday, 'MMM d')}`;
     } else {
-      // For repair mode, try to get week_start_date from weekly_focus
-      const focusIds = weekAssignments.map(a => a.weekly_focus_id);
-      if (focusIds.length > 0) {
-        const { data: focusWithDate } = await supabase
-          .from('weekly_focus')
+      // For repair mode, get week_start_date from weekly_assignments
+      const repairAssignIds = weekAssignments
+        .map(a => a.weekly_focus_id)
+        .filter(id => id.startsWith('assign:'))
+        .map(id => id.replace('assign:', ''));
+      if (repairAssignIds.length > 0) {
+        const { data: assignWithDate } = await supabase
+          .from('weekly_assignments')
           .select('week_start_date')
-          .in('id', focusIds)
+          .in('id', repairAssignIds)
           .limit(1)
           .maybeSingle();
-        
-        if (focusWithDate?.week_start_date) {
-          const weekStart = new Date(focusWithDate.week_start_date);
+
+        if (assignWithDate?.week_start_date) {
+          const weekStart = new Date(assignWithDate.week_start_date);
           weekLabel = `Week of ${format(weekStart, 'MMM d')}`;
         }
       }
@@ -893,28 +806,19 @@ export default function PerformanceWizard() {
     const actedOnIds = new Set<number>();
     
     // Extract raw IDs for querying
-    const rawIds = weeklyFocus.map(f => {
-      if (f.id.startsWith('assign:')) return f.id.replace('assign:', '');
-      if (f.id.startsWith('plan:')) return f.id.replace('plan:', '');
-      return f.id;
-    });
-    
-    // Query both tables to get action_ids
-    const { data: focusActionData } = await supabase
-      .from('weekly_focus')
-      .select('id, action_id, self_select')
-      .in('id', rawIds);
-      
+    // (weekly_focus retired 2026-07-25 — assignments are the only source)
+    const rawIds = weeklyFocus
+      .map(f => f.id)
+      .filter(id => id.startsWith('assign:'))
+      .map(id => id.replace('assign:', ''));
+
     const { data: assignActionData } = await supabase
       .from('weekly_assignments')
       .select('id, action_id, self_select')
       .in('id', rawIds);
-    
+
     // Build action map
     const actionMap = new Map<string, { action_id: number | null, self_select: boolean }>();
-    (focusActionData || []).forEach(wf => {
-      actionMap.set(wf.id, { action_id: wf.action_id, self_select: wf.self_select });
-    });
     (assignActionData || []).forEach(wa => {
       actionMap.set(`assign:${wa.id}`, { action_id: wa.action_id, self_select: wa.self_select });
     });
@@ -938,11 +842,10 @@ export default function PerformanceWizard() {
       }
     }
 
-    // Use reliable submission system
+    // Use reliable submission system (backlog resolution retired 2026-07-25)
     const submissionData = {
       updates,
-      staffId: staff.id,
-      resolveBacklogItems: Array.from(actedOnIds)
+      staffId: staff.id
     };
 
     const success = await submitWithRetry('performance', submissionData);

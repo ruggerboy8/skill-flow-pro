@@ -240,11 +240,14 @@ serve(async (req) => {
       return { status: 'ok', n2w, recentMeans };
     };
 
-    // 2. Fetch confidence history (lookback weeks) - handle weekly_focus, weekly_plan, and weekly_assignments
-    // Note: We explicitly select columns to avoid PostgREST auto-join attempts
+    // 2. Fetch confidence history (lookback weeks).
+    // weekly_scores.site_action_id is now backfilled for ALL eras (2026-07-25
+    // migration backfill_site_action_id_from_legacy_sources), so scores are
+    // self-describing — the retired weekly_focus/weekly_plan tables are no
+    // longer consulted. weekly_assignments remains as a safety-net mapping.
     const { data: confData, error: confError } = await supabase
       .from('weekly_scores')
-      .select('confidence_score, confidence_date, weekly_focus_id, assignment_id')
+      .select('confidence_score, confidence_date, weekly_focus_id, assignment_id, site_action_id, selected_action_id')
       .not('confidence_score', 'is', null)
       .gte('confidence_date', cutoffLookback.toISOString());
 
@@ -252,55 +255,18 @@ serve(async (req) => {
 
     logs.push(`Fetched ${confData?.length || 0} confidence scores`);
 
-    // Parse weekly_focus_id and assignment_id to get action_id
-    // NOTE: We KEEP this ID mapping logic for the 186 legacy scores still linked via weekly_focus_id
     const focusIdToActionId = new Map<string, number>();
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    
-    // Collect all unique focus IDs and assignment IDs
-    const allFocusIds = [...new Set(confData?.map((r: any) => r.weekly_focus_id).filter(Boolean))];
-    const allAssignmentIds = [...new Set(confData?.map((r: any) => r.assignment_id).filter(Boolean))];
-    
-    // Split focus IDs into UUID and plan:XXX formats
-    const uuidIds = allFocusIds.filter(id => uuidPattern.test(id));
-    const planIds = allFocusIds
-      .filter(id => id.startsWith('plan:'))
-      .map(id => id.replace('plan:', ''));
 
-    // Split assignment IDs into assign:XXX format
+    // Safety-net: map assign:<uuid> ids via weekly_assignments for any row
+    // missing site_action_id.
+    const allAssignmentIds = [...new Set(
+      confData?.filter((r: any) => !r.site_action_id && !r.selected_action_id)
+        .map((r: any) => r.assignment_id).filter(Boolean)
+    )];
     const assignIds = allAssignmentIds
       .filter(id => id.startsWith('assign:'))
       .map(id => id.replace('assign:', ''));
 
-    // Batch fetch action_ids from weekly_focus (Cycles 1-3) - for SCORE resolution only
-    if (uuidIds.length > 0) {
-      const { data: focusRows } = await supabase
-        .from('weekly_focus')
-        .select('id, action_id')
-        .eq('role_id', body.roleId)
-        .in('id', uuidIds);
-      
-      focusRows?.forEach((row: any) => {
-        if (row.action_id) focusIdToActionId.set(row.id, row.action_id);
-      });
-      logs.push(`Mapped ${focusRows?.length || 0} weekly_focus IDs to action_ids (for score resolution)`);
-    }
-
-    // Batch fetch action_ids from weekly_plan (Cycle 4+) - for SCORE resolution only
-    if (planIds.length > 0) {
-      const { data: planRows } = await supabase
-        .from('weekly_plan')
-        .select('id, action_id')
-        .eq('role_id', body.roleId)
-        .in('id', planIds);
-      
-      planRows?.forEach((row: any) => {
-        if (row.action_id) focusIdToActionId.set(`plan:${row.id}`, row.action_id);
-      });
-      logs.push(`Mapped ${planRows?.length || 0} weekly_plan IDs to action_ids (for score resolution)`);
-    }
-
-    // Batch fetch action_ids from weekly_assignments (V2) - for SCORE resolution only
     if (assignIds.length > 0) {
       const { data: assignRows } = await supabase
         .from('weekly_assignments')
@@ -317,11 +283,12 @@ serve(async (req) => {
     // Group by pro_move and week
     const confidenceMap = new Map<string, { sum: number; count: number }>();
     confData?.forEach((row: any) => {
-      // Try assignment_id first (V2), then fall back to weekly_focus_id (V1)
+      // site_action_id is authoritative; selected_action_id covers self-era
+      // rows; the assignments map is the safety net.
       const lookupKey = row.assignment_id || row.weekly_focus_id;
-      const actionId = focusIdToActionId.get(lookupKey);
+      const actionId = row.site_action_id ?? row.selected_action_id ?? focusIdToActionId.get(lookupKey);
       if (!actionId) return; // Skip if we couldn't map to action_id
-      
+
       const weekStart = new Date(row.confidence_date);
       weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
       const key = `${actionId}-${weekStart.toISOString().split('T')[0]}`;
@@ -352,9 +319,9 @@ serve(async (req) => {
     const individualLowCounts = new Map<number, { lowCount: number; totalCount: number }>();
     confData?.forEach((row: any) => {
       const lookupKey = row.assignment_id || row.weekly_focus_id;
-      const actionId = focusIdToActionId.get(lookupKey);
+      const actionId = row.site_action_id ?? row.selected_action_id ?? focusIdToActionId.get(lookupKey);
       if (!actionId) return;
-      
+
       const existing = individualLowCounts.get(actionId) || { lowCount: 0, totalCount: 0 };
       const isLow = row.confidence_score <= 2; // 1-4 scale
       individualLowCounts.set(actionId, {

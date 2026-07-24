@@ -11,7 +11,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useEvalDeliveryProgress, type LocationProgress, type StaffDeliveryStatus } from '@/hooks/useEvalDeliveryProgress';
 import { EvalPeriodSelector } from './EvalPeriodSelector';
-import { BatchTranscriptProcessor } from './BatchTranscriptProcessor';
 import { DeliveryStatusPill } from './DeliveryStatusPill';
 import { bulkSetVisibilityByLocation, setEvaluationVisibility } from '@/lib/evaluations';
 import type { EvaluationPeriod } from '@/lib/evalPeriods';
@@ -127,8 +126,6 @@ export function DeliveryTab({ period, onPeriodChange }: DeliveryTabProps) {
 
   return (
     <div className="space-y-4">
-      <BatchTranscriptProcessor />
-
       <div className="flex items-center gap-4 flex-wrap">
         <EvalPeriodSelector value={period} onChange={onPeriodChange} className="w-48" />
         <Select value={orgFilter} onValueChange={setOrgFilter}>

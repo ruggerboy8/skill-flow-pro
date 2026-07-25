@@ -68,7 +68,16 @@ legacy-flags-only; UK admins are capabilities-only. Order matters.
 | 2.5 | **Keep and re-document `coach_baseline_*`** as the doctor-track observed baseline. Correct data-model.md §6 + backlog C1. | Was wrongly slated as removable |
 | 2.6 | **Deputy tidy:** reconcile `sync_enabled` vs `auto_sync_enabled`; enable or remove the dormant second connection. | Small |
 
-## Track 3 — Persona-shaped IA (the visible work; nav-plan Phase 3 continues)
+## Track 3 — SUPERSEDED 2026-07-24 by Phase C
+
+> The PRD comparison ran (seven specialist audits, all spaces). Its synthesis —
+> including a 7-item integrity list, the four-wave replacement work plan, and
+> the 13-decision owner roster — lives in
+> **[phase-c-comparison.md](phase-c-comparison.md)**, which replaces the table
+> below. The rows below are retained for provenance only; several are absorbed
+> into the waves (3.1→Wave 2, 3.2→Waves 1+2, 3.3→Wave 4, 3.4/3.5→Wave 4).
+
+## Track 3 (original, superseded) — Persona-shaped IA
 
 | # | Step | Notes |
 |---|---|---|

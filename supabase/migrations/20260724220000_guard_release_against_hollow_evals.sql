@@ -7,7 +7,7 @@
 -- (p_visible = false) is intentionally left unconditional so an already-exposed
 -- hollow eval can always be pulled back.
 --
--- NOT YET APPLIED to the live project. Apply via the Supabase dashboard SQL
+-- APPLIED LIVE 2026-07-24 (Phase C U4). Idempotent CREATE OR REPLACE.
 -- Editor (or let Lovable pick it up from main) AFTER the frontend guards ship,
 -- so the two move together. Idempotent: CREATE OR REPLACE.
 

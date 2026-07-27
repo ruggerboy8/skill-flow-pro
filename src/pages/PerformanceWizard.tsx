@@ -14,6 +14,7 @@ import { useLocationTimezone } from '@/hooks/useLocationTimezone';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { getWeekAnchors } from '@/v2/time';
+import { getPolicyOffsetsForLocation } from '@/lib/submissionPolicy';
 import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
@@ -769,21 +770,27 @@ export default function PerformanceWizard() {
     setSubmitting(true);
     setSubmitPhase('saving');
 
-    // Get location timezone for proper deadline calculation
+    // Get location timezone AND per-location deadline offsets (Phase C U5:
+    // the late flag written to the DB must honor perf_due_day/time, not the
+    // system default).
     let timezone = 'America/Chicago'; // default fallback
+    let dueOffsets = undefined as ReturnType<typeof getPolicyOffsetsForLocation> | undefined;
     if (staff && 'primary_location_id' in staff && (staff as any).primary_location_id) {
       const { data: locationData } = await supabase
         .from('locations')
-        .select('timezone')
+        .select('timezone, conf_due_day, conf_due_time, perf_due_day, perf_due_time')
         .eq('id', (staff as any).primary_location_id)
         .maybeSingle();
       if (locationData?.timezone) {
         timezone = locationData.timezone;
       }
+      if (locationData) {
+        dueOffsets = getPolicyOffsetsForLocation(locationData);
+      }
     }
 
-    // Check if late submission using location timezone
-    const { checkout_due } = getWeekAnchors(effectiveNow, timezone);
+    // Check if late submission using location timezone + location deadline
+    const { checkout_due } = getWeekAnchors(effectiveNow, timezone, dueOffsets);
     const isLate = effectiveNow > checkout_due;
 
     const updates = existingScores.map(score => {

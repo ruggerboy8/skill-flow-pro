@@ -86,6 +86,33 @@ serve(async (req: Request) => {
   const action = payload?.action as string | undefined;
   console.log("admin-users action:", action);
 
+  // Phase C U3 (2026-07-24): admin-plane writes must stay inside the caller's
+  // org. Mirrors the org-ownership check invite_user already performs; platform
+  // admins are exempt. Returns a Response on violation, null when allowed.
+  const assertSameOrgTarget = async (targetUserId: string): Promise<Response | null> => {
+    if (me.is_super_admin || meCaps?.is_platform_admin) return null;
+    const { data: callerOrgId } = await caller.rpc("current_user_org_id");
+    const { data: target } = await admin
+      .from("staff")
+      .select("organization_id, primary_location_id, locations:primary_location_id(group_id)")
+      .eq("user_id", targetUserId)
+      .maybeSingle();
+    let targetOrgId: string | null = (target as any)?.organization_id ?? null;
+    if (!targetOrgId && (target as any)?.locations?.group_id) {
+      const { data: pg } = await admin
+        .from("practice_groups")
+        .select("organization_id")
+        .eq("id", (target as any).locations.group_id)
+        .single();
+      targetOrgId = pg?.organization_id ?? null;
+    }
+    if (!callerOrgId || !targetOrgId || callerOrgId !== targetOrgId) {
+      console.error(`org guard failed — action=${action} caller org=${callerOrgId}, target org=${targetOrgId}`);
+      return json({ error: "Forbidden: target user is not in your organization" }, 403);
+    }
+    return null;
+  };
+
   try {
     switch (action) {
       case "list_users": {
@@ -593,7 +620,10 @@ serve(async (req: Request) => {
         if (!user_id || !preset) {
           return json({ error: "user_id and preset required" }, 400);
         }
-        
+
+        const presetOrgErr = await assertSameOrgTarget(user_id);
+        if (presetOrgErr) return presetOrgErr;
+
         // Only super admins can create other super admins
         if (preset === "super_admin" && !me.is_super_admin) {
           return json({ error: "Only super admins can grant super admin privileges" }, 403);
@@ -990,6 +1020,9 @@ serve(async (req: Request) => {
         const { user_id, reason } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
 
+        const pauseOrgErr = await assertSameOrgTarget(user_id);
+        if (pauseOrgErr) return pauseOrgErr;
+
         // Get current staff record (with location tz for excuse anchoring)
         const { data: currentStaff, error: fetchErr } = await admin
           .from("staff")
@@ -1060,6 +1093,9 @@ serve(async (req: Request) => {
       case "unpause_user": {
         const { user_id } = payload ?? {};
         if (!user_id) return json({ error: "user_id required" }, 400);
+
+        const unpauseOrgErr = await assertSameOrgTarget(user_id);
+        if (unpauseOrgErr) return unpauseOrgErr;
 
         // Get current staff record (with paused_at + location tz for backfill)
         const { data: currentStaff, error: fetchErr } = await admin

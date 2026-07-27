@@ -252,8 +252,10 @@ export async function computeWeekState(params: {
   const ctx = await getLocationWeekContext(locationId, now);
   const { cycleNumber, weekInCycle } = weekContext || ctx;
 
-  // 2) Anchors for this location's current week
-  const anchors = getWeekAnchors(now, ctx.timezone);
+  // 2) Anchors for this location's current week — reuse the context's anchors,
+  // which already honor the location's per-deadline offsets (Phase C U5; the
+  // previous recompute here silently used system-default due times).
+  const anchors = ctx.anchors;
   const { checkin_open, checkin_due, checkout_open, checkout_due } = anchors;
 
   // Get staff information with org and timezone.

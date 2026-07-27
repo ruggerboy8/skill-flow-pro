@@ -25,7 +25,10 @@ serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const fromEmail = Deno.env.get("RESEND_FROM") || "Pro-Moves <no-reply@mypromoves.com>";
-    const hrEmail = Deno.env.get("HR_EXPORT_EMAIL") || "falvarez@alcandentalcooperative.com";
+    // Phase C U2 (2026-07-24): the HR recipient is resolved per-organization
+    // (organizations.hr_email) so a UK leaver's record goes to UK HR, never
+    // cross-border. The env var is only a last-resort fallback.
+    let hrEmail = Deno.env.get("HR_EXPORT_EMAIL") || "falvarez@alcandentalcooperative.com";
 
     if (!resendApiKey) return json({ error: "Email is not configured (RESEND_API_KEY missing)" }, 500);
 
@@ -38,9 +41,27 @@ serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
     const { data: caller } = await admin
-      .from("staff").select("is_org_admin, is_super_admin").eq("user_id", user.id).maybeSingle();
+      .from("staff")
+      .select("is_org_admin, is_super_admin, organization_id, primary_location_id, locations:primary_location_id(group_id)")
+      .eq("user_id", user.id).maybeSingle();
     if (!caller?.is_org_admin && !caller?.is_super_admin) {
       return json({ error: "Forbidden: admin only" }, 403);
+    }
+
+    // Resolve the caller's org → its HR contact.
+    let callerOrgId: string | null = (caller as any)?.organization_id ?? null;
+    if (!callerOrgId && (caller as any)?.locations?.group_id) {
+      const { data: pg } = await admin
+        .from("practice_groups")
+        .select("organization_id")
+        .eq("id", (caller as any).locations.group_id)
+        .single();
+      callerOrgId = pg?.organization_id ?? null;
+    }
+    if (callerOrgId) {
+      const { data: org } = await admin
+        .from("organizations").select("hr_email").eq("id", callerOrgId).maybeSingle();
+      if (org?.hr_email) hrEmail = org.hr_email;
     }
 
     const { pdfBase64, filename, staffName } = await req.json();

@@ -36,6 +36,15 @@ paraphrase (drift risk).
 
 ## Immediate actions (integrity & safety — do before feature work)
 
+> **Wave 1 status (2026-07-24 evening):** U1 ✅ applied (D1 decided: platform
+> library, writes platform-admin only). U2 ✅ (`organizations.hr_email` +
+> send-hr-export resolves per-org; deployed. Set UK org's `hr_email` when
+> known). U3 ✅ (target-org guards on role_preset/pause/unpause; deployed).
+> U4 ✅ (hollow-eval guard applied live). U5 ✅ in repo (late flags honor
+> per-location deadlines; ships with next publish). U6 🔵 cron unscheduled by
+> John; ghost config entry removed; **orphan function deletion list awaiting
+> John's confirm** (all 11 verified zero-caller). U7 ⏳ awaiting D10.
+
 | # | Item | Why now |
 |---|---|---|
 | U1 | **Scope the `pro_moves` policies.** Base table SELECT policy is `true` and the manage policy has no org filter: any org's coach/admin can read AND edit/retire every tenant's moves. UK's Abbie Fox holds `can_manage_library` today. Blocked on one owner decision (D1 below), then a small policy migration. | Confirmed cross-org write access |

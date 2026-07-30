@@ -55,6 +55,9 @@ indicate relative scale. For the **proposed/intended** multi-tenant design, see
 | `organization_pro_moves` | 1 | Per-org library entries (org copy of the platform library). |
 | `organization_pro_move_overrides` | 3 | Per-org **visibility** (show/hide) of Pro Moves. |
 | `organization_pro_move_content_overrides` | 1 | Per-org **wording** overrides (future content-customization layer). |
+| `framework_history` | ~800 | **Append-only version history** of `pro_moves` + `pro_move_resources` (added 2026-07-30). Fed by DB triggers on every insert/update/delete; jsonb old/new snapshots, author, reason. Hard DELETE of platform pro_moves is blocked by trigger; retire instead. |
+| `framework_releases` | 9 | Named immutable snapshots of one role's framework (e.g. `doctor-2026.07`, retro `doctor-2026.02-seed`). Create via `create_framework_release()`. |
+| `framework_release_items` | ~700 | Release membership: exact `framework_history` version per member move/resource. Diff two releases with `framework_release_diff(a, b)`; point-in-time state via `framework_as_of(role_id, ts)`. |
 
 ## 4. Weekly loop (assignments & scores)
 

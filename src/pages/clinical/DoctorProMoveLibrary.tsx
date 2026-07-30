@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Search, ArrowLeft, Trash2, HelpCircle, MessageSquareText, CheckSquare, ThumbsUp } from 'lucide-react';
+import { Plus, Search, ArrowLeft, EyeOff, HelpCircle, MessageSquareText, CheckSquare, ThumbsUp } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDomainColor } from '@/lib/domainColors';
 import { DoctorProMoveForm } from '@/components/clinical/DoctorProMoveForm';
@@ -60,8 +60,8 @@ export default function DoctorProMoveLibrary() {
   const [showAddForm, setShowAddForm] = useUrlState<boolean>('new', false);
   const [selectedProMoveId, setSelectedProMoveIdRaw] = useUrlState<string>('materials', '');
   const [refreshKey, setRefreshKey] = useState(0);
-  const [deleteTarget, setDeleteTarget] = useState<ProMove | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [retireTarget, setRetireTarget] = useState<ProMove | null>(null);
+  const [isRetiring, setIsRetiring] = useState(false);
 
   // Resolve editingProMove from URL id + loaded proMoves list.
   const editingProMove = editingActionId
@@ -250,51 +250,33 @@ export default function DoctorProMoveLibrary() {
     setRefreshKey(prev => prev + 1);
   };
 
-  const handleDeleteProMove = async () => {
-    if (!deleteTarget) return;
-    
-    setIsDeleting(true);
-    try {
-      // First delete any associated resources
-      await supabase
-        .from('pro_move_resources')
-        .delete()
-        .eq('action_id', deleteTarget.action_id);
+  const handleRetireProMove = async () => {
+    if (!retireTarget) return;
 
-      // Then delete the pro move
+    setIsRetiring(true);
+    try {
       const { error } = await supabase
         .from('pro_moves')
-        .delete()
-        .eq('action_id', deleteTarget.action_id);
+        .update({ active: false, retired_at: new Date().toISOString() })
+        .eq('action_id', retireTarget.action_id);
 
-      if (error) {
-        // FK constraint violation - pro move is referenced elsewhere
-        if (error.code === '23503') {
-          toast({
-            title: 'Cannot Delete',
-            description: 'This pro move is referenced in assignments or scores. Consider deactivating it instead.',
-            variant: 'destructive',
-          });
-        } else {
-          throw error;
-        }
-      } else {
-        toast({
-          title: 'Deleted',
-          description: 'Pro move has been deleted',
-        });
-        setRefreshKey(prev => prev + 1);
-      }
+      if (error) throw error;
+
+      toast({
+        title: 'Retired',
+        description: 'Pro move retired. Its history and learning materials are preserved.',
+      });
+      setRefreshKey(prev => prev + 1);
     } catch (error) {
-      console.error('Error deleting pro move:', error);
+      console.error('Error retiring pro move:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete pro move',
+        description: 'Failed to retire pro move',
         variant: 'destructive',
       });
     } finally {
-      setIsDeleting(false);
-      setDeleteTarget(null);
+      setIsRetiring(false);
+      setRetireTarget(null);
     }
   };
 
@@ -503,10 +485,11 @@ export default function DoctorProMoveLibrary() {
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    onClick={() => setDeleteTarget(pm)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setRetireTarget(pm)}
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    title="Retire"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <EyeOff className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
@@ -533,23 +516,23 @@ export default function DoctorProMoveLibrary() {
         />
       )}
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      {/* Retire Confirmation */}
+      <AlertDialog open={!!retireTarget} onOpenChange={(open) => !open && setRetireTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Pro Move?</AlertDialogTitle>
+            <AlertDialogTitle>Retire Pro Move?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete "{deleteTarget?.action_statement}" and all associated learning materials. This action cannot be undone.
+              "{retireTarget?.action_statement}" will be hidden from active use. Its scoring history and learning materials are preserved, and it can be restored later. Pro moves are never hard-deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isRetiring}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteProMove}
-              disabled={isDeleting}
+              onClick={handleRetireProMove}
+              disabled={isRetiring}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              {isRetiring ? 'Retiring...' : 'Retire'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -107,6 +107,24 @@ When writing migrations:
 3. Add a sanity-check `DO $$ ... $$` block at the end of backfill migrations
 4. Migrations are numbered manually for ordering; use `YYYYMMDDHHMMSS_description.sql`
 
+### Framework content is versioned (added 2026-07-30)
+
+`pro_moves` and `pro_move_resources` have DB-level version capture into the
+append-only `framework_history` table (see
+`docs/pro-move-versioning-implementation-plan.md`). Consequences for any
+migration or SQL touching those tables:
+
+- **Start the migration with**
+  `select set_config('app.change_reason', 'batch: <what and why>', true);`
+  so every captured version carries attribution instead of "unrecorded (SQL)".
+- **Never `DELETE` platform pro_moves** (`owner_org_id is null`): a trigger
+  blocks it with a 23503 error. Retire instead (`active = false`,
+  `retired_at = now()`). Org-owned rows are exempt (org teardown).
+- Updates that only touch `curriculum_priority*`, `updated_at/by`, or the
+  vestigial `status`/`version`/`date_added` columns produce no version rows.
+- After a meaningful editing milestone, cut a release:
+  `select create_framework_release('<role>-YYYY.MM', <role_id>, '<notes>');`
+
 ## Design system conventions
 
 ### Icon sizes

@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       _eval_repair_targets: {
@@ -1637,6 +1612,141 @@ export type Database = {
         }
         Relationships: []
       }
+      framework_history: {
+        Row: {
+          action_id: number | null
+          change_reason: string
+          changed_at: string
+          changed_by: string | null
+          changed_fields: string[] | null
+          changed_via: string
+          id: number
+          new_row: Json | null
+          old_row: Json | null
+          op: string
+          record_pk: string
+          table_name: string
+          version_no: number
+        }
+        Insert: {
+          action_id?: number | null
+          change_reason?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_fields?: string[] | null
+          changed_via?: string
+          id?: never
+          new_row?: Json | null
+          old_row?: Json | null
+          op: string
+          record_pk: string
+          table_name: string
+          version_no: number
+        }
+        Update: {
+          action_id?: number | null
+          change_reason?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_fields?: string[] | null
+          changed_via?: string
+          id?: never
+          new_row?: Json | null
+          old_row?: Json | null
+          op?: string
+          record_pk?: string
+          table_name?: string
+          version_no?: number
+        }
+        Relationships: []
+      }
+      framework_release_items: {
+        Row: {
+          action_id: number | null
+          history_id: number
+          record_pk: string
+          release_id: number
+          table_name: string
+        }
+        Insert: {
+          action_id?: number | null
+          history_id: number
+          record_pk: string
+          release_id: number
+          table_name: string
+        }
+        Update: {
+          action_id?: number | null
+          history_id?: number
+          record_pk?: string
+          release_id?: number
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "framework_release_items_history_id_fkey"
+            columns: ["history_id"]
+            isOneToOne: false
+            referencedRelation: "framework_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "framework_release_items_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "framework_releases"
+            referencedColumns: ["release_id"]
+          },
+        ]
+      }
+      framework_releases: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          gap_note: string | null
+          kind: string
+          name: string
+          notes: string | null
+          release_id: number
+          role_id: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          gap_note?: string | null
+          kind?: string
+          name: string
+          notes?: string | null
+          release_id?: never
+          role_id: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          gap_note?: string | null
+          kind?: string
+          name?: string
+          notes?: string | null
+          release_id?: never
+          role_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "framework_releases_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["role_id"]
+          },
+          {
+            foreignKeyName: "framework_releases_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "v_onboarding_progress"
+            referencedColumns: ["role_id"]
+          },
+        ]
+      }
       lead_focus_items: {
         Row: {
           created_at: string
@@ -2116,6 +2226,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           email_sign_off: string | null
+          hr_email: string | null
           id: string
           logo_url: string | null
           name: string
@@ -2129,6 +2240,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email_sign_off?: string | null
+          hr_email?: string | null
           id?: string
           logo_url?: string | null
           name: string
@@ -2142,6 +2254,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email_sign_off?: string | null
+          hr_email?: string | null
           id?: string
           logo_url?: string | null
           name?: string
@@ -2250,6 +2363,7 @@ export type Database = {
           action_id: number
           action_statement: string | null
           active: boolean | null
+          authored_by: string | null
           competency_id: number | null
           conditionally_applicable: boolean
           copied_from_action_id: number | null
@@ -2261,7 +2375,9 @@ export type Database = {
           curriculum_priority_revenue: number | null
           date_added: string | null
           description: string | null
+          evidence_label: string | null
           intervention_text: string | null
+          license_note: string | null
           owner_org_id: string | null
           practice_types: string[]
           resources_url: string | null
@@ -2269,6 +2385,7 @@ export type Database = {
           retired_by: string | null
           role_id: number | null
           source: string
+          source_citation: string | null
           status: string | null
           steps: string | null
           updated_at: string | null
@@ -2279,6 +2396,7 @@ export type Database = {
           action_id?: number
           action_statement?: string | null
           active?: boolean | null
+          authored_by?: string | null
           competency_id?: number | null
           conditionally_applicable?: boolean
           copied_from_action_id?: number | null
@@ -2290,7 +2408,9 @@ export type Database = {
           curriculum_priority_revenue?: number | null
           date_added?: string | null
           description?: string | null
+          evidence_label?: string | null
           intervention_text?: string | null
+          license_note?: string | null
           owner_org_id?: string | null
           practice_types?: string[]
           resources_url?: string | null
@@ -2298,6 +2418,7 @@ export type Database = {
           retired_by?: string | null
           role_id?: number | null
           source?: string
+          source_citation?: string | null
           status?: string | null
           steps?: string | null
           updated_at?: string | null
@@ -2308,6 +2429,7 @@ export type Database = {
           action_id?: number
           action_statement?: string | null
           active?: boolean | null
+          authored_by?: string | null
           competency_id?: number | null
           conditionally_applicable?: boolean
           copied_from_action_id?: number | null
@@ -2319,7 +2441,9 @@ export type Database = {
           curriculum_priority_revenue?: number | null
           date_added?: string | null
           description?: string | null
+          evidence_label?: string | null
           intervention_text?: string | null
+          license_note?: string | null
           owner_org_id?: string | null
           practice_types?: string[]
           resources_url?: string | null
@@ -2327,6 +2451,7 @@ export type Database = {
           retired_by?: string | null
           role_id?: number | null
           source?: string
+          source_citation?: string | null
           status?: string | null
           steps?: string | null
           updated_at?: string | null
@@ -3893,8 +4018,34 @@ export type Database = {
         }
         Returns: string
       }
+      create_framework_release: {
+        Args: { p_name: string; p_notes?: string; p_role_id: number }
+        Returns: number
+      }
       current_user_org_id: { Args: never; Returns: string }
       current_user_staff_id: { Args: never; Returns: string }
+      framework_as_of: {
+        Args: { p_role_id: number; p_ts: string }
+        Returns: {
+          action_id: number
+          action_statement: string
+          active: boolean
+          competency_id: number
+          description: string
+          resolution: string
+          retired: boolean
+          snapshot: Json
+          version_no: number
+        }[]
+      }
+      framework_release_diff: {
+        Args: { p_release_a: string; p_release_b: string }
+        Returns: {
+          action_id: number
+          change_kind: string
+          detail: Json
+        }[]
+      }
       get_best_weekly_win: {
         Args: { p_staff_id: string }
         Returns: {
@@ -4525,9 +4676,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       plan_status: ["locked", "draft"],

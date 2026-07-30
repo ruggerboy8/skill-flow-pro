@@ -6,10 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Edit, 
-  Eye, 
-  EyeOff, 
-  Trash2, 
-  GraduationCap, 
+  Eye,
+  EyeOff,
+  GraduationCap,
   Video, 
   FileText, 
   Volume2, 
@@ -339,40 +338,9 @@ export function ProMoveList({
     }
   };
 
-  const deleteProMove = async (proMove: ProMove) => {
-    try {
-      const { error } = await supabase
-        .from('pro_moves')
-        .delete()
-        .eq('action_id', proMove.action_id);
-
-      if (error) {
-        if (error.message.includes('violates foreign key constraint') || 
-            error.message.includes('weekly_focus_action_id_fkey')) {
-          toast({
-            title: "Cannot Delete Pro-Move",
-            description: "This pro-move is currently assigned in weekly focus schedules. Please retire it instead.",
-            variant: "destructive"
-          });
-          return;
-        }
-        throw error;
-      }
-
-      toast({
-        title: "Success",
-        description: "Pro-move deleted successfully.",
-      });
-
-      loadProMoves();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete pro-move.",
-        variant: "destructive"
-      });
-    }
-  };
+  // Hard deletes are intentionally not offered: pro_moves is versioned framework
+  // content and the database blocks DELETE on platform rows (framework_history
+  // guard). Retire/restore above is the supported lifecycle.
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -603,30 +571,6 @@ export function ProMoveList({
                       </AlertDialog>
                     )}
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" title="Delete Permanently">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Pro-Move?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete the pro-move and all associated data. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => deleteProMove(proMove)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
                   </div>
                 </TableCell>
               </TableRow>

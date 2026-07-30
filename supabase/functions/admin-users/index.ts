@@ -1416,7 +1416,10 @@ serve(async (req: Request) => {
           await requireDelete("admin audit (changed_by)", admin.from("admin_audit").delete().eq("changed_by", sid));
           await requireDelete("resource events", admin.from("resource_events").delete().eq("staff_id", sid));
           await requireDelete("organization role names", admin.from("organization_role_names").delete().eq("updated_by", sid));
-          await requireDelete("pro moves", admin.from("pro_moves").delete().eq("retired_by", sid));
+          // Never hard-delete framework content when a staff member is removed;
+          // just detach the retired_by attribution (mirrors delete_organization).
+          // The DB-level framework_history guard would block the old delete anyway.
+          await requireDelete("pro moves (retired_by)", admin.from("pro_moves").update({ retired_by: null }).eq("retired_by", sid));
           await requireDelete("staff audit", admin.from("staff_audit").delete().eq("staff_id", sid));
           await requireDelete("staff quarter focus", admin.from("staff_quarter_focus").delete().eq("staff_id", sid));
           await requireDelete("user backlog", admin.from("user_backlog_v2").delete().eq("staff_id", sid));

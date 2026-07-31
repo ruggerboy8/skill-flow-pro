@@ -90,6 +90,14 @@ function AppRoutes() {
   if (pathname.startsWith("/reset-password")) return <ResetPassword />;
   if (pathname.startsWith("/forgot-password")) return <ForgotPassword />;
 
+  // Public static sedation calculator (public/sedation/index.html). If the SPA
+  // fallback catches the URL, hand off to the real file; target the explicit
+  // filename so this can never redirect-loop.
+  if (pathname === "/sedation" || pathname.startsWith("/sedation/")) {
+    window.location.replace("/sedation/index.html");
+    return null;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

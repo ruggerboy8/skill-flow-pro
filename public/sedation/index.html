@@ -51,12 +51,13 @@
   @media (min-width: 640px) { .grid { grid-template-columns: repeat(3, 1fr); } }
   .field { min-width: 0; }
   .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
-  .field input[type="date"], .field input[type="number"] {
+  .field input[type="text"], .field input[type="number"] {
     width: 100%; padding: 9px 10px; font-size: 16px; color: var(--ink);
     background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 8px;
     appearance: none; -webkit-appearance: none; min-height: 42px;
   }
   .field input:focus { outline: 2px solid var(--input-focus); outline-offset: 1px; }
+  .field input.invalid { border-color: var(--danger); background: var(--danger-bg); }
   .seg { display: flex; gap: 0; border: 1px solid var(--input-border); border-radius: 8px; overflow: hidden; background: var(--input-bg); }
   .seg button {
     flex: 1; padding: 9px 0; min-height: 42px; font-size: 15px; font-weight: 600; color: var(--muted);
@@ -146,11 +147,11 @@
       </div>
       <div class="field">
         <label for="dob">Date of birth</label>
-        <input type="date" id="dob">
+        <input type="text" id="dob" inputmode="numeric" autocomplete="off" placeholder="MM/DD/YYYY" maxlength="10">
       </div>
       <div class="field">
         <label for="meas">Date of measurement</label>
-        <input type="date" id="meas">
+        <input type="text" id="meas" inputmode="numeric" autocomplete="off" placeholder="MM/DD/YYYY" maxlength="10">
       </div>
       <div class="field">
         <label for="weight">Weight (kg)</label>
@@ -312,15 +313,40 @@ function normsdist(x) {
 const $ = id => document.getElementById(id);
 const state = { sex: null }; // 1 = male, 2 = female
 
-function parseDateUTC(s) {
-  if (!s) return null;
-  const [y, m, d] = s.split("-").map(Number);
-  return Date.UTC(y, m - 1, d);
+/* Dates are typed, not picked: MM/DD/YYYY, bare digits (10162019), or a
+   pasted ISO date (2019-10-16) all parse. Returns UTC ms or null. */
+function parseFlexibleDate(raw) {
+  const v = raw.trim();
+  if (!v) return null;
+  let m, mm, dd, yy;
+  if ((m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) { mm = +m[1]; dd = +m[2]; yy = +m[3]; }
+  else if ((m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) { yy = +m[1]; mm = +m[2]; dd = +m[3]; }
+  else if (/^\d{8}$/.test(v)) { mm = +v.slice(0, 2); dd = +v.slice(2, 4); yy = +v.slice(4); }
+  else return null;
+  if (yy < 1900 || yy > 2100 || mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  const t = Date.UTC(yy, mm - 1, dd);
+  const d = new Date(t);
+  return d.getUTCMonth() === mm - 1 && d.getUTCDate() === dd ? t : null;
+}
+
+/* Auto-insert slashes while digits are appended at the end of the field.
+   Manual slash or ISO typing is left alone; parseFlexibleDate handles it. */
+function maskDateInput(el) {
+  const prev = el.dataset.prev || "";
+  const v = el.value;
+  const appending = v.length > prev.length && el.selectionStart === v.length;
+  const slashesOk = [...v].every((c, i) => c !== "/" || i === 2 || i === 5);
+  if (appending && /^[\d/]+$/.test(v) && slashesOk) {
+    const d = v.replace(/\//g, "").slice(0, 8);
+    if (d.length > 4) el.value = d.slice(0, 2) + "/" + d.slice(2, 4) + "/" + d.slice(4);
+    else if (d.length > 2) el.value = d.slice(0, 2) + "/" + d.slice(2);
+  }
+  el.dataset.prev = el.value;
 }
 
 function readInputs() {
-  const dob = parseDateUTC($("dob").value);
-  const meas = parseDateUTC($("meas").value);
+  const dob = parseFlexibleDate($("dob").value);
+  const meas = parseFlexibleDate($("meas").value);
   const w = $("weight").value === "" ? null : Number($("weight").value);
   const h = $("height").value === "" ? null : Number($("height").value);
   return { sex: state.sex, dob, meas, w: w > 0 ? w : null, h: h > 0 ? h : null };
@@ -412,6 +438,12 @@ function render() {
   const { sex, dob, meas, w, h } = readInputs();
   const months = ageMonths(dob, meas);
 
+  ["dob", "meas"].forEach(id => {
+    const el = $(id), v = el.value.trim();
+    const looksComplete = v.replace(/\D/g, "").length >= 8;
+    el.classList.toggle("invalid", v !== "" && looksComplete && parseFlexibleDate(v) == null);
+  });
+
   if (months == null) {
     $("age-value").textContent = "–";
     $("age-note").textContent = "";
@@ -458,9 +490,9 @@ function setSex(s) {
   render();
 }
 
-function todayLocalISO() {
+function todayUS() {
   const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  return `${String(t.getMonth() + 1).padStart(2, "0")}/${String(t.getDate()).padStart(2, "0")}/${t.getFullYear()}`;
 }
 
 function reset() {
@@ -468,7 +500,9 @@ function reset() {
   $("sex-m").setAttribute("aria-pressed", "false");
   $("sex-f").setAttribute("aria-pressed", "false");
   $("dob").value = "";
-  $("meas").value = todayLocalISO();
+  $("dob").dataset.prev = "";
+  $("meas").value = todayUS();
+  $("meas").dataset.prev = $("meas").value;
   $("weight").value = "";
   $("height").value = "";
   render();
@@ -476,6 +510,7 @@ function reset() {
 
 $("sex-m").addEventListener("click", () => setSex(1));
 $("sex-f").addEventListener("click", () => setSex(2));
+["dob", "meas"].forEach(id => $(id).addEventListener("input", () => maskDateInput($(id))));
 ["dob", "meas", "weight", "height"].forEach(id => {
   $(id).addEventListener("input", render);
   $(id).addEventListener("change", render);

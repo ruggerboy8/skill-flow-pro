@@ -80,6 +80,8 @@
   .stat .note { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
   .stat.result { background: var(--result-bg); border-color: #C7DFB8; }
   .stat.result .value { color: var(--result-ink); }
+  .stat.result.warn { background: var(--danger-bg); border-color: #E5AFAB; }
+  .stat.result.warn .value, .stat.result.warn .chip { color: var(--danger); }
   .chip {
     display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px;
     border-radius: 999px; background: rgba(255,255,255,0.75); color: var(--result-ink);
@@ -97,7 +99,16 @@
   td.med { font-weight: 600; }
   td.med .conc { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
   td.max { color: var(--muted); }
-  td .over { color: var(--danger); font-weight: 700; }
+  td .cap {
+    display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--danger); background: var(--danger-bg); vertical-align: 1px;
+  }
+  .alert {
+    background: var(--danger-bg); border: 1px solid #E5AFAB; border-radius: 10px;
+    padding: 10px 14px; color: var(--danger); font-size: 13.5px; font-weight: 600;
+    margin-top: 12px;
+  }
   .legend { font-size: 12.5px; color: var(--muted); margin: 10px 2px 0; }
   @media (max-width: 520px) {
     th, td { padding: 7px 7px; }
@@ -186,6 +197,10 @@
         <div class="note" id="pct-note"></div>
       </div>
     </div>
+    <div id="alert-banner" class="alert" hidden>
+      Caution: patient is at obesity status (BMI at or above the 95th percentile) and may be
+      considered a high risk candidate for sedation.
+    </div>
     <details>
       <summary>About the percentile</summary>
       <p>BMI and the CDC BMI-for-age percentile calculate automatically from sex, date of birth,
@@ -208,7 +223,7 @@
         <tbody id="sedation-body"></tbody>
       </table>
     </div>
-    <p class="legend">Amounts shown in <span class="over">red</span> exceed the listed maximum.</p>
+    <p class="legend">Amounts that would exceed the listed maximum are capped there and tagged <span class="cap">max</span>.</p>
   </section>
 
   <section class="card" aria-labelledby="h-local">
@@ -233,7 +248,7 @@
         <tbody id="reversal-body"></tbody>
       </table>
     </div>
-    <p class="legend">Amounts shown in <span class="over">red</span> exceed the listed maximum.</p>
+    <p class="legend">Amounts that would exceed the listed maximum are capped there and tagged <span class="cap">max</span>.</p>
   </section>
 
   <div class="disclaimer">
@@ -366,6 +381,10 @@ function referenceAge(m) {
   return Math.floor(m) + 0.5;
 }
 
+/* Matches the CDC Child and Teen BMI Calculator: the percentile is computed
+   from the unrounded BMI, the extended method applies at or above the 95th
+   percentile, and severe obesity is BMI at or above 120% of the 95th
+   percentile (or 35+). Verified against the CDC tool on three cases. */
 function percentile(sex, months, bmi) {
   const row = LMS.get(sex * 1000 + referenceAge(months));
   if (!row) return null;
@@ -377,14 +396,20 @@ function percentile(sex, months, bmi) {
     ? 0.3728 + 0.5196 * ageYears - 0.0091 * ageYears * ageYears
     : 0.8334 + 0.3712 * ageYears - 0.0011 * ageYears * ageYears;
   const ext = 0.9 + 0.1 * normsdist((bmi - P95) / excelRound(sigma, 8));
-  return { final: p >= 0.95 ? ext : p, extended: p >= 0.95 };
+  return { final: p >= 0.95 ? ext : p, extended: p >= 0.95, pctOfP95: bmi / P95, bmi };
 }
 
-function category(p) {
-  if (p < 0.05) return "Underweight";
-  if (p < 0.85) return "Healthy weight";
-  if (p < 0.95) return "Overweight";
-  return "Obese";
+function category(r) {
+  if (r.final < 0.05) return "Underweight";
+  if (r.final < 0.85) return "Healthy Weight";
+  if (r.final < 0.95) return "Overweight";
+  return (r.pctOfP95 >= 1.2 || r.bmi >= 35) ? "Severe Obesity" : "Obesity";
+}
+
+function ordinal(n) {
+  const tens = n % 100, ones = n % 10;
+  if (tens >= 11 && tens <= 13) return n + "th";
+  return n + (ones === 1 ? "st" : ones === 2 ? "nd" : ones === 3 ? "rd" : "th");
 }
 
 /* Dose tables, exactly as in the spreadsheet */
@@ -403,19 +428,22 @@ const REVERSAL = [
   { name: "Naloxone", conc: "0.4 mg/mL · 0.1 mg/kg", mgPerKg: 0.1, mgPerMl: 0.4, max: "5 mL", maxVolMl: 5 },
 ];
 
-const cell = (text, over) => `<td>${over ? `<span class="over" title="Exceeds listed maximum">${text}</span>` : text}</td>`;
+/* Weight-based amounts never display above the listed maximum: they are
+   capped there and tagged, per Dr. Alex. Volumes derive from the capped dose. */
+const cell = (text, capped) => `<td>${text}${capped ? `<span class="cap" title="Capped at the listed maximum">max</span>` : ""}</td>`;
 const dash = `<td>–</td>`;
 
 function renderTables(w) {
   $("sedation-body").innerHTML = SEDATION.map(d => {
     const head = `<td class="med">${d.name}<span class="conc">${d.conc}</span></td>`;
     if (w == null) return `<tr>${head}${dash}${dash}${dash}${dash}<td class="max">${d.max}</td></tr>`;
-    const lo = w * d.lo, hi = w * d.hi;
+    const lo = Math.min(w * d.lo, d.maxDoseMg), hi = Math.min(w * d.hi, d.maxDoseMg);
+    const loCap = w * d.lo > d.maxDoseMg, hiCap = w * d.hi > d.maxDoseMg;
     return `<tr>${head}` +
-      cell(fmt(lo, 2) + " mg", lo > d.maxDoseMg) +
-      cell(fmt(hi, 2) + " mg", hi > d.maxDoseMg) +
-      cell(fmt(lo * d.mlPerMg, 2) + " " + d.volUnit, lo > d.maxDoseMg) +
-      cell(fmt(hi * d.mlPerMg, 2) + " " + d.volUnit, hi > d.maxDoseMg) +
+      cell(fmt(lo, 2) + " mg", loCap) +
+      cell(fmt(hi, 2) + " mg", hiCap) +
+      cell(fmt(lo * d.mlPerMg, 2) + " " + d.volUnit, loCap) +
+      cell(fmt(hi * d.mlPerMg, 2) + " " + d.volUnit, hiCap) +
       `<td class="max">${d.max}</td></tr>`;
   }).join("");
 
@@ -429,8 +457,9 @@ function renderTables(w) {
   $("reversal-body").innerHTML = REVERSAL.map(d => {
     const head = `<td class="med">${d.name}<span class="conc">${d.conc}</span></td>`;
     if (w == null) return `<tr>${head}${dash}${dash}<td class="max">${d.max}</td></tr>`;
-    const mg = w * d.mgPerKg, ml = mg / d.mgPerMl;
-    return `<tr>${head}${cell(fmt(mg, 2) + " mg", false)}${cell(fmt(ml, 2) + " mL", ml > d.maxVolMl)}<td class="max">${d.max}</td></tr>`;
+    const mlRaw = w * d.mgPerKg / d.mgPerMl;
+    const ml = Math.min(mlRaw, d.maxVolMl), capped = mlRaw > d.maxVolMl;
+    return `<tr>${head}${cell(fmt(ml * d.mgPerMl, 2) + " mg", capped)}${cell(fmt(ml, 2) + " mL", capped)}<td class="max">${d.max}</td></tr>`;
   }).join("");
 }
 
@@ -458,10 +487,12 @@ function render() {
     $("age-note").textContent = `${fmt(months, 1)} months`;
   }
 
-  const bmi = w != null && h != null ? excelRound(w / Math.pow(h / 100, 2), 2) : null;
+  const bmiRaw = w != null && h != null ? w / Math.pow(h / 100, 2) : null;
+  const bmi = bmiRaw == null ? null : excelRound(bmiRaw, 2);
   $("bmi-value").textContent = bmi == null ? "–" : fmt(bmi, 1);
 
   const pv = $("pct-value"), pn = $("pct-note");
+  let caution = false;
   pv.classList.remove("msg");
   if (sex == null || months == null || bmi == null) {
     pv.textContent = "–";
@@ -474,11 +505,20 @@ function render() {
     pv.classList.add("msg");
     pn.innerHTML = "";
   } else {
-    const r = percentile(sex, months, bmi);
-    pv.textContent = fmt(r.final * 100, 1) + "%";
-    pn.innerHTML = `<span class="chip">${category(r.final)}</span>` +
-      (r.extended ? ` <span class="chip">Extended method</span>` : "");
+    const r = percentile(sex, months, bmiRaw);
+    // Display like the CDC calculator: truncated whole percentile below the
+    // 95th, one truncated decimal in the extended range, plus percent of the
+    // 95th percentile.
+    const whole = Math.floor(r.final * 100);
+    pv.textContent = r.extended
+      ? (Math.floor(r.final * 1000) / 10).toFixed(1) + "th"
+      : (whole < 1 ? "<1st" : ordinal(whole));
+    pn.innerHTML = `<span class="chip">${category(r)}</span>` +
+      (r.extended ? ` <span class="chip">${Math.round(r.pctOfP95 * 100)}% of 95th percentile</span>` : "");
+    caution = r.extended;
   }
+  $("alert-banner").hidden = !caution;
+  pv.closest(".stat").classList.toggle("warn", caution);
 
   renderTables(w);
 }

@@ -110,6 +110,7 @@
     padding: 10px 14px; color: var(--danger); font-size: 13.5px; font-weight: 600;
     margin-top: 12px;
   }
+  .alert.moderate { background: #FCF4E4; border-color: #E5C98E; color: #7A5410; }
   .legend { font-size: 12.5px; color: var(--muted); margin: 10px 2px 0; }
   @media (max-width: 520px) {
     th, td { padding: 7px 7px; }
@@ -198,10 +199,7 @@
         <div class="note" id="pct-note"></div>
       </div>
     </div>
-    <div id="alert-banner" class="alert" hidden>
-      Caution: patient is at obesity status (BMI at or above the 95th percentile) and may be
-      considered a high risk candidate for sedation.
-    </div>
+    <div id="alert-banner" class="alert" hidden></div>
     <details>
       <summary>About the percentile</summary>
       <p>BMI and the CDC BMI-for-age percentile calculate automatically from sex, date of birth,
@@ -493,7 +491,7 @@ function render() {
   $("bmi-value").textContent = bmi == null ? "–" : fmt(bmi, 1);
 
   const pv = $("pct-value"), pn = $("pct-note");
-  let caution = false;
+  let band = null; // "overweight" (85th-95th) | "obese" (95th+), per Dr. Alex's alert thresholds
   pv.classList.remove("msg");
   if (sex == null || months == null || bmi == null) {
     pv.textContent = "–";
@@ -516,10 +514,17 @@ function render() {
       : (whole < 1 ? "<1st" : ordinal(whole));
     pn.innerHTML = `<span class="chip">${category(r)}</span>` +
       (r.extended ? ` <span class="chip">${Math.round(r.pctOfP95 * 100)}% of 95th percentile</span>` : "");
-    caution = r.extended;
+    band = r.extended ? "obese" : r.final >= 0.85 ? "overweight" : null;
   }
-  $("alert-banner").hidden = !caution;
-  pv.closest(".stat").classList.toggle("warn", caution);
+  const banner = $("alert-banner");
+  banner.hidden = band == null;
+  banner.classList.toggle("moderate", band === "overweight");
+  banner.textContent = band === "obese"
+    ? "Caution: patient is at obesity status (BMI at or above the 95th percentile) and may be considered a high risk candidate for sedation."
+    : band === "overweight"
+      ? "Caution: patient is overweight (BMI between the 85th and 95th percentiles). Dose at the 50th percentile weight for the child's age and height."
+      : "";
+  pv.closest(".stat").classList.toggle("warn", band === "obese");
 
   renderTables(w);
 }

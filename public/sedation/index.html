@@ -616,9 +616,9 @@ function render() {
   const dosingW = useP50 ? p50 : w;
 
   const alertText = band === "obese"
-    ? "Caution: patient is at obesity status (BMI at or above the 95th percentile) and may be considered a high risk candidate for sedation."
+    ? "Caution: patient is at obesity status (BMI at or above the 95th percentile) and may be considered a high risk candidate for sedation. If proceeding, dose at the ideal body weight for the child's age and height."
     : band === "overweight"
-      ? "Caution: patient is overweight (BMI between the 85th and 95th percentiles). Dose at the 50th percentile weight for the child's age and height."
+      ? "Caution: patient is overweight (BMI between the 85th and 95th percentiles). Dose at the ideal body weight for the child's age and height."
       : "";
 
   const banner = $("alert-banner");
@@ -630,10 +630,10 @@ function render() {
   refRow.hidden = band == null || p50 == null || w == null;
   if (!refRow.hidden) {
     $("ref-weight-text").textContent = useP50
-      ? `Dosing at ${fmt(p50, 1)} kg, the 50th percentile weight for age`
-      : `50th percentile weight for age: ${fmt(p50, 1)} kg`;
+      ? `Dosing at ideal body weight: ${fmt(p50, 1)} kg`
+      : `Ideal body weight (CDC 50th percentile for age): ${fmt(p50, 1)} kg`;
     const btn = $("use-p50");
-    btn.textContent = useP50 ? "Using reference weight" : "Use for dosing";
+    btn.textContent = useP50 ? "Using ideal body weight" : "Use for dosing";
     btn.setAttribute("aria-pressed", String(useP50));
   }
   pv.closest(".stat").classList.toggle("warn", band === "obese");
@@ -641,7 +641,7 @@ function render() {
   const dn = $("dosing-note");
   dn.hidden = !useP50;
   if (useP50) {
-    dn.textContent = `Doses below use the CDC 50th percentile weight for age, ${fmt(p50, 1)} kg, not the measured weight of ${fmt(w, 1)} kg.`;
+    dn.textContent = `Doses below use the ideal body weight for age, ${fmt(p50, 1)} kg, not the measured weight of ${fmt(w, 1)} kg.`;
   }
 
   const doses = computeDoses(dosingW);
@@ -662,7 +662,7 @@ function render() {
     status: statusText,
     band, alertText, doses,
     dosingLine: useP50
-      ? `Doses calculated at the CDC 50th percentile weight for age: ${fmt(p50, 1)} kg. Measured weight ${fmt(w, 1)} kg.`
+      ? `Doses calculated at ideal body weight (CDC 50th percentile for age): ${fmt(p50, 1)} kg. Measured weight ${fmt(w, 1)} kg.`
       : `Doses calculated at the measured weight: ${fmt(w, 1)} kg.`
   };
   drawRecordCanvas();
@@ -838,7 +838,7 @@ function layoutRecord(ctx, d, draw) {
   F(400, 9.5);
   [
     "Reference aid for trained Alcan clinical staff. Does not replace clinical judgment, office protocol, or a doctor's order. Verify every dose before administration.",
-    "Percentile per CDC BMI-for-age, extended method at or above the 95th percentile. Reference weight is the CDC 50th percentile weight-for-age. Amounts tagged MAX are capped at the listed maximum."
+    "Percentile per CDC BMI-for-age, extended method at or above the 95th percentile. Ideal body weight is the CDC 50th percentile weight-for-age. Amounts tagged MAX are capped at the listed maximum."
   ].forEach(p => {
     wrapLines(p, innerW).forEach(ln => { T(ln, x0, y + 11, RC.muted); y += 13; });
     y += 3;

@@ -652,7 +652,13 @@ function ordinal(n) {
 const SEDATION = [
   { name: "Meperidine", conc: "50 mg/5 mL · 1–2 mg/kg", lo: 1, hi: 2, mlPerMg: 1 / 10, volUnit: "mL", max: "50 mg", maxDoseMg: 50 },
   { name: "Diazepam", conc: "5 mg/5 mL · 0.2–0.3 mg/kg", lo: 0.2, hi: 0.3, mlPerMg: 1, volUnit: "mL", max: "10 mg", maxDoseMg: 10 },
-  { name: "Midazolam", conc: "2 mg/mL · 0.3–0.5 mg/kg", lo: 0.3, hi: 0.5, mlPerMg: 1 / 2, volUnit: "mL", max: "14 mg", maxDoseMg: 14 },
+  /* Three midazolam preparations. The dose in mg is the same for all three;
+     only the volume differs, because the concentration differs. The mg/kg
+     range and the 14 mg maximum are inherited from the original single
+     midazolam row and are pending confirmation for the IV preparations. */
+  { name: "Midazolam Oral Syrup (2 mg/mL)", conc: "0.3–0.5 mg/kg", lo: 0.3, hi: 0.5, mlPerMg: 1 / 2, volUnit: "mL", max: "14 mg", maxDoseMg: 14 },
+  { name: "Midazolam IV injectable (1 mg/mL)", conc: "0.3–0.5 mg/kg", lo: 0.3, hi: 0.5, mlPerMg: 1, volUnit: "mL", max: "14 mg", maxDoseMg: 14 },
+  { name: "Midazolam IV injectable (5 mg/mL)", conc: "0.3–0.5 mg/kg", lo: 0.3, hi: 0.5, mlPerMg: 1 / 5, volUnit: "mL", max: "14 mg", maxDoseMg: 14 },
   { name: "Hydroxyzine", conc: "25 mg capsule · 0.5–1 mg/kg", lo: 0.5, hi: 1, mlPerMg: 1 / 25, volUnit: "caps", max: "50 mg", maxDoseMg: 50 },
 ];
 const LOCALS = [

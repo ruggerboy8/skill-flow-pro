@@ -99,7 +99,7 @@
     position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
     font-size: 12.5px; font-weight: 700; color: var(--navy); pointer-events: none;
   }
-  .conv { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 600; color: var(--muted); min-height: 14px; }
+  .conv:not(:empty) { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
   .unit-warn {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     margin-top: 12px; padding: 10px 14px; border-radius: 10px;
@@ -182,8 +182,33 @@
     background: #EAF1F7; border-left: 3px solid var(--navy); border-radius: 0 6px 6px 0;
     padding: 7px 10px;
   }
+  /* The three dose tables share one card, so the page reads as a single
+     block of results rather than three stacked panels. */
+  .dose-section + .dose-section {
+    margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line);
+  }
+  .card h3 {
+    font-size: 12px; margin: 0 0 10px; color: var(--navy);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .med-pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .med-pick label { font-size: 12.5px; font-weight: 600; }
+  .med-pick select {
+    font-size: 14px; padding: 7px 32px 7px 10px; min-height: 40px; color: var(--ink);
+    background: #fff; border: 1px solid var(--input-border); border-radius: 8px;
+    max-width: 100%;
+  }
+  .med-pick select:focus { outline: 2px solid var(--input-focus); outline-offset: 1px; }
+  .med-pick select.pending { border-color: #E5C98E; background: #FCF4E4; }
+  .oral-only {
+    margin: 10px 0 0; padding: 8px 12px; border-radius: 8px;
+    background: #FCF4E4; border: 1px solid #E5C98E; color: #7A5410;
+    font-size: 12.5px; font-weight: 600;
+  }
+  .record-preview { margin-top: 14px; }
+  .record-preview summary { font-size: 13px; }
   #record-canvas {
-    display: block; width: 100%; height: auto;
+    display: block; width: 100%; height: auto; margin-top: 10px;
     border: 1px solid var(--line); border-radius: 10px; background: #fff;
   }
   .record-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -340,59 +365,79 @@
     </details>
   </section>
 
-  <section class="card" aria-labelledby="h-sedation">
-    <h2 id="h-sedation">Sedation medications</h2>
-    <p class="dosing-note" id="dosing-note" hidden></p>
-    <div class="scroll-x">
-      <table class="wide">
-        <thead>
-          <tr>
-            <th>Medication</th><th>Low dose</th><th>High dose</th>
-            <th>Low volume</th><th>High volume</th><th>Maximum</th>
-          </tr>
-        </thead>
-        <tbody id="sedation-body"></tbody>
-      </table>
-    </div>
-    <p class="legend">Amounts that would exceed the listed maximum are capped there and tagged <span class="cap">max</span>.</p>
-  </section>
+  <section class="card" aria-labelledby="h-dosing">
+    <h2 id="h-dosing">Dosing
+      <span class="sub">Calculated from the patient's weight above.</span>
+    </h2>
 
-  <section class="card" aria-labelledby="h-local">
-    <h2 id="h-local">Local anesthetics</h2>
-    <div class="scroll-x">
-      <table>
-        <thead>
-          <tr><th>Medication</th><th>Maximum dose</th><th>Maximum cartridges</th></tr>
-        </thead>
-        <tbody id="local-body"></tbody>
-      </table>
+    <div class="dose-section">
+      <h3 id="h-sedation">Sedation medications</h3>
+      <div class="med-pick">
+        <label for="midazolam-form">Midazolam preparation</label>
+        <select id="midazolam-form">
+          <option value="">Choose one…</option>
+          <option value="syrup">Oral syrup (2 mg/mL)</option>
+          <option value="iv1">IV injectable (1 mg/mL), for oral use only</option>
+          <option value="iv5">IV injectable (5 mg/mL), for oral use only</option>
+        </select>
+      </div>
+      <p class="dosing-note" id="dosing-note" hidden></p>
+      <div class="scroll-x">
+        <table class="wide">
+          <thead>
+            <tr>
+              <th>Medication</th><th>Low dose</th><th>High dose</th>
+              <th>Low volume</th><th>High volume</th><th>Maximum</th>
+            </tr>
+          </thead>
+          <tbody id="sedation-body"></tbody>
+        </table>
+      </div>
+      <p class="oral-only" id="oral-only" hidden>
+        For oral use only. This is the IV injectable formulation given by mouth, not intravenously.
+      </p>
     </div>
-  </section>
 
-  <section class="card" aria-labelledby="h-reversal">
-    <h2 id="h-reversal">Reversal agents</h2>
-    <div class="scroll-x">
-      <table>
-        <thead>
-          <tr><th>Agent</th><th>Calculated dose</th><th>Calculated volume</th><th>Maximum</th></tr>
-        </thead>
-        <tbody id="reversal-body"></tbody>
-      </table>
+    <div class="dose-section">
+      <h3 id="h-local">Local anesthetics</h3>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr><th>Medication</th><th>Maximum dose</th><th>Maximum cartridges</th></tr>
+          </thead>
+          <tbody id="local-body"></tbody>
+        </table>
+      </div>
     </div>
+
+    <div class="dose-section">
+      <h3 id="h-reversal">Reversal agents</h3>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr><th>Agent</th><th>Calculated dose</th><th>Calculated volume</th><th>Maximum</th></tr>
+          </thead>
+          <tbody id="reversal-body"></tbody>
+        </table>
+      </div>
+    </div>
+
     <p class="legend">Amounts that would exceed the listed maximum are capped there and tagged <span class="cap">max</span>.</p>
   </section>
 
   <section class="card" aria-labelledby="h-record">
     <h2 id="h-record">Sedation record
-      <span class="sub">Everything above in one block, ready for the chart. Copy it straight into the
-      sedation record, or save it as an image.</span>
+      <span class="sub">Everything above in one block, ready for the chart.</span>
     </h2>
-    <canvas id="record-canvas" role="img" aria-label="Sedation record summary"></canvas>
     <div class="record-actions">
       <button type="button" id="copy-img">Copy image</button>
       <button type="button" id="save-img" class="secondary">Save image</button>
       <span id="record-status" role="status"></span>
     </div>
+    <details class="record-preview">
+      <summary>Preview the record image</summary>
+      <canvas id="record-canvas" role="img" aria-label="Sedation record summary"></canvas>
+    </details>
   </section>
 
   <div class="disclaimer">
@@ -499,7 +544,7 @@ function saveUnits(u) {
   try { localStorage.setItem(UNIT_KEY, u); } catch (e) { /* private browsing */ }
 }
 
-const state = { sex: null, useP50: false, units: loadUnits(), unitOk: null }; // sex: 1 = male, 2 = female
+const state = { sex: null, useP50: false, units: loadUnits(), unitOk: null, midazolam: "" }; // sex: 1 = male, 2 = female
 const isUS = () => state.units === "us";
 
 /* Dates are typed, not picked: MM/DD/YYYY, bare digits (10162019), or a
@@ -648,19 +693,35 @@ function ordinal(n) {
   return n + (ones === 1 ? "st" : ones === 2 ? "nd" : ones === 3 ? "rd" : "th");
 }
 
-/* Dose tables, exactly as in the spreadsheet */
-const SEDATION = [
-  { name: "Meperidine", conc: "50 mg/5 mL · 1–2 mg/kg", lo: 1, hi: 2, mlPerMg: 1 / 10, volUnit: "mL", max: "50 mg", maxDoseMg: 50 },
-  { name: "Diazepam", conc: "5 mg/5 mL · 0.2–0.3 mg/kg", lo: 0.2, hi: 0.3, mlPerMg: 1, volUnit: "mL", max: "10 mg", maxDoseMg: 10 },
-  /* Three midazolam preparations. The dose in mg is the same for all three;
-     only the volume differs, because the concentration differs. The mg/kg
-     range and the 14 mg maximum are inherited from the original single
-     midazolam row and are pending confirmation for the IV preparations. */
-  { name: "Midazolam Oral Syrup (2 mg/mL)", conc: "0.3–0.5 mg/kg", lo: 0.3, hi: 0.5, mlPerMg: 1 / 2, volUnit: "mL", max: "14 mg", maxDoseMg: 14 },
-  { name: "Midazolam IV injectable (1 mg/mL)", conc: "0.3–0.5 mg/kg", lo: 0.3, hi: 0.5, mlPerMg: 1, volUnit: "mL", max: "14 mg", maxDoseMg: 14 },
-  { name: "Midazolam IV injectable (5 mg/mL)", conc: "0.3–0.5 mg/kg", lo: 0.3, hi: 0.5, mlPerMg: 1 / 5, volUnit: "mL", max: "14 mg", maxDoseMg: 14 },
-  { name: "Hydroxyzine", conc: "25 mg capsule · 0.5–1 mg/kg", lo: 0.5, hi: 1, mlPerMg: 1 / 25, volUnit: "caps", max: "50 mg", maxDoseMg: 50 },
+/* Midazolam comes in three preparations. The dose in mg is identical across
+   all three; only the volume differs, because only the concentration differs.
+   The IV injectable forms are dye-free and are swallowed, not injected, which
+   is why they carry the same oral mg/kg range and the same 14 mg maximum.
+   Staff pick one, so the record names the preparation actually used. */
+const MIDAZOLAM_FORMS = [
+  { id: "syrup", name: "Midazolam Oral Syrup (2 mg/mL)", mlPerMg: 1 / 2, oralOnly: false },
+  { id: "iv1", name: "Midazolam IV injectable (1 mg/mL)", mlPerMg: 1, oralOnly: true },
+  { id: "iv5", name: "Midazolam IV injectable (5 mg/mL)", mlPerMg: 1 / 5, oralOnly: true }
 ];
+const midazolamForm = () => MIDAZOLAM_FORMS.find(f => f.id === state.midazolam) || null;
+
+/* Dose tables, exactly as in the spreadsheet */
+function sedationList() {
+  const f = midazolamForm();
+  return [
+    { name: "Meperidine", conc: "50 mg/5 mL · 1–2 mg/kg", lo: 1, hi: 2, mlPerMg: 1 / 10, volUnit: "mL", max: "50 mg", maxDoseMg: 50 },
+    { name: "Diazepam", conc: "5 mg/5 mL · 0.2–0.3 mg/kg", lo: 0.2, hi: 0.3, mlPerMg: 1, volUnit: "mL", max: "10 mg", maxDoseMg: 10 },
+    {
+      name: f ? f.name : "Midazolam",
+      conc: f
+        ? (f.oralOnly ? "0.3–0.5 mg/kg · for oral use only" : "0.3–0.5 mg/kg")
+        : "0.3–0.5 mg/kg · choose a preparation for volumes",
+      lo: 0.3, hi: 0.5, mlPerMg: f ? f.mlPerMg : null, volUnit: "mL",
+      max: "14 mg", maxDoseMg: 14, noVolume: !f
+    },
+    { name: "Hydroxyzine", conc: "25 mg capsule · 0.5–1 mg/kg", lo: 0.5, hi: 1, mlPerMg: 1 / 25, volUnit: "caps", max: "50 mg", maxDoseMg: 50 }
+  ];
+}
 const LOCALS = [
   { name: "2% Lidocaine", ref: "4.4 mg/kg · 34 mg per cartridge", mgPerKg: 4.4, mgPerCarp: 34 },
   { name: "4% Articaine (Septocaine)", ref: "7 mg/kg · 68 mg per cartridge", mgPerKg: 7, mgPerCarp: 68 },
@@ -677,12 +738,14 @@ const REVERSAL = [
 function computeDoses(w) {
   if (w == null) return null;
   return {
-    sedation: SEDATION.map(d => {
+    sedation: sedationList().map(d => {
       const loRaw = w * d.lo, hiRaw = w * d.hi;
       const lo = Math.min(loRaw, d.maxDoseMg), hi = Math.min(hiRaw, d.maxDoseMg);
       return {
-        name: d.name, conc: d.conc, unit: d.volUnit, max: d.max,
-        lo, hi, loVol: lo * d.mlPerMg, hiVol: hi * d.mlPerMg,
+        name: d.name, conc: d.conc, unit: d.volUnit, max: d.max, noVolume: !!d.noVolume,
+        lo, hi,
+        loVol: d.noVolume ? null : lo * d.mlPerMg,
+        hiVol: d.noVolume ? null : hi * d.mlPerMg,
         loCap: loRaw > d.maxDoseMg, hiCap: hiRaw > d.maxDoseMg
       };
     }),
@@ -705,7 +768,7 @@ const cell = (text, capped) => `<td>${text}${capped ? `<span class="cap" title="
 const dash = `<td>–</td>`;
 
 function renderTables(doses) {
-  const S = doses ? doses.sedation : SEDATION, L = doses ? doses.locals : LOCALS, R = doses ? doses.reversal : REVERSAL;
+  const S = doses ? doses.sedation : sedationList(), L = doses ? doses.locals : LOCALS, R = doses ? doses.reversal : REVERSAL;
 
   $("sedation-body").innerHTML = S.map(d => {
     const head = `<td class="med">${d.name}<span class="conc">${d.conc}</span></td>`;
@@ -713,8 +776,9 @@ function renderTables(doses) {
     return `<tr>${head}` +
       cell(fmt(d.lo, 2) + " mg", d.loCap) +
       cell(fmt(d.hi, 2) + " mg", d.hiCap) +
-      cell(fmt(d.loVol, 2) + " " + d.unit, d.loCap) +
-      cell(fmt(d.hiVol, 2) + " " + d.unit, d.hiCap) +
+      (d.noVolume ? dash + dash
+        : cell(fmt(d.loVol, 2) + " " + d.unit, d.loCap) +
+          cell(fmt(d.hiVol, 2) + " " + d.unit, d.hiCap)) +
       `<td class="max">${d.max}</td></tr>`;
   }).join("");
 
@@ -860,6 +924,10 @@ function render() {
     $("unit-fix").textContent = `Yes, these are ${us ? "kg / cm" : "lb / in"}`;
     $("unit-keep").dataset.key = misKey;
   }
+
+  const mform = midazolamForm();
+  $("midazolam-form").classList.toggle("pending", mform == null);
+  $("oral-only").hidden = !(mform && mform.oralOnly);
 
   const doses = computeDoses(dosingW);
   renderTables(doses);
@@ -1035,7 +1103,8 @@ function layoutRecord(ctx, d, draw) {
     D.sedation.map(m => ({
       name: m.name, sub: m.conc + " · max " + m.max,
       c1: `${fmt(m.lo, 2)} – ${fmt(m.hi, 2)} mg`, cap1: m.hiCap,
-      c2: `${fmt(m.loVol, 2)} – ${fmt(m.hiVol, 2)} ${m.unit}`, cap2: m.hiCap
+      c2: m.noVolume ? "—" : `${fmt(m.loVol, 2)} – ${fmt(m.hiVol, 2)} ${m.unit}`,
+      cap2: m.noVolume ? false : m.hiCap
     })));
   table("Local anesthetics", ["Medication", "Maximum dose", "Maximum cartridges"],
     D.locals.map(m => ({
@@ -1175,6 +1244,7 @@ $("unit-metric").addEventListener("click", () => setUnits("metric", true));
 $("unit-us").addEventListener("click", () => setUnits("us", true));
 $("unit-fix").addEventListener("click", () => setUnits(isUS() ? "metric" : "us", false));
 $("unit-keep").addEventListener("click", () => { state.unitOk = $("unit-keep").dataset.key; render(); });
+$("midazolam-form").addEventListener("change", () => { state.midazolam = $("midazolam-form").value; render(); });
 
 function setSex(s) {
   state.sex = s;
@@ -1192,6 +1262,8 @@ function reset() {
   state.sex = null;
   state.useP50 = false;
   state.unitOk = null;
+  state.midazolam = "";
+  $("midazolam-form").value = "";
   $("record-status").textContent = "";
   $("sex-m").setAttribute("aria-pressed", "false");
   $("sex-f").setAttribute("aria-pressed", "false");

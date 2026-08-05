@@ -171,6 +171,11 @@ export default function Layout() {
     ...(showFacilitate ? [
       { name: 'Facilitate', href: '/facilitate', icon: Presentation },
     ] : []),
+    // Training workspace for Alcan directors (interim gate — must match
+    // allowTraining in RequireAccess.tsx; super admins get it in their branch).
+    ...(canManageLibrary && organizationId === ALCAN_ORG_ID ? [
+      { name: 'Training', href: '/training', icon: Compass },
+    ] : []),
     ...(canManageAssignments ? [
       { name: 'Builder', href: '/builder', icon: SettingsIcon },
     ] : []),

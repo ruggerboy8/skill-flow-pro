@@ -1404,25 +1404,48 @@ serve(async (req: Request) => {
             "evaluations (evaluator)",
             admin.from("evaluations").delete().eq("evaluator_id", sid),
           );
+          // Never delete OTHER people's evals just because this person released
+          // them (pre-2026-08-05 behavior deleted them — a footgun for admins);
+          // detach the attribution instead.
           await requireDelete(
-            "evaluations (released_by)",
-            admin.from("evaluations").delete().eq("released_by", sid),
+            "evaluations (released_by detach)",
+            admin.from("evaluations").update({ released_by: null }).eq("released_by", sid),
           );
 
           await requireDelete("coach scopes", admin.from("coach_scopes").delete().eq("staff_id", sid));
-          // manager_priorities table retained but cleanup skipped (no active UI usage)
           await requireDelete("excused submissions", admin.from("excused_submissions").delete().eq("staff_id", sid));
           await requireDelete("admin audit (staff)", admin.from("admin_audit").delete().eq("staff_id", sid));
           await requireDelete("admin audit (changed_by)", admin.from("admin_audit").delete().eq("changed_by", sid));
-          await requireDelete("resource events", admin.from("resource_events").delete().eq("staff_id", sid));
+          // (resource_events + user_backlog_v2 cleanup removed 2026-08-05 —
+          // those tables were dropped 2026-07-24; deleting from them made
+          // every delete_user attempt fail with "relation does not exist".)
           await requireDelete("organization role names", admin.from("organization_role_names").delete().eq("updated_by", sid));
+          // FK coverage added 2026-08-05 (previously missing → hard FK errors):
+          await requireDelete("deputy mappings", admin.from("deputy_employee_mappings").delete().eq("staff_id", sid));
+          await requireDelete("survey responses", admin.from("survey_responses").delete().eq("staff_id", sid));
+          await requireDelete("survey assignments", admin.from("survey_assignments").delete().eq("staff_id", sid));
+          await requireDelete("lead meeting requests (lead)", admin.from("lead_meeting_requests").delete().eq("lead_staff_id", sid));
+          await requireDelete("lead meeting requests (creator detach)", admin.from("lead_meeting_requests").update({ created_by: null }).eq("created_by", sid));
+          // Attribution detaches (keep others' records, drop the reference):
+          await requireDelete("coaching issues (creator detach)", admin.from("coaching_issues").update({ created_by: null }).eq("created_by", sid));
+          await requireDelete("coaching issue events (actor detach)", admin.from("coaching_issue_events").update({ by_staff: null }).eq("by_staff", sid));
+          await requireDelete("coach baseline audit (actor detach)", admin.from("coach_baseline_audit").update({ actor_staff_id: null }).eq("actor_staff_id", sid));
+          await requireDelete("deputy connections (connector detach)", admin.from("deputy_connections").update({ connected_by: null }).eq("connected_by", sid));
+          await requireDelete("surveys (creator detach)", admin.from("surveys").update({ created_by: null }).eq("created_by", sid));
+          await requireDelete("lead focus weeks (creator detach)", admin.from("lead_focus_weeks").update({ created_by: null }).eq("created_by", sid));
+          await requireDelete("coaching sessions (editor detach)", admin.from("coaching_sessions").update({ last_edited_by_staff_id: null }).eq("last_edited_by_staff_id", sid));
+          await requireDelete("coaching sessions (opener detach)", admin.from("coaching_sessions").update({ last_opened_by_staff_id: null }).eq("last_opened_by_staff_id", sid));
+          await requireDelete("meeting records (editor detach)", admin.from("coaching_meeting_records").update({ last_edited_by_staff_id: null }).eq("last_edited_by_staff_id", sid));
+          await requireDelete("meeting records (opener detach)", admin.from("coaching_meeting_records").update({ last_opened_by_staff_id: null }).eq("last_opened_by_staff_id", sid));
+          await requireDelete("coach baseline assessments (editor detach)", admin.from("coach_baseline_assessments").update({ last_edited_by_staff_id: null }).eq("last_edited_by_staff_id", sid));
+          await requireDelete("coach baseline items (editor detach)", admin.from("coach_baseline_items").update({ last_edited_by_staff_id: null }).eq("last_edited_by_staff_id", sid));
+          await requireDelete("coaching agenda templates", admin.from("coaching_agenda_templates").delete().eq("staff_id", sid));
           // Never hard-delete framework content when a staff member is removed;
           // just detach the retired_by attribution (mirrors delete_organization).
           // The DB-level framework_history guard would block the old delete anyway.
           await requireDelete("pro moves (retired_by)", admin.from("pro_moves").update({ retired_by: null }).eq("retired_by", sid));
           await requireDelete("staff audit", admin.from("staff_audit").delete().eq("staff_id", sid));
           await requireDelete("staff quarter focus", admin.from("staff_quarter_focus").delete().eq("staff_id", sid));
-          await requireDelete("user backlog", admin.from("user_backlog_v2").delete().eq("staff_id", sid));
           await requireDelete("user capabilities", admin.from("user_capabilities").delete().eq("staff_id", sid));
           await requireDelete("weekly scores", admin.from("weekly_scores").delete().eq("staff_id", sid));
 
@@ -1564,15 +1587,12 @@ serve(async (req: Request) => {
           await requireDelete("excused submissions", admin.from("excused_submissions").delete().eq("staff_id", sid));
           await requireDelete("admin audit (staff)", admin.from("admin_audit").delete().eq("staff_id", sid));
           await requireDelete("admin audit (changed_by)", admin.from("admin_audit").delete().eq("changed_by", sid));
-          await requireDelete("resource events", admin.from("resource_events").delete().eq("staff_id", sid));
           await requireDelete("org role names (updated_by)", admin.from("organization_role_names").delete().eq("updated_by", sid));
           await requireDelete("pro moves (retired_by)", admin.from("pro_moves").update({ retired_by: null }).eq("retired_by", sid));
           await requireDelete("staff audit", admin.from("staff_audit").delete().eq("staff_id", sid));
           await requireDelete("staff quarter focus", admin.from("staff_quarter_focus").delete().eq("staff_id", sid));
-          await requireDelete("user backlog", admin.from("user_backlog_v2").delete().eq("staff_id", sid));
           await requireDelete("user capabilities", admin.from("user_capabilities").delete().eq("staff_id", sid));
           await requireDelete("weekly scores", admin.from("weekly_scores").delete().eq("staff_id", sid));
-          await requireDelete("manager priorities", admin.from("manager_priorities").delete().eq("coach_staff_id", sid));
           await requireDelete("coaching agenda templates", admin.from("coaching_agenda_templates").delete().eq("staff_id", sid));
 
           // Delete staff record

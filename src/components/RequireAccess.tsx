@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
 
 type RoleInfo = ReturnType<typeof useUserRole>;
 
@@ -58,6 +59,16 @@ export const allowFacilitate = (r: RoleInfo) =>
  */
 export const allowStaffEvals = (r: RoleInfo) =>
   r.canSubmitEvals || r.canReviewEvals || r.isOrgAdmin || r.isSuperAdmin || r.isOfficeManager;
+
+/**
+ * Training workspace audience — INTERIM gate (2026-08-05) until the Functional
+ * Director archetype exists (Phase C D7): platform admins plus Alcan directors,
+ * where can_manage_library is the working "director" marker (Ariyana, Lauren).
+ * Deliberately excludes Raul/Wes for now (their inclusion is the D7 decision)
+ * and the UK.
+ */
+export const allowTraining = (r: RoleInfo) =>
+  r.isSuperAdmin || (r.canManageLibrary && r.organizationId === ALCAN_ORG_ID);
 
 /** Regional dashboard ("Command Center") audience: admins, regional managers, coaches. */
 export const allowDashboard = (r: RoleInfo) =>

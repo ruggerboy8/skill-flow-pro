@@ -24,7 +24,7 @@ import {
 const STAGE_HEX: Record<IssueStage, string> = {
   identified: '#8497A6', communicated: '#0E7C86', assessed: '#C77D18',
 };
-const SOURCE_ICON: Record<SourceType, any> = { visit: Eye, doctor: Stethoscope, leads: Users, signal: Activity };
+const SOURCE_ICON: Record<SourceType, any> = { visit: Eye, doctor: Stethoscope, leads: Users, signal: Activity, management: Shield };
 
 interface Loc { id: string; name: string; group: string }
 

@@ -5,7 +5,7 @@
 export type IssueStage = 'identified' | 'communicated' | 'assessed';
 export type IssueStatus = 'active' | 'retired';
 export type RetireOutcome = 'landed' | 'let_go' | 'recurring';
-export type SourceType = 'visit' | 'doctor' | 'leads' | 'signal';
+export type SourceType = 'visit' | 'doctor' | 'leads' | 'signal' | 'management';
 export type EventKind =
   | 'created' | 'stage_change' | 'note' | 'declared_focus' | 'retired' | 'reopened';
 
@@ -59,8 +59,9 @@ export const OUTCOME_META: Record<RetireOutcome, { label: string }> = {
 };
 
 export const SOURCE_META: Record<SourceType, { label: string }> = {
-  visit:  { label: 'You saw it on a visit' },
-  doctor: { label: 'Doctor / clinical director' },
-  leads:  { label: 'Lead meeting' },
-  signal: { label: 'Confidence signal' },
+  visit:      { label: 'You saw it on a visit' },
+  doctor:     { label: 'Doctor / clinical director' },
+  leads:      { label: 'Lead meeting' },
+  signal:     { label: 'Confidence signal' },
+  management: { label: 'Management' },
 };

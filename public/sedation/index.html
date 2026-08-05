@@ -207,6 +207,32 @@
     background: #FCF4E4; border-left: 3px solid #D9A441; color: #7A5410;
     font-size: 12.5px; font-weight: 600;
   }
+  /* Two cards take input, two are read-only. The tint and left rule make that
+     legible at a glance without adding any new elements. */
+  .card.input-card { background: #FBFCFE; border-left: 3px solid var(--navy); }
+
+  .given { margin-bottom: 16px; }
+  .given-help { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
+  .given-row {
+    display: grid; grid-template-columns: minmax(110px, 1fr) 116px minmax(160px, 1.3fr);
+    gap: 4px 12px; align-items: center; padding: 7px 0;
+  }
+  .given-row + .given-row { border-top: 1px solid var(--line); }
+  .given-name { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .given-row input { width: 100%; }
+  .given-meta { font-size: 12.5px; color: var(--muted); }
+  .given-meta .over { color: var(--danger); font-weight: 700; }
+  .given-row input.over { border-color: var(--danger); background: var(--danger-bg); }
+  .given-error {
+    margin: 10px 0 0; padding: 9px 13px; border-radius: 8px;
+    background: var(--danger-bg); border: 1px solid #E5AFAB; color: var(--danger);
+    font-size: 13px; font-weight: 700;
+  }
+  @media (max-width: 560px) {
+    .given-row { grid-template-columns: 1fr 116px; }
+    .given-meta { grid-column: 1 / -1; }
+  }
+
   .record-preview { margin-top: 14px; }
   .record-preview summary { font-size: 13px; }
   #record-canvas {
@@ -278,7 +304,7 @@
     Dose ranges and maximums follow the sedation protocol supplied by the practice, not the CDC.</p>
   </div>
 
-  <section class="card" aria-labelledby="h-patient">
+  <section class="card input-card" aria-labelledby="h-patient">
     <h2 id="h-patient">Patient information
       <span class="sub">Everything below updates automatically as you type. Nothing is saved or sent anywhere.</span>
     </h2>
@@ -428,10 +454,55 @@
     <p class="legend">Amounts that would exceed the listed maximum are capped there and tagged <span class="cap">max</span>.</p>
   </section>
 
-  <section class="card" aria-labelledby="h-record">
+  <section class="card input-card" aria-labelledby="h-record">
     <h2 id="h-record">Sedation record
-      <span class="sub">Everything above in one block, ready for the chart.</span>
+      <span class="sub">Record what was given, then copy the whole thing into the chart.</span>
     </h2>
+
+    <div class="given">
+      <h3>Medication administered</h3>
+      <p class="given-help">Enter the dose given. The volume and the check against this patient's
+      maximum update as you type. Leave a drug blank if it was not given.</p>
+
+      <div class="given-row">
+        <label class="given-name" id="name-meperidine" for="given-meperidine">Meperidine</label>
+        <div class="input-wrap">
+          <input type="number" id="given-meperidine" inputmode="decimal" step="0.01" min="0" placeholder="0">
+          <span class="unit-tag">mg</span>
+        </div>
+        <span class="given-meta" id="meta-meperidine"></span>
+      </div>
+
+      <div class="given-row">
+        <label class="given-name" id="name-diazepam" for="given-diazepam">Diazepam</label>
+        <div class="input-wrap">
+          <input type="number" id="given-diazepam" inputmode="decimal" step="0.01" min="0" placeholder="0">
+          <span class="unit-tag">mg</span>
+        </div>
+        <span class="given-meta" id="meta-diazepam"></span>
+      </div>
+
+      <div class="given-row">
+        <label class="given-name" id="name-midazolam" for="given-midazolam">Midazolam</label>
+        <div class="input-wrap">
+          <input type="number" id="given-midazolam" inputmode="decimal" step="0.01" min="0" placeholder="0">
+          <span class="unit-tag">mg</span>
+        </div>
+        <span class="given-meta" id="meta-midazolam"></span>
+      </div>
+
+      <div class="given-row">
+        <label class="given-name" id="name-hydroxyzine" for="given-hydroxyzine">Hydroxyzine</label>
+        <div class="input-wrap">
+          <input type="number" id="given-hydroxyzine" inputmode="decimal" step="0.01" min="0" placeholder="0">
+          <span class="unit-tag">mg</span>
+        </div>
+        <span class="given-meta" id="meta-hydroxyzine"></span>
+      </div>
+
+      <p class="given-error" id="given-error" hidden></p>
+    </div>
+
     <div class="record-actions">
       <button type="button" id="copy-img">Copy image</button>
       <button type="button" id="save-img" class="secondary">Save image</button>
@@ -712,9 +783,10 @@ const midazolamForm = () => MIDAZOLAM_FORMS.find(f => f.id === state.midazolam) 
 function sedationList() {
   const f = midazolamForm();
   return [
-    { name: "Meperidine", conc: "50 mg/5 mL · 1–2 mg/kg", lo: 1, hi: 2, mlPerMg: 1 / 10, volUnit: "mL", max: "50 mg", maxDoseMg: 50 },
-    { name: "Diazepam", conc: "5 mg/5 mL · 0.2–0.3 mg/kg", lo: 0.2, hi: 0.3, mlPerMg: 1, volUnit: "mL", max: "10 mg", maxDoseMg: 10 },
+    { key: "meperidine", name: "Meperidine", conc: "50 mg/5 mL · 1–2 mg/kg", lo: 1, hi: 2, mlPerMg: 1 / 10, volUnit: "mL", max: "50 mg", maxDoseMg: 50 },
+    { key: "diazepam", name: "Diazepam", conc: "5 mg/5 mL · 0.2–0.3 mg/kg", lo: 0.2, hi: 0.3, mlPerMg: 1, volUnit: "mL", max: "10 mg", maxDoseMg: 10 },
     {
+      key: "midazolam",
       name: f ? f.name : "Midazolam",
       conc: f
         ? (f.oralOnly ? "0.3–0.5 mg/kg · for oral use only" : "0.3–0.5 mg/kg")
@@ -722,7 +794,7 @@ function sedationList() {
       lo: 0.3, hi: 0.5, mlPerMg: f ? f.mlPerMg : null, volUnit: "mL",
       max: "14 mg", maxDoseMg: 14, noVolume: !f
     },
-    { name: "Hydroxyzine", conc: "25 mg capsule · 0.5–1 mg/kg", lo: 0.5, hi: 1, mlPerMg: 1 / 25, volUnit: "caps", max: "50 mg", maxDoseMg: 50 }
+    { key: "hydroxyzine", name: "Hydroxyzine", conc: "25 mg capsule · 0.5–1 mg/kg", lo: 0.5, hi: 1, mlPerMg: 1 / 25, volUnit: "caps", max: "50 mg", maxDoseMg: 50 }
   ];
 }
 const LOCALS = [
@@ -745,7 +817,8 @@ function computeDoses(w) {
       const loRaw = w * d.lo, hiRaw = w * d.hi;
       const lo = Math.min(loRaw, d.maxDoseMg), hi = Math.min(hiRaw, d.maxDoseMg);
       return {
-        name: d.name, conc: d.conc, unit: d.volUnit, max: d.max, noVolume: !!d.noVolume,
+        key: d.key, name: d.name, conc: d.conc, unit: d.volUnit, max: d.max,
+        noVolume: !!d.noVolume, mlPerMg: d.mlPerMg,
         lo, hi,
         loVol: d.noVolume ? null : lo * d.mlPerMg,
         hiVol: d.noVolume ? null : hi * d.mlPerMg,
@@ -796,6 +869,55 @@ function renderTables(doses) {
     if (!doses) return `<tr>${head}${dash}${dash}<td class="max">${d.max}</td></tr>`;
     return `<tr>${head}${cell(fmt(d.mg, 2) + " mg", d.capped)}${cell(fmt(d.ml, 2) + " mL", d.capped)}<td class="max">${d.max}</td></tr>`;
   }).join("");
+}
+
+/* Medication administered. The dose is typed in mg and the volume follows
+   from the preparation's concentration, so a self-contradictory mg/mL pair
+   cannot be entered. Anything above this patient's maximum is flagged loudly
+   but never blocked: a dose that was genuinely given needs to be recordable. */
+const GIVEN_KEYS = ["meperidine", "diazepam", "midazolam", "hydroxyzine"];
+
+function renderGiven(doses) {
+  const list = sedationList();
+  const administered = [];
+  let overCount = 0;
+
+  GIVEN_KEYS.forEach(key => {
+    const spec = list.find(s => s.key === key);
+    const dose = doses ? doses.sedation.find(s => s.key === key) : null;
+    const input = $("given-" + key);
+    const raw = input.value === "" ? null : Number(input.value);
+    const mg = raw != null && isFinite(raw) && raw > 0 ? raw : null;
+    const max = dose ? dose.hi : null;              // this patient's capped high dose
+    const isOver = mg != null && max != null && mg > max;
+    if (isOver) overCount++;
+
+    $("name-" + key).textContent = spec.name;
+    input.classList.toggle("over", isOver);
+
+    const vol = (mg != null && spec.mlPerMg != null) ? mg * spec.mlPerMg : null;
+    const parts = [];
+    if (mg != null) parts.push(vol != null ? `${fmt(vol, 2)} ${spec.volUnit}` : "choose a preparation");
+    parts.push(max == null
+      ? "enter a weight above"
+      : isOver
+        ? `<span class="over">over the ${fmt(max, 2)} mg maximum</span>`
+        : `max ${fmt(max, 2)} mg`);
+    $("meta-" + key).innerHTML = parts.join(" · ");
+
+    if (mg != null) {
+      administered.push({ name: spec.name, mg, vol, unit: spec.volUnit, max, over: isOver });
+    }
+  });
+
+  const err = $("given-error");
+  err.hidden = overCount === 0;
+  if (overCount) {
+    err.textContent = overCount === 1
+      ? "One administered dose is above this patient's maximum. Confirm before mixing."
+      : `${overCount} administered doses are above this patient's maximum. Confirm before mixing.`;
+  }
+  return administered;
 }
 
 function render() {
@@ -934,6 +1056,7 @@ function render() {
 
   const doses = computeDoses(dosingW);
   renderTables(doses);
+  const administered = renderGiven(doses);
 
   // Snapshot for the record image
   const complete = sex != null && months != null && months >= 0 && w != null && h != null;
@@ -948,7 +1071,7 @@ function render() {
     bmi: bmi == null ? "–" : fmt(bmi, 1),
     pct: pv.textContent,
     status: statusText,
-    band, alertText, doses,
+    band, alertText, doses, administered,
     dosingLine: useP50
       ? `Doses calculated at ideal body weight (CDC 50th percentile for age): ${showWeight(p50)}. Measured weight ${showWeight(w)}.`
       : `Doses calculated at the measured weight: ${showWeight(w)}.`
@@ -1090,9 +1213,10 @@ function layoutRecord(ctx, d, draw) {
       [[r.c1, r.cap1, cx2], [r.c2, r.cap2, cx3]].forEach(([val, capped, rx]) => {
         let right = rx;
         if (capped) {
+          const tag = r.tag || "MAX";
           F(700, 8.5);
-          T("MAX", right, y + 17, RC.danger, "right");
-          right -= ctx.measureText("MAX").width + 6;
+          T(tag, right, y + 17, RC.danger, "right");
+          right -= ctx.measureText(tag).width + 6;
         }
         F(600, 12.5); T(val, right, y + 17, RC.ink, "right");
       });
@@ -1121,6 +1245,18 @@ function layoutRecord(ctx, d, draw) {
       c1: fmt(m.mg, 2) + " mg", cap1: m.capped,
       c2: fmt(m.ml, 2) + " mL", cap2: m.capped
     })));
+
+  // What was actually given, listed only when something was entered
+  if (d.administered && d.administered.length) {
+    table("Medication administered", ["Medication", "Dose given", "Volume given"],
+      d.administered.map(m => ({
+        name: m.name,
+        sub: m.max == null ? "" : (m.over ? `above the ${fmt(m.max, 2)} mg maximum` : `within the ${fmt(m.max, 2)} mg maximum`),
+        tag: "OVER",
+        c1: fmt(m.mg, 2) + " mg", cap1: m.over,
+        c2: m.vol != null ? `${fmt(m.vol, 2)} ${m.unit}` : "—", cap2: false
+      })));
+  }
 
   // Footer
   rule(y); y += 6;
@@ -1248,6 +1384,7 @@ $("unit-us").addEventListener("click", () => setUnits("us", true));
 $("unit-fix").addEventListener("click", () => setUnits(isUS() ? "metric" : "us", false));
 $("unit-keep").addEventListener("click", () => { state.unitOk = $("unit-keep").dataset.key; render(); });
 $("midazolam-form").addEventListener("change", () => { state.midazolam = $("midazolam-form").value; render(); });
+GIVEN_KEYS.forEach(k => $("given-" + k).addEventListener("input", render));
 
 function setSex(s) {
   state.sex = s;
@@ -1267,6 +1404,7 @@ function reset() {
   state.unitOk = null;
   state.midazolam = "";
   $("midazolam-form").value = "";
+  GIVEN_KEYS.forEach(k => { $("given-" + k).value = ""; });
   $("record-status").textContent = "";
   $("sex-m").setAttribute("aria-pressed", "false");
   $("sex-f").setAttribute("aria-pressed", "false");

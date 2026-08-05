@@ -191,7 +191,7 @@
     font-size: 12px; margin: 0 0 10px; color: var(--navy);
     text-transform: uppercase; letter-spacing: 0.06em;
   }
-  .med-pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .med-pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .med-pick label { font-size: 12.5px; font-weight: 600; }
   .med-pick select {
     font-size: 14px; padding: 7px 32px 7px 10px; min-height: 40px; color: var(--ink);
@@ -200,9 +200,11 @@
   }
   .med-pick select:focus { outline: 2px solid var(--input-focus); outline-offset: 1px; }
   .med-pick select.pending { border-color: #E5C98E; background: #FCF4E4; }
+  /* Sits directly under the preparation picker, not under the table, so it
+     reads as belonging to midazolam rather than to every drug listed. */
   .oral-only {
-    margin: 10px 0 0; padding: 8px 12px; border-radius: 8px;
-    background: #FCF4E4; border: 1px solid #E5C98E; color: #7A5410;
+    margin: 0 0 12px; padding: 8px 12px; border-radius: 8px;
+    background: #FCF4E4; border-left: 3px solid #D9A441; color: #7A5410;
     font-size: 12.5px; font-weight: 600;
   }
   .record-preview { margin-top: 14px; }
@@ -381,6 +383,10 @@
           <option value="iv5">IV injectable (5 mg/mL), for oral use only</option>
         </select>
       </div>
+      <p class="oral-only" id="oral-only" hidden>
+        Midazolam IV injectable: for oral use only. This is the injectable formulation given by
+        mouth, not intravenously.
+      </p>
       <p class="dosing-note" id="dosing-note" hidden></p>
       <div class="scroll-x">
         <table class="wide">
@@ -393,9 +399,6 @@
           <tbody id="sedation-body"></tbody>
         </table>
       </div>
-      <p class="oral-only" id="oral-only" hidden>
-        For oral use only. This is the IV injectable formulation given by mouth, not intravenously.
-      </p>
     </div>
 
     <div class="dose-section">

@@ -145,7 +145,7 @@
 
   .scroll-x { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
   table { border-collapse: collapse; width: 100%; font-size: 14px; }
-  table.wide { min-width: 560px; }
+  /* (wide-table min-width removed — range columns fit on phone screens) */
   th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
   th { font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
   th:first-child, td:first-child { text-align: left; white-space: normal; }
@@ -263,10 +263,7 @@
   footer p { margin: 6px 0; }
   footer a { color: var(--navy); }
   .foot-brand { margin-top: 12px !important; padding-top: 12px; border-top: 1px solid var(--line); font-weight: 600; }
-  .disclaimer {
-    background: #F1F2F4; border: 1px solid var(--line); border-radius: 10px;
-    padding: 10px 14px; color: #4F5155; font-size: 13px; margin-top: 16px;
-  }
+  /* .disclaimer removed (duplicated the top notice) */
 
   @media print {
     body { background: #fff; }
@@ -310,13 +307,6 @@
     </h2>
     <div class="grid">
       <div class="field">
-        <label id="units-label">Units</label>
-        <div class="seg" role="group" aria-labelledby="units-label">
-          <button type="button" id="unit-metric" aria-pressed="true">kg / cm</button>
-          <button type="button" id="unit-us" aria-pressed="false">lb / in</button>
-        </div>
-      </div>
-      <div class="field">
         <label id="sex-label">Patient sex</label>
         <div class="seg" role="group" aria-labelledby="sex-label">
           <button type="button" id="sex-m" aria-pressed="false">Male</button>
@@ -326,10 +316,6 @@
       <div class="field">
         <label for="dob">Date of birth</label>
         <input type="text" id="dob" inputmode="numeric" autocomplete="off" placeholder="MM/DD/YYYY" maxlength="10">
-      </div>
-      <div class="field">
-        <label for="meas">Date of measurement</label>
-        <input type="text" id="meas" inputmode="numeric" autocomplete="off" placeholder="MM/DD/YYYY" maxlength="10">
       </div>
       <div class="field">
         <label for="weight" id="weight-label">Weight (kg)</label>
@@ -346,6 +332,17 @@
           <span class="unit-tag" id="height-unit">cm</span>
         </div>
         <span class="conv" id="height-conv"></span>
+      </div>
+      <div class="field">
+        <label for="meas">Date of measurement</label>
+        <input type="text" id="meas" inputmode="numeric" autocomplete="off" placeholder="MM/DD/YYYY" maxlength="10">
+      </div>
+      <div class="field">
+        <label id="units-label">Units</label>
+        <div class="seg" role="group" aria-labelledby="units-label">
+          <button type="button" id="unit-metric" aria-pressed="true">kg / cm</button>
+          <button type="button" id="unit-us" aria-pressed="false">lb / in</button>
+        </div>
       </div>
     </div>
     <div class="unit-warn" id="unit-warn" hidden>
@@ -395,7 +392,7 @@
 
   <section class="card" aria-labelledby="h-dosing">
     <h2 id="h-dosing">Dosing
-      <span class="sub">Calculated from the patient's weight above.</span>
+      <span class="sub" id="dosing-sub">Enter patient weight above to see doses.</span>
     </h2>
 
     <div class="dose-section">
@@ -415,11 +412,11 @@
       </p>
       <p class="dosing-note" id="dosing-note" hidden></p>
       <div class="scroll-x">
-        <table class="wide">
+        <table>
           <thead>
             <tr>
-              <th>Medication</th><th>Low dose</th><th>High dose</th>
-              <th>Low volume</th><th>High volume</th><th>Maximum</th>
+              <th>Medication</th><th>Dose range</th>
+              <th>Volume range</th><th>Maximum</th>
             </tr>
           </thead>
           <tbody id="sedation-body"></tbody>
@@ -427,9 +424,9 @@
       </div>
     </div>
 
-    <div class="dose-section">
-      <h3 id="h-local">Local anesthetics</h3>
-      <div class="scroll-x">
+    <details class="dose-section">
+      <summary>Local anesthetics — 2% Lidocaine, Septocaine</summary>
+      <div class="scroll-x" style="margin-top: 10px;">
         <table>
           <thead>
             <tr><th>Medication</th><th>Maximum dose</th><th>Maximum cartridges</th></tr>
@@ -437,11 +434,11 @@
           <tbody id="local-body"></tbody>
         </table>
       </div>
-    </div>
+    </details>
 
-    <div class="dose-section">
-      <h3 id="h-reversal">Reversal agents</h3>
-      <div class="scroll-x">
+    <details class="dose-section">
+      <summary>Reversal agents — Flumazenil, Naloxone</summary>
+      <div class="scroll-x" style="margin-top: 10px;">
         <table>
           <thead>
             <tr><th>Agent</th><th>Calculated dose</th><th>Calculated volume</th><th>Maximum</th></tr>
@@ -449,7 +446,7 @@
           <tbody id="reversal-body"></tbody>
         </table>
       </div>
-    </div>
+    </details>
 
     <p class="legend">Amounts that would exceed the listed maximum are capped there and tagged <span class="cap">max</span>.</p>
   </section>
@@ -508,16 +505,14 @@
       <button type="button" id="save-img" class="secondary">Save image</button>
       <span id="record-status" role="status"></span>
     </div>
-    <details class="record-preview">
+    <details class="record-preview" open>
       <summary>Preview the record image</summary>
       <canvas id="record-canvas" role="img" aria-label="Sedation record summary"></canvas>
     </details>
+    <div class="toolbar">
+      <button type="button" id="clear-bottom">Clear for next patient</button>
+    </div>
   </section>
-
-  <div class="disclaimer">
-    Reference aid only. It does not replace clinical judgment, current office protocols, or a
-    doctor's order. Confirm every dose before administration.
-  </div>
 
   <footer>
     <p>All calculations run in your browser. No patient information is stored or transmitted.</p>
@@ -848,13 +843,11 @@ function renderTables(doses) {
 
   $("sedation-body").innerHTML = S.map(d => {
     const head = `<td class="med">${d.name}<span class="conc">${d.conc}</span></td>`;
-    if (!doses) return `<tr>${head}${dash}${dash}${dash}${dash}<td class="max">${d.max}</td></tr>`;
+    if (!doses) return `<tr>${head}${dash}${dash}<td class="max">${d.max}</td></tr>`;
     return `<tr>${head}` +
-      cell(fmt(d.lo, 2) + " mg", d.loCap) +
-      cell(fmt(d.hi, 2) + " mg", d.hiCap) +
-      (d.noVolume ? dash + dash
-        : cell(fmt(d.loVol, 2) + " " + d.unit, d.loCap) +
-          cell(fmt(d.hiVol, 2) + " " + d.unit, d.hiCap)) +
+      cell(`${fmt(d.lo, 2)} – ${fmt(d.hi, 2)} mg`, d.hiCap) +
+      (d.noVolume ? dash
+        : cell(`${fmt(d.loVol, 2)} – ${fmt(d.hiVol, 2)} ${d.unit}`, d.hiCap)) +
       `<td class="max">${d.max}</td></tr>`;
   }).join("");
 
@@ -1023,6 +1016,13 @@ function render() {
   }
   pv.closest(".stat").classList.toggle("warn", band === "obese");
 
+  // Echo which weight the doses are based on, directly on the dosing card
+  $("dosing-sub").textContent = dosingW != null
+    ? (useP50
+      ? `Calculated from ideal body weight: ${showWeight(p50)} (not the measured ${showWeight(w)})`
+      : `Calculated from ${showWeight(dosingW)}`)
+    : "Enter patient weight above to see doses.";
+
   const dn = $("dosing-note");
   dn.hidden = !useP50;
   if (useP50) {
@@ -1051,7 +1051,6 @@ function render() {
   }
 
   const mform = midazolamForm();
-  $("midazolam-form").classList.toggle("pending", mform == null);
   $("oral-only").hidden = !(mform && mform.oralOnly);
 
   const doses = computeDoses(dosingW);
@@ -1425,6 +1424,7 @@ $("sex-f").addEventListener("click", () => setSex(2));
   $(id).addEventListener("change", render);
 });
 $("clear").addEventListener("click", reset);
+$("clear-bottom").addEventListener("click", reset);
 
 applyUnitChrome();
 reset();

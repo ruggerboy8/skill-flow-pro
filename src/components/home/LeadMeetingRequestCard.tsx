@@ -1,16 +1,17 @@
 import { useEffect } from 'react';
-import { useLeadIncomingRequest } from '@/hooks/useLeadMeetingRequests';
-import { DEFAULT_BOOKING_LINK } from '@/types/leadFocus';
+import { useLeadIncomingRequest, useDirectorBookingLink } from '@/hooks/useLeadMeetingRequests';
 import { Button } from '@/components/ui/button';
 import { CalendarClock } from 'lucide-react';
 
 /**
  * Lead-home scheduling card: shows an incoming "let's find time" nudge from Ariyana
- * (with her rationale) and a standing "Book time" button. Viewing it flips the
- * nudge sent → opened so Ariyana can see it landed. Shown only for leads.
+ * (with her rationale) and a standing "Book time" button. The booking link is
+ * resolved from the director's profile (director_booking_link RPC), never hardcoded.
+ * Viewing it flips the nudge sent → opened so Ariyana can see it landed. Leads only.
  */
 export function LeadMeetingRequestCard({ staffId, isLead }: { staffId?: string | null; isLead?: boolean }) {
   const { request, markOpened, markBooked } = useLeadIncomingRequest(isLead ? staffId : null);
+  const { data: bookingLink } = useDirectorBookingLink(!!isLead);
 
   useEffect(() => {
     if (request && request.status === 'sent') markOpened.mutate(request.id);
@@ -20,8 +21,9 @@ export function LeadMeetingRequestCard({ staffId, isLead }: { staffId?: string |
   if (!isLead) return null;
 
   const book = () => {
+    if (!bookingLink) return;
     if (request) markBooked.mutate(request.id);
-    window.open(DEFAULT_BOOKING_LINK, '_blank', 'noopener');
+    window.open(bookingLink, '_blank', 'noopener');
   };
 
   return (
@@ -34,7 +36,9 @@ export function LeadMeetingRequestCard({ staffId, isLead }: { staffId?: string |
             </span>
           </div>
           {request.note && <p className="mt-2 text-[13.5px]">“{request.note}”</p>}
-          <Button size="sm" className="mt-2.5" onClick={book}>Find a time →</Button>
+          {bookingLink
+            ? <Button size="sm" className="mt-2.5" onClick={book}>Find a time →</Button>
+            : <p className="mt-2 text-xs text-muted-foreground">Ariyana will follow up with a time.</p>}
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
@@ -42,7 +46,9 @@ export function LeadMeetingRequestCard({ staffId, isLead }: { staffId?: string |
           <h3 className="text-sm font-bold">Need to talk something through?</h3>
           <p className="mt-0.5 text-[12.5px] text-muted-foreground">Book time with Ariyana whenever you need it.</p>
         </div>
-        <Button variant="outline" onClick={book}>Book time with Ariyana →</Button>
+        {bookingLink
+          ? <Button variant="outline" onClick={book}>Book time with Ariyana →</Button>
+          : <span className="text-xs text-muted-foreground">Booking link coming soon</span>}
       </div>
     </div>
   );

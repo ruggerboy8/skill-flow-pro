@@ -118,3 +118,20 @@ export function useLeadIncomingRequest(staffId: string | null | undefined) {
 
   return { request: query.data ?? null, markOpened, markBooked };
 }
+
+/**
+ * The director's booking link, resolved server-side (director_booking_link RPC) so
+ * a lead never has to read another staff member's row. Null until the director sets
+ * a scheduling_link in their profile.
+ */
+export function useDirectorBookingLink(enabled: boolean) {
+  return useQuery({
+    queryKey: ['director-booking-link'],
+    enabled,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await sb.rpc('director_booking_link');
+      if (error) throw error;
+      return (data as string | null) ?? null;
+    },
+  });
+}

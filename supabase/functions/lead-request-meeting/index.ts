@@ -11,8 +11,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const DEFAULT_BOOKING_LINK = "https://calendar.app.google/ariyana-rda";
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -88,7 +86,8 @@ serve(async (req) => {
       : `${fromDisplayName} <${defaultFromEmail}>`;
     const replyTo = orgBranding.reply_to_email || defaultReplyTo;
 
-    const link = caller.scheduling_link || DEFAULT_BOOKING_LINK;
+    // Real booking link from the director's profile, or null (never a placeholder).
+    const link = (caller.scheduling_link || "").trim() || null;
 
     let emailSent = false;
     let subject = "";
@@ -106,7 +105,9 @@ serve(async (req) => {
         `<p>Hi ${firstName},</p>`,
         `<p>${coachName} would like to find time to meet with you.</p>`,
         reasonHtml,
-        `<p>Please <a href="${link}">pick a time that works for you</a>.</p>`,
+        link
+          ? `<p>Please <a href="${link}">pick a time that works for you</a>.</p>`
+          : `<p>${coachName} will follow up to find a time.</p>`,
         `<p>You can also see this on your <a href="${homeUrl}">Pro Moves home</a>.</p>`,
         `<p>— ${coachName}</p>`,
       ].filter(Boolean).join("\n");
@@ -116,7 +117,7 @@ serve(async (req) => {
         "",
         `${coachName} would like to find time to meet with you.`,
         "",
-        reasonText + `Pick a time that works for you: ${link}`,
+        reasonText + (link ? `Pick a time that works for you: ${link}` : `${coachName} will follow up to find a time.`),
         "",
         `— ${coachName}`,
       ].join("\n");

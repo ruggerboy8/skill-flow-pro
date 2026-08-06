@@ -78,6 +78,5 @@ export const MEETING_STATUS_META: Record<MeetingStatus, { label: string }> = {
   booked: { label: 'booked' },
 };
 
-// Ariyana's booking link. Hardcoded for MVP; staff.scheduling_link overrides it
-// when set (later made profile-editable, like clinical directors). See build plan.
-export const DEFAULT_BOOKING_LINK = 'https://calendar.app.google/ariyana-rda';
+// Booking link is resolved from the director's profile (staff.scheduling_link) via
+// the director_booking_link RPC — never hardcoded. See useDirectorBookingLink.

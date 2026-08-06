@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLeadMeetingRequests } from '@/hooks/useLeadMeetingRequests';
-import { MEETING_STATUS_META, DEFAULT_BOOKING_LINK } from '@/types/leadFocus';
+import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { MEETING_STATUS_META } from '@/types/leadFocus';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,6 +16,8 @@ const STATUS_STYLE: Record<string, string> = {
 
 export function SchedulingTab() {
   const { leads, sent, isLoading, sendRequest } = useLeadMeetingRequests();
+  const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
+  const myLink = staffProfile?.scheduling_link ?? null;
   const [leadId, setLeadId] = useState('');
   const [note, setNote] = useState('');
   const leadName = (id: string) => leads.find((l) => l.id === id)?.name ?? 'the lead';
@@ -49,7 +52,9 @@ export function SchedulingTab() {
             {sendRequest.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending…</> : 'Send nudge →'}
           </Button>
           <p className="mt-2.5 rounded-lg border border-dashed bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            Shows on their Pro Moves home with your reason, and emails them. They tap <b>Find a time</b> → your link <span className="font-semibold text-[color:var(--domain-clinical,#0E7C86)]">{DEFAULT_BOOKING_LINK.replace('https://', '')}</span>.
+            Shows on their Pro Moves home with your reason, and emails them. They tap <b>Find a time</b> → {myLink
+              ? <>your booking link <span className="font-semibold text-[color:var(--domain-clinical,#0E7C86)]">{myLink.replace(/^https?:\/\//, '')}</span>.</>
+              : <>your Google booking link. <span className="font-semibold text-[color:var(--domain-clinical,#0E7C86)]">Add it in your Profile</span> so the buttons work.</>}
           </p>
         </div>
 

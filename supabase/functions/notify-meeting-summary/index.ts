@@ -46,7 +46,18 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .single();
 
-    if (!caller || (!caller.is_clinical_director && !caller.is_coach && !caller.is_super_admin)) {
+    // Assigned doctor coaches (owner doctors) may also send summaries.
+    let isDoctorCoach = false;
+    if (caller?.id) {
+      const { data: anyAssignment } = await supabase
+        .from('doctor_coach_assignments')
+        .select('id')
+        .eq('coach_staff_id', caller.id)
+        .limit(1)
+        .maybeSingle();
+      isDoctorCoach = !!anyAssignment;
+    }
+    if (!caller || (!caller.is_clinical_director && !caller.is_coach && !caller.is_super_admin && !isDoctorCoach)) {
       return new Response(JSON.stringify({ error: 'Access denied' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

@@ -66,6 +66,11 @@ export interface StaffProfile {
     scope_type: 'org' | 'location';
     scope_id: string;
   }[];
+  // Doctors this staff member is assigned to coach (doctor-coach model,
+  // 2026-08-06). Non-empty ⇒ they get the scoped Clinical surface.
+  mentee_assignments: {
+    doctor_staff_id: string;
+  }[];
   // New: granular capability toggles. null = no user_capabilities row yet (fall back to staff flags).
   user_capabilities: UserCapabilities | null;
 }
@@ -136,6 +141,9 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           coach_scopes (
             scope_type,
             scope_id
+          ),
+          mentee_assignments:doctor_coach_assignments!doctor_coach_assignments_coach_staff_id_fkey (
+            doctor_staff_id
           ),
           user_capabilities (
             is_participant,

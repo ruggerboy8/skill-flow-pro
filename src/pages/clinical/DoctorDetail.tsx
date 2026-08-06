@@ -19,6 +19,7 @@ import { DoctorDetailThread } from '@/components/clinical/DoctorDetailThread';
 import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
 import { ClinicalBaselineResults } from '@/components/clinical/ClinicalBaselineResults';
 import { AssessmentTrackCard, AssessmentCardStatus } from '@/components/clinical/AssessmentTrackCard';
+import { DoctorCoachesCard } from '@/components/clinical/DoctorCoachesCard';
 import { AssessmentResultsSheet } from '@/components/clinical/AssessmentResultsSheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
@@ -186,6 +187,10 @@ export default function DoctorDetail() {
           )}
         </div>
       </div>
+
+      {/* Doctor coaching assignments — CDs assign owner doctors as coaches;
+          the learner's assigned coaches get the scoped Clinical surface. */}
+      <DoctorCoachesCard doctorStaffId={staffId!} doctorName={doctor.name} />
 
 
       {/* Assessments — collapsible module with two columns:

@@ -18,6 +18,8 @@ export function useUserRole() {
       isOfficeManager: false,
       isDoctor: false,
       isClinicalDirector: false,
+      isDoctorCoach: false,
+      doctorMenteeIds: [] as string[],
       managedLocationIds: [] as string[],
       managedOrgIds: [] as string[],
       homeRoute: '/',
@@ -68,6 +70,12 @@ export function useUserRole() {
   // is_lead: still on staff table (scope-based role — not a capability toggle)
   const isLead = staff.is_lead ?? false;
 
+  // Doctor coach (2026-08-06): derived, not flagged — having ≥1 assigned
+  // learner doctor grants the scoped Clinical surface. Typically owner doctors
+  // (e.g. Sprout) coaching their associates; CDs keep the org-wide view.
+  const doctorMenteeIds = (staff.mentee_assignments ?? []).map(a => a.doctor_staff_id);
+  const isDoctorCoach = doctorMenteeIds.length > 0;
+
   // ─── Coach / regional / coaching scope ────────────────────────────────────
   // isCoach: has coach_scopes OR can_view_submissions capability
   const isCoach = scopes.length > 0 || (caps?.can_view_submissions ?? false);
@@ -109,7 +117,7 @@ export function useUserRole() {
     canViewSubmissions ||
     canReviewEvals ||
     canManageLibrary;
-  const canAccessClinical = isClinicalDirector || isSuperAdmin;
+  const canAccessClinical = isClinicalDirector || isSuperAdmin || isDoctorCoach;
 
   // ─── Home route ───────────────────────────────────────────────────────────
   // Admin / regional / coach roles take precedence over isDoctor for landing page.
@@ -137,6 +145,8 @@ export function useUserRole() {
     isOfficeManager,
     isDoctor,
     isClinicalDirector,
+    isDoctorCoach,
+    doctorMenteeIds,
     managedLocationIds,
     managedOrgIds,
     homeRoute,

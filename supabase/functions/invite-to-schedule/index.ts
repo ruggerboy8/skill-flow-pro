@@ -48,14 +48,26 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    if (!callerStaff?.is_clinical_director && !callerStaff?.is_super_admin) {
+    const { doctor_staff_id, session_id, scheduling_link, custom_subject, custom_body, prep_link } = await req.json();
+
+    // CDs and super admins pass; otherwise the caller must be an ASSIGNED
+    // doctor coach for this specific doctor (2026-08-06 doctor-coach model).
+    let allowed = !!(callerStaff?.is_clinical_director || callerStaff?.is_super_admin);
+    if (!allowed && callerStaff?.id && doctor_staff_id) {
+      const { data: assignment } = await admin
+        .from("doctor_coach_assignments")
+        .select("id")
+        .eq("coach_staff_id", callerStaff.id)
+        .eq("doctor_staff_id", doctor_staff_id)
+        .maybeSingle();
+      allowed = !!assignment;
+    }
+    if (!allowed) {
       return new Response(JSON.stringify({ error: "Access denied" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const { doctor_staff_id, session_id, scheduling_link, custom_subject, custom_body, prep_link } = await req.json();
     if (!doctor_staff_id) {
       return new Response(JSON.stringify({ error: "doctor_staff_id required" }), {
         status: 400,

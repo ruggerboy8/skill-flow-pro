@@ -37,17 +37,21 @@ export default function DoctorManagement() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useUrlState<FilterValue>('status', 'all');
   const navigate = useNavigate();
-  const { organizationId, isSuperAdmin } = useUserRole();
+  const { organizationId, isSuperAdmin, isClinicalDirector, isDoctorCoach, doctorMenteeIds } = useUserRole();
+
+  // Doctor coaches (owner doctors with assigned learners) see ONLY their
+  // assigned doctors; CDs and super admins keep the org-wide roster.
+  const menteesOnly = isDoctorCoach && !isClinicalDirector && !isSuperAdmin;
 
   const { data: doctors, isLoading, refetch } = useQuery({
-    queryKey: ['doctors-management', organizationId, isSuperAdmin],
+    queryKey: ['doctors-management', organizationId, isSuperAdmin, menteesOnly, doctorMenteeIds.join(',')],
     refetchOnMount: 'always',
     staleTime: 0,
     queryFn: async (): Promise<DoctorRow[]> => {
       // Diagnostic logging: if a clinical director can't see an expected doctor,
       // they can copy this console output. Org resolution is the usual culprit —
       // a null organizationId yields an empty list (see the guard below).
-      console.log('[ClinicalDoctors] resolving list — organizationId:', organizationId, '| isSuperAdmin:', isSuperAdmin);
+      console.log('[ClinicalDoctors] resolving list — organizationId:', organizationId, '| isSuperAdmin:', isSuperAdmin, '| menteesOnly:', menteesOnly);
 
       let staffQuery = supabase
         .from('staff')
@@ -55,7 +59,10 @@ export default function DoctorManagement() {
         .eq('is_doctor', true)
         .order('name');
 
-      if (organizationId) {
+      if (menteesOnly) {
+        if (doctorMenteeIds.length === 0) return [];
+        staffQuery = staffQuery.in('id', doctorMenteeIds);
+      } else if (organizationId) {
         const scopeFilter = await buildOrganizationStaffScopeFilter(organizationId);
         console.log('[ClinicalDoctors] staff scope filter:', scopeFilter);
         staffQuery = staffQuery.or(scopeFilter);

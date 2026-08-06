@@ -43,6 +43,7 @@ export default function Layout() {
     isOfficeManager,
     isDoctor,
     isClinicalDirector,
+    isDoctorCoach,
     canViewSubmissions,
     canSubmitEvals,
     canReviewEvals,
@@ -129,6 +130,11 @@ export default function Layout() {
     { name: 'My Role', href: '/doctor/my-role', icon: BookOpen },
     { name: 'My Team', href: '/doctor/my-team', icon: Users },
     { name: 'Coaching History', href: '/doctor/coaching-history', icon: ClipboardList },
+    // Doctor coaches (owner doctors with assigned learners) get the scoped
+    // Clinical surface alongside their own doctor experience.
+    ...(isDoctorCoach ? [
+      { name: 'Clinical', href: '/clinical', icon: Stethoscope },
+    ] : []),
   ] : isSuperAdmin ? [
     // Super admin navigation — Command Center first, no Home/My Role
     { name: 'Command Center', href: '/dashboard', icon: Building2 },
@@ -157,8 +163,8 @@ export default function Layout() {
     ...(showLocationDashboard ? [
       { name: 'My Location', href: '/my-location', icon: Building2 },
     ] : []),
-    // Clinical Director portal
-    ...(isClinicalDirector ? [
+    // Clinical Director portal (also doctor coaches with assigned learners)
+    ...(isClinicalDirector || isDoctorCoach ? [
       { name: 'Clinical', href: '/clinical', icon: Stethoscope },
     ] : []),
     // Doctor portal — for admins/coaches who are also doctors

@@ -210,6 +210,9 @@
   /* Two cards take input, two are read-only. The tint and left rule make that
      legible at a glance without adding any new elements. */
   .card.input-card { background: #FBFCFE; border-left: 3px solid var(--navy); }
+  /* The record card matches the administered panel in the record image
+     (#EAF1F7 + navy left accent), so the user connects them visually. */
+  #record-card { background: #EAF1F7; }
 
   .given { margin-bottom: 16px; }
   .given-help { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
@@ -451,7 +454,7 @@
     <p class="legend">Amounts that would exceed the listed maximum are capped there and tagged <span class="cap">max</span>.</p>
   </section>
 
-  <section class="card input-card" aria-labelledby="h-record">
+  <section class="card input-card" id="record-card" aria-labelledby="h-record">
     <h2 id="h-record">Sedation record
       <span class="sub">Record what was given, then copy the whole thing into the chart.</span>
     </h2>
@@ -899,7 +902,11 @@ function renderGiven(doses) {
     $("meta-" + key).innerHTML = parts.join(" · ");
 
     if (mg != null) {
-      administered.push({ name: spec.name, mg, vol, unit: spec.volUnit, max, over: isOver });
+      administered.push({
+        name: spec.name, mg, vol, unit: spec.volUnit, max, over: isOver,
+        recLo: dose ? dose.lo : null, recHi: dose ? dose.hi : null,
+        maxLabel: spec.max
+      });
     }
   });
 
@@ -1225,7 +1232,61 @@ function layoutRecord(ctx, d, draw) {
   };
 
   const D = d.doses;
-  table("Sedation medications", ["Medication", "Dose range", "Volume range"],
+
+  // Administered goes FIRST — it is the most important information in the
+  // record. The reference tables follow below as supporting context.
+  if (d.administered && d.administered.length) {
+    const admN = d.administered.length;
+    const admPanelH = 28 + admN * 46;       // title(14) + drugs(46 each) + bottom(14)
+    const admPad = 10;
+
+    if (draw) {
+      // Background panel — matches the on-page record card (#EAF1F7)
+      ctx.fillStyle = "#EAF1F7";
+      roundRectPath(ctx, x0 - admPad, y - 4, innerW + admPad * 2, admPanelH + 8, 8);
+      ctx.fill();
+      // Navy left accent bar (mirrors the input-card left border on page)
+      ctx.fillStyle = RC.navy;
+      roundRectPath(ctx, x0 - admPad, y - 4, 3, admPanelH + 8, 2);
+      ctx.fill();
+    }
+
+    F(700, 10.5); T("MEDICATION ADMINISTERED", x0, y + 9, RC.navy);
+    y += 14; rule(y);
+
+    d.administered.forEach(m => {
+      y += 6;
+      const overColor = m.over ? RC.danger : RC.ink;
+      F(700, 13.5); T(m.name, x0, y + 17, overColor);
+
+      const doseStr = fmt(m.mg, 2) + " mg";
+      const volStr = m.vol != null ? fmt(m.vol, 2) + " " + m.unit : "—";
+
+      if (m.over) {
+        F(700, 8.5);
+        T("OVER", cx2, y + 17, RC.danger, "right");
+        const tagW = ctx.measureText("OVER").width + 6;
+        F(700, 13.5); T(doseStr, cx2 - tagW, y + 17, RC.danger, "right");
+      } else {
+        F(700, 13.5); T(doseStr, cx2, y + 17, RC.ink, "right");
+      }
+      F(600, 13.5); T(volStr, cx3, y + 17, RC.ink, "right");
+
+      // Sub-line: just the within/over advisory (recommended range lives
+      // in the "Recommended dosages" table below, no need to repeat it)
+      y += 22;
+      const status = m.over
+        ? `Exceeds the ${m.maxLabel} maximum`
+        : "Within range";
+      F(400, 10.5);
+      T(status, x0 + 12, y + 11, m.over ? RC.danger : RC.muted);
+
+      y += 18; rule(y);
+    });
+    y += 20;  // extra gap so the panel's rounded bottom clears the next title
+  }
+
+  table("Recommended dosages", ["Medication", "Dose range", "Volume range"],
     D.sedation.map(m => ({
       name: m.name, sub: m.conc + " · max " + m.max,
       c1: `${fmt(m.lo, 2)} – ${fmt(m.hi, 2)} mg`, cap1: m.hiCap,
@@ -1244,18 +1305,6 @@ function layoutRecord(ctx, d, draw) {
       c1: fmt(m.mg, 2) + " mg", cap1: m.capped,
       c2: fmt(m.ml, 2) + " mL", cap2: m.capped
     })));
-
-  // What was actually given, listed only when something was entered
-  if (d.administered && d.administered.length) {
-    table("Medication administered", ["Medication", "Dose given", "Volume given"],
-      d.administered.map(m => ({
-        name: m.name,
-        sub: m.max == null ? "" : (m.over ? `above the ${fmt(m.max, 2)} mg maximum` : `within the ${fmt(m.max, 2)} mg maximum`),
-        tag: "OVER",
-        c1: fmt(m.mg, 2) + " mg", cap1: m.over,
-        c2: m.vol != null ? `${fmt(m.vol, 2)} ${m.unit}` : "—", cap2: false
-      })));
-  }
 
   // Footer
   rule(y); y += 6;

@@ -1239,6 +1239,73 @@ export type Database = {
           },
         ]
       }
+      doctor_coach_assignments: {
+        Row: {
+          assigned_by: string | null
+          coach_staff_id: string
+          created_at: string
+          doctor_staff_id: string
+          id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          coach_staff_id: string
+          created_at?: string
+          doctor_staff_id: string
+          id?: string
+        }
+        Update: {
+          assigned_by?: string | null
+          coach_staff_id?: string
+          created_at?: string
+          doctor_staff_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_coach_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_coach_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "doctor_coach_assignments_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_coach_assignments_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "doctor_coach_assignments_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_coach_assignments_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+        ]
+      }
       domains: {
         Row: {
           color_hex: string | null
@@ -4024,6 +4091,7 @@ export type Database = {
       }
       current_user_org_id: { Args: never; Returns: string }
       current_user_staff_id: { Args: never; Returns: string }
+      director_booking_link: { Args: never; Returns: string }
       framework_as_of: {
         Args: { p_role_id: number; p_ts: string }
         Returns: {
@@ -4461,6 +4529,10 @@ export type Database = {
       }
       get_user_org_id: { Args: { p_user_id: string }; Returns: string }
       is_admin: { Args: { check_user_id: string }; Returns: boolean }
+      is_assigned_doctor_coach: {
+        Args: { p_doctor_staff_id: string; p_user: string }
+        Returns: boolean
+      }
       is_clinical_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_coach_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_eligible_for_pro_moves: {

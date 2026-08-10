@@ -33,7 +33,7 @@ export function GutCheckPrompt({
       await onFlag(domainName);
       toast({
         title: 'Flagged for discussion',
-        description: 'You can discuss these with Alex in your check-in.',
+        description: 'You can discuss these with your coach in your check-in.',
       });
       setDismissed(true);
     } catch (error) {

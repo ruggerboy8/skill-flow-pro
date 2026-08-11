@@ -383,6 +383,67 @@ export type Database = {
           },
         ]
       }
+      coach_session_reflections: {
+        Row: {
+          coach_staff_id: string
+          created_at: string
+          id: string
+          note: string | null
+          r_ask: number | null
+          r_candor: number | null
+          r_continuity: number | null
+          r_specificity: number | null
+          r_talk: number | null
+          session_id: string
+        }
+        Insert: {
+          coach_staff_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          r_ask?: number | null
+          r_candor?: number | null
+          r_continuity?: number | null
+          r_specificity?: number | null
+          r_talk?: number | null
+          session_id: string
+        }
+        Update: {
+          coach_staff_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          r_ask?: number | null
+          r_candor?: number | null
+          r_continuity?: number | null
+          r_specificity?: number | null
+          r_talk?: number | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_session_reflections_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_session_reflections_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "coach_session_reflections_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "coaching_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaching_agenda_templates: {
         Row: {
           created_at: string

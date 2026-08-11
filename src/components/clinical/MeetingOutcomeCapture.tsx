@@ -13,6 +13,7 @@ import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, C
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import DOMPurify from 'dompurify';
+import { CoachSessionReflection } from '@/components/clinical/CoachSessionReflection';
 
 interface Experiment {
   title: string;
@@ -40,6 +41,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const [rawTranscript, setRawTranscript] = useState('');
   const [aiProcessing, setAiProcessing] = useState(false);
   const [nextSessionDate, setNextSessionDate] = useState('');
+  const [showReflection, setShowReflection] = useState(false);
 
   const { data: session } = useQuery({
     queryKey: ['coaching-session', sessionId],
@@ -278,12 +280,20 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
       queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['coaching-sessions'] });
       toast({ title: 'Meeting summary submitted', description: `${doctorName} can now review and confirm.` });
-      onBack();
+      setShowReflection(true);
     },
     onError: (err: any) => {
       toast({ title: 'Error submitting', description: err.message, variant: 'destructive' });
     },
   });
+
+  if (showReflection) {
+    return (
+      <div className="max-w-2xl mx-auto py-6">
+        <CoachSessionReflection sessionId={sessionId} onDone={onBack} />
+      </div>
+    );
+  }
 
   if (!session) return null;
 

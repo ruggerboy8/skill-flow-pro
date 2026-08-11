@@ -694,7 +694,7 @@ export type Database = {
           {
             foreignKeyName: "coaching_meeting_records_session_id_fkey"
             columns: ["session_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "coaching_sessions"
             referencedColumns: ["id"]
           },
@@ -1303,6 +1303,170 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "view_evaluation_items_enriched"
             referencedColumns: ["staff_id"]
+          },
+        ]
+      }
+      doctor_focus_item_updates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          focus_item_id: string
+          id: string
+          note: string | null
+          progress: string
+          session_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          focus_item_id: string
+          id?: string
+          note?: string | null
+          progress: string
+          session_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          focus_item_id?: string
+          id?: string
+          note?: string | null
+          progress?: string
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_focus_item_updates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_item_updates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_item_updates_focus_item_id_fkey"
+            columns: ["focus_item_id"]
+            isOneToOne: false
+            referencedRelation: "doctor_focus_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_item_updates_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      doctor_focus_items: {
+        Row: {
+          activated_at: string | null
+          coach_staff_id: string
+          created_at: string
+          created_by: string | null
+          doctor_staff_id: string
+          id: string
+          origin_session_id: string | null
+          pro_move_id: number
+          retired_at: string | null
+          retired_outcome: string | null
+          statement: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          coach_staff_id: string
+          created_at?: string
+          created_by?: string | null
+          doctor_staff_id: string
+          id?: string
+          origin_session_id?: string | null
+          pro_move_id: number
+          retired_at?: string | null
+          retired_outcome?: string | null
+          statement?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          coach_staff_id?: string
+          created_at?: string
+          created_by?: string | null
+          doctor_staff_id?: string
+          id?: string
+          origin_session_id?: string | null
+          pro_move_id?: number
+          retired_at?: string | null
+          retired_outcome?: string | null
+          statement?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctor_focus_items_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_items_coach_staff_id_fkey"
+            columns: ["coach_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_items_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_items_doctor_staff_id_fkey"
+            columns: ["doctor_staff_id"]
+            isOneToOne: false
+            referencedRelation: "view_evaluation_items_enriched"
+            referencedColumns: ["staff_id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_items_origin_session_id_fkey"
+            columns: ["origin_session_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doctor_focus_items_pro_move_id_fkey"
+            columns: ["pro_move_id"]
+            isOneToOne: false
+            referencedRelation: "pro_moves"
+            referencedColumns: ["action_id"]
           },
         ]
       }

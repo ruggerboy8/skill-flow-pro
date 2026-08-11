@@ -25,6 +25,7 @@ interface Props {
   doctorEmail: string;
   onBack: () => void;
   onOpenCoachBaseline?: () => void;
+  onOpenReviewPrep?: () => void;
 }
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
@@ -56,7 +57,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   );
 }
 
-export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffId, doctorName, doctorEmail, onBack, onOpenCoachBaseline }: Props) {
+export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffId, doctorName, doctorEmail, onBack, onOpenCoachBaseline, onOpenReviewPrep }: Props) {
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [coachNote, setCoachNote] = useState('');
@@ -628,7 +629,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         <Button variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-xl font-bold">Build Meeting Agenda</h2>
           {session?.scheduled_at && (
             <p className="text-sm text-muted-foreground">
@@ -636,6 +637,11 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
             </p>
           )}
         </div>
+        {isBaselineReview && onOpenReviewPrep && (
+          <Button variant="outline" size="sm" onClick={onOpenReviewPrep}>
+            Baseline review prep
+          </Button>
+        )}
       </div>
 
       {/* Collaboration smoke signals */}

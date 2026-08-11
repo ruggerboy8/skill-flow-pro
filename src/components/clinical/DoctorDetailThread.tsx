@@ -67,9 +67,10 @@ interface Props {
   doctorBaselineComplete?: boolean;
   coachAssessment?: CoachAssessmentInfo | null;
   onStartCoachWizard?: () => void;
+  onOpenReviewPrep?: () => void;
 }
 
-export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail, doctorBaselineComplete, coachAssessment, onStartCoachWizard }: Props) {
+export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorName = 'Doctor', doctorStaffId, doctorEmail, doctorBaselineComplete, coachAssessment, onStartCoachWizard, onOpenReviewPrep }: Props) {
   const { data: myStaff } = useStaffProfile();
   const { isSuperAdmin } = useUserRole();
   const { toast } = useToast();
@@ -138,6 +139,7 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
         doctorEmail={doctorEmail}
         onBack={() => setPrepSessionId(null)}
         onOpenCoachBaseline={onStartCoachWizard}
+        onOpenReviewPrep={onOpenReviewPrep}
       />
     );
   }

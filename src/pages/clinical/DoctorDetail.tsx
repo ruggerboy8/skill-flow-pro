@@ -21,6 +21,7 @@ import { CoachBaselineWizard } from '@/components/clinical/CoachBaselineWizard';
 import { ClinicalBaselineResults } from '@/components/clinical/ClinicalBaselineResults';
 import { AssessmentTrackCard, AssessmentCardStatus } from '@/components/clinical/AssessmentTrackCard';
 import { DoctorCoachesCard } from '@/components/clinical/DoctorCoachesCard';
+import { BaselineReviewPrep } from '@/components/clinical/BaselineReviewPrep';
 import { AssessmentResultsSheet } from '@/components/clinical/AssessmentResultsSheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +39,7 @@ export default function DoctorDetail() {
   const { staffId } = useParams<{ staffId: string }>();
   const { data: myStaff } = useStaffProfile();
   const [showCoachWizard, setShowCoachWizard] = useUrlState<boolean>('wizard', false);
+  const [showReviewPrep, setShowReviewPrep] = useUrlState<boolean>('reviewPrep', false);
   const [expandedAssessment, setExpandedAssessment] = useUrlState<ExpandedAssessmentKey>(
     'sheet',
     null,
@@ -180,6 +182,18 @@ export default function DoctorDetail() {
     );
   }
 
+  // Full-page baseline review prep (self vs observed comparison)
+  if (showReviewPrep && staffId && doctor) {
+    return (
+      <BaselineReviewPrep
+        doctorStaffId={staffId}
+        doctorName={drName(doctor.name)}
+        onBack={() => setShowReviewPrep(false)}
+        onOpenCoachBaseline={() => { setShowReviewPrep(false); setShowCoachWizard(true); }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header — name + single journey pill + one next-action line */}
@@ -240,22 +254,29 @@ export default function DoctorDetail() {
 
         return (
           <Collapsible open={open} onOpenChange={setAssessmentsOpen}>
-            <CollapsibleTrigger asChild>
-              <button className="flex items-center gap-3 w-full py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
-                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
-                <h2 className="text-lg font-semibold">Assessments</h2>
-                <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <StatusDot status={doctorBaselineStatus} />
-                    Doctor
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <StatusDot status={coachBaselineStatus} />
-                    Director
-                  </span>
-                </div>
-              </button>
-            </CollapsibleTrigger>
+            <div className="flex items-center gap-2">
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center gap-3 flex-1 py-3 px-1 text-left hover:bg-muted/30 rounded-md transition-colors">
+                  <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
+                  <h2 className="text-lg font-semibold">Assessments</h2>
+                  <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <StatusDot status={doctorBaselineStatus} />
+                      Doctor
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <StatusDot status={coachBaselineStatus} />
+                      Director
+                    </span>
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              {doctorBaselineStatus === 'completed' && (
+                <Button size="sm" variant="outline" onClick={() => setShowReviewPrep(true)}>
+                  Baseline review prep
+                </Button>
+              )}
+            </div>
             <CollapsibleContent className="pt-2">
               <div className="grid gap-4 md:grid-cols-2">
                 {/* Doctor self-assessments column */}
@@ -328,6 +349,7 @@ export default function DoctorDetail() {
           doctorBaselineComplete={baseline?.status === 'completed'}
           coachAssessment={coachAssessment}
           onStartCoachWizard={() => setShowCoachWizard(true)}
+          onOpenReviewPrep={() => setShowReviewPrep(true)}
         />
       </div>
 

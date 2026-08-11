@@ -22,7 +22,7 @@ import { ClinicalBaselineResults } from '@/components/clinical/ClinicalBaselineR
 import { AssessmentTrackCard, AssessmentCardStatus } from '@/components/clinical/AssessmentTrackCard';
 import { DoctorCoachesCard } from '@/components/clinical/DoctorCoachesCard';
 import { BaselineReviewPrep } from '@/components/clinical/BaselineReviewPrep';
-import { FocusMovesCard } from '@/components/clinical/FocusMovesCard';
+import { ActionStepsCard } from '@/components/clinical/ActionStepsCard';
 import { AssessmentResultsSheet } from '@/components/clinical/AssessmentResultsSheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
@@ -338,7 +338,7 @@ export default function DoctorDetail() {
         );
       })()}
 
-      <FocusMovesCard doctorStaffId={staffId!} doctorName={drName(doctor.name)} />
+      <ActionStepsCard doctorStaffId={staffId!} />
 
       {/* Coaching Thread — the action hub */}
       <div className="space-y-2">

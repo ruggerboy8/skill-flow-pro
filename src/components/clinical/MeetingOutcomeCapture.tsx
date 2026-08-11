@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, CheckCircle2, Clock, CircleDashed, ShieldAlert, Target, XCircle, FlaskConical } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, CheckCircle2, Clock, CircleDashed, ShieldAlert } from 'lucide-react';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import DOMPurify from 'dompurify';
@@ -18,10 +19,12 @@ import { CoachSessionReflection } from '@/components/clinical/CoachSessionReflec
 interface Experiment {
   title: string;
   description: string;
-  // snake_case: this key is persisted verbatim into the experiments jsonb,
-  // and the written data contract (build instructions) specifies
-  // focus_item_id.
-  focus_item_id?: string;
+  // Optional Pro Move link, persisted into the experiments jsonb. Cursory
+  // by design (John, 2026-08-11): the slated Pro Moves are offered first,
+  // the full doctor library covers branched conversations, and skipping is
+  // fine. This tag is what makes any future longitudinal view computable
+  // without asking coaches to learn a second system.
+  action_id?: number | null;
 }
 
 interface Props {
@@ -92,45 +95,20 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
     enabled: !!session?.doctor_staff_id,
   });
 
-  const { data: activeFocusMoves, refetch: refetchFocusMoves } = useQuery({
-    queryKey: ['capture-active-focus-moves', session?.doctor_staff_id],
+  // Full doctor Pro Move library, for tagging action steps whose topic
+  // branched beyond the Pro Moves slated for this session.
+  const { data: doctorProMoves } = useQuery({
+    queryKey: ['doctor-pro-moves-for-tagging'],
     queryFn: async () => {
-      if (!session?.doctor_staff_id) return [];
       const { data, error } = await supabase
-        .from('doctor_focus_items')
-        .select(`
-          id, statement,
-          pro_moves!doctor_focus_items_pro_move_id_fkey (action_statement)
-        `)
-        .eq('doctor_staff_id', session.doctor_staff_id)
-        .eq('status', 'active');
+        .from('pro_moves')
+        .select('action_id, action_statement')
+        .eq('role_id', 4)
+        .eq('active', true)
+        .order('action_id');
       if (error) throw error;
       return data || [];
     },
-    enabled: !!session?.doctor_staff_id,
-  });
-
-  const retireFocusMoveMutation = useMutation({
-    mutationFn: async ({ id, outcome }: { id: string; outcome: 'landed' | 'set_aside' }) => {
-      const { error } = await supabase
-        .from('doctor_focus_items')
-        .update({ status: 'retired', retired_outcome: outcome, retired_at: new Date().toISOString() })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      refetchFocusMoves();
-      // Invalidate every surface that lists Focus Moves — with the app's
-      // staleTime, a missed key means a recently viewed screen shows the
-      // retired item as still active.
-      queryClient.invalidateQueries({ queryKey: ['doctor-focus-items', session?.doctor_staff_id] });
-      queryClient.invalidateQueries({ queryKey: ['my-active-focus-moves', session?.doctor_staff_id] });
-      queryClient.invalidateQueries({ queryKey: ['prep-focus-moves', session?.doctor_staff_id] });
-      queryClient.invalidateQueries({ queryKey: ['my-active-focus-moves-prep', session?.doctor_staff_id] });
-      queryClient.invalidateQueries({ queryKey: ['baseline-review-prep-focus-items', session?.doctor_staff_id] });
-      toast({ title: 'Focus Move retired' });
-    },
-    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
   const coachSelections = selections?.filter(s => s.selected_by === 'coach') || [];
@@ -142,19 +120,21 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
   const allTopics = [...coachSelections, ...doctorSelections.filter(s => !overlapIds.has(s.action_id))];
 
-  const addExperiment = (prefill?: { title: string; focusItemId?: string }) => {
+  // Options for the per-action-step Pro Move tag: the session's slated
+  // moves first, then the rest of the doctor library.
+  const slatedMoves = allTopics.map(sel => ({
+    action_id: sel.action_id,
+    statement: (sel.pro_moves as any)?.action_statement || `Action #${sel.action_id}`,
+  }));
+  const slatedIds = new Set(slatedMoves.map(m => m.action_id));
+  const otherMoves = (doctorProMoves || []).filter(m => !slatedIds.has(m.action_id));
+
+  const addExperiment = () => {
     if (experiments.length >= 3) {
       toast({ title: 'Maximum 3 action steps', variant: 'destructive' });
       return;
     }
-    // If the single default empty row is still untouched, fill it instead
-    // of appending a second row.
-    setExperiments(prev => {
-      if (prev.length === 1 && !prev[0].title.trim() && !prev[0].description.trim() && prefill) {
-        return [{ title: prefill.title, description: '', focus_item_id: prefill.focusItemId }];
-      }
-      return [...prev, { title: prefill?.title || '', description: '', focus_item_id: prefill?.focusItemId }];
-    });
+    setExperiments(prev => [...prev, { title: '', description: '' }]);
   };
 
   const removeExperiment = (index: number) => {
@@ -379,65 +359,6 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
         </CardContent>
       </Card>
 
-      {/* Active Focus Moves — keep / retire / turn into an action step */}
-      {(activeFocusMoves?.length ?? 0) > 0 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Focus Moves</CardTitle>
-            </div>
-            <CardDescription>What's the state of each, coming out of this conversation?</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {(activeFocusMoves || []).map((fm: any) => {
-              const alreadyLinked = experiments.some(e => e.focus_item_id === fm.id);
-              return (
-                <div key={fm.id} className="p-3 rounded-md border bg-muted/20 space-y-2">
-                  <p className="text-sm font-medium">{fm.pro_moves?.action_statement || 'Focus Move'}</p>
-                  {fm.statement?.trim() && (
-                    <p className="text-xs text-muted-foreground italic">"{fm.statement}"</p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 text-xs"
-                      disabled={alreadyLinked || isReadOnly}
-                      onClick={() => addExperiment({ title: fm.pro_moves?.action_statement || 'Focus Move', focusItemId: fm.id })}
-                    >
-                      <FlaskConical className="h-3.5 w-3.5" />
-                      {alreadyLinked ? 'Action step added' : 'Add action step'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="gap-1.5 text-xs text-muted-foreground"
-                      disabled={isReadOnly || retireFocusMoveMutation.isPending}
-                      onClick={() => retireFocusMoveMutation.mutate({ id: fm.id, outcome: 'landed' })}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Retire as Landed
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="gap-1.5 text-xs text-muted-foreground"
-                      disabled={isReadOnly || retireFocusMoveMutation.isPending}
-                      onClick={() => retireFocusMoveMutation.mutate({ id: fm.id, outcome: 'set_aside' })}
-                    >
-                      <XCircle className="h-3.5 w-3.5" /> Retire as Set aside
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-            <p className="text-xs text-muted-foreground">
-              Leave a Focus Move alone to keep it active. No action needed.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Coach Agenda */}
       {session.coach_note && session.coach_note.trim() && (
         <Card>
@@ -588,6 +509,41 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                 rows={2}
                 className="resize-none"
               />
+              {/* Cursory Pro Move link: slated moves first, full library for
+                  branched topics, and skipping is fine. */}
+              <Select
+                value={exp.action_id != null ? String(exp.action_id) : 'none'}
+                onValueChange={(v) =>
+                  setExperiments(prev => prev.map((e, j) => j === i ? { ...e, action_id: v === 'none' ? null : Number(v) } : e))
+                }
+              >
+                <SelectTrigger className="h-8 text-xs text-muted-foreground">
+                  <SelectValue placeholder="Which Pro Move is this about? (optional)" />
+                </SelectTrigger>
+                <SelectContent className="max-w-[calc(100vw-4rem)] sm:max-w-md">
+                  <SelectItem value="none">No Pro Move link</SelectItem>
+                  {slatedMoves.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Discussed this session</SelectLabel>
+                      {slatedMoves.map(m => (
+                        <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
+                          {m.statement}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                  {otherMoves.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>All doctor Pro Moves</SelectLabel>
+                      {otherMoves.map(m => (
+                        <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
+                          {m.action_statement}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
           ))}
         </CardContent>

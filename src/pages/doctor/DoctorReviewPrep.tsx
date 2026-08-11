@@ -71,10 +71,6 @@ export default function DoctorReviewPrep() {
   const [progressEntries, setProgressEntries] = useState<ProgressEntry[]>([]);
   const [hasScheduled, setHasScheduled] = useState(false);
   const [lowSelfFilter, setLowSelfFilter] = useState(false);
-  // Keyed by doctor_focus_items.id. No default status — reporting progress
-  // on a Focus Move is optional, not a required checkbox (no formal doctor
-  // confirmation step on Focus Moves, per John).
-  const [focusMoveProgress, setFocusMoveProgress] = useState<Record<string, { status: ProgressStatus | null; note: string }>>({});
 
   // Fetch session
   const { data: session, isLoading: sessionLoading } = useQuery({
@@ -185,27 +181,6 @@ export default function DoctorReviewPrep() {
     enabled: !!session?.doctor_staff_id && (session?.sequence_number ?? 0) > 1,
   });
 
-  // Active Focus Moves — the standing "review these first" block. Doctor
-  // marks progress per item; unlinked prior action steps below still use
-  // the older per-session experiment mechanic.
-  const { data: activeFocusMoves } = useQuery({
-    queryKey: ['my-active-focus-moves-prep', session?.doctor_staff_id],
-    queryFn: async () => {
-      if (!session?.doctor_staff_id) return [];
-      const { data, error } = await supabase
-        .from('doctor_focus_items')
-        .select(`
-          id, statement,
-          pro_moves!doctor_focus_items_pro_move_id_fkey (action_statement)
-        `)
-        .eq('doctor_staff_id', session.doctor_staff_id)
-        .eq('status', 'active');
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!session?.doctor_staff_id,
-  });
-
   // Initialize progress entries from prior experiments
   const isFollowUp = (session?.sequence_number ?? 0) > 1;
   const hasPriorSteps = (priorExperiments?.length ?? 0) > 0;
@@ -289,21 +264,6 @@ export default function DoctorReviewPrep() {
         })
         .eq('id', sessionId);
       if (sessErr) throw sessErr;
-
-      // Focus Move progress — only for items the doctor actually touched;
-      // an untouched item just doesn't get an update row this round.
-      const touched = Object.entries(focusMoveProgress).filter(([, v]) => v.status !== null);
-      if (touched.length > 0) {
-        const rows = touched.map(([focusItemId, v]) => ({
-          focus_item_id: focusItemId,
-          session_id: sessionId!,
-          progress: v.status as ProgressStatus,
-          note: v.note?.trim() || null,
-          created_by: staff?.id ?? null,
-        }));
-        const { error: fiErr } = await supabase.from('doctor_focus_item_updates').insert(rows);
-        if (fiErr) throw fiErr;
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
@@ -434,75 +394,6 @@ export default function DoctorReviewPrep() {
           )}
         </div>
       </div>
-
-      {/* Focus Moves — review these first, pick up where you left off */}
-      {(activeFocusMoves?.length ?? 0) > 0 && (
-        <>
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">✓</div>
-                <CardTitle className="text-base">Your Focus Moves</CardTitle>
-              </div>
-              <CardDescription>How's it going on what you and {coachName} are working on?</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {(activeFocusMoves || []).map((fm: any) => {
-                const entry = focusMoveProgress[fm.id] || { status: null, note: '' };
-                return (
-                  <div key={fm.id} className="space-y-2 p-3 rounded-lg border bg-background">
-                    <p className="text-sm font-medium">{fm.pro_moves?.action_statement || 'Focus Move'}</p>
-                    {fm.statement?.trim() && (
-                      <p className="text-xs text-muted-foreground italic">"{fm.statement}"</p>
-                    )}
-                    <div className="flex gap-2 flex-wrap">
-                      {PROGRESS_OPTIONS.map(opt => {
-                        const Icon = opt.icon;
-                        const isActive = entry.status === opt.value;
-                        return (
-                          <Button
-                            key={opt.value}
-                            variant={isActive ? 'default' : 'outline'}
-                            size="sm"
-                            className={`gap-1.5 text-xs ${isActive ? '' : opt.color}`}
-                            onClick={() => {
-                              // Clicking the selected option un-selects it —
-                              // reporting is optional, so a mis-click must
-                              // not become a forced report.
-                              setFocusMoveProgress(prev => ({
-                                ...prev,
-                                [fm.id]: { status: isActive ? null : opt.value, note: prev[fm.id]?.note || '' },
-                              }));
-                            }}
-                          >
-                            <Icon className="h-3.5 w-3.5" />
-                            {opt.label}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    {entry.status !== null && (
-                      <Textarea
-                        placeholder="Any quick notes? (optional)"
-                        value={entry.note}
-                        onChange={(e) => {
-                          setFocusMoveProgress(prev => ({
-                            ...prev,
-                            [fm.id]: { status: prev[fm.id]?.status ?? null, note: e.target.value },
-                          }));
-                        }}
-                        rows={2}
-                        className="resize-none text-sm"
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-          <Separator />
-        </>
-      )}
 
       {/* Step 0: Prior Action Steps Progress (follow-ups only) */}
       {isFollowUp && hasPriorSteps && (

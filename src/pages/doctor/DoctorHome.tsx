@@ -314,52 +314,32 @@ export default function DoctorHome() {
       {/* Baseline CTA — only shown when no coaching sessions are active */}
       {!hasActionableItems && !showOnTrack && renderBaselineCTA()}
 
-      {/* Current Focus — Active Focus Moves when any exist, else the most
-          recent session's action steps only (not every session ever). */}
-      {staff?.id && <CurrentFocusCard staffId={staff.id} fallbackSessionId={latestActiveSessionId} />}
+      {/* Current Focus — the most recent session's action steps only (not
+          every session ever; old confirmed sessions used to accumulate). */}
+      {latestActiveSessionId && <CurrentFocusCard sessionId={latestActiveSessionId} />}
 
     </div>
   );
 }
 
-function CurrentFocusCard({ staffId, fallbackSessionId }: { staffId: string; fallbackSessionId: string | null }) {
-  const { data: focusMoves } = useQuery({
-    queryKey: ['my-active-focus-moves', staffId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('doctor_focus_items')
-        .select(`
-          id, statement,
-          pro_moves!doctor_focus_items_pro_move_id_fkey (action_statement)
-        `)
-        .eq('doctor_staff_id', staffId)
-        .eq('status', 'active');
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!staffId,
-  });
-
-  const hasFocusMoves = (focusMoves?.length || 0) > 0;
-
+function CurrentFocusCard({ sessionId }: { sessionId: string }) {
   const { data: meetingRecord } = useQuery({
-    queryKey: ['meeting-record-focus', fallbackSessionId],
+    queryKey: ['meeting-record-focus', sessionId],
     queryFn: async () => {
-      if (!fallbackSessionId) return null;
       const { data, error } = await supabase
         .from('coaching_meeting_records')
         .select('experiments')
-        .eq('session_id', fallbackSessionId)
+        .eq('session_id', sessionId)
         .maybeSingle();
       if (error) throw error;
       return data;
     },
-    enabled: !hasFocusMoves && !!fallbackSessionId,
+    enabled: !!sessionId,
   });
 
-  const fallbackSteps = hasFocusMoves ? [] : ((meetingRecord?.experiments as any[] | null) || []);
+  const steps = (meetingRecord?.experiments as any[] | null) || [];
 
-  if (!hasFocusMoves && fallbackSteps.length === 0) return null;
+  if (steps.length === 0) return null;
 
   return (
     <Card className="border-primary/20">
@@ -370,25 +350,14 @@ function CurrentFocusCard({ staffId, fallbackSessionId }: { staffId: string; fal
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {hasFocusMoves ? (
-          (focusMoves || []).map((fm: any) => (
-            <div key={fm.id} className="p-3 rounded-lg bg-primary/5 border border-primary/10">
-              <p className="text-sm font-medium">{fm.pro_moves?.action_statement || 'Focus Move'}</p>
-              {fm.statement?.trim() && (
-                <p className="text-sm text-muted-foreground mt-0.5">{fm.statement}</p>
-              )}
-            </div>
-          ))
-        ) : (
-          fallbackSteps.map((step: any, i: number) => (
-            <div key={i} className="p-3 rounded-lg bg-primary/5 border border-primary/10">
-              <p className="text-sm font-medium">{step.title}</p>
-              {step.description && (
-                <p className="text-sm text-muted-foreground mt-0.5">{step.description}</p>
-              )}
-            </div>
-          ))
-        )}
+        {steps.map((step: any, i: number) => (
+          <div key={i} className="p-3 rounded-lg bg-primary/5 border border-primary/10">
+            <p className="text-sm font-medium">{step.title}</p>
+            {step.description && (
+              <p className="text-sm text-muted-foreground mt-0.5">{step.description}</p>
+            )}
+          </div>
+        ))}
       </CardContent>
     </Card>
   );

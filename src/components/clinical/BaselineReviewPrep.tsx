@@ -1,13 +1,11 @@
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, ArrowUpDown, Flag, Target, Bookmark, CheckCircle2 } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { ArrowLeft, ArrowUpDown, Flag } from 'lucide-react';
 import { ReflectionSection } from '@/components/doctor/ReflectionSection';
 import { getDomainColorRaw } from '@/lib/domainColors';
 import { drName } from '@/lib/doctorDisplayName';
@@ -42,9 +40,7 @@ interface Row {
  */
 export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCoachBaseline }: Props) {
   const { data: myStaff } = useStaffProfile();
-  const queryClient = useQueryClient();
   const firstName = drName(doctorName).replace(/^dr\.?\s*/i, '').trim().split(' ')[0] || doctorName;
-  const [creatingActionId, setCreatingActionId] = useState<number | null>(null);
 
   const { data: selfAssessment, isLoading: selfLoading } = useQuery({
     queryKey: ['baseline-review-prep-self', doctorStaffId],
@@ -126,55 +122,11 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
     enabled: !!coachAssessmentId,
   });
 
-  const { data: existingFocusItems } = useQuery({
-    queryKey: ['baseline-review-prep-focus-items', doctorStaffId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('doctor_focus_items')
-        .select('id, pro_move_id, status')
-        .eq('doctor_staff_id', doctorStaffId)
-        .in('status', ['draft', 'parked', 'active']);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!doctorStaffId,
-  });
-
-  const createFocusMoveMutation = useMutation({
-    mutationFn: async ({ actionId, status }: { actionId: number; status: 'draft' | 'parked' }) => {
-      if (!myStaff?.id) throw new Error('Not authenticated');
-      const { error } = await supabase.from('doctor_focus_items').insert({
-        doctor_staff_id: doctorStaffId,
-        coach_staff_id: myStaff.id,
-        pro_move_id: actionId,
-        status,
-        created_by: myStaff.id,
-      });
-      if (error) throw error;
-    },
-    onMutate: ({ actionId }) => setCreatingActionId(actionId),
-    onSuccess: (_, { status }) => {
-      queryClient.invalidateQueries({ queryKey: ['baseline-review-prep-focus-items', doctorStaffId] });
-      queryClient.invalidateQueries({ queryKey: ['doctor-focus-items', doctorStaffId] });
-      queryClient.invalidateQueries({ queryKey: ['prep-focus-moves', doctorStaffId] });
-      queryClient.invalidateQueries({ queryKey: ['capture-active-focus-moves', doctorStaffId] });
-      toast({ title: status === 'parked' ? 'Parked for later' : 'Added as a Focus Move' });
-    },
-    onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
-    onSettled: () => setCreatingActionId(null),
-  });
-
   const coachRatingMap = useMemo(() => {
     const map = new Map<number, number>();
     (coachItems || []).forEach(i => { if (i.rating != null) map.set(i.action_id, i.rating); });
     return map;
   }, [coachItems]);
-
-  const focusItemMap = useMemo(() => {
-    const map = new Map<number, { id: string; status: string }>();
-    (existingFocusItems || []).forEach(fi => map.set(fi.pro_move_id, { id: fi.id, status: fi.status }));
-    return map;
-  }, [existingFocusItems]);
 
   const rows: Row[] = useMemo(() => {
     return (selfItems || []).map((item: any) => {
@@ -213,41 +165,6 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
 
   const orderedDomains = DOMAIN_ORDER.filter(d => groupedByDomain[d]?.length);
   const flaggedDomains: string[] = (selfAssessment?.flagged_domains as string[]) || [];
-
-  const FocusMoveActions = ({ actionId }: { actionId: number }) => {
-    const existing = focusItemMap.get(actionId);
-    if (existing) {
-      const label = existing.status === 'parked' ? 'Parked' : existing.status === 'active' ? 'Active Focus Move' : 'Draft Focus Move';
-      return (
-        <Badge variant="secondary" className="text-2xs gap-1 shrink-0">
-          <CheckCircle2 className="h-3 w-3" /> {label}
-        </Badge>
-      );
-    }
-    const isPending = creatingActionId === actionId && createFocusMoveMutation.isPending;
-    return (
-      <div className="flex gap-1.5 shrink-0">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 gap-1 text-xs"
-          disabled={isPending}
-          onClick={() => createFocusMoveMutation.mutate({ actionId, status: 'draft' })}
-        >
-          <Target className="h-3 w-3" /> Make it a Focus Move
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1 text-xs text-muted-foreground"
-          disabled={isPending}
-          onClick={() => createFocusMoveMutation.mutate({ actionId, status: 'parked' })}
-        >
-          <Bookmark className="h-3 w-3" /> Park for later
-        </Button>
-      </div>
-    );
-  };
 
   if (selfLoading) {
     return (
@@ -337,7 +254,6 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
                       </p>
                     </div>
                   </div>
-                  <FocusMoveActions actionId={r.action_id} />
                 </div>
               );
             })}
@@ -392,7 +308,6 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
                       )}
                     </div>
                   </div>
-                  <FocusMoveActions actionId={r.action_id} />
                 </div>
               ))}
             </div>

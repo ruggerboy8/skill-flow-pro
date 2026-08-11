@@ -11,6 +11,17 @@ doctor confirmation step; Q9 Pro Move always required; Q10 confirmed;
 Q11 approved; Q12 CDs and assigned coaches; Q13 approved; Q14
 coach-private; Q15 persist everywhere; Q16 deferred (coaching guide not in
 today's build); Q17 remove the promise, confirm-only, minimize loops.
+
+**SUPERSEDED (2026-08-11 evening): section D's Focus Moves UI was built,
+then retired before any publish.** John's decision after seeing Dr. Alex's
+real usage: no second lexicon; the action step stays the single unit.
+Instead, each action step gains an optional Pro Move link at meeting
+write-up (slated session moves offered first, full library for branched
+topics, skippable), and the latest action steps surface on the coach's
+doctor page. The doctor_focus_items / doctor_focus_item_updates tables
+remain in the DB, empty and dormant; Pro-Move-tagged action steps capture
+the data any future longitudinal view would need, so that decision is
+deferred, not lost. Longitudinal tracking decisions are explicitly parked.
 Companion to
 `doctor-coaching-regional-adjustments.md` (the agreed recommendations; that
 doc holds context and decisions, this one holds build specs).

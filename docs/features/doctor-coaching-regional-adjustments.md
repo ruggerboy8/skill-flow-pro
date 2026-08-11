@@ -63,9 +63,15 @@ Add in-flow instruction (short panel or first-run step) that states the why:
 
 The system's best data asset for seeding a session (self baseline vs observed
 baseline over the same Pro Move set) is currently buried. Surface a
-side-by-side comparison with the biggest gaps highlighted, feeding directly
-into agenda building in `DirectorPrepComposer`. This also helps a new coach
-identify the first several Pro Move priorities for their doctor.
+side-by-side comparison with the biggest gaps highlighted.
+
+**Scope refinement (2026-08-11):** the full comparison happens **once**, as
+the prep artifact for the first coaching conversation (the baseline review).
+It is not a recurring per-session view. Its outputs (the chosen first Pro
+Move priorities, ideally as focus items per item 4, plus any unresolved gaps)
+persist and continue to feed prep for subsequent sessions in a compact form.
+This also helps a new coach identify the first several Pro Move priorities
+for their doctor.
 
 ## 4. Focus items: longitudinal growth containers
 

@@ -76,7 +76,12 @@ export function getDoctorJourneyStatus(
         };
       }
 
-      // Canonical labels + next actions come from SESSION_STATUS_CONFIG
+      // Canonical labels + next actions come from SESSION_STATUS_CONFIG, but
+      // nextAction there is written in the coach's voice ("Schedule next
+      // session", "Review the doctor's note") — wrong when shown to the
+      // doctor about themselves. Override with doctor-voiced copy per
+      // status; fall back to the coach copy only if a status is missing
+      // here (shouldn't happen, but fails safe rather than silently).
       const cfg = SESSION_STATUS_CONFIG[latest.status];
       if (cfg) {
         const stageByStatus: Record<string, DoctorJourneyStage> = {
@@ -88,12 +93,23 @@ export function getDoctorJourneyStatus(
           doctor_confirmed: isFollowup ? 'followup_completed' : 'doctor_confirmed',
           doctor_revision_requested: 'meeting_pending',
         };
+        const doctorNextAction: Record<string, string> = {
+          scheduled: 'Your coach is setting up your next session',
+          director_prep_ready: 'Your coach is finalizing the agenda',
+          doctor_prep_submitted: "You're prepped — waiting on the meeting",
+          meeting_pending: 'Summary ready — review and confirm',
+          doctor_confirmed: 'Completed',
+          doctor_revision_requested: 'Your coach is reviewing your note',
+        };
+        // This branch serves BOTH perspectives (coach callers land here too,
+        // e.g. from the roster) — only swap in doctor-voiced copy when the
+        // caller actually asked for the doctor's perspective.
         return {
           stage: stageByStatus[latest.status] || 'ready_for_prep',
           label: cfg.label,
           variant: 'default',
           colorClass: cfg.className,
-          nextAction: cfg.nextAction,
+          nextAction: perspective === 'doctor' ? (doctorNextAction[latest.status] ?? cfg.nextAction) : cfg.nextAction,
         };
       }
     }

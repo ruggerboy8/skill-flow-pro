@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ChevronDown, FlaskConical } from 'lucide-react';
+import { CheckCircle2, ChevronDown, FlaskConical, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -21,6 +21,8 @@ export default function DoctorCoachingHistory() {
         .select('id, session_type, sequence_number, status, scheduled_at')
         .eq('doctor_staff_id', staff.id)
         .order('sequence_number', { ascending: false });
+      // status is carried through to CompletedSessionCard so it can tell
+      // "summary ready, not yet confirmed" apart from "confirmed".
       if (error) throw error;
       return data || [];
     },
@@ -54,8 +56,9 @@ export default function DoctorCoachingHistory() {
   );
 }
 
-function CompletedSessionCard({ session }: { session: { id: string; session_type: string; sequence_number: number; scheduled_at: string | null } }) {
+function CompletedSessionCard({ session }: { session: { id: string; session_type: string; sequence_number: number; scheduled_at: string | null; status: string } }) {
   const [open, setOpen] = useState(false);
+  const isConfirmed = session.status === 'doctor_confirmed';
 
   const { data: meetingRecord } = useQuery({
     queryKey: ['meeting-record', session.id],
@@ -72,7 +75,10 @@ function CompletedSessionCard({ session }: { session: { id: string; session_type
   });
 
   const actionSteps = (meetingRecord?.experiments as any[] | null) || [];
-  const typeLabel = session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${session.sequence_number - 1}`;
+  // "Check-in N", not "Follow-up N" — matches the coach side's naming
+  // (DoctorDetailThread) so both parties talk about the same session by the
+  // same name.
+  const typeLabel = session.session_type === 'baseline_review' ? 'Baseline Review' : `Check-in ${session.sequence_number - 1}`;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -80,12 +86,21 @@ function CompletedSessionCard({ session }: { session: { id: string; session_type
         <CollapsibleTrigger asChild>
           <CardContent className="flex items-center justify-between py-4 cursor-pointer hover:bg-muted/30">
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+              {isConfirmed ? (
+                <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+              ) : (
+                <Clock className="h-5 w-5 text-amber-500 shrink-0" />
+              )}
               <div>
                 <p className="text-sm font-medium">{typeLabel}</p>
                 <p className="text-sm text-muted-foreground">
                   {session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}
                 </p>
+                {!isConfirmed && (
+                  <p className="text-xs text-amber-600 dark:text-amber-500 font-medium mt-0.5">
+                    Summary ready — confirm to lock it in
+                  </p>
+                )}
               </div>
             </div>
             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -118,9 +133,19 @@ function CompletedSessionCard({ session }: { session: { id: string; session_type
             ) : (
               <p className="text-sm text-muted-foreground">Loading...</p>
             )}
-            <Link to={`/doctor/review-prep/${session.id}`}>
-              <Button variant="ghost" size="sm" className="w-full">View Full Record</Button>
-            </Link>
+            {/* "View Full Record" only makes sense for meeting_pending: that
+                route (review-prep) is where MeetingConfirmationCard lives and
+                the doctor still has an action to take (confirm). For an
+                already-confirmed session this card's own expand already
+                shows the summary and action steps in full — the prep-view
+                route actually shows LESS for a confirmed session (it has no
+                confirmed-session branch of its own), so linking to it there
+                would be a downgrade, not a detail view. */}
+            {!isConfirmed && (
+              <Link to={`/doctor/review-prep/${session.id}`}>
+                <Button variant="ghost" size="sm" className="w-full">View Full Record</Button>
+              </Link>
+            )}
           </CardContent>
         </CollapsibleContent>
       </Card>

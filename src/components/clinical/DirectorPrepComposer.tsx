@@ -263,7 +263,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   }, {} as Record<number, number | null>);
 
   // Fetch existing selections if editing
-  const { data: existingSelections } = useQuery({
+  const { data: existingSelections, isLoading: existingSelectionsLoading } = useQuery({
     queryKey: ['session-selections', sessionId, 'coach'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -274,6 +274,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
       if (error) throw error;
       return data?.map(s => s.action_id) || [];
     },
+    enabled: !!sessionId,
   });
 
   // Fetch prior session experiments for follow-ups
@@ -281,11 +282,15 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     queryKey: ['prior-experiments', sessionId, session?.doctor_staff_id],
     queryFn: async () => {
       if (!session?.doctor_staff_id || !session?.sequence_number || session.sequence_number <= 1) return [];
+      // Include meeting_pending alongside doctor_confirmed: if the doctor
+      // hasn't confirmed the last summary yet, the coach should still see
+      // its action steps when prepping the next session (the doctor's own
+      // prep already looks back this far).
       const { data: priorSessions } = await supabase
         .from('coaching_sessions')
         .select('id')
         .eq('doctor_staff_id', session.doctor_staff_id)
-        .eq('status', 'doctor_confirmed')
+        .in('status', ['doctor_confirmed', 'meeting_pending'])
         .lt('sequence_number', session.sequence_number)
         .order('sequence_number', { ascending: false })
         .limit(1);
@@ -320,15 +325,24 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!myStaff?.id && !!sessionType,
   });
 
-  // Initialize from existing data
-  useState(() => {
+  // Initialize from existing data. This must run AFTER `session` and
+  // `existingSelections` have resolved, and only once — a plain useState
+  // initializer runs at first render, before either query has data, so
+  // opening an existing agenda showed an empty editor and saving wiped it.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    if (hydrated) return;
+    if (!session) return;
+    if (existingSelectionsLoading) return;
     if (existingSelections?.length) {
       setSelectedActions(existingSelections);
     }
-    if (session?.coach_note) {
+    if (session.coach_note) {
       setCoachNote(session.coach_note);
     }
-  });
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, session, existingSelections, existingSelectionsLoading]);
 
   const toggleAction = (actionId: number) => {
     setSelectedActions(prev => {
@@ -938,14 +952,14 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         <Button
           variant="outline"
           onClick={() => saveDraftMutation.mutate()}
-          disabled={saveDraftMutation.isPending}
+          disabled={saveDraftMutation.isPending || !hydrated}
         >
           Save draft
         </Button>
         <Button
           className="flex-1 gap-2"
           onClick={() => publishMutation.mutate()}
-          disabled={selectedActions.length === 0 || publishMutation.isPending}
+          disabled={selectedActions.length === 0 || publishMutation.isPending || !hydrated}
         >
           <Send className="h-4 w-4" />
           {publishMutation.isPending ? 'Sending…' : 'Send to doctor'}

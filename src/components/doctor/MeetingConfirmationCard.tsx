@@ -105,10 +105,10 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
       {/* Meeting Info */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Calendar className="h-4 w-4" />
-        <span>{format(new Date(session.scheduled_at), 'MMMM d, yyyy')}</span>
+        <span>{session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}</span>
         <span>·</span>
         <span>
-          {session.session_type === 'baseline_review' ? 'Baseline Review' : `Follow-up ${session.sequence_number - 1}`}
+          {session.session_type === 'baseline_review' ? 'Baseline Review' : `Check-in ${session.sequence_number - 1}`}
         </span>
       </div>
 

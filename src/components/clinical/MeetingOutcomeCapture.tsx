@@ -162,20 +162,31 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
       const validExperiments = experiments.filter(e => e.title.trim());
       if (!summary.trim()) throw new Error('Please add a meeting summary.');
 
-      const { error: insertErr } = await supabase
+      // Upsert, not insert: a record may already exist for this session
+      // (e.g. re-capture), and coaching_meeting_records.session_id is
+      // unique. An unconditional insert would 23505 on any second write.
+      const { error: upsertErr } = await supabase
         .from('coaching_meeting_records')
-        .insert([{
+        .upsert([{
           session_id: sessionId,
           calibration_confirmed: false,
           summary: summary.trim(),
           experiments: validExperiments as any,
           submitted_at: new Date().toISOString(),
-        }]);
-      if (insertErr) throw insertErr;
+        }] as any, { onConflict: 'session_id' });
+      if (upsertErr) throw upsertErr;
 
+      // Only stamp scheduled_at if it isn't already set — this field is the
+      // actual meeting time, not "when the write-up happened". Overwriting
+      // it here made "Met on ..." display the capture timestamp instead of
+      // when the meeting actually occurred.
+      const statusPayload: { status: string; scheduled_at?: string } = { status: 'meeting_pending' };
+      if (!session?.scheduled_at) {
+        statusPayload.scheduled_at = new Date().toISOString();
+      }
       const { error: statusErr } = await supabase
         .from('coaching_sessions')
-        .update({ status: 'meeting_pending', scheduled_at: new Date().toISOString() })
+        .update(statusPayload)
         .eq('id', sessionId);
       if (statusErr) throw statusErr;
 

@@ -50,10 +50,26 @@ serve(async (req) => {
 
     const { doctor_staff_id, session_id, scheduling_link, custom_subject, custom_body, prep_link } = await req.json();
 
-    // CDs and super admins pass; otherwise the caller must be an ASSIGNED
-    // doctor coach for this specific doctor (2026-08-06 doctor-coach model).
-    let allowed = !!(callerStaff?.is_clinical_director || callerStaff?.is_super_admin);
-    if (!allowed && callerStaff?.id && doctor_staff_id) {
+    if (!doctor_staff_id) {
+      return new Response(JSON.stringify({ error: "doctor_staff_id required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Super admins pass anywhere. Clinical directors pass only within their
+    // own org (previously ungated — a CD in org A could invite doctors in
+    // org B). Otherwise the caller must be an ASSIGNED doctor coach for
+    // this specific doctor (2026-08-06 doctor-coach model).
+    let allowed = !!callerStaff?.is_super_admin;
+    if (!allowed && callerStaff?.is_clinical_director && callerStaff?.id) {
+      const [{ data: callerOrgId }, { data: doctorOrgId }] = await Promise.all([
+        admin.rpc("org_id_of_staff", { _staff_id: callerStaff.id }),
+        admin.rpc("org_id_of_staff", { _staff_id: doctor_staff_id }),
+      ]);
+      allowed = !!callerOrgId && callerOrgId === doctorOrgId;
+    }
+    if (!allowed && callerStaff?.id) {
       const { data: assignment } = await admin
         .from("doctor_coach_assignments")
         .select("id")
@@ -65,12 +81,6 @@ serve(async (req) => {
     if (!allowed) {
       return new Response(JSON.stringify({ error: "Access denied" }), {
         status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!doctor_staff_id) {
-      return new Response(JSON.stringify({ error: "doctor_staff_id required" }), {
-        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -113,6 +123,34 @@ serve(async (req) => {
     // Create or update coaching session
     let sessionData: any;
     if (session_id) {
+      // Verify the session actually belongs to this doctor and is in a
+      // status where sending an invite makes sense, before flipping it via
+      // the service-role client. Previously this update trusted whatever
+      // session_id was passed with no ownership or status check.
+      const { data: existingSession, error: sessionFetchErr } = await admin
+        .from("coaching_sessions")
+        .select("id, doctor_staff_id, status")
+        .eq("id", session_id)
+        .single();
+      if (sessionFetchErr || !existingSession) {
+        return new Response(JSON.stringify({ error: "Session not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (existingSession.doctor_staff_id !== doctor_staff_id) {
+        return new Response(JSON.stringify({ error: "Session does not belong to this doctor" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!["director_prep_ready", "scheduling_invite_sent"].includes(existingSession.status)) {
+        return new Response(
+          JSON.stringify({ error: `Cannot send an invite from status "${existingSession.status}"` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       // Update existing session
       const { data, error } = await admin
         .from("coaching_sessions")
@@ -132,7 +170,10 @@ serve(async (req) => {
         .limit(1);
 
       const nextSeq = (existing?.[0]?.sequence_number ?? 0) + 1;
-      const sessionType = nextSeq === 1 ? "baseline_review" : "followup";
+      // Must match the client-side literal 'follow_up' (with underscore) —
+      // this fallback previously wrote "followup" and would have silently
+      // misclassified any session created through this uncalled path.
+      const sessionType = nextSeq === 1 ? "baseline_review" : "follow_up";
 
       const { data, error } = await admin
         .from("coaching_sessions")
@@ -191,7 +232,7 @@ serve(async (req) => {
           htmlParts.push(`<p>Please reach out to ${coachName} to find a time that works for your baseline review meeting.</p>`);
         }
         htmlParts.push(`<p>Before the meeting, please <a href="${resolvedPrepLink}">complete your meeting prep</a> on the Pro Moves site. In your prep, you'll:</p>`);
-        htmlParts.push(`<ul><li>Review the meeting agenda your coach has prepared</li><li>Select 1–2 Pro Moves you'd like to focus on</li><li>Add any questions or topics you want to discuss</li></ul>`);
+        htmlParts.push(`<ul><li>Review the meeting agenda your coach has prepared</li><li>Select the 1 Pro Move you'd most like to discuss</li><li>Add any questions or topics you want to discuss</li></ul>`);
         htmlParts.push(`<p>Looking forward to connecting!<br/>— ${coachName}</p>`);
         htmlBody = htmlParts.join("\n");
 
@@ -215,7 +256,7 @@ serve(async (req) => {
         textParts.push("");
         textParts.push("In your prep, you'll:");
         textParts.push("  • Review the meeting agenda your coach has prepared");
-        textParts.push("  • Select 1–2 Pro Moves you'd like to focus on");
+        textParts.push("  • Select the 1 Pro Move you'd most like to discuss");
         textParts.push("  • Add any questions or topics you want to discuss");
         textParts.push("");
         textParts.push("Looking forward to connecting!");

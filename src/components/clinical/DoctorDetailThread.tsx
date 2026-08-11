@@ -364,11 +364,18 @@ function SessionCard({
 
   const experiments = (meetingRecord?.experiments as any[] | null) || [];
 
+  // Only statuses with real content underneath (isExpandable) should toggle
+  // open — otherwise every row (including a fresh 'scheduled' draft with
+  // nothing to show) still visually invites a click that reveals "No prep
+  // details yet for this session."
+  const HeaderWrapper: any = expandableStatus ? CollapsibleTrigger : 'div';
+  const headerWrapperProps = expandableStatus ? { asChild: true } : {};
+
   return (
-    <Collapsible open={expanded} onOpenChange={onToggle}>
+    <Collapsible open={expandableStatus && expanded} onOpenChange={onToggle}>
       <Card className="transition-colors">
-        <CollapsibleTrigger asChild>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-4 cursor-pointer hover:bg-muted/30">
+        <HeaderWrapper {...(headerWrapperProps as any)}>
+          <CardHeader className={`flex flex-row items-center justify-between space-y-0 py-4 ${expandableStatus ? 'cursor-pointer hover:bg-muted/30' : ''}`}>
             <div className="flex items-center gap-3">
               {expandableStatus && (
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -453,7 +460,11 @@ function SessionCard({
                   onClick={(e) => { e.stopPropagation(); onCapture(); }}
                 >
                   <ClipboardEdit className="h-3.5 w-3.5" />
-                  Start Meeting
+                  {/* "Start Meeting" only fits once the doctor has actually
+                      prepped. At scheduling_invite_sent the session is still
+                      "Awaiting doctor's response" — this button records
+                      notes for a meeting that may already be scheduled. */}
+                  {session.status === 'scheduling_invite_sent' ? 'Record Meeting Notes' : 'Start Meeting'}
                 </Button>
               )}
               {showDelete && (
@@ -500,7 +511,7 @@ function SessionCard({
               )}
             </div>
           </CardHeader>
-        </CollapsibleTrigger>
+        </HeaderWrapper>
 
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-4">

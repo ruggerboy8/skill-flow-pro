@@ -39,30 +39,6 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify caller is clinical director / coach / admin
-    const { data: caller } = await supabase
-      .from('staff')
-      .select('id, name, is_clinical_director, is_coach, is_super_admin')
-      .eq('user_id', user.id)
-      .single();
-
-    // Assigned doctor coaches (owner doctors) may also send summaries.
-    let isDoctorCoach = false;
-    if (caller?.id) {
-      const { data: anyAssignment } = await supabase
-        .from('doctor_coach_assignments')
-        .select('id')
-        .eq('coach_staff_id', caller.id)
-        .limit(1)
-        .maybeSingle();
-      isDoctorCoach = !!anyAssignment;
-    }
-    if (!caller || (!caller.is_clinical_director && !caller.is_coach && !caller.is_super_admin && !isDoctorCoach)) {
-      return new Response(JSON.stringify({ error: 'Access denied' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const { session_id } = await req.json();
     if (!session_id) {
       return new Response(JSON.stringify({ error: 'session_id required' }), {
@@ -87,6 +63,40 @@ serve(async (req) => {
     if (!doctor?.email) {
       return new Response(JSON.stringify({ error: 'Doctor email not found' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify caller is clinical director (in-org), super admin, or an
+    // ASSIGNED doctor coach for THIS session's doctor. Previously this
+    // qualified any caller who coached anyone, anywhere — including
+    // `is_coach` (the unrelated RDA weekly-loop coach flag) — with no check
+    // against the session at all.
+    const { data: caller } = await supabase
+      .from('staff')
+      .select('id, name, is_clinical_director, is_super_admin')
+      .eq('user_id', user.id)
+      .single();
+
+    let allowed = !!caller?.is_super_admin;
+    if (!allowed && caller?.is_clinical_director && caller?.id) {
+      const [{ data: callerOrgId }, { data: doctorOrgId }] = await Promise.all([
+        supabase.rpc('org_id_of_staff', { _staff_id: caller.id }),
+        supabase.rpc('org_id_of_staff', { _staff_id: session.doctor_staff_id }),
+      ]);
+      allowed = !!callerOrgId && callerOrgId === doctorOrgId;
+    }
+    if (!allowed && caller?.id) {
+      const { data: assignment } = await supabase
+        .from('doctor_coach_assignments')
+        .select('id')
+        .eq('coach_staff_id', caller.id)
+        .eq('doctor_staff_id', session.doctor_staff_id)
+        .maybeSingle();
+      allowed = !!assignment;
+    }
+    if (!caller || !allowed) {
+      return new Response(JSON.stringify({ error: 'Access denied' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -129,7 +139,7 @@ serve(async (req) => {
     const subject = `Your coaching meeting summary is ready for review`;
     const html = `<p>Hi Dr. ${firstName},</p>
 <p>${coachName} has shared the summary from your recent coaching session. Please take a moment to <a href="${reviewLink}">review the key takeaways and action steps</a>.</p>
-<p>If everything looks good, confirm it so your action steps are locked in. If something needs adjusting, you can request a revision.</p>
+<p>Confirm it so your action steps are locked in. Questions? Just reach out to ${coachName} directly.</p>
 <p>— ${signOff}</p>`;
 
     const text = `Hi Dr. ${firstName},
@@ -138,7 +148,7 @@ ${coachName} has shared the summary from your recent coaching session. Please ta
 
 ${reviewLink}
 
-If everything looks good, confirm it so your action steps are locked in. If something needs adjusting, you can request a revision.
+Confirm it so your action steps are locked in. Questions? Just reach out to ${coachName} directly.
 
 — ${signOff}`;
 

@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter, ShieldAlert, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter, ShieldAlert, AlertCircle, Clock, CircleDashed, Target } from 'lucide-react';
+import { FOCUS_MOVE_PROGRESS_LABELS } from '@/types/focusMoves';
 import { toast } from '@/hooks/use-toast';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
@@ -285,6 +286,48 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const [baselineNudgeDismissed, setBaselineNudgeDismissed] = useState(false);
   const showBaselineNudge =
     isBaselineReview && myCoachBaselineStatus !== undefined && myCoachBaselineStatus !== 'completed' && !baselineNudgeDismissed;
+
+  // Active Focus Moves + the doctor's latest reported progress on each —
+  // the standing "review these first" block for the coach's own prep.
+  const { data: activeFocusMoves } = useQuery({
+    queryKey: ['prep-active-focus-moves', doctorStaffId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('doctor_focus_items')
+        .select(`
+          id, statement,
+          pro_moves!doctor_focus_items_pro_move_id_fkey (action_statement)
+        `)
+        .eq('doctor_staff_id', doctorStaffId)
+        .eq('status', 'active');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!doctorStaffId,
+  });
+
+  const { data: focusMoveUpdates } = useQuery({
+    queryKey: ['prep-focus-move-updates', (activeFocusMoves || []).map(f => f.id).join(',')],
+    queryFn: async () => {
+      const ids = (activeFocusMoves || []).map(f => f.id);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from('doctor_focus_item_updates')
+        .select('focus_item_id, progress, note, created_at')
+        .in('focus_item_id', ids)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: (activeFocusMoves?.length ?? 0) > 0,
+  });
+
+  const latestUpdateByItem = new Map<string, { progress: string; note: string | null }>();
+  (focusMoveUpdates || []).forEach(u => {
+    if (!latestUpdateByItem.has(u.focus_item_id)) {
+      latestUpdateByItem.set(u.focus_item_id, { progress: u.progress, note: u.note });
+    }
+  });
 
   // Fetch existing selections if editing
   const { data: existingSelections, isLoading: existingSelectionsLoading } = useQuery({
@@ -701,6 +744,46 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 </Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Active Focus Moves — review these first, pick up where you left off */}
+      {(activeFocusMoves?.length ?? 0) > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Focus Moves</CardTitle>
+            </div>
+            <CardDescription>Review these first. Pick up where you left off.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(activeFocusMoves || []).map((fm: any) => {
+              const update = latestUpdateByItem.get(fm.id);
+              const StatusIcon = update?.progress === 'going_well' ? CheckCircle2 : update?.progress === 'working_on_it' ? Clock : CircleDashed;
+              return (
+                <div key={fm.id} className="p-3 rounded-md bg-muted/30 border space-y-1">
+                  <p className="text-sm font-medium">{fm.pro_moves?.action_statement || 'Focus Move'}</p>
+                  {fm.statement?.trim() && (
+                    <p className="text-xs text-muted-foreground italic">"{fm.statement}"</p>
+                  )}
+                  {update ? (
+                    <div className="flex items-start gap-1.5 pt-1">
+                      <StatusIcon className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                      <div>
+                        <Badge variant="secondary" className="text-2xs">
+                          {FOCUS_MOVE_PROGRESS_LABELS[update.progress as keyof typeof FOCUS_MOVE_PROGRESS_LABELS] || update.progress}
+                        </Badge>
+                        {update.note && <p className="text-xs text-muted-foreground mt-1">{update.note}</p>}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground pt-1">No progress reported yet.</p>
+                  )}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, CheckCircle2, Clock, CircleDashed, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Send, Calendar, Sparkles, Loader2, FileText, CheckCircle2, Clock, CircleDashed, ShieldAlert, Target, XCircle, FlaskConical } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import DOMPurify from 'dompurify';
@@ -17,6 +17,7 @@ import DOMPurify from 'dompurify';
 interface Experiment {
   title: string;
   description: string;
+  focusItemId?: string;
 }
 
 interface Props {
@@ -86,6 +87,41 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
     enabled: !!session?.doctor_staff_id,
   });
 
+  const { data: activeFocusMoves, refetch: refetchFocusMoves } = useQuery({
+    queryKey: ['capture-active-focus-moves', session?.doctor_staff_id],
+    queryFn: async () => {
+      if (!session?.doctor_staff_id) return [];
+      const { data, error } = await supabase
+        .from('doctor_focus_items')
+        .select(`
+          id, statement,
+          pro_moves!doctor_focus_items_pro_move_id_fkey (action_statement)
+        `)
+        .eq('doctor_staff_id', session.doctor_staff_id)
+        .eq('status', 'active');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!session?.doctor_staff_id,
+  });
+
+  const retireFocusMoveMutation = useMutation({
+    mutationFn: async ({ id, outcome }: { id: string; outcome: 'landed' | 'set_aside' }) => {
+      const { error } = await supabase
+        .from('doctor_focus_items')
+        .update({ status: 'retired', retired_outcome: outcome, retired_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchFocusMoves();
+      queryClient.invalidateQueries({ queryKey: ['doctor-focus-items', session?.doctor_staff_id] });
+      queryClient.invalidateQueries({ queryKey: ['my-active-focus-moves', session?.doctor_staff_id] });
+      toast({ title: 'Focus Move retired' });
+    },
+    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
+
   const coachSelections = selections?.filter(s => s.selected_by === 'coach') || [];
   const doctorSelections = selections?.filter(s => s.selected_by === 'doctor') || [];
 
@@ -95,12 +131,19 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
   const allTopics = [...coachSelections, ...doctorSelections.filter(s => !overlapIds.has(s.action_id))];
 
-  const addExperiment = () => {
+  const addExperiment = (prefill?: { title: string; focusItemId?: string }) => {
     if (experiments.length >= 3) {
       toast({ title: 'Maximum 3 action steps', variant: 'destructive' });
       return;
     }
-    setExperiments(prev => [...prev, { title: '', description: '' }]);
+    // If the single default empty row is still untouched, fill it instead
+    // of appending a second row.
+    setExperiments(prev => {
+      if (prev.length === 1 && !prev[0].title.trim() && !prev[0].description.trim() && prefill) {
+        return [{ title: prefill.title, description: '', focusItemId: prefill.focusItemId }];
+      }
+      return [...prev, { title: prefill?.title || '', description: '', focusItemId: prefill?.focusItemId }];
+    });
   };
 
   const removeExperiment = (index: number) => {
@@ -302,6 +345,65 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
         </CardContent>
       </Card>
 
+      {/* Active Focus Moves — keep / retire / turn into an action step */}
+      {(activeFocusMoves?.length ?? 0) > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Focus Moves</CardTitle>
+            </div>
+            <CardDescription>What's the state of each, coming out of this conversation?</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(activeFocusMoves || []).map((fm: any) => {
+              const alreadyLinked = experiments.some(e => e.focusItemId === fm.id);
+              return (
+                <div key={fm.id} className="p-3 rounded-md border bg-muted/20 space-y-2">
+                  <p className="text-sm font-medium">{fm.pro_moves?.action_statement || 'Focus Move'}</p>
+                  {fm.statement?.trim() && (
+                    <p className="text-xs text-muted-foreground italic">"{fm.statement}"</p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 text-xs"
+                      disabled={alreadyLinked || isReadOnly}
+                      onClick={() => addExperiment({ title: fm.pro_moves?.action_statement || 'Focus Move', focusItemId: fm.id })}
+                    >
+                      <FlaskConical className="h-3.5 w-3.5" />
+                      {alreadyLinked ? 'Action step added' : 'Add action step'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1.5 text-xs text-muted-foreground"
+                      disabled={isReadOnly || retireFocusMoveMutation.isPending}
+                      onClick={() => retireFocusMoveMutation.mutate({ id: fm.id, outcome: 'landed' })}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Retire — Landed
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1.5 text-xs text-muted-foreground"
+                      disabled={isReadOnly || retireFocusMoveMutation.isPending}
+                      onClick={() => retireFocusMoveMutation.mutate({ id: fm.id, outcome: 'set_aside' })}
+                    >
+                      <XCircle className="h-3.5 w-3.5" /> Retire — Set aside
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+            <p className="text-xs text-muted-foreground">
+              Leave a Focus Move alone to keep it active — no action needed.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Coach Agenda */}
       {session.coach_note && session.coach_note.trim() && (
         <Card>
@@ -423,7 +525,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
               <CardTitle className="text-base">Action Steps</CardTitle>
               <CardDescription>Specific actions to practice before the next check-in.</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={addExperiment} disabled={experiments.length >= 3}>
+            <Button variant="outline" size="sm" onClick={() => addExperiment()} disabled={experiments.length >= 3}>
               <Plus className="h-4 w-4 mr-1" />
               Add
             </Button>

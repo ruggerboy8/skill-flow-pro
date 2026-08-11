@@ -82,7 +82,7 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
 
   // Own assessment first, falling back to the latest completed one from
   // any coach — same pattern DirectorPrepComposer uses.
-  const { data: coachAssessmentId } = useQuery({
+  const { data: coachAssessmentId, isLoading: coachIdLoading } = useQuery({
     queryKey: ['baseline-review-prep-coach-assessment-id', doctorStaffId, myStaff?.id],
     queryFn: async () => {
       if (myStaff?.id) {
@@ -108,7 +108,7 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
     enabled: !!doctorStaffId,
   });
 
-  const { data: coachItems } = useQuery({
+  const { data: coachItems, isLoading: coachItemsLoading } = useQuery({
     queryKey: ['baseline-review-prep-coach-items', coachAssessmentId],
     queryFn: async () => {
       if (!coachAssessmentId) return [];
@@ -166,7 +166,9 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
   const orderedDomains = DOMAIN_ORDER.filter(d => groupedByDomain[d]?.length);
   const flaggedDomains: string[] = (selfAssessment?.flagged_domains as string[]) || [];
 
-  if (selfLoading) {
+  // Wait for the coach-side queries too, so the "finish your baseline"
+  // gate doesn't flash before a completed comparison loads.
+  if (selfLoading || coachIdLoading || (!!coachAssessmentId && coachItemsLoading)) {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
         <Skeleton className="h-8 w-48" />
@@ -185,6 +187,34 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
             {firstName} hasn't finished their self-assessment yet. Come back once it's complete.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Sequencing gate: prepping the baseline review requires the coach's own
+  // observed baseline to be complete first (John, 2026-08-11).
+  if (!hasCoachData) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6">
+        <Button variant="ghost" onClick={onBack} className="gap-2">
+          <ArrowLeft className="h-4 w-4" /> Back to Doctor Detail
+        </Button>
+        <div>
+          <h1 className="text-xl font-semibold">Baseline Review Prep</h1>
+          <p className="text-sm text-muted-foreground mt-1">Unlocks once your observed baseline is complete.</p>
+        </div>
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="py-4 space-y-3">
+            <p className="text-sm font-medium">Finish your baseline first</p>
+            <p className="text-sm text-muted-foreground">
+              {firstName} has finished their self-assessment. Complete your own observed baseline,
+              and this screen will put their ratings next to yours and rank the biggest gaps.
+            </p>
+            {onOpenCoachBaseline && (
+              <Button size="sm" onClick={onOpenCoachBaseline}>Open baseline</Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -210,21 +240,6 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
           </p>
         </CardContent>
       </Card>
-
-      {!hasCoachData && (
-        <Card className="border-amber-500/40 bg-amber-500/5">
-          <CardContent className="py-4 space-y-3">
-            <p className="text-sm font-medium">Showing self-only for now</p>
-            <p className="text-sm text-muted-foreground">
-              Complete your own observed baseline to see where your read differs from {firstName}'s,
-              and to get a ranked list of the biggest gaps.
-            </p>
-            {onOpenCoachBaseline && (
-              <Button size="sm" onClick={onOpenCoachBaseline}>Open baseline</Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {hasCoachData && (
         <Card>

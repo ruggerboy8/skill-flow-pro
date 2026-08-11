@@ -263,6 +263,7 @@ function SessionCard({
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const statusInfo = statusLabels[session.status] || { label: session.status, className: 'bg-muted text-muted-foreground' };
   const typeLabel = session.session_type === 'baseline_review'
     ? 'Baseline Review'
@@ -561,6 +562,22 @@ function SessionCard({
                       ))}
                     </div>
                   </div>
+                )}
+
+                {(meetingRecord as any).raw_transcript && (
+                  <Collapsible open={transcriptOpen} onOpenChange={setTranscriptOpen}>
+                    <CollapsibleTrigger asChild>
+                      <button className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground">
+                        <ChevronDown className={`h-3 w-3 transition-transform ${transcriptOpen ? 'rotate-180' : ''}`} />
+                        Transcript on file
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="text-xs whitespace-pre-wrap bg-muted/30 rounded-md p-3 max-h-[300px] overflow-y-auto text-muted-foreground">
+                        {(meetingRecord as any).raw_transcript}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 )}
 
                 {meetingRecord.doctor_revision_note && (

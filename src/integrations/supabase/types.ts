@@ -687,6 +687,7 @@ export type Database = {
           last_opened_at: string | null
           last_opened_by_staff_id: string | null
           prior_action_status: Json | null
+          raw_transcript: string | null
           session_id: string
           submitted_at: string | null
           summary: string
@@ -703,6 +704,7 @@ export type Database = {
           last_opened_at?: string | null
           last_opened_by_staff_id?: string | null
           prior_action_status?: Json | null
+          raw_transcript?: string | null
           session_id: string
           submitted_at?: string | null
           summary?: string
@@ -719,6 +721,7 @@ export type Database = {
           last_opened_at?: string | null
           last_opened_by_staff_id?: string | null
           prior_action_status?: Json | null
+          raw_transcript?: string | null
           session_id?: string
           submitted_at?: string | null
           summary?: string

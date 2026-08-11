@@ -219,6 +219,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           summary: summary.trim(),
           experiments: validExperiments as any,
           submitted_at: new Date().toISOString(),
+          raw_transcript: rawTranscript.trim() || null,
         }] as any, { onConflict: 'session_id' });
       if (upsertErr) throw upsertErr;
 

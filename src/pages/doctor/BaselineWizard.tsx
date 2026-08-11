@@ -39,22 +39,30 @@ export default function BaselineWizard() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [forceOpenProMoveId, setForceOpenProMoveId] = useState<number | null>(null);
 
-  // Fetch name of the person who released this baseline
-  const { data: releaserName } = useQuery({
+  // Fetch name (and role) of the person who released this baseline. When we
+  // have their name we always sign with it; the fallback below only fires
+  // for baselines with no recorded releaser at all, where we can't assume
+  // "Your Clinical Director" anymore now that regional coaches release
+  // baselines too — "Your Coach" is the safe default either way.
+  const { data: releaser } = useQuery({
     queryKey: ['baseline-releaser', staff?.id],
     queryFn: async () => {
       if (!staff?.baseline_released_by) return null;
       const { data } = await supabase
         .from('staff')
-        .select('name')
+        .select('name, is_clinical_director')
         .eq('id', staff.baseline_released_by)
         .maybeSingle();
-      return data?.name || null;
+      return data;
     },
     enabled: !!staff?.baseline_released_by,
   });
 
-  const releaserDisplayName = releaserName ? drName(releaserName) : 'Your Clinical Director';
+  const releaserDisplayName = releaser?.name
+    ? drName(releaser.name)
+    : releaser?.is_clinical_director
+    ? 'Your Clinical Director'
+    : 'Your Coach';
 
   // Fetch existing assessment
   const { data: existingAssessment } = useQuery({

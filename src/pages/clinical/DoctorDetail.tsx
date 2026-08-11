@@ -256,7 +256,7 @@ export default function DoctorDetail() {
                   </h3>
                   <AssessmentTrackCard
                     title="Private baseline"
-                    subtitle="Visible only to clinical directors"
+                    subtitle="Visible only to clinical coaches"
                     icon={ShieldCheck}
                     status={coachBaselineStatus}
                     statusDate={coachAssessment?.completed_at || coachAssessment?.updated_at}
@@ -325,7 +325,7 @@ export default function DoctorDetail() {
         open={expandedAssessment === 'coach_baseline'}
         onOpenChange={(o) => !o && setExpandedAssessment(null)}
         title="Private baseline"
-        description="Your read of where this doctor stands. Visible only to clinical directors."
+        description="Your read of where this doctor stands. Visible only to clinical coaches."
       >
         <DoctorDetailBaseline
           coachAssessment={coachAssessment}

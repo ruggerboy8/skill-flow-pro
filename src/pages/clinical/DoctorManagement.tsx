@@ -186,7 +186,12 @@ export default function DoctorManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Clinical Director Portal</h1>
+          {/* Mentees-only coaches (regional coaches without CD/super-admin
+              scope) don't run the org's doctor pipeline — inviting doctors
+              and sending platform invites belongs to the clinical
+              directors. "Coaching Portal" better matches what they can
+              actually do here. */}
+          <h1 className="text-2xl font-bold">{menteesOnly ? 'Coaching Portal' : 'Clinical Director Portal'}</h1>
           <p className="text-muted-foreground">Manage doctor onboarding and development</p>
         </div>
         <div className="flex items-center gap-2">
@@ -194,10 +199,12 @@ export default function DoctorManagement() {
             <BookOpen className="w-4 h-4 mr-2" />
             Pro Moves Library
           </Button>
-          <Button onClick={() => setInviteOpen(true)}>
-            <UserPlus className="w-4 h-4 mr-2" />
-            Invite Doctor
-          </Button>
+          {!menteesOnly && (
+            <Button onClick={() => setInviteOpen(true)}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Invite Doctor
+            </Button>
+          )}
         </div>
       </div>
 
@@ -289,6 +296,8 @@ export default function DoctorManagement() {
                     Show all doctors
                   </Button>
                 </>
+              ) : menteesOnly ? (
+                <p>No doctors are assigned to you yet.</p>
               ) : (
                 <>
                   <p>No doctors found.</p>
@@ -348,22 +357,29 @@ export default function DoctorManagement() {
                           }}>
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              const { data, error } = await supabase.functions.invoke('admin-users', {
-                                body: { action: 'resend_invite', user_id: doctor.user_id },
-                              });
-                              if (error) throw error;
-                              if (data?.error) throw new Error(data.error);
-                              toast({ title: 'Sent', description: `Invitation resent to ${doctor.email}` });
-                            } catch (err: any) {
-                              toast({ title: 'Error', description: err.message || 'Failed to resend invite', variant: 'destructive' });
-                            }
-                          }}>
-                            <Mail className="h-4 w-4 mr-2" />
-                            Resend Invite
-                          </DropdownMenuItem>
+                          {/* Resend Invite re-sends the platform account invite,
+                              a CD/admin action — a regional coach seeing it
+                              would either fail (no permission) or confuse
+                              "resend platform invite" with "invite to a
+                              coaching session". */}
+                          {!menteesOnly && (
+                            <DropdownMenuItem onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const { data, error } = await supabase.functions.invoke('admin-users', {
+                                  body: { action: 'resend_invite', user_id: doctor.user_id },
+                                });
+                                if (error) throw error;
+                                if (data?.error) throw new Error(data.error);
+                                toast({ title: 'Sent', description: `Invitation resent to ${doctor.email}` });
+                              } catch (err: any) {
+                                toast({ title: 'Error', description: err.message || 'Failed to resend invite', variant: 'destructive' });
+                              }
+                            }}>
+                              <Mail className="h-4 w-4 mr-2" />
+                              Resend Invite
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

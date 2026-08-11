@@ -10,7 +10,7 @@ interface BaselineWelcomeProps {
 }
 
 export function BaselineWelcome({ staffName, releaserName, onStart, isLoading }: BaselineWelcomeProps) {
-  const signOff = releaserName || 'Your Clinical Director';
+  const signOff = releaserName || 'Your Coach';
 
   return (
     <Card className="max-w-2xl mx-auto">
@@ -26,6 +26,11 @@ export function BaselineWelcome({ staffName, releaserName, onStart, isLoading }:
           </p>
           <p>
             Be honest about where you are today. That's what makes this useful.
+          </p>
+          <p>
+            One more thing: I'll be completing my own version of this assessment based on what
+            I've observed working alongside you. That's not a report card, it's how I prepare,
+            so our first conversation starts from real observations instead of guesses.
           </p>
           <p className="text-right font-medium text-foreground">— {signOff}</p>
         </div>

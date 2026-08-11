@@ -548,7 +548,7 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         <p className="text-sm text-muted-foreground mt-1">
           {isComplete
             ? 'You can review and update ratings or notes. Changes will require confirmation before saving.'
-            : 'Rate each Pro Move and optionally record verbal feedback. This is visible only to clinical directors.'}
+            : 'Rate each Pro Move and optionally record verbal feedback. This is visible only to clinical coaches.'}
         </p>
         {(ownerName || lastEditorName) && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">

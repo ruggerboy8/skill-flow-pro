@@ -18,7 +18,10 @@ import { CoachSessionReflection } from '@/components/clinical/CoachSessionReflec
 interface Experiment {
   title: string;
   description: string;
-  focusItemId?: string;
+  // snake_case: this key is persisted verbatim into the experiments jsonb,
+  // and the written data contract (build instructions) specifies
+  // focus_item_id.
+  focus_item_id?: string;
 }
 
 interface Props {
@@ -117,8 +120,14 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
     },
     onSuccess: () => {
       refetchFocusMoves();
+      // Invalidate every surface that lists Focus Moves — with the app's
+      // staleTime, a missed key means a recently viewed screen shows the
+      // retired item as still active.
       queryClient.invalidateQueries({ queryKey: ['doctor-focus-items', session?.doctor_staff_id] });
       queryClient.invalidateQueries({ queryKey: ['my-active-focus-moves', session?.doctor_staff_id] });
+      queryClient.invalidateQueries({ queryKey: ['prep-focus-moves', session?.doctor_staff_id] });
+      queryClient.invalidateQueries({ queryKey: ['my-active-focus-moves-prep', session?.doctor_staff_id] });
+      queryClient.invalidateQueries({ queryKey: ['baseline-review-prep-focus-items', session?.doctor_staff_id] });
       toast({ title: 'Focus Move retired' });
     },
     onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
@@ -142,9 +151,9 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
     // of appending a second row.
     setExperiments(prev => {
       if (prev.length === 1 && !prev[0].title.trim() && !prev[0].description.trim() && prefill) {
-        return [{ title: prefill.title, description: '', focusItemId: prefill.focusItemId }];
+        return [{ title: prefill.title, description: '', focus_item_id: prefill.focusItemId }];
       }
-      return [...prev, { title: prefill?.title || '', description: '', focusItemId: prefill?.focusItemId }];
+      return [...prev, { title: prefill?.title || '', description: '', focus_item_id: prefill?.focusItemId }];
     });
   };
 
@@ -219,7 +228,10 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           summary: summary.trim(),
           experiments: validExperiments as any,
           submitted_at: new Date().toISOString(),
-          raw_transcript: rawTranscript.trim() || null,
+          // Only include the transcript when one was pasted this time —
+          // sending null unconditionally would erase a previously stored
+          // transcript on a legitimate re-capture.
+          ...(rawTranscript.trim() ? { raw_transcript: rawTranscript.trim() } : {}),
         }] as any, { onConflict: 'session_id' });
       if (upsertErr) throw upsertErr;
 
@@ -262,9 +274,14 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
             scheduled_at: `${nextSessionDate}T12:00:00.000Z`,
           });
         if (nextSessionErr) {
-          // Don't fail the whole submit over this — the meeting summary is
-          // the important write; the coach can add a session manually.
+          // Don't fail the whole submit over this: the meeting summary is
+          // the important write. But do tell the coach — they entered a
+          // date and reasonably believe the session now exists.
           console.warn('Failed to create next session:', nextSessionErr);
+          toast({
+            title: "Couldn't schedule the next session",
+            description: 'Your summary was saved. Add the next session manually from the coaching thread.',
+          });
         }
       }
 
@@ -298,7 +315,13 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
 
   if (!session) return null;
 
-  const isReadOnly = myStaff?.id ? session.coach_staff_id !== myStaff.id : false;
+  // Capture is URL-addressable (?capture=<id>), so back/forward or a stale
+  // link can reopen it on a session that's already meeting_pending or
+  // doctor_confirmed. With the upsert write path, a re-submit there would
+  // overwrite the finished record and re-email the doctor — so any
+  // non-capturable status renders read-only.
+  const statusAllowsCapture = ['scheduling_invite_sent', 'doctor_prep_submitted', 'doctor_revision_requested'].includes(session.status);
+  const isReadOnly = (myStaff?.id ? session.coach_staff_id !== myStaff.id : false) || !statusAllowsCapture;
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -368,7 +391,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           </CardHeader>
           <CardContent className="space-y-3">
             {(activeFocusMoves || []).map((fm: any) => {
-              const alreadyLinked = experiments.some(e => e.focusItemId === fm.id);
+              const alreadyLinked = experiments.some(e => e.focus_item_id === fm.id);
               return (
                 <div key={fm.id} className="p-3 rounded-md border bg-muted/20 space-y-2">
                   <p className="text-sm font-medium">{fm.pro_moves?.action_statement || 'Focus Move'}</p>
@@ -393,7 +416,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                       disabled={isReadOnly || retireFocusMoveMutation.isPending}
                       onClick={() => retireFocusMoveMutation.mutate({ id: fm.id, outcome: 'landed' })}
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Retire — Landed
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Retire as Landed
                     </Button>
                     <Button
                       size="sm"
@@ -402,14 +425,14 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                       disabled={isReadOnly || retireFocusMoveMutation.isPending}
                       onClick={() => retireFocusMoveMutation.mutate({ id: fm.id, outcome: 'set_aside' })}
                     >
-                      <XCircle className="h-3.5 w-3.5" /> Retire — Set aside
+                      <XCircle className="h-3.5 w-3.5" /> Retire as Set aside
                     </Button>
                   </div>
                 </div>
               );
             })}
             <p className="text-xs text-muted-foreground">
-              Leave a Focus Move alone to keep it active — no action needed.
+              Leave a Focus Move alone to keep it active. No action needed.
             </p>
           </CardContent>
         </Card>

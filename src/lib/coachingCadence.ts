@@ -33,7 +33,9 @@ export function getCadenceInfo(lastSessionAt: string | null | undefined): Cadenc
 
   const plural = weeks === 1 ? '' : 's';
 
+  // Bands per John: under 4 weeks fresh, 4 to 6 weeks drifting (6 itself
+  // is still amber), past 6 stale.
   if (weeks < DRIFTING_AT_WEEKS) return { tone: 'fresh', label: `${weeks} week${plural} ago` };
-  if (weeks < STALE_AT_WEEKS) return { tone: 'drifting', label: `${weeks} week${plural} since last session` };
+  if (weeks <= STALE_AT_WEEKS) return { tone: 'drifting', label: `${weeks} week${plural} since last session` };
   return { tone: 'stale', label: `${weeks} week${plural} since last session` };
 }

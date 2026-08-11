@@ -156,6 +156,8 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['baseline-review-prep-focus-items', doctorStaffId] });
       queryClient.invalidateQueries({ queryKey: ['doctor-focus-items', doctorStaffId] });
+      queryClient.invalidateQueries({ queryKey: ['prep-focus-moves', doctorStaffId] });
+      queryClient.invalidateQueries({ queryKey: ['capture-active-focus-moves', doctorStaffId] });
       toast({ title: status === 'parked' ? 'Parked for later' : 'Added as a Focus Move' });
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
@@ -265,7 +267,7 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
         </Button>
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            {firstName} hasn't finished their self-assessment yet — come back once it's complete.
+            {firstName} hasn't finished their self-assessment yet. Come back once it's complete.
           </CardContent>
         </Card>
       </div>
@@ -318,7 +320,7 @@ export function BaselineReviewPrep({ doctorStaffId, doctorName, onBack, onOpenCo
           </CardHeader>
           <CardContent className="space-y-2">
             {rankedGaps.length === 0 && (
-              <p className="text-sm text-muted-foreground">No meaningful gaps — your reads line up closely.</p>
+              <p className="text-sm text-muted-foreground">No meaningful gaps. Your reads line up closely.</p>
             )}
             {rankedGaps.map(r => {
               const doctorHigher = (r.self_score as number) > (r.observed_score as number);

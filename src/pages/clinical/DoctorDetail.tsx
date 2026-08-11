@@ -377,7 +377,7 @@ export default function DoctorDetail() {
         open={expandedAssessment === 'coach_baseline'}
         onOpenChange={(o) => !o && setExpandedAssessment(null)}
         title="Private baseline"
-        description="Your read of where this doctor stands. Visible only to clinical coaches."
+        description="Your read of where this doctor stands. This is visible only to clinical coaches."
       >
         <DoctorDetailBaseline
           coachAssessment={coachAssessment}

@@ -218,8 +218,10 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!doctorStaffId,
   });
 
-  // Fetch coach baseline items for coach scores
-  const isBaselineReview = (session?.session_type || 'baseline_review') === 'baseline_review';
+  // Fetch coach baseline items for coach scores. No default while the
+  // session query is in flight — defaulting to baseline_review briefly
+  // flashed the baseline nudge and review-prep button on follow-up agendas.
+  const isBaselineReview = session?.session_type === 'baseline_review';
   const { data: coachItems } = useQuery({
     queryKey: ['coach-baseline-items-for-prep', doctorStaffId, myStaff?.id],
     queryFn: async () => {
@@ -287,24 +289,27 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
   const showBaselineNudge =
     isBaselineReview && myCoachBaselineStatus !== undefined && myCoachBaselineStatus !== 'completed' && !baselineNudgeDismissed;
 
-  // Active Focus Moves + the doctor's latest reported progress on each —
-  // the standing "review these first" block for the coach's own prep.
-  const { data: activeFocusMoves } = useQuery({
-    queryKey: ['prep-active-focus-moves', doctorStaffId],
+  // Focus Moves for prep: active ones form the standing "review these
+  // first" block; draft/parked ones feed the "From your baseline review"
+  // recap on follow-up sessions.
+  const { data: workingFocusMoves } = useQuery({
+    queryKey: ['prep-focus-moves', doctorStaffId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('doctor_focus_items')
         .select(`
-          id, statement,
+          id, statement, status,
           pro_moves!doctor_focus_items_pro_move_id_fkey (action_statement)
         `)
         .eq('doctor_staff_id', doctorStaffId)
-        .eq('status', 'active');
+        .in('status', ['draft', 'parked', 'active']);
       if (error) throw error;
       return data || [];
     },
     enabled: !!doctorStaffId,
   });
+  const activeFocusMoves = (workingFocusMoves || []).filter((f: any) => f.status === 'active');
+  const draftOrParkedFocusMoves = (workingFocusMoves || []).filter((f: any) => f.status !== 'active');
 
   const { data: focusMoveUpdates } = useQuery({
     queryKey: ['prep-focus-move-updates', (activeFocusMoves || []).map(f => f.id).join(',')],
@@ -518,6 +523,15 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
       }
       setLoadedLastEditedAt(updated[0].last_edited_at);
 
+      // Push the fresh values into the cache. The app's global staleTime
+      // serves cached data on reopen, so without this a coach who saved and
+      // reopened within the window would hydrate the PRE-save agenda and the
+      // concurrency guard would then reject every save as a phantom conflict.
+      queryClient.setQueryData(['coaching-session', sessionId], (old: any) =>
+        old ? { ...old, coach_note: coachNote, status: 'director_prep_ready', last_edited_at: updated[0].last_edited_at, last_edited_by_staff_id: myStaffForOwnership?.id ?? null } : old);
+      queryClient.setQueryData(['session-selections', sessionId, 'coach'], selectedActions);
+      queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
+
       // Save prior action statuses if any exist
       if (priorExperiments && priorExperiments.length > 0 && Object.keys(priorActionStatuses).length > 0) {
         const statusArray = priorExperiments.map((exp: any, i: number) => ({
@@ -582,6 +596,14 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         throw new Error('Someone else saved changes to this session while you were editing. Reload to see their version before saving again.');
       }
       setLoadedLastEditedAt(updated[0].last_edited_at);
+
+      // Same cache-freshness write as publish: without it, reopening within
+      // the staleTime window hydrates the pre-save draft and the concurrency
+      // guard then blocks every save with a phantom conflict.
+      queryClient.setQueryData(['coaching-session', sessionId], (old: any) =>
+        old ? { ...old, coach_note: coachNote, last_edited_at: updated[0].last_edited_at, last_edited_by_staff_id: myStaffForOwnership?.id ?? null } : old);
+      queryClient.setQueryData(['session-selections', sessionId, 'coach'], selectedActions);
+      queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
     },
     onSuccess: () => {
       toast({ title: 'Draft saved' });
@@ -784,6 +806,27 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 </div>
               );
             })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* From your baseline review — draft/parked Focus Moves the coach
+          identified but hasn't activated yet (follow-up sessions only). */}
+      {!isBaselineReview && session && draftOrParkedFocusMoves.length > 0 && (
+        <Card className="border-dashed">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">From your baseline review</CardTitle>
+            <CardDescription>Identified but not yet active. Worth a look while you build this agenda.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {draftOrParkedFocusMoves.map((fm: any) => (
+              <div key={fm.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/20">
+                <span className="text-sm flex-1 min-w-0">{fm.pro_moves?.action_statement || 'Focus Move'}</span>
+                <Badge variant="secondary" className="text-2xs shrink-0">
+                  {fm.status === 'parked' ? 'Parked' : 'Draft'}
+                </Badge>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}

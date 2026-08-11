@@ -96,8 +96,8 @@ export function getDoctorJourneyStatus(
         const doctorNextAction: Record<string, string> = {
           scheduled: 'Your coach is setting up your next session',
           director_prep_ready: 'Your coach is finalizing the agenda',
-          doctor_prep_submitted: "You're prepped — waiting on the meeting",
-          meeting_pending: 'Summary ready — review and confirm',
+          doctor_prep_submitted: "You're prepped and ready for the meeting",
+          meeting_pending: 'Summary ready to review and confirm',
           doctor_confirmed: 'Completed',
           doctor_revision_requested: 'Your coach is reviewing your note',
         };

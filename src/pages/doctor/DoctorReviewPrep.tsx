@@ -466,9 +466,12 @@ export default function DoctorReviewPrep() {
                             size="sm"
                             className={`gap-1.5 text-xs ${isActive ? '' : opt.color}`}
                             onClick={() => {
+                              // Clicking the selected option un-selects it —
+                              // reporting is optional, so a mis-click must
+                              // not become a forced report.
                               setFocusMoveProgress(prev => ({
                                 ...prev,
-                                [fm.id]: { status: opt.value, note: prev[fm.id]?.note || '' },
+                                [fm.id]: { status: isActive ? null : opt.value, note: prev[fm.id]?.note || '' },
                               }));
                             }}
                           >

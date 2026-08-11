@@ -52,9 +52,14 @@ export function FocusMovesCard({ doctorStaffId }: Props) {
   });
 
   const invalidate = () => {
+    // Every surface that lists Focus Moves — a missed key plus the app's
+    // staleTime means a recently viewed screen serves the old list.
     queryClient.invalidateQueries({ queryKey: ['doctor-focus-items', doctorStaffId] });
     queryClient.invalidateQueries({ queryKey: ['my-active-focus-moves', doctorStaffId] });
     queryClient.invalidateQueries({ queryKey: ['baseline-review-prep-focus-items', doctorStaffId] });
+    queryClient.invalidateQueries({ queryKey: ['prep-focus-moves', doctorStaffId] });
+    queryClient.invalidateQueries({ queryKey: ['my-active-focus-moves-prep', doctorStaffId] });
+    queryClient.invalidateQueries({ queryKey: ['capture-active-focus-moves', doctorStaffId] });
   };
 
   const activateMutation = useMutation({
@@ -107,7 +112,7 @@ export function FocusMovesCard({ doctorStaffId }: Props) {
     if (active.length >= ACTIVE_SOFT_CAP) {
       toast({
         title: 'More than three Focus Moves is hard to focus on',
-        description: 'You can still activate this one — just a nudge, not a limit.',
+        description: 'You can still activate this one. Just a nudge, not a limit.',
       });
     }
     // If there's no statement yet, prompt for it inline before activating.
@@ -146,7 +151,7 @@ export function FocusMovesCard({ doctorStaffId }: Props) {
               autoFocus
               value={draftStatement}
               onChange={(e) => setDraftStatement(e.target.value)}
-              placeholder="Our starting point — what are we seeing, and why this one?"
+              placeholder="Our starting point: what are we seeing, and why this one?"
               className="text-sm min-h-[70px]"
             />
             <div className="flex gap-2">

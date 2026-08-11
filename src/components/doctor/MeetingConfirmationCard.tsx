@@ -34,11 +34,13 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
   });
 
   const { data: meetingRecord } = useQuery({
-    queryKey: ['meeting-record', sessionId],
+    queryKey: ['meeting-record-doctor', sessionId],
     queryFn: async () => {
+      // Deliberately not select('*'): raw_transcript lives on this row and
+      // is coach-side material — keep it off the doctor's client.
       const { data, error } = await supabase
         .from('coaching_meeting_records')
-        .select('*')
+        .select('session_id, summary, experiments, doctor_confirmed_at')
         .eq('session_id', sessionId)
         .maybeSingle();
       if (error) throw error;
@@ -77,7 +79,7 @@ export function MeetingConfirmationCard({ sessionId, onConfirmed }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coaching-session', sessionId] });
-      queryClient.invalidateQueries({ queryKey: ['meeting-record', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['meeting-record-doctor', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['my-coaching-sessions'] });
       toast({ title: 'All set!', description: 'You have confirmed receipt of your meeting summary.' });
       onConfirmed?.();

@@ -16,9 +16,13 @@ export default function DoctorCoachingHistory() {
     queryKey: ['my-coaching-sessions', staff?.id],
     queryFn: async () => {
       if (!staff?.id) return [];
+      // Select list must match DoctorHome's — both share the
+      // ['my-coaching-sessions', staffId] cache key, and whichever runs
+      // first serves the other, so differing column sets would leave one
+      // consumer reading fields the cached shape doesn't have.
       const { data, error } = await supabase
         .from('coaching_sessions')
-        .select('id, session_type, sequence_number, status, scheduled_at')
+        .select('id, session_type, sequence_number, status, scheduled_at, meeting_link, coach_note')
         .eq('doctor_staff_id', staff.id)
         .order('sequence_number', { ascending: false });
       // status is carried through to CompletedSessionCard so it can tell
@@ -61,11 +65,15 @@ function CompletedSessionCard({ session }: { session: { id: string; session_type
   const isConfirmed = session.status === 'doctor_confirmed';
 
   const { data: meetingRecord } = useQuery({
-    queryKey: ['meeting-record', session.id],
+    // Distinct from the coach-side ['meeting-record'] key: this one holds a
+    // narrowed row (no raw_transcript), the coach side selects *.
+    queryKey: ['meeting-record-doctor', session.id],
     queryFn: async () => {
+      // Deliberately not select('*'): raw_transcript lives on this row and
+      // is coach-side material — keep it off the doctor's client.
       const { data, error } = await supabase
         .from('coaching_meeting_records')
-        .select('*')
+        .select('session_id, summary, experiments, doctor_confirmed_at')
         .eq('session_id', session.id)
         .maybeSingle();
       if (error) throw error;
@@ -89,7 +97,7 @@ function CompletedSessionCard({ session }: { session: { id: string; session_type
               {isConfirmed ? (
                 <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
               ) : (
-                <Clock className="h-5 w-5 text-amber-500 shrink-0" />
+                <Clock className="h-5 w-5 shrink-0" style={{ color: 'hsl(var(--status-pending))' }} />
               )}
               <div>
                 <p className="text-sm font-medium">{typeLabel}</p>
@@ -97,8 +105,8 @@ function CompletedSessionCard({ session }: { session: { id: string; session_type
                   {session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}
                 </p>
                 {!isConfirmed && (
-                  <p className="text-xs text-amber-600 dark:text-amber-500 font-medium mt-0.5">
-                    Summary ready — confirm to lock it in
+                  <p className="text-xs font-medium mt-0.5" style={{ color: 'hsl(var(--status-pending))' }}>
+                    Summary ready to review
                   </p>
                 )}
               </div>

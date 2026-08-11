@@ -261,14 +261,96 @@ created_at. RLS: owner-only read/write (widen later if Q14 says so).
   on file" section on the record, coach/CD-visible only, not doctor-visible.
 2. `notify-meeting-summary` edge function: require the caller to be an
   assigned coach FOR THAT DOCTOR (mirror invite-to-schedule's check).
-3. Any confirmed findings from the 2026-08-11 flow re-audit get folded in
-  here once triaged.
+3. Findings from the 2026-08-11 flow re-audit, triaged. Verified against the
+  live DB and code on 2026-08-11 unless marked otherwise.
+
+  **Blockers (verified):**
+  - **G3a. Edit Agenda silently wipes the existing agenda.**
+    `DirectorPrepComposer.tsx:324` hydrates `selectedActions`/`coachNote` in
+    a `useState` initializer, which runs once before the session and
+    existing-selections queries resolve and never re-runs. Opening a
+    published agenda shows an empty editor; Save draft or Send then deletes
+    the prior selections and overwrites `coach_note`. Fix: proper effect
+    hydration keyed on data arrival, plus don't-clobber guards.
+  - **G3b. Meeting-record write paths contradict each other.** Live DB has
+    NO unique constraint on `coaching_meeting_records.session_id` (verified;
+    0 duplicate rows so far). `DirectorPrepComposer` upserts with
+    `onConflict: 'session_id'`, which errors 42P10 without the constraint
+    (after the session status update has already succeeded: half-published
+    session). `MeetingOutcomeCapture` INSERTs unconditionally, so duplicates
+    are possible, which would break every `.maybeSingle()` reader. Fix: add
+    the unique constraint (safe now, zero duplicates) and make capture an
+    upsert.
+  - **G3c. RLS: any authenticated staff can create and manage a coaching
+    session for any doctor, cross-org**, by naming themselves coach.
+    Verified live: "Coach can manage own sessions" is FOR ALL with
+    `with_check` null, so WITH CHECK defaults to the USING clause
+    (`coach_staff_id` = self), which any staff row satisfies on INSERT.
+    Fix: WITH CHECK requiring self AND (clinical director in-org, assigned
+    doctor coach for that doctor, or super admin).
+  - **G3d. `invite-to-schedule` doesn't validate the session belongs to the
+    doctor** (it flips whatever `session_id` is passed, via service role,
+    no status guard), and its CD check has no org scope. Fix: verify
+    session.doctor_staff_id matches, and org-scope the CD check.
+  - **G3e. `notify-meeting-summary`** (the known gap, worse than thought):
+    qualifies any caller who coaches anyone, and also anyone with
+    `staff.is_coach` (RDA-line coaches). Fix: require CD-in-org, assigned
+    coach for that session's doctor, or super admin.
+
+  **Design decision needed (verified unreachable):**
+  - **G3f. The revision loop is a promise with no implementation.** The
+    summary email and capture copy tell doctors they can request a
+    revision; no UI writes `doctor_revision_requested` or
+    `doctor_revision_note`, and if the status ever occurred both sides
+    dead-end (doctor gets an editable prep form whose resubmit is blocked
+    by RLS status lists; coach gets "Start Meeting"). Either build the
+    small revision loop (doctor: "request a change" with a note; coach:
+    respond and re-notify) or remove the promise from the email. See Q17.
+
+  **Smaller confirmed defects (fix opportunistically or alongside D/E):**
+  - **G3g.** Capture overwrites `scheduled_at` with now-at-writeup, so "Met
+    on" dates are wrong; and `MeetingConfirmationCard` formats a null
+    `scheduled_at` as Jan 1 1970. Fixing this properly merges into E
+    (cadence), which makes dates first-class.
+  - **G3h.** Prior-action resurfacing asymmetry: CD prep pulls only
+    `doctor_confirmed` prior sessions; doctor prep also includes
+    `meeting_pending`. An unconfirmed summary hides its action steps from
+    the coach's next agenda while the doctor is asked to report on them.
+    Align both on confirmed + meeting_pending. (Supersedes nothing; D's
+    focus items will replace this mechanic longer-term.)
+  - **G3i.** `prior_action_status` is written at prep but displayed nowhere
+    (only reader is the orphaned `DoctorGrowthTimeline`). Resolved by D.
+  - **G3j.** `invite-to-schedule`'s create-session fallback writes
+    `session_type: 'followup'` while all client checks use `'follow_up'`.
+    Path appears uncalled today; fix the string.
+  - **G3k.** Experiments max-3 is client-side only; add a DB CHECK when
+    convenient.
+  - **G3l.** DoctorHome "Current Focus" merges experiments from ALL
+    confirmed and pending sessions, accumulating superseded action steps.
+    Largely resolved by D (focus items become the doctor's current-focus
+    source); interim fix: latest session only.
+  - **G3m.** Doctor history counts `meeting_pending` as completed with a
+    checkmark; and "View Full Record" on a confirmed session routes to a
+    prep view that shows less than the history card itself.
+
+  **UX quick wins (batch with A):** "Start Meeting" label shows while
+  status is "Awaiting doctor's response"; CD-voiced next-action strings
+  reused in the doctor's own status pill ("Schedule next session" shown to
+  the doctor about themselves); invite email default says "Select 1-2 Pro
+  Moves" while the UI enforces exactly 1; coach side says "Check-in N",
+  doctor side "Follow-up N" for the same session; status config hardcodes
+  Tailwind colors against the token rule; dead components to delete
+  (`DoctorNextActionPanel`, `MeetingScheduleDialog`, `NotifyDoctorDialog`,
+  `DoctorGrowthTimeline`); chevron-less rows still expand.
 
 **Questions for John:**
 - **Q15.** Transcripts may name patients. Comfortable storing them in the
   DB under the same RLS as meeting records (UK org makes this a GDPR
   question eventually), or would you rather we not persist them until
   there's a retention policy? Middle option: persist for Alcan orgs only.
+- **Q17.** The revision loop (G3f): build the small honest version (doctor
+  can request a change with a note, coach responds and re-notifies), or
+  strip the promise from the email and keep confirm-only?
 
 ## H. Self-directed coach learning resources
 

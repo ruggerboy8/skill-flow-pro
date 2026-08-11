@@ -118,7 +118,11 @@ export function FocusMovesCard({ doctorStaffId }: Props) {
     activateMutation.mutate({ id: item.id, statement: item.statement });
   };
 
-  const ItemRow = ({ item, showActivate }: { item: FocusMove; showActivate: boolean }) => {
+  // Plain render function, NOT a nested component: defining a component
+  // inside FocusMovesCard gives it a new identity on every render, so React
+  // unmounts/remounts each row whenever parent state changes — which made
+  // the statement Textarea drop focus after every keystroke.
+  const renderItemRow = (item: FocusMove, showActivate: boolean) => {
     const pm = item.pro_moves;
     const isEditing = editingId === item.id;
     const isRetiring = retiringId === item.id;
@@ -229,7 +233,7 @@ export function FocusMovesCard({ doctorStaffId }: Props) {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
               <Sparkles className="h-3 w-3" /> Active
             </p>
-            {active.map(item => <ItemRow key={item.id} item={item} showActivate={false} />)}
+            {active.map(item => <div key={item.id}>{renderItemRow(item, false)}</div>)}
           </div>
         )}
 
@@ -238,7 +242,7 @@ export function FocusMovesCard({ doctorStaffId }: Props) {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Draft &amp; Parked
             </p>
-            {draftAndParked.map(item => <ItemRow key={item.id} item={item} showActivate />)}
+            {draftAndParked.map(item => <div key={item.id}>{renderItemRow(item, true)}</div>)}
           </div>
         )}
 

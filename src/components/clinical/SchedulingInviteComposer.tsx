@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -74,6 +78,8 @@ export function SchedulingInviteComposer({
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [myBaselineIncomplete, setMyBaselineIncomplete] = useState(false);
+  const [showBaselineConfirm, setShowBaselineConfirm] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -90,6 +96,25 @@ export function SchedulingInviteComposer({
       }
     })();
   }, [user]);
+
+  // Strong-but-skippable confirm when sending the baseline-review invite
+  // before this coach's own observed baseline is done — mirrors the nudge
+  // in DirectorPrepComposer, at the last point the coach can still pause.
+  useEffect(() => {
+    if (!open || sessionType !== 'baseline_review' || !myStaff?.id || !doctorStaffId) {
+      setMyBaselineIncomplete(false);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('coach_baseline_assessments')
+        .select('status')
+        .eq('doctor_staff_id', doctorStaffId)
+        .eq('coach_staff_id', myStaff.id)
+        .maybeSingle();
+      setMyBaselineIncomplete(data?.status !== 'completed');
+    })();
+  }, [open, sessionType, myStaff?.id, doctorStaffId]);
 
   useEffect(() => {
     if (open) loadTemplate();
@@ -257,12 +282,39 @@ export function SchedulingInviteComposer({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={sendInvite} disabled={sending} className="gap-2">
+          <Button
+            onClick={() => (myBaselineIncomplete ? setShowBaselineConfirm(true) : sendInvite())}
+            disabled={sending}
+            className="gap-2"
+          >
             <Mail className="h-4 w-4" />
             {sending ? 'Sending…' : 'Send Invite'}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog open={showBaselineConfirm} onOpenChange={setShowBaselineConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send without your baseline?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You're scheduling the baseline review before finishing your own assessment of{' '}
+              {doctorName}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Finish baseline first</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowBaselineConfirm(false);
+                sendInvite();
+              }}
+            >
+              Send anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

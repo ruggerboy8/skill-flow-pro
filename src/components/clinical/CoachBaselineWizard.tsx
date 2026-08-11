@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw, FileText, Sparkles } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw, FileText, Sparkles, HelpCircle } from 'lucide-react';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
 import {
@@ -25,6 +25,44 @@ const SCORE_CONFIG = [
   { value: 3, selected: 'bg-blue-100 border-blue-400 text-blue-800' },
   { value: 4, selected: 'bg-emerald-100 border-emerald-400 text-emerald-800' },
 ];
+
+const COACH_BASELINE_INTRO_DISMISSED_KEY = (doctorStaffId: string) =>
+  `coach-baseline-intro-dismissed:${doctorStaffId}`;
+
+// Shared with the compact "how to do this well" panel and the forced
+// first-run screen — same words, two places to read them.
+function CoachBaselineGuidance() {
+  return (
+    <div className="space-y-4 text-sm leading-relaxed text-muted-foreground">
+      <p>
+        <span className="font-medium text-foreground">Why this matters.</span>{' '}
+        Your read of this doctor is what grounds your first conversation in observation instead
+        of self-report. You're not grading them. You're preparing yourself.
+      </p>
+      <p>
+        <span className="font-medium text-foreground">The gap runs both directions.</span>{' '}
+        Experienced doctors often rate themselves high on habits they've stopped noticing.
+        Newer doctors often rate themselves low on skills they already have. Your job changes
+        with the direction: sometimes you'll gently introduce reality, sometimes you'll build
+        confidence with evidence.
+      </p>
+      <p>
+        <span className="font-medium text-foreground">Rate only what you've seen.</span>{' '}
+        If you haven't observed a Pro Move, mark it N/A and plan to watch for it chairside.
+        A guess helps no one.
+      </p>
+    </div>
+  );
+}
+
+function CoachBaselineTip() {
+  return (
+    <p className="text-sm text-muted-foreground">
+      In the conversation itself, name the Pro Move you want to talk about, not the number
+      you gave it. The number invites debate. The behavior invites conversation.
+    </p>
+  );
+}
 
 interface DomainGroup {
   domain_id: number;
@@ -51,6 +89,22 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const [activeActionId, setActiveActionId] = useState<number | null>(null);
   const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+
+  // "Before you start" guidance — shown once per doctor before the coach's
+  // first rating, re-openable any time via the help icon in the header.
+  const [introDismissed, setIntroDismissed] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem(COACH_BASELINE_INTRO_DISMISSED_KEY(doctorStaffId)) === '1'
+  );
+  const [showGuidancePanel, setShowGuidancePanel] = useState(false);
+  const dismissIntro = useCallback(() => {
+    setIntroDismissed(true);
+    try {
+      localStorage.setItem(COACH_BASELINE_INTRO_DISMISSED_KEY(doctorStaffId), '1');
+    } catch {
+      // localStorage can throw in private browsing — non-critical, the
+      // intro just reappears next time, which is a fine fallback.
+    }
+  }, [doctorStaffId]);
 
   // Track which pro-move note textareas are open
   const [openNotes, setOpenNotes] = useState<Set<number>>(new Set());
@@ -528,6 +582,39 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
 
   const isProcessing = isTranscribing || isMappingNotes;
 
+  // Forced first-run screen: shown once, before this coach has rated
+  // anything for this doctor. Not a gate on the wizard itself (R1.3
+  // removed the scheduling gate) — just guidance shown before the first
+  // rating instead of buried in a panel nobody opens.
+  const showForcedIntro = !isComplete && ratedCount === 0 && !introDismissed;
+
+  if (showForcedIntro) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <Button variant="ghost" onClick={onBack} className="gap-2">
+          <ArrowLeft className="h-4 w-4" /> Back to Doctor Detail
+        </Button>
+        <Card>
+          <CardContent className="pt-6 space-y-5">
+            <div>
+              <h1 className="text-xl font-semibold">Before you start</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Private Assessment: {doctorName}
+              </p>
+            </div>
+            <CoachBaselineGuidance />
+            <div className="pt-2 border-t">
+              <CoachBaselineTip />
+            </div>
+            <Button size="lg" className="w-full" onClick={dismissIntro}>
+              Start rating
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Button variant="ghost" onClick={onBack} className="gap-2">
@@ -544,6 +631,15 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
               <CheckCircle2 className="h-3 w-3" /> Complete
             </span>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 ml-auto text-muted-foreground"
+            onClick={() => setShowGuidancePanel(v => !v)}
+            title="How to do this well"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           {isComplete
@@ -566,6 +662,20 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
             )}
           </div>
         )}
+
+        <Collapsible open={showGuidancePanel} onOpenChange={setShowGuidancePanel}>
+          <CollapsibleContent className="pt-3">
+            <Card className="bg-muted/30">
+              <CardContent className="pt-4 space-y-4">
+                <h3 className="text-sm font-semibold">How to do this well</h3>
+                <CoachBaselineGuidance />
+                <div className="pt-2 border-t">
+                  <CoachBaselineTip />
+                </div>
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <div className="space-y-2">

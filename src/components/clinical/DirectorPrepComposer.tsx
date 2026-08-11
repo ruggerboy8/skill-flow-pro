@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { DomainBadge } from '@/components/ui/domain-badge';
-import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDown, Filter, ShieldAlert, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
@@ -24,6 +24,7 @@ interface Props {
   doctorName: string;
   doctorEmail: string;
   onBack: () => void;
+  onOpenCoachBaseline?: () => void;
 }
 
 const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
@@ -55,7 +56,7 @@ function ScoreCircle({ score, label }: { score: number | null | undefined; label
   );
 }
 
-export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffId, doctorName, doctorEmail, onBack }: Props) {
+export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffId, doctorName, doctorEmail, onBack, onOpenCoachBaseline }: Props) {
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
   const [coachNote, setCoachNote] = useState('');
@@ -261,6 +262,28 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     acc[item.action_id] = item.rating;
     return acc;
   }, {} as Record<number, number | null>);
+
+  // Specifically THIS coach's own baseline status (not "any completed
+  // assessment", which coachItems above falls back to) — the callout is
+  // about whether *you* did your part before building the baseline-review
+  // agenda, per the guidance in the baseline wizard.
+  const { data: myCoachBaselineStatus } = useQuery({
+    queryKey: ['my-coach-baseline-status', doctorStaffId, myStaff?.id],
+    queryFn: async () => {
+      if (!myStaff?.id) return null;
+      const { data } = await supabase
+        .from('coach_baseline_assessments')
+        .select('status')
+        .eq('doctor_staff_id', doctorStaffId)
+        .eq('coach_staff_id', myStaff.id)
+        .maybeSingle();
+      return data?.status ?? null;
+    },
+    enabled: !!doctorStaffId && !!myStaff?.id && isBaselineReview,
+  });
+  const [baselineNudgeDismissed, setBaselineNudgeDismissed] = useState(false);
+  const showBaselineNudge =
+    isBaselineReview && myCoachBaselineStatus !== undefined && myCoachBaselineStatus !== 'completed' && !baselineNudgeDismissed;
 
   // Fetch existing selections if editing
   const { data: existingSelections, isLoading: existingSelectionsLoading } = useQuery({
@@ -646,6 +669,35 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
           </div>
         );
       })()}
+
+      {/* Nudge: this coach's own baseline isn't done yet, and this is the
+          baseline-review session. Skippable — R1.3 deliberately removed
+          the hard scheduling gate — but prominent, since the observed
+          baseline is what makes this agenda concrete rather than guessed. */}
+      {showBaselineNudge && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="py-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1 space-y-2">
+              <p className="text-sm font-medium">Your baseline isn't done</p>
+              <p className="text-sm text-muted-foreground">
+                Your observed baseline is what makes the first conversation concrete. Finish it
+                before you build this agenda.
+              </p>
+              <div className="flex gap-2 pt-1">
+                {onOpenCoachBaseline && (
+                  <Button size="sm" onClick={onOpenCoachBaseline}>
+                    Open baseline
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" onClick={() => setBaselineNudgeDismissed(true)}>
+                  Continue anyway
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Prior Experiments (for follow-ups) */}
       {priorExperiments && priorExperiments.length > 0 && (

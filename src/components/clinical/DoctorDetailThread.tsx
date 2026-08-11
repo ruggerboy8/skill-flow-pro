@@ -137,6 +137,7 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
         doctorName={doctorName}
         doctorEmail={doctorEmail}
         onBack={() => setPrepSessionId(null)}
+        onOpenCoachBaseline={onStartCoachWizard}
       />
     );
   }

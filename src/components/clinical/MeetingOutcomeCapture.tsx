@@ -38,6 +38,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const [transcriptMode, setTranscriptMode] = useState(false);
   const [rawTranscript, setRawTranscript] = useState('');
   const [aiProcessing, setAiProcessing] = useState(false);
+  const [nextSessionDate, setNextSessionDate] = useState('');
 
   const { data: session } = useQuery({
     queryKey: ['coaching-session', sessionId],
@@ -189,6 +190,37 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
         .update(statusPayload)
         .eq('id', sessionId);
       if (statusErr) throw statusErr;
+
+      // Best case, the coach leaves this meeting with the next one already
+      // on the calendar. Optional — skip by leaving the date blank.
+      if (nextSessionDate && session?.doctor_staff_id && session?.coach_staff_id) {
+        const { data: maxSeqRow } = await supabase
+          .from('coaching_sessions')
+          .select('sequence_number')
+          .eq('doctor_staff_id', session.doctor_staff_id)
+          .order('sequence_number', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const nextSeq = (maxSeqRow?.sequence_number ?? session.sequence_number ?? 0) + 1;
+        // Noon UTC avoids the date shifting a calendar day when displayed
+        // in a local timezone — this is a date the coach picked, not a
+        // precise meeting time.
+        const { error: nextSessionErr } = await supabase
+          .from('coaching_sessions')
+          .insert({
+            doctor_staff_id: session.doctor_staff_id,
+            coach_staff_id: session.coach_staff_id,
+            session_type: 'follow_up',
+            sequence_number: nextSeq,
+            status: 'scheduled',
+            scheduled_at: `${nextSessionDate}T12:00:00.000Z`,
+          });
+        if (nextSessionErr) {
+          // Don't fail the whole submit over this — the meeting summary is
+          // the important write; the coach can add a session manually.
+          console.warn('Failed to create next session:', nextSessionErr);
+        }
+      }
 
       // Send email notification to doctor (fire-and-forget)
       try {
@@ -442,6 +474,26 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           />
         </CardContent>
       </Card>
+
+      {/* Next Session Date */}
+      {!isReadOnly && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">When will you meet next?</CardTitle>
+            <CardDescription>
+              Best case, you leave this meeting with the next one on the calendar. Skip if you're scheduling later.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Input
+              type="date"
+              value={nextSessionDate}
+              onChange={(e) => setNextSessionDate(e.target.value)}
+              className="max-w-xs"
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Submit */}
       {!isReadOnly && (

@@ -10,6 +10,7 @@ import { ArrowLeft, MapPin, ChevronDown, ClipboardCheck, ShieldCheck, CheckCircl
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { getDoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
+import { CadenceIndicator } from '@/components/clinical/CadenceIndicator';
 import { drName } from '@/lib/doctorDisplayName';
 
 
@@ -115,6 +116,26 @@ export default function DoctorDetail() {
     enabled: !!staffId,
   });
 
+  // Cadence pulse for the header — same "time since last session" signal as
+  // the roster, computed from this doctor's own sessions.
+  const sessionIds = (sessions || []).map((s: any) => s.id);
+  const { data: lastSessionAt } = useQuery({
+    queryKey: ['doctor-last-session', staffId, sessionIds.join(',')],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('coaching_meeting_records')
+        .select('submitted_at')
+        .in('session_id', sessionIds)
+        .not('submitted_at', 'is', null)
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.submitted_at ?? null;
+    },
+    enabled: sessionIds.length > 0,
+  });
+
   const isLoading = doctorLoading || baselineLoading;
 
   if (isLoading) {
@@ -179,6 +200,12 @@ export default function DoctorDetail() {
               currentLocationId={(doctor as any).primary_location_id ?? null}
               currentLocationName={(doctor.locations as any)?.name ?? null}
             />
+            {sessionIds.length > 0 && (
+              <>
+                <span className="text-muted-foreground/50">·</span>
+                <CadenceIndicator lastSessionAt={lastSessionAt} />
+              </>
+            )}
           </p>
           {journeyStatus.nextAction && (
             <p className="text-sm text-muted-foreground mt-1">

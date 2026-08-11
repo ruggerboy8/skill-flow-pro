@@ -18,6 +18,7 @@ import { buildOrganizationStaffScopeFilter } from '@/lib/clinicalDoctorScope';
 
 import { getDoctorJourneyStatus, type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
+import { CadenceIndicator } from '@/components/clinical/CadenceIndicator';
 
 interface DoctorRow {
   id: string;
@@ -27,6 +28,7 @@ interface DoctorRow {
   location_name: string | null;
   created_at: string;
   journeyStatus: DoctorJourneyStatus;
+  lastSessionAt: string | null;
 }
 
 type FilterValue = 'all' | 'needs_my_action' | 'waiting_on_doctor';
@@ -108,11 +110,34 @@ export default function DoctorManagement() {
 
       const baselineMap = new Map(baselinesRes.data?.map(b => [b.doctor_staff_id, b]) || []);
       const coachBaselineMap = new Map(coachBaselinesRes.data?.map(b => [b.doctor_staff_id, b]) || []);
-      
+
       const sessionsMap = new Map<string, typeof sessionsRes.data>();
       for (const s of sessionsRes.data || []) {
         if (!sessionsMap.has(s.doctor_staff_id)) sessionsMap.set(s.doctor_staff_id, []);
         sessionsMap.get(s.doctor_staff_id)!.push(s);
+      }
+
+      // Cadence pulse: max meeting-record submitted_at per doctor, via
+      // their sessions. Purely informational — no gate, just a nudge on
+      // the roster when a pair has gone quiet.
+      const allSessionIds = (sessionsRes.data || []).map(s => s.id);
+      const sessionIdToDoctorId = new Map((sessionsRes.data || []).map(s => [s.id, s.doctor_staff_id]));
+      const lastSessionMap = new Map<string, string>();
+      if (allSessionIds.length > 0) {
+        const { data: recordsData, error: recordsErr } = await supabase
+          .from('coaching_meeting_records')
+          .select('session_id, submitted_at')
+          .in('session_id', allSessionIds)
+          .not('submitted_at', 'is', null);
+        if (recordsErr) throw recordsErr;
+        for (const r of recordsData || []) {
+          const doctorId = sessionIdToDoctorId.get(r.session_id);
+          if (!doctorId || !r.submitted_at) continue;
+          const existing = lastSessionMap.get(doctorId);
+          if (!existing || new Date(r.submitted_at) > new Date(existing)) {
+            lastSessionMap.set(doctorId, r.submitted_at);
+          }
+        }
       }
 
       return (staffData || []).map(s => {
@@ -126,10 +151,6 @@ export default function DoctorManagement() {
           (s as any).baseline_released_at,
         );
 
-        const upcomingSessions = sessions
-          .filter(sess => ['scheduled', 'director_prep_ready', 'doctor_prep_submitted'].includes(sess.status))
-          .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
-
         return {
           id: s.id,
           user_id: s.user_id,
@@ -138,7 +159,7 @@ export default function DoctorManagement() {
           location_name: (s.locations as any)?.name || null,
           created_at: s.created_at || '',
           journeyStatus,
-          
+          lastSessionAt: lastSessionMap.get(s.id) || null,
         };
       });
     },
@@ -315,6 +336,7 @@ export default function DoctorManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Stage</TableHead>
+                  <TableHead>Last Session</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
@@ -339,6 +361,9 @@ export default function DoctorManagement() {
                     </TableCell>
                     <TableCell>
                       <DoctorJourneyStatusPill status={doctor.journeyStatus} />
+                    </TableCell>
+                    <TableCell>
+                      <CadenceIndicator lastSessionAt={doctor.lastSessionAt} />
                     </TableCell>
                     <TableCell>
                       <InlineAction stage={doctor.journeyStatus.stage} doctorId={doctor.id} navigate={navigate} />

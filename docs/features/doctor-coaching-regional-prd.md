@@ -1,6 +1,17 @@
 # Regional Clinical Coach PRD
 
-**Status:** v0.1 draft, 2026-08-11. Companion to
+**Status:** v0.2, 2026-08-11. ALL QUESTIONS ANSWERED by John 2026-08-11;
+decisions folded into `doctor-coaching-regional-build-instructions.md`,
+which is now the build source of truth. Summary of answers: Q1 approved;
+Q2 no visible label; Q3 approved; Q4 strong skippable callout plus a
+confirm dialog on invite-send, no hard gate; Q5 confirmed coach-eyes-only
+(and coaches advised to name the Pro Move, not the rating); Q6 approved
+(parked status); Q7 default "Focus Move" / "Our starting point"; Q8 no
+doctor confirmation step; Q9 Pro Move always required; Q10 confirmed;
+Q11 approved; Q12 CDs and assigned coaches; Q13 approved; Q14
+coach-private; Q15 persist everywhere; Q16 deferred (coaching guide not in
+today's build); Q17 remove the promise, confirm-only, minimize loops.
+Companion to
 `doctor-coaching-regional-adjustments.md` (the agreed recommendations; that
 doc holds context and decisions, this one holds build specs).
 **Working method:** piece by piece, in the sequence at the bottom. Each

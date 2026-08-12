@@ -82,7 +82,7 @@ interface UseStaffProfileOptions {
 
 export function useStaffProfile(options: UseStaffProfileOptions = {}) {
   const { redirectToSetup = true, showErrorToast = true } = options;
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { overrides } = useSim();
@@ -235,9 +235,16 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
         user_capabilities: caps,
       } as StaffProfile;
     },
-    enabled: !!user || !!masqueradeStaffId,
+    // Wait for a real session before querying. Firing while the access token
+    // is still being restored sends an anonymous request, RLS returns zero
+    // rows (HTTP 200, empty), and we'd wrongly conclude "no staff profile".
+    enabled: (!!user && !!session?.access_token) || !!masqueradeStaffId,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    retry: false, // Don't retry on error - likely a missing profile
+    // A missing row right after sign-in is usually a token/propagation race,
+    // not a genuinely missing profile — retry a few times before giving up.
+    retry: (failureCount, error: any) =>
+      error?.message === 'No staff profile found' && failureCount < 3,
+    retryDelay: (attempt) => 400 * (attempt + 1),
   });
 
   // Handle errors via useEffect (React Query v5 pattern)

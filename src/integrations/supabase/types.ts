@@ -448,6 +448,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_org_default: boolean
+          organization_id: string | null
           session_type: string
           staff_id: string
           template_html: string
@@ -456,6 +458,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_org_default?: boolean
+          organization_id?: string | null
           session_type: string
           staff_id: string
           template_html?: string
@@ -464,12 +468,21 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_org_default?: boolean
+          organization_id?: string | null
           session_type?: string
           staff_id?: string
           template_html?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "coaching_agenda_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "coaching_agenda_templates_staff_id_fkey"
             columns: ["staff_id"]

@@ -548,7 +548,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                 <SelectTrigger className="h-8 text-xs text-muted-foreground">
                   <SelectValue placeholder="Which Pro Move is this about? (optional)" />
                 </SelectTrigger>
-                <SelectContent className="max-w-[calc(100vw-4rem)] sm:max-w-lg">
+                <SelectContent className="max-w-[calc(100vw-3rem)] sm:max-w-lg [&_[data-radix-select-viewport]]:max-w-none [&_[data-radix-select-viewport]]:w-[min(28rem,calc(100vw-3rem))]">
                   <SelectItem value="none">No Pro Move link</SelectItem>
                   {slatedMoves.length > 0 && (
                     <SelectGroup>

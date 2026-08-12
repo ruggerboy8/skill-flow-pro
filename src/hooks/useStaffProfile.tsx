@@ -80,6 +80,10 @@ interface UseStaffProfileOptions {
   showErrorToast?: boolean;  // Default true - show toast on error
 }
 
+// Shared across every mounted consumer of the hook so one failed fetch cannot
+// stack up a dozen identical toasts.
+let lastProfileErrorToastAt = 0;
+
 export function useStaffProfile(options: UseStaffProfileOptions = {}) {
   const { redirectToSetup = true, showErrorToast = true } = options;
   const { user, session } = useAuth();

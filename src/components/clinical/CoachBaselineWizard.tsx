@@ -84,7 +84,6 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const [isComplete, setIsComplete] = useState(false);
   const [activeActionId, setActiveActionId] = useState<number | null>(null);
   const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false); // retained: cleared by handleResave
 
   // "Before you start" guidance — shown once per doctor before the coach's
   // first rating, re-openable any time via the help icon in the header.
@@ -565,7 +564,6 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       setInitialSnapshot(JSON.stringify(ratings));
       toast({ title: 'Changes saved', description: 'Your updated assessment has been saved.' });
     }
-    setShowSaveConfirm(false);
     onBack();
   }, [assessmentId, ratings, queryClient, toast, onBack]);
 

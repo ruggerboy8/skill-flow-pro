@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { Link } from 'react-router-dom';
 import { ClipboardCheck, CheckCircle2, Eye, FileText, Sparkles, Target } from 'lucide-react';
+import { DomainBadge } from '@/components/ui/domain-badge';
 import { format } from 'date-fns';
 import { drName } from '@/lib/doctorDisplayName';
 import { formatInTimeZone } from 'date-fns-tz';

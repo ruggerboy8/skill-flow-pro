@@ -90,10 +90,11 @@ export function ActionStepsCard({ doctorStaffId }: Props) {
             {step.description && (
               <p className="text-xs text-muted-foreground whitespace-pre-wrap">{step.description}</p>
             )}
-            {step.proMoveStatement && (
-              <Badge variant="secondary" className="text-2xs mt-1">
-                {step.proMoveStatement}
-              </Badge>
+            {step.proMove && (
+              <div className="flex items-start gap-2 mt-1">
+                <DomainBadge domain={step.proMove.domain} className="mt-0.5" />
+                <span className="text-xs text-muted-foreground">{step.proMove.statement}</span>
+              </div>
             )}
           </div>
         ))}

@@ -102,12 +102,16 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pro_moves')
-        .select('action_id, action_statement')
+        .select('action_id, action_statement, competencies!pro_moves_competency_id_fkey(domains!competencies_domain_id_fkey(domain_name))')
         .eq('role_id', 4)
         .eq('active', true)
         .order('action_id');
       if (error) throw error;
-      return data || [];
+      return (data || []).map((m: any) => ({
+        action_id: m.action_id,
+        action_statement: m.action_statement,
+        domain_name: m.competencies?.domains?.domain_name || 'Unknown',
+      }));
     },
   });
 
@@ -125,9 +129,19 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const slatedMoves = allTopics.map(sel => ({
     action_id: sel.action_id,
     statement: (sel.pro_moves as any)?.action_statement || `Action #${sel.action_id}`,
+    domain_name: (sel.pro_moves as any)?.competencies?.domains?.domain_name || 'Unknown',
   }));
   const slatedIds = new Set(slatedMoves.map(m => m.action_id));
   const otherMoves = (doctorProMoves || []).filter(m => !slatedIds.has(m.action_id));
+
+  // Group the remaining library by domain so the dropdown reads as
+  // colour-coded sections while scrolling.
+  const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+  const otherMovesByDomain = DOMAIN_ORDER
+    .map(domain => ({ domain, moves: otherMoves.filter(m => m.domain_name === domain) }))
+    .concat([{ domain: 'Other', moves: otherMoves.filter(m => !DOMAIN_ORDER.includes(m.domain_name)) }])
+    .filter(g => g.moves.length > 0);
+
 
   const addExperiment = () => {
     if (experiments.length >= 3) {

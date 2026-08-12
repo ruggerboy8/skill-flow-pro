@@ -315,8 +315,14 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   // doctor_confirmed. With the upsert write path, a re-submit there would
   // overwrite the finished record and re-email the doctor — so any
   // non-capturable status renders read-only.
-  const statusAllowsCapture = ['scheduling_invite_sent', 'doctor_prep_submitted', 'doctor_revision_requested'].includes(session.status);
-  const isReadOnly = (myStaff?.id ? session.coach_staff_id !== myStaff.id : false) || !statusAllowsCapture;
+  // The owning coach can still edit and re-share a summary they've already
+  // sent (typos, missed action steps) — the write path is an upsert, so a
+  // second submit updates the record rather than duplicating it. It locks
+  // once the doctor has confirmed.
+  const statusAllowsCapture = ['scheduling_invite_sent', 'doctor_prep_submitted', 'doctor_revision_requested', 'meeting_pending'].includes(session.status);
+  const notMyySession = myStaff?.id ? session.coach_staff_id !== myStaff.id : false;
+  const isReadOnly = notMyySession || !statusAllowsCapture;
+  const isResubmit = session.status === 'meeting_pending';
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -326,7 +332,9 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-xl font-bold">{isReadOnly ? 'Meeting Outcome (Read Only)' : 'Capture Meeting Outcome'}</h2>
+          <h2 className="text-xl font-bold">
+            {isReadOnly ? 'Meeting Outcome (Read Only)' : isResubmit ? 'Edit Meeting Outcome' : 'Capture Meeting Outcome'}
+          </h2>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
             <Calendar className="h-3.5 w-3.5" />
             {session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}
@@ -336,7 +344,12 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           {isReadOnly && (
             <Badge variant="secondary" className="text-xs mt-1 gap-1">
               <ShieldAlert className="h-3 w-3" />
-              Managed by another coach
+              {notMyySession ? 'Managed by another coach' : 'Locked — the doctor has confirmed this summary'}
+            </Badge>
+          )}
+          {!isReadOnly && isResubmit && (
+            <Badge variant="secondary" className="text-xs mt-1 gap-1">
+              Already shared — your edits will re-send the updated summary
             </Badge>
           )}
         </div>
@@ -633,7 +646,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
             disabled={!summary.trim() || submitMutation.isPending}
           >
             <Send className="h-4 w-4" />
-            {submitMutation.isPending ? 'Submitting...' : 'Submit & Share with Doctor'}
+            {submitMutation.isPending ? 'Submitting...' : isResubmit ? 'Update & Re-share with Doctor' : 'Submit & Share with Doctor'}
           </Button>
           <p className="text-xs text-muted-foreground text-center pb-4">
             The doctor will be able to review and acknowledge this summary.

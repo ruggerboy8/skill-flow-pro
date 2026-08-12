@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Info } from 'lucide-react';
 import { normalizeDoctorName, drName } from '@/lib/doctorDisplayName';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface InviteDoctorDialogProps {
   open: boolean;
@@ -26,25 +27,36 @@ interface InviteDoctorDialogProps {
 export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoctorDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { organizationId } = useUserRole();
   
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [groupId, setGroupId] = useState('');
   const [locationId, setLocationId] = useState('__roaming__');
 
-  // Fetch practice groups
+  // Fetch practice groups — scoped to the inviter's organization so a clinical
+  // director never sees groups belonging to other tenants.
   const { data: practiceGroups } = useQuery({
-    queryKey: ['practice-groups-for-invite'],
+    queryKey: ['practice-groups-for-invite', organizationId],
+    enabled: !!organizationId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('practice_groups')
         .select('id, name')
+        .eq('organization_id', organizationId!)
         .eq('active', true)
         .order('name');
       if (error) throw error;
       return data;
     },
   });
+
+  // Auto-select when the org has a single group (common case).
+  useEffect(() => {
+    if (!groupId && practiceGroups?.length === 1) {
+      setGroupId(practiceGroups[0].id);
+    }
+  }, [practiceGroups, groupId]);
 
   // Fetch locations for selected group
   const { data: locations } = useQuery({
@@ -71,7 +83,8 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
           action: 'invite_doctor',
           email: email.trim(),
           name: cleanName,
-          group_id: groupId,
+          group_id: groupId || null,
+          organization_id: organizationId ?? null,
           location_id: locationId === '__roaming__' ? null : locationId,
           release_baseline: true,
         },
@@ -110,7 +123,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !name.trim() || !groupId) {
+    if (!email.trim() || !name.trim() || (!groupId && !organizationId)) {
       toast({
         title: 'Missing fields',
         description: 'Please fill in all required fields',

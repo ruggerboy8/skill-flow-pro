@@ -315,8 +315,14 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   // doctor_confirmed. With the upsert write path, a re-submit there would
   // overwrite the finished record and re-email the doctor — so any
   // non-capturable status renders read-only.
-  const statusAllowsCapture = ['scheduling_invite_sent', 'doctor_prep_submitted', 'doctor_revision_requested'].includes(session.status);
-  const isReadOnly = (myStaff?.id ? session.coach_staff_id !== myStaff.id : false) || !statusAllowsCapture;
+  // The owning coach can still edit and re-share a summary they've already
+  // sent (typos, missed action steps) — the write path is an upsert, so a
+  // second submit updates the record rather than duplicating it. It locks
+  // once the doctor has confirmed.
+  const statusAllowsCapture = ['scheduling_invite_sent', 'doctor_prep_submitted', 'doctor_revision_requested', 'meeting_pending'].includes(session.status);
+  const notMyySession = myStaff?.id ? session.coach_staff_id !== myStaff.id : false;
+  const isReadOnly = notMyySession || !statusAllowsCapture;
+  const isResubmit = session.status === 'meeting_pending';
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">

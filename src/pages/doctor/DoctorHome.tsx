@@ -339,6 +339,26 @@ function CurrentFocusCard({ sessionId }: { sessionId: string }) {
   });
 
   const steps = (meetingRecord?.experiments as any[] | null) || [];
+  const taggedIds = steps.map(s => s.action_id).filter((id): id is number => typeof id === 'number');
+
+  const { data: moves } = useQuery({
+    queryKey: ['focus-pro-moves', taggedIds],
+    queryFn: async () => {
+      if (taggedIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('pro_moves')
+        .select('action_id, action_statement, competencies!fk_pro_moves_competency_id(domains!fk_competencies_domain_id(domain_name))')
+        .in('action_id', taggedIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: taggedIds.length > 0,
+  });
+
+  const moveMap = new Map((moves || []).map(m => [m.action_id, {
+    statement: m.action_statement,
+    domain: (m.competencies as any)?.domains?.domain_name || '',
+  }]));
 
   if (steps.length === 0) return null;
 
@@ -352,10 +372,16 @@ function CurrentFocusCard({ sessionId }: { sessionId: string }) {
       </CardHeader>
       <CardContent className="space-y-2">
         {steps.map((step: any, i: number) => (
-          <div key={i} className="p-3 rounded-lg bg-primary/5 border border-primary/10">
+          <div key={i} className="p-3 rounded-lg bg-primary/5 border border-primary/10 space-y-1">
             <p className="text-sm font-medium">{step.title}</p>
             {step.description && (
               <p className="text-sm text-muted-foreground mt-0.5">{step.description}</p>
+            )}
+            {step.action_id && moveMap.has(step.action_id) && (
+              <div className="flex items-start gap-2 mt-1">
+                <DomainBadge domain={moveMap.get(step.action_id)!.domain} className="mt-0.5" />
+                <span className="text-xs text-muted-foreground">{moveMap.get(step.action_id)!.statement}</span>
+              </div>
             )}
           </div>
         ))}

@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { drName } from '@/lib/doctorDisplayName';
 import { useUserRole } from '@/hooks/useUserRole';
 import { buildOrganizationStaffScopeFilter } from '@/lib/clinicalDoctorScope';
+import { useDoctorMenteeIds } from '@/hooks/useDoctorMenteeIds';
+
 
 import { getDoctorJourneyStatus, type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
@@ -39,15 +41,22 @@ export default function DoctorManagement() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useUrlState<FilterValue>('status', 'all');
   const navigate = useNavigate();
-  const { organizationId, isSuperAdmin, isClinicalDirector, isDoctorCoach, doctorMenteeIds } = useUserRole();
+  const { organizationId, isSuperAdmin, isClinicalDirector, staffId } = useUserRole();
+
+  // Assignments are read live (not from the cached staff profile) so removing a
+  // coaching assignment takes effect for the coach without a full reload.
+  const { data: liveMenteeIds = [], isLoading: menteesLoading } = useDoctorMenteeIds(staffId);
+  const doctorMenteeIds = liveMenteeIds;
 
   // Doctor coaches (owner doctors with assigned learners) see ONLY their
   // assigned doctors; CDs and super admins keep the org-wide roster.
-  const menteesOnly = isDoctorCoach && !isClinicalDirector && !isSuperAdmin;
+  const menteesOnly = doctorMenteeIds.length > 0 && !isClinicalDirector && !isSuperAdmin;
 
-  const { data: doctors, isLoading, refetch } = useQuery({
+  const { data: doctors, isLoading: doctorsLoading, refetch } = useQuery({
     queryKey: ['doctors-management', organizationId, isSuperAdmin, menteesOnly, doctorMenteeIds.join(',')],
+
     refetchOnMount: 'always',
+
     staleTime: 0,
     queryFn: async (): Promise<DoctorRow[]> => {
       // Diagnostic logging: if a clinical director can't see an expected doctor,
@@ -184,7 +193,10 @@ export default function DoctorManagement() {
     };
   }, [queryClient]);
 
+  const isLoading = menteesLoading || doctorsLoading;
+
   // Compute stats from doctors data
+
   const stats = doctors ? {
     total: doctors.length,
     completed: doctors.filter(d => ['baseline_submitted', 'coach_baseline_pending', 'ready_for_prep', 'prep_complete', 'scheduling_invite_sent', 'meeting_ready', 'meeting_pending', 'doctor_confirmed', 'followup_scheduled', 'followup_completed'].includes(d.journeyStatus.stage)).length,

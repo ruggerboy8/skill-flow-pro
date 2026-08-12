@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { drName } from '@/lib/doctorDisplayName';
 import { useUserRole } from '@/hooks/useUserRole';
 import { buildOrganizationStaffScopeFilter } from '@/lib/clinicalDoctorScope';
+import { useDoctorMenteeIds } from '@/hooks/useDoctorMenteeIds';
+
 
 import { getDoctorJourneyStatus, type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';

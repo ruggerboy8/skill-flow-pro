@@ -163,10 +163,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithPassword = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     });
+
+    // Do not rely exclusively on onAuthStateChange to commit a password login.
+    // Some browsers can delay that callback while storage/visibility events are
+    // settling, leaving a successful request stuck on the login screen. The
+    // password response already contains the server-issued session, so make it
+    // authoritative immediately; the listener remains responsible for later
+    // refresh, update, and sign-out events.
+    if (!error && data.session && data.user) {
+      setSession(data.session);
+      setUser(data.user);
+      setNeedsPasswordSetup(!data.user.user_metadata?.password_set);
+      setLoading(false);
+
+      if (data.user.user_metadata?.password_set) {
+        await checkUserStatus(data.user.id);
+      }
+    }
     
     return { error };
   };

@@ -259,8 +259,9 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
       const error = query.error as any;
       // Don't redirect when masquerading
       if (!masqueradeStaffId && redirectToSetup && (error.code === 'PGRST116' || error.message === 'No staff profile found')) {
-        // No staff record found, redirect to setup
-        navigate('/setup');
+        // No staff record found. Route to the existing setup screen rather
+        // than the retired /setup path, which otherwise falls through to 404.
+        navigate('/setup-password');
       } else if (
         showErrorToast &&
         error.code !== 'PGRST116' &&

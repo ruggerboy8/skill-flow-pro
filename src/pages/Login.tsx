@@ -40,6 +40,10 @@ export default function Login() {
         title: "Welcome back!",
         description: "You've been signed in successfully"
       });
+      // The auth provider commits the returned session before this resolves,
+      // so navigation is deterministic even if the browser delays the auth
+      // state event that the user effect also watches.
+      navigate('/', { replace: true });
     }
     setLoading(false);
   };

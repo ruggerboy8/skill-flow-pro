@@ -95,6 +95,9 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
     queryFn: async () => {
       if (!user && !masqueradeStaffId) throw new Error('No authenticated user');
 
+      // 1) Primary staff row — scalar columns only. This must never depend on
+      // RLS for related tables, otherwise a single restricted join breaks the
+      // whole profile ("Failed to load profile") for legitimate users.
       let queryBuilder = supabase
         .from('staff')
         .select(`
@@ -114,51 +117,10 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
           is_paused,
           paused_at,
           pause_reason,
-           allow_backfill_until,
-           baseline_released_at,
-           baseline_released_by,
-           scheduling_link,
-          roles!staff_role_id_fkey (
-            archetype_code,
-            role_name
-          ),
-          locations (
-            group_id,
-            program_start_date,
-            cycle_length_weeks,
-            timezone,
-            conf_due_day,
-            conf_due_time,
-            perf_due_day,
-            perf_due_time,
-            practice_groups!locations_org_fkey (
-              organization_id,
-              organizations!practice_groups_organization_id_fkey (
-                practice_type
-              )
-            )
-          ),
-          coach_scopes (
-            scope_type,
-            scope_id
-          ),
-          mentee_assignments:doctor_coach_assignments!doctor_coach_assignments_coach_staff_id_fkey (
-            doctor_staff_id
-          ),
-          user_capabilities (
-            is_participant,
-            participation_start_at,
-            can_view_submissions,
-            can_submit_evals,
-            can_review_evals,
-            can_invite_users,
-            can_manage_library,
-            can_manage_locations,
-            can_manage_users,
-            can_manage_assignments,
-            is_org_admin,
-            is_platform_admin
-          )
+          allow_backfill_until,
+          baseline_released_at,
+          baseline_released_by,
+          scheduling_link
         `);
 
       // If masquerading, query by staff.id; otherwise query by user_id
@@ -178,13 +140,100 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
         throw new Error('No staff profile found');
       }
 
-      // Supabase returns the one-to-one join as an array; unwrap to object or null
       const raw = data as any;
-      const caps = Array.isArray(raw.user_capabilities)
-        ? (raw.user_capabilities[0] ?? null)
-        : (raw.user_capabilities ?? null);
 
-      return { ...raw, user_capabilities: caps } as StaffProfile;
+      // 2) Optional related data — each is best-effort; failures degrade
+      // gracefully instead of blocking sign-in.
+      const safe = async <T,>(fn: () => Promise<T>, fallback: T): Promise<T> => {
+        try {
+          return await fn();
+        } catch (e) {
+          console.warn('Staff profile: optional data unavailable', e);
+          return fallback;
+        }
+      };
+
+      const [roles, locations, coachScopes, menteeAssignments, caps] = await Promise.all([
+        raw.role_id
+          ? safe(async () => {
+              const { data } = await supabase
+                .from('roles')
+                .select('archetype_code, role_name')
+                .eq('role_id', raw.role_id)
+                .maybeSingle();
+              return (data as any) ?? null;
+            }, null)
+          : Promise.resolve(null),
+        raw.primary_location_id
+          ? safe(async () => {
+              const { data } = await supabase
+                .from('locations')
+                .select(`
+                  group_id,
+                  program_start_date,
+                  cycle_length_weeks,
+                  timezone,
+                  conf_due_day,
+                  conf_due_time,
+                  perf_due_day,
+                  perf_due_time,
+                  practice_groups!locations_org_fkey (
+                    organization_id,
+                    organizations!practice_groups_organization_id_fkey (
+                      practice_type
+                    )
+                  )
+                `)
+                .eq('id', raw.primary_location_id)
+                .maybeSingle();
+              return (data as any) ?? null;
+            }, null)
+          : Promise.resolve(null),
+        safe(async () => {
+          const { data } = await supabase
+            .from('coach_scopes')
+            .select('scope_type, scope_id')
+            .eq('staff_id', raw.id);
+          return (data as any[]) ?? [];
+        }, [] as any[]),
+        safe(async () => {
+          const { data } = await supabase
+            .from('doctor_coach_assignments')
+            .select('doctor_staff_id')
+            .eq('coach_staff_id', raw.id);
+          return (data as any[]) ?? [];
+        }, [] as any[]),
+        safe(async () => {
+          const { data } = await supabase
+            .from('user_capabilities')
+            .select(`
+              is_participant,
+              participation_start_at,
+              can_view_submissions,
+              can_submit_evals,
+              can_review_evals,
+              can_invite_users,
+              can_manage_library,
+              can_manage_locations,
+              can_manage_users,
+              can_manage_assignments,
+              is_org_admin,
+              is_platform_admin
+            `)
+            .eq('staff_id', raw.id)
+            .maybeSingle();
+          return (data as any) ?? null;
+        }, null),
+      ]);
+
+      return {
+        ...raw,
+        roles,
+        locations,
+        coach_scopes: coachScopes,
+        mentee_assignments: menteeAssignments,
+        user_capabilities: caps,
+      } as StaffProfile;
     },
     enabled: !!user || !!masqueradeStaffId,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes

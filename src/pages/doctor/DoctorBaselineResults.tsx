@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
@@ -12,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
-import { ClipboardCheck, CheckCircle2, MessageSquare, ChevronDown, GraduationCap, ArrowDown } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, MessageSquare, ChevronDown, GraduationCap, ArrowDown, ArrowLeft } from 'lucide-react';
 
 interface BaselineItem {
   action_id: number;
@@ -225,6 +226,18 @@ export default function DoctorBaselineResults() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {/* Back to doctor home */}
+      <div className="flex items-center">
+        <Link
+          to="/doctor"
+          replace
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Link>
+      </div>
+
       {/* Header Card */}
       <Card className="overflow-hidden border-0 shadow-lg">
         <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background p-6">

@@ -226,6 +226,18 @@ export default function DoctorBaselineResults() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {/* Back to doctor home */}
+      <div className="flex items-center">
+        <Link
+          to="/doctor"
+          replace
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Link>
+      </div>
+
       {/* Header Card */}
       <Card className="overflow-hidden border-0 shadow-lg">
         <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background p-6">

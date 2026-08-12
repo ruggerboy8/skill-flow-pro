@@ -882,15 +882,15 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                     return true;
                   });
                   if (filtered.length === 0) return null;
-                  const raw = getDomainColorRaw(domain);
+                  const rich = getDomainColorRichRaw(domain);
                   return (
                     <div key={domain}>
                       <div
                         className="rounded-t-lg px-3 py-1.5 flex items-center gap-2"
-                        style={{ backgroundColor: `hsl(${raw} / 0.12)` }}
+                        style={{ backgroundColor: `hsl(${rich} / 0.18)` }}
                       >
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `hsl(${raw})` }} />
-                        <span className="text-xs font-semibold" style={{ color: `hsl(${raw})` }}>{domain}</span>
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `hsl(${rich})` }} />
+                        <span className="text-xs font-semibold text-foreground">{domain}</span>
                       </div>
                       <div
                         className="rounded-b-lg border border-t-0 p-3 space-y-1"

@@ -1068,7 +1068,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 size="sm"
                 className="gap-1 text-xs"
                 onClick={handleLoadTemplate}
-                title={savedTemplate ? 'Load your saved template' : 'No saved template'}
+                title={savedTemplate ? 'Load your saved template' : orgDefaultTemplate ? 'Load the org default template' : 'No saved template'}
               >
                 <FileDown className="h-3.5 w-3.5" />
                 Load
@@ -1078,10 +1078,24 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 size="sm"
                 className="gap-1 text-xs"
                 onClick={handleSaveTemplate}
+                title="Save this agenda as your personal template"
               >
                 <Save className="h-3.5 w-3.5" />
                 Save
               </Button>
+              {myStaff?.is_super_admin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 text-xs"
+                  onClick={handleSaveOrgDefault}
+                  title="Make this the default agenda that auto-loads for all coaches"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  Set as default
+                </Button>
+              )}
+
               <Button
                 variant="outline"
                 size="sm"

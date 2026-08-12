@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { getDomainColorRichRaw } from '@/lib/domainColors';
-import { ClipboardCheck, CheckCircle2, MessageSquare, ChevronDown, GraduationCap, ArrowDown } from 'lucide-react';
+import { ClipboardCheck, CheckCircle2, MessageSquare, ChevronDown, GraduationCap, ArrowDown, ArrowLeft } from 'lucide-react';
 
 interface BaselineItem {
   action_id: number;

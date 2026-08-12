@@ -256,7 +256,7 @@ serve(async (req) => {
     // Return 200 with structured error so the client sees the real message
     // (supabase.functions.invoke swallows the body on non-2xx responses).
     return new Response(
-      JSON.stringify({ error: friendly, detail: rawMsg, corrupted: looksCorrupted }),
+      JSON.stringify({ error: friendly, detail: rawMsg, corrupted: looksCorrupted, noSpeech }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }

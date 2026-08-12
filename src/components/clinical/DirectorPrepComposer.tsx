@@ -12,7 +12,7 @@ import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDow
 import { toast } from '@/hooks/use-toast';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
-import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
+import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';

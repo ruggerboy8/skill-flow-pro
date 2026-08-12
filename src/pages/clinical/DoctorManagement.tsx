@@ -52,8 +52,9 @@ export default function DoctorManagement() {
   // assigned doctors; CDs and super admins keep the org-wide roster.
   const menteesOnly = doctorMenteeIds.length > 0 && !isClinicalDirector && !isSuperAdmin;
 
-  const { data: doctors, isLoading, refetch } = useQuery({
+  const { data: doctors, isLoading: doctorsLoading, refetch } = useQuery({
     queryKey: ['doctors-management', organizationId, isSuperAdmin, menteesOnly, doctorMenteeIds.join(',')],
+
     refetchOnMount: 'always',
 
     staleTime: 0,

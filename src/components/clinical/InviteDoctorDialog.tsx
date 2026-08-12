@@ -83,7 +83,8 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
           action: 'invite_doctor',
           email: email.trim(),
           name: cleanName,
-          group_id: groupId,
+          group_id: groupId || null,
+          organization_id: organizationId ?? null,
           location_id: locationId === '__roaming__' ? null : locationId,
           release_baseline: true,
         },
@@ -122,7 +123,7 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !name.trim() || !groupId) {
+    if (!email.trim() || !name.trim() || (!groupId && !organizationId)) {
       toast({
         title: 'Missing fields',
         description: 'Please fill in all required fields',

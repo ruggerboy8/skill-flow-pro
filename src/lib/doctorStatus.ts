@@ -7,6 +7,7 @@ export type DoctorJourneyStage =
   | 'baseline_released'
   | 'baseline_in_progress'
   | 'baseline_submitted'
+  | 'coach_baseline_pending'
   | 'ready_for_prep'
   | 'prep_complete'
   | 'scheduling_invite_sent'

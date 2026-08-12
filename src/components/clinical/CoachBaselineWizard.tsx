@@ -412,14 +412,19 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       if (!blob) throw new Error('No audio captured');
 
       setProcessingStep('Transcribing audio...');
+      // Name the upload for its real container — Safari records mp4, not webm,
+      // and a mismatched extension makes Whisper mis-decode (and hallucinate).
+      const mime = (blob.type || '').split(';')[0];
+      const ext = ({ 'audio/webm': 'webm', 'video/webm': 'webm', 'audio/mp4': 'mp4', 'video/mp4': 'mp4', 'audio/x-m4a': 'm4a', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/ogg': 'ogg' } as Record<string, string>)[mime] || 'webm';
       const formData = new FormData();
-      formData.append('audio', blob, 'recording.webm');
+      formData.append('audio', blob, `recording.${ext}`);
 
       const { data: transcriptData, error: transcriptErr } = await supabase.functions.invoke('transcribe-audio', { body: formData });
       if (transcriptErr) throw transcriptErr;
+      if (transcriptData?.error) throw new Error(transcriptData.error);
 
       const text = transcriptData?.text || transcriptData?.transcript;
-      if (!text) throw new Error('No transcript returned');
+      if (!text) throw new Error('No speech was detected in that recording. Please check your microphone and record again.');
 
       // Save transcript to DB
       const { error: saveErr } = await supabase

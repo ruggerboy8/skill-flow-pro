@@ -556,22 +556,22 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     return 'Tap a Pro Move…';
   };
 
-  // Re-save handler for completed assessments with changes (must be before early return)
-  const handleResave = useCallback(() => {
+  // Ratings and notes autosave as they're edited, so closing a completed
+  // assessment just touches updated_at and leaves — no confirmation prompt.
+  const handleResave = useCallback(async () => {
     if (assessmentId) {
-      supabase
+      await supabase
         .from('coach_baseline_assessments')
         .update({ updated_at: new Date().toISOString() })
-        .eq('id', assessmentId)
-        .then(() => {
-          queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment'] });
-          queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
-          setInitialSnapshot(JSON.stringify(ratings));
-          toast({ title: 'Changes saved', description: 'Your updated assessment has been saved.' });
-        });
+        .eq('id', assessmentId);
+      queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment'] });
+      queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
+      setInitialSnapshot(JSON.stringify(ratings));
+      toast({ title: 'Changes saved', description: 'Your updated assessment has been saved.' });
     }
     setShowSaveConfirm(false);
-  }, [assessmentId, ratings, queryClient, toast]);
+    onBack();
+  }, [assessmentId, ratings, queryClient, toast, onBack]);
 
   if (domainsLoading || !domains) {
     return (

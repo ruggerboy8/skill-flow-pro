@@ -14,10 +14,6 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, ArrowLeft, Mic, MicOff, Loader2, ChevronDown, RotateCcw, FileText, Sparkles, HelpCircle } from 'lucide-react';
 import { FloatingRecorderPill } from '@/components/coach/FloatingRecorderPill';
 import { cn } from '@/lib/utils';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 const SCORE_CONFIG = [
   { value: 1, selected: 'bg-orange-100 border-orange-400 text-orange-800' },
@@ -88,7 +84,6 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
   const [isComplete, setIsComplete] = useState(false);
   const [activeActionId, setActiveActionId] = useState<number | null>(null);
   const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   // "Before you start" guidance — shown once per doctor before the coach's
   // first rating, re-openable any time via the help icon in the header.
@@ -371,6 +366,9 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment', doctorStaffId] });
       queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
       setIsComplete(true);
+      // Everything on screen was just persisted — re-baseline the dirty check so
+      // the button doesn't immediately flip to "Save changes".
+      setInitialSnapshot(JSON.stringify(ratings));
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
@@ -502,6 +500,9 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       }
 
       setRatings(updatedRatings);
+      // Mapped notes were written straight to the DB above, so they are not
+      // unsaved changes — move the dirty baseline forward with them.
+      setInitialSnapshot(prev => (prev === null ? prev : JSON.stringify(updatedRatings)));
       setOpenNotes(nowOpenNotes);
       setMappingJustCompleted(true);
       proMoveTimeline.current = [];
@@ -550,22 +551,21 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
     return 'Tap a Pro Move…';
   };
 
-  // Re-save handler for completed assessments with changes (must be before early return)
-  const handleResave = useCallback(() => {
+  // Ratings and notes autosave as they're edited, so closing a completed
+  // assessment just touches updated_at and leaves — no confirmation prompt.
+  const handleResave = useCallback(async () => {
     if (assessmentId) {
-      supabase
+      await supabase
         .from('coach_baseline_assessments')
         .update({ updated_at: new Date().toISOString() })
-        .eq('id', assessmentId)
-        .then(() => {
-          queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment'] });
-          queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
-          setInitialSnapshot(JSON.stringify(ratings));
-          toast({ title: 'Changes saved', description: 'Your updated assessment has been saved.' });
-        });
+        .eq('id', assessmentId);
+      queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment'] });
+      queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
+      setInitialSnapshot(JSON.stringify(ratings));
+      toast({ title: 'Changes saved', description: 'Your updated assessment has been saved.' });
     }
-    setShowSaveConfirm(false);
-  }, [assessmentId, ratings, queryClient, toast]);
+    onBack();
+  }, [assessmentId, ratings, queryClient, toast, onBack]);
 
   if (domainsLoading || !domains) {
     return (
@@ -950,17 +950,19 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           {/* Complete / Save Changes */}
           {!isProcessing && (
             <div className="flex items-center justify-end gap-3">
-              {isComplete && isDirty && (
-                <p className="text-sm text-muted-foreground">You have unsaved changes</p>
+              {isComplete && (
+                <p className="text-sm text-muted-foreground">
+                  {isDirty ? 'Saving your edits…' : 'All changes saved'}
+                </p>
               )}
               {isComplete ? (
                 <Button
-                  onClick={() => isDirty ? setShowSaveConfirm(true) : onBack()}
+                  onClick={() => (isDirty ? handleResave() : onBack())}
                   size="lg"
-                  variant={isDirty ? 'default' : 'outline'}
+                  variant="outline"
                   className="shadow-lg"
                 >
-                  {isDirty ? 'Save Changes' : 'Back to Detail'}
+                  Back to Detail
                 </Button>
               ) : (
                 <div className="flex flex-col items-end gap-1">
@@ -1030,21 +1032,6 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
         </div>
       )}
 
-      {/* Confirmation dialog for saving changes to completed assessment */}
-      <AlertDialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save changes?</AlertDialogTitle>
-            <AlertDialogDescription>
-              It looks like you've updated some ratings or notes. Are you sure you want to save these changes?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleResave}>Save Changes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

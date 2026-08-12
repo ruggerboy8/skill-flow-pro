@@ -548,19 +548,19 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                 <SelectTrigger className="h-8 text-xs text-muted-foreground">
                   <SelectValue placeholder="Which Pro Move is this about? (optional)" />
                 </SelectTrigger>
-                <SelectContent className="max-w-[calc(100vw-4rem)] sm:max-w-md">
+                <SelectContent className="max-w-[calc(100vw-4rem)] sm:max-w-lg">
                   <SelectItem value="none">No Pro Move link</SelectItem>
                   {slatedMoves.length > 0 && (
                     <SelectGroup>
                       <SelectLabel>Discussed this session</SelectLabel>
                       {slatedMoves.map(m => (
                         <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          <span className="flex items-start gap-2">
+                          <span className="flex items-start gap-2 min-w-0">
                             <span
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: getDomainColorRich(m.domain_name) }}
                             />
-                            <span>{m.statement}</span>
+                            <span className="break-words">{m.statement}</span>
                           </span>
                         </SelectItem>
                       ))}
@@ -580,12 +580,12 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                       </SelectLabel>
                       {group.moves.map(m => (
                         <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          <span className="flex items-start gap-2">
+                          <span className="flex items-start gap-2 min-w-0">
                             <span
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: getDomainColorRich(group.domain) }}
                             />
-                            <span>{m.action_statement}</span>
+                            <span className="break-words">{m.action_statement}</span>
                           </span>
                         </SelectItem>
                       ))}

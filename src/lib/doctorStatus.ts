@@ -105,9 +105,12 @@ export function getDoctorJourneyStatus(
         // This branch serves BOTH perspectives (coach callers land here too,
         // e.g. from the roster) — only swap in doctor-voiced copy when the
         // caller actually asked for the doctor's perspective.
+        // "Draft" reads as a document state, not a journey stage — on the
+        // roster/detail pill a freshly created session means prep is needed.
+        const journeyLabel = latest.status === 'scheduled' ? 'Prep Needed' : cfg.label;
         return {
           stage: stageByStatus[latest.status] || 'ready_for_prep',
-          label: cfg.label,
+          label: journeyLabel,
           variant: 'default',
           colorClass: cfg.className,
           nextAction: perspective === 'doctor' ? (doctorNextAction[latest.status] ?? cfg.nextAction) : cfg.nextAction,

@@ -4756,6 +4756,7 @@ export type Database = {
         }[]
       }
       get_user_org_id: { Args: { p_user_id: string }; Returns: string }
+      has_survey_assignment: { Args: { _survey_id: string }; Returns: boolean }
       is_admin: { Args: { check_user_id: string }; Returns: boolean }
       is_assigned_doctor_coach: {
         Args: { p_doctor_staff_id: string; p_user: string }
@@ -4785,6 +4786,7 @@ export type Database = {
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_superadmin: { Args: never; Returns: boolean }
+      is_survey_admin_for: { Args: { _survey_id: string }; Returns: boolean }
       mark_eval_viewed: { Args: { p_eval_id: string }; Returns: undefined }
       org_id_of_location: { Args: { _location_id: string }; Returns: string }
       org_id_of_staff: { Args: { _staff_id: string }; Returns: string }

@@ -956,17 +956,19 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
           {/* Complete / Save Changes */}
           {!isProcessing && (
             <div className="flex items-center justify-end gap-3">
-              {isComplete && isDirty && (
-                <p className="text-sm text-muted-foreground">You have unsaved changes</p>
+              {isComplete && (
+                <p className="text-sm text-muted-foreground">
+                  {isDirty ? 'Saving your edits…' : 'All changes saved'}
+                </p>
               )}
               {isComplete ? (
                 <Button
-                  onClick={() => isDirty ? setShowSaveConfirm(true) : onBack()}
+                  onClick={() => (isDirty ? handleResave() : onBack())}
                   size="lg"
-                  variant={isDirty ? 'default' : 'outline'}
+                  variant="outline"
                   className="shadow-lg"
                 >
-                  {isDirty ? 'Save Changes' : 'Back to Detail'}
+                  Back to Detail
                 </Button>
               ) : (
                 <div className="flex flex-col items-end gap-1">

@@ -58,9 +58,50 @@ async function transcribeWithWhisper(
   }
 
   const data = await response.json();
-  console.log('[transcribe-audio] Whisper transcription successful, length:', data.text?.length || 0);
-  
-  return { transcript: data.text };
+
+  // Drop segments Whisper is confident are not speech, or is very unsure about.
+  const segments: any[] = Array.isArray(data.segments) ? data.segments : [];
+  let text: string = data.text || '';
+  if (segments.length > 0) {
+    const kept = segments.filter(
+      (s) => !((s.no_speech_prob ?? 0) > 0.6 && (s.avg_logprob ?? 0) < -0.4),
+    );
+    text = kept.map((s) => (s.text || '').trim()).join(' ').trim();
+    if (kept.length !== segments.length) {
+      console.warn('[transcribe-audio] Dropped', segments.length - kept.length, 'non-speech segments');
+    }
+  }
+
+  text = stripHallucinations(text);
+
+  console.log('[transcribe-audio] Whisper transcription successful, length:', text.length);
+
+  if (!text) throw new Error('NO_SPEECH_DETECTED');
+
+  return { transcript: text };
+}
+
+/**
+ * Whisper emits a small set of canned phrases when it hears silence or noise
+ * (subtitle-credit and PSA boilerplate from its training data). Strip them so
+ * a silent clip returns nothing instead of nonsense like "visit www.fema.gov".
+ */
+const HALLUCINATION_PATTERNS: RegExp[] = [
+  /(?:please\s+)?visit\s+(?:www\.)?fema\.gov[^.]*\.?/gi,
+  /for more information[^.]*(?:fema|ready)\.gov[^.]*\.?/gi,
+  /subtitles?\s+by[^.\n]*\.?/gi,
+  /transcription\s+by[^.\n]*\.?/gi,
+  /(?:thanks?|thank you) for watching[^.\n]*\.?/gi,
+  /please subscribe[^.\n]*\.?/gi,
+  /www\.[a-z0-9.-]+\.(?:com|org|gov)/gi,
+  /\bcopyright\b[^.\n]*\d{4}[^.\n]*\.?/gi,
+  /^[\s.!?♪-]*$/g,
+];
+
+function stripHallucinations(input: string): string {
+  let out = input || '';
+  for (const re of HALLUCINATION_PATTERNS) out = out.replace(re, ' ');
+  return out.replace(/\s{2,}/g, ' ').trim();
 }
 
 /**

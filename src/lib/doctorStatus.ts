@@ -7,6 +7,7 @@ export type DoctorJourneyStage =
   | 'baseline_released'
   | 'baseline_in_progress'
   | 'baseline_submitted'
+  | 'coach_baseline_pending'
   | 'ready_for_prep'
   | 'prep_complete'
   | 'scheduling_invite_sent'
@@ -115,17 +116,17 @@ export function getDoctorJourneyStatus(
     }
   }
 
-  // R1.3: Removed the coach baseline scheduling gate
-  // When doctor baseline is complete but coach baseline isn't,
-  // show ready_for_prep with a soft nudge instead of blocking
+  // R1.3: no hard gate — but when the doctor's baseline is in and the coach's
+  // isn't, the honest next action is "complete your coach baseline", not
+  // "build agenda".
   if (baseline?.status === 'completed' && coachBaseline !== null && coachBaseline !== undefined && coachBaseline?.status !== 'completed') {
     return {
-      stage: 'ready_for_prep',
-      label: 'Ready for Prep',
+      stage: 'coach_baseline_pending',
+      label: 'Baseline Submitted',
       variant: 'outline',
       colorClass: 'bg-blue-100 text-blue-800',
-      nextAction: 'Open the coaching thread to build your meeting agenda',
-      nudge: 'Tip: Complete your private baseline assessment before the meeting for better prep.',
+      nextAction: 'Complete your coach baseline assessment',
+      nudge: 'You can still build the agenda first, but the coach baseline gives you better prep.',
     };
   }
 

@@ -187,7 +187,7 @@ export default function DoctorManagement() {
   // Compute stats from doctors data
   const stats = doctors ? {
     total: doctors.length,
-    completed: doctors.filter(d => ['baseline_submitted', 'ready_for_prep', 'prep_complete', 'scheduling_invite_sent', 'meeting_ready', 'meeting_pending', 'doctor_confirmed', 'followup_scheduled', 'followup_completed'].includes(d.journeyStatus.stage)).length,
+    completed: doctors.filter(d => ['baseline_submitted', 'coach_baseline_pending', 'ready_for_prep', 'prep_complete', 'scheduling_invite_sent', 'meeting_ready', 'meeting_pending', 'doctor_confirmed', 'followup_scheduled', 'followup_completed'].includes(d.journeyStatus.stage)).length,
     inProgress: doctors.filter(d => d.journeyStatus.stage === 'baseline_in_progress').length,
     invited: doctors.filter(d => ['invited', 'baseline_released'].includes(d.journeyStatus.stage)).length,
   } : null;
@@ -195,7 +195,7 @@ export default function DoctorManagement() {
   const filteredDoctors = doctors?.filter(d => {
     if (filter === 'all') return true;
     if (filter === 'needs_my_action') {
-      return ['baseline_submitted', 'ready_for_prep', 'prep_complete', 'doctor_confirmed', 'followup_completed'].includes(d.journeyStatus.stage);
+      return ['baseline_submitted', 'coach_baseline_pending', 'ready_for_prep', 'prep_complete', 'doctor_confirmed', 'followup_completed'].includes(d.journeyStatus.stage);
     }
     if (filter === 'waiting_on_doctor') {
       return ['invited', 'baseline_in_progress', 'baseline_released', 'meeting_pending', 'scheduling_invite_sent'].includes(d.journeyStatus.stage);
@@ -431,7 +431,14 @@ function InlineAction({ stage, doctorId, navigate }: { stage: string; doctorId: 
     navigate(`/clinical/doctors/${doctorId}`);
   };
 
-  if (['baseline_submitted', 'ready_for_prep'].includes(stage)) {
+  if (['baseline_submitted', 'coach_baseline_pending'].includes(stage)) {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Complete coach baseline <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'ready_for_prep') {
     return (
       <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
         Build agenda <ArrowRight className="h-3 w-3" />

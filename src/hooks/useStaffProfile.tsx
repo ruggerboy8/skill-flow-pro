@@ -257,8 +257,16 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
       if (!masqueradeStaffId && redirectToSetup && (error.code === 'PGRST116' || error.message === 'No staff profile found')) {
         // No staff record found, redirect to setup
         navigate('/setup');
-      } else if (showErrorToast && error.code !== 'PGRST116') {
-        // Show toast for other errors (not missing profile)
+      } else if (
+        showErrorToast &&
+        error.code !== 'PGRST116' &&
+        error.message !== 'No staff profile found' &&
+        Date.now() - lastProfileErrorToastAt > 10000
+      ) {
+        // Show toast for real errors only, and at most once per 10s — the hook
+        // is mounted by many components sharing one query, so an unguarded
+        // toast fires repeatedly for a single failure.
+        lastProfileErrorToastAt = Date.now();
         toast({
           title: 'Error',
           description: 'Failed to load profile',

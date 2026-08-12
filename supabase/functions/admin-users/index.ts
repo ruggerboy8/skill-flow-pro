@@ -1211,7 +1211,7 @@ serve(async (req: Request) => {
         // 2) Resolve organization_id from the selected practice group so the
         // doctor is scoped to the correct org even when roaming (no location).
         let doctorOrgId: string | null = null;
-        {
+        if (resolvedGroupId) {
           const { data: pgRow } = await admin
             .from('practice_groups')
             .select('organization_id')
@@ -1219,9 +1219,17 @@ serve(async (req: Request) => {
             .maybeSingle();
           doctorOrgId = pgRow?.organization_id ?? null;
         }
+        if (!doctorOrgId && organization_id) {
+          const { data: orgRow } = await admin
+            .from('organizations')
+            .select('id')
+            .eq('id', organization_id)
+            .maybeSingle();
+          doctorOrgId = orgRow?.id ?? null;
+        }
 
         if (!doctorOrgId) {
-          return json({ error: "Cannot invite doctor: selected group is not linked to an organization. Please contact support." }, 400);
+          return json({ error: "Cannot invite doctor: could not resolve the organization for this doctor. Please contact support." }, 400);
         }
 
         // 3) Create staff row with is_doctor = true

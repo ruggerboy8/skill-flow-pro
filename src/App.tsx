@@ -120,6 +120,7 @@ function AppRoutes() {
       <Route path="/facilitate" element={<RequireAccess allow={allowFacilitate}><FacilitatePage /></RequireAccess>} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
+        <Route path="login" element={<Navigate to="/" replace />} />
         <Route path="welcome" element={<Welcome />} />
         <Route path="setup-password" element={<SetupPassword />} />
 

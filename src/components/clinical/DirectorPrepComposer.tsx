@@ -894,7 +894,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                       </div>
                       <div
                         className="rounded-b-lg border border-t-0 p-3 space-y-1"
-                        style={{ backgroundColor: `hsl(${raw} / 0.04)` }}
+                        style={{ backgroundColor: `hsl(${rich} / 0.08)` }}
                       >
                         {filtered.map(item => {
                           const pm = item.pro_moves as any;

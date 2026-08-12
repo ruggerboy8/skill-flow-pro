@@ -179,10 +179,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(data.user);
       setNeedsPasswordSetup(!data.user.user_metadata?.password_set);
       setLoading(false);
-
-      if (data.user.user_metadata?.password_set) {
-        await checkUserStatus(data.user.id);
-      }
     }
     
     return { error };

@@ -103,7 +103,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pro_moves')
-        .select('action_id, action_statement, competencies!pro_moves_competency_id_fkey(domains!competencies_domain_id_fkey(domain_name))')
+        .select('action_id, action_statement, competencies!fk_pro_moves_competency_id(domains!fk_competencies_domain_id(domain_name))')
         .eq('role_id', 4)
         .eq('active', true)
         .order('action_id');

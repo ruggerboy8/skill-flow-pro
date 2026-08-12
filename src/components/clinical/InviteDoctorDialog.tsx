@@ -32,19 +32,29 @@ export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoct
   const [groupId, setGroupId] = useState('');
   const [locationId, setLocationId] = useState('__roaming__');
 
-  // Fetch practice groups
+  // Fetch practice groups — scoped to the inviter's organization so a clinical
+  // director never sees groups belonging to other tenants.
   const { data: practiceGroups } = useQuery({
-    queryKey: ['practice-groups-for-invite'],
+    queryKey: ['practice-groups-for-invite', organizationId],
+    enabled: !!organizationId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('practice_groups')
         .select('id, name')
+        .eq('organization_id', organizationId!)
         .eq('active', true)
         .order('name');
       if (error) throw error;
       return data;
     },
   });
+
+  // Auto-select when the org has a single group (common case).
+  useEffect(() => {
+    if (!groupId && practiceGroups?.length === 1) {
+      setGroupId(practiceGroups[0].id);
+    }
+  }, [practiceGroups, groupId]);
 
   // Fetch locations for selected group
   const { data: locations } = useQuery({

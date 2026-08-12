@@ -344,7 +344,12 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           {isReadOnly && (
             <Badge variant="secondary" className="text-xs mt-1 gap-1">
               <ShieldAlert className="h-3 w-3" />
-              Managed by another coach
+              {notMyySession ? 'Managed by another coach' : 'Locked — the doctor has confirmed this summary'}
+            </Badge>
+          )}
+          {!isReadOnly && isResubmit && (
+            <Badge variant="secondary" className="text-xs mt-1 gap-1">
+              Already shared — your edits will re-send the updated summary
             </Badge>
           )}
         </div>

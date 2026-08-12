@@ -34,6 +34,10 @@ async function transcribeWithWhisper(
   whisperFormData.append('file', audioFile, fileName);
   whisperFormData.append('model', 'whisper-1');
   whisperFormData.append('language', 'en');
+  // temperature 0 + verbose_json lets us detect and drop hallucinated segments
+  // that Whisper emits over silence (e.g. "visit www.fema.gov").
+  whisperFormData.append('temperature', '0');
+  whisperFormData.append('response_format', 'verbose_json');
   // Prompt hint improves accuracy for domain-specific vocabulary and prevents hallucination on short clips
   whisperFormData.append('prompt', 'This is a clinical director providing a baseline assessment of a pediatric dentist. They are commenting on specific Pro Moves related to clinical skills, case acceptance, cultural behavior, and clerical tasks. Terms include: sealants, SDF, Curodont, bitewings, PA, pano, RDA, odontogram, caries risk, sedation, nitrous, pulp therapy, DEJ, anticipatory guidance, morning huddle, space maintainer.');
 

@@ -548,7 +548,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                 <SelectTrigger className="h-8 text-xs text-muted-foreground">
                   <SelectValue placeholder="Which Pro Move is this about? (optional)" />
                 </SelectTrigger>
-                <SelectContent className="max-w-[calc(100vw-4rem)] sm:max-w-lg">
+                <SelectContent className="max-w-[calc(100vw-3rem)] sm:max-w-lg [&_[data-radix-select-viewport]]:max-w-none [&_[data-radix-select-viewport]]:w-[min(28rem,calc(100vw-3rem))]">
                   <SelectItem value="none">No Pro Move link</SelectItem>
                   {slatedMoves.length > 0 && (
                     <SelectGroup>
@@ -560,7 +560,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: getDomainColorRich(m.domain_name) }}
                             />
-                            <span className="break-words">{m.statement}</span>
+                            <span className="flex-1 min-w-0 break-words">{m.statement}</span>
                           </span>
                         </SelectItem>
                       ))}
@@ -585,7 +585,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: getDomainColorRich(group.domain) }}
                             />
-                            <span className="break-words">{m.action_statement}</span>
+                            <span className="flex-1 min-w-0 break-words">{m.action_statement}</span>
                           </span>
                         </SelectItem>
                       ))}

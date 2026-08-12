@@ -193,7 +193,10 @@ export default function DoctorManagement() {
     };
   }, [queryClient]);
 
+  const isLoading = menteesLoading || doctorsLoading;
+
   // Compute stats from doctors data
+
   const stats = doctors ? {
     total: doctors.length,
     completed: doctors.filter(d => ['baseline_submitted', 'coach_baseline_pending', 'ready_for_prep', 'prep_complete', 'scheduling_invite_sent', 'meeting_ready', 'meeting_pending', 'doctor_confirmed', 'followup_scheduled', 'followup_completed'].includes(d.journeyStatus.stage)).length,

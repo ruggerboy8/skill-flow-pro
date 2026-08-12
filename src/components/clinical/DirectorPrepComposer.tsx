@@ -395,6 +395,19 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, session, existingSelections, existingSelectionsLoading]);
 
+  // Prefill a brand-new agenda with the coach's own template, falling back to
+  // the org-wide default. Runs once, and never overwrites existing content.
+  const [prefilled, setPrefilled] = useState(false);
+  useEffect(() => {
+    if (!hydrated || prefilled) return;
+    if (session?.coach_note) { setPrefilled(true); return; }
+    if (!effectiveTemplate) return;
+    if (coachNote.trim() && coachNote !== '<p><br></p>') { setPrefilled(true); return; }
+    setCoachNote(effectiveTemplate);
+    setPrefilled(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, prefilled, effectiveTemplate, session?.coach_note]);
+
   const toggleAction = (actionId: number) => {
     setSelectedActions(prev => {
       if (prev.includes(actionId)) return prev.filter(id => id !== actionId);
@@ -422,19 +435,63 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         } as any, { onConflict: 'staff_id,session_type' });
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['agenda-template'] });
-      toast({ title: 'Template saved ✓' });
+      toast({ title: 'Template saved ✓', description: 'Saved for you only.' });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // Super admins can promote the current agenda to the org-wide default that
+  // auto-loads for every coach who hasn't saved their own.
+  const handleSaveOrgDefault = async () => {
+    if (!myStaff?.id || !myStaff?.organization_id) return;
+    if (!coachNote.trim() || coachNote === '<p><br></p>') {
+      toast({ title: 'Nothing to save', description: 'Write your agenda first.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const sb = supabase as any;
+      const { data: existing } = await sb
+        .from('coaching_agenda_templates')
+        .select('id')
+        .eq('session_type', sessionType)
+        .eq('is_org_default', true)
+        .eq('organization_id', myStaff.organization_id)
+        .maybeSingle();
+
+      if (existing?.id) {
+        const { error } = await sb
+          .from('coaching_agenda_templates')
+          .update({ template_html: coachNote, updated_at: new Date().toISOString() })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await sb
+          .from('coaching_agenda_templates')
+          .insert({
+            staff_id: myStaff.id,
+            organization_id: myStaff.organization_id,
+            session_type: sessionType,
+            is_org_default: true,
+            template_html: coachNote,
+          });
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ['agenda-template-org-default'] });
+      toast({ title: 'Default set ✓', description: 'This agenda now auto-loads for all coaches.' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
     }
   };
 
   const handleLoadTemplate = () => {
-    if (!savedTemplate) {
+    if (!effectiveTemplate) {
       toast({ title: 'No saved template', description: `No template found for ${sessionType === 'baseline_review' ? 'Baseline Review' : 'Check-in'}.`, variant: 'destructive' });
       return;
     }
-    setCoachNote(savedTemplate);
-    toast({ title: 'Template loaded' });
+    setCoachNote(effectiveTemplate);
+    toast({ title: savedTemplate ? 'Template loaded' : 'Default template loaded' });
+
   };
 
   const handleMagicFormat = async () => {

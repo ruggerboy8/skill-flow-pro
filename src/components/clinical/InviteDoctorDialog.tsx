@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Info } from 'lucide-react';
 import { normalizeDoctorName, drName } from '@/lib/doctorDisplayName';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface InviteDoctorDialogProps {
   open: boolean;
@@ -26,6 +27,7 @@ interface InviteDoctorDialogProps {
 export function InviteDoctorDialog({ open, onOpenChange, onSuccess }: InviteDoctorDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { organizationId } = useUserRole();
   
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');

@@ -130,14 +130,14 @@ export function getDoctorJourneyStatus(
     };
   }
 
-  // Both baselines done but no session yet → ready for prep
+  // Both baselines done but no session yet → create the baseline review first
   if (baseline?.status === 'completed' && coachBaseline?.status === 'completed') {
     return {
       stage: 'ready_for_prep',
       label: 'Ready for Prep',
       variant: 'outline',
       colorClass: 'bg-blue-100 text-blue-800',
-      nextAction: 'Build your meeting agenda before inviting to schedule',
+      nextAction: 'Create a baseline review session',
     };
   }
 

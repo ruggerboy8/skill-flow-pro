@@ -272,11 +272,6 @@ export default function DoctorDetail() {
                   </div>
                 </button>
               </CollapsibleTrigger>
-              {doctorBaselineStatus === 'completed' && (
-                <Button size="sm" variant="outline" onClick={() => setShowReviewPrep(true)}>
-                  Baseline review prep
-                </Button>
-              )}
             </div>
             <CollapsibleContent className="pt-2">
               <div className="grid gap-4 md:grid-cols-2">

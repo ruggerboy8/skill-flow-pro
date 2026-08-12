@@ -73,6 +73,8 @@ export function DoctorCoachesCard({ doctorStaffId, doctorName }: { doctorStaffId
     onSuccess: () => {
       setSelectedCoach('');
       queryClient.invalidateQueries({ queryKey: ['doctor-coach-assignments', doctorStaffId] });
+      queryClient.invalidateQueries({ queryKey: ['doctor-mentee-ids'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-profile'] });
       toast.success('Doctor coach assigned');
     },
     onError: (e: any) => toast.error(e?.message ?? 'Could not assign coach'),
@@ -88,6 +90,8 @@ export function DoctorCoachesCard({ doctorStaffId, doctorName }: { doctorStaffId
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctor-coach-assignments', doctorStaffId] });
+      queryClient.invalidateQueries({ queryKey: ['doctor-mentee-ids'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-profile'] });
       toast.success('Assignment removed');
     },
     onError: (e: any) => toast.error(e?.message ?? 'Could not remove assignment'),

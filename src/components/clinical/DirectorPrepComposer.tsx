@@ -355,6 +355,27 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!myStaff?.id && !!sessionType,
   });
 
+  // Org-wide default template (set by a super admin) — used when this coach
+  // hasn't saved their own version yet.
+  const { data: orgDefaultTemplate } = useQuery({
+    queryKey: ['agenda-template-org-default', myStaff?.organization_id, sessionType],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('coaching_agenda_templates')
+        .select('template_html')
+        .eq('session_type', sessionType)
+        .eq('is_org_default', true)
+        .eq('organization_id', myStaff!.organization_id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.template_html || null;
+    },
+    enabled: !!myStaff?.organization_id && !!sessionType,
+  });
+
+  const effectiveTemplate = savedTemplate || orgDefaultTemplate || null;
+
+
   // Initialize from existing data. This must run AFTER `session` and
   // `existingSelections` have resolved, and only once — a plain useState
   // initializer runs at first render, before either query has data, so

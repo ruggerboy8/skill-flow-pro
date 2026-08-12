@@ -548,19 +548,23 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                 <SelectTrigger className="h-8 text-xs text-muted-foreground">
                   <SelectValue placeholder="Which Pro Move is this about? (optional)" />
                 </SelectTrigger>
-                <SelectContent className="max-w-[calc(100vw-3rem)] sm:max-w-lg [&_[data-radix-select-viewport]]:max-w-none [&_[data-radix-select-viewport]]:w-[min(28rem,calc(100vw-3rem))]">
+                <SelectContent className="w-[min(32rem,calc(100vw-2rem))] max-w-none [&_[data-radix-select-viewport]]:!w-full [&_[data-radix-select-viewport]]:!max-w-none">
                   <SelectItem value="none">No Pro Move link</SelectItem>
                   {slatedMoves.length > 0 && (
                     <SelectGroup>
                       <SelectLabel>Discussed this session</SelectLabel>
                       {slatedMoves.map(m => (
-                        <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          <span className="flex items-start gap-2 min-w-0">
+                        <SelectItem
+                          key={m.action_id}
+                          value={String(m.action_id)}
+                          className="overflow-hidden whitespace-normal text-xs [&>span:last-child]:block [&>span:last-child]:w-full [&>span:last-child]:min-w-0 [&>span:last-child]:whitespace-normal"
+                        >
+                          <span className="flex w-full min-w-0 items-start gap-2 whitespace-normal">
                             <span
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: getDomainColorRich(m.domain_name) }}
                             />
-                            <span className="flex-1 min-w-0 break-words">{m.statement}</span>
+                            <span className="min-w-0 flex-1 whitespace-normal break-words">{m.statement}</span>
                           </span>
                         </SelectItem>
                       ))}
@@ -579,13 +583,17 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                         {group.domain}
                       </SelectLabel>
                       {group.moves.map(m => (
-                        <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          <span className="flex items-start gap-2 min-w-0">
+                        <SelectItem
+                          key={m.action_id}
+                          value={String(m.action_id)}
+                          className="overflow-hidden whitespace-normal text-xs [&>span:last-child]:block [&>span:last-child]:w-full [&>span:last-child]:min-w-0 [&>span:last-child]:whitespace-normal"
+                        >
+                          <span className="flex w-full min-w-0 items-start gap-2 whitespace-normal">
                             <span
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: getDomainColorRich(group.domain) }}
                             />
-                            <span className="flex-1 min-w-0 break-words">{m.action_statement}</span>
+                            <span className="min-w-0 flex-1 whitespace-normal break-words">{m.action_statement}</span>
                           </span>
                         </SelectItem>
                       ))}

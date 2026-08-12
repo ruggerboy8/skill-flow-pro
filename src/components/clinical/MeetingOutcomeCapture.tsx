@@ -570,7 +570,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                     <SelectGroup key={group.domain}>
                       <SelectLabel
                         className="sticky top-0 z-10 flex items-center gap-2 text-foreground"
-                        style={{ backgroundColor: `hsl(${getDomainColorRichRaw(group.domain)} / 0.18)` }}
+                        style={{ backgroundColor: `hsl(${getDomainColorRaw(group.domain)})` }}
                       >
                         <span
                           className="h-2 w-2 shrink-0 rounded-full"

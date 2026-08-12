@@ -560,7 +560,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: getDomainColorRich(m.domain_name) }}
                             />
-                            <span className="break-words">{m.statement}</span>
+                            <span className="flex-1 min-w-0 break-words">{m.statement}</span>
                           </span>
                         </SelectItem>
                       ))}
@@ -585,7 +585,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                               className="mt-1 h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: getDomainColorRich(group.domain) }}
                             />
-                            <span className="break-words">{m.action_statement}</span>
+                            <span className="flex-1 min-w-0 break-words">{m.action_statement}</span>
                           </span>
                         </SelectItem>
                       ))}

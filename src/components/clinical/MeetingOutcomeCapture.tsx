@@ -541,22 +541,44 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                       <SelectLabel>Discussed this session</SelectLabel>
                       {slatedMoves.map(m => (
                         <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          {m.statement}
+                          <span className="flex items-start gap-2">
+                            <span
+                              className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: getDomainColorRich(m.domain_name) }}
+                            />
+                            <span>{m.statement}</span>
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectGroup>
                   )}
-                  {otherMoves.length > 0 && (
-                    <SelectGroup>
-                      <SelectLabel>All doctor Pro Moves</SelectLabel>
-                      {otherMoves.map(m => (
+                  {otherMovesByDomain.map(group => (
+                    <SelectGroup key={group.domain}>
+                      <SelectLabel
+                        className="sticky top-0 z-10 flex items-center gap-2 text-foreground"
+                        style={{ backgroundColor: `hsl(${getDomainColorRichRaw(group.domain)} / 0.18)` }}
+                      >
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: getDomainColorRich(group.domain) }}
+                        />
+                        {group.domain}
+                      </SelectLabel>
+                      {group.moves.map(m => (
                         <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          {m.action_statement}
+                          <span className="flex items-start gap-2">
+                            <span
+                              className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: getDomainColorRich(group.domain) }}
+                            />
+                            <span>{m.action_statement}</span>
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectGroup>
-                  )}
+                  ))}
                 </SelectContent>
+
               </Select>
             </div>
           ))}

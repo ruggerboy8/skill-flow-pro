@@ -134,9 +134,12 @@ async function transcribeWithElevenLabs(
   }
 
   const data = await response.json();
-  console.log('[transcribe-audio] ElevenLabs transcription successful, length:', data.text?.length || 0);
-  
-  return { transcript: data.text };
+  const cleaned = stripHallucinations(data.text || '');
+  console.log('[transcribe-audio] ElevenLabs transcription successful, length:', cleaned.length);
+
+  if (!cleaned) throw new Error('NO_SPEECH_DETECTED');
+
+  return { transcript: cleaned };
 }
 
 serve(async (req) => {

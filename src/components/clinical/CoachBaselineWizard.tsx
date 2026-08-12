@@ -369,6 +369,8 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       // Everything on screen was just persisted — re-baseline the dirty check so
       // the button doesn't immediately flip to "Save changes".
       setInitialSnapshot(JSON.stringify(ratings));
+      toast({ title: 'Assessment complete', description: 'Returning to doctor detail…' });
+      onBack();
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });

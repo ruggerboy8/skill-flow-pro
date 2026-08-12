@@ -431,7 +431,14 @@ function InlineAction({ stage, doctorId, navigate }: { stage: string; doctorId: 
     navigate(`/clinical/doctors/${doctorId}`);
   };
 
-  if (['baseline_submitted', 'ready_for_prep'].includes(stage)) {
+  if (['baseline_submitted', 'coach_baseline_pending'].includes(stage)) {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Complete coach baseline <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'ready_for_prep') {
     return (
       <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
         Build agenda <ArrowRight className="h-3 w-3" />

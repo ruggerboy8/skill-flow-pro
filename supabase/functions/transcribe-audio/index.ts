@@ -245,7 +245,11 @@ serve(async (req) => {
         rawMsg,
       );
 
-    const friendly = looksCorrupted
+    const noSpeech = /NO_SPEECH_DETECTED/.test(rawMsg);
+
+    const friendly = noSpeech
+      ? "We couldn't hear any speech in that recording — the mic may have been muted or the wrong input was selected. Please check your microphone and record again."
+      : looksCorrupted
       ? "We couldn't read this recording — the audio file appears to be corrupted (this can happen when a recording is paused and resumed). Please record a new clip in one take and try again."
       : rawMsg;
 

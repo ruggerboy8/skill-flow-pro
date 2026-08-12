@@ -250,25 +250,24 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Scheduling Link — for clinical directors */}
-          {(profile.is_clinical_director || profile.is_super_admin) && (
-            <div className="space-y-2">
-              <Label htmlFor="scheduling_link">Scheduling Link (Calendly)</Label>
-              <div className="flex items-center gap-2">
-                <Link2 className="w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="scheduling_link"
-                  value={profile.scheduling_link || ''}
-                  onChange={(e) => setProfile({ ...profile, scheduling_link: e.target.value })}
-                  disabled={!editMode}
-                  placeholder="https://calendly.com/your-link"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                This link is included in scheduling invite emails sent to doctors.
-              </p>
+          {/* Scheduling Link — available to everyone */}
+          <div className="space-y-2">
+            <Label htmlFor="scheduling_link">Scheduling Link (Calendly)</Label>
+            <div className="flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-muted-foreground" />
+              <Input
+                id="scheduling_link"
+                value={profile.scheduling_link || ''}
+                onChange={(e) => setProfile({ ...profile, scheduling_link: e.target.value })}
+                disabled={!editMode}
+                placeholder="https://calendly.com/your-link"
+              />
             </div>
-          )}
+            <p className="text-xs text-muted-foreground">
+              Used when you send scheduling invites so others can book time with you.
+            </p>
+          </div>
+
         </CardContent>
       </Card>
 

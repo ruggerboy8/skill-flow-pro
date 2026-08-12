@@ -371,6 +371,9 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       queryClient.invalidateQueries({ queryKey: ['coach-baseline-assessment', doctorStaffId] });
       queryClient.invalidateQueries({ queryKey: ['coach-baseline-items-compare'] });
       setIsComplete(true);
+      // Everything on screen was just persisted — re-baseline the dirty check so
+      // the button doesn't immediately flip to "Save changes".
+      setInitialSnapshot(JSON.stringify(ratings));
     },
     onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
@@ -502,6 +505,9 @@ export function CoachBaselineWizard({ doctorStaffId, doctorName, onBack }: Coach
       }
 
       setRatings(updatedRatings);
+      // Mapped notes were written straight to the DB above, so they are not
+      // unsaved changes — move the dirty baseline forward with them.
+      setInitialSnapshot(prev => (prev === null ? prev : JSON.stringify(updatedRatings)));
       setOpenNotes(nowOpenNotes);
       setMappingJustCompleted(true);
       proMoveTimeline.current = [];

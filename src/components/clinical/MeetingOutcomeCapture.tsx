@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { getDomainColorRich, getDomainColorRichRaw } from '@/lib/domainColors';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -102,12 +103,16 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pro_moves')
-        .select('action_id, action_statement')
+        .select('action_id, action_statement, competencies!pro_moves_competency_id_fkey(domains!competencies_domain_id_fkey(domain_name))')
         .eq('role_id', 4)
         .eq('active', true)
         .order('action_id');
       if (error) throw error;
-      return data || [];
+      return (data || []).map((m: any) => ({
+        action_id: m.action_id,
+        action_statement: m.action_statement,
+        domain_name: m.competencies?.domains?.domain_name || 'Unknown',
+      }));
     },
   });
 
@@ -125,9 +130,19 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const slatedMoves = allTopics.map(sel => ({
     action_id: sel.action_id,
     statement: (sel.pro_moves as any)?.action_statement || `Action #${sel.action_id}`,
+    domain_name: (sel.pro_moves as any)?.competencies?.domains?.domain_name || 'Unknown',
   }));
   const slatedIds = new Set(slatedMoves.map(m => m.action_id));
   const otherMoves = (doctorProMoves || []).filter(m => !slatedIds.has(m.action_id));
+
+  // Group the remaining library by domain so the dropdown reads as
+  // colour-coded sections while scrolling.
+  const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+  const otherMovesByDomain = DOMAIN_ORDER
+    .map(domain => ({ domain, moves: otherMoves.filter(m => m.domain_name === domain) }))
+    .concat([{ domain: 'Other', moves: otherMoves.filter(m => !DOMAIN_ORDER.includes(m.domain_name)) }])
+    .filter(g => g.moves.length > 0);
+
 
   const addExperiment = () => {
     if (experiments.length >= 3) {
@@ -527,22 +542,44 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                       <SelectLabel>Discussed this session</SelectLabel>
                       {slatedMoves.map(m => (
                         <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          {m.statement}
+                          <span className="flex items-start gap-2">
+                            <span
+                              className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: getDomainColorRich(m.domain_name) }}
+                            />
+                            <span>{m.statement}</span>
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectGroup>
                   )}
-                  {otherMoves.length > 0 && (
-                    <SelectGroup>
-                      <SelectLabel>All doctor Pro Moves</SelectLabel>
-                      {otherMoves.map(m => (
+                  {otherMovesByDomain.map(group => (
+                    <SelectGroup key={group.domain}>
+                      <SelectLabel
+                        className="sticky top-0 z-10 flex items-center gap-2 text-foreground"
+                        style={{ backgroundColor: `hsl(${getDomainColorRichRaw(group.domain)} / 0.18)` }}
+                      >
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: getDomainColorRich(group.domain) }}
+                        />
+                        {group.domain}
+                      </SelectLabel>
+                      {group.moves.map(m => (
                         <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          {m.action_statement}
+                          <span className="flex items-start gap-2">
+                            <span
+                              className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: getDomainColorRich(group.domain) }}
+                            />
+                            <span>{m.action_statement}</span>
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectGroup>
-                  )}
+                  ))}
                 </SelectContent>
+
               </Select>
             </div>
           ))}

@@ -440,3 +440,50 @@ recommendation:
 
 The clickable prototype iterates from this direction; decisions get folded
 back here as they harden.
+
+## Addendum 2: John's second review pass (2026-08-13, prototype v1 → v2)
+
+1. **Copy correction:** "Explore your craft" is too frou-frou. Plain
+   language throughout; copy gets worked bit by bit.
+2. **The meeting context reframes Home.** Roughly 90% of logins happen
+   inside a Pro Moves meeting, with everyone doing check-in or check-out
+   together. Independent use is the exception (catching up after a missed
+   meeting), and the deadlines exist to give that flexibility, not to
+   pressure. So the home hero is not a nag for the diligent; its two real
+   states are "you're in the meeting, here's the button everyone is
+   pressing right now" and "you missed it, here's your catch-up path,
+   kindly." The Thursday takeover concept survives but as the catch-up
+   state, framed warm.
+3. **No "coming soon" language anywhere.** Features don't exist until the
+   day they exist. (Schedule card concept is liked; the placeholder is
+   cut.)
+4. **Fourth tab: Performance** (placeholder name). The job is "see how
+   I'm doing," and it is bigger than evaluations: reflect the patterns in
+   staff's own Pro Move submissions back to them (domain by domain, recent
+   low-rated moves, confidence vs performance), plus evaluation
+   highlights. Long-discussed and never built; the submission data is
+   rich and unused. Future: a natural-language reflection surface could
+   feed this tab.
+5. **Outstanding tasks live on Home** (acknowledge an evaluation, take a
+   survey, catch up on a missed check-in), not in a notifications area.
+6. **Method for v2:** every prototype surface must be grounded in data
+   and UI that actually exists in the codebase/database, verified before
+   building, so the prototype shows what the real system can back.
+
+Data verification for v2 (live DB, 2026-08-13): `weekly_scores` holds
+confidence_score / performance_score / week_of / late flags per staff per
+move (5,957 check-in rows vs 4,705 check-out rows, the ~21% gap).
+Domain-level truth: end-of-week performance scores come in above
+start-of-week confidence in every domain (Clinical 3.18→3.45, Clerical
+2.94→3.25, Cultural 2.92→3.27, Case Acceptance 2.97→3.24). John's framing
+note (2026-08-13): both numbers are self-reported, so this is *felt*
+growth, not evidence they outperform their predictions; marking yourself
+a 2 on Monday biases you toward believing you improved by Friday. The
+reflection copy celebrates the growth feeling ("you end the week
+stronger") and must not claim measured outperformance. `evaluations` already has viewed_at
+and acknowledged_at (ack task card is backed), summary_feedback and
+extracted_insights; `evaluation_items` has observer_glow / observer_grow
+per competency (highlight material, warm coaching prose ~110-250 chars).
+`staff_quarter_focus` records the staff member's chosen focus Pro Move
+from their eval. `survey_assignments.status` backs a survey task card.
+`pro_move_resources` types: audio, script, video, link.

@@ -550,3 +550,67 @@ Data coverage checks behind these decisions (live DB, 2026-08-13):
    and the coach/self *pair* surfaces calibration gaps that today are
    buried in the eval detail grid. Page order: focus hero → eval scores →
    what you've flagged → confidence (numeric) → participation.
+
+## Addendum 5: v6 — lead surfaces, past evaluations, design polish (2026-08-13)
+
+**New: the lead Team surface.** Leads are the direct line of intervention
+to a staff member, and today's coach panel serves administrators, not
+leads. Two screens, both mobile-first:
+
+- **Team roster** (`scr-team`): location header, a "N of 7 checked in"
+  summary for the week, then one row per teammate with a single status
+  pill (In / Open / Missing). A lead's question is "who needs a nudge
+  before Thursday," and the roster answers it without a table.
+- **Staff detail** (`scr-staffdetail`): mirrors the Performance page
+  minus the focus hero, per John's spec. Order: this-week status →
+  Participation → Latest evaluation (with View full evaluation) →
+  Confidence merged with the moves they're still building. The same
+  confidence component serves both surfaces with a different subject.
+
+**Entry points, and why not a fifth tab.** The tab bar must hold four
+today and five when Ask arrives, so Team is reached by tapping the Home
+lead card (primary, since it already reads "5 of 7 checked in") and from
+a More row (secondary). Both are lead-gated.
+
+**New: past evaluations.** Staff had no way to reach older evaluations.
+Added `scr-evals` (list by period, newest first) reachable from More and
+from an "All evaluations" button on the Performance evaluation card.
+
+**Design polish integrated** (from the design review pass):
+- Domain colors are now reserved exclusively for domain identity; survey,
+  lead, and callout rails use neutral or primary.
+- Domain spines render at full strength (pastel-on-white was ~1.15:1 and
+  effectively invisible at arm's length).
+- **Score 1 is orange, never the missing-red.** An honest 1 is the fuel of
+  the system and must not be painted as failure.
+- The on-time check-out CTA no longer uses the "late" amber; amber is
+  reserved for genuinely missed weeks. Check-in and check-out get a
+  primary-bordered "attention" hero instead.
+- Type hierarchy split: task headings 17px, reference headings 15px.
+- Touch targets: time toggle, back pills, and small buttons all ≥44px.
+- Contrast fixes on level badges, delta arrows, win badge, and muted text
+  on tinted cards (new `--muted-tint` token).
+- Motion: press states everywhere, wizard step fade, scale-button press,
+  value fade when the confidence window changes, tab crossfade vs
+  drill-down slide.
+- Week list caps at 4 moves with a "+N more" expander so the CTA stays
+  above the fold; the CONF/PERF arrow slot always renders so columns
+  never go ragged.
+- Emoji replaced with inline 16px icons; resource tags are now 36px chips.
+- Tokens restructured as bare HSL triplets with paired `-ink` tokens,
+  which is the precondition for dark mode later.
+- New-hire Performance state added (no evaluation, warm framing).
+
+**Copy changes to confirm with John:**
+- "What you've flagged" → "Moves you're still building" (the review
+  argued "flagged" is surveillance vocabulary; John liked the module, so
+  this is a label change he should veto or keep).
+- "Your evaluator's next step" → "Ariyana's next step".
+- The no-focus state is no longer accusatory.
+- Prototype-invented copy standardizes on "Pro Moves"; verbatim
+  production strings (the deadline disclaimer's "ProMove scores") are
+  untouched, so production has a real inconsistency to settle.
+
+**Flagged upward, production bug:** `src/index.css` `.dark` does not
+darken the `-pastel` or `-score-bg` values, so pastel chips and score
+pills will glow near-white on dark backgrounds in the live app today.

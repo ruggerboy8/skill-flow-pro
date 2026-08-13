@@ -487,3 +487,38 @@ per competency (highlight material, warm coaching prose ~110-250 chars).
 `staff_quarter_focus` records the staff member's chosen focus Pro Move
 from their eval. `survey_assignments.status` backs a survey task card.
 `pro_move_resources` types: audio, script, video, link.
+
+## Addendum 3: v3 revisions from John's prototype review (2026-08-13)
+
+1. **Home order:** the week's ProMoves list is the top card, with the
+   Rate Confidence / Rate Performance CTA directly beneath it inside the
+   same card. Lead cards ("This week at your location", "Need to talk
+   something through?") are second-tier and sit at the bottom.
+2. **Performance page must have an opinion.** v2 was a buffet. v3 leads
+   with one question: "What am I working on, and is it moving?" The hero
+   is the staff member's quarterly focus move, its confidence trend, and
+   the coach's next step, with a direct link to that move's learning
+   resources. Everything else (trends, flagged items, latest evaluation,
+   participation) is reference material below.
+3. **"You end the week stronger" is cut.** Even reframed, self-reported
+   conf-to-perf lift doesn't tell staff much. Growth celebration stays in
+   the toast/win-banner layer, not as an analytical claim.
+4. **Domain rows become confidence-only trend lines** with a 3w / 6w /
+   Quarter toggle (mirrors the real OnTimeRateWidget lookback pattern).
+5. **Flagged items link to that move's learning resources** and back.
+6. **Back buttons must read as buttons** (restyled as pill buttons).
+7. **Trend lines are wanted broadly** (John reaffirmed).
+8. My Role: fine as-is; pull real domain names in the build; design the
+   domain → competency → move → resource drill with smooth transitions.
+
+Data coverage checks behind these decisions (live DB, 2026-08-13):
+- `staff_quarter_focus` covers 14 of 56 released evals, so the Performance
+  hero needs a fallback when no focus is chosen (e.g. lowest-trending
+  domain), and the eval review flow should keep nudging focus selection.
+- `observer_glow` / `observer_grow`: 9 glows and 125 grows across 864
+  released items; zero glows since June. The What's-working / Next-step
+  module therefore requires either an intake change (evaluators always
+  provide both, John's preference to consider) or generation from notes:
+  `observer_note` exists on 290 of 864 items (avg 208 chars) and
+  `evaluator_note` on 25 of 56 evals. Do not build the module before
+  settling this pipeline.

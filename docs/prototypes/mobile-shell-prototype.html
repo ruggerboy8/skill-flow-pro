@@ -81,7 +81,24 @@
   .row .r-sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
   .badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; border-radius: 999px; padding: 3px 8px; }
   .badge.new { background: hsl(214 95% 96%); color: hsl(217 80% 40%); }
-  .backlink { background: none; border: none; color: var(--muted); font-size: 14px; display: inline-flex; align-items: center; gap: 4px; padding: 0 0 10px; }
+  .backlink {
+    background: var(--card); border: 1px solid var(--border); border-radius: 999px;
+    color: var(--primary); font-size: 13.5px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px 7px 10px; margin-bottom: 12px;
+  }
+
+  /* subtle screen transition (John: smooth exploration between levels) */
+  @keyframes screenIn { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+  .screen.active { animation: screenIn .18s ease; }
+  @media (prefers-reduced-motion: reduce) { .screen.active { animation: none; } }
+
+  /* sparklines + time toggle */
+  .spark { width: 92px; height: 26px; flex: none; }
+  .spark polyline { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .spark circle { stroke: none; }
+  .toggle { display: inline-flex; gap: 4px; }
+  .toggle button { border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: 4px 10px; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .toggle button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
   .footnote { font-size: 11px; color: var(--muted); text-align: center; margin-top: 20px; line-height: 1.5; }
 
   /* ---- home ---- */
@@ -207,15 +224,21 @@
       <p class="eyebrow" id="home-date">Monday, Aug 17</p>
       <h1>Hi, Jordan</h1>
 
+      <!-- PRIMARY: this week's ProMoves at the top, CTA underneath (John, v2 review) -->
+      <div class="hero" id="hero">
+        <div style="display:flex; justify-content:space-between; align-items:baseline">
+          <h2>ProMoves</h2><span class="sub" id="weekOf">Week of Aug 17</span>
+        </div>
+        <div id="moveRows" style="margin-top:6px"></div>
+        <div id="heroState" style="margin-top:10px"></div>
+      </div>
+
       <!-- survey card: real PendingSurveysCard copy; not dismissible by design -->
       <div class="card survey" id="surveyCard" style="display:none">
         <h2>We'd love your input</h2>
         <p class="sub" style="margin-top:2px">Team Culture Pulse · Open until Aug 28</p>
         <button class="btn quiet sm" style="margin-top:10px" onclick="alert('Survey flow (exists today at /survey/:id).')">Take it →</button>
       </div>
-
-      <!-- week-state hero: copy from src/v2/weekCta.ts -->
-      <div class="hero" id="hero"></div>
 
       <!-- eval ready: real EvalReadyCard states -->
       <div class="card" id="evalCard" style="display:none">
@@ -247,7 +270,7 @@
         <p class="sub" style="font-style:italic">My note: "This quarter I want to stop letting families leave without knowing what happens next."</p>
       </div>
 
-      <!-- lead cards: real copy -->
+      <!-- second-tier: lead cards slide to the bottom (John, v2 review) -->
       <div class="card leadcard" id="leadCard">
         <p class="eyebrow">This week at your location</p>
         <p style="font-size:14px; margin-top:6px"><b id="leadCount">5 of 7</b> teammates checked in</p>
@@ -256,14 +279,6 @@
       <div class="card leadcard" id="leadMeetCard">
         <h2>Need to talk something through?</h2>
         <p class="sub" style="margin-top:2px">Book time with Ariyana whenever you need it.</p>
-      </div>
-
-      <!-- this week's moves: ThisWeekPanel row pattern -->
-      <div class="card" id="weekList">
-        <div style="display:flex; justify-content:space-between; align-items:baseline">
-          <h2>ProMoves</h2><span class="sub" id="weekOf">Week of Aug 17</span>
-        </div>
-        <div id="moveRows" style="margin-top:6px"></div>
       </div>
 
       <!-- real deadline disclaimer copy -->
@@ -355,54 +370,68 @@
       </div>
     </section>
 
-    <!-- ============ PERFORMANCE ============ -->
+    <!-- ============ PERFORMANCE ============
+         v3 thesis (John): the page must have an opinion. It answers ONE
+         question first — "What am I working on, and is it moving?" — then
+         offers the reference material below, clearly second-tier.
+         Data notes: quarter focus exists for 14/56 released evals today
+         (hero falls back to the lowest-trending domain when absent);
+         glow/grow columns exist but are thinly populated (9 glows / 125
+         grows of 864 released items), so the What's-working module
+         depends on an intake change or generation from observer notes
+         (290 items have notes, avg 208 chars). -->
     <section class="screen" id="scr-perf">
       <p class="eyebrow">How you're doing</p>
       <h1>Performance</h1>
 
-      <!-- headline pattern: conf→perf lift (mirrors live DB aggregates).
-           Both scores are self-reported, so this celebrates felt growth,
-           not measured outperformance (John, 2026-08-13). -->
+      <!-- THE OPINION: your one focus, and whether it's moving -->
       <div class="card insight">
-        <h2>You end the week stronger</h2>
-        <div class="bignums">
-          <div class="n"><div class="v">3.0</div><div class="l">Monday confidence</div></div>
-          <div class="arr">→</div>
-          <div class="n"><div class="v">3.3</div><div class="l">Friday performance</div></div>
+        <p class="eyebrow" style="color:hsl(160 60% 25%)">Your focus this quarter</p>
+        <p style="font-size:16px; font-weight:650; line-height:1.4; margin-top:6px">Offer the parent one clear next step before they leave the operatory.</p>
+        <p class="sub" style="margin-top:4px">You chose this from your Fall evaluation.</p>
+        <div style="display:flex; align-items:center; gap:12px; margin-top:12px">
+          <svg class="spark" style="width:140px; height:34px" viewBox="0 0 140 34" id="focusSpark" aria-label="Confidence trend for your focus"></svg>
+          <div>
+            <div style="font-size:20px; font-weight:800; font-variant-numeric:tabular-nums">2.9 <span style="font-size:12px; color:var(--positive); font-weight:700">▲ from 2.4</span></div>
+            <div class="sub" style="font-size:11px">Your confidence, this quarter</div>
+          </div>
         </div>
-        <p class="sub" style="text-align:center">In every domain, your end-of-week scores come in higher than where your confidence started. A week of practice moves the needle.</p>
+        <p class="sub" style="margin-top:12px; color:var(--ink)">Ariyana's next step for you: <span style="font-style:italic">"When a family leaves knowing what happens next, treatment actually happens."</span></p>
+        <button class="btn quiet sm" style="margin-top:12px" onclick="go('scr-domain','scr-perf')">Learning resources for this move</button>
       </div>
 
-      <!-- per-domain conf → perf -->
+      <!-- confidence trends, confidence only, with time toggle (John, v2 review) -->
       <div class="card">
-        <h2>By domain</h2>
-        <div style="margin-top:6px">
-          <div class="dom-line"><span class="spine" style="width:8px; height:22px; background:var(--clinical-pastel)"></span><span class="name">Clinical</span><span class="nums">3.2</span><span class="d-arr">→</span><span class="nums">3.5</span></div>
-          <div class="dom-line"><span class="spine" style="width:8px; height:22px; background:var(--clerical-pastel)"></span><span class="name">Clerical</span><span class="nums">2.9</span><span class="d-arr">→</span><span class="nums">3.3</span></div>
-          <div class="dom-line"><span class="spine" style="width:8px; height:22px; background:var(--cultural-pastel)"></span><span class="name">Cultural</span><span class="nums">2.9</span><span class="d-arr">→</span><span class="nums">3.3</span></div>
-          <div class="dom-line"><span class="spine" style="width:8px; height:22px; background:var(--caseacc-pastel)"></span><span class="name">Case Acceptance</span><span class="nums">3.0</span><span class="d-arr">→</span><span class="nums">3.2</span></div>
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <h2>Confidence over time</h2>
+          <div class="toggle" id="trendToggle">
+            <button data-win="3" aria-pressed="false">3w</button>
+            <button data-win="6" aria-pressed="false">6w</button>
+            <button data-win="12" aria-pressed="true">Quarter</button>
+          </div>
         </div>
+        <div id="domainTrends" style="margin-top:6px"></div>
       </div>
 
-      <!-- Priority Focus Areas: real StaffPriorityFocusTab semantics (confidence <= 2) -->
+      <!-- Priority Focus Areas: real StaffPriorityFocusTab semantics; rows link to resources -->
       <div class="card">
         <h2>What you've flagged</h2>
-        <p class="sub" style="margin-top:2px">Low confidence items from the past 6 weeks</p>
+        <p class="sub" style="margin-top:2px">Low confidence items from the past 6 weeks. Tap one for its learning resources.</p>
         <div style="margin-top:4px">
-          <div class="lowitem">
+          <button class="lowitem" style="width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--border)" onclick="go('scr-domain','scr-perf')">
             <div class="spine" style="background:var(--caseacc-pastel)"></div>
             <p>Offer the parent one clear next step before they leave.<br><span class="move-meta">Week of Aug 3</span></p>
             <span class="pill pill2">2</span>
-          </div>
-          <div class="lowitem">
+          </button>
+          <button class="lowitem" style="width:100%; text-align:left; background:none; border:0" onclick="go('scr-domain','scr-perf')">
             <div class="spine" style="background:var(--clerical-pastel)"></div>
             <p>Confirm tomorrow's first three families before you leave today.<br><span class="move-meta">Week of Jul 27</span></p>
             <span class="pill pill1">1</span>
-          </div>
+          </button>
         </div>
       </div>
 
-      <!-- latest evaluation: glow/grow surfaced (real columns, unshown today) -->
+      <!-- latest evaluation: what's working + coach note (grow lives in the hero) -->
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:baseline">
           <h2>Latest evaluation</h2><span class="sub">Fall 2026</span>
@@ -411,15 +440,11 @@
           <p class="gl">What's working</p>
           <p>Your narration has become second nature. Families settle faster in your rooms, and it shows in how visits flow.</p>
         </div>
-        <div class="glowgrow grow">
-          <p class="gl">Next step</p>
-          <p>The checkout moment is your biggest lever. When a family leaves knowing their next step, treatment actually happens.</p>
-        </div>
         <blockquote>"Proud of the quarter you put together. Let's make checkout conversations the thing we sharpen next." — Ariyana</blockquote>
         <button class="btn quiet sm" style="margin-top:12px" onclick="go('scr-evaldetail','scr-perf')">View full evaluation</button>
       </div>
 
-      <!-- participation: real OnTimeRateWidget numbers, quiet placement -->
+      <!-- participation: quiet, bottom -->
       <div class="card">
         <h2>Participation</h2>
         <div class="statline"><span>Meetings: <b>92%</b> (24/26)</span><span>On time: <b>88%</b></span></div>
@@ -534,52 +559,48 @@
     }).join('');
   }
 
-  // ---------- scenarios (hero copy verbatim from src/v2/weekCta.ts) ----------
+  // ---------- scenarios (state copy verbatim from src/v2/weekCta.ts;
+  // moves list sits above the CTA inside one primary card, John v2 review) ----------
   const scenarios = {
     checkin: {
       date: 'Monday, Aug 17', moves: 'none', survey: false, evalCard: false, win: false, focus: false, lead: '2 of 7',
       heroClass: '',
-      hero: `<p class="eyebrow">This week</p>
-        <div class="state-line"><span class="dot due"></span><h2>Check-in</h2></div>
+      state: `<div class="state-line"><span class="dot due"></span><h2>Check-in</h2></div>
         <p class="sub">Welcome back! Time to set your confidence for this week's Pro Moves.</p>
-        <button class="btn" onclick="startWizard()">Rate Confidence</button>`,
+        <button class="btn" style="margin-top:10px" onclick="startWizard()">Rate Confidence</button>`,
     },
     midweek: {
       date: 'Wednesday, Aug 19', moves: 'conf', survey: false, evalCard: true, win: false, focus: false, lead: '5 of 7',
       heroClass: '',
-      hero: `<p class="eyebrow">This week</p>
-        <div class="state-line"><span class="dot done"></span><h2>Confidence submitted ✅</h2></div>
+      state: `<div class="state-line"><span class="dot done"></span><h2>Confidence submitted ✅</h2></div>
         <p class="sub">Come back on Thursday to rate your performance.</p>`,
     },
     checkout: {
       date: 'Thursday, Aug 20', moves: 'conf', survey: true, evalCard: false, win: false, focus: false, lead: '6 of 7',
       heroClass: 'takeover',
-      hero: `<p class="eyebrow">This week</p>
-        <div class="state-line"><span class="dot due"></span><h2>Check-out</h2></div>
+      state: `<div class="state-line"><span class="dot due"></span><h2>Check-out</h2></div>
         <p class="sub">Time to reflect. Rate your performance for this week's Pro Moves.</p>
-        <button class="btn due" onclick="startWizard()">Rate Performance</button>`,
+        <button class="btn due" style="margin-top:10px" onclick="startWizard()">Rate Performance</button>`,
     },
     missed: {
       date: 'Saturday, Aug 22', moves: 'conf', survey: false, evalCard: false, win: false, focus: false, lead: '6 of 7',
       heroClass: 'takeover',
-      hero: `<p class="eyebrow">This week</p>
-        <div class="state-line"><span class="dot due"></span><h2>Still open</h2></div>
+      state: `<div class="state-line"><span class="dot due"></span><h2>Still open</h2></div>
         <p class="sub">Performance is late for this week — add it now to wrap things up.</p>
-        <button class="btn due" onclick="startWizard()">Rate Performance</button>`,
+        <button class="btn due" style="margin-top:10px" onclick="startWizard()">Rate Performance</button>`,
     },
     done: {
       date: 'Friday, Aug 21', moves: 'both', survey: false, evalCard: false, win: true, focus: true, lead: '7 of 7',
       heroClass: 'celebrate',
-      hero: `<p class="eyebrow">This week</p>
-        <div class="state-line"><span class="dot done"></span><h2>All set 🎉</h2></div>
+      state: `<div class="state-line"><span class="dot done"></span><h2>All set 🎉</h2></div>
         <p class="sub">Nice work! You're all set for this week.</p>`,
     },
   };
   function setScenario(name) {
     const s = scenarios[name];
     document.getElementById('home-date').textContent = s.date;
-    const hero = document.getElementById('hero');
-    hero.innerHTML = s.hero; hero.className = 'hero ' + s.heroClass;
+    document.getElementById('heroState').innerHTML = s.state;
+    document.getElementById('hero').className = 'hero ' + s.heroClass;
     document.getElementById('surveyCard').style.display = s.survey ? '' : 'none';
     document.getElementById('evalCard').style.display = s.evalCard ? '' : 'none';
     document.getElementById('winCard').style.display = s.win ? '' : 'none';
@@ -597,6 +618,38 @@
     document.getElementById('leadMeetCard').style.display = on ? '' : 'none';
   });
   setScenario('checkin');
+
+  // ---------- confidence trends (weekly_scores → domain averages per week) ----------
+  const trendSeries = [
+    { name: 'Clinical', spine: 'var(--clinical-pastel)', stroke: 'var(--clinical)', pts: [2.8,2.9,3.0,3.0,3.1,3.2,3.1,3.2,3.3,3.3,3.4,3.4] },
+    { name: 'Clerical', spine: 'var(--clerical-pastel)', stroke: 'var(--clerical)', pts: [3.0,3.0,2.9,3.1,3.0,3.0,3.1,3.0,3.1,3.0,3.1,3.1] },
+    { name: 'Cultural', spine: 'var(--cultural-pastel)', stroke: 'var(--cultural)', pts: [2.6,2.7,2.8,2.8,3.0,3.0,3.1,3.2,3.1,3.2,3.3,3.3] },
+    { name: 'Case Acceptance', spine: 'var(--caseacc-pastel)', stroke: 'var(--caseacc)', pts: [2.4,2.4,2.5,2.5,2.6,2.7,2.6,2.7,2.8,2.8,2.9,2.9] },
+  ];
+  function sparkline(pts, stroke, w, h) {
+    const pad = 3, lo = 1, hi = 4;
+    const x = i => pad + i * ((w - 2 * pad) / Math.max(pts.length - 1, 1));
+    const y = v => h - pad - ((v - lo) / (hi - lo)) * (h - 2 * pad);
+    const line = pts.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const last = pts.length - 1;
+    return `<polyline points="${line}" stroke="${stroke}"></polyline>
+            <circle cx="${x(last).toFixed(1)}" cy="${y(pts[last]).toFixed(1)}" r="3" fill="${stroke}"></circle>`;
+  }
+  function renderTrends(win) {
+    document.getElementById('domainTrends').innerHTML = trendSeries.map(s => {
+      const pts = s.pts.slice(-win);
+      return `<div class="dom-line">
+        <span class="spine" style="width:8px; height:22px; background:${s.spine}"></span>
+        <span class="name">${s.name}</span>
+        <svg class="spark" viewBox="0 0 92 26" aria-label="${s.name} confidence trend">${sparkline(pts, s.stroke, 92, 26)}</svg>
+        <span class="nums" style="width:26px; text-align:right">${pts[pts.length-1].toFixed(1)}</span>
+      </div>`;
+    }).join('');
+    document.querySelectorAll('#trendToggle button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.win) === win)));
+  }
+  document.querySelectorAll('#trendToggle button').forEach(b => b.addEventListener('click', () => renderTrends(Number(b.dataset.win))));
+  renderTrends(12);
+  document.getElementById('focusSpark').innerHTML = sparkline(trendSeries[3].pts, 'var(--caseacc)', 140, 34);
 
   // ---------- wizard (real NumberScale copy) ----------
   const scaleHints = {

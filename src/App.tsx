@@ -20,6 +20,7 @@ import Index from "@/pages/Index";
 import Welcome from "@/pages/Welcome";
 import Profile from "@/pages/Profile";
 import MorePage from "@/pages/mobile/MorePage";
+import PerformancePage from "@/pages/performance/PerformancePage";
 
 import ConfidenceWizard from "@/pages/ConfidenceWizard";
 import PerformanceWizard from "@/pages/PerformanceWizard";
@@ -146,6 +147,9 @@ function AppRoutes() {
 
         {/* Mobile shell: More tab (see docs/features/mobile-build-instructions.md B.4) */}
         <Route path="more" element={<MorePage />} />
+
+        {/* Performance tab (mobile-shell primary; renders in the content area on desktop too, no nav entry) */}
+        <Route path="performance" element={<PerformancePage />} />
         
         {/* Redirect legacy pages to wizard versions */}
         <Route path="confidence/:week" element={<RedirectToStepOne base="confidence" />} />

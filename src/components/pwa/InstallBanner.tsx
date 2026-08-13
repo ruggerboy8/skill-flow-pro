@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { X, Share, PlusSquare, Download } from 'lucide-react';
+import { X, Share, PlusSquare, Download, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   isStandalone,
   isIos,
+  isIosSafari,
   isBannerDismissed,
   dismissBanner,
   getDeferredInstallPrompt,
@@ -24,6 +25,7 @@ export function InstallBanner() {
   const isMobile = useIsMobile();
   const [dismissed, setDismissed] = useState(isBannerDismissed());
   const [canPrompt, setCanPrompt] = useState(!!getDeferredInstallPrompt());
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => onInstallPromptAvailable(() => setCanPrompt(true)), []);
 
@@ -37,6 +39,16 @@ export function InstallBanner() {
   const handleSharedDevice = () => {
     setDeviceOptOut();
     setDismissed(true);
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.origin);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      /* clipboard unavailable — the URL is visible in the address bar */
+    }
   };
 
   return (
@@ -57,7 +69,7 @@ export function InstallBanner() {
             Already have a Pro Moves icon on your home screen? <span className="font-medium text-foreground">Delete it first</span> — it's
             an old bookmark and can't receive notifications.
           </p>
-          {isIos() ? (
+          {isIosSafari() ? (
             <ol className="list-decimal pl-5 space-y-1">
               <li>
                 Tap the Share button <Share className="inline h-4 w-4 align-text-bottom" /> in Safari
@@ -68,6 +80,27 @@ export function InstallBanner() {
               </li>
               <li>Open Pro Moves from your home screen and sign in</li>
             </ol>
+          ) : isIos() ? (
+            <>
+              {/* Chrome/Firefox/Edge on iOS: Apple only lets Safari install a
+                  full app with notifications, so route the user there. */}
+              <p>
+                On iPhone, the app installs from{' '}
+                <span className="font-medium text-foreground">Safari</span>. Copy the link, open
+                Safari, and paste it there — the install steps will appear.
+              </p>
+              <Button size="sm" variant="outline" className="w-full" onClick={handleCopyLink}>
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-1.5" /> Link copied — now open Safari
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-1.5" /> Copy link for Safari
+                  </>
+                )}
+              </Button>
+            </>
           ) : canPrompt ? (
             <Button size="sm" className="w-full" onClick={() => triggerInstallPrompt()}>
               Install Pro Moves

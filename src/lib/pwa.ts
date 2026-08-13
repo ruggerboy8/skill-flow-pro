@@ -63,7 +63,24 @@ export function isStandalone(): boolean {
 }
 
 export function isIos(): boolean {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+  // Modern iPads report as "Macintosh" with touch support, so UA sniffing
+  // alone misses them.
+  return (
+    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+/**
+ * On iOS, ONLY Safari can install a PWA — Chrome/Firefox/Edge on iOS run
+ * WebKit but Apple restricts Add to Home Screen installability to Safari.
+ * Detection: every third-party iOS browser adds its own UA marker
+ * (CriOS = Chrome, FxiOS = Firefox, EdgiOS = Edge, OPT = Opera, plus
+ * GSA/DuckDuckGo for in-app webviews). Safari is iOS minus all of those.
+ */
+export function isIosSafari(): boolean {
+  if (!isIos()) return false;
+  return !/crios|fxios|edgios|opt\/|gsa|duckduckgo/i.test(navigator.userAgent);
 }
 
 export function getDeferredInstallPrompt(): any {

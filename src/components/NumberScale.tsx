@@ -51,7 +51,7 @@ export default function NumberScale({ value, onChange, disabled, hideTips, metri
             onClick={() => handleClick(score)}
             disabled={disabled}
             aria-label={`${metric === 'confidence' ? 'Confidence' : 'Performance'} ${score} – ${tooltipText[score as keyof typeof tooltipText]}`}
-            className={`h-12 w-full text-lg font-semibold transition-all ${
+            className={`h-12 w-full text-lg font-semibold transition-all active:scale-[0.94] motion-reduce:active:scale-100 ${
               value !== score ? 'hover:bg-slate-50 border-slate-200 text-slate-600' : ''
             }`}
             style={getScoreStyle(score, value === score)}
@@ -61,9 +61,13 @@ export default function NumberScale({ value, onChange, disabled, hideTips, metri
         ))}
       </div>
 
-      {persistentTooltip && !hideTips && (
-        <div className="text-sm text-muted-foreground p-3 bg-muted rounded-lg">
-          <strong>{persistentTooltip}</strong> – {tooltipText[persistentTooltip as keyof typeof tooltipText]}
+      {!hideTips && (
+        <div className="min-h-[52px] flex items-center text-sm text-muted-foreground p-3 bg-muted rounded-lg">
+          {persistentTooltip && (
+            <span>
+              <strong>{persistentTooltip}</strong> – {tooltipText[persistentTooltip as keyof typeof tooltipText]}
+            </span>
+          )}
         </div>
       )}
     </div>

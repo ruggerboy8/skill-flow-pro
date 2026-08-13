@@ -75,7 +75,9 @@ export default function ConfidenceWizard() {
   const [optionsByCompetency, setOptionsByCompetency] = useState<{ [key: number]: { action_id: string; action_statement: string }[] }>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [submitPhase, setSubmitPhase] = useState<'idle' | 'saving' | 'done'>('idle');
+  // 'retry' surfaces useReliableSubmission's queued-for-retry state (display
+  // only — the retry logic itself is unchanged). See section D.2.
+  const [submitPhase, setSubmitPhase] = useState<'idle' | 'saving' | 'done' | 'retry'>('idle');
   const [hasConfidence, setHasConfidence] = useState(false);
   const [showIntervention, setShowIntervention] = useState(false);
   const [direction, setDirection] = useState(1);
@@ -100,14 +102,14 @@ export default function ConfidenceWizard() {
   const scoresStorageKey = user?.id ? `confidence-scores-${user.id}-${weekContext}` : null;
   const selectionsStorageKey = user?.id ? `confidence-selections-${user.id}-${weekContext}` : null;
 
-  // Restore scores and selections from sessionStorage on mount
+  // Restore scores and selections from localStorage on mount
   useEffect(() => {
     if (scoresStorageKey) {
-      const storedScores = sessionStorage.getItem(scoresStorageKey);
+      const storedScores = localStorage.getItem(scoresStorageKey);
       if (storedScores) {
         try {
           const parsed = JSON.parse(storedScores);
-          debug('Restoring scores from sessionStorage:', parsed);
+          debug('Restoring scores from localStorage:', parsed);
           setScores(parsed);
         } catch (e) {
           console.error('Failed to parse stored scores:', e);
@@ -115,11 +117,11 @@ export default function ConfidenceWizard() {
       }
     }
     if (selectionsStorageKey) {
-      const storedSelections = sessionStorage.getItem(selectionsStorageKey);
+      const storedSelections = localStorage.getItem(selectionsStorageKey);
       if (storedSelections) {
         try {
           const parsed = JSON.parse(storedSelections);
-          debug('Restoring selections from sessionStorage:', parsed);
+          debug('Restoring selections from localStorage:', parsed);
           setSelectedActions(parsed);
         } catch (e) {
           console.error('Failed to parse stored selections:', e);
@@ -923,12 +925,12 @@ export default function ConfidenceWizard() {
       // Show checkmark phase
       setSubmitPhase('done');
       
-      // Clear sessionStorage on successful submission
+      // Clear localStorage on successful submission
       if (scoresStorageKey) {
-        sessionStorage.removeItem(scoresStorageKey);
+        localStorage.removeItem(scoresStorageKey);
       }
       if (selectionsStorageKey) {
-        sessionStorage.removeItem(selectionsStorageKey);
+        localStorage.removeItem(selectionsStorageKey);
       }
 
       // Fire confetti for non-repair submissions
@@ -952,17 +954,17 @@ export default function ConfidenceWizard() {
       // Don't show error toast - useReliableSubmission handles retries in background
       debug('Immediate submission failed, retries queued in background');
       
-      // Clear sessionStorage
+      // Clear localStorage
       if (scoresStorageKey) {
-        sessionStorage.removeItem(scoresStorageKey);
+        localStorage.removeItem(scoresStorageKey);
       }
       if (selectionsStorageKey) {
-        sessionStorage.removeItem(selectionsStorageKey);
+        localStorage.removeItem(selectionsStorageKey);
       }
       
-      setSubmitPhase('idle');
+      setSubmitPhase('retry');
       setSubmitting(false);
-      
+
       // Always navigate - data will be saved via background retries
       if (isRepair) {
         const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
@@ -988,9 +990,9 @@ export default function ConfidenceWizard() {
     };
     setScores(newScores);
     
-    // Persist to sessionStorage
+    // Persist to localStorage
     if (scoresStorageKey) {
-      sessionStorage.setItem(scoresStorageKey, JSON.stringify(newScores));
+      localStorage.setItem(scoresStorageKey, JSON.stringify(newScores));
     }
   };
   
@@ -1002,9 +1004,9 @@ export default function ConfidenceWizard() {
     };
     setSelectedActions(newSelections);
     
-    // Persist to sessionStorage
+    // Persist to localStorage
     if (selectionsStorageKey) {
-      sessionStorage.setItem(selectionsStorageKey, JSON.stringify(newSelections));
+      localStorage.setItem(selectionsStorageKey, JSON.stringify(newSelections));
     }
   };
 
@@ -1190,11 +1192,19 @@ export default function ConfidenceWizard() {
             )}
           >
             {submitPhase === 'done' ? (
-              <Check className="h-5 w-5 animate-scale-in" />
+              <>
+                <Check className="h-5 w-5 mr-1 animate-scale-in" />
+                Saved
+              </>
             ) : submitPhase === 'saving' ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
+                Saving…
+              </>
+            ) : submitPhase === 'retry' ? (
+              <>
+                <AlertCircle className="h-4 w-4 mr-2" />
+                Will retry
               </>
             ) : isLastItem ? (
               <>

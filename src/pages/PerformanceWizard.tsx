@@ -19,7 +19,7 @@ import { useNow } from '@/providers/NowProvider';
 import { useSim } from '@/devtools/SimProvider';
 import { assembleCurrentWeek } from '@/lib/weekAssembly';
 import { useReliableSubmission } from '@/hooks/useReliableSubmission';
-import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fireCelebration } from '@/lib/confetti';
@@ -83,7 +83,9 @@ export default function PerformanceWizard() {
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [submitPhase, setSubmitPhase] = useState<'idle' | 'saving' | 'done'>('idle');
+  // 'retry' surfaces useReliableSubmission's queued-for-retry state (display
+  // only — the retry logic itself is unchanged). See section D.2.
+  const [submitPhase, setSubmitPhase] = useState<'idle' | 'saving' | 'done' | 'retry'>('idle');
   const [isCarryoverWeek, setIsCarryoverWeek] = useState(false);
   const [isConfidenceExcused, setIsConfidenceExcused] = useState(false);
   const [showVictory, setShowVictory] = useState(false);
@@ -111,14 +113,14 @@ export default function PerformanceWizard() {
   const weekContext = isRepair ? weekOf : 'current';
   const scoresStorageKey = user?.id ? `performance-scores-${user.id}-${weekContext}` : null;
 
-  // Restore scores from sessionStorage on mount
+  // Restore scores from localStorage on mount
   useEffect(() => {
     if (scoresStorageKey) {
-      const storedScores = sessionStorage.getItem(scoresStorageKey);
+      const storedScores = localStorage.getItem(scoresStorageKey);
       if (storedScores) {
         try {
           const parsed = JSON.parse(storedScores);
-          console.log('Restoring performance scores from sessionStorage:', parsed);
+          console.log('Restoring performance scores from localStorage:', parsed);
           setPerformanceScores(parsed);
         } catch (e) {
           console.error('Failed to parse stored performance scores:', e);
@@ -861,9 +863,9 @@ export default function PerformanceWizard() {
       // Show checkmark phase
       setSubmitPhase('done');
       
-      // Clear sessionStorage on successful submission
+      // Clear localStorage on successful submission
       if (scoresStorageKey) {
-        sessionStorage.removeItem(scoresStorageKey);
+        localStorage.removeItem(scoresStorageKey);
       }
 
       // Fire confetti for non-repair submissions
@@ -881,14 +883,14 @@ export default function PerformanceWizard() {
         }
       }, isRepair ? 800 : 1800);
     } else {
-      // Clear sessionStorage on successful submission
+      // Clear localStorage on successful submission
       if (scoresStorageKey) {
-        sessionStorage.removeItem(scoresStorageKey);
+        localStorage.removeItem(scoresStorageKey);
       }
-      
-      setSubmitPhase('idle');
+
+      setSubmitPhase('retry');
       setSubmitting(false);
-      
+
       // Navigate based on mode
       if (isRepair) {
         const dest = returnTo ? decodeURIComponent(returnTo) : '/my-role/practice-log';
@@ -909,9 +911,9 @@ export default function PerformanceWizard() {
     };
     setPerformanceScores(newScores);
     
-    // Persist to sessionStorage
+    // Persist to localStorage
     if (scoresStorageKey) {
-      sessionStorage.setItem(scoresStorageKey, JSON.stringify(newScores));
+      localStorage.setItem(scoresStorageKey, JSON.stringify(newScores));
     }
   };
 
@@ -1079,11 +1081,19 @@ export default function PerformanceWizard() {
             )}
           >
             {submitPhase === 'done' ? (
-              <Check className="h-5 w-5 animate-scale-in" />
+              <>
+                <Check className="h-5 w-5 mr-1 animate-scale-in" />
+                Saved
+              </>
             ) : submitPhase === 'saving' ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
+                Saving…
+              </>
+            ) : submitPhase === 'retry' ? (
+              <>
+                <AlertCircle className="h-4 w-4 mr-2" />
+                Will retry
               </>
             ) : isLastItem ? (
               <>

@@ -13,6 +13,8 @@ interface AuthContextType {
   isOrgAdmin: boolean;
   isParticipant: boolean;
   isLead: boolean;
+  /** staff.pwa_enabled — per-user PWA activation flag (see src/lib/pwa.ts) */
+  pwaEnabled: boolean;
   signInWithOtp: (email: string) => Promise<{ error: any }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error: any }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error: any }>;
@@ -34,23 +36,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isOrgAdmin, setIsOrgAdmin] = useState(false);
   const [isParticipant, setIsParticipant] = useState(true);
   const [isLead, setIsLead] = useState(false);
+  const [pwaEnabled, setPwaEnabled] = useState(false);
 
   useEffect(() => {
     const checkUserStatus = async (userId: string) => {
       setRoleLoading(true);
       try {
-        const { data } = await supabase
+        // pwa_enabled is a recent additive column; generated types lag until
+        // Lovable's next regen, so the row is typed by hand here.
+        const { data: rawData } = await supabase
           .from('staff')
-          .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead')
+          .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead, pwa_enabled' as 'is_coach')
           .eq('user_id', userId)
           .single();
-        
+        const data = rawData as unknown as {
+          is_coach: boolean; is_super_admin: boolean; is_org_admin: boolean | null;
+          is_participant: boolean; is_lead: boolean | null; pwa_enabled: boolean | null;
+        } | null;
+
         if (data) {
-          setIsCoach(data.is_coach || data.is_super_admin || data.is_org_admin);
+          setIsCoach(data.is_coach || data.is_super_admin || !!data.is_org_admin);
           setIsSuperAdmin(data.is_super_admin);
           setIsOrgAdmin(data.is_org_admin || false);
           setIsParticipant(data.is_participant);
           setIsLead(data.is_lead || false);
+          setPwaEnabled(data.pwa_enabled || false);
         } else {
           // No staff record exists - reset all roles
           setIsCoach(false);
@@ -58,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsOrgAdmin(false);
           setIsParticipant(true);
           setIsLead(false);
+          setPwaEnabled(false);
         }
       } finally {
         setRoleLoading(false);
@@ -112,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsOrgAdmin(false);
           setIsParticipant(true);
           setIsLead(false);
+          setPwaEnabled(false);
         }
         
         setLoading(false);
@@ -204,18 +216,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     setRoleLoading(true);
     try {
-      const { data } = await supabase
+      const { data: rawData } = await supabase
         .from('staff')
-        .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead')
+        .select('is_coach, is_super_admin, is_org_admin, is_participant, is_lead, pwa_enabled' as 'is_coach')
         .eq('user_id', user.id)
         .single();
-      
+      const data = rawData as unknown as {
+        is_coach: boolean; is_super_admin: boolean; is_org_admin: boolean | null;
+        is_participant: boolean; is_lead: boolean | null; pwa_enabled: boolean | null;
+      } | null;
+
       if (data) {
-        setIsCoach(data.is_coach || data.is_super_admin || data.is_org_admin);
+        setIsCoach(data.is_coach || data.is_super_admin || !!data.is_org_admin);
         setIsSuperAdmin(data.is_super_admin);
         setIsOrgAdmin(data.is_org_admin || false);
         setIsParticipant(data.is_participant);
         setIsLead(data.is_lead || false);
+        setPwaEnabled(data.pwa_enabled || false);
       } else {
         setIsCoach(false);
         setIsSuperAdmin(false);
@@ -242,6 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isOrgAdmin,
       isParticipant,
       isLead,
+      pwaEnabled,
       signInWithOtp,
       signInWithPassword,
       signUpWithPassword,

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { PwaManager } from "@/components/pwa/PwaManager";
 import { BatchProcessorProvider } from "@/contexts/BatchProcessorContext";
 import { SimProvider } from "@/devtools/SimProvider";
 
@@ -238,6 +239,7 @@ export default function App() {
               <RouteErrorBoundary>
                 <AppRoutes />
               </RouteErrorBoundary>
+              <PwaManager />
               <Toaster />
             </BrowserRouter>
           </BatchProcessorProvider>

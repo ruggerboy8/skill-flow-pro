@@ -121,6 +121,20 @@ All colors MUST be HSL.
     --score-2-bg: 45 100% 90%;
     --score-3-bg: 211 100% 92%;
     --score-4-bg: 160 84% 90%;
+
+    /* Mobile shell: ink pairs for tinted surfaces + muted text on tint */
+    --muted-tint: 215 20% 38%;
+    --clinical-ink: 211 70% 30%;
+    --clerical-ink: 123 45% 22%;
+    --cultural-ink: 330 50% 32%;
+    --case-acceptance-ink: 30 70% 28%;
+    --complete-ink: 142 71% 24%;
+    --late-ink: 40 80% 25%;
+    --missing-ink: 0 70% 35%;
+    --score-1-ink: 24 85% 27%;
+    --score-2-ink: 40 80% 25%;
+    --score-3-ink: 211 70% 30%;
+    --score-4-ink: 160 84% 20%;
    }
 
   .dark {
@@ -166,11 +180,11 @@ All colors MUST be HSL.
     --domain-cultural: 330 85% 60%;
     --domain-case-acceptance: 36 90% 55%;
 
-    /* Domain colors (pastel) */
-    --domain-clinical-pastel: 211 100% 92%;
-    --domain-clerical-pastel: 123 41% 88%;
-    --domain-cultural-pastel: 354 70% 89%;
-    --domain-case-acceptance-pastel: 36 100% 90%;
+    /* Domain colors (pastel) — dark-tuned so chips don't glow near-white on dark cards */
+    --domain-clinical-pastel: 211 50% 22%;
+    --domain-clerical-pastel: 123 45% 20%;
+    --domain-cultural-pastel: 330 50% 22%;
+    --domain-case-acceptance-pastel: 36 55% 22%;
 
     /* Score colors (1–4 scale) */
     --score-1: 24 95% 53%;
@@ -178,11 +192,25 @@ All colors MUST be HSL.
     --score-3: 211 85% 55%;
     --score-4: 160 84% 39%;
 
-    /* Score colors pastel (backgrounds) */
-    --score-1-bg: 24 100% 93%;
-    --score-2-bg: 45 100% 90%;
-    --score-3-bg: 211 100% 92%;
-    --score-4-bg: 160 84% 90%;
+    /* Score colors pastel (backgrounds) — dark-tuned, see domain pastels above */
+    --score-1-bg: 24 50% 22%;
+    --score-2-bg: 45 50% 22%;
+    --score-3-bg: 211 50% 22%;
+    --score-4-bg: 160 50% 20%;
+
+    /* Mobile shell: ink pairs, lightened for dark tinted surfaces */
+    --muted-tint: 215 20% 70%;
+    --clinical-ink: 211 70% 80%;
+    --clerical-ink: 123 45% 80%;
+    --cultural-ink: 330 50% 80%;
+    --case-acceptance-ink: 30 70% 80%;
+    --complete-ink: 142 71% 80%;
+    --late-ink: 40 80% 80%;
+    --missing-ink: 0 70% 80%;
+    --score-1-ink: 24 85% 80%;
+    --score-2-ink: 40 80% 80%;
+    --score-3-ink: 211 70% 80%;
+    --score-4-ink: 160 84% 80%;
   }
 }
 

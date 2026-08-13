@@ -1,15 +1,16 @@
 # Mobile Design Principles (PWA Track B foundation)
 
-**Status:** v0.1 draft for John's review, 2026-08-13, produced by design
-research pass. Companion docs: `pwa-push-notifications.md` (section C is
-the Tier 1 surface this designs for; H and I record the decision that led
-here) and `ask-alcan-assistant.md` (the future chat surface this IA must
-leave room for). This is the shared model we agree on before any screen
-gets drawn; John reviews the open questions at the end first. Written
-after reading the system overview, glossary, management model, both
-feature docs, and the Tier 1 code (`Index.tsx`, `ThisWeekPanel.tsx`,
-`LeadFocusHomeCard.tsx`, `ConfidenceWizard.tsx`, `MyRoleLayout.tsx`,
-`Layout.tsx`, and the token system in `index.css` /
+**Status:** v0.2, 2026-08-13. v0.1 was the design research pass; John's
+first review landed the same day and his IA direction supersedes section
+7's recommendation. See the addendum at the bottom ("John's first review
+pass") before reading section 7. Prototyping is underway from a blank-slate
+usage model rather than a slot-the-existing-features exercise. Companion
+docs: `pwa-push-notifications.md` (section C is the Tier 1 surface this
+designs for) and `ask-alcan-assistant.md` (the future chat surface this IA
+must leave room for). Written after reading the system overview, glossary,
+management model, both feature docs, and the Tier 1 code (`Index.tsx`,
+`ThisWeekPanel.tsx`, `LeadFocusHomeCard.tsx`, `ConfidenceWizard.tsx`,
+`MyRoleLayout.tsx`, `Layout.tsx`, and the token system in `index.css` /
 `tailwind.config.ts`).
 
 ---
@@ -404,3 +405,38 @@ What changes or gets stricter on small screens:
 Next step once these are answered: fold decisions into v0.2, then build
 the clickable prototype for the recommended IA and the two ritual flows,
 per the process locked in `pwa-push-notifications.md` section I.
+
+---
+
+## Addendum: John's first review pass (2026-08-13)
+
+John's direction after reading v0.1, which supersedes the section 7 IA
+recommendation:
+
+1. **No Inbox tab.** Anticipated notification traffic does not justify a
+   dedicated tab. Notification history lives under More; the day-one
+   in-app log (backed by `notification_log`) is still built, it just isn't
+   a tab.
+2. **The v1 tab set is three: Home | My Role | More.** The fourth tab,
+   when it arrives, is **Ask**, not Inbox.
+3. **My Role's purpose is redefined as learning and reference
+   exploration.** The name stays for now, but the flag on the tent is:
+   this is where you browse and discover the Pro Moves and resources for
+   your role. Honest usage read: staff rarely open it unprompted today
+   (mostly at a coach's urging in a coaching conversation), and the most
+   common self-directed reason is finding an evaluation. Ask (future) is
+   for specific questions; My Role is for exploration. The two complement
+   rather than compete.
+4. **My Role slims down: Overview stays; Practice Log and Evaluations
+   relocate** (working assumption: under More, with evaluations also
+   reachable through Home cards and push deep links at the moments they
+   matter). Staff are unlikely to browse practice logs or meeting
+   participation rates unprompted now that attendance is healthy.
+5. **Method change: design from a blank slate, not from the current
+   feature list.** First imagine how staff will use the app given the
+   one-stop-shop vision, then audit each existing feature against that
+   model: slots in cleanly / belongs but needs renaming, retooling, or
+   relocating / not actually important to keep surfaced.
+
+The clickable prototype iterates from this direction; decisions get folded
+back here as they harden.

@@ -1,0 +1,507 @@
+<!-- Pro Moves mobile shell prototype v1 — Home | My Role | More
+     Design source: docs/features/mobile-design-principles.md + John's
+     first review (addendum). Tokens mirror src/index.css. Fake data only.
+     Published as a private artifact so John can click through on a phone. -->
+<title>Pro Moves Mobile Prototype</title>
+<style>
+  :root {
+    --bg: hsl(210 40% 98%);
+    --ink: hsl(222 47% 11%);
+    --muted: hsl(215 16% 47%);
+    --card: hsl(0 0% 100%);
+    --border: hsl(214 32% 91%);
+    --primary: hsl(215 25% 27%);
+    --primary-ink: hsl(210 40% 98%);
+    --clinical: hsl(211 85% 55%);     --clinical-pastel: hsl(211 100% 92%);
+    --clerical: hsl(123 60% 45%);     --clerical-pastel: hsl(123 41% 88%);
+    --cultural: hsl(330 85% 60%);     --cultural-pastel: hsl(354 70% 89%);
+    --caseacc: hsl(36 90% 55%);       --caseacc-pastel: hsl(36 100% 90%);
+    --complete: hsl(142 71% 45%);     --complete-bg: hsl(142 76% 92%);
+    --late: hsl(45 93% 47%);          --late-bg: hsl(48 96% 89%);
+    --missing: hsl(0 84% 60%);        --missing-bg: hsl(0 93% 94%);
+    --win: hsl(160 84% 39%);          --win-bg: hsl(152 81% 96%);  --win-border: hsl(149 80% 85%);
+    --score1: hsl(24 95% 53%); --score4: hsl(160 84% 39%);
+    --radius: 14px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: hsl(215 25% 92%);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100dvh;
+  }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ---- scenario bar (prototype chrome, not part of the app) ---- */
+  .scenario-bar {
+    width: 100%; max-width: 430px;
+    padding: 10px 12px 8px;
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    font-size: 12px;
+  }
+  .scenario-bar .lbl { color: hsl(215 15% 40%); text-transform: uppercase; letter-spacing: .06em; font-size: 10px; font-weight: 600; margin-right: 2px; }
+  .chip {
+    border: 1px solid hsl(215 20% 78%); background: hsl(210 30% 96%);
+    border-radius: 999px; padding: 4px 10px; font-size: 12px; color: hsl(215 20% 30%);
+  }
+  .chip[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+
+  /* ---- phone frame ---- */
+  .phone {
+    width: 100%; max-width: 430px; height: min(860px, calc(100dvh - 52px));
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    border-radius: 22px; overflow: hidden;
+    box-shadow: 0 8px 40px hsl(215 30% 20% / .18);
+    position: relative;
+  }
+  @media (max-width: 450px) {
+    body { background: var(--bg); }
+    .phone { height: calc(100dvh - 44px); border-radius: 0; box-shadow: none; max-width: none; }
+  }
+
+  .screens { flex: 1; overflow: hidden; position: relative; }
+  .screen { position: absolute; inset: 0; overflow-y: auto; padding: 20px 16px 24px; display: none; }
+  .screen.active { display: block; }
+
+  /* ---- bottom tab bar ---- */
+  .tabbar {
+    display: flex; border-top: 1px solid var(--border); background: var(--card);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tab {
+    flex: 1; background: none; border: none; padding: 8px 0 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    color: var(--muted); font-size: 10.5px; font-weight: 500; letter-spacing: .02em;
+    min-height: 52px;
+  }
+  .tab svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .tab[aria-selected="true"] { color: var(--primary); font-weight: 600; }
+
+  /* ---- shared bits ---- */
+  .eyebrow { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 15px; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; margin-top: 12px;
+  }
+  .btn {
+    display: block; width: 100%; border: none; border-radius: 12px;
+    padding: 15px; font-size: 16px; font-weight: 600;
+    background: var(--primary); color: var(--primary-ink);
+  }
+  .btn.quiet { background: hsl(215 25% 27% / .08); color: var(--primary); }
+  .btn.go { background: var(--complete); }
+  .btn.due { background: var(--late); color: hsl(30 60% 12%); }
+  .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 14px 2px; border-bottom: 1px solid var(--border);
+    background: none; border-left: none; border-right: none; border-top: none;
+    width: 100%; text-align: left; font-size: 15px; color: var(--ink);
+  }
+  .row:last-child { border-bottom: none; }
+  .row .arrow { color: var(--muted); flex: none; }
+  .row .r-sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; border-radius: 999px; padding: 3px 8px; }
+  .badge.done { background: var(--complete-bg); color: hsl(142 71% 28%); }
+  .badge.due  { background: var(--late-bg); color: hsl(40 80% 28%); }
+  .badge.new  { background: hsl(214 95% 96%); color: hsl(217 80% 40%); }
+  .badge.soon { background: hsl(215 25% 27% / .07); color: var(--muted); }
+  .backlink {
+    background: none; border: none; color: var(--muted); font-size: 14px;
+    display: inline-flex; align-items: center; gap: 4px; padding: 0 0 10px;
+  }
+
+  /* ---- home ---- */
+  .greet { margin-top: 2px; }
+  .hero { margin-top: 14px; border-radius: var(--radius); padding: 18px 16px; border: 1px solid var(--border); background: var(--card); }
+  .hero .state-line { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .dot.done { background: var(--complete); }
+  .dot.due { background: var(--late); }
+  .dot.wait { background: hsl(215 20% 80%); }
+  .hero.takeover { background: var(--late-bg); border-color: hsl(45 80% 70%); }
+  .hero.celebrate { background: var(--win-bg); border-color: var(--win-border); }
+  .moves-mini { display: flex; gap: 6px; margin: 10px 0 14px; }
+  .move-pip { flex: 1; height: 6px; border-radius: 3px; background: hsl(215 20% 88%); }
+  .move-pip.filled { background: var(--complete); }
+  .leadcard { border-left: 4px solid var(--clinical); }
+  .ghost {
+    margin-top: 12px; border: 1.5px dashed hsl(215 20% 78%); border-radius: var(--radius);
+    padding: 14px 16px; color: var(--muted); font-size: 13px; background: none; width: 100%; text-align: left;
+  }
+
+  /* ---- my role ---- */
+  .domain-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .domain-card { border: none; border-radius: var(--radius); padding: 14px; text-align: left; min-height: 92px; display: flex; flex-direction: column; justify-content: space-between; }
+  .domain-card b { font-size: 14px; }
+  .domain-card span { font-size: 12px; opacity: .75; }
+  .d-clinical { background: var(--clinical-pastel); color: hsl(211 70% 25%); }
+  .d-clerical { background: var(--clerical-pastel); color: hsl(123 45% 18%); }
+  .d-cultural { background: var(--cultural-pastel); color: hsl(330 50% 28%); }
+  .d-caseacc  { background: var(--caseacc-pastel); color: hsl(30 70% 25%); }
+  .move-item { padding: 13px 2px; border-bottom: 1px solid var(--border); }
+  .move-item:last-child { border-bottom: none; }
+  .move-item p { font-size: 14.5px; line-height: 1.4; }
+  .resource-tag { display: inline-flex; gap: 4px; align-items: center; font-size: 11px; color: var(--muted); margin-top: 5px; margin-right: 10px; }
+
+  /* ---- wizard ---- */
+  .wiz { display: flex; flex-direction: column; height: 100%; }
+  .wiz-progress { display: flex; gap: 6px; margin: 6px 0 22px; }
+  .wiz-progress .seg { flex: 1; height: 4px; border-radius: 2px; background: hsl(215 20% 88%); }
+  .wiz-progress .seg.on { background: var(--primary); }
+  .wiz-domain { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 3px 8px; border-radius: 999px; display: inline-block; }
+  .wiz-q { font-size: 20px; font-weight: 650; line-height: 1.35; margin: 12px 0 6px; text-wrap: balance; }
+  .scale { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: auto; padding-top: 24px; }
+  .scale button {
+    aspect-ratio: 1; border-radius: 14px; border: 1.5px solid var(--border); background: var(--card);
+    font-size: 22px; font-weight: 700; color: var(--ink);
+  }
+  .scale button.sel { border-color: var(--primary); background: var(--primary); color: var(--primary-ink); }
+  .scale-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .wiz-next { margin-top: 16px; }
+  .confetti-wrap { position: relative; overflow: hidden; text-align: center; padding: 60px 0 30px; }
+  .confetti { position: absolute; width: 8px; height: 8px; border-radius: 2px; top: -10px; animation: fall 1.8s ease-in forwards; }
+  @keyframes fall { to { transform: translateY(360px) rotate(280deg); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .confetti { display: none; } }
+  .bigcheck { width: 64px; height: 64px; border-radius: 50%; background: var(--complete-bg); color: var(--complete); display: inline-flex; align-items: center; justify-content: center; font-size: 30px; margin-bottom: 14px; }
+
+  /* ---- eval detail ---- */
+  .scorebar { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .scorebar .track { flex: 1; height: 8px; border-radius: 4px; background: hsl(215 20% 90%); overflow: hidden; }
+  .scorebar .fill { height: 100%; border-radius: 4px; }
+  .scorenum { font-weight: 700; font-variant-numeric: tabular-nums; width: 30px; text-align: right; }
+  blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted); font-size: 14px; line-height: 1.5; margin-top: 10px; font-style: italic; }
+
+  .footnote { font-size: 11px; color: var(--muted); text-align: center; margin-top: 20px; }
+  :focus-visible { outline: 2px solid var(--clinical); outline-offset: 2px; }
+</style>
+
+<div class="scenario-bar" role="toolbar" aria-label="Prototype scenarios">
+  <span class="lbl">Scenario</span>
+  <button class="chip" data-scn="monday" aria-pressed="true">Monday</button>
+  <button class="chip" data-scn="midweek" aria-pressed="false">Midweek</button>
+  <button class="chip" data-scn="thursday" aria-pressed="false">Thursday</button>
+  <button class="chip" data-scn="done" aria-pressed="false">Week done</button>
+  <span class="lbl" style="margin-left:6px">View</span>
+  <button class="chip" id="leadToggle" aria-pressed="true">Lead</button>
+</div>
+
+<div class="phone">
+  <div class="screens">
+
+    <!-- ============ HOME ============ -->
+    <section class="screen active" id="scr-home">
+      <div class="greet">
+        <p class="eyebrow" id="home-date">Monday, Aug 17</p>
+        <h1 id="home-hi">Hi, Jordan</h1>
+      </div>
+
+      <!-- week-state hero: content swapped per scenario -->
+      <div class="hero" id="hero"></div>
+
+      <!-- win banner (done scenario) -->
+      <div class="card" id="winCard" style="display:none; background: var(--win-bg); border-color: var(--win-border);">
+        <p class="eyebrow" style="color:hsl(160 60% 25%)">Growth win</p>
+        <p style="font-size:14px; margin-top:4px; line-height:1.45">Your confidence on <b>narrating before you act</b> grew two weeks in a row. Keep it up.</p>
+      </div>
+
+      <!-- eval released card -->
+      <div class="card" id="evalCard" style="display:none">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <h2>Your evaluation is ready</h2>
+          <span class="badge new">New</span>
+        </div>
+        <p class="sub" style="margin-top:4px">Ariyana released your August evaluation.</p>
+        <button class="btn quiet" style="margin-top:12px" onclick="go('scr-evaldetail','scr-home')">Read it</button>
+      </div>
+
+      <!-- lead card -->
+      <div class="card leadcard" id="leadCard">
+        <p class="eyebrow">Your team · Cedar Park</p>
+        <p style="font-size:14px; margin-top:6px"><b id="leadCount">5 of 7</b> checked in this week</p>
+        <p class="sub" style="margin-top:4px">This week's location focus: <b style="color:var(--ink)">room turnover narration</b></p>
+      </div>
+
+      <!-- room-to-grow: future schedule slot -->
+      <button class="ghost" onclick="alert('Future: your Deputy schedule lands here as a Home card.')">
+        🗓 Your schedule <span style="float:right">coming later</span>
+      </button>
+
+      <p class="footnote">Prototype · fake data · v1</p>
+    </section>
+
+    <!-- ============ CHECK-IN WIZARD ============ -->
+    <section class="screen" id="scr-wizard">
+      <div class="wiz">
+        <button class="backlink" onclick="go('scr-home')">‹ Save &amp; exit</button>
+        <div class="wiz-progress" id="wizProgress"></div>
+        <div id="wizBody"></div>
+      </div>
+    </section>
+
+    <!-- ============ MY ROLE ============ -->
+    <section class="screen" id="scr-role">
+      <p class="eyebrow">My Role · RDA</p>
+      <h1>Explore your craft</h1>
+      <p class="sub" style="margin-top:6px">The Pro Moves, scripts, and examples for your role. Browse by domain, or ask a specific question once <b>Ask</b> arrives.</p>
+
+      <div class="domain-grid">
+        <button class="domain-card d-clinical" onclick="go('scr-domain','scr-role')"><b>Clinical</b><span>14 Pro Moves</span></button>
+        <button class="domain-card d-clerical" onclick="go('scr-domain','scr-role')"><b>Clerical</b><span>9 Pro Moves</span></button>
+        <button class="domain-card d-cultural" onclick="go('scr-domain','scr-role')"><b>Cultural</b><span>11 Pro Moves</span></button>
+        <button class="domain-card d-caseacc" onclick="go('scr-domain','scr-role')"><b>Case Acceptance</b><span>7 Pro Moves</span></button>
+      </div>
+
+      <div class="card">
+        <h2>This week's focus</h2>
+        <p class="sub" style="margin-top:4px">Narrate what you're doing before you do it, so the parent never wonders what's happening.</p>
+        <span class="resource-tag">📄 Script</span><span class="resource-tag">🎧 Example</span>
+      </div>
+    </section>
+
+    <!-- ============ DOMAIN DETAIL ============ -->
+    <section class="screen" id="scr-domain">
+      <button class="backlink" onclick="back()">‹ My Role</button>
+      <span class="wiz-domain d-clinical">Clinical</span>
+      <h1 style="margin-top:8px">Clinical Pro Moves</h1>
+      <div class="card" style="padding: 4px 16px;">
+        <div class="move-item">
+          <p><b>Narrate before you act.</b> Tell the parent and patient what you're about to do before you do it.</p>
+          <span class="resource-tag">📄 Script</span><span class="resource-tag">🎧 Audio example</span>
+        </div>
+        <div class="move-item">
+          <p><b>Set the room before the huddle.</b> Hygiene rooms fully turned over before morning huddle starts.</p>
+          <span class="resource-tag">📄 Checklist</span>
+        </div>
+        <div class="move-item">
+          <p><b>Support your doctor during pro fees.</b> Anticipate the next instrument; keep the conversation with the parent flowing.</p>
+          <span class="resource-tag">🎧 Example</span>
+        </div>
+        <div class="move-item">
+          <p><b>Comfort narration for nervous patients.</b> Name the sensation before it happens ("you'll feel a little cold water").</p>
+          <span class="resource-tag">📄 Script</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MORE ============ -->
+    <section class="screen" id="scr-more">
+      <h1>More</h1>
+      <div class="card" style="padding: 2px 16px;">
+        <button class="row" onclick="go('scr-evals','scr-more')">
+          <span>My evaluations<span class="r-sub">2 released</span></span><span class="arrow">›</span>
+        </button>
+        <button class="row" onclick="alert('Practice log: your week-by-week check-in history (mock).')">
+          <span>Practice log<span class="r-sub">Your weekly history</span></span><span class="arrow">›</span>
+        </button>
+        <button class="row" onclick="go('scr-notifs','scr-more')">
+          <span>Notifications<span class="r-sub">3 recent</span></span><span class="arrow">›</span>
+        </button>
+        <button class="row" onclick="alert('Profile (mock).')">
+          <span>Profile</span><span class="arrow">›</span>
+        </button>
+      </div>
+      <div class="card" style="padding: 2px 16px;">
+        <button class="row" onclick="alert('Ask Alcan: ask anything about working at Alcan. Coming soon.')">
+          <span>Ask Alcan<span class="r-sub">Answers about how we work</span></span><span class="badge soon">Soon</span>
+        </button>
+      </div>
+      <div class="card" style="padding: 2px 16px;">
+        <button class="row" style="color:var(--muted)"><span>Sign out</span></button>
+      </div>
+    </section>
+
+    <!-- ============ EVAL LIST ============ -->
+    <section class="screen" id="scr-evals">
+      <button class="backlink" onclick="back()">‹ More</button>
+      <h1>My evaluations</h1>
+      <div class="card" style="padding: 2px 16px;">
+        <button class="row" onclick="go('scr-evaldetail','scr-evals')">
+          <span>August 2026<span class="r-sub">Released Aug 11 · Ariyana</span></span><span class="badge new">New</span>
+        </button>
+        <button class="row" onclick="go('scr-evaldetail','scr-evals')">
+          <span>May 2026<span class="r-sub">Released May 14 · Ariyana</span></span><span class="arrow">›</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ============ EVAL DETAIL ============ -->
+    <section class="screen" id="scr-evaldetail">
+      <button class="backlink" onclick="back()">‹ Back</button>
+      <p class="eyebrow">Evaluation · August 2026</p>
+      <h1>Strong, steady growth</h1>
+      <div class="card">
+        <div class="scorebar"><span style="width:110px; font-size:13px">Clinical</span><div class="track"><div class="fill" style="width:85%; background:var(--score4)"></div></div><span class="scorenum">3.4</span></div>
+        <div class="scorebar"><span style="width:110px; font-size:13px">Clerical</span><div class="track"><div class="fill" style="width:75%; background:var(--score4)"></div></div><span class="scorenum">3.0</span></div>
+        <div class="scorebar"><span style="width:110px; font-size:13px">Cultural</span><div class="track"><div class="fill" style="width:90%; background:var(--score4)"></div></div><span class="scorenum">3.6</span></div>
+        <div class="scorebar"><span style="width:110px; font-size:13px">Case Accept.</span><div class="track"><div class="fill" style="width:60%; background:var(--score1)"></div></div><span class="scorenum">2.4</span></div>
+      </div>
+      <div class="card">
+        <h2>From Ariyana</h2>
+        <blockquote>Your narration this month changed how parents settle into the room, and it shows in the cultural score. Next month let's work on offering the specific next step at checkout.</blockquote>
+      </div>
+    </section>
+
+    <!-- ============ NOTIFICATIONS ============ -->
+    <section class="screen" id="scr-notifs">
+      <button class="backlink" onclick="back()">‹ More</button>
+      <h1>Notifications</h1>
+      <div class="card" style="padding: 2px 16px;">
+        <button class="row" onclick="go('scr-evaldetail','scr-notifs')">
+          <span>Your evaluation is ready<span class="r-sub">Yesterday · Tap to read</span></span><span class="badge new">New</span>
+        </button>
+        <button class="row" onclick="alert('Coach note (mock): Great energy in the huddle this morning!')">
+          <span>Note from Ariyana<span class="r-sub">Tuesday</span></span><span class="arrow">›</span>
+        </button>
+        <button class="row" onclick="setScenario('thursday'); go('scr-home')">
+          <span>Check-out reminder<span class="r-sub">Last Thursday</span></span><span class="arrow">›</span>
+        </button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============ TAB BAR ============ -->
+  <nav class="tabbar" role="tablist" aria-label="Main navigation">
+    <button class="tab" role="tab" data-tab="scr-home" aria-selected="true">
+      <svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+      Home
+    </button>
+    <button class="tab" role="tab" data-tab="scr-role" aria-selected="false">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8"/></svg>
+      My Role
+    </button>
+    <button class="tab" role="tab" data-tab="scr-more" aria-selected="false">
+      <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+      More
+    </button>
+  </nav>
+</div>
+
+<script>
+  // ---------- tiny nav ----------
+  let backTarget = null;
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    const tabOwner = { 'scr-home':'scr-home','scr-wizard':'scr-home','scr-role':'scr-role','scr-domain':'scr-role',
+                       'scr-more':'scr-more','scr-evals':'scr-more','scr-evaldetail':'scr-more','scr-notifs':'scr-more' }[id];
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === tabOwner)));
+  }
+  function go(id, from) { if (from) backTarget = from; show(id); }
+  function back() { show(backTarget || 'scr-home'); }
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => show(t.dataset.tab)));
+
+  // ---------- scenarios ----------
+  const scenarios = {
+    monday: {
+      date: 'Monday, Aug 17',
+      hero: `
+        <p class="eyebrow">This week</p>
+        <div class="state-line"><span class="dot due"></span><h2>Check-in is open</h2></div>
+        <p class="sub">Set your confidence on this week's 6 Pro Moves. Takes about two minutes.</p>
+        <div class="moves-mini">${'<span class="move-pip"></span>'.repeat(6)}</div>
+        <button class="btn" onclick="startWizard()">Check in</button>`,
+      heroClass: '', win: false, evalCard: false, leadCount: '2 of 7',
+    },
+    midweek: {
+      date: 'Wednesday, Aug 19',
+      hero: `
+        <p class="eyebrow">This week</p>
+        <div class="state-line"><span class="dot done"></span><h2>Checked in ✓</h2></div>
+        <p class="sub">Nice. Check-out opens Thursday, due before Friday's huddle.</p>
+        <div class="moves-mini">${'<span class="move-pip filled"></span>'.repeat(6)}</div>
+        <button class="btn quiet" onclick="go('scr-role')">Browse this week's moves</button>`,
+      heroClass: '', win: false, evalCard: true, leadCount: '5 of 7',
+    },
+    thursday: {
+      date: 'Thursday, Aug 20',
+      hero: `
+        <p class="eyebrow">Due before Friday's huddle</p>
+        <div class="state-line"><span class="dot due"></span><h2>Time to check out</h2></div>
+        <p class="sub">How did this week's moves actually go? Two minutes, then you're done for the week.</p>
+        <div class="moves-mini">${'<span class="move-pip filled"></span>'.repeat(6)}</div>
+        <button class="btn due" onclick="startWizard()">Check out</button>`,
+      heroClass: 'takeover', win: false, evalCard: false, leadCount: '6 of 7',
+    },
+    done: {
+      date: 'Friday, Aug 21',
+      hero: `
+        <p class="eyebrow">This week</p>
+        <div class="state-line"><span class="dot done"></span><h2>Week complete 🎉</h2></div>
+        <p class="sub">Check-in and check-out both in. See you at the huddle.</p>`,
+      heroClass: 'celebrate', win: true, evalCard: false, leadCount: '7 of 7',
+    },
+  };
+  function setScenario(name) {
+    const s = scenarios[name];
+    document.getElementById('home-date').textContent = s.date;
+    const hero = document.getElementById('hero');
+    hero.innerHTML = s.hero;
+    hero.className = 'hero ' + s.heroClass;
+    document.getElementById('winCard').style.display = s.win ? '' : 'none';
+    document.getElementById('evalCard').style.display = s.evalCard ? '' : 'none';
+    document.getElementById('leadCount').textContent = s.leadCount;
+    document.querySelectorAll('[data-scn]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.scn === name)));
+  }
+  document.querySelectorAll('[data-scn]').forEach(c => c.addEventListener('click', () => { setScenario(c.dataset.scn); show('scr-home'); }));
+  document.getElementById('leadToggle').addEventListener('click', () => {
+    const t = document.getElementById('leadToggle');
+    const on = t.getAttribute('aria-pressed') !== 'true';
+    t.setAttribute('aria-pressed', String(on));
+    document.getElementById('leadCard').style.display = on ? '' : 'none';
+  });
+  setScenario('monday');
+
+  // ---------- wizard ----------
+  const moves = [
+    { domain: 'Clinical', cls: 'd-clinical', text: 'Narrate what you\'re doing before you do it, so the parent never wonders what\'s happening.' },
+    { domain: 'Cultural', cls: 'd-cultural', text: 'Greet every teammate by name before the morning huddle starts.' },
+    { domain: 'Case Acceptance', cls: 'd-caseacc', text: 'Offer the parent one specific next step before they leave the operatory.' },
+  ];
+  let wizStep = 0, wizScores = [];
+  function startWizard() { wizStep = 0; wizScores = []; renderWiz(); show('scr-wizard'); }
+  function renderWiz() {
+    document.getElementById('wizProgress').innerHTML =
+      moves.map((_, i) => `<span class="seg ${i <= wizStep ? 'on' : ''}"></span>`).join('');
+    if (wizStep >= moves.length) return renderWizDone();
+    const m = moves[wizStep];
+    document.getElementById('wizBody').innerHTML = `
+      <span class="wiz-domain ${m.cls}">${m.domain}</span>
+      <p class="wiz-q">${m.text}</p>
+      <p class="sub">How confident do you feel about this one right now?</p>
+      <div class="scale">
+        ${[1,2,3,4].map(n => `<button onclick="pick(${n}, this)">${n}</button>`).join('')}
+      </div>
+      <div class="scale-labels"><span>Not yet</span><span>Got this</span></div>
+      <button class="btn wiz-next" id="wizNext" style="opacity:.4" disabled onclick="nextStep()">Next</button>`;
+  }
+  function pick(n, el) {
+    wizScores[wizStep] = n;
+    el.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('sel'));
+    el.classList.add('sel');
+    const next = document.getElementById('wizNext');
+    next.disabled = false; next.style.opacity = '1';
+    next.textContent = wizStep === moves.length - 1 ? 'Finish' : 'Next';
+  }
+  function nextStep() { wizStep++; renderWiz(); }
+  function renderWizDone() {
+    const colors = ['var(--clinical)','var(--cultural)','var(--caseacc)','var(--complete)'];
+    const bits = Array.from({length: 26}, (_, i) =>
+      `<span class="confetti" style="left:${(i * 37) % 100}%; background:${colors[i % 4]}; animation-delay:${(i % 9) * .12}s"></span>`).join('');
+    document.getElementById('wizBody').innerHTML = `
+      <div class="confetti-wrap">${bits}
+        <div class="bigcheck">✓</div>
+        <h1>Checked in</h1>
+        <p class="sub" style="margin-top:8px">That's the week set. See you Thursday for check-out.</p>
+        <button class="btn" style="margin-top:26px" onclick="setScenario('midweek'); go('scr-home')">Done</button>
+      </div>`;
+  }
+</script>

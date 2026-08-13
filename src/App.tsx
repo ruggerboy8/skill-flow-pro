@@ -21,6 +21,8 @@ import Welcome from "@/pages/Welcome";
 import Profile from "@/pages/Profile";
 import MorePage from "@/pages/mobile/MorePage";
 import PerformancePage from "@/pages/performance/PerformancePage";
+import TeamPage from "@/pages/team/TeamPage";
+import TeamStaffPage from "@/pages/team/TeamStaffPage";
 
 import ConfidenceWizard from "@/pages/ConfidenceWizard";
 import PerformanceWizard from "@/pages/PerformanceWizard";
@@ -42,7 +44,7 @@ import EvaluationReview from "@/pages/EvaluationReview";
 import EvaluationReviewV2 from "@/pages/EvaluationReviewV2";
 import AdminBuilder from "@/pages/AdminBuilder";
 import NotFound from "@/pages/NotFound";
-import { RequireAccess, allowCoachSurface, allowDashboard, allowFacilitate, allowStaffEvals, allowTraining } from "@/components/RequireAccess";
+import { RequireAccess, allowCoachSurface, allowDashboard, allowFacilitate, allowStaffEvals, allowTraining, allowTeam } from "@/components/RequireAccess";
 import TrainingHome from "@/pages/training/TrainingHome";
 import StatsEvaluations from "@/pages/stats/StatsEvaluations";
 import LocationDetail from "@/pages/dashboard/LocationDetail";
@@ -150,6 +152,10 @@ function AppRoutes() {
 
         {/* Performance tab (mobile-shell primary; renders in the content area on desktop too, no nav entry) */}
         <Route path="performance" element={<PerformancePage />} />
+
+        {/* Team surface (leads) — mobile-shell only entry points, section F */}
+        <Route path="team" element={<RequireAccess allow={allowTeam}><TeamPage /></RequireAccess>} />
+        <Route path="team/:staffId" element={<RequireAccess allow={allowTeam}><TeamStaffPage /></RequireAccess>} />
         
         {/* Redirect legacy pages to wizard versions */}
         <Route path="confidence/:week" element={<RedirectToStepOne base="confidence" />} />

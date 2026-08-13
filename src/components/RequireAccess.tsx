@@ -73,3 +73,11 @@ export const allowTraining = (r: RoleInfo) =>
 /** Regional dashboard ("Command Center") audience: admins, regional managers, coaches. */
 export const allowDashboard = (r: RoleInfo) =>
   r.isSuperAdmin || r.isOrgAdmin || r.isRegional || r.isCoach || r.canAccessAdmin;
+
+/**
+ * Team surface (mobile-shell /team, /team/:staffId) audience — leads plus
+ * anyone who already has coach-surface access. allowCoachSurface already
+ * includes isLead, so in practice this is the same set; defined separately
+ * for clarity per docs/features/mobile-build-instructions.md section F.
+ */
+export const allowTeam = (r: RoleInfo) => r.isLead || allowCoachSurface(r);

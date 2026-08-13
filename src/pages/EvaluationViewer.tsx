@@ -156,7 +156,7 @@ export default function EvaluationViewer() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get('returnTo');
-  const { user, isCoach, isSuperAdmin } = useAuth();
+  const { user, isCoach, isSuperAdmin, isLead } = useAuth();
   const [loading, setLoading] = useState(true);
   const [evaluation, setEvaluation] = useState<EvaluationWithItems | null>(null);
   const [staffName, setStaffName] = useState<string>('');
@@ -172,10 +172,10 @@ export default function EvaluationViewer() {
 
     (async () => {
       try {
-        // Get current user's staff id
+        // Get current user's staff id (+ location, for the lead-access check below)
         const { data: staff } = await supabase
           .from('staff')
-          .select('id')
+          .select('id, primary_location_id')
           .eq('user_id', user.id)
           .maybeSingle();
 
@@ -186,7 +186,7 @@ export default function EvaluationViewer() {
 
         // Get evaluation
         const evalData = await getEvaluation(evalId);
-        
+
         if (!evalData) {
           setError("Evaluation not found.");
           return;
@@ -198,9 +198,21 @@ export default function EvaluationViewer() {
           return;
         }
 
-        // Allow access if: own evaluation OR is coach/admin
+        // Allow access if: own evaluation OR is coach/admin OR a lead viewing a
+        // teammate at their own location (mobile-shell Team surface, section F.2 —
+        // leads can already read coach-surface data via allowCoachSurface, this
+        // just extends the evaluation viewer's own allow-list to match).
         const isOwnEval = evalData.staff_id === staff.id;
-        if (!isOwnEval && !isCoach && !isSuperAdmin) {
+        let isLeadForThisStaff = false;
+        if (!isOwnEval && isLead && staff.primary_location_id) {
+          const { data: targetStaff } = await supabase
+            .from('staff')
+            .select('primary_location_id')
+            .eq('id', evalData.staff_id)
+            .maybeSingle();
+          isLeadForThisStaff = targetStaff?.primary_location_id === staff.primary_location_id;
+        }
+        if (!isOwnEval && !isCoach && !isSuperAdmin && !isLeadForThisStaff) {
           setError("You don't have access to this evaluation.");
           return;
         }
@@ -235,6 +247,8 @@ export default function EvaluationViewer() {
         // Set back URL: if coach viewing another staff's evaluation, go to that staff's page
         if ((isCoach || isSuperAdmin) && evalData.staff_id !== staff.id) {
           setBackUrl(`/coach/${evalData.staff_id}`);
+        } else if (isLeadForThisStaff) {
+          setBackUrl(`/team/${evalData.staff_id}`);
         }
 
         // Mark viewed only if staff is viewing their OWN evaluation

@@ -26,7 +26,7 @@ export function ProMoveRow({ move, onClick }: ProMoveRowProps) {
             }
           : undefined
       }
-      className="group flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3 rounded-lg border border-transparent hover:bg-muted/50 hover:border-border/50 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3 min-h-[44px] rounded-lg border border-transparent hover:bg-muted/50 hover:border-border/50 active:bg-muted/60 active:scale-[0.99] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {/* Content */}
       <div className="flex-1 space-y-1.5">

@@ -67,7 +67,7 @@ export default function DomainDetail() {
             variant="ghost"
             size="sm"
             onClick={() => navigate('/my-role')}
-            className="mb-6 -ml-2 text-muted-foreground hover:text-foreground"
+            className="mb-6 -ml-2 min-h-[44px] text-muted-foreground hover:text-foreground active:bg-muted/50"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Overview

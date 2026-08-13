@@ -55,7 +55,7 @@ export default function CompetencyAccordion({
       }}
     >
       <CollapsibleTrigger asChild>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 md:p-5 cursor-pointer w-full text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 md:p-5 min-h-[44px] cursor-pointer w-full text-left active:bg-muted/40 transition-colors">
           {/* Text Group - Expands */}
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground leading-tight text-base">

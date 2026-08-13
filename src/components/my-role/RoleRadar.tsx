@@ -23,6 +23,7 @@ export default function RoleRadar() {
   
   const [loading, setLoading] = useState(true);
   const [domainScores, setDomainScores] = useState<Map<string, number>>(new Map());
+  const [periodLabel, setPeriodLabel] = useState<string | null>(null);
 
   // Resolve role type from the role's archetype (multi-tenant safe).
   const archetype = (staffProfile as any)?.roles?.archetype_code ?? null;
@@ -49,25 +50,29 @@ export default function RoleRadar() {
           const evalIds = [...new Set(data.map(r => r.eval_id))];
           const { data: evalData } = await supabase
             .from('evaluations')
-            .select('id, is_visible_to_staff')
+            .select('id, is_visible_to_staff, type, quarter, program_year')
             .in('id', evalIds);
-          
+
           const visibilityMap = new Map<string, boolean>();
+          const periodMap = new Map<string, string>();
           if (evalData) {
-            evalData.forEach(e => visibilityMap.set(e.id, e.is_visible_to_staff));
+            evalData.forEach(e => {
+              visibilityMap.set(e.id, e.is_visible_to_staff);
+              periodMap.set(e.id, e.type === 'Baseline' ? `Baseline ${e.program_year}` : `${e.quarter} ${e.program_year}`);
+            });
           }
 
           // Group by eval_id to find the most recent VISIBLE evaluation
           const evalGroups = new Map<string, { submitted_at: string; domains: DomainScore[] }>();
-          
+
           for (const row of data) {
             // Skip non-visible evaluations
             if (!visibilityMap.get(row.eval_id)) continue;
-            
+
             if (!evalGroups.has(row.eval_id)) {
-              evalGroups.set(row.eval_id, { 
-                submitted_at: row.submitted_at, 
-                domains: [] 
+              evalGroups.set(row.eval_id, {
+                submitted_at: row.submitted_at,
+                domains: []
               });
             }
             evalGroups.get(row.eval_id)!.domains.push({
@@ -77,10 +82,12 @@ export default function RoleRadar() {
           }
 
           // Find most recent visible evaluation
+          let mostRecentEvalId: string | null = null;
           let mostRecent: { submitted_at: string; domains: DomainScore[] } | null = null;
-          for (const evalData of evalGroups.values()) {
+          for (const [evalId, evalData] of evalGroups.entries()) {
             if (!mostRecent || new Date(evalData.submitted_at) > new Date(mostRecent.submitted_at)) {
               mostRecent = evalData;
+              mostRecentEvalId = evalId;
             }
           }
 
@@ -93,6 +100,7 @@ export default function RoleRadar() {
               }
             }
             setDomainScores(scoreMap);
+            if (mostRecentEvalId) setPeriodLabel(periodMap.get(mostRecentEvalId) ?? null);
           }
         }
       } finally {
@@ -177,10 +185,10 @@ export default function RoleRadar() {
         })}
       </div>
 
-      {/* Footnote */}
+      {/* Footnote — Copy appendix, verbatim */}
       {hasAnyScores && (
         <p className="text-xs text-muted-foreground text-center">
-          * Domain averages from most recent evaluation
+          Averages from your {periodLabel ?? 'most recent'} evaluation.
         </p>
       )}
     </div>

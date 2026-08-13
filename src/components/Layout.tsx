@@ -19,10 +19,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PendingSurveysCard } from '@/components/home/PendingSurveysCard';
 import { ProMovesLogo } from '@/components/ProMovesLogo';
 import { ALCAN_ORG_ID } from '@/lib/askAlcanAccess';
+import { useMobileShell } from '@/hooks/useMobileShell';
+import { MobileTabBar } from '@/components/mobile/MobileTabBar';
 // Server-side backfill detection via RPC
 
 export default function Layout() {
   const { user, signOut, roleLoading, refreshRoles } = useAuth();
+  const isMobileShell = useMobileShell();
   const queryClient = useQueryClient();
   const [isSimConsoleOpen, setIsSimConsoleOpen] = useState(false);
   const { data: staffProfile } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
@@ -223,6 +226,32 @@ export default function Layout() {
           </div>
           <Skeleton className="h-64 w-full rounded-xl" />
         </div>
+      </div>
+    );
+  }
+
+  // Mobile shell: no sidebar, no hamburger — sticky header reduced to the
+  // Alcan mark + wordmark, page content, then the bottom tab bar. Gated by
+  // useMobileShell() (mobile viewport + PWA flag); everyone else falls
+  // through to the unchanged sidebar layout below.
+  if (isMobileShell) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-card flex-none sticky top-0 z-10">
+          <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            Pro Moves
+          </span>
+        </header>
+
+        <main className="flex-1 overflow-auto w-full p-4">
+          <div className="mb-4 empty:mb-0">
+            <PendingSurveysCard />
+          </div>
+          <Outlet />
+        </main>
+
+        <MobileTabBar />
       </div>
     );
   }

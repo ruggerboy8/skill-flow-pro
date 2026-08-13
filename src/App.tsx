@@ -19,6 +19,7 @@ import Layout from "@/components/Layout";
 import Index from "@/pages/Index";
 import Welcome from "@/pages/Welcome";
 import Profile from "@/pages/Profile";
+import MorePage from "@/pages/mobile/MorePage";
 
 import ConfidenceWizard from "@/pages/ConfidenceWizard";
 import PerformanceWizard from "@/pages/PerformanceWizard";
@@ -142,6 +143,9 @@ function AppRoutes() {
 
         <Route path="profile" element={<Profile />} />
         <Route path="reset-password" element={<ResetPassword />} />
+
+        {/* Mobile shell: More tab (see docs/features/mobile-build-instructions.md B.4) */}
+        <Route path="more" element={<MorePage />} />
         
         {/* Redirect legacy pages to wizard versions */}
         <Route path="confidence/:week" element={<RedirectToStepOne base="confidence" />} />

@@ -34,6 +34,10 @@ async function transcribeWithWhisper(
   whisperFormData.append('file', audioFile, fileName);
   whisperFormData.append('model', 'whisper-1');
   whisperFormData.append('language', 'en');
+  // temperature 0 + verbose_json lets us detect and drop hallucinated segments
+  // that Whisper emits over silence (e.g. "visit www.fema.gov").
+  whisperFormData.append('temperature', '0');
+  whisperFormData.append('response_format', 'verbose_json');
   // Prompt hint improves accuracy for domain-specific vocabulary and prevents hallucination on short clips
   whisperFormData.append('prompt', 'This is a clinical director providing a baseline assessment of a pediatric dentist. They are commenting on specific Pro Moves related to clinical skills, case acceptance, cultural behavior, and clerical tasks. Terms include: sealants, SDF, Curodont, bitewings, PA, pano, RDA, odontogram, caries risk, sedation, nitrous, pulp therapy, DEJ, anticipatory guidance, morning huddle, space maintainer.');
 
@@ -54,9 +58,50 @@ async function transcribeWithWhisper(
   }
 
   const data = await response.json();
-  console.log('[transcribe-audio] Whisper transcription successful, length:', data.text?.length || 0);
-  
-  return { transcript: data.text };
+
+  // Drop segments Whisper is confident are not speech, or is very unsure about.
+  const segments: any[] = Array.isArray(data.segments) ? data.segments : [];
+  let text: string = data.text || '';
+  if (segments.length > 0) {
+    const kept = segments.filter(
+      (s) => !((s.no_speech_prob ?? 0) > 0.6 && (s.avg_logprob ?? 0) < -0.4),
+    );
+    text = kept.map((s) => (s.text || '').trim()).join(' ').trim();
+    if (kept.length !== segments.length) {
+      console.warn('[transcribe-audio] Dropped', segments.length - kept.length, 'non-speech segments');
+    }
+  }
+
+  text = stripHallucinations(text);
+
+  console.log('[transcribe-audio] Whisper transcription successful, length:', text.length);
+
+  if (!text) throw new Error('NO_SPEECH_DETECTED');
+
+  return { transcript: text };
+}
+
+/**
+ * Whisper emits a small set of canned phrases when it hears silence or noise
+ * (subtitle-credit and PSA boilerplate from its training data). Strip them so
+ * a silent clip returns nothing instead of nonsense like "visit www.fema.gov".
+ */
+const HALLUCINATION_PATTERNS: RegExp[] = [
+  /(?:please\s+)?visit\s+(?:www\.)?fema\.gov[^.]*\.?/gi,
+  /for more information[^.]*(?:fema|ready)\.gov[^.]*\.?/gi,
+  /subtitles?\s+by[^.\n]*\.?/gi,
+  /transcription\s+by[^.\n]*\.?/gi,
+  /(?:thanks?|thank you) for watching[^.\n]*\.?/gi,
+  /please subscribe[^.\n]*\.?/gi,
+  /www\.[a-z0-9.-]+\.(?:com|org|gov)/gi,
+  /\bcopyright\b[^.\n]*\d{4}[^.\n]*\.?/gi,
+  /^[\s.!?♪-]*$/g,
+];
+
+function stripHallucinations(input: string): string {
+  let out = input || '';
+  for (const re of HALLUCINATION_PATTERNS) out = out.replace(re, ' ');
+  return out.replace(/\s{2,}/g, ' ').trim();
 }
 
 /**
@@ -89,9 +134,12 @@ async function transcribeWithElevenLabs(
   }
 
   const data = await response.json();
-  console.log('[transcribe-audio] ElevenLabs transcription successful, length:', data.text?.length || 0);
-  
-  return { transcript: data.text };
+  const cleaned = stripHallucinations(data.text || '');
+  console.log('[transcribe-audio] ElevenLabs transcription successful, length:', cleaned.length);
+
+  if (!cleaned) throw new Error('NO_SPEECH_DETECTED');
+
+  return { transcript: cleaned };
 }
 
 serve(async (req) => {
@@ -197,14 +245,18 @@ serve(async (req) => {
         rawMsg,
       );
 
-    const friendly = looksCorrupted
+    const noSpeech = /NO_SPEECH_DETECTED/.test(rawMsg);
+
+    const friendly = noSpeech
+      ? "We couldn't hear any speech in that recording — the mic may have been muted or the wrong input was selected. Please check your microphone and record again."
+      : looksCorrupted
       ? "We couldn't read this recording — the audio file appears to be corrupted (this can happen when a recording is paused and resumed). Please record a new clip in one take and try again."
       : rawMsg;
 
     // Return 200 with structured error so the client sees the real message
     // (supabase.functions.invoke swallows the body on non-2xx responses).
     return new Response(
-      JSON.stringify({ error: friendly, detail: rawMsg, corrupted: looksCorrupted }),
+      JSON.stringify({ error: friendly, detail: rawMsg, corrupted: looksCorrupted, noSpeech }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }

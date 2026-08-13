@@ -169,7 +169,7 @@ export function DoctorDetailThread({ sessions, coachName = 'Your Coach', doctorN
           disabled={addCheckinMutation.isPending}
         >
           <Plus className="h-5 w-5" />
-          {addCheckinMutation.isPending ? 'Creating…' : sessions.length === 0 ? 'Add Baseline Review' : 'Add Coaching Session'}
+          {addCheckinMutation.isPending ? 'Creating…' : sessions.length === 0 ? 'Create Baseline Review' : 'Add Coaching Session'}
         </Button>
       )}
 

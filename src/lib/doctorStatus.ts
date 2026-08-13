@@ -7,6 +7,7 @@ export type DoctorJourneyStage =
   | 'baseline_released'
   | 'baseline_in_progress'
   | 'baseline_submitted'
+  | 'coach_baseline_pending'
   | 'ready_for_prep'
   | 'prep_complete'
   | 'scheduling_invite_sent'
@@ -104,9 +105,12 @@ export function getDoctorJourneyStatus(
         // This branch serves BOTH perspectives (coach callers land here too,
         // e.g. from the roster) — only swap in doctor-voiced copy when the
         // caller actually asked for the doctor's perspective.
+        // "Draft" reads as a document state, not a journey stage — on the
+        // roster/detail pill a freshly created session means prep is needed.
+        const journeyLabel = latest.status === 'scheduled' ? 'Prep Needed' : cfg.label;
         return {
           stage: stageByStatus[latest.status] || 'ready_for_prep',
-          label: cfg.label,
+          label: journeyLabel,
           variant: 'default',
           colorClass: cfg.className,
           nextAction: perspective === 'doctor' ? (doctorNextAction[latest.status] ?? cfg.nextAction) : cfg.nextAction,
@@ -115,28 +119,28 @@ export function getDoctorJourneyStatus(
     }
   }
 
-  // R1.3: Removed the coach baseline scheduling gate
-  // When doctor baseline is complete but coach baseline isn't,
-  // show ready_for_prep with a soft nudge instead of blocking
+  // R1.3: no hard gate — but when the doctor's baseline is in and the coach's
+  // isn't, the honest next action is "complete your coach baseline", not
+  // "build agenda".
   if (baseline?.status === 'completed' && coachBaseline !== null && coachBaseline !== undefined && coachBaseline?.status !== 'completed') {
     return {
-      stage: 'ready_for_prep',
-      label: 'Ready for Prep',
+      stage: 'coach_baseline_pending',
+      label: 'Baseline Submitted',
       variant: 'outline',
       colorClass: 'bg-blue-100 text-blue-800',
-      nextAction: 'Open the coaching thread to build your meeting agenda',
-      nudge: 'Tip: Complete your private baseline assessment before the meeting for better prep.',
+      nextAction: 'Complete your coach baseline assessment',
+      nudge: 'You can still build the agenda first, but the coach baseline gives you better prep.',
     };
   }
 
-  // Both baselines done but no session yet → ready for prep
+  // Both baselines done but no session yet → create the baseline review first
   if (baseline?.status === 'completed' && coachBaseline?.status === 'completed') {
     return {
       stage: 'ready_for_prep',
       label: 'Ready for Prep',
       variant: 'outline',
       colorClass: 'bg-blue-100 text-blue-800',
-      nextAction: 'Build your meeting agenda before inviting to schedule',
+      nextAction: 'Create a baseline review session',
     };
   }
 

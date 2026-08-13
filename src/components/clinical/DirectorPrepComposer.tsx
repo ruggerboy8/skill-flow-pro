@@ -12,7 +12,7 @@ import { ArrowLeft, Send, CheckCircle2, FlaskConical, Sparkles, X, Save, FileDow
 import { toast } from '@/hooks/use-toast';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { format } from 'date-fns';
-import { getDomainColor, getDomainColorRaw } from '@/lib/domainColors';
+import { getDomainColor, getDomainColorRaw, getDomainColorRichRaw } from '@/lib/domainColors';
 import { SchedulingInviteComposer } from '@/components/clinical/SchedulingInviteComposer';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -355,6 +355,27 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     enabled: !!myStaff?.id && !!sessionType,
   });
 
+  // Org-wide default template (set by a super admin) — used when this coach
+  // hasn't saved their own version yet.
+  const { data: orgDefaultTemplate } = useQuery({
+    queryKey: ['agenda-template-org-default', myStaff?.organization_id, sessionType],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('coaching_agenda_templates')
+        .select('template_html')
+        .eq('session_type', sessionType)
+        .eq('is_org_default', true)
+        .eq('organization_id', myStaff!.organization_id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.template_html || null;
+    },
+    enabled: !!myStaff?.organization_id && !!sessionType,
+  });
+
+  const effectiveTemplate = savedTemplate || orgDefaultTemplate || null;
+
+
   // Initialize from existing data. This must run AFTER `session` and
   // `existingSelections` have resolved, and only once — a plain useState
   // initializer runs at first render, before either query has data, so
@@ -373,6 +394,19 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, session, existingSelections, existingSelectionsLoading]);
+
+  // Prefill a brand-new agenda with the coach's own template, falling back to
+  // the org-wide default. Runs once, and never overwrites existing content.
+  const [prefilled, setPrefilled] = useState(false);
+  useEffect(() => {
+    if (!hydrated || prefilled) return;
+    if (session?.coach_note) { setPrefilled(true); return; }
+    if (!effectiveTemplate) return;
+    if (coachNote.trim() && coachNote !== '<p><br></p>') { setPrefilled(true); return; }
+    setCoachNote(effectiveTemplate);
+    setPrefilled(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, prefilled, effectiveTemplate, session?.coach_note]);
 
   const toggleAction = (actionId: number) => {
     setSelectedActions(prev => {
@@ -401,19 +435,63 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
         } as any, { onConflict: 'staff_id,session_type' });
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['agenda-template'] });
-      toast({ title: 'Template saved ✓' });
+      toast({ title: 'Template saved ✓', description: 'Saved for you only.' });
+    } catch (err: any) {
+      toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // Super admins can promote the current agenda to the org-wide default that
+  // auto-loads for every coach who hasn't saved their own.
+  const handleSaveOrgDefault = async () => {
+    if (!myStaff?.id || !myStaff?.organization_id) return;
+    if (!coachNote.trim() || coachNote === '<p><br></p>') {
+      toast({ title: 'Nothing to save', description: 'Write your agenda first.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const sb = supabase as any;
+      const { data: existing } = await sb
+        .from('coaching_agenda_templates')
+        .select('id')
+        .eq('session_type', sessionType)
+        .eq('is_org_default', true)
+        .eq('organization_id', myStaff.organization_id)
+        .maybeSingle();
+
+      if (existing?.id) {
+        const { error } = await sb
+          .from('coaching_agenda_templates')
+          .update({ template_html: coachNote, updated_at: new Date().toISOString() })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await sb
+          .from('coaching_agenda_templates')
+          .insert({
+            staff_id: myStaff.id,
+            organization_id: myStaff.organization_id,
+            session_type: sessionType,
+            is_org_default: true,
+            template_html: coachNote,
+          });
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ['agenda-template-org-default'] });
+      toast({ title: 'Default set ✓', description: 'This agenda now auto-loads for all coaches.' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err.message, variant: 'destructive' });
     }
   };
 
   const handleLoadTemplate = () => {
-    if (!savedTemplate) {
+    if (!effectiveTemplate) {
       toast({ title: 'No saved template', description: `No template found for ${sessionType === 'baseline_review' ? 'Baseline Review' : 'Check-in'}.`, variant: 'destructive' });
       return;
     }
-    setCoachNote(savedTemplate);
-    toast({ title: 'Template loaded' });
+    setCoachNote(effectiveTemplate);
+    toast({ title: savedTemplate ? 'Template loaded' : 'Default template loaded' });
+
   };
 
   const handleMagicFormat = async () => {
@@ -882,19 +960,19 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                     return true;
                   });
                   if (filtered.length === 0) return null;
-                  const raw = getDomainColorRaw(domain);
+                  const rich = getDomainColorRichRaw(domain);
                   return (
                     <div key={domain}>
                       <div
                         className="rounded-t-lg px-3 py-1.5 flex items-center gap-2"
-                        style={{ backgroundColor: `hsl(${raw} / 0.12)` }}
+                        style={{ backgroundColor: `hsl(${rich} / 0.18)` }}
                       >
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `hsl(${raw})` }} />
-                        <span className="text-xs font-semibold" style={{ color: `hsl(${raw})` }}>{domain}</span>
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `hsl(${rich})` }} />
+                        <span className="text-xs font-semibold text-foreground">{domain}</span>
                       </div>
                       <div
                         className="rounded-b-lg border border-t-0 p-3 space-y-1"
-                        style={{ backgroundColor: `hsl(${raw} / 0.04)` }}
+                        style={{ backgroundColor: `hsl(${rich} / 0.08)` }}
                       >
                         {filtered.map(item => {
                           const pm = item.pro_moves as any;
@@ -990,7 +1068,7 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 size="sm"
                 className="gap-1 text-xs"
                 onClick={handleLoadTemplate}
-                title={savedTemplate ? 'Load your saved template' : 'No saved template'}
+                title={savedTemplate ? 'Load your saved template' : orgDefaultTemplate ? 'Load the org default template' : 'No saved template'}
               >
                 <FileDown className="h-3.5 w-3.5" />
                 Load
@@ -1000,10 +1078,24 @@ export function DirectorPrepComposer({ sessionId: initialSessionId, doctorStaffI
                 size="sm"
                 className="gap-1 text-xs"
                 onClick={handleSaveTemplate}
+                title="Save this agenda as your personal template"
               >
                 <Save className="h-3.5 w-3.5" />
                 Save
               </Button>
+              {myStaff?.is_super_admin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 text-xs"
+                  onClick={handleSaveOrgDefault}
+                  title="Make this the default agenda that auto-loads for all coaches"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  Set as default
+                </Button>
+              )}
+
               <Button
                 variant="outline"
                 size="sm"

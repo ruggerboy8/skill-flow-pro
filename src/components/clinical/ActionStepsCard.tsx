@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { DomainBadge } from '@/components/ui/domain-badge';
 import { Target } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -43,21 +43,27 @@ export function ActionStepsCard({ doctorStaffId }: Props) {
       const steps = ((record.experiments as any[] | null) || []).filter(s => s?.title);
       if (steps.length === 0) return null;
 
-      // Resolve Pro Move statements for any tagged steps
+      // Resolve Pro Move statements and domains for any tagged steps
       const taggedIds = steps.map(s => s.action_id).filter((id): id is number => typeof id === 'number');
-      let moveMap = new Map<number, string>();
+      let moveMap = new Map<number, { statement: string; domain: string }>();
       if (taggedIds.length > 0) {
         const { data: moves } = await supabase
           .from('pro_moves')
-          .select('action_id, action_statement')
+          .select('action_id, action_statement, competencies!fk_pro_moves_competency_id(domains!fk_competencies_domain_id(domain_name))')
           .in('action_id', taggedIds);
-        moveMap = new Map((moves || []).map(m => [m.action_id, m.action_statement]));
+        moveMap = new Map((moves || []).map(m => [m.action_id, {
+          statement: m.action_statement,
+          domain: (m.competencies as any)?.domains?.domain_name || '',
+        }]));
       }
 
       return {
         sessionLabel: session.session_type === 'baseline_review' ? 'Baseline Review' : `Check-in ${session.sequence_number - 1}`,
         submittedAt: record.submitted_at,
-        steps: steps.map(s => ({ ...s, proMoveStatement: s.action_id ? moveMap.get(s.action_id) : undefined })),
+        steps: steps.map(s => ({
+          ...s,
+          proMove: s.action_id ? moveMap.get(s.action_id) : undefined,
+        })),
       };
     },
     enabled: !!doctorStaffId,
@@ -84,10 +90,11 @@ export function ActionStepsCard({ doctorStaffId }: Props) {
             {step.description && (
               <p className="text-xs text-muted-foreground whitespace-pre-wrap">{step.description}</p>
             )}
-            {step.proMoveStatement && (
-              <Badge variant="secondary" className="text-2xs mt-1">
-                {step.proMoveStatement}
-              </Badge>
+            {step.proMove && (
+              <div className="flex items-start gap-2 mt-1">
+                <DomainBadge domain={step.proMove.domain} className="mt-0.5" />
+                <span className="text-xs text-muted-foreground">{step.proMove.statement}</span>
+              </div>
             )}
           </div>
         ))}

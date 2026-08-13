@@ -80,9 +80,13 @@ interface UseStaffProfileOptions {
   showErrorToast?: boolean;  // Default true - show toast on error
 }
 
+// Shared across every mounted consumer of the hook so one failed fetch cannot
+// stack up a dozen identical toasts.
+let lastProfileErrorToastAt = 0;
+
 export function useStaffProfile(options: UseStaffProfileOptions = {}) {
   const { redirectToSetup = true, showErrorToast = true } = options;
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { overrides } = useSim();
@@ -235,9 +239,16 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
         user_capabilities: caps,
       } as StaffProfile;
     },
-    enabled: !!user || !!masqueradeStaffId,
+    // Wait for a real session before querying. Firing while the access token
+    // is still being restored sends an anonymous request, RLS returns zero
+    // rows (HTTP 200, empty), and we'd wrongly conclude "no staff profile".
+    enabled: (!!user && !!session?.access_token) || !!masqueradeStaffId,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    retry: false, // Don't retry on error - likely a missing profile
+    // A missing row right after sign-in is usually a token/propagation race,
+    // not a genuinely missing profile — retry a few times before giving up.
+    retry: (failureCount, error: any) =>
+      error?.message === 'No staff profile found' && failureCount < 3,
+    retryDelay: (attempt) => 400 * (attempt + 1),
   });
 
   // Handle errors via useEffect (React Query v5 pattern)
@@ -248,10 +259,19 @@ export function useStaffProfile(options: UseStaffProfileOptions = {}) {
       const error = query.error as any;
       // Don't redirect when masquerading
       if (!masqueradeStaffId && redirectToSetup && (error.code === 'PGRST116' || error.message === 'No staff profile found')) {
-        // No staff record found, redirect to setup
-        navigate('/setup');
-      } else if (showErrorToast && error.code !== 'PGRST116') {
-        // Show toast for other errors (not missing profile)
+        // No staff record found. Route to the existing setup screen rather
+        // than the retired /setup path, which otherwise falls through to 404.
+        navigate('/setup-password');
+      } else if (
+        showErrorToast &&
+        error.code !== 'PGRST116' &&
+        error.message !== 'No staff profile found' &&
+        Date.now() - lastProfileErrorToastAt > 10000
+      ) {
+        // Show toast for real errors only, and at most once per 10s — the hook
+        // is mounted by many components sharing one query, so an unguarded
+        // toast fires repeatedly for a single failure.
+        lastProfileErrorToastAt = Date.now();
         toast({
           title: 'Error',
           description: 'Failed to load profile',

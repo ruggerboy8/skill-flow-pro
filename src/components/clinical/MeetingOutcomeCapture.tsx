@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { getDomainColorRich, getDomainColorRichRaw, getDomainColorRaw } from '@/lib/domainColors';
 import { DomainBadge } from '@/components/ui/domain-badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -102,12 +103,16 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pro_moves')
-        .select('action_id, action_statement')
+        .select('action_id, action_statement, competencies!fk_pro_moves_competency_id(domains!fk_competencies_domain_id(domain_name))')
         .eq('role_id', 4)
         .eq('active', true)
         .order('action_id');
       if (error) throw error;
-      return data || [];
+      return (data || []).map((m: any) => ({
+        action_id: m.action_id,
+        action_statement: m.action_statement,
+        domain_name: m.competencies?.domains?.domain_name || 'Unknown',
+      }));
     },
   });
 
@@ -125,9 +130,19 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   const slatedMoves = allTopics.map(sel => ({
     action_id: sel.action_id,
     statement: (sel.pro_moves as any)?.action_statement || `Action #${sel.action_id}`,
+    domain_name: (sel.pro_moves as any)?.competencies?.domains?.domain_name || 'Unknown',
   }));
   const slatedIds = new Set(slatedMoves.map(m => m.action_id));
   const otherMoves = (doctorProMoves || []).filter(m => !slatedIds.has(m.action_id));
+
+  // Group the remaining library by domain so the dropdown reads as
+  // colour-coded sections while scrolling.
+  const DOMAIN_ORDER = ['Clinical', 'Clerical', 'Cultural', 'Case Acceptance'];
+  const otherMovesByDomain = DOMAIN_ORDER
+    .map(domain => ({ domain, moves: otherMoves.filter(m => m.domain_name === domain) }))
+    .concat([{ domain: 'Other', moves: otherMoves.filter(m => !DOMAIN_ORDER.includes(m.domain_name)) }])
+    .filter(g => g.moves.length > 0);
+
 
   const addExperiment = () => {
     if (experiments.length >= 3) {
@@ -300,8 +315,14 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
   // doctor_confirmed. With the upsert write path, a re-submit there would
   // overwrite the finished record and re-email the doctor — so any
   // non-capturable status renders read-only.
-  const statusAllowsCapture = ['scheduling_invite_sent', 'doctor_prep_submitted', 'doctor_revision_requested'].includes(session.status);
-  const isReadOnly = (myStaff?.id ? session.coach_staff_id !== myStaff.id : false) || !statusAllowsCapture;
+  // The owning coach can still edit and re-share a summary they've already
+  // sent (typos, missed action steps) — the write path is an upsert, so a
+  // second submit updates the record rather than duplicating it. It locks
+  // once the doctor has confirmed.
+  const statusAllowsCapture = ['scheduling_invite_sent', 'doctor_prep_submitted', 'doctor_revision_requested', 'meeting_pending'].includes(session.status);
+  const notMyySession = myStaff?.id ? session.coach_staff_id !== myStaff.id : false;
+  const isReadOnly = notMyySession || !statusAllowsCapture;
+  const isResubmit = session.status === 'meeting_pending';
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -311,7 +332,9 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-xl font-bold">{isReadOnly ? 'Meeting Outcome (Read Only)' : 'Capture Meeting Outcome'}</h2>
+          <h2 className="text-xl font-bold">
+            {isReadOnly ? 'Meeting Outcome (Read Only)' : isResubmit ? 'Edit Meeting Outcome' : 'Capture Meeting Outcome'}
+          </h2>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
             <Calendar className="h-3.5 w-3.5" />
             {session.scheduled_at ? format(new Date(session.scheduled_at), 'MMMM d, yyyy') : 'Date not set'}
@@ -321,7 +344,12 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
           {isReadOnly && (
             <Badge variant="secondary" className="text-xs mt-1 gap-1">
               <ShieldAlert className="h-3 w-3" />
-              Managed by another coach
+              {notMyySession ? 'Managed by another coach' : 'Locked — the doctor has confirmed this summary'}
+            </Badge>
+          )}
+          {!isReadOnly && isResubmit && (
+            <Badge variant="secondary" className="text-xs mt-1 gap-1">
+              Already shared — your edits will re-send the updated summary
             </Badge>
           )}
         </div>
@@ -520,29 +548,59 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
                 <SelectTrigger className="h-8 text-xs text-muted-foreground">
                   <SelectValue placeholder="Which Pro Move is this about? (optional)" />
                 </SelectTrigger>
-                <SelectContent className="max-w-[calc(100vw-4rem)] sm:max-w-md">
+                <SelectContent className="w-[min(32rem,calc(100vw-2rem))] max-w-none [&_[data-radix-select-viewport]]:!w-full [&_[data-radix-select-viewport]]:!max-w-none">
                   <SelectItem value="none">No Pro Move link</SelectItem>
                   {slatedMoves.length > 0 && (
                     <SelectGroup>
                       <SelectLabel>Discussed this session</SelectLabel>
                       {slatedMoves.map(m => (
-                        <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          {m.statement}
+                        <SelectItem
+                          key={m.action_id}
+                          value={String(m.action_id)}
+                          className="overflow-hidden whitespace-normal text-xs [&>span:last-child]:block [&>span:last-child]:w-full [&>span:last-child]:min-w-0 [&>span:last-child]:whitespace-normal"
+                        >
+                          <span className="flex w-full min-w-0 items-start gap-2 whitespace-normal">
+                            <span
+                              className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: getDomainColorRich(m.domain_name) }}
+                            />
+                            <span className="min-w-0 flex-1 whitespace-normal break-words">{m.statement}</span>
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectGroup>
                   )}
-                  {otherMoves.length > 0 && (
-                    <SelectGroup>
-                      <SelectLabel>All doctor Pro Moves</SelectLabel>
-                      {otherMoves.map(m => (
-                        <SelectItem key={m.action_id} value={String(m.action_id)} className="text-xs whitespace-normal">
-                          {m.action_statement}
+                  {otherMovesByDomain.map(group => (
+                    <SelectGroup key={group.domain}>
+                      <SelectLabel
+                        className="sticky top-0 z-10 flex items-center gap-2 text-foreground"
+                        style={{ backgroundColor: `hsl(${getDomainColorRaw(group.domain)})` }}
+                      >
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: getDomainColorRich(group.domain) }}
+                        />
+                        {group.domain}
+                      </SelectLabel>
+                      {group.moves.map(m => (
+                        <SelectItem
+                          key={m.action_id}
+                          value={String(m.action_id)}
+                          className="overflow-hidden whitespace-normal text-xs [&>span:last-child]:block [&>span:last-child]:w-full [&>span:last-child]:min-w-0 [&>span:last-child]:whitespace-normal"
+                        >
+                          <span className="flex w-full min-w-0 items-start gap-2 whitespace-normal">
+                            <span
+                              className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: getDomainColorRich(group.domain) }}
+                            />
+                            <span className="min-w-0 flex-1 whitespace-normal break-words">{m.action_statement}</span>
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectGroup>
-                  )}
+                  ))}
                 </SelectContent>
+
               </Select>
             </div>
           ))}
@@ -596,7 +654,7 @@ export function MeetingOutcomeCapture({ sessionId, onBack }: Props) {
             disabled={!summary.trim() || submitMutation.isPending}
           >
             <Send className="h-4 w-4" />
-            {submitMutation.isPending ? 'Submitting...' : 'Submit & Share with Doctor'}
+            {submitMutation.isPending ? 'Submitting...' : isResubmit ? 'Update & Re-share with Doctor' : 'Submit & Share with Doctor'}
           </Button>
           <p className="text-xs text-muted-foreground text-center pb-4">
             The doctor will be able to review and acknowledge this summary.

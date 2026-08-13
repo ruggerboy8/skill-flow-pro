@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { drName } from '@/lib/doctorDisplayName';
 import { useUserRole } from '@/hooks/useUserRole';
 import { buildOrganizationStaffScopeFilter } from '@/lib/clinicalDoctorScope';
+import { useDoctorMenteeIds } from '@/hooks/useDoctorMenteeIds';
+
 
 import { getDoctorJourneyStatus, type DoctorJourneyStatus } from '@/lib/doctorStatus';
 import { DoctorJourneyStatusPill } from '@/components/clinical/DoctorJourneyStatusPill';
@@ -39,15 +41,22 @@ export default function DoctorManagement() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useUrlState<FilterValue>('status', 'all');
   const navigate = useNavigate();
-  const { organizationId, isSuperAdmin, isClinicalDirector, isDoctorCoach, doctorMenteeIds } = useUserRole();
+  const { organizationId, isSuperAdmin, isClinicalDirector, staffId } = useUserRole();
+
+  // Assignments are read live (not from the cached staff profile) so removing a
+  // coaching assignment takes effect for the coach without a full reload.
+  const { data: liveMenteeIds = [], isLoading: menteesLoading } = useDoctorMenteeIds(staffId);
+  const doctorMenteeIds = liveMenteeIds;
 
   // Doctor coaches (owner doctors with assigned learners) see ONLY their
   // assigned doctors; CDs and super admins keep the org-wide roster.
-  const menteesOnly = isDoctorCoach && !isClinicalDirector && !isSuperAdmin;
+  const menteesOnly = doctorMenteeIds.length > 0 && !isClinicalDirector && !isSuperAdmin;
 
-  const { data: doctors, isLoading, refetch } = useQuery({
+  const { data: doctors, isLoading: doctorsLoading, refetch } = useQuery({
     queryKey: ['doctors-management', organizationId, isSuperAdmin, menteesOnly, doctorMenteeIds.join(',')],
+
     refetchOnMount: 'always',
+
     staleTime: 0,
     queryFn: async (): Promise<DoctorRow[]> => {
       // Diagnostic logging: if a clinical director can't see an expected doctor,
@@ -184,10 +193,13 @@ export default function DoctorManagement() {
     };
   }, [queryClient]);
 
+  const isLoading = menteesLoading || doctorsLoading;
+
   // Compute stats from doctors data
+
   const stats = doctors ? {
     total: doctors.length,
-    completed: doctors.filter(d => ['baseline_submitted', 'ready_for_prep', 'prep_complete', 'scheduling_invite_sent', 'meeting_ready', 'meeting_pending', 'doctor_confirmed', 'followup_scheduled', 'followup_completed'].includes(d.journeyStatus.stage)).length,
+    completed: doctors.filter(d => ['baseline_submitted', 'coach_baseline_pending', 'ready_for_prep', 'prep_complete', 'scheduling_invite_sent', 'meeting_ready', 'meeting_pending', 'doctor_confirmed', 'followup_scheduled', 'followup_completed'].includes(d.journeyStatus.stage)).length,
     inProgress: doctors.filter(d => d.journeyStatus.stage === 'baseline_in_progress').length,
     invited: doctors.filter(d => ['invited', 'baseline_released'].includes(d.journeyStatus.stage)).length,
   } : null;
@@ -195,7 +207,7 @@ export default function DoctorManagement() {
   const filteredDoctors = doctors?.filter(d => {
     if (filter === 'all') return true;
     if (filter === 'needs_my_action') {
-      return ['baseline_submitted', 'ready_for_prep', 'prep_complete', 'doctor_confirmed', 'followup_completed'].includes(d.journeyStatus.stage);
+      return ['baseline_submitted', 'coach_baseline_pending', 'ready_for_prep', 'prep_complete', 'doctor_confirmed', 'followup_completed'].includes(d.journeyStatus.stage);
     }
     if (filter === 'waiting_on_doctor') {
       return ['invited', 'baseline_in_progress', 'baseline_released', 'meeting_pending', 'scheduling_invite_sent'].includes(d.journeyStatus.stage);
@@ -431,7 +443,14 @@ function InlineAction({ stage, doctorId, navigate }: { stage: string; doctorId: 
     navigate(`/clinical/doctors/${doctorId}`);
   };
 
-  if (['baseline_submitted', 'ready_for_prep'].includes(stage)) {
+  if (['baseline_submitted', 'coach_baseline_pending'].includes(stage)) {
+    return (
+      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
+        Complete coach baseline <ArrowRight className="h-3 w-3" />
+      </Button>
+    );
+  }
+  if (stage === 'ready_for_prep') {
     return (
       <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={goToDetail}>
         Build agenda <ArrowRight className="h-3 w-3" />

@@ -522,3 +522,31 @@ Data coverage checks behind these decisions (live DB, 2026-08-13):
   `observer_note` exists on 290 of 864 items (avg 208 chars) and
   `evaluator_note` on 25 of 56 evals. Do not build the module before
   settling this pipeline.
+
+## Addendum 4: v4 revisions (2026-08-13, cadence reality)
+
+1. **Sparklines removed everywhere.** Staff rate individual Pro Moves that
+   happen to belong to domains, on an infrequent cadence, so per-domain or
+   per-move trend lines render as jagged noise. Domain confidence is
+   numeric only, with a chip colored on the 1-4 score scale and the
+   3w/6w/Quarter toggle retained.
+2. **The focus hero drops numeric tracking.** It is now: the move you
+   chose, plus your last formal feedback ("Your evaluator's next step" +
+   the evaluator's overall note), plus a learning-resources link. The
+   no-focus fallback states plainly that no focus was chosen after the
+   last evaluation and offers "Choose your focus."
+3. **"Next step" data lineage (John's question, answered):** it renders
+   from `observer_grow` on the evaluation item whose competency contains
+   the chosen focus move (`staff_quarter_focus.action_id` →
+   `pro_moves.competency_id` → `evaluation_items.observer_grow`), falling
+   back to `evaluations.evaluator_note`, else the module hides. Grow is
+   also the better-populated column today (125 vs 9 glows), and because
+   the focus is chosen from the eval, its competency's grow usually
+   exists when a focus does. The intake guarantee (addendum 3) still
+   applies.
+4. **Evaluation scores brought forward** as a domain-level Coach vs Self
+   table directly under the focus hero, labeled with the eval period.
+   Rationale: observer scores are the only calibrated signal on the page,
+   and the coach/self *pair* surfaces calibration gaps that today are
+   buried in the eval detail grid. Page order: focus hero → eval scores →
+   what you've flagged → confidence (numeric) → participation.

@@ -92,10 +92,8 @@
   .screen.active { animation: screenIn .18s ease; }
   @media (prefers-reduced-motion: reduce) { .screen.active { animation: none; } }
 
-  /* sparklines + time toggle */
-  .spark { width: 92px; height: 26px; flex: none; }
-  .spark polyline { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .spark circle { stroke: none; }
+  /* time toggle + prototype-only affordances */
+  .protolink { display: block; background: none; border: none; color: hsl(215 15% 60%); font-size: 10.5px; text-decoration: underline; margin-top: 10px; padding: 0; }
   .toggle { display: inline-flex; gap: 4px; }
   .toggle button { border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: 4px 10px; font-size: 11.5px; color: var(--muted); font-weight: 600; }
   .toggle button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
@@ -384,33 +382,26 @@
       <p class="eyebrow">How you're doing</p>
       <h1>Performance</h1>
 
-      <!-- THE OPINION: your one focus, and whether it's moving -->
-      <div class="card insight">
-        <p class="eyebrow" style="color:hsl(160 60% 25%)">Your focus this quarter</p>
-        <p style="font-size:16px; font-weight:650; line-height:1.4; margin-top:6px">Offer the parent one clear next step before they leave the operatory.</p>
-        <p class="sub" style="margin-top:4px">You chose this from your Fall evaluation.</p>
-        <div style="display:flex; align-items:center; gap:12px; margin-top:12px">
-          <svg class="spark" style="width:140px; height:34px" viewBox="0 0 140 34" id="focusSpark" aria-label="Confidence trend for your focus"></svg>
-          <div>
-            <div style="font-size:20px; font-weight:800; font-variant-numeric:tabular-nums">2.9 <span style="font-size:12px; color:var(--positive); font-weight:700">▲ from 2.4</span></div>
-            <div class="sub" style="font-size:11px">Your confidence, this quarter</div>
-          </div>
-        </div>
-        <p class="sub" style="margin-top:12px; color:var(--ink)">Ariyana's next step for you: <span style="font-style:italic">"When a family leaves knowing what happens next, treatment actually happens."</span></p>
-        <button class="btn quiet sm" style="margin-top:12px" onclick="go('scr-domain','scr-perf')">Learning resources for this move</button>
-      </div>
+      <!-- THE OPINION: your focus + your last formal feedback, one band.
+           No numeric tracking here — Pro Moves are assessed too infrequently
+           for a per-move or per-domain trend to mean anything (John, v3
+           review). "Next step" sources from observer_grow on the evaluation
+           item for the focus move's competency; fallback evaluator_note. -->
+      <div class="card insight" id="focusHero"></div>
 
-      <!-- confidence trends, confidence only, with time toggle (John, v2 review) -->
+      <!-- eval scores brought forward: domain-level Observer vs Self pair,
+           labeled with the eval period so it can't masquerade as current -->
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center">
-          <h2>Confidence over time</h2>
-          <div class="toggle" id="trendToggle">
-            <button data-win="3" aria-pressed="false">3w</button>
-            <button data-win="6" aria-pressed="false">6w</button>
-            <button data-win="12" aria-pressed="true">Quarter</button>
-          </div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline">
+          <h2>From your Fall 2026 evaluation</h2>
         </div>
-        <div id="domainTrends" style="margin-top:6px"></div>
+        <div class="ev-head" style="margin-top:8px"><span>Domain</span><span>Coach</span><span>Self</span></div>
+        <div class="ev-row"><span>Clinical</span><span class="p pill3">3.4</span><span class="p pill3">3.3</span></div>
+        <div class="ev-row"><span>Clerical</span><span class="p pill3">3.0</span><span class="p pill2">2.5</span></div>
+        <div class="ev-row"><span>Cultural</span><span class="p pill4">3.6</span><span class="p pill3">3.4</span></div>
+        <div class="ev-row"><span>Case Acceptance</span><span class="p pill2">2.4</span><span class="p pill2">2.5</span></div>
+        <p class="sub" style="margin-top:8px; font-size:11.5px">Your self-score is the average performance score you submitted during this quarter.</p>
+        <button class="btn quiet sm" style="margin-top:10px" onclick="go('scr-evaldetail','scr-perf')">View full evaluation</button>
       </div>
 
       <!-- Priority Focus Areas: real StaffPriorityFocusTab semantics; rows link to resources -->
@@ -431,17 +422,20 @@
         </div>
       </div>
 
-      <!-- latest evaluation: what's working + coach note (grow lives in the hero) -->
+      <!-- confidence by domain: NUMERIC ONLY — sparklines removed because
+           the assessment cadence makes them jagged noise (John, v3 review).
+           Value chip colored on the 1-4 score scale. -->
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:baseline">
-          <h2>Latest evaluation</h2><span class="sub">Fall 2026</span>
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <h2>Confidence</h2>
+          <div class="toggle" id="trendToggle">
+            <button data-win="3" aria-pressed="false">3w</button>
+            <button data-win="6" aria-pressed="false">6w</button>
+            <button data-win="12" aria-pressed="true">Quarter</button>
+          </div>
         </div>
-        <div class="glowgrow">
-          <p class="gl">What's working</p>
-          <p>Your narration has become second nature. Families settle faster in your rooms, and it shows in how visits flow.</p>
-        </div>
-        <blockquote>"Proud of the quarter you put together. Let's make checkout conversations the thing we sharpen next." — Ariyana</blockquote>
-        <button class="btn quiet sm" style="margin-top:12px" onclick="go('scr-evaldetail','scr-perf')">View full evaluation</button>
+        <p class="sub" style="margin-top:2px">Your average check-in scores by domain.</p>
+        <div id="domainTrends" style="margin-top:6px"></div>
       </div>
 
       <!-- participation: quiet, bottom -->
@@ -619,37 +613,52 @@
   });
   setScenario('checkin');
 
-  // ---------- confidence trends (weekly_scores → domain averages per week) ----------
-  const trendSeries = [
-    { name: 'Clinical', spine: 'var(--clinical-pastel)', stroke: 'var(--clinical)', pts: [2.8,2.9,3.0,3.0,3.1,3.2,3.1,3.2,3.3,3.3,3.4,3.4] },
-    { name: 'Clerical', spine: 'var(--clerical-pastel)', stroke: 'var(--clerical)', pts: [3.0,3.0,2.9,3.1,3.0,3.0,3.1,3.0,3.1,3.0,3.1,3.1] },
-    { name: 'Cultural', spine: 'var(--cultural-pastel)', stroke: 'var(--cultural)', pts: [2.6,2.7,2.8,2.8,3.0,3.0,3.1,3.2,3.1,3.2,3.3,3.3] },
-    { name: 'Case Acceptance', spine: 'var(--caseacc-pastel)', stroke: 'var(--caseacc)', pts: [2.4,2.4,2.5,2.5,2.6,2.7,2.6,2.7,2.8,2.8,2.9,2.9] },
-  ];
-  function sparkline(pts, stroke, w, h) {
-    const pad = 3, lo = 1, hi = 4;
-    const x = i => pad + i * ((w - 2 * pad) / Math.max(pts.length - 1, 1));
-    const y = v => h - pad - ((v - lo) / (hi - lo)) * (h - 2 * pad);
-    const line = pts.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-    const last = pts.length - 1;
-    return `<polyline points="${line}" stroke="${stroke}"></polyline>
-            <circle cx="${x(last).toFixed(1)}" cy="${y(pts[last]).toFixed(1)}" r="3" fill="${stroke}"></circle>`;
-  }
+  // ---------- focus hero: focus + last formal feedback in one band.
+  // "Next step" = observer_grow for the focus move's competency; the quote
+  // is evaluations.evaluator_note. Prototype toggle shows the no-focus
+  // fallback state (real coverage: 14 of 56 released evals have a focus).
+  const focusStates = {
+    chosen: `
+      <p class="eyebrow" style="color:hsl(160 60% 25%)">Your focus this quarter</p>
+      <p style="font-size:16px; font-weight:650; line-height:1.4; margin-top:6px">Offer the parent one clear next step before they leave the operatory.</p>
+      <p class="sub" style="margin-top:4px">You chose this from your Fall evaluation.</p>
+      <div class="glowgrow grow" style="margin-top:12px">
+        <p class="gl">Your evaluator's next step</p>
+        <p>"When a family leaves knowing what happens next, treatment actually happens."</p>
+      </div>
+      <blockquote>"Proud of the quarter you put together. Let's make checkout conversations the thing we sharpen next." — Ariyana</blockquote>
+      <button class="btn quiet sm" style="margin-top:12px" onclick="go('scr-domain','scr-perf')">Learning resources for this move</button>
+      <button class="protolink" onclick="setFocusState('none')">Prototype: view no-focus state</button>`,
+    none: `
+      <p class="eyebrow" style="color:hsl(160 60% 25%)">Your focus this quarter</p>
+      <p style="font-size:16px; font-weight:650; line-height:1.4; margin-top:6px">You haven't chosen a focus yet</p>
+      <p class="sub" style="margin-top:4px">You didn't pick one after your Fall evaluation. Choosing one gives your quarter a direction.</p>
+      <blockquote>"Proud of the quarter you put together. Let's make checkout conversations the thing we sharpen next." — Ariyana</blockquote>
+      <button class="btn sm" style="margin-top:12px" onclick="go('scr-evaldetail','scr-perf')">Choose your focus</button>
+      <button class="protolink" onclick="setFocusState('chosen')">Prototype: view chosen state</button>`,
+  };
+  function setFocusState(name) { document.getElementById('focusHero').innerHTML = focusStates[name]; }
+  setFocusState('chosen');
+
+  // ---------- confidence by domain: numeric only, chip colored on the 1-4 scale ----------
+  const confWindows = {
+    3:  [ ['Clinical', 3.4], ['Clerical', 3.1], ['Cultural', 3.3], ['Case Acceptance', 2.9] ],
+    6:  [ ['Clinical', 3.3], ['Clerical', 3.0], ['Cultural', 3.2], ['Case Acceptance', 2.8] ],
+    12: [ ['Clinical', 3.2], ['Clerical', 3.0], ['Cultural', 3.0], ['Case Acceptance', 2.7] ],
+  };
+  const domainSpines = { 'Clinical': 'var(--clinical-pastel)', 'Clerical': 'var(--clerical-pastel)', 'Cultural': 'var(--cultural-pastel)', 'Case Acceptance': 'var(--caseacc-pastel)' };
+  function scorePill(v) { return v >= 3.5 ? 'pill4' : v >= 2.5 ? 'pill3' : v >= 1.5 ? 'pill2' : 'pill1'; }
   function renderTrends(win) {
-    document.getElementById('domainTrends').innerHTML = trendSeries.map(s => {
-      const pts = s.pts.slice(-win);
-      return `<div class="dom-line">
-        <span class="spine" style="width:8px; height:22px; background:${s.spine}"></span>
-        <span class="name">${s.name}</span>
-        <svg class="spark" viewBox="0 0 92 26" aria-label="${s.name} confidence trend">${sparkline(pts, s.stroke, 92, 26)}</svg>
-        <span class="nums" style="width:26px; text-align:right">${pts[pts.length-1].toFixed(1)}</span>
-      </div>`;
-    }).join('');
+    document.getElementById('domainTrends').innerHTML = confWindows[win].map(([name, v]) => `
+      <div class="dom-line">
+        <span class="spine" style="width:8px; height:22px; background:${domainSpines[name]}"></span>
+        <span class="name">${name}</span>
+        <span class="p ${scorePill(v)}" style="width:38px; height:26px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px">${v.toFixed(1)}</span>
+      </div>`).join('');
     document.querySelectorAll('#trendToggle button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.win) === win)));
   }
   document.querySelectorAll('#trendToggle button').forEach(b => b.addEventListener('click', () => renderTrends(Number(b.dataset.win))));
   renderTrends(12);
-  document.getElementById('focusSpark').innerHTML = sparkline(trendSeries[3].pts, 'var(--caseacc)', 140, 34);
 
   // ---------- wizard (real NumberScale copy) ----------
   const scaleHints = {

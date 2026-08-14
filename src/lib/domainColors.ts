@@ -66,6 +66,23 @@ export const getDomainColorRich = (domain: string): string => {
   return `hsl(${getDomainColorRichRaw(domain)})`;
 };
 
+// CSS-var-backed variants that track light/dark mode live (getDomainColor /
+// getDomainColorRich above intentionally stay static-fallback-only so
+// already-shipped surfaces — RoleRadar, DomainDetail, CompetencyAccordion —
+// render byte-identically; see
+// docs/features/explore-my-role-build-instructions.md section D). Use these
+// for anything new in the mobile-shell Craft Atlas, where dark mode must be
+// legible per the .dark overrides already defined for --domain-*-pastel.
+export const getDomainColorVar = (domain: string): string => {
+  const varName = DOMAIN_CSS_VARS[(domain || '').trim()];
+  return varName ? `hsl(var(${varName}))` : getDomainColorRich(domain);
+};
+
+export const getDomainPastelVar = (domain: string): string => {
+  const varName = DOMAIN_CSS_VARS_PASTEL[(domain || '').trim()];
+  return varName ? `hsl(var(${varName}))` : getDomainColor(domain);
+};
+
 // Readable ink tokens for text sitting on a domain's pastel/tinted
 // background (see --clinical-ink etc. in index.css, mobile-shell round).
 const DOMAIN_INK_VARS: Record<string, string> = {

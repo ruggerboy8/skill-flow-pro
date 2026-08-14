@@ -45,6 +45,19 @@ export default function MyRoleLayout() {
         ? `${roleLabel} Competency Blueprint`
         : 'Competency Blueprint';
 
+  // Mobile shell overview = the Craft Atlas (rendered by RoleRadar's own
+  // mobile branch). It owns its full screen, including its own eyebrow +
+  // h1 "My Role" header per the atlas visual spec, so this layout skips
+  // its generic header/tab chrome entirely here rather than doubling up
+  // on "My Role". Non-overview mobile routes (practice-log, evaluations)
+  // and all of desktop are unaffected. See
+  // docs/features/explore-my-role-build-instructions.md section B.
+  const isAtlasOverview = isMobileShell && currentTab === 'overview';
+
+  if (isAtlasOverview) {
+    return <Outlet />;
+  }
+
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
@@ -56,7 +69,7 @@ export default function MyRoleLayout() {
           <p className="text-muted-foreground mt-1">{roleSubtitle}</p>
         )}
       </div>
-      
+
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         {isMobileShell ? (
           // Mobile shell: My Role is overview-only (no internal tab strip);

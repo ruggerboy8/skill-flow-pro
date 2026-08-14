@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffProfile } from '@/hooks/useStaffProfile';
+import { useMobileShell } from '@/hooks/useMobileShell';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor, getDomainColorRichRaw } from '@/lib/domainColors';
 import { getDomainSlug } from '@/lib/domainUtils';
 import { ROLE_CONTENT, DOMAIN_ORDER, getRoleTypeFromArchetype, type RoleType } from '@/lib/content/roleDefinitions';
 import { ChevronRight, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import CraftAtlasOverview from './CraftAtlasOverview';
 
 interface DomainScore {
   domain_name: string;
@@ -16,11 +18,12 @@ interface DomainScore {
 
 export default function RoleRadar() {
   const navigate = useNavigate();
-  const { data: staffProfile, isLoading: profileLoading } = useStaffProfile({ 
-    redirectToSetup: false, 
-    showErrorToast: false 
+  const isMobileShell = useMobileShell();
+  const { data: staffProfile, isLoading: profileLoading } = useStaffProfile({
+    redirectToSetup: false,
+    showErrorToast: false
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [domainScores, setDomainScores] = useState<Map<string, number>>(new Map());
   const [periodLabel, setPeriodLabel] = useState<string | null>(null);
@@ -31,10 +34,16 @@ export default function RoleRadar() {
   const roleContent = ROLE_CONTENT[roleType];
 
   useEffect(() => {
+    // Mobile shell renders CraftAtlasOverview instead (see the branch
+    // below) — skip the desktop-only radar fetch entirely.
+    if (isMobileShell) {
+      setLoading(false);
+      return;
+    }
     if (profileLoading) return;
-    if (!staffProfile?.id) { 
-      setLoading(false); 
-      return; 
+    if (!staffProfile?.id) {
+      setLoading(false);
+      return;
     }
     
     (async () => {
@@ -107,7 +116,15 @@ export default function RoleRadar() {
         setLoading(false);
       }
     })();
-  }, [staffProfile?.id, profileLoading]);
+  }, [staffProfile?.id, profileLoading, isMobileShell]);
+
+  // Mobile shell: the Explore tab lands on the Craft Atlas instead of the
+  // domain-radar grid. Branching here (rather than in the route table)
+  // keeps desktop's route + this component's own rendering byte-identical
+  // — see docs/features/explore-my-role-build-instructions.md section B.
+  if (isMobileShell) {
+    return <CraftAtlasOverview />;
+  }
 
   if (profileLoading || loading) {
     return (

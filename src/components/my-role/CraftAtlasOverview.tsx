@@ -75,7 +75,13 @@ export default function CraftAtlasOverview() {
         </p>
       </div>
 
-      {/* Snapshot strip */}
+      {/* Snapshot strip. TODO(build-review): the spec only names two states
+          here (pills when levels exist, the fallback line when no
+          evaluation exists at all) — an evaluation that exists but scores
+          none of this person's merged competencies falls through to
+          neither and renders nothing, which matches "no empty chrome" but
+          hasn't been asked for explicitly. Not expected in practice since
+          an evaluation normally covers every domain. */}
       {hasEvaluation ? (
         snapshotPills.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2.5">

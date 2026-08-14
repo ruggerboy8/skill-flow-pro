@@ -57,6 +57,7 @@ import MyRoleLayout from "@/pages/my-role/MyRoleLayout";
 import RoleRadar from "@/components/my-role/RoleRadar";
 import PracticeLog from "@/pages/my-role/PracticeLog";
 import DomainDetail from "@/pages/my-role/DomainDetail";
+import CraftAtlasArea from "@/pages/my-role/CraftAtlasArea";
 
 // Clinical Director pages
 import ClinicalLayout from "@/pages/clinical/ClinicalLayout";
@@ -143,6 +144,11 @@ function AppRoutes() {
         
         {/* My Role - Domain Detail (Full Page Takeover - No Tabs) */}
         <Route path="my-role/domain/:domainSlug" element={<DomainDetail />} />
+
+        {/* Explore atlas — area page (Concept B screen 2, mobile-shell primary;
+            redirects to the domain page on desktop). See
+            docs/features/explore-my-role-build-instructions.md section C. */}
+        <Route path="my-role/area/:competencyId" element={<CraftAtlasArea />} />
 
         <Route path="profile" element={<Profile />} />
         <Route path="reset-password" element={<ResetPassword />} />

@@ -3,19 +3,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCraftAtlas, type AtlasCompetency } from '@/hooks/useCraftAtlas';
 import { DOMAIN_ORDER } from '@/lib/content/roleDefinitions';
 import { getDomainColorVar, getDomainPastelVar } from '@/lib/domainColors';
-
-type Level = 'Mastery' | 'Proficient' | 'Building';
-const LEVEL_BUCKET: Record<Level, 2 | 3 | 4> = { Building: 2, Proficient: 3, Mastery: 4 };
-
-function levelFor(score: number | null): Level | null {
-  if (score == null) return null;
-  if (score >= 3.5) return 'Mastery';
-  if (score >= 2.5) return 'Proficient';
-  return 'Building';
-}
+import { levelForScore, SCORE_LEVEL_BUCKET, type ScoreLevel } from '@/lib/scoreLevel';
 
 function LevelPill({ score }: { score: number | null }) {
-  const level = levelFor(score);
+  const level = levelForScore(score);
   if (!level) {
     return (
       <span className="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold bg-muted text-muted-foreground whitespace-nowrap">
@@ -23,7 +14,7 @@ function LevelPill({ score }: { score: number | null }) {
       </span>
     );
   }
-  const bucket = LEVEL_BUCKET[level];
+  const bucket = SCORE_LEVEL_BUCKET[level];
   return (
     <span
       className="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-bold whitespace-nowrap"
@@ -63,15 +54,15 @@ export default function CraftAtlasOverview() {
   const n = data.competencies.length;
   const hasEvaluation = data.periodLabel !== null;
 
-  const levelCounts: Record<Level, number> = { Mastery: 0, Proficient: 0, Building: 0 };
+  const levelCounts: Record<ScoreLevel, number> = { Mastery: 0, Proficient: 0, Building: 0 };
   for (const c of data.competencies) {
-    const level = levelFor(c.observerScore);
+    const level = levelForScore(c.observerScore);
     if (level) levelCounts[level]++;
   }
-  const snapshotPills = (Object.keys(levelCounts) as Level[])
+  const snapshotPills = (Object.keys(levelCounts) as ScoreLevel[])
     .filter((label) => levelCounts[label] > 0)
     // Mastery, Proficient, Building — matches the level hierarchy top to bottom.
-    .sort((a, b) => LEVEL_BUCKET[b] - LEVEL_BUCKET[a]);
+    .sort((a, b) => SCORE_LEVEL_BUCKET[b] - SCORE_LEVEL_BUCKET[a]);
 
   return (
     <div className="space-y-5">
@@ -93,8 +84,8 @@ export default function CraftAtlasOverview() {
                 key={label}
                 className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap"
                 style={{
-                  backgroundColor: `hsl(var(--score-${LEVEL_BUCKET[label]}-bg))`,
-                  color: `hsl(var(--score-${LEVEL_BUCKET[label]}-ink))`,
+                  backgroundColor: `hsl(var(--score-${SCORE_LEVEL_BUCKET[label]}-bg))`,
+                  color: `hsl(var(--score-${SCORE_LEVEL_BUCKET[label]}-ink))`,
                 }}
               >
                 {label} ×{levelCounts[label]}

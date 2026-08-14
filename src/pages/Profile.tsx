@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Mail, Building, MapPin, Calendar, Link2 } from 'lucide-react';
+import { useMobileShell } from '@/hooks/useMobileShell';
+import { BackPill } from '@/components/mobile/BackPill';
 
 interface ProfileData {
   id: string;
@@ -31,6 +33,7 @@ export default function Profile() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const isMobileShell = useMobileShell();
 
   useEffect(() => {
     if (user) {
@@ -132,6 +135,7 @@ export default function Profile() {
   if (!profile) {
     return (
       <div className="space-y-6">
+        {isMobileShell && <BackPill label="More" to="/more" />}
         <h1 className="text-3xl font-bold">Profile</h1>
         <Card>
           <CardContent className="py-12 text-center">
@@ -144,6 +148,7 @@ export default function Profile() {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      {isMobileShell && <BackPill label="More" to="/more" />}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Profile</h1>
         <div className="flex gap-2">

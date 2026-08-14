@@ -29,7 +29,8 @@ export function ownerTabFor(pathname: string): TabKey | null {
     pathname === '/' ||
     pathname.startsWith('/confidence') ||
     pathname.startsWith('/performance/') || // the wizard: /performance/:week/*
-    pathname.startsWith('/team')
+    pathname.startsWith('/team') ||
+    pathname.startsWith('/survey') // PendingSurveysCard lives on Home (and every page); Home is the closest owner
   ) {
     return 'home';
   }

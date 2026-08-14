@@ -49,23 +49,17 @@ they are the same job: getting better at the craft.
 
 ## Entry screen
 
-The Explore tab lands on a simple two-door screen (working shape, to be
-refined with the Alcan Way concepts):
-
-- **My Craft** door: the atlas snapshot (level counts, e.g. "Mastery ×3")
-  leading into the domain-banded tile map.
-- **The Alcan Way** door: the journey invitation (stage progress if we
-  track it, e.g. "You've walked 3 of 5 stages") leading into the
-  swipe experience.
-
-If the Alcan Way concepting suggests a stronger unified entry (e.g. the
-journey as the spine with moves hanging off it), that supersedes this.
+Decided 2026-08-13: no doors, no gateway metaphor. The Explore tab is a
+simple page with plain in-page tabs (or a segmented control):
+**My Role | The Alcan Way**. My Role keeps its name and is the default
+segment; it opens directly into the atlas (snapshot + domain-banded
+tiles). The Alcan Way segment appears only once E3 ships.
 
 ## Build phases
 
 | Phase | What | Depends on |
 |---|---|---|
-| E1 | Rename tab My Role → Explore; entry screen with the two doors (Alcan Way door hidden until E3 ships — no coming-soon states) | nothing |
+| E1 | Rename tab My Role → Explore; plain in-page segments, My Role default (Alcan Way segment hidden until E3 ships — no coming-soon states) | nothing |
 | E2 | Atlas build: rework `/my-role` overview + domain screens to the Craft Atlas design (tiles with levels, area page with eval note + moves, existing study drawer stays) | E1 |
 | E3 | Alcan Way mobile module: build from the winning concept; reuse the beat map / Phase C copy and pixel art where the concept calls for it | concept review with John |
 | E4 | Search across moves (and later the Way) | fits naturally when Ask work begins; not before |
@@ -73,14 +67,13 @@ journey as the spine with moves hanging off it), that supersedes this.
 Conservative practice as always: E2 reworks existing surfaces behind the
 mobile shell gating first; desktop follows once John signs off.
 
-## Open questions for John
+## Decisions log (was: open questions) — answered 2026-08-13
 
-1. Entry screen: two doors, or one unified spine? (Park until the Alcan
-   Way concepts land.)
-2. Does the atlas keep the "My Role" name inside its own header (tab says
-   Explore, atlas says "My Craft" or similar), or does "My Role"
-   disappear entirely as a term?
-3. Alcan Way progress tracking: is "walked stages" worth persisting per
-   user (a small table), or is the Way stateless reading material?
-4. Does the desktop app get Explore too, or does desktop keep the
-   current My Role until the mobile version proves out?
+1. Entry: simple in-page tabs, nothing cute. (Folded into Entry screen
+   above.)
+2. **"My Role" stays as the name** of the atlas segment; Explore is the
+   tab, My Role is the pillar.
+3. **The Alcan Way is stateless reading material** for now: no persisted
+   per-user progress, no completion tracking. A learning resource.
+4. **Desktop keeps everything as-is** until the mobile version rolls
+   out; Explore ships mobile-shell-first.

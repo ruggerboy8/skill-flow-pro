@@ -15,9 +15,11 @@ const TABS: { key: TabKey; label: string; to: string; icon: typeof Home }[] = [
  * docs/features/mobile-build-instructions.md section B.2 for the map.
  */
 export function ownerTabFor(pathname: string): TabKey | null {
-  // Performance owns the eval surfaces even though they live under /my-role
-  // and /evaluation, so check these exceptions before the broader My Role match.
+  // Performance owns the eval and practice-log surfaces even though they
+  // live under /my-role and /evaluation, so check these exceptions before
+  // the broader My Role match.
   if (pathname === '/my-role/evaluations') return 'performance';
+  if (pathname === '/my-role/practice-log') return 'performance';
   if (pathname.startsWith('/evaluation/')) return 'performance';
   if (pathname === '/performance') return 'performance';
 

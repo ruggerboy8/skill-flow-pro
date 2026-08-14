@@ -7,8 +7,6 @@ import { useStaffProfile } from '@/hooks/useStaffProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { getDomainColor } from '@/lib/domainColors';
 import { useNavigate } from 'react-router-dom';
-import { useMobileShell } from '@/hooks/useMobileShell';
-import { BackPill } from '@/components/mobile/BackPill';
 
 type DomainRow = { 
   domain_name: string; 
@@ -29,7 +27,6 @@ export default function StatsEvaluations() {
   // Use staff profile which respects masquerade/simulation
   const { data: staffProfile, isLoading: profileLoading } = useStaffProfile({ redirectToSetup: false, showErrorToast: false });
   const navigate = useNavigate();
-  const isMobileShell = useMobileShell();
   const [loading, setLoading] = useState(true);
   const [evals, setEvals] = useState<EvalRow[]>([]);
 
@@ -109,7 +106,6 @@ export default function StatsEvaluations() {
   if (loading) {
     return (
       <div className="space-y-4">
-        {isMobileShell && <BackPill />}
         <Skeleton className="h-28 w-full" />
         <Skeleton className="h-20 w-full" />
       </div>
@@ -119,7 +115,6 @@ export default function StatsEvaluations() {
   if (!evals.length) {
     return (
       <div className="space-y-4">
-        {isMobileShell && <BackPill />}
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">
@@ -138,7 +133,6 @@ export default function StatsEvaluations() {
 
   return (
     <div className="space-y-6">
-      {isMobileShell && <BackPill />}
       {/* Latest summary */}
       <Card>
         <CardHeader>

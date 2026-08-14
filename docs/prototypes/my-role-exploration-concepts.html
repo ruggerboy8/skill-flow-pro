@@ -1,0 +1,883 @@
+<title>Explore My Craft: three library concepts</title>
+<style>
+  :root {
+    --clinical: hsl(211, 85%, 55%);
+    --clinical-pastel: hsl(211, 85%, 92%);
+    --clerical: hsl(123, 60%, 45%);
+    --clerical-pastel: hsl(123, 60%, 92%);
+    --cultural: hsl(330, 85%, 60%);
+    --cultural-pastel: hsl(330, 85%, 92%);
+    --casea: hsl(36, 90%, 55%);
+    --casea-pastel: hsl(36, 90%, 92%);
+    --warm-one: hsl(26, 92%, 52%);      /* score of 1: warm orange, never red */
+    --warm-one-bg: hsl(26, 92%, 94%);
+    --ink: #1d2530;
+    --sub: #5d6774;
+    --faint: #8b95a3;
+    --line: #e4e8ee;
+    --bg: #f2f4f7;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 40px 32px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- page chrome ---------- */
+  .brief {
+    max-width: 900px;
+    margin: 0 auto 48px;
+  }
+  .brief h1 { font-size: 28px; letter-spacing: -0.02em; margin-bottom: 10px; }
+  .brief p { font-size: 15px; line-height: 1.55; color: var(--sub); }
+  .brief .swatches { display: flex; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+  .swatch { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sub); font-weight: 600; }
+  .swatch i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+
+  .concepts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 48px;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .concept {
+    flex: 0 1 420px;
+    max-width: 440px;
+  }
+  .concept > h2 {
+    font-size: 20px;
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+  .concept > .metaphor {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+  .concept > .rationale {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--sub);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 24px;
+  }
+  .concept .rationale b { color: var(--ink); }
+  .screen-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--faint);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin: 26px 0 10px;
+    text-align: center;
+  }
+
+  /* ---------- phone frame ---------- */
+  .phone {
+    width: 375px;
+    margin: 0 auto;
+    background: #10141a;
+    border-radius: 46px;
+    padding: 10px;
+    box-shadow: 0 18px 40px rgba(20, 30, 45, 0.18);
+  }
+  .screen {
+    background: #fbfcfd;
+    border-radius: 37px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 730px;
+    position: relative;
+  }
+  .statusbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 26px 4px;
+    font-size: 12px; font-weight: 600; color: var(--ink);
+  }
+  .statusbar .cell { letter-spacing: 0.05em; color: var(--faint); }
+  main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .tabbar {
+    margin-top: auto;
+    border-top: 1px solid var(--line);
+    background: #fafbfc;
+    padding: 10px 0 18px;
+    display: flex;
+    justify-content: space-around;
+    opacity: 0.45;
+  }
+  .tabbar div { font-size: 10px; font-weight: 600; color: var(--faint); text-align: center; }
+  .tabbar div i {
+    display: block; width: 18px; height: 18px; border-radius: 6px;
+    background: #c9d1dc; margin: 0 auto 3px;
+  }
+  .tabbar div.on { color: var(--ink); }
+  .tabbar div.on i { background: var(--ink); }
+
+  /* ---------- shared bits ---------- */
+  .h-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .h-sub { font-size: 13px; color: var(--sub); line-height: 1.4; margin-top: 3px; }
+  .pad { padding: 10px 18px 0; }
+
+  .chips { display: flex; gap: 7px; overflow: hidden; padding: 12px 18px 4px; }
+  .chip {
+    flex: none; font-size: 12px; font-weight: 600; color: var(--sub);
+    border: 1px solid var(--line); background: #fff;
+    padding: 6px 11px; border-radius: 999px; white-space: nowrap;
+  }
+  .chip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .chip .n { color: var(--faint); font-weight: 600; margin-left: 3px; }
+  .chip.on .n { color: rgba(255,255,255,0.65); }
+
+  .dots { display: inline-flex; gap: 3px; align-items: center; }
+  .dots i { width: 7px; height: 7px; border-radius: 50%; background: #dfe4ea; }
+  .dots i.f { background: var(--dot, var(--clinical)); }
+  .dots i.w { background: var(--warm-one); }
+
+  .pill {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px; letter-spacing: 0.02em;
+  }
+  .lvl-mastery { background: #26324a; color: #fff; }
+  .lvl-proficient { background: #5c6f92; color: #fff; }
+  .lvl-building { background: #fff; border: 1.5px solid #9fb0c9; color: #4d6383; }
+  .lvl-exploration { background: var(--warm-one); color: #fff; }
+  .lvl-none { background: #eef1f5; color: var(--faint); }
+
+  .tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; font-weight: 700; color: var(--sub);
+    background: #eef1f5; border-radius: 6px; padding: 2px 7px;
+  }
+
+  .btn {
+    display: block; text-align: center; font-weight: 700; font-size: 15px;
+    border-radius: 14px; padding: 14px;
+  }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-ghost { background: #fff; border: 1.5px solid var(--line); color: var(--ink); }
+
+  .domain-bar { width: 4px; border-radius: 4px; align-self: stretch; flex: none; }
+
+  /* ================= CONCEPT A: POCKET DECK ================= */
+  .deck-stage { position: relative; margin: 26px 18px 8px; height: 356px; }
+  .deck-card, .deck-behind {
+    position: absolute; inset: 0;
+    background: var(--card); border-radius: 22px;
+    border: 1px solid var(--line);
+    box-shadow: 0 10px 24px rgba(25, 40, 60, 0.10);
+  }
+  .deck-behind.b1 { transform: translateY(-10px) scale(0.955); opacity: 0.65; }
+  .deck-behind.b2 { transform: translateY(-19px) scale(0.915); opacity: 0.35; }
+  .deck-card { display: flex; flex-direction: column; overflow: hidden; }
+  .deck-ribbon {
+    padding: 10px 18px; font-size: 12px; font-weight: 700; color: #fff;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .deck-body { flex: 1; padding: 26px 22px; display: flex; flex-direction: column; }
+  .deck-move { font-size: 22px; line-height: 1.32; font-weight: 700; letter-spacing: -0.01em; }
+  .deck-meta {
+    margin-top: auto; display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--sub); font-weight: 600;
+  }
+  .deck-flipnote { text-align: center; font-size: 12px; color: var(--faint); font-weight: 600; padding: 0 0 14px; }
+  .deck-controls { display: flex; gap: 10px; padding: 14px 18px 6px; align-items: center; }
+  .deck-controls .btn-ghost { flex: 1; }
+  .deck-controls .btn-primary { flex: 2; }
+  .deck-count { text-align: center; font-size: 12px; color: var(--faint); font-weight: 600; padding-top: 10px; }
+
+  .study-scroll { padding: 4px 18px 12px; overflow: hidden; }
+  .study-kicker { font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+  .study-move { font-size: 21px; font-weight: 800; line-height: 1.3; letter-spacing: -0.01em; margin: 6px 0 16px; }
+  .sec-label { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin: 16px 0 7px; }
+  .why { font-size: 14.5px; line-height: 1.55; color: var(--ink); }
+  .script {
+    border-radius: 14px; padding: 14px 16px; font-size: 14.5px; line-height: 1.5;
+    font-style: italic; position: relative;
+  }
+  .audio-row {
+    display: flex; align-items: center; gap: 10px; margin-top: 10px;
+    font-size: 13px; font-weight: 700; color: var(--ink);
+  }
+  .play {
+    width: 34px; height: 34px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 12px;
+  }
+  .wave { display: flex; gap: 2.5px; align-items: center; height: 20px; }
+  .wave i { width: 3px; border-radius: 2px; background: #ccd4de; }
+  .trail {
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px 14px; display: flex; justify-content: space-between; gap: 8px;
+  }
+  .trail .cellt { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); margin-bottom: 4px; }
+  .trail .cellv { font-size: 13.5px; font-weight: 700; }
+
+  .sheet-back { background: rgba(20, 28, 40, 0.45); flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
+  .sheet {
+    background: #fff; border-radius: 24px 24px 0 0; padding: 18px 18px 22px;
+    box-shadow: 0 -10px 30px rgba(15, 25, 40, 0.2);
+  }
+  .sheet-grab { width: 40px; height: 4px; border-radius: 2px; background: #d7dde5; margin: 0 auto 14px; }
+  .sheet h3 { font-size: 19px; font-weight: 800; margin-bottom: 2px; }
+  .sheet .sub { font-size: 13px; color: var(--sub); margin-bottom: 14px; }
+  .toggle-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 2px; border-top: 1px solid var(--line);
+    font-size: 14px; font-weight: 600;
+  }
+  .toggle-row small { display: block; font-weight: 500; font-size: 12px; color: var(--faint); margin-top: 1px; }
+  .switch { width: 44px; height: 26px; border-radius: 999px; background: #d9dfe7; position: relative; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .switch.on { background: var(--clerical); }
+  .switch.on::after { left: auto; right: 3px; }
+  .deal-note { text-align: center; font-size: 13px; font-weight: 700; color: var(--clerical); margin: 12px 0; }
+
+  /* ================= CONCEPT B: THE ATLAS ================= */
+  .atlas-snapshot {
+    margin: 14px 18px 4px; background: #fff; border: 1px solid var(--line);
+    border-radius: 14px; padding: 11px 14px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12.5px; color: var(--sub); font-weight: 600;
+  }
+  .domain-band { padding: 14px 18px 2px; }
+  .domain-band h4 {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 800; letter-spacing: 0.02em;
+  }
+  .domain-band h4 i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .domain-band h4 .n { font-weight: 600; color: var(--faint); font-size: 12px; margin-left: auto; }
+  .tile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .tile {
+    border-radius: 13px; padding: 11px 12px; min-height: 74px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    border: 1px solid rgba(0,0,0,0.04);
+  }
+  .tile .tname { font-size: 13px; font-weight: 750; line-height: 1.25; }
+  .tile .trow { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .tile .tcount { font-size: 10.5px; font-weight: 600; color: var(--sub); }
+  .atlas-fade { height: 34px; margin-top: -34px; background: linear-gradient(rgba(251,252,253,0), #fbfcfd); position: relative; }
+
+  .comp-hero { padding: 16px 18px 14px; }
+  .comp-crumb { font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+  .comp-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin: 4px 0 6px; }
+  .comp-desc { font-size: 13.5px; line-height: 1.5; color: var(--ink); opacity: 0.85; }
+  .coach-card {
+    margin: 12px 18px; background: #fff; border: 1px solid var(--line);
+    border-radius: 14px; padding: 12px 14px;
+  }
+  .coach-card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .coach-card .who { font-size: 12px; color: var(--faint); font-weight: 600; }
+  .coach-card p { font-size: 13px; line-height: 1.45; color: var(--sub); }
+  .move-row {
+    display: flex; gap: 10px; padding: 12px 18px;
+    border-top: 1px solid var(--line); align-items: flex-start;
+  }
+  .move-row .mtxt { font-size: 13.5px; font-weight: 650; line-height: 1.35; flex: 1; }
+  .move-row .mmeta { display: flex; gap: 6px; margin-top: 5px; align-items: center; }
+  .move-row .mright { flex: none; text-align: right; }
+  .move-row .mwhen { font-size: 10.5px; color: var(--faint); font-weight: 600; margin-top: 4px; }
+  .chev { color: #c3cbd6; font-size: 16px; font-weight: 700; align-self: center; }
+
+  .related {
+    display: flex; gap: 10px; align-items: center;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 12px; margin-top: 8px; font-size: 13px; font-weight: 650; line-height: 1.3;
+  }
+
+  /* ================= CONCEPT C: SHELVES ================= */
+  .search {
+    margin: 12px 18px 4px; background: #fff; border: 1.5px solid var(--line);
+    border-radius: 14px; padding: 12px 14px; display: flex; gap: 9px; align-items: center;
+    font-size: 14.5px; color: var(--faint);
+  }
+  .search.active { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+  .search .glass { width: 16px; height: 16px; border: 2px solid #aeb8c4; border-radius: 50%; position: relative; flex: none; }
+  .search .glass::after { content: ""; position: absolute; width: 7px; height: 2px; background: #aeb8c4; transform: rotate(45deg); bottom: -3px; right: -5px; border-radius: 2px; }
+  .search .caret { width: 2px; height: 18px; background: var(--ink); }
+
+  .shelf { margin-top: 16px; }
+  .shelf-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0 18px 8px; }
+  .shelf-head h4 { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+  .shelf-head small { font-size: 12px; font-weight: 700; color: var(--faint); }
+  .shelf-sub { font-size: 12px; color: var(--sub); padding: 0 18px 8px; margin-top: -6px; }
+  .shelf-row { display: flex; gap: 10px; padding: 0 18px; overflow: hidden; }
+  .scard {
+    flex: none; width: 160px; background: #fff; border: 1px solid var(--line);
+    border-radius: 14px; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .scard .edge { height: 5px; }
+  .scard .sbody { padding: 10px 12px 11px; }
+  .scard .smv { font-size: 12.5px; font-weight: 700; line-height: 1.3; }
+  .scard .sfoot { display: flex; justify-content: space-between; align-items: center; margin-top: 9px; }
+  .scard .swhen { font-size: 10px; color: var(--faint); font-weight: 600; }
+  .dom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 18px; }
+  .dom-tile { border-radius: 14px; padding: 13px 14px; color: #fff; }
+  .dom-tile .dn { font-size: 14px; font-weight: 800; }
+  .dom-tile .dc { font-size: 11px; font-weight: 600; opacity: 0.9; margin-top: 2px; }
+
+  .result-sec { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); padding: 16px 18px 6px; }
+  .result-row {
+    display: flex; gap: 11px; align-items: center;
+    padding: 11px 18px; border-top: 1px solid var(--line); background: #fff;
+  }
+  .result-row .rtxt { flex: 1; }
+  .result-row .rname { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .result-row .rname mark { background: var(--casea-pastel); border-radius: 3px; padding: 0 1px; }
+  .result-row .rsub { font-size: 11.5px; color: var(--faint); font-weight: 600; margin-top: 2px; }
+
+  .upnext {
+    margin: 14px 18px 8px; background: #fff; border: 1px solid var(--line);
+    border-radius: 14px; padding: 12px 14px;
+  }
+  .upnext .ulabel { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin-bottom: 7px; }
+  .upnext .urow { display: flex; gap: 10px; align-items: center; }
+  .upnext .umv { font-size: 13px; font-weight: 700; line-height: 1.3; flex: 1; }
+
+  .footnote { max-width: 900px; margin: 56px auto 0; font-size: 13px; color: var(--faint); line-height: 1.5; }
+</style>
+<header class="brief">
+  <h1>Explore My Craft: three concepts for the Pro Moves library</h1>
+  <p>This page explores how a dental assistant might browse and study the full catalog of Pro Moves for their role, outside the weekly check-in ritual. Each concept takes a different navigation metaphor for the same underlying data, 4 domains holding about 16 competencies holding about 60 moves, with the person's own coach levels, confidence, and practice history woven in as encouragement rather than scorekeeping.</p>
+  <div class="swatches">
+    <span class="swatch"><i style="background:var(--clinical)"></i>Clinical</span>
+    <span class="swatch"><i style="background:var(--clerical)"></i>Clerical</span>
+    <span class="swatch"><i style="background:var(--cultural)"></i>Cultural</span>
+    <span class="swatch"><i style="background:var(--casea)"></i>Case Acceptance</span>
+    <span class="swatch"><i style="background:var(--warm-one)"></i>Score of 1 (warm, celebrated)</span>
+  </div>
+</header>
+
+<div class="concepts">
+
+<!-- ============================================================
+     CONCEPT A: POCKET DECK
+============================================================ -->
+<section class="concept">
+  <h2>Concept A: Pocket Deck</h2>
+  <div class="metaphor">Metaphor: a deck of flashcards in your scrub pocket</div>
+  <div class="rationale">
+    <b>Optimizes for:</b> the 30-second moment between patients. No navigation at all, the app deals you one move and your thumb does the rest. Tuning the deck once ("where I'm still building") makes every future open instantly useful, and the flip-to-study rhythm builds a light spaced-repetition habit.
+    <b>Costs:</b> you never see the whole catalog at a glance, so it is weak when a coach says "go look at the narration moves," and it depends on people trusting the shuffle instead of choosing.
+  </div>
+
+  <div class="screen-label">Screen 1 · The deck (entry)</div>
+  <div class="phone"><div class="screen">
+    <div class="statusbar"><span>9:41</span><span class="cell">●●●●</span></div>
+    <main>
+      <div class="pad">
+        <div class="h-title">Pocket Deck</div>
+        <div class="h-sub">One move at a time. Flick through when you have a minute.</div>
+      </div>
+      <div class="chips">
+        <span class="chip on">My deck <span class="n">23</span></span>
+        <span class="chip">Clinical</span>
+        <span class="chip">Clerical</span>
+        <span class="chip">Cultural</span>
+        <span class="chip">Case Acc</span>
+      </div>
+      <div class="deck-stage">
+        <div class="deck-behind b2"></div>
+        <div class="deck-behind b1"></div>
+        <div class="deck-card">
+          <div class="deck-ribbon" style="background:var(--clinical)">
+            <span>Clinical · Narrating Care</span>
+            <span class="tag" style="background:rgba(255,255,255,0.22);color:#fff">Has a script</span>
+          </div>
+          <div class="deck-body">
+            <div class="deck-move">Name the sensation before it happens ("you'll feel a little cold water").</div>
+            <div class="deck-meta">
+              <span class="dots" style="--dot:var(--clinical)"><i class="f"></i><i class="f"></i><i class="f"></i><i></i>&nbsp;&nbsp;Feels solid</span>
+              <span>Practiced Tue</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="deck-flipnote">Tap the card to flip it and study</div>
+      <div class="deck-controls">
+        <span class="btn btn-ghost">Later</span>
+        <span class="btn btn-primary">Next move</span>
+      </div>
+      <div class="deck-count">Card 4 of 23 · Shuffle</div>
+      <div class="tabbar">
+        <div><i></i>Home</div><div class="on"><i></i>Explore</div><div><i></i>Check-in</div><div><i></i>Me</div>
+      </div>
+    </main>
+  </div></div>
+
+  <div class="screen-label">Screen 2 · Card flipped (study side)</div>
+  <div class="phone"><div class="screen">
+    <div class="statusbar"><span>9:41</span><span class="cell">●●●●</span></div>
+    <main>
+      <div class="study-scroll">
+        <div class="study-kicker" style="color:var(--clinical)">Clinical · Narrating Care</div>
+        <div class="study-move">Name the sensation before it happens ("you'll feel a little cold water").</div>
+
+        <div class="sec-label">Why it works</div>
+        <p class="why">Kids fear surprises more than sensations. When you name the feeling first, their brain files it as expected instead of alarming, and the whole visit gets easier for everyone in the room.</p>
+
+        <div class="sec-label">Say it like this</div>
+        <div class="script" style="background:var(--clinical-pastel)">
+          "You'll feel a little cold water now, kind of like a tiny splash at the pool. Wiggle your toes if it tickles."
+        </div>
+        <div class="audio-row">
+          <span class="play" style="background:var(--clinical)">&#9654;</span>
+          Hear it from Coach Dana · 0:19
+          <span class="wave"><i style="height:6px"></i><i style="height:12px"></i><i style="height:18px"></i><i style="height:9px"></i><i style="height:15px"></i><i style="height:7px"></i><i style="height:13px"></i><i style="height:5px"></i></span>
+        </div>
+
+        <div class="sec-label">Your trail</div>
+        <div class="trail">
+          <div><div class="cellt">Last practiced</div><div class="cellv">Tuesday</div></div>
+          <div><div class="cellt">Your confidence</div><div class="cellv"><span class="dots" style="--dot:var(--clinical)"><i class="f"></i><i class="f"></i><i class="f"></i><i></i></span> 3.1</div></div>
+          <div><div class="cellt">Weeks seen</div><div class="cellv">4</div></div>
+        </div>
+      </div>
+      <div class="deck-controls" style="margin-top:auto">
+        <span class="btn btn-ghost">Flip back</span>
+        <span class="btn btn-primary">Next move</span>
+      </div>
+      <div class="tabbar">
+        <div><i></i>Home</div><div class="on"><i></i>Explore</div><div><i></i>Check-in</div><div><i></i>Me</div>
+      </div>
+    </main>
+  </div></div>
+
+  <div class="screen-label">Screen 3 · Tune your deck (sheet)</div>
+  <div class="phone"><div class="screen">
+    <div class="statusbar" style="opacity:0.4"><span>9:41</span><span class="cell">●●●●</span></div>
+    <main>
+      <div class="sheet-back">
+        <div class="sheet">
+          <div class="sheet-grab"></div>
+          <h3>Tune your deck</h3>
+          <div class="sub">Pick what gets dealt. Change it any time.</div>
+          <div class="chips" style="padding:0 0 12px">
+            <span class="chip on">All domains</span>
+            <span class="chip">Clinical <span class="n">18</span></span>
+            <span class="chip">Clerical <span class="n">14</span></span>
+            <span class="chip">Cultural <span class="n">13</span></span>
+          </div>
+          <div class="toggle-row">
+            <span>Where I'm still building<small>Moves I've rated 1 or 2</small></span>
+            <span class="switch on"></span>
+          </div>
+          <div class="toggle-row">
+            <span>Fresh to me<small>Moves I've never practiced</small></span>
+            <span class="switch on"></span>
+          </div>
+          <div class="toggle-row">
+            <span>Has a script or audio<small>Things to say out loud</small></span>
+            <span class="switch"></span>
+          </div>
+          <div class="deal-note">9 moves in this deck. Nice and focused.</div>
+          <span class="btn btn-primary">Deal the deck</span>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div><i></i>Home</div><div class="on"><i></i>Explore</div><div><i></i>Check-in</div><div><i></i>Me</div>
+      </div>
+    </main>
+  </div></div>
+</section>
+
+<!-- ============================================================
+     CONCEPT B: THE CRAFT ATLAS
+============================================================ -->
+<section class="concept">
+  <h2>Concept B: The Craft Atlas</h2>
+  <div class="metaphor">Metaphor: a map of your craft you drill into</div>
+  <div class="rationale">
+    <b>Optimizes for:</b> orientation and the coaching conversation. All 16 skill areas sit on one colorful map with your coach level painted onto each tile, so "go look at the narration moves" is one glance and one tap, and the quarterly evaluation has an exact mirror to come study in. Growth is visible: tiles change as levels change.
+    <b>Costs:</b> a move is always two or three taps deep, and the entry screen asks for more reading than a between-patients moment allows. Browsing can feel like reviewing a report card if the tone slips even slightly.
+  </div>
+
+  <div class="screen-label">Screen 1 · Atlas home (entry)</div>
+  <div class="phone"><div class="screen">
+    <div class="statusbar"><span>9:41</span><span class="cell">●●●●</span></div>
+    <main>
+      <div class="pad">
+        <div class="h-title">My Craft</div>
+        <div class="h-sub">16 skill areas, one map. The color is the domain. The badge is you.</div>
+      </div>
+      <div class="atlas-snapshot">
+        <span class="pill lvl-mastery">Mastery ×3</span>
+        <span class="pill lvl-exploration">Exploration ×2</span>
+        <span style="margin-left:auto">Fresh ground to explore</span>
+      </div>
+
+      <div class="domain-band">
+        <h4><i style="background:var(--clinical)"></i>Clinical <span class="n">4 areas · 18 moves</span></h4>
+        <div class="tile-grid">
+          <div class="tile" style="background:var(--clinical-pastel)">
+            <div class="tname">Narrating Care</div>
+            <div class="trow"><span class="pill lvl-proficient">Proficient</span><span class="tcount">5 moves</span></div>
+          </div>
+          <div class="tile" style="background:var(--clinical-pastel)">
+            <div class="tname">Comfort &amp; Calm</div>
+            <div class="trow"><span class="pill lvl-mastery">Mastery</span><span class="tcount">4 moves</span></div>
+          </div>
+          <div class="tile" style="background:var(--clinical-pastel)">
+            <div class="tname">Chairside Flow</div>
+            <div class="trow"><span class="pill lvl-building">Building</span><span class="tcount">5 moves</span></div>
+          </div>
+          <div class="tile" style="background:var(--clinical-pastel)">
+            <div class="tname">Safety &amp; Setup</div>
+            <div class="trow"><span class="pill lvl-exploration">Exploration</span><span class="tcount">4 moves</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="domain-band">
+        <h4><i style="background:var(--clerical)"></i>Clerical <span class="n">4 areas · 14 moves</span></h4>
+        <div class="tile-grid">
+          <div class="tile" style="background:var(--clerical-pastel)">
+            <div class="tname">Room Readiness</div>
+            <div class="trow"><span class="pill lvl-mastery">Mastery</span><span class="tcount">3 moves</span></div>
+          </div>
+          <div class="tile" style="background:var(--clerical-pastel)">
+            <div class="tname">Day Flow</div>
+            <div class="trow"><span class="pill lvl-none">Not yet rated</span><span class="tcount">4 moves</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="domain-band" style="padding-bottom:0">
+        <h4><i style="background:var(--cultural)"></i>Cultural <span class="n">4 areas · 13 moves</span></h4>
+        <div class="tile-grid">
+          <div class="tile" style="background:var(--cultural-pastel)">
+            <div class="tname">Team Rituals</div>
+            <div class="trow"><span class="pill lvl-proficient">Proficient</span><span class="tcount">3 moves</span></div>
+          </div>
+          <div class="tile" style="background:var(--cultural-pastel)">
+            <div class="tname">Lifting Teammates</div>
+            <div class="trow"><span class="pill lvl-building">Building</span><span class="tcount">3 moves</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="atlas-fade"></div>
+      <div class="tabbar">
+        <div><i></i>Home</div><div class="on"><i></i>Explore</div><div><i></i>Check-in</div><div><i></i>Me</div>
+      </div>
+    </main>
+  </div></div>
+
+  <div class="screen-label">Screen 2 · A skill area, opened</div>
+  <div class="phone"><div class="screen">
+    <div class="statusbar"><span>9:41</span><span class="cell">●●●●</span></div>
+    <main>
+      <div class="comp-hero" style="background:var(--clinical-pastel)">
+        <div class="comp-crumb" style="color:var(--clinical)">&#8249; Clinical</div>
+        <div class="comp-title">Narrating Care</div>
+        <p class="comp-desc">Kids relax when nothing is a surprise. This area is about talking patients and parents through every step before it happens.</p>
+      </div>
+      <div class="coach-card">
+        <div class="top">
+          <span class="pill lvl-proficient">Coach level: Proficient</span>
+          <span class="who">March eval · Dana</span>
+        </div>
+        <p>"Your narration with little ones is a strength. Keep stretching it to the parents in the room."</p>
+      </div>
+
+      <div class="sec-label" style="padding:0 18px">5 moves in this area</div>
+      <div class="move-row">
+        <span class="domain-bar" style="background:var(--clinical)"></span>
+        <div class="mtxt">Tell the parent and patient what you're about to do before you do it.
+          <div class="mmeta"><span class="tag">Script</span><span class="tag">&#9654; Audio</span></div>
+        </div>
+        <div class="mright">
+          <span class="dots" style="--dot:var(--clinical)"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i></span>
+          <div class="mwhen">2d ago</div>
+        </div>
+        <span class="chev">&#8250;</span>
+      </div>
+      <div class="move-row">
+        <span class="domain-bar" style="background:var(--clinical)"></span>
+        <div class="mtxt">Name the sensation before it happens ("you'll feel a little cold water").
+          <div class="mmeta"><span class="tag">Script</span></div>
+        </div>
+        <div class="mright">
+          <span class="dots" style="--dot:var(--clinical)"><i class="f"></i><i class="f"></i><i class="f"></i><i></i></span>
+          <div class="mwhen">Tue</div>
+        </div>
+        <span class="chev">&#8250;</span>
+      </div>
+      <div class="move-row">
+        <span class="domain-bar" style="background:var(--clinical)"></span>
+        <div class="mtxt">Count down the last ten seconds of anything uncomfortable, out loud.</div>
+        <div class="mright">
+          <span class="dots"><i class="w"></i><i></i><i></i><i></i></span>
+          <div class="mwhen">Fresh start</div>
+        </div>
+        <span class="chev">&#8250;</span>
+      </div>
+      <div class="move-row">
+        <span class="domain-bar" style="background:var(--clinical)"></span>
+        <div class="mtxt">Give the patient a job ("your job is to hold big open like an alligator").
+          <div class="mmeta"><span class="tag">Script</span><span class="tag">&#9654; Audio</span></div>
+        </div>
+        <div class="mright">
+          <span class="dots"><i style="background:#c3cbd6"></i><i></i><i></i><i></i></span>
+          <div class="mwhen">New to you</div>
+        </div>
+        <span class="chev">&#8250;</span>
+      </div>
+      <div class="tabbar">
+        <div><i></i>Home</div><div class="on"><i></i>Explore</div><div><i></i>Check-in</div><div><i></i>Me</div>
+      </div>
+    </main>
+  </div></div>
+
+  <div class="screen-label">Screen 3 · Move study view</div>
+  <div class="phone"><div class="screen">
+    <div class="statusbar"><span>9:41</span><span class="cell">●●●●</span></div>
+    <main>
+      <div class="study-scroll" style="padding-top:12px">
+        <div class="study-kicker" style="color:var(--clinical)">&#8249; Clinical · Narrating Care</div>
+        <div class="study-move">Tell the parent and patient what you're about to do before you do it.</div>
+
+        <div class="sec-label">Why it works</div>
+        <p class="why">Narrating for two audiences at once builds trust twice. The child hears calm and predictability. The parent hears competence, and a parent who trusts you says yes to care more easily.</p>
+
+        <div class="sec-label">Say it like this</div>
+        <div class="script" style="background:var(--clinical-pastel)">
+          "Miss Ana is going to count your teeth now. You'll hear a little clicking while I call out numbers, and it doesn't hurt one bit."
+        </div>
+        <div class="audio-row">
+          <span class="play" style="background:var(--clinical)">&#9654;</span>
+          Hear it in the operatory · 0:22
+          <span class="wave"><i style="height:8px"></i><i style="height:14px"></i><i style="height:18px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:6px"></i><i style="height:12px"></i></span>
+        </div>
+
+        <div class="sec-label">Your trail</div>
+        <div class="trail">
+          <div><div class="cellt">Last practiced</div><div class="cellv">2 days ago</div></div>
+          <div><div class="cellt">Your confidence</div><div class="cellv"><span class="dots" style="--dot:var(--clinical)"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i></span> 3.8</div></div>
+        </div>
+
+        <div class="sec-label">Neighbors in this skill</div>
+        <div class="related">
+          <span class="domain-bar" style="background:var(--clinical)"></span>
+          Name the sensation before it happens ("you'll feel a little cold water").
+          <span class="chev">&#8250;</span>
+        </div>
+        <div class="related">
+          <span class="domain-bar" style="background:var(--clinical)"></span>
+          Count down the last ten seconds of anything uncomfortable, out loud.
+          <span class="chev">&#8250;</span>
+        </div>
+      </div>
+      <div class="tabbar" style="margin-top:auto">
+        <div><i></i>Home</div><div class="on"><i></i>Explore</div><div><i></i>Check-in</div><div><i></i>Me</div>
+      </div>
+    </main>
+  </div></div>
+</section>
+
+<!-- ============================================================
+     CONCEPT C: SHELVES
+============================================================ -->
+<section class="concept">
+  <h2>Concept C: Shelves</h2>
+  <div class="metaphor">Metaphor: a streaming library with search and curated rows</div>
+  <div class="rationale">
+    <b>Optimizes for:</b> meeting every mood at the door. Search is first-class, so a coach's phrase ("look at the narration moves") lands in two seconds. Curated shelves ("Keep going", "From your spring evaluation", "Say it out loud") turn the person's own history and eval into ready-made study paths, and the "up next" footer keeps a study session rolling like a playlist.
+    <b>Costs:</b> the shelves are only as good as the curation logic behind them, and the domain-competency structure fades into the background, so people may never form a mental map of the whole craft.
+  </div>
+
+  <div class="screen-label">Screen 1 · Library home (entry)</div>
+  <div class="phone"><div class="screen">
+    <div class="statusbar"><span>9:41</span><span class="cell">●●●●</span></div>
+    <main>
+      <div class="pad">
+        <div class="h-title">Explore</div>
+      </div>
+      <div class="search"><span class="glass"></span>Try "cold water" or "huddle"</div>
+
+      <div class="shelf">
+        <div class="shelf-head"><h4>Keep going</h4><small>See all</small></div>
+        <div class="shelf-row">
+          <div class="scard">
+            <div class="edge" style="background:var(--clinical)"></div>
+            <div class="sbody">
+              <div class="smv">Name the sensation before it happens.</div>
+              <div class="sfoot"><span class="dots" style="--dot:var(--clinical)"><i class="f"></i><i class="f"></i><i class="f"></i><i></i></span><span class="swhen">Tue</span></div>
+            </div>
+          </div>
+          <div class="scard">
+            <div class="edge" style="background:var(--cultural)"></div>
+            <div class="sbody">
+              <div class="smv">Greet every teammate by name before the morning huddle starts.</div>
+              <div class="sfoot"><span class="dots" style="--dot:var(--cultural)"><i class="f"></i><i class="f"></i><i></i><i></i></span><span class="swhen">Mon</span></div>
+            </div>
+          </div>
+          <div class="scard" style="width:70px">
+            <div class="edge" style="background:var(--clerical)"></div>
+            <div class="sbody"><div class="smv">Hygiene rooms fully turned</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="shelf">
+        <div class="shelf-head"><h4>From your spring evaluation</h4><small>See all</small></div>
+        <div class="shelf-sub">Dana pointed at Next Step Clarity. Fresh ground, worth a wander.</div>
+        <div class="shelf-row">
+          <div class="scard" style="width:190px">
+            <div class="edge" style="background:var(--casea)"></div>
+            <div class="sbody">
+              <div class="smv">Offer the parent one clear next step before they leave the operatory.</div>
+              <div class="sfoot"><span class="pill lvl-exploration">Exploration</span><span class="swhen">Script</span></div>
+            </div>
+          </div>
+          <div class="scard" style="width:130px">
+            <div class="edge" style="background:var(--casea)"></div>
+            <div class="sbody"><div class="smv">Walk the parent to the front desk and hand them off by name.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="shelf">
+        <div class="shelf-head"><h4>Say it out loud</h4><small>10 moves</small></div>
+        <div class="shelf-row">
+          <div class="scard" style="width:150px">
+            <div class="edge" style="background:var(--clinical)"></div>
+            <div class="sbody">
+              <div class="smv">"Your job is to hold big open like an alligator."</div>
+              <div class="sfoot"><span class="tag">&#9654; 0:15</span></div>
+            </div>
+          </div>
+          <div class="scard" style="width:150px">
+            <div class="edge" style="background:var(--casea)"></div>
+            <div class="sbody">
+              <div class="smv">"Let's get Mia's next visit on the books."</div>
+              <div class="sfoot"><span class="tag">&#9654; 0:18</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="shelf" style="padding-bottom:10px">
+        <div class="shelf-head"><h4>Browse by domain</h4></div>
+        <div class="dom-grid">
+          <div class="dom-tile" style="background:var(--clinical)"><div class="dn">Clinical</div><div class="dc">18 moves</div></div>
+          <div class="dom-tile" style="background:var(--clerical)"><div class="dn">Clerical</div><div class="dc">14 moves</div></div>
+        </div>
+      </div>
+      <div class="atlas-fade"></div>
+      <div class="tabbar">
+        <div><i></i>Home</div><div class="on"><i></i>Explore</div><div><i></i>Check-in</div><div><i></i>Me</div>
+      </div>
+    </main>
+  </div></div>
+
+  <div class="screen-label">Screen 2 · Search, mid-word</div>
+  <div class="phone"><div class="screen">
+    <div class="statusbar"><span>9:41</span><span class="cell">●●●●</span></div>
+    <main>
+      <div class="search active"><span class="glass"></span>narrat<span class="caret"></span></div>
+
+      <div class="result-sec">Skill areas</div>
+      <div class="result-row">
+        <span class="domain-bar" style="background:var(--clinical)"></span>
+        <div class="rtxt">
+          <div class="rname"><mark>Narrat</mark>ing Care</div>
+          <div class="rsub">Clinical · 5 moves · you're Proficient here</div>
+        </div>
+        <span class="pill lvl-proficient">Proficient</span>
+        <span class="chev">&#8250;</span>
+      </div>
+
+      <div class="result-sec">Moves</div>
+      <div class="result-row">
+        <span class="domain-bar" style="background:var(--clinical)"></span>
+        <div class="rtxt">
+          <div class="rname">Tell the parent and patient what you're about to do before you do it.</div>
+          <div class="rsub">Narrating Care · script · audio</div>
+        </div>
+        <span class="chev">&#8250;</span>
+      </div>
+      <div class="result-row">
+        <span class="domain-bar" style="background:var(--clinical)"></span>
+        <div class="rtxt">
+          <div class="rname">Name the sensation before it happens ("you'll feel a little cold water").</div>
+          <div class="rsub">Narrating Care · script</div>
+        </div>
+        <span class="chev">&#8250;</span>
+      </div>
+      <div class="result-row">
+        <span class="domain-bar" style="background:var(--clinical)"></span>
+        <div class="rtxt">
+          <div class="rname">Count down the last ten seconds of anything uncomfortable, out loud.</div>
+          <div class="rsub">Narrating Care</div>
+        </div>
+        <span class="chev">&#8250;</span>
+      </div>
+
+      <div class="pad" style="padding-top:16px">
+        <p style="font-size:12.5px;color:var(--faint);line-height:1.5">Results group skill areas above moves, so whatever phrase the coach used lands you on the right shelf.</p>
+      </div>
+
+      <div class="tabbar">
+        <div><i></i>Home</div><div class="on"><i></i>Explore</div><div><i></i>Check-in</div><div><i></i>Me</div>
+      </div>
+    </main>
+  </div></div>
+
+  <div class="screen-label">Screen 3 · Move study, playlist style</div>
+  <div class="phone"><div class="screen">
+    <div class="statusbar"><span>9:41</span><span class="cell">●●●●</span></div>
+    <main>
+      <div class="study-scroll" style="padding-top:12px">
+        <div class="study-kicker" style="color:var(--casea)">&#8249; From your spring evaluation · 1 of 4</div>
+        <div class="study-move">Offer the parent one clear next step before they leave the operatory.</div>
+
+        <div class="sec-label">Why it works</div>
+        <p class="why">Parents leave a visit holding a lot. One clear next step, said warmly and once, is the difference between "we'll think about it" and an appointment on the books before they reach the door.</p>
+
+        <div class="sec-label">Say it like this</div>
+        <div class="script" style="background:var(--casea-pastel)">
+          "Before you head out, let's get Mia's next visit on the books. Mornings or afternoons, which is easier for you two?"
+        </div>
+        <div class="audio-row">
+          <span class="play" style="background:var(--casea)">&#9654;</span>
+          Hear it from Coach Dana · 0:18
+          <span class="wave"><i style="height:7px"></i><i style="height:13px"></i><i style="height:17px"></i><i style="height:9px"></i><i style="height:14px"></i><i style="height:6px"></i><i style="height:11px"></i></span>
+        </div>
+
+        <div class="sec-label">Your trail</div>
+        <div class="trail">
+          <div><div class="cellt">Last practiced</div><div class="cellv">Not yet, fresh start</div></div>
+          <div><div class="cellt">Your confidence</div><div class="cellv"><span class="dots"><i class="w"></i><i></i><i></i><i></i></span> honest 1, great place to begin</div></div>
+        </div>
+
+        <div class="upnext">
+          <div class="ulabel">Up next on this shelf</div>
+          <div class="urow">
+            <span class="domain-bar" style="background:var(--casea)"></span>
+            <span class="umv">Walk the parent to the front desk and hand them off by name.</span>
+            <span class="pill" style="background:var(--casea);color:#fff">Next</span>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar" style="margin-top:auto">
+        <div><i></i>Home</div><div class="on"><i></i>Explore</div><div><i></i>Check-in</div><div><i></i>Me</div>
+      </div>
+    </main>
+  </div></div>
+</section>
+
+</div>
+
+<p class="footnote">All content shown is sample content in the product voice. Names, dates, ratings, and counts are illustrative. A score of 1 always renders in warm orange, never red: an honest 1 is a starting line, not a warning.</p>
+

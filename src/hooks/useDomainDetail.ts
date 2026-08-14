@@ -56,7 +56,7 @@ export function useDomainDetail(domainSlug: string) {
       // 1. Fetch competencies for this domain and ALL applicable roles
       const { data: competencies, error: compError } = await supabase
         .from('competencies')
-        .select('competency_id, name, tagline, friendly_description')
+        .select('competency_id, name, tagline, friendly_description, role_id')
         .eq('domain_id', domainId)
         .in('role_id', roleIds)
         .eq('status', 'Active')
@@ -183,22 +183,58 @@ export function useDomainDetail(domainSlug: string) {
       }
 
       // 6. Build the competency details. Leads merge in competencies from
-      // their lead role (see roleIds above); some lead-role competencies
-      // (e.g. Lead Dental Assistant, role_id 11) carry no active pro moves
-      // because the retired lead panel left them behind, so they'd render
-      // as blank near-duplicates of the base role's competency. Drop those
-      // here rather than upstream so counts/averages stay consistent with
-      // what's actually shown.
-      const competencyDetails: CompetencyDetail[] = (competencies || [])
-        .map(c => ({
-          competency_id: c.competency_id,
-          title: c.name || '',
-          subtitle: c.tagline,
-          description: (c as any).friendly_description || null,
-          observerScore: competencyScores.get(c.competency_id) ?? null,
-          proMoves: proMovesByCompetency.get(c.competency_id) || []
-        }))
-        .filter(c => c.proMoves.length > 0);
+      // their lead role (see roleIds above). The Lead Dental Assistant role
+      // (role_id 11) carries 16 competencies but only 1 still has an active
+      // pro move (leftovers from the retired lead panel). Rather than let
+      // that surviving move sit in its own orphaned lead-role competency
+      // card next to an identically-named, richer base-role card, merge
+      // same-named competencies first (trimmed/case-insensitive): a
+      // lead-role competency's pro moves fold into the base-role
+      // competency of the same name (deduped by action_id), and the lead
+      // copy is dropped. The base competency's id/description/observer
+      // score win, since evaluations key off the base role's competency
+      // ids. A lead competency with no base-role name match stays as its
+      // own entry (lead-exclusive competencies are legitimate if they ever
+      // carry moves). Only after merging do we drop any remaining
+      // competency, base or lead, left with zero pro moves.
+      const baseRoleId = staffProfile.role_id;
+      const normalizeTitle = (s: string) => s.trim().toLowerCase();
+
+      const rawCompetencies = (competencies || []).map(c => ({
+        competency_id: c.competency_id,
+        role_id: c.role_id,
+        title: c.name || '',
+        subtitle: c.tagline,
+        description: (c as any).friendly_description || null,
+        observerScore: competencyScores.get(c.competency_id) ?? null,
+        proMoves: proMovesByCompetency.get(c.competency_id) || []
+      }));
+
+      const baseByName = new Map<string, (typeof rawCompetencies)[number]>();
+      for (const c of rawCompetencies) {
+        if (c.role_id === baseRoleId) baseByName.set(normalizeTitle(c.title), c);
+      }
+
+      const mergedAwayIds = new Set<number>();
+      for (const c of rawCompetencies) {
+        if (c.role_id === baseRoleId) continue; // only fold lead rows into base
+        const match = baseByName.get(normalizeTitle(c.title));
+        if (!match) continue; // lead-exclusive competency: keep as its own entry
+
+        const existingActionIds = new Set(match.proMoves.map(pm => pm.action_id));
+        for (const pm of c.proMoves) {
+          if (!existingActionIds.has(pm.action_id)) {
+            match.proMoves.push(pm);
+            existingActionIds.add(pm.action_id);
+          }
+        }
+        mergedAwayIds.add(c.competency_id);
+      }
+
+      const competencyDetails: CompetencyDetail[] = rawCompetencies
+        .filter(c => !mergedAwayIds.has(c.competency_id))
+        .filter(c => c.proMoves.length > 0)
+        .map(({ role_id, ...rest }) => rest);
 
       // 7. Calculate average score for the domain
       const scores = competencyDetails.map(c => c.observerScore).filter((s): s is number => s !== null);

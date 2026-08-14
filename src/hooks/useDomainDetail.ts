@@ -182,15 +182,23 @@ export function useDomainDetail(domainSlug: string) {
         }
       }
 
-      // 6. Build the competency details
-      const competencyDetails: CompetencyDetail[] = (competencies || []).map(c => ({
-        competency_id: c.competency_id,
-        title: c.name || '',
-        subtitle: c.tagline,
-        description: (c as any).friendly_description || null,
-        observerScore: competencyScores.get(c.competency_id) ?? null,
-        proMoves: proMovesByCompetency.get(c.competency_id) || []
-      }));
+      // 6. Build the competency details. Leads merge in competencies from
+      // their lead role (see roleIds above); some lead-role competencies
+      // (e.g. Lead Dental Assistant, role_id 11) carry no active pro moves
+      // because the retired lead panel left them behind, so they'd render
+      // as blank near-duplicates of the base role's competency. Drop those
+      // here rather than upstream so counts/averages stay consistent with
+      // what's actually shown.
+      const competencyDetails: CompetencyDetail[] = (competencies || [])
+        .map(c => ({
+          competency_id: c.competency_id,
+          title: c.name || '',
+          subtitle: c.tagline,
+          description: (c as any).friendly_description || null,
+          observerScore: competencyScores.get(c.competency_id) ?? null,
+          proMoves: proMovesByCompetency.get(c.competency_id) || []
+        }))
+        .filter(c => c.proMoves.length > 0);
 
       // 7. Calculate average score for the domain
       const scores = competencyDetails.map(c => c.observerScore).filter((s): s is number => s !== null);

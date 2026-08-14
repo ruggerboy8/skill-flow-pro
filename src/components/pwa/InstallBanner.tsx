@@ -26,6 +26,7 @@ export function InstallBanner() {
   const [dismissed, setDismissed] = useState(isBannerDismissed());
   const [canPrompt, setCanPrompt] = useState(!!getDeferredInstallPrompt());
   const [copied, setCopied] = useState(false);
+  const [clipboardFailed, setClipboardFailed] = useState(false);
 
   useEffect(() => onInstallPromptAvailable(() => setCanPrompt(true)), []);
 
@@ -45,9 +46,12 @@ export function InstallBanner() {
     try {
       await navigator.clipboard.writeText(window.location.origin);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setClipboardFailed(false);
+      setTimeout(() => setCopied(false), 3000);
     } catch {
-      /* clipboard unavailable — the URL is visible in the address bar */
+      // Clipboard API unavailable or denied (common in some iOS in-app
+      // webviews) — fall back to a visible, selectable URL instead.
+      setClipboardFailed(true);
     }
   };
 
@@ -82,24 +86,28 @@ export function InstallBanner() {
             </ol>
           ) : isIos() ? (
             <>
-              {/* Chrome/Firefox/Edge on iOS: Apple only lets Safari install a
-                  full app with notifications, so route the user there. */}
-              <p>
-                On iPhone, the app installs from{' '}
-                <span className="font-medium text-foreground">Safari</span>. Copy the link, open
-                Safari, and paste it there — the install steps will appear.
-              </p>
-              <Button size="sm" variant="outline" className="w-full" onClick={handleCopyLink}>
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 mr-1.5" /> Link copied — now open Safari
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 mr-1.5" /> Copy link for Safari
-                  </>
-                )}
-              </Button>
+              {/* iOS + any non-Safari browser (Chrome/Firefox/Edge/etc.):
+                  Apple restricts PWA installability to Safari on iOS, so the
+                  share-sheet steps above don't apply here — route the user
+                  to Safari instead. */}
+              <p>On iPhone and iPad, Pro Moves can only be installed from Safari.</p>
+              {clipboardFailed ? (
+                <p className="rounded-md border bg-muted px-2 py-1.5 text-xs text-foreground select-all break-all">
+                  {window.location.origin}
+                </p>
+              ) : (
+                <Button size="sm" variant="outline" className="w-full" onClick={handleCopyLink}>
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 mr-1.5" /> Link copied — now paste it in Safari
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-1.5" /> Copy link for Safari
+                    </>
+                  )}
+                </Button>
+              )}
             </>
           ) : canPrompt ? (
             <Button size="sm" className="w-full" onClick={() => triggerInstallPrompt()}>

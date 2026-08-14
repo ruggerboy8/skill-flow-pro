@@ -65,3 +65,18 @@ export const getDomainColor = (domain: string): string => {
 export const getDomainColorRich = (domain: string): string => {
   return `hsl(${getDomainColorRichRaw(domain)})`;
 };
+
+// Readable ink tokens for text sitting on a domain's pastel/tinted
+// background (see --clinical-ink etc. in index.css, mobile-shell round).
+const DOMAIN_INK_VARS: Record<string, string> = {
+  'clinical': '--clinical-ink',
+  'clerical': '--clerical-ink',
+  'cultural': '--cultural-ink',
+  'case acceptance': '--case-acceptance-ink',
+};
+
+// Returns fully qualified CSS color string for on-pastel text
+export const getDomainInk = (domain: string): string => {
+  const key = (domain || '').trim().toLowerCase();
+  return `hsl(var(${DOMAIN_INK_VARS[key] || '--foreground'}))`;
+};

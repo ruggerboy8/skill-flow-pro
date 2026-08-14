@@ -246,6 +246,14 @@ export default function Layout() {
   // grows with content) so <main> is the only scroller — otherwise the
   // document itself scrolls and the in-flow tab bar rides away with it.
   if (isMobileShell) {
+    // The check-in/check-out wizards are full-screen rituals with their own
+    // fixed bottom footer (Back/Next); rendering the tab bar under them
+    // would be painted over by that z-50 footer. Hide it for those routes —
+    // the wizard's own controls are the navigation there.
+    const isRitualRoute =
+      location.pathname.startsWith('/confidence/') ||
+      /^\/performance\/[^/]+/.test(location.pathname);
+
     return (
       <div className="h-screen supports-[height:100dvh]:h-[100dvh] bg-background flex flex-col">
         <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-card flex-none">
@@ -262,7 +270,7 @@ export default function Layout() {
           <Outlet />
         </main>
 
-        <MobileTabBar />
+        {!isRitualRoute && <MobileTabBar />}
       </div>
     );
   }

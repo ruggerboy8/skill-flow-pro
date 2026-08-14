@@ -15,13 +15,22 @@ role (role_id 11) still carries 16 competencies but only **1** active
 Pro Move (leftovers from the retired lead panel), so its competencies
 render as empty near-duplicates of the base role's.
 
-**Fix:** in `src/hooks/useDomainDetail.ts`, after assembling
-`competencies[].proMoves`, drop any competency whose `proMoves` array is
-empty (filter at the hook level so counts and averages stay consistent).
-This is not mobile-gated; it fixes the same blank rows on desktop. Keep
-the lead-role merge itself — the one lead competency that still has an
-active move must continue to appear. Add a one-line comment naming the
-lead-role data situation so the filter isn't "simplified" away later.
+**Fix (refined by John mid-round):** in `src/hooks/useDomainDetail.ts`,
+merge-then-filter:
+1. Same-named competencies across the merged roles collapse into one:
+   a lead-role competency whose name matches a base-role competency
+   (trimmed, case-insensitive) contributes its `proMoves` into the base
+   competency's list (dedupe by `action_id`) and is dropped as a
+   separate entry. The base competency's id, description, and observer
+   score win (evaluations key on the base role's competencies).
+2. Lead-role competencies with no same-named base counterpart remain
+   their own entries (lead-exclusive competencies are legitimate when
+   they carry moves).
+3. Then drop any remaining competency whose `proMoves` is empty.
+Net effect today: the one active lead move sits inside the matching base
+competency card; leads see no blanks and no duplicates. Not mobile-gated
+(fixes desktop too). Comment the merge-then-filter order and why (the
+lead role carries 16 competencies with 1 active move).
 
 ## 2. My Role sub-tabs on mobile: overview only
 

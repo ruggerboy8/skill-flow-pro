@@ -58,9 +58,12 @@ Phase 1 work item or an explicit accepted behavior.
    Icons added before we ship the manifest are plain bookmarks: they open in
    Safari chrome and can never receive push. There is no upgrade path.
    **The install instructions must say: delete the old Pro Moves icon, then
-   re-add from Safari.** Android similar: old shortcuts remain shortcuts;
-   proper install creates the real app. This goes in the launch
-   comms, the in-app install banner copy, and the huddle script.
+   re-add from Safari.** On iOS the re-add must happen in Safari specifically
+   — Chrome, Firefox, and Edge on iOS cannot create a standalone home-screen
+   app, so a user on another iOS browser needs to open Safari first. Android
+   similar: old shortcuts remain shortcuts; proper install creates the real
+   app. This goes in the launch comms, the in-app install banner copy, and
+   the huddle script.
 2. **Everyone logs in once more, inside the installed app.** The installed
    PWA has its own storage, separate from Safari, so Safari sessions don't
    carry over. Because login is password-based this is a one-time
@@ -151,7 +154,10 @@ punch list.
 5. Invite/reset email + screen copy tweak (B2).
 6. In-app install banner on mobile browsers: Android one-tap via
    `beforeinstallprompt`; iOS share-sheet instructions; **both versions
-   include "remove your old Pro Moves icon first"** (B1).
+   include "remove your old Pro Moves icon first"** (B1). On iOS, only
+   Safari can install a PWA, so the banner detects non-Safari iOS browsers
+   and points the user to Safari instead of showing share-sheet steps that
+   don't apply there.
 7. Tier 1 device audit and resulting fixes (C).
 8. Verify the Lovable publish emits SW + manifest on the live site before
    any announcement.

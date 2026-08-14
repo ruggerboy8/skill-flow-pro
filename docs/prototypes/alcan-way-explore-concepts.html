@@ -1,0 +1,1291 @@
+<title>The Alcan Way, Mobile Concepts</title>
+<style>
+  :root {
+    --page-bg: #f6f1e9;
+    --ink: #2b2320;
+    --ink-soft: #6b5f56;
+    --card: #ffffff;
+    --line: #e4dbcd;
+
+    --c1-bg: #fff8ee;
+    --c1-plum: #4a2b3f;
+    --c1-apricot: #e8956d;
+    --c1-terra: #c96f4a;
+    --c1-dusk: #7d93a8;
+
+    --c2-paper: #fdfbf5;
+    --c2-ink: #26241f;
+    --c2-hi: #f7e17f;
+    --c2-ribbon: #b8442c;
+
+    --c3-sand: #f3ead9;
+    --c3-teal: #3f6f6a;
+    --c3-path: #c9a76a;
+    --c3-glow: #e8b64c;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--page-bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.5;
+    padding: 40px 24px 80px;
+  }
+
+  .brief {
+    max-width: 900px;
+    margin: 0 auto 48px;
+  }
+  .brief h1 {
+    font-size: 28px;
+    letter-spacing: -0.01em;
+    margin-bottom: 10px;
+  }
+  .brief p {
+    font-size: 16px;
+    color: var(--ink-soft);
+    max-width: 72ch;
+  }
+
+  .concepts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 40px;
+    justify-content: center;
+    align-items: flex-start;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+
+  .concept {
+    flex: 1 1 420px;
+    max-width: 460px;
+  }
+
+  .concept > header { margin-bottom: 20px; }
+  .concept h2 {
+    font-size: 24px;
+    letter-spacing: -0.01em;
+  }
+  .metaphor {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 6px 0 14px;
+    color: var(--ink-soft);
+  }
+  .c1 .metaphor { color: var(--c1-terra); }
+  .c2 .metaphor { color: var(--c2-ribbon); }
+  .c3 .metaphor { color: var(--c3-teal); }
+
+  .rationale {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    font-size: 13.5px;
+  }
+  .rationale h3 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .rationale p { color: var(--ink); margin-bottom: 12px; }
+  .rationale p:last-child { margin-bottom: 0; }
+
+  .phones {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    margin-top: 24px;
+  }
+
+  figure.shot { margin: 0; }
+  figcaption {
+    font-size: 13px;
+    color: var(--ink-soft);
+    padding: 10px 8px 0;
+    max-width: 375px;
+    margin: 0 auto;
+  }
+  figcaption strong { color: var(--ink); }
+
+  .phone {
+    width: 375px;
+    height: 780px;
+    margin: 0 auto;
+    border-radius: 42px;
+    border: 8px solid #1d1a17;
+    background: #fff;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 0 18px 40px rgba(43, 35, 32, 0.18);
+  }
+
+  .statusbar {
+    height: 34px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.75;
+  }
+  .homebar {
+    flex: none;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .homebar::after {
+    content: "";
+    width: 120px;
+    height: 5px;
+    border-radius: 3px;
+    background: currentColor;
+    opacity: 0.25;
+  }
+
+  .screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 20px 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .pixel {
+    border-radius: 12px;
+    display: flex;
+    align-items: flex-end;
+    padding: 10px 12px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.92);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0 6px, transparent 6px 12px),
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.08) 0 6px, transparent 6px 12px);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+
+  .chip {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+
+  .btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px;
+    border-radius: 14px;
+    border: none;
+  }
+  .btn.ghost {
+    background: transparent;
+    font-weight: 500;
+  }
+
+  .play {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 999px;
+  }
+  .play::before {
+    content: "";
+    width: 0; height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 8px solid currentColor;
+  }
+
+  /* ============ Concept 1: The Walk ============ */
+
+  .c1 .phone { background: var(--c1-bg); color: var(--c1-plum); }
+  .c1 .pixel { background-color: var(--c1-dusk); }
+
+  .explore-tabs { padding: 6px 0 14px; }
+  .explore-tabs .over {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: 0.45;
+    margin-bottom: 6px;
+  }
+  .explore-tabs nav { display: flex; gap: 18px; font-size: 15px; font-weight: 700; }
+  .explore-tabs nav span { opacity: 0.4; padding-bottom: 5px; }
+  .explore-tabs nav .on { opacity: 1; border-bottom: 2.5px solid currentColor; }
+
+  .c1 .cover-title {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 18px 0 8px;
+  }
+  .c1 .cover-sub {
+    font-size: 15.5px;
+    color: #7a5a6b;
+    margin-bottom: 22px;
+  }
+
+  .c1 .depth {
+    background: #fff;
+    border: 1px solid #f0dfc9;
+    border-radius: 14px;
+    padding: 14px 16px 10px;
+  }
+  .c1 .depth-dots {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .c1 .depth-dots i {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #ecd9c4;
+  }
+  .c1 .depth-dots i.done { background: var(--c1-terra); }
+  .c1 .depth-dots i.here {
+    background: #fff;
+    border: 3px solid var(--c1-terra);
+    width: 14px; height: 14px;
+  }
+  .c1 .depth-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #b09a88;
+  }
+  .c1 .depth-note {
+    font-size: 13px;
+    color: #7a5a6b;
+    margin-top: 10px;
+  }
+
+  .c1 .btn { background: var(--c1-terra); color: #fff; margin-top: 18px; }
+  .c1 .btn.ghost { color: var(--c1-terra); margin-top: 4px; }
+  .c1 .fineprint {
+    font-size: 12px;
+    color: #b09a88;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  .c1 .beatbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #b09a88;
+    padding: 4px 0 10px;
+  }
+  .c1 .minidots { display: flex; gap: 3px; }
+  .c1 .minidots i { width: 5px; height: 5px; border-radius: 50%; background: #ecd9c4; }
+  .c1 .minidots i.done { background: var(--c1-terra); }
+
+  .c1 .chip { background: #f9e4d2; color: var(--c1-terra); }
+
+  .c1 .beat-title {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 10px 0 12px;
+  }
+
+  .c1 .bubble {
+    background: #fff;
+    border: 1px solid #f0dfc9;
+    border-radius: 16px 16px 16px 4px;
+    padding: 14px 16px;
+  }
+  .c1 .speaker {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c1-terra);
+    margin-bottom: 4px;
+  }
+  .c1 .line {
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .c1 .say-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .c1 .play { background: var(--c1-plum); color: #fff; }
+  .c1 .say-hint { font-size: 12.5px; color: #b09a88; }
+
+  .c1 .insight {
+    font-size: 14px;
+    line-height: 1.45;
+    color: #6d4a5e;
+    border-left: 3px solid var(--c1-apricot);
+    padding-left: 12px;
+  }
+  .c1 .move {
+    background: #fdf0e5;
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 12.5px;
+    color: #8a5a3e;
+    margin-bottom: 12px;
+  }
+  .c1 .move b {
+    display: block;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c1-terra);
+    margin-bottom: 2px;
+  }
+
+  .c1 .peek {
+    position: absolute;
+    right: -6px;
+    top: 130px;
+    bottom: 130px;
+    width: 22px;
+    background: #fff;
+    border: 1px solid #f0dfc9;
+    border-radius: 16px 0 0 16px;
+    box-shadow: -6px 0 14px rgba(74,43,63,0.08);
+  }
+  .c1 .swipe-hint {
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #b09a88;
+    padding: 10px 0 4px;
+  }
+
+  .c1 .end-open {
+    font-size: 14px;
+    color: #b09a88;
+    text-align: center;
+    margin: 18px 0 20px;
+  }
+  .c1 .principle-card {
+    background: #fff;
+    border: 1px solid #f0dfc9;
+    border-radius: 14px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+  }
+  .c1 .principle-card h4 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--c1-terra);
+    margin-bottom: 3px;
+  }
+  .c1 .principle-card p { font-size: 13.5px; color: #6d4a5e; }
+  .c1 .end-ask {
+    font-size: 21px;
+    font-weight: 800;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    margin: 18px 0 6px;
+  }
+  .c1 .end-send {
+    font-size: 14px;
+    color: #7a5a6b;
+  }
+
+  /* ============ Concept 2: The Table Read ============ */
+
+  .c2 .phone { background: var(--c2-paper); color: var(--c2-ink); }
+
+  .c2 .masthead {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--c2-ribbon);
+    padding: 8px 0 4px;
+  }
+  .c2 h3.big {
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    margin-bottom: 18px;
+  }
+
+  .c2 .roles {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .c2 .roles span {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1.5px solid #d9d2c0;
+    color: #8a8171;
+  }
+  .c2 .roles span.on {
+    background: var(--c2-ink);
+    border-color: var(--c2-ink);
+    color: var(--c2-hi);
+  }
+
+  .c2 .cast {
+    background: #fff;
+    border: 1px solid #e8e1cf;
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+  .c2 .cast h4 {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8a8171;
+    margin-bottom: 8px;
+  }
+  .c2 .cast li {
+    list-style: none;
+    font-size: 13.5px;
+    padding: 3px 0;
+  }
+  .c2 .cast li b { font-weight: 700; }
+
+  .c2 .ribbon-card {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e8e1cf;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-top: 14px;
+  }
+  .c2 .ribbon-mark {
+    flex: none;
+    width: 14px;
+    height: 44px;
+    background: var(--c2-ribbon);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+  }
+  .c2 .ribbon-card p { font-size: 13.5px; }
+  .c2 .ribbon-card p b { font-weight: 700; }
+
+  .c2 .btn { background: var(--c2-ink); color: var(--c2-hi); margin-top: 16px; }
+  .c2 .btn.ghost { color: #8a8171; margin-top: 2px; }
+
+  .c2 .scene-head {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-bottom: 2px solid var(--c2-ink);
+    padding: 10px 0 8px;
+    margin-bottom: 14px;
+  }
+  .c2 .action {
+    font-size: 14px;
+    font-style: italic;
+    color: #6f675a;
+    margin-bottom: 16px;
+  }
+  .c2 .cue {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    margin-bottom: 4px;
+  }
+  .c2 .sline {
+    text-align: center;
+    font-size: 16.5px;
+    font-weight: 600;
+    line-height: 1.4;
+    max-width: 280px;
+    margin: 0 auto 16px;
+  }
+  .c2 .sline.mine {
+    background: var(--c2-hi);
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+  .c2 .direction {
+    font-size: 13px;
+    background: var(--c2-hi);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+  }
+  .c2 .direction b {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .c2 .note {
+    border-left: 3px solid var(--c2-ribbon);
+    background: #fdf3ef;
+    border-radius: 0 10px 10px 0;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #7c4437;
+    margin-bottom: 14px;
+  }
+  .c2 .note b {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    color: var(--c2-ribbon);
+  }
+  .c2 .tap-hint {
+    text-align: center;
+    font-size: 11.5px;
+    color: #a89e8a;
+    margin-bottom: 8px;
+  }
+  .c2 .run-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .c2 .run-row .btn { flex: 1; margin-top: 0; }
+  .c2 .timer {
+    flex: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8a8171;
+    border: 1.5px solid #d9d2c0;
+    border-radius: 999px;
+    padding: 8px 12px;
+  }
+
+  .c2 .side-item {
+    background: #fff;
+    border: 1px solid #e8e1cf;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .c2 .tick {
+    flex: none;
+    width: 22px; height: 22px;
+    border-radius: 7px;
+    border: 2px solid #d9d2c0;
+    margin-top: 2px;
+  }
+  .c2 .tick.done {
+    background: var(--c2-ink);
+    border-color: var(--c2-ink);
+    position: relative;
+  }
+  .c2 .tick.done::after {
+    content: "";
+    position: absolute;
+    left: 6px; top: 3px;
+    width: 5px; height: 9px;
+    border-right: 2.5px solid var(--c2-hi);
+    border-bottom: 2.5px solid var(--c2-hi);
+    transform: rotate(40deg);
+  }
+  .c2 .side-item q {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    display: block;
+  }
+  .c2 .side-item small {
+    display: block;
+    font-size: 11.5px;
+    color: #8a8171;
+    margin-top: 3px;
+  }
+  .c2 .sides-close {
+    font-size: 14px;
+    color: #6f675a;
+    text-align: center;
+    margin-top: 10px;
+    font-style: italic;
+  }
+  .c2 .share-note {
+    font-size: 12.5px;
+    color: #8a8171;
+    background: #fff;
+    border: 1px dashed #d9d2c0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-top: 12px;
+  }
+
+  /* ============ Concept 3: The Floor ============ */
+
+  .c3 .phone { background: var(--c3-sand); color: #33413c; }
+  .c3 .pixel { background-color: #6c8a80; }
+
+  .c3 .map-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 0 12px;
+  }
+  .c3 .map-title h3 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+  .c3 .map-title small { font-size: 12px; color: #8a7f66; }
+
+  .c3 .room {
+    background: #faf5e9;
+    border: 1.5px solid #e0d3b4;
+    border-radius: 14px;
+    padding: 10px 14px 12px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .c3 .room.deep { background: #eef3ee; border-color: #c4d4c9; }
+  .c3 .room h4 {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8a7f66;
+    margin-bottom: 8px;
+  }
+  .c3 .room.deep h4 { color: var(--c3-teal); }
+  .c3 .lanes { display: flex; justify-content: space-between; }
+  .c3 .lane { display: flex; gap: 8px; }
+  .c3 .lane.center { margin: 0 auto; }
+  .c3 .stop {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 2px solid #d6c8a5;
+    background: #fff;
+    color: #a1977f;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    position: relative;
+  }
+  .c3 .stop span {
+    position: absolute;
+    top: 36px;
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: #a1977f;
+  }
+  .c3 .stop.fd {
+    background: #bd6a3f;
+    border-color: #bd6a3f;
+    color: #fff;
+  }
+  .c3 .stop.da {
+    background: var(--c3-teal);
+    border-color: var(--c3-teal);
+    color: #fff;
+  }
+  .c3 .stop.dr {
+    background: var(--c3-glow);
+    border-color: var(--c3-glow);
+    color: #4a3a12;
+  }
+  .c3 .legend {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    font-size: 11px;
+    color: #8a7f66;
+    padding: 0 0 10px;
+  }
+  .c3 .legend i {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+  .c3 .legend .lfd { background: #bd6a3f; }
+  .c3 .legend .lda { background: var(--c3-teal); }
+  .c3 .legend .ldr { background: var(--c3-glow); }
+  .c3 .stop.here {
+    border-color: var(--c3-glow);
+    box-shadow: 0 0 0 4px rgba(232, 182, 76, 0.35);
+    color: var(--c3-teal);
+  }
+  .c3 .lanes.tall { padding-bottom: 16px; }
+  .c3 .arrows {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #b3a88c;
+    padding: 2px 6px 6px;
+  }
+
+  .c3 .pin {
+    background: var(--c3-teal);
+    color: #fff;
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .c3 .pin b { font-size: 14.5px; display: block; }
+  .c3 .pin small { font-size: 12px; opacity: 0.85; }
+  .c3 .pin .go {
+    flex: none;
+    background: var(--c3-glow);
+    color: #4a3a12;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 9px 14px;
+    border-radius: 999px;
+  }
+
+  .c3 .dim {
+    background: #d9d2bf;
+    border-radius: 12px;
+    height: 128px;
+    opacity: 0.55;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8a7f66;
+  }
+  .c3 .sheet {
+    background: #fff;
+    border-radius: 22px 22px 0 0;
+    margin: -26px -20px 0;
+    padding: 16px 22px 0;
+    flex: 1;
+    box-shadow: 0 -10px 26px rgba(63, 111, 106, 0.16);
+    display: flex;
+    flex-direction: column;
+  }
+  .c3 .grab {
+    width: 44px; height: 5px;
+    border-radius: 3px;
+    background: #ddd5c2;
+    margin: 0 auto 12px;
+  }
+  .c3 .sheet-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .c3 .chip { background: #e4efe7; color: var(--c3-teal); }
+  .c3 .peakchip { background: var(--c3-glow); color: #4a3a12; }
+  .c3 .sheet h3 { font-size: 23px; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 10px; }
+  .c3 .s-speaker {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c3-teal);
+    margin: 12px 0 4px;
+  }
+  .c3 .s-line { font-size: 15.5px; font-weight: 600; line-height: 1.4; }
+  .c3 .s-insight {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: #5d6b60;
+    border-left: 3px solid var(--c3-glow);
+    padding-left: 12px;
+    margin: 12px 0 8px;
+  }
+  .c3 .s-move {
+    font-size: 11.5px;
+    color: #8a7f66;
+    margin-bottom: 6px;
+  }
+  .c3 .s-move b {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c3-teal);
+    margin-right: 4px;
+  }
+  .c3 .sheet-actions { display: flex; gap: 10px; align-items: center; margin-top: auto; padding-bottom: 14px; }
+  .c3 .play { background: var(--c3-teal); color: #fff; }
+  .c3 .next {
+    margin-left: auto;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--c3-teal);
+  }
+
+  .c3 .sent-head {
+    text-align: center;
+    padding: 22px 0 16px;
+  }
+  .c3 .avatar {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--c3-teal);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+  }
+  .c3 .sent-head h3 { font-size: 21px; font-weight: 800; }
+  .c3 .sent-head p { font-size: 13.5px; color: #8a7f66; }
+  .c3 .zoom {
+    background: #faf5e9;
+    border: 1.5px solid #e0d3b4;
+    border-radius: 16px;
+    padding: 18px 16px 22px;
+    margin: 14px 0;
+    text-align: center;
+  }
+  .c3 .zoom h4 {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8a7f66;
+    margin-bottom: 14px;
+  }
+  .c3 .zoom .stop { margin: 0 auto; width: 46px; height: 46px; font-size: 15px; }
+  .c3 .zoom .stopname {
+    font-size: 15px;
+    font-weight: 700;
+    margin-top: 12px;
+    color: #33413c;
+  }
+  .c3 .zoom .stopsub { font-size: 12px; color: #8a7f66; }
+  .c3 .coach-note {
+    background: #fff;
+    border: 1px solid #e0d3b4;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+    font-style: italic;
+    color: #5d6b60;
+  }
+  .c3 .btn { background: var(--c3-teal); color: #fff; margin-top: 14px; }
+  .c3 .sent-fine {
+    text-align: center;
+    font-size: 12px;
+    color: #b3a88c;
+    margin-top: 8px;
+  }
+
+  .spacer { flex: 1; }
+</style>
+
+<header class="brief">
+  <h1>The Alcan Way on a phone: three concepts</h1>
+  <p>Three interaction models for the Alcan Way pillar of the new Explore tab, each built from the locked 13-beat sequence: the journey stages showing excellence in action, with each beat pairing the visible moment against the role-specific move behind it. Every concept answers the same six questions: how you enter and re-enter from a plain tab, how stages and beats are staged, how dialogue gets said instead of skimmed, how the principles and your own role's moves surface, what finishing leaves you with, and how a lead points someone at a single beat.</p>
+</header>
+
+<main class="concepts">
+
+  <!-- ================= CONCEPT 1 ================= -->
+  <section class="concept c1">
+    <header>
+      <h2>The Walk</h2>
+      <p class="metaphor">A pocket film, one card per moment</p>
+      <div class="rationale">
+        <h3>Optimizes for</h3>
+        <p>The first full watch-through. One beat per full-screen card shows excellence in order, and every card pairs the visible moment with the role-specific Pro Move behind it, so the "what" and the "how" arrive together. It honors the client's swipe instinct and translates the desktop's out-and-back camera into a depth strip you can feel. Interruptions are cheap: it reopens on the card you left, remembered on the device, nothing stored anywhere else.</p>
+        <h3>Costs</h3>
+        <p>Linear by nature, so jumping to one beat mid-coaching takes a beat index rather than a natural gesture. Dialogue is heard and echoed more than rehearsed. Needs all 13 cards staged with art before it feels finished.</p>
+      </div>
+    </header>
+    <div class="phones">
+
+      <figure class="shot">
+        <div class="phone">
+          <div class="statusbar"><span>9:41</span><span>LTE</span></div>
+          <div class="screen">
+            <div class="explore-tabs"><span class="over">Explore</span><nav><span>My Craft</span><span class="on">The Alcan Way</span></nav></div>
+            <div class="pixel" style="height:180px;">pixel scene: the lobby, lights on, nobody at the desk yet</div>
+            <h3 class="cover-title">The Alcan Way</h3>
+            <p class="cover-sub">One family's visit, start to finish. Excellence shown where it happens, and the move behind each moment.</p>
+            <div class="depth">
+              <div class="depth-dots">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+              <div class="depth-labels"><span>lobby</span><span>the exam, deepest point</span><span>lobby</span></div>
+              <p class="depth-note">Thirteen beats, out and back. About 5 minutes.</p>
+            </div>
+            <button class="btn">Start the walk</button>
+            <button class="btn ghost">Pick up where you left off</button>
+            <div class="spacer"></div>
+            <p class="fineprint">Your spot is remembered on this phone, nowhere else.</p>
+          </div>
+          <div class="homebar"></div>
+        </div>
+        <figcaption><strong>Entry and re-entry.</strong> An ordinary tab inside Explore, no gateway. The depth strip is a table of contents for the out-and-back walk; resume is a light device-local nicety, not tracked progress.</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="phone">
+          <div class="statusbar"><span>9:41</span><span>LTE</span></div>
+          <div class="screen">
+            <div class="beatbar">
+              <span>Beat 4 of 13 · Transition</span>
+              <span class="minidots"><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            </div>
+            <div class="pixel" style="height:175px;">pixel scene: the lobby pickup, Jordan kneeling to Johnny</div>
+            <div style="margin:12px 0 0;"><span class="chip">Own the First Moment</span></div>
+            <h3 class="beat-title">The Handoff</h3>
+            <div class="bubble">
+              <div class="speaker">Jordan · Dental Assistant</div>
+              <div class="line">"Hi Johnny! I'm Jordan, I'll be taking care of you today."</div>
+            </div>
+            <div class="say-row">
+              <span class="play">Hear it</span>
+              <span class="say-hint">Then say it once, out loud.</span>
+            </div>
+            <div class="move">
+              <b>The move · Dental Assistant</b>
+              I always greet the patient by name, smile with eye contact, and introduce myself by name.
+            </div>
+            <p class="insight">Nobody shouted a name across the room. Someone came and knelt down. For a second, the kid wasn't a chart number.</p>
+            <div class="spacer"></div>
+            <p class="swipe-hint">Swipe for the walk back</p>
+          </div>
+          <div class="c1-peek peek"></div>
+          <div class="homebar"></div>
+        </div>
+        <figcaption><strong>Mid-experience.</strong> Every card pairs the visible moment with the Pro Move behind it, tagged to the role that owns it. The spoken line has a "hear it, then say it" ritual, the principle is a label on the moment, and the next card peeks at the edge.</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="phone">
+          <div class="statusbar"><span>9:41</span><span>LTE</span></div>
+          <div class="screen">
+            <p class="end-open">The office is empty now. The family is in the car. Every part of that visit was somebody's move.</p>
+            <div class="principle-card">
+              <h4>Own the First Moment</h4>
+              <p>The greeting, the lobby pickup, the doctor's hello. Every role has one.</p>
+            </div>
+            <div class="principle-card">
+              <h4>Master the Moves</h4>
+              <p>Tell, show, do. Hand off in the room, out loud. Ask before telling.</p>
+            </div>
+            <div class="principle-card">
+              <h4>Be the Reason</h4>
+              <p>The blanket. The walk-out. A goodbye that uses their names.</p>
+            </div>
+            <p class="end-ask">Your first moment is happening tomorrow. Do you know which one it is?</p>
+            <p class="end-send">You just pictured someone who's always the reason. Send it to them.</p>
+            <button class="btn">Send The Walk to a teammate</button>
+            <div class="spacer"></div>
+            <p class="fineprint">Or send just one moment. Every beat has its own link.</p>
+          </div>
+          <div class="homebar"></div>
+        </div>
+        <figcaption><strong>The ending.</strong> Beat 13 as a keepsake: the three principles recapped as what you just watched, the role question, and the send prompt. Completing the Way leaves you with a question and a person to send it to.</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <!-- ================= CONCEPT 2 ================= -->
+  <section class="concept c2">
+    <header>
+      <h2>The Table Read</h2>
+      <p class="metaphor">A script you perform, not a story you watch</p>
+      <div class="rationale">
+        <h3>Optimizes for</h3>
+        <p>Dialogue as the product. The lines in the beat map are meant to be said in a real lobby, so this concept stages the Way as a five-scene script where your role's lines are highlighted, insights are director's notes in the margin, and the ending hands you your sides: every line that's yours, on one card. Strongest for coaching and rehearsal, and the fastest surface for a two-minute revisit before a meeting.</p>
+        <h3>Costs</h3>
+        <p>Deliberately gives up the pixel art and the scene-craft, so it teaches the moves better than it shows the experience whole. Needs per-role line mapping, and beats with no dialogue (the arrival, the walk back) become stage directions rather than moments.</p>
+      </div>
+    </header>
+    <div class="phones">
+
+      <figure class="shot">
+        <div class="phone">
+          <div class="statusbar"><span>9:41</span><span>LTE</span></div>
+          <div class="screen">
+            <div class="explore-tabs"><span class="over">Explore</span><nav><span>My Craft</span><span class="on">The Alcan Way</span></nav></div>
+            <h3 class="big">Five scenes.<br>One family.<br>You already have a part.</h3>
+            <div class="roles">
+              <span class="on">Front Desk</span>
+              <span>Dental Asst</span>
+              <span>Doctor</span>
+            </div>
+            <div class="cast">
+              <h4>Cast</h4>
+              <ul>
+                <li><b>Jessica</b>, Johnny's mom</li>
+                <li><b>Johnny</b>, five, half hidden behind her</li>
+                <li><b>Maria</b>, front desk. This is you.</li>
+                <li><b>Jordan</b>, dental assistant</li>
+                <li><b>Dr. Patel</b>, the doctor they're told about before they meet her</li>
+              </ul>
+            </div>
+            <div class="ribbon-card">
+              <div class="ribbon-mark"></div>
+              <p>Your ribbon is in <b>Scene 3, The Chair</b>. It lives on this phone; the script just opens where you left it.</p>
+            </div>
+            <button class="btn">Open to your ribbon</button>
+            <button class="btn ghost">Start at Scene 1, Check-In</button>
+            <div class="spacer"></div>
+          </div>
+          <div class="homebar"></div>
+        </div>
+        <figcaption><strong>Entry and re-entry.</strong> A plain tab switch lands on the cast page. Pick who you read as, and a device-local bookmark ribbon marks your place; nothing is tracked beyond the phone in your hand.</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="phone">
+          <div class="statusbar"><span>9:41</span><span>LTE</span></div>
+          <div class="screen">
+            <div class="scene-head">Scene 4 · The Return · hallway to front</div>
+            <p class="action">Jordan walks the family up the hallway to the desk. Not pointing the way. Walking it, the whole way.</p>
+            <div class="cue">JORDAN</div>
+            <p class="sline">"Maria, this is Jessica and Johnny. He did awesome today."</p>
+            <div class="direction">
+              <b>Your moment, Front Desk</b>
+              Take the baton where they can see it. Greet Johnny by name before you touch the keyboard.
+            </div>
+            <div class="note">
+              <b>Director's note · Be the Reason</b>
+              The handoff between two people is exactly where families get dropped, or don't. Nobody let go of them.
+            </div>
+            <p class="tap-hint">Tap any line for its director's note</p>
+            <div class="spacer"></div>
+            <div class="run-row">
+              <button class="btn">Run this scene aloud</button>
+              <span class="timer">90 sec</span>
+            </div>
+          </div>
+          <div class="homebar"></div>
+        </div>
+        <figcaption><strong>Mid-experience.</strong> Beats read as screenplay: action line, cue, spoken line. Your role's cues are marked, principles arrive as director's notes on the line they belong to, and "run this scene aloud" makes saying it the interaction.</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="phone">
+          <div class="statusbar"><span>9:41</span><span>LTE</span></div>
+          <div class="screen">
+            <p class="masthead">Your sides · Front Desk</p>
+            <h3 class="big" style="font-size:23px;">Every line that's yours, on one card.</h3>
+            <div class="side-item">
+              <div class="tick done"></div>
+              <div>
+                <q>"Welcome in, Jessica! And this must be Johnny."</q>
+                <small>Scene 1 · The Greeting · stand up first, then say it</small>
+              </div>
+            </div>
+            <div class="side-item">
+              <div class="tick done"></div>
+              <div>
+                <q>"You'll be seeing Dr. Patel. She did her residency at Children's Hospital in Baltimore. You're going to love her."</q>
+                <small>Scene 1 · Preview the Doctor · one real thing, said warmly</small>
+              </div>
+            </div>
+            <div class="side-item">
+              <div class="tick"></div>
+              <div>
+                <q>"Thanks so much, Jessica. Johnny was a rockstar. See you in August!"</q>
+                <small>Scene 5 · The Goodbye · the last moment is a first moment for next time</small>
+              </div>
+            </div>
+            <p class="sides-close">That's the whole part. Three lines, and a first moment that's yours to own.</p>
+            <div class="share-note">Any scene has its own link. A lead can send you straight to Scene 4, The Walk-Out, and the script opens on that line.</div>
+            <div class="spacer"></div>
+          </div>
+          <div class="homebar"></div>
+        </div>
+        <figcaption><strong>The ending, and sharing.</strong> Completing the read leaves you with your sides: a personal, practicable line sheet with said-it-aloud checks. Scene links are how a lead assigns one beat.</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <!-- ================= CONCEPT 3 ================= -->
+  <section class="concept c3">
+    <header>
+      <h2>The Floor</h2>
+      <p class="metaphor">Walk the floor plan, stop by stop</p>
+      <div class="rationale">
+        <h3>Optimizes for</h3>
+        <p>Role legibility and coaching. The office itself is the interface: an out-and-back path through the lobby, hallway, and exam room, with each beat as a numbered stop colored by the role whose move it is, so a front desk person, an assistant, and a doctor each see their own stops at a glance. Every stop is a place with a stable link, so "go look at the walk-out beat" is literal. It's stateless by design: the map is a table of contents you can walk in order or dip into, nothing to track. At the last stop the lights go out, one phone glows with the review, and the question turns to your role: which of these stops is yours tomorrow?</p>
+        <h3>Costs</h3>
+        <p>First-timers can wander out of order and blunt the arc, so the first walk needs a gentle "in order" default. The map is the hardest artwork and layout in the set, and dialogue lives one tap deep inside sheets rather than in your face.</p>
+      </div>
+    </header>
+    <div class="phones">
+
+      <figure class="shot">
+        <div class="phone">
+          <div class="statusbar"><span>9:41</span><span>LTE</span></div>
+          <div class="screen">
+            <div class="explore-tabs"><span class="over">Explore</span><nav><span>My Craft</span><span class="on">The Alcan Way</span></nav></div>
+            <div class="legend">
+              <span><i class="lfd"></i>Front Desk</span>
+              <span><i class="lda"></i>Assistant</span>
+              <span><i class="ldr"></i>Doctor</span>
+            </div>
+            <div class="arrows"><span>the way in</span><span>the way out</span></div>
+            <div class="room">
+              <h4>Front of House</h4>
+              <div class="lanes tall">
+                <div class="lane">
+                  <div class="stop">1<span>arrival</span></div>
+                  <div class="stop fd">2<span>greeting</span></div>
+                  <div class="stop fd">3<span>dr. patel</span></div>
+                </div>
+                <div class="lane">
+                  <div class="stop fd">11<span>goodbye</span></div>
+                  <div class="stop">12<span>review</span></div>
+                  <div class="stop">13<span>send it</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="room">
+              <h4>The Hallway</h4>
+              <div class="lanes tall">
+                <div class="lane">
+                  <div class="stop da">4<span>handoff</span></div>
+                  <div class="stop">5<span>walk back</span></div>
+                </div>
+                <div class="lane">
+                  <div class="stop da">10<span>the seam</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="room deep">
+              <h4>Exam Room · the deepest point</h4>
+              <div class="lanes tall">
+                <div class="lane center">
+                  <div class="stop da">6<span>tell show do</span></div>
+                  <div class="stop dr">7<span>warm handoff</span></div>
+                  <div class="stop dr">8<span>ask first</span></div>
+                  <div class="stop da">9<span>blanket</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="spacer"></div>
+            <div class="pin">
+              <div>
+                <b>Walk it in order, lobby to lobby</b>
+                <small>About 5 minutes. Or tap any stop.</small>
+              </div>
+              <span class="go">Start</span>
+            </div>
+          </div>
+          <div class="homebar"></div>
+        </div>
+        <figcaption><strong>Entry.</strong> A plain tab lands on the whole Way at once: rooms, the out-and-back path, and stops colored by the role whose move lives there. A front desk hire spots their own stops immediately. Nothing is tracked; the map is a table of contents.</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="phone">
+          <div class="statusbar"><span>9:41</span><span>LTE</span></div>
+          <div class="screen">
+            <div class="dim">the floor, dimmed behind</div>
+            <div class="sheet">
+              <div class="grab"></div>
+              <div class="sheet-top">
+                <span class="chip">Stop 7 · Exam Room</span>
+                <span class="chip peakchip">The Peak</span>
+              </div>
+              <h3>The Warm Handoff</h3>
+              <div class="pixel" style="height:150px;">pixel scene: Dr. Patel enters, the family hears everything</div>
+              <div class="s-speaker">Jordan, presenting in the room</div>
+              <p class="s-line">"Dr. Patel, this is Johnny and his mom Jessica. He's five, upper right today, a little pain, history unchanged, X-rays done."</p>
+              <p class="s-insight">No private hallway conference. The family heard all of it. In the room, they see a team. In the hallway, they wonder what they're not being told.</p>
+              <p class="s-move"><b>The moves</b>The assistant presents the family to the doctor in the room; the doctor greets the child by name.</p>
+              <div class="sheet-actions">
+                <span class="play">Hear it</span>
+                <span class="next">Next stop: Ask Before Telling</span>
+              </div>
+            </div>
+          </div>
+          <div class="homebar"></div>
+        </div>
+        <figcaption><strong>Mid-experience.</strong> A stop opens as a sheet over the dimmed floor: scene, the line said in the room, the insight, and the role moves behind the moment. The peak of the visit is named as a place, and the path onward is one tap.</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="phone">
+          <div class="statusbar"><span>9:41</span><span>LTE</span></div>
+          <div class="screen">
+            <div class="sent-head">
+              <div class="avatar">A</div>
+              <h3>Ariyana sent you a stop</h3>
+              <p>from The Alcan Way</p>
+            </div>
+            <div class="zoom">
+              <h4>Hallway 2 · the way out</h4>
+              <div class="stop here">10</div>
+              <p class="stopname">The Seam, the walk-out</p>
+              <p class="stopsub">"Maria, this is Jessica and Johnny. He did awesome today."</p>
+            </div>
+            <div class="coach-note">"Before Thursday's huddle, walk this one. It's the part we talked about: nobody lets go of the family between rooms."</div>
+            <button class="btn">Walk this stop</button>
+            <p class="sent-fine">Two minutes, right on the map.</p>
+            <div class="spacer"></div>
+          </div>
+          <div class="homebar"></div>
+        </div>
+        <figcaption><strong>Sharing.</strong> The coaching move this concept is built for: a lead sends a stop, the recipient lands on the map zoomed to that place, with the coach's note attached. Because stops are stateless places, the link is all there is to it.</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+</main>

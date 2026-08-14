@@ -11,10 +11,13 @@ const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satu
 
 type Pill = 'missing' | 'open' | 'in';
 
+// Pair each -bg tint with its darker -ink token, not the full-strength
+// status color — the full-strength colors fail contrast on the -bg tints
+// (~3:1). See round-1 section A for the -ink tokens.
 const PILL_CONFIG: Record<Pill, { label: string; bg: string; ink: string }> = {
-  missing: { label: 'Missing', bg: '--status-missing-bg', ink: '--status-missing' },
-  open: { label: 'Open', bg: '--status-late-bg', ink: '--status-late' },
-  in: { label: 'In', bg: '--status-complete-bg', ink: '--status-complete' },
+  missing: { label: 'Missing', bg: '--status-missing-bg', ink: '--missing-ink' },
+  open: { label: 'Open', bg: '--status-late-bg', ink: '--late-ink' },
+  in: { label: 'In', bg: '--status-complete-bg', ink: '--complete-ink' },
 };
 
 function StatusPill({ pill }: { pill: Pill }) {

@@ -67,10 +67,13 @@ export default function TeamStaffPage() {
     return 'open' as const;
   }, [rawData]);
 
+  // Pair each -bg tint with its darker -ink token, not the full-strength
+  // status color — the full-strength colors fail contrast on the -bg tints
+  // (~3:1). See round-1 section A for the -ink tokens.
   const PILL_CONFIG = {
-    missing: { label: 'Missing', bg: '--status-missing-bg', ink: '--status-missing' },
-    open: { label: 'Open', bg: '--status-late-bg', ink: '--status-late' },
-    in: { label: 'In', bg: '--status-complete-bg', ink: '--status-complete' },
+    missing: { label: 'Missing', bg: '--status-missing-bg', ink: '--missing-ink' },
+    open: { label: 'Open', bg: '--status-late-bg', ink: '--late-ink' },
+    in: { label: 'In', bg: '--status-complete-bg', ink: '--complete-ink' },
   } as const;
 
   const { data: evalData } = useQuery({

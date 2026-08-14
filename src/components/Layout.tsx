@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import alcanLogo from '@/assets/alcan-logo.png';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -82,7 +82,14 @@ export default function Layout() {
   
   const location = useLocation();
   const { toast } = useToast();
-  
+
+  // Mobile shell: <main> (not the window) is the scroller, so route-change
+  // scroll restoration has to target it explicitly.
+  const mobileMainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    mobileMainRef.current?.scrollTo(0, 0);
+  }, [location.pathname]);
+
   // Persist and restore route on page refresh
   useRoutePersistence();
 
@@ -230,21 +237,25 @@ export default function Layout() {
     );
   }
 
-  // Mobile shell: no sidebar, no hamburger — sticky header reduced to the
-  // Alcan mark + wordmark, page content, then the bottom tab bar. Gated by
+  // Mobile shell: no sidebar, no hamburger — header reduced to the Alcan
+  // mark + wordmark, page content, then the bottom tab bar. Gated by
   // useMobileShell() (mobile viewport + PWA flag); everyone else falls
   // through to the unchanged sidebar layout below.
+  //
+  // The outer column is a fixed-height viewport (not min-h-screen, which
+  // grows with content) so <main> is the only scroller — otherwise the
+  // document itself scrolls and the in-flow tab bar rides away with it.
   if (isMobileShell) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-card flex-none sticky top-0 z-10">
+      <div className="h-screen supports-[height:100dvh]:h-[100dvh] bg-background flex flex-col">
+        <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-card flex-none">
           <img src={alcanLogo} alt="Alcan" className="h-6 object-contain dark:invert" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             Pro Moves
           </span>
         </header>
 
-        <main className="flex-1 overflow-auto w-full p-4">
+        <main ref={mobileMainRef} className="flex-1 overflow-y-auto overflow-x-hidden w-full p-4">
           <div className="mb-4 empty:mb-0">
             <PendingSurveysCard />
           </div>

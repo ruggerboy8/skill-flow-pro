@@ -1,11 +1,14 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, BookOpen, TrendingUp, MoreHorizontal } from 'lucide-react';
+import { Home, Compass, TrendingUp, MoreHorizontal } from 'lucide-react';
 
 type TabKey = 'home' | 'my-role' | 'performance' | 'more';
 
+// Tab label is "Explore" (an encyclopedia you explore, not a book you read);
+// the pillar inside keeps the name "My Role". Route is unchanged — see
+// docs/features/explore-my-role-build-instructions.md section A.
 const TABS: { key: TabKey; label: string; to: string; icon: typeof Home }[] = [
   { key: 'home', label: 'Home', to: '/', icon: Home },
-  { key: 'my-role', label: 'My Role', to: '/my-role', icon: BookOpen },
+  { key: 'my-role', label: 'Explore', to: '/my-role', icon: Compass },
   { key: 'performance', label: 'Performance', to: '/performance', icon: TrendingUp },
   { key: 'more', label: 'More', to: '/more', icon: MoreHorizontal },
 ];

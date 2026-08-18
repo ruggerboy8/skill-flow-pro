@@ -1,0 +1,248 @@
+<title>CLI Field Notes</title>
+<style>
+  :root {
+    --paper: #f3f4f7;
+    --card: #ffffff;
+    --ink: #14181f;
+    --ink-soft: #565f6e;
+    --line: #dde1e7;
+    --accent: #2a5fd9;
+    --accent-soft: #e9effd;
+    --accent-ink: #1a3f99;
+    --mono-bg: #eef0f4;
+    --mono-ink: #1a3f99;
+    --good: #0e8f7a;
+    --good-soft: #e3f5f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0f1216;
+      --card: #171b21;
+      --ink: #e8eaed;
+      --ink-soft: #9aa3b2;
+      --line: #262b33;
+      --accent: #6e9bff;
+      --accent-soft: #1c2a4a;
+      --accent-ink: #bfd3ff;
+      --mono-bg: #1c2028;
+      --mono-ink: #bfd3ff;
+      --good: #4cd3b6;
+      --good-soft: #113230;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0f1216;
+    --card: #171b21;
+    --ink: #e8eaed;
+    --ink-soft: #9aa3b2;
+    --line: #262b33;
+    --accent: #6e9bff;
+    --accent-soft: #1c2a4a;
+    --accent-ink: #bfd3ff;
+    --mono-bg: #1c2028;
+    --mono-ink: #bfd3ff;
+    --good: #4cd3b6;
+    --good-soft: #113230;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+
+  header.page h1 {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0 0 8px;
+  }
+  header.page p {
+    font-size: 15.5px;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0;
+  }
+
+  section.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 22px 24px 24px;
+    margin-top: 18px;
+  }
+  section.card h2 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+  section.card > .dek {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0 0 14px;
+  }
+
+  ul.notes {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  ul.notes li {
+    font-size: 14.5px;
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+  }
+  ul.notes li:first-child { border-top: none; padding-top: 0; }
+  ul.notes li:last-child { padding-bottom: 0; }
+  ul.notes b { font-weight: 650; }
+
+  .try {
+    display: inline-block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    background: var(--mono-bg);
+    color: var(--mono-ink);
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+
+  .cmd-table {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 9px 16px;
+    align-items: baseline;
+  }
+  .cmd-table .cmd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    background: var(--mono-bg);
+    color: var(--mono-ink);
+    padding: 3px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .cmd-table .desc {
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  .say {
+    display: block;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--ink);
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    border-radius: 0 8px 8px 0;
+    margin: 10px 0;
+  }
+
+  .callout {
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: var(--good-soft);
+    border: 1px solid var(--good);
+    border-radius: 8px;
+    font-size: 13.5px;
+  }
+  .callout b { color: var(--good); }
+
+  footer {
+    margin-top: 32px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    text-align: center;
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="page">
+    <h1>CLI Field Notes</h1>
+    <p>Working habits for Warp + Claude Code, written for how you actually think about product work — not a generic terminal tutorial.</p>
+  </header>
+
+  <section class="card">
+    <h2>Starting and resuming</h2>
+    <ul class="notes">
+      <li>Ritual: <span class="try">cd</span> into the repo, then <span class="try">claude</span>. That's it.</li>
+      <li><b>Picking up where you left off?</b> Don't start fresh — use <span class="try">claude --continue</span>, or <span class="try">claude --resume</span> to choose from recent sessions. A new conversation forgets everything about what you were mid-way through.</li>
+      <li><b>One feature, one session.</b> Open a new Warp tab for unrelated work instead of steering one conversation through two different things.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>The habits that keep you safe</h2>
+    <ul class="notes">
+      <li><b>Plan mode before anything non-trivial.</b> <span class="try">shift+tab</span> cycles into it — Claude shows you the plan before touching a file. This is your approval gate, built into the tool itself.</li>
+      <li><b>Interrupting is always safe.</b> <span class="try">Esc</span> stops Claude mid-action. Don't let a "wait, that's not it" moment run to completion out of politeness.</li>
+      <li><b>There's a safety net before git.</b> Claude Code tracks the edits it makes within a session. If something looks wrong, just say it:</li>
+    </ul>
+    <span class="say">"Undo that last change, put the file back."</span>
+    <ul class="notes">
+      <li><b>Nothing should reach <code>main</code> without a PR you see first</b>, once the workflow kit's guard hook is in. Unsure? Just ask.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>How to talk to Claude</h2>
+    <p class="dek">Your instincts here are already right — describing behavior is the actual skill.</p>
+    <ul class="notes">
+      <li><b>Say the outcome, not the implementation.</b> "Coaches should be able to flag a favorite move" beats guessing at a component name.</li>
+      <li><b>Name the "who."</b> This week's lead-account bug only showed up for one persona. Say which account/role/screen matters when you ask for or test something.</li>
+      <li><b>Ask for plain English, as a standing habit</b> — not an admission of anything:</li>
+    </ul>
+    <span class="say">"Explain what you just did like I don't read code."</span>
+    <ul class="notes">
+      <li><b>Say when a plan feels off before you approve it.</b> One sentence now beats a redo later.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>The short command list</h2>
+    <p class="dek">Deliberately small — these are the ones that pay for themselves.</p>
+    <div class="cmd-table">
+      <span class="cmd">/model</span><span class="desc">see or switch which Claude model you're talking to</span>
+      <span class="cmd">/clear</span><span class="desc">wipe the conversation, start clean (not for resuming — for truly new work)</span>
+      <span class="cmd">/help</span><span class="desc">everything else, so you never memorize the full set</span>
+      <span class="cmd">/permissions</span><span class="desc">see and adjust what Claude can do without asking first</span>
+      <span class="cmd">/doctor</span><span class="desc">self-diagnose the Claude Code tool itself</span>
+      <span class="cmd">/init</span><span class="desc">regenerate CLAUDE.md if the project's own docs feel stale</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Cutting "may I do this?" fatigue</h2>
+    <p style="font-size:14.5px; margin:0;">Claude asks before anything it's unsure is safe — correct, but tiring for the same harmless repeats. Every few weeks, run:</p>
+    <div class="callout"><span class="try">/fewer-permission-prompts</span> — looks at recent sessions, finds the read-only actions you keep approving, adds them to an allowlist.</div>
+  </section>
+
+  <section class="card">
+    <h2>Long tasks and verification</h2>
+    <ul class="notes">
+      <li><b>Don't watch the spinner.</b> Ask Claude to run long things in the background and let you know when done.</li>
+      <li><b>The verification loop hasn't changed.</b> Visual or data-shaped work still gets checked on the Lovable branch preview, as the right persona, against the acceptance script. Everything else: ask for the QA report in plain language.</li>
+      <li><b>Ask what couldn't be verified, specifically.</b> "Not verifiable live" is a signal to act on, not a red flag.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>When the terminal looks broken</h2>
+    <p style="font-size:14.5px; margin:0;">Don't decode an error yourself. Paste the whole thing back:</p>
+    <span class="say">"What does this mean, and what should I do?"</span>
+    <p style="font-size:13px; color:var(--ink-soft); margin:8px 0 0;">Usually the fastest path either way, not just a fallback for when you're stuck.</p>
+  </section>
+
+  <footer>Source of truth: docs/dev/cli-best-practices.md — add to it as new habits earn their place.</footer>
+
+</div>

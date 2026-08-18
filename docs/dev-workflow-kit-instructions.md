@@ -7,6 +7,11 @@ proposal John approved in principle on 2026-08-18; the session executing
 this should still confirm each phase's plan with John before building it
 (that is the workflow being installed, so practice it).
 
+John's day-to-day habits for working in Warp + Claude Code (starting/
+resuming sessions, plan mode, verification, the short command list) are
+in `docs/dev/cli-best-practices.md`. Point him back there rather than
+re-explaining; add to it, don't duplicate it.
+
 ## Zero: orientation for the executing session
 
 Read, in order: `CLAUDE.md`, `docs/dev-workflow-redesign.md`,
